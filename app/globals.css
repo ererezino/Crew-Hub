@@ -2629,6 +2629,129 @@ html.dark .topbar {
   border-color: var(--status-success-border);
 }
 
+.analytics-toolbar {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.analytics-toolbar-actions {
+  display: grid;
+  align-content: end;
+  gap: 0.5rem;
+}
+
+.analytics-preset-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.analytics-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.analytics-metric-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.analytics-chart-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-chart-grid-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-chart-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.analytics-chart-span-two {
+  grid-column: span 2;
+}
+
+.analytics-list-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.analytics-chip-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.analytics-chip-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.55rem 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.analytics-skeleton {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.analytics-skeleton-toolbar,
+.analytics-skeleton-card,
+.analytics-skeleton-chart {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.analytics-skeleton-toolbar {
+  height: 5rem;
+}
+
+.analytics-skeleton-metrics {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.analytics-skeleton-card {
+  height: 6.5rem;
+}
+
+.analytics-skeleton-charts {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.analytics-skeleton-chart {
+  height: 18rem;
+}
+
 .payroll-withholding-note {
   border-color: var(--status-info-border);
   background: var(--status-info-bg);
@@ -3778,6 +3901,20 @@ html.dark .topbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .analytics-metric-grid,
+  .analytics-skeleton-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-chart-grid,
+  .analytics-skeleton-charts {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-chart-span-two {
+    grid-column: span 1;
+  }
+
   .expenses-metric-grid,
   .expenses-metric-skeleton-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3991,6 +4128,29 @@ html.dark .topbar {
   .performance-form-header,
   .performance-section-header,
   .performance-assignment-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .analytics-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-toolbar-actions {
+    justify-items: start;
+  }
+
+  .analytics-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .analytics-metric-grid,
+  .analytics-skeleton-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-chip-item {
     flex-direction: column;
     align-items: flex-start;
   }
