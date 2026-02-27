@@ -263,6 +263,80 @@ type SeedExpense = {
   reimbursementNotes?: string | null;
 };
 
+type SeedReviewCycleType = "quarterly" | "annual" | "probation";
+
+type SeedReviewCycleStatus = "draft" | "active" | "in_review" | "completed";
+
+type SeedReviewAssignmentStatus =
+  | "pending_self"
+  | "pending_manager"
+  | "in_review"
+  | "completed";
+
+type SeedReviewResponseType = "self" | "manager";
+
+type SeedReviewQuestionType = "rating" | "text";
+
+type SeedReviewQuestion = {
+  id: string;
+  title: string;
+  prompt: string;
+  type: SeedReviewQuestionType;
+  required: boolean;
+  maxLength?: number;
+};
+
+type SeedReviewSection = {
+  id: string;
+  title: string;
+  description: string;
+  questions: SeedReviewQuestion[];
+};
+
+type SeedReviewCycle = {
+  key: string;
+  name: string;
+  type: SeedReviewCycleType;
+  status: SeedReviewCycleStatus;
+  startOffsetDays: number;
+  endOffsetDays: number;
+  selfReviewDeadlineOffsetDays: number | null;
+  managerReviewDeadlineOffsetDays: number | null;
+  createdByKey: SeedMember["key"];
+};
+
+type SeedReviewTemplate = {
+  key: string;
+  name: string;
+  sections: SeedReviewSection[];
+  createdByKey: SeedMember["key"];
+};
+
+type SeedReviewAssignment = {
+  key: string;
+  cycleKey: SeedReviewCycle["key"];
+  employeeKey: SeedMember["key"];
+  reviewerKey: SeedMember["key"];
+  templateKey: SeedReviewTemplate["key"];
+  status: SeedReviewAssignmentStatus;
+  dueOffsetDays: number | null;
+};
+
+type SeedReviewAnswerValue = {
+  rating: number | null;
+  text: string | null;
+};
+
+type SeedReviewAnswers = Record<string, SeedReviewAnswerValue>;
+
+type SeedReviewResponse = {
+  assignmentKey: SeedReviewAssignment["key"];
+  respondentKey: SeedMember["key"];
+  responseType: SeedReviewResponseType;
+  answers: SeedReviewAnswers;
+  submittedOffsetDays: number | null;
+};
+
 type SeedDeductionRule = {
   countryCode: "NG";
   ruleType:
@@ -1174,6 +1248,255 @@ const SEED_NIGERIA_DEDUCTION_RULES: SeedDeductionRule[] = [
     calculationOrder: 400,
     notes: "National Social Insurance Trust Fund contribution",
     effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  }
+];
+
+const SEED_PERFORMANCE_TEMPLATE_SECTIONS: SeedReviewSection[] = [
+  {
+    id: "delivery",
+    title: "Delivery",
+    description: "Execution quality and measurable outcomes.",
+    questions: [
+      {
+        id: "delivery-impact-rating",
+        title: "Delivery impact",
+        prompt: "Rate delivery impact for this review period.",
+        type: "rating",
+        required: true
+      },
+      {
+        id: "delivery-commentary",
+        title: "Delivery notes",
+        prompt: "Share specific examples of delivery outcomes.",
+        type: "text",
+        required: true,
+        maxLength: 1200
+      }
+    ]
+  },
+  {
+    id: "collaboration",
+    title: "Collaboration",
+    description: "Communication, teamwork, and growth focus.",
+    questions: [
+      {
+        id: "collaboration-rating",
+        title: "Collaboration effectiveness",
+        prompt: "Rate collaboration with teammates and stakeholders.",
+        type: "rating",
+        required: true
+      },
+      {
+        id: "growth-focus",
+        title: "Growth focus",
+        prompt: "What should this person continue or improve next cycle?",
+        type: "text",
+        required: true,
+        maxLength: 1200
+      }
+    ]
+  }
+];
+
+const SEED_REVIEW_CYCLES: SeedReviewCycle[] = [
+  {
+    key: "q1_active",
+    name: "Q1 2026 Performance Cycle",
+    type: "quarterly",
+    status: "active",
+    startOffsetDays: -21,
+    endOffsetDays: 42,
+    selfReviewDeadlineOffsetDays: 7,
+    managerReviewDeadlineOffsetDays: 18,
+    createdByKey: "head_people_finance"
+  },
+  {
+    key: "q4_completed",
+    name: "Q4 2025 Performance Cycle",
+    type: "quarterly",
+    status: "completed",
+    startOffsetDays: -170,
+    endOffsetDays: -95,
+    selfReviewDeadlineOffsetDays: -125,
+    managerReviewDeadlineOffsetDays: -110,
+    createdByKey: "head_people_finance"
+  }
+];
+
+const SEED_REVIEW_TEMPLATES: SeedReviewTemplate[] = [
+  {
+    key: "standard_performance",
+    name: "Standard Performance Template",
+    sections: SEED_PERFORMANCE_TEMPLATE_SECTIONS,
+    createdByKey: "head_people_finance"
+  }
+];
+
+const SEED_REVIEW_ASSIGNMENTS: SeedReviewAssignment[] = [
+  {
+    key: "active_engineer_1",
+    cycleKey: "q1_active",
+    employeeKey: "engineer_1",
+    reviewerKey: "eng_manager",
+    templateKey: "standard_performance",
+    status: "pending_manager",
+    dueOffsetDays: 9
+  },
+  {
+    key: "active_ops_associate",
+    cycleKey: "q1_active",
+    employeeKey: "ops_associate",
+    reviewerKey: "ops_manager",
+    templateKey: "standard_performance",
+    status: "completed",
+    dueOffsetDays: 9
+  },
+  {
+    key: "active_engineer_2",
+    cycleKey: "q1_active",
+    employeeKey: "engineer_2",
+    reviewerKey: "ops_manager",
+    templateKey: "standard_performance",
+    status: "pending_self",
+    dueOffsetDays: 9
+  },
+  {
+    key: "active_compliance_officer",
+    cycleKey: "q1_active",
+    employeeKey: "compliance_officer",
+    reviewerKey: "coo",
+    templateKey: "standard_performance",
+    status: "in_review",
+    dueOffsetDays: 10
+  },
+  {
+    key: "active_engineer_3",
+    cycleKey: "q1_active",
+    employeeKey: "engineer_3",
+    reviewerKey: "coo",
+    templateKey: "standard_performance",
+    status: "pending_self",
+    dueOffsetDays: 10
+  },
+  {
+    key: "completed_engineer_1",
+    cycleKey: "q4_completed",
+    employeeKey: "engineer_1",
+    reviewerKey: "eng_manager",
+    templateKey: "standard_performance",
+    status: "completed",
+    dueOffsetDays: -112
+  }
+];
+
+const SEED_REVIEW_RESPONSES: SeedReviewResponse[] = [
+  {
+    assignmentKey: "active_engineer_1",
+    respondentKey: "engineer_1",
+    responseType: "self",
+    submittedOffsetDays: -2,
+    answers: {
+      "delivery-impact-rating": { rating: 4, text: null },
+      "delivery-commentary": {
+        rating: null,
+        text: "Delivered migration tooling ahead of schedule and reduced deployment rollback rate."
+      },
+      "collaboration-rating": { rating: 4, text: null },
+      "growth-focus": {
+        rating: null,
+        text: "Improve cross-team planning by sharing draft implementation notes earlier."
+      }
+    }
+  },
+  {
+    assignmentKey: "active_ops_associate",
+    respondentKey: "ops_associate",
+    responseType: "self",
+    submittedOffsetDays: -6,
+    answers: {
+      "delivery-impact-rating": { rating: 4, text: null },
+      "delivery-commentary": {
+        rating: null,
+        text: "Closed operations tickets within SLA and improved handoff quality across shifts."
+      },
+      "collaboration-rating": { rating: 5, text: null },
+      "growth-focus": {
+        rating: null,
+        text: "Keep documentation current and improve automation coverage for recurring requests."
+      }
+    }
+  },
+  {
+    assignmentKey: "active_ops_associate",
+    respondentKey: "ops_manager",
+    responseType: "manager",
+    submittedOffsetDays: -4,
+    answers: {
+      "delivery-impact-rating": { rating: 5, text: null },
+      "delivery-commentary": {
+        rating: null,
+        text: "Consistently handled high-priority partner escalations with clear ownership."
+      },
+      "collaboration-rating": { rating: 5, text: null },
+      "growth-focus": {
+        rating: null,
+        text: "Strong communicator. Next goal is mentoring newer teammates on incident workflow."
+      }
+    }
+  },
+  {
+    assignmentKey: "active_compliance_officer",
+    respondentKey: "coo",
+    responseType: "manager",
+    submittedOffsetDays: -1,
+    answers: {
+      "delivery-impact-rating": { rating: 4, text: null },
+      "delivery-commentary": {
+        rating: null,
+        text: "Maintained complete regulatory filing record and reduced follow-up requests."
+      },
+      "collaboration-rating": { rating: 3, text: null },
+      "growth-focus": {
+        rating: null,
+        text: "Prioritize early escalation of cross-country compliance blockers."
+      }
+    }
+  },
+  {
+    assignmentKey: "completed_engineer_1",
+    respondentKey: "engineer_1",
+    responseType: "self",
+    submittedOffsetDays: -126,
+    answers: {
+      "delivery-impact-rating": { rating: 4, text: null },
+      "delivery-commentary": {
+        rating: null,
+        text: "Delivered key platform reliability upgrades and improved alerting quality."
+      },
+      "collaboration-rating": { rating: 4, text: null },
+      "growth-focus": {
+        rating: null,
+        text: "Continue partnering with operations earlier in project scoping."
+      }
+    }
+  },
+  {
+    assignmentKey: "completed_engineer_1",
+    respondentKey: "eng_manager",
+    responseType: "manager",
+    submittedOffsetDays: -121,
+    answers: {
+      "delivery-impact-rating": { rating: 5, text: null },
+      "delivery-commentary": {
+        rating: null,
+        text: "Strong execution and incident leadership across high-priority releases."
+      },
+      "collaboration-rating": { rating: 4, text: null },
+      "growth-focus": {
+        rating: null,
+        text: "Increase delegation to create room for mentoring junior engineers."
+      }
+    }
   }
 ];
 
@@ -2473,6 +2796,388 @@ async function upsertSeedDeductionRules(
   }
 }
 
+function reviewAssignmentKey({
+  cycleId,
+  employeeId,
+  reviewerId
+}: {
+  cycleId: string;
+  employeeId: string;
+  reviewerId: string;
+}): string {
+  return `${cycleId}:${employeeId}:${reviewerId}`;
+}
+
+function reviewResponseKey({
+  assignmentId,
+  respondentId,
+  responseType
+}: {
+  assignmentId: string;
+  respondentId: string;
+  responseType: SeedReviewResponseType;
+}): string {
+  return `${assignmentId}:${respondentId}:${responseType}`;
+}
+
+async function upsertSeedPerformance(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  const templateNames = SEED_REVIEW_TEMPLATES.map((template) => template.name);
+
+  const { data: existingTemplateRows, error: existingTemplateRowsError } = await client
+    .from("review_templates")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .in("name", templateNames);
+
+  if (existingTemplateRowsError) {
+    throw new Error(`Unable to query review templates seed data: ${existingTemplateRowsError.message}`);
+  }
+
+  const existingTemplateByName = new Map<string, string>();
+
+  for (const row of existingTemplateRows ?? []) {
+    if (typeof row.id !== "string" || typeof row.name !== "string") {
+      continue;
+    }
+
+    if (!existingTemplateByName.has(row.name)) {
+      existingTemplateByName.set(row.name, row.id);
+    }
+  }
+
+  const templateIdByKey = new Map<string, string>();
+
+  for (const template of SEED_REVIEW_TEMPLATES) {
+    const createdById = userIdByKey.get(template.createdByKey);
+
+    if (!createdById) {
+      throw new Error(`Missing template creator id for performance seed (${template.createdByKey})`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      name: template.name,
+      sections: template.sections,
+      created_by: createdById,
+      deleted_at: null as string | null
+    };
+
+    const existingTemplateId = existingTemplateByName.get(template.name);
+
+    if (existingTemplateId) {
+      const { error: updateError } = await client
+        .from("review_templates")
+        .update(payload)
+        .eq("id", existingTemplateId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update review template seed data: ${updateError.message}`);
+      }
+
+      templateIdByKey.set(template.key, existingTemplateId);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("review_templates")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(`Unable to insert review template seed data: ${insertError?.message ?? "unknown error"}`);
+      }
+
+      templateIdByKey.set(template.key, insertedRow.id);
+      existingTemplateByName.set(template.name, insertedRow.id);
+    }
+  }
+
+  const cycleNames = SEED_REVIEW_CYCLES.map((cycle) => cycle.name);
+
+  const { data: existingCycleRows, error: existingCycleRowsError } = await client
+    .from("review_cycles")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .in("name", cycleNames);
+
+  if (existingCycleRowsError) {
+    throw new Error(`Unable to query review cycles seed data: ${existingCycleRowsError.message}`);
+  }
+
+  const existingCycleByName = new Map<string, string>();
+
+  for (const row of existingCycleRows ?? []) {
+    if (typeof row.id !== "string" || typeof row.name !== "string") {
+      continue;
+    }
+
+    if (!existingCycleByName.has(row.name)) {
+      existingCycleByName.set(row.name, row.id);
+    }
+  }
+
+  const cycleIdByKey = new Map<string, string>();
+
+  for (const cycle of SEED_REVIEW_CYCLES) {
+    const createdById = userIdByKey.get(cycle.createdByKey);
+
+    if (!createdById) {
+      throw new Error(`Missing cycle creator id for performance seed (${cycle.createdByKey})`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      name: cycle.name,
+      type: cycle.type,
+      status: cycle.status,
+      start_date: dateWithOffset(cycle.startOffsetDays),
+      end_date: dateWithOffset(cycle.endOffsetDays),
+      self_review_deadline:
+        cycle.selfReviewDeadlineOffsetDays === null
+          ? null
+          : dateWithOffset(cycle.selfReviewDeadlineOffsetDays),
+      manager_review_deadline:
+        cycle.managerReviewDeadlineOffsetDays === null
+          ? null
+          : dateWithOffset(cycle.managerReviewDeadlineOffsetDays),
+      created_by: createdById,
+      deleted_at: null as string | null
+    };
+
+    const existingCycleId = existingCycleByName.get(cycle.name);
+
+    if (existingCycleId) {
+      const { error: updateError } = await client
+        .from("review_cycles")
+        .update(payload)
+        .eq("id", existingCycleId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update review cycle seed data: ${updateError.message}`);
+      }
+
+      cycleIdByKey.set(cycle.key, existingCycleId);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("review_cycles")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(`Unable to insert review cycle seed data: ${insertError?.message ?? "unknown error"}`);
+      }
+
+      cycleIdByKey.set(cycle.key, insertedRow.id);
+      existingCycleByName.set(cycle.name, insertedRow.id);
+    }
+  }
+
+  const cycleIds = [...cycleIdByKey.values()];
+  const existingAssignmentByKey = new Map<string, string>();
+
+  if (cycleIds.length > 0) {
+    const { data: existingAssignmentRows, error: existingAssignmentRowsError } = await client
+      .from("review_assignments")
+      .select("id, cycle_id, employee_id, reviewer_id")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("cycle_id", cycleIds);
+
+    if (existingAssignmentRowsError) {
+      throw new Error(`Unable to query review assignments seed data: ${existingAssignmentRowsError.message}`);
+    }
+
+    for (const row of existingAssignmentRows ?? []) {
+      if (
+        typeof row.id !== "string" ||
+        typeof row.cycle_id !== "string" ||
+        typeof row.employee_id !== "string" ||
+        typeof row.reviewer_id !== "string"
+      ) {
+        continue;
+      }
+
+      const key = reviewAssignmentKey({
+        cycleId: row.cycle_id,
+        employeeId: row.employee_id,
+        reviewerId: row.reviewer_id
+      });
+
+      if (!existingAssignmentByKey.has(key)) {
+        existingAssignmentByKey.set(key, row.id);
+      }
+    }
+  }
+
+  const assignmentIdByKey = new Map<string, string>();
+
+  for (const assignment of SEED_REVIEW_ASSIGNMENTS) {
+    const cycleId = cycleIdByKey.get(assignment.cycleKey);
+    const templateId = templateIdByKey.get(assignment.templateKey);
+    const employeeId = userIdByKey.get(assignment.employeeKey);
+    const reviewerId = userIdByKey.get(assignment.reviewerKey);
+
+    if (!cycleId) {
+      throw new Error(`Missing cycle id for performance assignment seed (${assignment.cycleKey})`);
+    }
+
+    if (!templateId) {
+      throw new Error(`Missing template id for performance assignment seed (${assignment.templateKey})`);
+    }
+
+    if (!employeeId) {
+      throw new Error(`Missing employee id for performance assignment seed (${assignment.employeeKey})`);
+    }
+
+    if (!reviewerId) {
+      throw new Error(`Missing reviewer id for performance assignment seed (${assignment.reviewerKey})`);
+    }
+
+    const key = reviewAssignmentKey({
+      cycleId,
+      employeeId,
+      reviewerId
+    });
+
+    const payload = {
+      org_id: orgId,
+      cycle_id: cycleId,
+      employee_id: employeeId,
+      reviewer_id: reviewerId,
+      template_id: templateId,
+      status: assignment.status,
+      due_at:
+        assignment.dueOffsetDays === null ? null : dateWithOffset(assignment.dueOffsetDays),
+      deleted_at: null as string | null
+    };
+
+    const existingAssignmentId = existingAssignmentByKey.get(key);
+
+    if (existingAssignmentId) {
+      const { error: updateError } = await client
+        .from("review_assignments")
+        .update(payload)
+        .eq("id", existingAssignmentId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update review assignment seed data: ${updateError.message}`);
+      }
+
+      assignmentIdByKey.set(assignment.key, existingAssignmentId);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("review_assignments")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(`Unable to insert review assignment seed data: ${insertError?.message ?? "unknown error"}`);
+      }
+
+      assignmentIdByKey.set(assignment.key, insertedRow.id);
+      existingAssignmentByKey.set(key, insertedRow.id);
+    }
+  }
+
+  const assignmentIds = [...assignmentIdByKey.values()];
+  const existingResponseByKey = new Map<string, string>();
+
+  if (assignmentIds.length > 0) {
+    const { data: existingResponseRows, error: existingResponseRowsError } = await client
+      .from("review_responses")
+      .select("id, assignment_id, respondent_id, response_type")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("assignment_id", assignmentIds);
+
+    if (existingResponseRowsError) {
+      throw new Error(`Unable to query review responses seed data: ${existingResponseRowsError.message}`);
+    }
+
+    for (const row of existingResponseRows ?? []) {
+      if (
+        typeof row.id !== "string" ||
+        typeof row.assignment_id !== "string" ||
+        typeof row.respondent_id !== "string" ||
+        (row.response_type !== "self" && row.response_type !== "manager")
+      ) {
+        continue;
+      }
+
+      const key = reviewResponseKey({
+        assignmentId: row.assignment_id,
+        respondentId: row.respondent_id,
+        responseType: row.response_type
+      });
+
+      if (!existingResponseByKey.has(key)) {
+        existingResponseByKey.set(key, row.id);
+      }
+    }
+  }
+
+  for (const response of SEED_REVIEW_RESPONSES) {
+    const assignmentId = assignmentIdByKey.get(response.assignmentKey);
+    const respondentId = userIdByKey.get(response.respondentKey);
+
+    if (!assignmentId) {
+      throw new Error(`Missing assignment id for review response seed (${response.assignmentKey})`);
+    }
+
+    if (!respondentId) {
+      throw new Error(`Missing respondent id for review response seed (${response.respondentKey})`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      assignment_id: assignmentId,
+      respondent_id: respondentId,
+      response_type: response.responseType,
+      answers: response.answers,
+      submitted_at:
+        response.submittedOffsetDays === null
+          ? null
+          : timestampWithOffsetDays(response.submittedOffsetDays),
+      deleted_at: null as string | null
+    };
+
+    const key = reviewResponseKey({
+      assignmentId,
+      respondentId,
+      responseType: response.responseType
+    });
+    const existingResponseId = existingResponseByKey.get(key);
+
+    if (existingResponseId) {
+      const { error: updateError } = await client
+        .from("review_responses")
+        .update(payload)
+        .eq("id", existingResponseId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update review response seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("review_responses").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert review response seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function upsertSeedExpenses(
   client: SupabaseClient,
   orgId: string,
@@ -2651,6 +3356,7 @@ async function main() {
   await upsertSeedCompensation(client, org.id, userIdByKey);
   await upsertSeedDeductionRules(client, org.id);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
+  await upsertSeedPerformance(client, org.id, userIdByKey);
   await upsertSeedExpenses(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
@@ -2669,6 +3375,10 @@ async function main() {
   console.log(`Equity grants upserted: ${SEED_EQUITY_GRANTS.length}`);
   console.log(`Nigeria deduction rules upserted: ${SEED_NIGERIA_DEDUCTION_RULES.length}`);
   console.log(`Payment details upserted: ${SEED_PAYMENT_DETAILS.length}`);
+  console.log(`Performance cycles upserted: ${SEED_REVIEW_CYCLES.length}`);
+  console.log(`Performance templates upserted: ${SEED_REVIEW_TEMPLATES.length}`);
+  console.log(`Performance assignments upserted: ${SEED_REVIEW_ASSIGNMENTS.length}`);
+  console.log(`Performance responses upserted: ${SEED_REVIEW_RESPONSES.length}`);
   console.log(`Expenses upserted: ${SEED_EXPENSES.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
