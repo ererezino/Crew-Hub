@@ -1,116 +1,123 @@
-# North Star
+# Crew Hub -- North Star
 
-## Overview
+## Product
+- Crew Hub: internal employee ops platform for Accrue, a distributed 
+  multi-country fintech team.
+- Repo: crew-hub
+- UI branding: "Crew Hub" everywhere. Never "Accrue Hub".
+- Users: Accrue team across Nigeria, Ghana, Kenya, South Africa, Canada.
+- Modules: People, Onboarding, Time Off, Documents, Payroll, 
+  Expenses, Performance, Compliance, Analytics, Announcements.
 
-Accrue Hub is a multi-tenant workforce and operations platform for organizations that manage employees, managers, and HR workflows in one place. It is designed for internal teams that need reliable people operations, clear role boundaries, auditable actions, and predictable APIs that scale across organizations.
+## Roles (RBAC, server-enforced via roles array)
+- EMPLOYEE: view own data, submit requests
+- MANAGER: above + view direct reports, approve leave/expenses
+- HR_ADMIN: above + manage all employees, run onboarding, 
+  manage documents, view compensation (cannot approve payroll)
+- FINANCE_ADMIN: initiate payroll runs, manage deduction rules, 
+  first-approve payroll, manage expense reimbursements, 
+  view compensation
+- SUPER_ADMIN: full access, final payroll approval, system config, 
+  role management
 
-Primary users:
-- Employees: view and manage their own profile/workflow interactions.
-- Managers: supervise team members and approvals.
-- HR Admins: manage HR processes and compliance-sensitive records.
-- Super Admins: govern organization-level settings and platform controls.
+Implementation: store as TEXT[] on profiles. A person can hold 
+multiple roles. Permission checks use hasRole(user, 'ROLE'), 
+not equality. Double-approval still requires two different people.
 
-## Roles & Permissions
-
-| Role | Core permissions |
-| --- | --- |
-| Employee | View/update own profile data, submit requests, view own records and statuses |
-| Manager | All Employee capabilities for self + view team members, approve/deny manager-scoped requests, manage team operations |
-| HR Admin | Broad HR data access within org, manage employee lifecycle data, manage HR workflows and policies, view compliance/audit views |
-| Super Admin | Full org administration, role assignment, org-wide settings/configuration, privileged access to all admin modules |
+## Payroll Policy
+- Employment types: contractor, full_time, part_time
+- Contractors: paid in USD. Crew Hub does NOT calculate or 
+  withhold taxes. Payslips are optional; default is a payment 
+  statement. Contractor handles own taxes.
+- Employees (future): paid in local currency with statutory 
+  deductions by country when enabled.
+- Each person has a payroll_mode:
+  - contractor_usd_no_withholding (default for contractors)
+  - employee_local_withholding (future, when country engine enabled)
+- Current state: ALL team members are contractors paid in USD 
+  with zero withholding. The system must be structured so that 
+  flipping payroll_mode for an employee and enabling a country 
+  engine activates full withholding without restructuring.
 
 ## Tech Stack
-
-- Framework: Next.js (App Router) + TypeScript
-- UI: Tailwind CSS + shadcn/ui
-- Data/Auth: Supabase (Postgres, Auth, RLS, Storage)
-- Email: Resend
-- Hosting/Deployment: Vercel
-- Client state/data fetching: Zustand or React Query (module-dependent)
-- Forms/validation: React Hook Form + Zod
+- Next.js 14+ App Router, TypeScript strict, Tailwind CSS, shadcn/ui
+- Supabase (PostgreSQL + Auth + RLS + Storage + Realtime)
+- Resend (transactional email)
+- Vercel (hosting + CI/CD)
+- React Query for server state, Zustand for client state
+- React Hook Form + Zod for all forms
+- @react-pdf/renderer for PDF generation
+- Recharts for analytics charts (install in Phase 4.2)
 
 ## API Conventions
-
-### Base Path
-
-- All versioned endpoints must live under `/api/v1`.
-
-### Response Format
-
-- Every response must use:
-  - `data`: payload on success (or `null` on failure)
-  - `error`: structured error object on failure (or `null` on success)
-  - `meta`: request metadata (pagination, request id, timing, etc.)
-
-Example envelope:
-
-```json
-{
-  "data": {},
-  "error": null,
-  "meta": {}
-}
-```
-
-### Status Codes Rules
-
-- `200` for successful reads/updates that return content.
-- `201` for successful create operations.
-- `204` for successful operations with no response body.
-- `400` for malformed requests.
-- `401` for unauthenticated access.
-- `403` for authenticated but unauthorized access.
-- `404` for missing resources.
-- `409` for conflicts (state/version/uniqueness).
-- `422` for validation failure when request shape is syntactically valid but semantically invalid.
-- `429` for rate limiting.
-- `500` for unexpected server failures.
-
-### Cursor Pagination Rules
-
-- Cursor pagination is the default for list endpoints.
-- Request shape:
-  - `limit`: integer with enforced max.
-  - `cursor`: opaque token representing the last seen sort key(s).
-- Response metadata:
-  - `meta.next_cursor`: present when additional results exist.
-  - `meta.has_more`: boolean indicator.
-- Sorting must be deterministic and stable (e.g., `(created_at DESC, id DESC)`).
-- Cursors must be opaque to clients and validated on every request.
-
-### Validation
-
-- Every endpoint must validate input with Zod before business logic runs.
-- Validation applies to params, query, headers (where relevant), and body.
-- Validation failures return standardized `422` responses in the `{ data, error, meta }` envelope.
+- All routes under /api/v1/
+- Response shape: { data, error, meta }
+- Cursor-based pagination for all lists
+- Zod validation on every endpoint
+- Rate limiting on sensitive endpoints (auth, payments, payroll)
+- Proper HTTP status codes
 
 ## Database Principles
+- org_id on every table (multi-tenancy ready)
+- deleted_at TIMESTAMPTZ for soft delete on all records
+- audit_log table for all mutations
+- RLS policies on EVERY table, no exceptions
+- Money: BIGINT in smallest currency unit + VARCHAR(3) currency
+- JSONB for flexible/extensible fields
+- Proper indexes on frequently queried columns
 
-- Multi-tenancy readiness: include `org_id` on all domain tables.
-- Soft delete: use `deleted_at` timestamps instead of hard delete by default.
-- Auditing: maintain an `audit_log` table for all mutations with at least:
-  - `actor_id`
-  - `action`
-  - `table_name`
-  - `old_values` (JSON/JSONB)
-  - `new_values` (JSON/JSONB)
-  - `created_at` (timestamp)
-  - `ip_address`
-- Security: Row Level Security (RLS) is required on every table.
-- Money: store in smallest currency unit as integer + ISO currency code column.
-- Data integrity/performance:
-  - use enums for statuses
-  - add indexes for common filters/sorts/joins
-- JSONB usage: only for explicitly flexible or schemaless extension fields.
+## Security
+- Auth middleware on all routes (except /login)
+- RLS on every Supabase table
+- AES-256 encryption for sensitive fields at application level
+- CSP headers, CSRF protection on mutations
+- Secure file upload with type/size validation
+- Admin action IP logging
 
-## Design System Tokens
+## Design Tokens (SINGLE SOURCE OF TRUTH)
 
-- Primary: `#1a1a2e`
-- Accent (placeholder): `#22C55E`
-- Typography: Geist + Geist Mono
-- UI rules:
-  - subtle borders
-  - no heavy shadows
-  - skeleton loaders for async content
-  - fast transitions in the 150–200ms range
-  - light mode default with dark mode support
+### Core Palette
+Primary:          #0F172A
+Accent:           #22C55E
+Accent hover:     #16A34A
+Accent subtle:    #F0FDF4
+Accent dark mode: #4ADE80
+
+### Backgrounds
+Light: #FFFFFF / #F8FAFC / #F1F5F9
+Dark:  #0F172A / #1E293B / #334155
+
+### Text
+Light: #0F172A / #475569 / #94A3B8 / #CBD5E1
+Dark:  #F8FAFC / #94A3B8 / #64748B / #475569
+
+### Borders
+Light: #E2E8F0 (default), #F1F5F9 (subtle)
+Dark:  #334155 (default), #1E293B (subtle)
+
+### Status Colors (each has bg, text, border)
+Success/Active:    bg #F0FDF4, text #15803D, border #BBF7D0
+Warning:           bg #FFFBEB, text #A16207, border #FDE68A
+Error/Rejected:    bg #FEF2F2, text #B91C1C, border #FECACA
+Info:              bg #EFF6FF, text #1D4ED8, border #BFDBFE
+Pending:           bg #F5F3FF, text #6D28D9, border #DDD6FE
+Draft:             bg #F8FAFC, text #475569, border #E2E8F0
+Processing:        bg #F0F9FF, text #0369A1, border #BAE6FD
+
+Dark mode status: same hues but lower saturation backgrounds 
+that work on dark surfaces. Define as CSS variables.
+
+### Typography
+Fonts: Geist (body), Geist Mono (numbers/data/code)
+Scale: 12px caption, 14px body, 16px section title, 20px page title
+All weights: 400 normal, 600 semibold
+Line heights: 1.25 headings, 1.5 body
+
+### Spacing & Shape
+Radius: 6px default, 8px cards, 12px modals
+Transitions: 150ms hover, 200ms panels
+
+Do NOT use #1a1a2e anywhere. Primary is #0F172A.
+Do NOT hardcode colors outside these tokens. Every color in the 
+app must trace back to a token defined here or a CSS variable 
+derived from one.
