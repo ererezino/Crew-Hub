@@ -20,6 +20,7 @@ import type {
   CalculatePayrollRunResponse,
   PayrollAdjustmentType,
   PayrollRunItem,
+  PayrollRunActionResponse,
   PayrollRunStatus
 } from "../../../../../types/payroll-runs";
 
@@ -164,21 +165,31 @@ function hasErrors(errors: AdjustmentFormErrors): boolean {
 
 export function PayrollRunDetailClient({
   runId,
-  canManage
+  viewerUserId,
+  canManage,
+  canFinalApprove
 }: {
   runId: string;
+  viewerUserId: string;
   canManage: boolean;
+  canFinalApprove: boolean;
 }) {
   const runQuery = usePayrollRunDetail({ runId, enabled: true });
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [activeRunAction, setActiveRunAction] = useState<
+    null | "submit" | "approve_first" | "approve_final" | "reject" | "cancel"
+  >(null);
   const [adjustmentItemId, setAdjustmentItemId] = useState<string | null>(null);
   const [adjustmentValues, setAdjustmentValues] = useState<AdjustmentFormValues>(
     INITIAL_ADJUSTMENT_VALUES
   );
   const [adjustmentErrors, setAdjustmentErrors] = useState<AdjustmentFormErrors>({});
   const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState(false);
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectReasonError, setRejectReasonError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const sortedItems = useMemo(() => {
@@ -189,6 +200,33 @@ export function PayrollRunDetailClient({
       return sortDirection === "asc" ? comparison : comparison * -1;
     });
   }, [runQuery.data?.items, sortDirection]);
+
+  const run = runQuery.data?.run ?? null;
+  const isApproved = run?.status === "approved";
+  const isCalculated = run?.status === "calculated";
+  const isPendingFirst = run?.status === "pending_first_approval";
+  const isPendingFinal = run?.status === "pending_final_approval";
+  const canCalculateRun = canManage && (run?.status === "draft" || isCalculated);
+  const canAdjustItems = canManage && isCalculated;
+  const canSubmitForApproval = canManage && isCalculated;
+  const canApproveFirst =
+    canManage &&
+    isPendingFirst &&
+    run?.initiatedBy !== viewerUserId;
+  const canApproveFinal =
+    canFinalApprove &&
+    isPendingFinal &&
+    run?.firstApprovedBy !== viewerUserId;
+  const canRejectAtCurrentStep =
+    (canManage &&
+      isPendingFirst &&
+      run?.initiatedBy !== viewerUserId) ||
+    (canFinalApprove &&
+      isPendingFinal &&
+      run?.firstApprovedBy !== viewerUserId);
+  const canCancelRun =
+    canManage &&
+    (run ? run.status !== "approved" && run.status !== "cancelled" : false);
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -228,6 +266,57 @@ export function PayrollRunDetailClient({
       showToast("error", error instanceof Error ? error.message : "Unable to calculate payroll run.");
     } finally {
       setIsCalculating(false);
+    }
+  };
+
+  const performRunAction = async (
+    action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel",
+    reason: string | null = null
+  ) => {
+    setActiveRunAction(action);
+
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/actions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action,
+          reason
+        })
+      });
+
+      const payload = (await response.json()) as PayrollRunActionResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? "Unable to update approval state.");
+        return false;
+      }
+
+      if (action === "submit") {
+        showToast("success", "Run submitted for first approval.");
+      } else if (action === "approve_first") {
+        showToast("success", "First approval complete. Awaiting final approval.");
+      } else if (action === "approve_final") {
+        showToast("success", "Final approval complete. Payroll is now locked.");
+      } else if (action === "reject") {
+        showToast("info", "Run rejected and returned to calculated state.");
+      } else if (action === "cancel") {
+        showToast("info", "Run cancelled.");
+      }
+
+      if (action === "approve_final") {
+        setAdjustmentItemId(null);
+      }
+
+      runQuery.refresh();
+      return true;
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to update approval state.");
+      return false;
+    } finally {
+      setActiveRunAction(null);
     }
   };
 
@@ -292,18 +381,55 @@ export function PayrollRunDetailClient({
     }
   };
 
+  const submitRejectReason = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedReason = rejectReason.trim();
+
+    if (!trimmedReason) {
+      setRejectReasonError("Rejection reason is required.");
+      return;
+    }
+
+    if (trimmedReason.length > 500) {
+      setRejectReasonError("Rejection reason must be 500 characters or fewer.");
+      return;
+    }
+
+    setRejectReasonError(null);
+    const success = await performRunAction("reject", trimmedReason);
+
+    if (success) {
+      setIsRejectDialogOpen(false);
+      setRejectReason("");
+      setRejectReasonError(null);
+    }
+  };
+
+  const cancelRun = async () => {
+    const confirmed = window.confirm(
+      "Cancel this payroll run? This action is intended for runs that should no longer proceed."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await performRunAction("cancel");
+  };
+
   return (
     <>
       <PageHeader
         title="Payroll Run"
-        description="Review contractor payroll calculations and manage item-level adjustments."
+        description="Review contractor payroll calculations, approvals, and item-level adjustments."
         actions={
-          canManage ? (
+          canCalculateRun ? (
             <button
               type="button"
               className="button button-accent"
               onClick={calculateRun}
-              disabled={isCalculating}
+              disabled={isCalculating || activeRunAction !== null}
             >
               {isCalculating ? "Calculating..." : "Calculate run"}
             </button>
@@ -392,6 +518,151 @@ export function PayrollRunDetailClient({
               <p className="metric-hint">Items currently in this run</p>
             </article>
           </section>
+
+          <section className="settings-card payroll-approval-card" aria-label="Approval workflow">
+            <div className="payroll-approval-header">
+              <h2 className="section-title">Approval workflow</h2>
+              <StatusBadge tone={toneForPayrollRunStatus(runQuery.data.run.status)}>
+                {labelForPayrollRunStatus(runQuery.data.run.status)}
+              </StatusBadge>
+            </div>
+
+            <div className="payroll-approval-steps">
+              <article className="payroll-approval-step">
+                <p className="payroll-approval-step-title">Step 1: First approval</p>
+                {runQuery.data.run.firstApprovedAt ? (
+                  <>
+                    <StatusBadge tone="success">Approved</StatusBadge>
+                    <p className="settings-card-description">
+                      {runQuery.data.run.firstApprovedBy ?? "--"} at{" "}
+                      <time
+                        dateTime={runQuery.data.run.firstApprovedAt}
+                        title={formatDateTimeTooltip(runQuery.data.run.firstApprovedAt)}
+                      >
+                        {new Date(runQuery.data.run.firstApprovedAt).toLocaleString()}
+                      </time>
+                    </p>
+                  </>
+                ) : (
+                  <StatusBadge tone={isPendingFirst ? "pending" : "draft"}>
+                    {isPendingFirst ? "Awaiting first approval" : "Not approved yet"}
+                  </StatusBadge>
+                )}
+              </article>
+
+              <article className="payroll-approval-step">
+                <p className="payroll-approval-step-title">Step 2: Final approval</p>
+                {runQuery.data.run.finalApprovedAt ? (
+                  <>
+                    <StatusBadge tone="success">Approved</StatusBadge>
+                    <p className="settings-card-description">
+                      {runQuery.data.run.finalApprovedBy ?? "--"} at{" "}
+                      <time
+                        dateTime={runQuery.data.run.finalApprovedAt}
+                        title={formatDateTimeTooltip(runQuery.data.run.finalApprovedAt)}
+                      >
+                        {new Date(runQuery.data.run.finalApprovedAt).toLocaleString()}
+                      </time>
+                    </p>
+                  </>
+                ) : (
+                  <StatusBadge tone={isPendingFinal ? "pending" : "draft"}>
+                    {isPendingFinal ? "Awaiting final approval" : "Not approved yet"}
+                  </StatusBadge>
+                )}
+              </article>
+            </div>
+
+            <div className="settings-actions payroll-approval-actions">
+              {canSubmitForApproval ? (
+                <button
+                  type="button"
+                  className="button button-accent"
+                  disabled={activeRunAction !== null || isCalculating}
+                  onClick={() => {
+                    void performRunAction("submit");
+                  }}
+                >
+                  {activeRunAction === "submit" ? "Submitting..." : "Submit for approval"}
+                </button>
+              ) : null}
+
+              {canApproveFirst ? (
+                <button
+                  type="button"
+                  className="button button-accent"
+                  disabled={activeRunAction !== null}
+                  onClick={() => {
+                    void performRunAction("approve_first");
+                  }}
+                >
+                  {activeRunAction === "approve_first" ? "Approving..." : "Approve step 1"}
+                </button>
+              ) : null}
+
+              {canApproveFinal ? (
+                <button
+                  type="button"
+                  className="button button-accent"
+                  disabled={activeRunAction !== null}
+                  onClick={() => {
+                    void performRunAction("approve_final");
+                  }}
+                >
+                  {activeRunAction === "approve_final" ? "Approving..." : "Approve final"}
+                </button>
+              ) : null}
+
+              {canRejectAtCurrentStep ? (
+                <button
+                  type="button"
+                  className="button button-subtle"
+                  disabled={activeRunAction !== null}
+                  onClick={() => {
+                    setRejectReasonError(null);
+                    setRejectReason("");
+                    setIsRejectDialogOpen(true);
+                  }}
+                >
+                  Reject
+                </button>
+              ) : null}
+
+              {canCancelRun ? (
+                <button
+                  type="button"
+                  className="button button-subtle"
+                  disabled={activeRunAction !== null}
+                  onClick={() => {
+                    void cancelRun();
+                  }}
+                >
+                  {activeRunAction === "cancel" ? "Cancelling..." : "Cancel run"}
+                </button>
+              ) : null}
+            </div>
+          </section>
+
+          {isApproved ? (
+            <section className="payroll-lock-banner" aria-label="Payroll locked">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M7 10V8a5 5 0 0 1 10 0v2M6 10h12v10H6z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <div>
+                <p className="section-title">Payroll locked</p>
+                <p className="settings-card-description">
+                  Final approval completed. Snapshot is immutable and edits are blocked.
+                </p>
+              </div>
+            </section>
+          ) : null}
 
           {runQuery.data.flaggedCount > 0 ? (
             <section className="payroll-flag-banner">
@@ -545,7 +816,7 @@ export function PayrollRunDetailClient({
                                     )}
                                   </ul>
 
-                                  {canManage ? (
+                                  {canAdjustItems ? (
                                     adjustmentItemId === item.id ? (
                                       <form className="settings-form" onSubmit={submitAdjustment} noValidate>
                                         <label className="form-field" htmlFor={`adjustment-type-${item.id}`}>
@@ -674,7 +945,11 @@ export function PayrollRunDetailClient({
                                         Add adjustment
                                       </button>
                                     )
-                                  ) : null}
+                                  ) : (
+                                    <p className="settings-card-description">
+                                      Adjustments are available only while status is calculated.
+                                    </p>
+                                  )}
                                 </article>
                               </div>
                             </section>
@@ -688,6 +963,72 @@ export function PayrollRunDetailClient({
             </section>
           )}
         </>
+      ) : null}
+
+      {isRejectDialogOpen ? (
+        <section className="payroll-reject-dialog" aria-label="Reject payroll run dialog">
+          <button
+            type="button"
+            className="payroll-reject-backdrop"
+            aria-label="Close reject dialog"
+            onClick={() => {
+              if (activeRunAction) {
+                return;
+              }
+
+              setIsRejectDialogOpen(false);
+              setRejectReasonError(null);
+            }}
+          />
+          <article className="payroll-reject-panel">
+            <h2 className="section-title">Reject payroll run</h2>
+            <p className="settings-card-description">
+              Add a reason. The run will move back to calculated.
+            </p>
+
+            <form className="settings-form" onSubmit={submitRejectReason} noValidate>
+              <label className="form-field" htmlFor="reject-reason">
+                <span className="form-label">Rejection reason</span>
+                <textarea
+                  id="reject-reason"
+                  className={rejectReasonError ? "form-input form-input-error" : "form-input"}
+                  value={rejectReason}
+                  onChange={(event) => {
+                    setRejectReason(event.currentTarget.value);
+                    if (rejectReasonError) {
+                      setRejectReasonError(null);
+                    }
+                  }}
+                  rows={4}
+                />
+                {rejectReasonError ? (
+                  <p className="form-field-error">{rejectReasonError}</p>
+                ) : null}
+              </label>
+
+              <div className="settings-actions">
+                <button
+                  type="submit"
+                  className="button button-accent"
+                  disabled={activeRunAction === "reject"}
+                >
+                  {activeRunAction === "reject" ? "Rejecting..." : "Confirm reject"}
+                </button>
+                <button
+                  type="button"
+                  className="button button-subtle"
+                  disabled={activeRunAction === "reject"}
+                  onClick={() => {
+                    setIsRejectDialogOpen(false);
+                    setRejectReasonError(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </article>
+        </section>
       ) : null}
 
       {toasts.length > 0 ? (

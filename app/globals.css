@@ -2301,6 +2301,88 @@ html.dark .topbar {
   border-radius: var(--radius-default);
 }
 
+.payroll-approval-card {
+  gap: 0.85rem;
+}
+
+.payroll-approval-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.payroll-approval-steps {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.payroll-approval-step {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.6rem 0.7rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.payroll-approval-step-title {
+  font-weight: 600;
+}
+
+.payroll-approval-actions {
+  flex-wrap: wrap;
+}
+
+.payroll-lock-banner {
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius-card);
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+  padding: 0.7rem 0.8rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: flex-start;
+}
+
+.payroll-lock-banner svg {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.2rem;
+}
+
+.payroll-reject-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.payroll-reject-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.payroll-reject-panel {
+  position: relative;
+  width: min(520px, 100%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-modal);
+  background: var(--bg-canvas);
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.24);
+  animation: panel-enter var(--transition-panel);
+}
+
 .settings-form {
   display: grid;
   gap: 0.8rem;
@@ -2974,6 +3056,10 @@ html.dark .topbar {
     grid-template-columns: 1fr;
   }
 
+  .payroll-approval-steps {
+    grid-template-columns: 1fr;
+  }
+
   .timeoff-calendar-entry-card {
     display: grid;
   }
@@ -3143,6 +3229,15 @@ html.dark .topbar {
 
   .payroll-status-timeline {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .payroll-approval-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .payroll-lock-banner {
+    grid-template-columns: 1fr;
   }
 
   .payroll-country-item {

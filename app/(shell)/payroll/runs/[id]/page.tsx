@@ -62,7 +62,9 @@ export default async function PayrollRunDetailPage({ params }: PayrollRunDetailP
   return (
     <PayrollRunDetailClient
       runId={id}
+      viewerUserId={session.profile.id}
       canManage={canManagePayroll(session.profile.roles)}
+      canFinalApprove={hasRole(session.profile.roles, "SUPER_ADMIN")}
     />
   );
 }

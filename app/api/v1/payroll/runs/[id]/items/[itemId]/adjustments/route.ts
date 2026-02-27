@@ -12,7 +12,8 @@ import {
   parseIntegerAmount,
   parsePositiveIntegerAmount,
   payrollAdjustmentSchema,
-  payrollDeductionSchema
+  payrollDeductionSchema,
+  payrollRunRowSchema
 } from "../../../../../_helpers";
 
 const adjustmentBodySchema = z.object({
@@ -137,6 +138,62 @@ export async function POST(
 
   try {
     const supabase = await createSupabaseServerClient();
+
+    const { data: rawRun, error: runError } = await supabase
+      .from("payroll_runs")
+      .select(
+        "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, created_at, updated_at"
+      )
+      .eq("org_id", session.profile.org_id)
+      .eq("id", runId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (runError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PAYROLL_ADJUSTMENT_FAILED",
+          message: "Unable to load payroll run status."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedRun = payrollRunRowSchema.safeParse(rawRun);
+
+    if (!parsedRun.success) {
+      return jsonResponse<null>(404, {
+        data: null,
+        error: {
+          code: "NOT_FOUND",
+          message: "Payroll run was not found."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (parsedRun.data.status === "approved") {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "PAYROLL_LOCKED",
+          message: "Payroll locked. Approved runs cannot be modified."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (parsedRun.data.status !== "calculated") {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "INVALID_STATE",
+          message: "Adjustments can only be applied while run status is calculated."
+        },
+        meta: buildMeta()
+      });
+    }
 
     const { data: rawItem, error: itemError } = await supabase
       .from("payroll_items")

@@ -170,8 +170,18 @@ export type AddPayrollAdjustmentResponseData = {
   adjustmentTotal: number;
 };
 
+export type PayrollRunActionPayload = {
+  action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel";
+  reason?: string | null;
+};
+
+export type PayrollRunActionResponseData = {
+  run: PayrollRunSummary;
+};
+
 export type PayrollRunsDashboardResponse = ApiResponse<PayrollRunsDashboardResponseData>;
 export type PayrollRunDetailResponse = ApiResponse<PayrollRunDetailResponseData>;
 export type CreatePayrollRunResponse = ApiResponse<CreatePayrollRunResponseData>;
 export type CalculatePayrollRunResponse = ApiResponse<CalculatePayrollRunResponseData>;
 export type AddPayrollAdjustmentResponse = ApiResponse<AddPayrollAdjustmentResponseData>;
+export type PayrollRunActionResponse = ApiResponse<PayrollRunActionResponseData>;
