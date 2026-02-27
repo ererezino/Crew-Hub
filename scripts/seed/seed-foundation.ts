@@ -231,6 +231,38 @@ type SeedPaymentDetail =
       wiseRecipientId: string;
     });
 
+type SeedExpenseCategory =
+  | "travel"
+  | "lodging"
+  | "meals"
+  | "transport"
+  | "internet"
+  | "office_supplies"
+  | "software"
+  | "wellness"
+  | "other";
+
+type SeedExpenseStatus = "pending" | "approved" | "rejected" | "reimbursed" | "cancelled";
+
+type SeedExpense = {
+  employeeKey: SeedMember["key"];
+  category: SeedExpenseCategory;
+  description: string;
+  amount: number;
+  currency: "USD";
+  expenseDateOffsetDays: number;
+  status: SeedExpenseStatus;
+  approvedByKey?: SeedMember["key"] | null;
+  approvedOffsetDays?: number | null;
+  rejectedByKey?: SeedMember["key"] | null;
+  rejectedOffsetDays?: number | null;
+  rejectionReason?: string | null;
+  reimbursedByKey?: SeedMember["key"] | null;
+  reimbursedOffsetDays?: number | null;
+  reimbursementReference?: string | null;
+  reimbursementNotes?: string | null;
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -948,6 +980,91 @@ const SEED_PAYMENT_DETAILS: SeedPaymentDetail[] = [
     currency: "USD",
     isVerified: true,
     changeEffectiveOffsetHours: -90
+  }
+];
+
+const SEED_EXPENSES: SeedExpense[] = [
+  {
+    employeeKey: "engineer_1",
+    category: "software",
+    description: "Annual API testing tool subscription renewal.",
+    amount: 24_900,
+    currency: "USD",
+    expenseDateOffsetDays: -18,
+    status: "pending"
+  },
+  {
+    employeeKey: "ops_associate",
+    category: "transport",
+    description: "Intercity transit for partner onboarding visit.",
+    amount: 12_500,
+    currency: "USD",
+    expenseDateOffsetDays: -15,
+    status: "approved",
+    approvedByKey: "ops_manager",
+    approvedOffsetDays: -13
+  },
+  {
+    employeeKey: "engineer_2",
+    category: "internet",
+    description: "Monthly high-bandwidth internet reimbursement.",
+    amount: 15_000,
+    currency: "USD",
+    expenseDateOffsetDays: -12,
+    status: "reimbursed",
+    approvedByKey: "eng_manager",
+    approvedOffsetDays: -10,
+    reimbursedByKey: "head_people_finance",
+    reimbursedOffsetDays: -8,
+    reimbursementReference: "RBM-2026-1102",
+    reimbursementNotes: "Paid via monthly reimbursement batch."
+  },
+  {
+    employeeKey: "compliance_officer",
+    category: "travel",
+    description: "Flight and local transit for regulatory workshop.",
+    amount: 86_000,
+    currency: "USD",
+    expenseDateOffsetDays: -21,
+    status: "rejected",
+    rejectedByKey: "head_people_finance",
+    rejectedOffsetDays: -19,
+    rejectionReason: "Workshop approval code was missing from the receipt."
+  },
+  {
+    employeeKey: "engineer_3",
+    category: "wellness",
+    description: "Quarterly wellness allowance reimbursement.",
+    amount: 10_000,
+    currency: "USD",
+    expenseDateOffsetDays: -30,
+    status: "reimbursed",
+    approvedByKey: "coo",
+    approvedOffsetDays: -28,
+    reimbursedByKey: "head_people_finance",
+    reimbursedOffsetDays: -26,
+    reimbursementReference: "RBM-2026-1079",
+    reimbursementNotes: "Approved under quarterly wellness policy."
+  },
+  {
+    employeeKey: "ops_manager",
+    category: "meals",
+    description: "Team meal during cross-country operations planning.",
+    amount: 32_450,
+    currency: "USD",
+    expenseDateOffsetDays: -9,
+    status: "pending"
+  },
+  {
+    employeeKey: "eng_manager",
+    category: "office_supplies",
+    description: "Ergonomic keyboard and headset replacement.",
+    amount: 18_990,
+    currency: "USD",
+    expenseDateOffsetDays: -7,
+    status: "approved",
+    approvedByKey: "head_people_finance",
+    approvedOffsetDays: -6
   }
 ];
 
@@ -2055,6 +2172,120 @@ async function upsertSeedPaymentDetails(
   }
 }
 
+async function upsertSeedExpenses(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  for (let index = 0; index < SEED_EXPENSES.length; index += 1) {
+    const expense = SEED_EXPENSES[index];
+    const employeeId = userIdByKey.get(expense.employeeKey);
+
+    if (!employeeId) {
+      throw new Error(`Missing employee user id for expense seed (${expense.employeeKey})`);
+    }
+
+    const approvedById = expense.approvedByKey
+      ? userIdByKey.get(expense.approvedByKey) ?? null
+      : null;
+    const rejectedById = expense.rejectedByKey
+      ? userIdByKey.get(expense.rejectedByKey) ?? null
+      : null;
+    const reimbursedById = expense.reimbursedByKey
+      ? userIdByKey.get(expense.reimbursedByKey) ?? null
+      : null;
+
+    if (expense.approvedByKey && !approvedById) {
+      throw new Error(`Missing approver id for expense seed (${expense.approvedByKey})`);
+    }
+
+    if (expense.rejectedByKey && !rejectedById) {
+      throw new Error(`Missing rejector id for expense seed (${expense.rejectedByKey})`);
+    }
+
+    if (expense.reimbursedByKey && !reimbursedById) {
+      throw new Error(`Missing reimburser id for expense seed (${expense.reimbursedByKey})`);
+    }
+
+    const expenseDate = dateWithOffset(expense.expenseDateOffsetDays);
+    const approvedAt =
+      expense.status === "approved" || expense.status === "reimbursed"
+        ? timestampWithOffsetDays(expense.approvedOffsetDays ?? expense.expenseDateOffsetDays + 1)
+        : null;
+    const rejectedAt =
+      expense.status === "rejected"
+        ? timestampWithOffsetDays(expense.rejectedOffsetDays ?? expense.expenseDateOffsetDays + 1)
+        : null;
+    const reimbursedAt =
+      expense.status === "reimbursed"
+        ? timestampWithOffsetDays(expense.reimbursedOffsetDays ?? expense.expenseDateOffsetDays + 3)
+        : null;
+    const receiptFilePath = `${orgId}/seed/receipts/${expense.employeeKey}-${index + 1}.pdf`;
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      category: expense.category,
+      description: expense.description,
+      amount: expense.amount,
+      currency: expense.currency,
+      receipt_file_path: receiptFilePath,
+      expense_date: expenseDate,
+      status: expense.status,
+      approved_by:
+        expense.status === "approved" || expense.status === "reimbursed" ? approvedById : null,
+      approved_at:
+        expense.status === "approved" || expense.status === "reimbursed" ? approvedAt : null,
+      rejected_by: expense.status === "rejected" ? rejectedById : null,
+      rejected_at: expense.status === "rejected" ? rejectedAt : null,
+      rejection_reason: expense.status === "rejected" ? expense.rejectionReason ?? null : null,
+      reimbursed_by: expense.status === "reimbursed" ? reimbursedById : null,
+      reimbursed_at: expense.status === "reimbursed" ? reimbursedAt : null,
+      reimbursement_reference:
+        expense.status === "reimbursed" ? expense.reimbursementReference ?? null : null,
+      reimbursement_notes:
+        expense.status === "reimbursed" ? expense.reimbursementNotes ?? null : null,
+      deleted_at: null as string | null
+    };
+
+    const { data: existingRow, error: existingRowError } = await client
+      .from("expenses")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("category", expense.category)
+      .eq("amount", expense.amount)
+      .eq("description", expense.description)
+      .eq("expense_date", expenseDate)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingRowError) {
+      throw new Error(`Unable to query expense seed data: ${existingRowError.message}`);
+    }
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("expenses")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update expense seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("expenses").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert expense seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function main() {
   const client = createServiceRoleClient();
   const sharedPassword = process.env.SEED_TEST_PASSWORD ?? "CrewHub123!";
@@ -2118,6 +2349,7 @@ async function main() {
   await upsertSeedTimeOff(client, org.id, userIdByKey);
   await upsertSeedCompensation(client, org.id, userIdByKey);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
+  await upsertSeedExpenses(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
   console.log(`Organization: ${org.name} (${org.id})`);
@@ -2134,6 +2366,7 @@ async function main() {
   console.log(`Allowances upserted: ${SEED_ALLOWANCES.length}`);
   console.log(`Equity grants upserted: ${SEED_EQUITY_GRANTS.length}`);
   console.log(`Payment details upserted: ${SEED_PAYMENT_DETAILS.length}`);
+  console.log(`Expenses upserted: ${SEED_EXPENSES.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
 
