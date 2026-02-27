@@ -1014,6 +1014,269 @@ html.dark .topbar {
   display: block;
 }
 
+.onboarding-tabs,
+.onboarding-instance-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.onboarding-tab {
+  border: 1px solid var(--border-default);
+  background: var(--bg-canvas);
+  border-radius: var(--radius-default);
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition: border-color var(--transition-hover), background-color var(--transition-hover);
+}
+
+.onboarding-tab:hover {
+  border-color: var(--text-muted);
+}
+
+.onboarding-tab-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.onboarding-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .onboarding-row-actions,
+.data-table-row:focus-within .onboarding-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.onboarding-table-skeleton {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.onboarding-table-skeleton-header {
+  height: 2.1rem;
+  border-radius: var(--radius-default);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.onboarding-table-skeleton-row {
+  height: 2.8rem;
+  border-radius: var(--radius-default);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.onboarding-template-preview {
+  margin-top: 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.onboarding-template-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.onboarding-template-task-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.onboarding-template-task-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.65rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.onboarding-template-task-title {
+  font-weight: 600;
+}
+
+.onboarding-template-task-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.progress-ring {
+  position: relative;
+  width: max-content;
+  min-width: 116px;
+  min-height: 116px;
+  display: grid;
+  place-items: center;
+}
+
+.progress-ring-value {
+  position: absolute;
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.progress-ring-label {
+  position: absolute;
+  margin-top: 2.4rem;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.onboarding-instance-summary {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto 1fr;
+  margin-bottom: 1rem;
+}
+
+.onboarding-instance-summary-metrics {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.onboarding-instance-metric {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.55rem 0.65rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.onboarding-instance-metric-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.onboarding-instance-metric-value {
+  font-weight: 600;
+}
+
+.onboarding-category-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.onboarding-category-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.onboarding-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.onboarding-task-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.onboarding-task-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.onboarding-task-main {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.onboarding-task-title {
+  font-weight: 600;
+}
+
+.onboarding-task-meta {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.my-onboarding-task-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.my-onboarding-task-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.my-onboarding-task-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.my-onboarding-footer {
+  margin-top: 1rem;
+}
+
+.onboarding-details-skeleton {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.onboarding-details-skeleton-summary,
+.onboarding-details-skeleton-section {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.onboarding-details-skeleton-summary {
+  height: 9rem;
+}
+
+.onboarding-details-skeleton-section {
+  height: 6.75rem;
+}
+
 .settings-layout {
   display: grid;
   gap: 1rem;
