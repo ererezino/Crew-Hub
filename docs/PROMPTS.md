@@ -170,7 +170,7 @@ REFERENCE (MUST READ BEFORE STARTING)
 - Read this `docs/PROMPTS.md`.
 
 TASK
-- Build the Design System Foundation for Accrue Hub.
+- Build the Design System Foundation for Crew Hub.
 - Include the following exactly:
   - CSS variables color system (bg/text/status/brand + dark mode swap)
   - Typography scale (Geist/Geist Mono)

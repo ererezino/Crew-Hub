@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { DashboardAnnouncementsWidget } from "../../../components/shared/dashboard-announcements-widget";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { MetricCard } from "../../../components/shared/metric-card";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -198,13 +199,7 @@ export default async function DashboardPage() {
 
       <section className="dashboard-two-column" aria-label="Employee widgets">
         <div className="dashboard-panel">
-          <h3 className="section-title">Announcements</h3>
-          <EmptyState
-            title="No announcements yet"
-            description="Company updates will appear here once the Announcements module is enabled."
-            ctaLabel="Open dashboard"
-            ctaHref="/dashboard"
-          />
+          <DashboardAnnouncementsWidget />
         </div>
 
         <div className="dashboard-panel">

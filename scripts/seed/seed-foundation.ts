@@ -28,6 +28,13 @@ type SeedMember = {
   status: SeedStatus;
 };
 
+type SeedAnnouncement = {
+  title: string;
+  body: string;
+  isPinned: boolean;
+  authorKey: SeedMember["key"];
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -148,6 +155,27 @@ const SEED_MEMBERS: SeedMember[] = [
     roles: ["EMPLOYEE"],
     managerKey: "eng_manager",
     status: "onboarding"
+  }
+];
+
+const SEED_ANNOUNCEMENTS: SeedAnnouncement[] = [
+  {
+    title: "Crew Hub rollout update",
+    body: "Crew Hub is now the default hub for internal employee operations. Use it for announcements, settings, and upcoming workflow modules.",
+    isPinned: true,
+    authorKey: "coo"
+  },
+  {
+    title: "Monthly all-hands schedule",
+    body: "The monthly all-hands now runs on the first Wednesday of each month at 3:00 PM WAT. Calendar invites have been updated.",
+    isPinned: false,
+    authorKey: "ceo"
+  },
+  {
+    title: "People ops office hours",
+    body: "People and Finance office hours are open every Friday from 11:00 AM to 1:00 PM WAT for onboarding and policy questions.",
+    isPinned: false,
+    authorKey: "head_people_finance"
   }
 ];
 
@@ -285,6 +313,108 @@ async function upsertProfiles(client: SupabaseClient, rows: ProfileRow[]): Promi
   }
 }
 
+async function upsertSeedAnnouncements(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  if (SEED_ANNOUNCEMENTS.length === 0) {
+    return;
+  }
+
+  const announcementTitles = SEED_ANNOUNCEMENTS.map((announcement) => announcement.title);
+
+  const { data: existingRows, error: existingRowsError } = await client
+    .from("announcements")
+    .select("id, title")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .in("title", announcementTitles);
+
+  if (existingRowsError) {
+    throw new Error(`Unable to query existing announcements: ${existingRowsError.message}`);
+  }
+
+  const existingIdByTitle = new Map(
+    (existingRows ?? []).map((row) => [row.title, row.id] as const)
+  );
+  const announcementReadRows: Array<{
+    announcement_id: string;
+    user_id: string;
+    read_at: string;
+  }> = [];
+
+  for (const announcement of SEED_ANNOUNCEMENTS) {
+    const authorId = userIdByKey.get(announcement.authorKey);
+
+    if (!authorId) {
+      throw new Error(`Missing author user id for announcement ${announcement.title}`);
+    }
+
+    const existingAnnouncementId = existingIdByTitle.get(announcement.title);
+
+    if (existingAnnouncementId) {
+      const { data: updatedRow, error: updateError } = await client
+        .from("announcements")
+        .update({
+          title: announcement.title,
+          body: announcement.body,
+          is_pinned: announcement.isPinned,
+          created_by: authorId,
+          deleted_at: null
+        })
+        .eq("id", existingAnnouncementId)
+        .eq("org_id", orgId)
+        .select("id")
+        .single();
+
+      if (updateError || !updatedRow) {
+        throw new Error(`Unable to update announcement ${announcement.title}: ${updateError?.message ?? "unknown error"}`);
+      }
+
+      announcementReadRows.push({
+        announcement_id: updatedRow.id,
+        user_id: authorId,
+        read_at: new Date().toISOString()
+      });
+
+      continue;
+    }
+
+    const { data: insertedRow, error: insertError } = await client
+      .from("announcements")
+      .insert({
+        org_id: orgId,
+        title: announcement.title,
+        body: announcement.body,
+        is_pinned: announcement.isPinned,
+        created_by: authorId
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !insertedRow) {
+      throw new Error(`Unable to insert announcement ${announcement.title}: ${insertError?.message ?? "unknown error"}`);
+    }
+
+    announcementReadRows.push({
+      announcement_id: insertedRow.id,
+      user_id: authorId,
+      read_at: new Date().toISOString()
+    });
+  }
+
+  if (announcementReadRows.length > 0) {
+    const { error: readUpsertError } = await client
+      .from("announcement_reads")
+      .upsert(announcementReadRows, { onConflict: "announcement_id,user_id" });
+
+    if (readUpsertError) {
+      throw new Error(`Unable to upsert announcement reads: ${readUpsertError.message}`);
+    }
+  }
+}
+
 async function main() {
   const client = createServiceRoleClient();
   const sharedPassword = process.env.SEED_TEST_PASSWORD ?? "CrewHub123!";
@@ -342,10 +472,12 @@ async function main() {
 
   await upsertProfiles(client, managementRows);
   await upsertProfiles(client, employeeRows);
+  await upsertSeedAnnouncements(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
   console.log(`Organization: ${org.name} (${org.id})`);
   console.log(`Profiles upserted: ${SEED_MEMBERS.length}`);
+  console.log(`Announcements upserted: ${SEED_ANNOUNCEMENTS.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
 
