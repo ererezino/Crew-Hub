@@ -75,6 +75,18 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G T"
       },
       {
+        label: "Time Off Approvals",
+        href: "/time-off/approvals",
+        description: "Approve or reject pending leave requests.",
+        shortcut: "G V"
+      },
+      {
+        label: "Time Off Calendar",
+        href: "/time-off/calendar",
+        description: "Monthly team leave calendar with filters.",
+        shortcut: "G K"
+      },
+      {
         label: "Documents",
         href: "/documents",
         description: "Contracts, policies, and signed files.",

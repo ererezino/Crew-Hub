@@ -102,6 +102,46 @@ type SeedOnboardingInstance = {
   tasks: SeedOnboardingInstanceTask[];
 };
 
+type SeedLeaveAccrualType = "annual_upfront" | "monthly" | "quarterly" | "manual";
+
+type SeedLeaveRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+type SeedLeavePolicy = {
+  countryCode: SeedMember["countryCode"];
+  leaveType: "annual" | "sick";
+  defaultDaysPerYear: number;
+  accrualType: SeedLeaveAccrualType;
+  carryOver: boolean;
+  notes: string | null;
+};
+
+type SeedLeaveBalance = {
+  employeeKey: SeedMember["key"];
+  leaveType: "annual" | "sick";
+  totalDays: number;
+  usedDays: number;
+  pendingDays: number;
+  carriedDays: number;
+};
+
+type SeedHoliday = {
+  countryCode: SeedMember["countryCode"];
+  date: string;
+  name: string;
+};
+
+type SeedLeaveRequest = {
+  employeeKey: SeedMember["key"];
+  leaveType: "annual" | "sick";
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  status: SeedLeaveRequestStatus;
+  reason: string;
+  approverKey: SeedMember["key"] | null;
+  rejectionReason: string | null;
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -472,6 +512,163 @@ const SEED_ONBOARDING_INSTANCES: SeedOnboardingInstance[] = [
         notes: null
       }
     ]
+  }
+];
+
+const CURRENT_SEED_YEAR = new Date().getUTCFullYear();
+
+function yearDate(monthDay: string): string {
+  return `${String(CURRENT_SEED_YEAR)}-${monthDay}`;
+}
+
+const SEED_LEAVE_POLICIES: SeedLeavePolicy[] = [
+  {
+    countryCode: "NG",
+    leaveType: "annual",
+    defaultDaysPerYear: 20,
+    accrualType: "annual_upfront",
+    carryOver: true,
+    notes: "Standard annual leave allocation for Nigeria employees."
+  },
+  {
+    countryCode: "NG",
+    leaveType: "sick",
+    defaultDaysPerYear: 10,
+    accrualType: "annual_upfront",
+    carryOver: false,
+    notes: "Sick leave allocation for Nigeria employees."
+  }
+];
+
+const ANNUAL_BALANCE_OVERRIDES: Partial<
+  Record<
+    SeedMember["key"],
+    {
+      usedDays: number;
+      pendingDays: number;
+      carriedDays: number;
+    }
+  >
+> = {
+  engineer_1: {
+    usedDays: 4,
+    pendingDays: 3,
+    carriedDays: 2
+  },
+  engineer_2: {
+    usedDays: 5,
+    pendingDays: 0,
+    carriedDays: 1
+  }
+};
+
+const SICK_BALANCE_OVERRIDES: Partial<
+  Record<
+    SeedMember["key"],
+    {
+      usedDays: number;
+      pendingDays: number;
+      carriedDays: number;
+    }
+  >
+> = {
+  ops_associate: {
+    usedDays: 2,
+    pendingDays: 0,
+    carriedDays: 0
+  }
+};
+
+const SEED_LEAVE_BALANCES: SeedLeaveBalance[] = SEED_MEMBERS.flatMap((member) => {
+  const annualOverride = ANNUAL_BALANCE_OVERRIDES[member.key];
+  const sickOverride = SICK_BALANCE_OVERRIDES[member.key];
+
+  return [
+    {
+      employeeKey: member.key,
+      leaveType: "annual",
+      totalDays: 20,
+      usedDays: annualOverride?.usedDays ?? 3,
+      pendingDays: annualOverride?.pendingDays ?? 1,
+      carriedDays: annualOverride?.carriedDays ?? 1
+    },
+    {
+      employeeKey: member.key,
+      leaveType: "sick",
+      totalDays: 10,
+      usedDays: sickOverride?.usedDays ?? 1,
+      pendingDays: sickOverride?.pendingDays ?? 0,
+      carriedDays: sickOverride?.carriedDays ?? 0
+    }
+  ];
+});
+
+const SEED_HOLIDAYS: SeedHoliday[] = [
+  {
+    countryCode: "NG",
+    date: yearDate("01-01"),
+    name: "New Year's Day"
+  },
+  {
+    countryCode: "NG",
+    date: yearDate("04-03"),
+    name: "Good Friday"
+  },
+  {
+    countryCode: "NG",
+    date: yearDate("04-06"),
+    name: "Easter Monday"
+  },
+  {
+    countryCode: "NG",
+    date: yearDate("05-01"),
+    name: "Workers' Day"
+  },
+  {
+    countryCode: "NG",
+    date: yearDate("10-01"),
+    name: "Independence Day"
+  },
+  {
+    countryCode: "NG",
+    date: yearDate("12-25"),
+    name: "Christmas Day"
+  }
+];
+
+const SEED_LEAVE_REQUESTS: SeedLeaveRequest[] = [
+  {
+    employeeKey: "engineer_1",
+    leaveType: "annual",
+    startDate: yearDate("03-10"),
+    endDate: yearDate("03-12"),
+    totalDays: 3,
+    status: "pending",
+    reason: "Planned personal time off for a family event.",
+    approverKey: null,
+    rejectionReason: null
+  },
+  {
+    employeeKey: "ops_associate",
+    leaveType: "sick",
+    startDate: yearDate("02-17"),
+    endDate: yearDate("02-18"),
+    totalDays: 2,
+    status: "approved",
+    reason: "Medical rest and recovery period.",
+    approverKey: "ops_manager",
+    rejectionReason: null
+  },
+  {
+    employeeKey: "engineer_2",
+    leaveType: "annual",
+    startDate: yearDate("01-20"),
+    endDate: yearDate("01-22"),
+    totalDays: 3,
+    status: "rejected",
+    reason: "Travel request during critical sprint delivery.",
+    approverKey: "eng_manager",
+    rejectionReason: "Coverage is unavailable during sprint close."
   }
 ];
 
@@ -1110,6 +1307,145 @@ async function upsertSeedOnboarding(
   }
 }
 
+async function upsertSeedTimeOff(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  if (SEED_LEAVE_POLICIES.length > 0) {
+    const policyRows = SEED_LEAVE_POLICIES.map((policy) => ({
+      org_id: orgId,
+      country_code: policy.countryCode,
+      leave_type: policy.leaveType,
+      default_days_per_year: policy.defaultDaysPerYear,
+      accrual_type: policy.accrualType,
+      carry_over: policy.carryOver,
+      notes: policy.notes,
+      deleted_at: null
+    }));
+
+    const { error: policyUpsertError } = await client
+      .from("leave_policies")
+      .upsert(policyRows, { onConflict: "org_id,country_code,leave_type" });
+
+    if (policyUpsertError) {
+      throw new Error(`Unable to upsert leave policies: ${policyUpsertError.message}`);
+    }
+  }
+
+  if (SEED_HOLIDAYS.length > 0) {
+    const holidayRows = SEED_HOLIDAYS.map((holiday) => ({
+      org_id: orgId,
+      country_code: holiday.countryCode,
+      date: holiday.date,
+      name: holiday.name,
+      year: Number.parseInt(holiday.date.slice(0, 4), 10),
+      deleted_at: null
+    }));
+
+    const { error: holidayUpsertError } = await client
+      .from("holiday_calendars")
+      .upsert(holidayRows, { onConflict: "org_id,country_code,date" });
+
+    if (holidayUpsertError) {
+      throw new Error(`Unable to upsert holiday calendars: ${holidayUpsertError.message}`);
+    }
+  }
+
+  if (SEED_LEAVE_BALANCES.length > 0) {
+    const balanceRows = SEED_LEAVE_BALANCES.map((balance) => {
+      const employeeId = userIdByKey.get(balance.employeeKey);
+
+      if (!employeeId) {
+        throw new Error(`Missing employee user id for leave balance seed (${balance.employeeKey})`);
+      }
+
+      return {
+        org_id: orgId,
+        employee_id: employeeId,
+        leave_type: balance.leaveType,
+        year: CURRENT_SEED_YEAR,
+        total_days: balance.totalDays,
+        used_days: balance.usedDays,
+        pending_days: balance.pendingDays,
+        carried_days: balance.carriedDays,
+        deleted_at: null
+      };
+    });
+
+    const { error: balanceUpsertError } = await client
+      .from("leave_balances")
+      .upsert(balanceRows, { onConflict: "employee_id,leave_type,year" });
+
+    if (balanceUpsertError) {
+      throw new Error(`Unable to upsert leave balances: ${balanceUpsertError.message}`);
+    }
+  }
+
+  for (const request of SEED_LEAVE_REQUESTS) {
+    const employeeId = userIdByKey.get(request.employeeKey);
+
+    if (!employeeId) {
+      throw new Error(`Missing employee user id for leave request seed (${request.employeeKey})`);
+    }
+
+    const approverId = request.approverKey ? userIdByKey.get(request.approverKey) ?? null : null;
+
+    if (request.approverKey && !approverId) {
+      throw new Error(`Missing approver user id for leave request seed (${request.approverKey})`);
+    }
+
+    const { data: existingRequest, error: existingRequestError } = await client
+      .from("leave_requests")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("leave_type", request.leaveType)
+      .eq("start_date", request.startDate)
+      .eq("end_date", request.endDate)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingRequestError) {
+      throw new Error(`Unable to query leave requests seed data: ${existingRequestError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      leave_type: request.leaveType,
+      start_date: request.startDate,
+      end_date: request.endDate,
+      total_days: request.totalDays,
+      status: request.status,
+      reason: request.reason,
+      approver_id: approverId,
+      rejection_reason: request.rejectionReason,
+      deleted_at: null
+    };
+
+    if (existingRequest?.id) {
+      const { error: updateError } = await client
+        .from("leave_requests")
+        .update(payload)
+        .eq("id", existingRequest.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update leave request seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("leave_requests").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert leave request seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function main() {
   const client = createServiceRoleClient();
   const sharedPassword = process.env.SEED_TEST_PASSWORD ?? "CrewHub123!";
@@ -1170,6 +1506,7 @@ async function main() {
   await upsertSeedAnnouncements(client, org.id, userIdByKey);
   await upsertSeedDocuments(client, org.id, userIdByKey);
   await upsertSeedOnboarding(client, org.id, userIdByKey);
+  await upsertSeedTimeOff(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
   console.log(`Organization: ${org.name} (${org.id})`);
@@ -1178,6 +1515,10 @@ async function main() {
   console.log(`Documents upserted: ${SEED_DOCUMENTS.length}`);
   console.log(`Onboarding templates upserted: ${SEED_ONBOARDING_TEMPLATES.length}`);
   console.log(`Onboarding instances upserted: ${SEED_ONBOARDING_INSTANCES.length}`);
+  console.log(`Leave policies upserted: ${SEED_LEAVE_POLICIES.length}`);
+  console.log(`Leave balances upserted: ${SEED_LEAVE_BALANCES.length}`);
+  console.log(`Leave requests upserted: ${SEED_LEAVE_REQUESTS.length}`);
+  console.log(`Holidays upserted: ${SEED_HOLIDAYS.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
 
