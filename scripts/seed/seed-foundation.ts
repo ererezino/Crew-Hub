@@ -142,6 +142,65 @@ type SeedLeaveRequest = {
   rejectionReason: string | null;
 };
 
+type SeedCompensationPayFrequency =
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "quarterly"
+  | "annual";
+
+type SeedCompensationEmploymentType = "full_time" | "part_time" | "contractor";
+
+type SeedCompensationRecord = {
+  employeeKey: SeedMember["key"];
+  baseSalaryAmount: number;
+  currency: "USD";
+  payFrequency: SeedCompensationPayFrequency;
+  employmentType: SeedCompensationEmploymentType;
+  effectiveOffsetDays: number;
+  effectiveToOffsetDays: number | null;
+  approvedByKey: SeedMember["key"] | null;
+};
+
+type SeedAllowanceType =
+  | "housing"
+  | "transport"
+  | "communication"
+  | "meal"
+  | "internet"
+  | "wellness"
+  | "other";
+
+type SeedAllowance = {
+  employeeKey: SeedMember["key"];
+  type: SeedAllowanceType;
+  label: string;
+  amount: number;
+  currency: "USD";
+  isTaxable: boolean;
+  effectiveOffsetDays: number;
+  effectiveToOffsetDays: number | null;
+};
+
+type SeedEquityGrantType = "ISO" | "NSO" | "RSU";
+
+type SeedEquityGrantStatus = "draft" | "active" | "cancelled" | "vested" | "terminated";
+
+type SeedEquityGrant = {
+  employeeKey: SeedMember["key"];
+  grantType: SeedEquityGrantType;
+  numberOfShares: number;
+  exercisePriceCents: number | null;
+  grantOffsetDays: number;
+  vestingStartOffsetDays: number;
+  cliffMonths: number;
+  vestingDurationMonths: number;
+  status: SeedEquityGrantStatus;
+  approvedByKey: SeedMember["key"] | null;
+  boardApprovalOffsetDays: number | null;
+  notes: string | null;
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -669,6 +728,98 @@ const SEED_LEAVE_REQUESTS: SeedLeaveRequest[] = [
     reason: "Travel request during critical sprint delivery.",
     approverKey: "eng_manager",
     rejectionReason: "Coverage is unavailable during sprint close."
+  }
+];
+
+const BASE_SALARY_BY_MEMBER: Record<SeedMember["key"], number> = {
+  coo: 2_100_000,
+  ceo: 2_300_000,
+  head_people_finance: 1_700_000,
+  eng_manager: 1_450_000,
+  ops_manager: 1_250_000,
+  engineer_1: 1_050_000,
+  ops_associate: 800_000,
+  engineer_2: 1_000_000,
+  compliance_officer: 900_000,
+  engineer_3: 1_150_000
+};
+
+const SEED_COMPENSATION_RECORDS: SeedCompensationRecord[] = SEED_MEMBERS.map((member) => ({
+  employeeKey: member.key,
+  baseSalaryAmount: BASE_SALARY_BY_MEMBER[member.key],
+  currency: "USD",
+  payFrequency: "monthly",
+  employmentType: "contractor",
+  effectiveOffsetDays: -180,
+  effectiveToOffsetDays: null,
+  approvedByKey: "coo"
+}));
+
+const SEED_ALLOWANCES: SeedAllowance[] = SEED_MEMBERS.flatMap((member) => [
+  {
+    employeeKey: member.key,
+    type: "internet",
+    label: "Internet Stipend",
+    amount: 15_000,
+    currency: "USD",
+    isTaxable: false,
+    effectiveOffsetDays: -120,
+    effectiveToOffsetDays: null
+  },
+  {
+    employeeKey: member.key,
+    type: "wellness",
+    label: "Wellness Stipend",
+    amount: 10_000,
+    currency: "USD",
+    isTaxable: false,
+    effectiveOffsetDays: -120,
+    effectiveToOffsetDays: null
+  }
+]);
+
+const SEED_EQUITY_GRANTS: SeedEquityGrant[] = [
+  {
+    employeeKey: "engineer_1",
+    grantType: "RSU",
+    numberOfShares: 12_000,
+    exercisePriceCents: null,
+    grantOffsetDays: -240,
+    vestingStartOffsetDays: -220,
+    cliffMonths: 12,
+    vestingDurationMonths: 48,
+    status: "active",
+    approvedByKey: "coo",
+    boardApprovalOffsetDays: -236,
+    notes: "Core engineering retention grant."
+  },
+  {
+    employeeKey: "eng_manager",
+    grantType: "NSO",
+    numberOfShares: 18_500,
+    exercisePriceCents: 250,
+    grantOffsetDays: -320,
+    vestingStartOffsetDays: -300,
+    cliffMonths: 12,
+    vestingDurationMonths: 48,
+    status: "active",
+    approvedByKey: "coo",
+    boardApprovalOffsetDays: -316,
+    notes: "Manager leadership grant."
+  },
+  {
+    employeeKey: "ceo",
+    grantType: "ISO",
+    numberOfShares: 30_000,
+    exercisePriceCents: 100,
+    grantOffsetDays: -760,
+    vestingStartOffsetDays: -730,
+    cliffMonths: 12,
+    vestingDurationMonths: 48,
+    status: "vested",
+    approvedByKey: "coo",
+    boardApprovalOffsetDays: -754,
+    notes: "Executive founding grant."
   }
 ];
 
@@ -1446,6 +1597,235 @@ async function upsertSeedTimeOff(
   }
 }
 
+async function upsertSeedCompensation(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  for (const compensation of SEED_COMPENSATION_RECORDS) {
+    const employeeId = userIdByKey.get(compensation.employeeKey);
+
+    if (!employeeId) {
+      throw new Error(
+        `Missing employee user id for compensation seed (${compensation.employeeKey})`
+      );
+    }
+
+    const approvedById = compensation.approvedByKey
+      ? userIdByKey.get(compensation.approvedByKey) ?? null
+      : null;
+
+    if (compensation.approvedByKey && !approvedById) {
+      throw new Error(
+        `Missing approver user id for compensation seed (${compensation.approvedByKey})`
+      );
+    }
+
+    const effectiveFrom = dateWithOffset(compensation.effectiveOffsetDays);
+    const effectiveTo =
+      compensation.effectiveToOffsetDays === null
+        ? null
+        : dateWithOffset(compensation.effectiveToOffsetDays);
+
+    const { data: existingRecord, error: existingRecordError } = await client
+      .from("compensation_records")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("effective_from", effectiveFrom)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingRecordError) {
+      throw new Error(
+        `Unable to query compensation records seed data: ${existingRecordError.message}`
+      );
+    }
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      base_salary_amount: compensation.baseSalaryAmount,
+      currency: compensation.currency,
+      pay_frequency: compensation.payFrequency,
+      employment_type: compensation.employmentType,
+      effective_from: effectiveFrom,
+      effective_to: effectiveTo,
+      approved_by: approvedById,
+      deleted_at: null
+    };
+
+    if (existingRecord?.id) {
+      const { error: updateError } = await client
+        .from("compensation_records")
+        .update(payload)
+        .eq("id", existingRecord.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(
+          `Unable to update compensation record seed data: ${updateError.message}`
+        );
+      }
+    } else {
+      const { error: insertError } = await client
+        .from("compensation_records")
+        .insert(payload);
+
+      if (insertError) {
+        throw new Error(
+          `Unable to insert compensation record seed data: ${insertError.message}`
+        );
+      }
+    }
+  }
+
+  for (const allowance of SEED_ALLOWANCES) {
+    const employeeId = userIdByKey.get(allowance.employeeKey);
+
+    if (!employeeId) {
+      throw new Error(
+        `Missing employee user id for allowance seed (${allowance.employeeKey})`
+      );
+    }
+
+    const effectiveFrom = dateWithOffset(allowance.effectiveOffsetDays);
+    const effectiveTo =
+      allowance.effectiveToOffsetDays === null
+        ? null
+        : dateWithOffset(allowance.effectiveToOffsetDays);
+
+    const { data: existingAllowance, error: existingAllowanceError } = await client
+      .from("allowances")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("type", allowance.type)
+      .eq("label", allowance.label)
+      .eq("effective_from", effectiveFrom)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingAllowanceError) {
+      throw new Error(
+        `Unable to query allowance seed data: ${existingAllowanceError.message}`
+      );
+    }
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      type: allowance.type,
+      label: allowance.label,
+      amount: allowance.amount,
+      currency: allowance.currency,
+      is_taxable: allowance.isTaxable,
+      effective_from: effectiveFrom,
+      effective_to: effectiveTo,
+      deleted_at: null
+    };
+
+    if (existingAllowance?.id) {
+      const { error: updateError } = await client
+        .from("allowances")
+        .update(payload)
+        .eq("id", existingAllowance.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update allowance seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("allowances").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert allowance seed data: ${insertError.message}`);
+      }
+    }
+  }
+
+  for (const grant of SEED_EQUITY_GRANTS) {
+    const employeeId = userIdByKey.get(grant.employeeKey);
+
+    if (!employeeId) {
+      throw new Error(`Missing employee user id for equity seed (${grant.employeeKey})`);
+    }
+
+    const approvedById = grant.approvedByKey
+      ? userIdByKey.get(grant.approvedByKey) ?? null
+      : null;
+
+    if (grant.approvedByKey && !approvedById) {
+      throw new Error(
+        `Missing approver user id for equity seed (${grant.approvedByKey})`
+      );
+    }
+
+    const grantDate = dateWithOffset(grant.grantOffsetDays);
+    const vestingStartDate = dateWithOffset(grant.vestingStartOffsetDays);
+    const boardApprovalDate =
+      grant.boardApprovalOffsetDays === null
+        ? null
+        : dateWithOffset(grant.boardApprovalOffsetDays);
+
+    const { data: existingGrant, error: existingGrantError } = await client
+      .from("equity_grants")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("grant_type", grant.grantType)
+      .eq("grant_date", grantDate)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingGrantError) {
+      throw new Error(`Unable to query equity seed data: ${existingGrantError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      grant_type: grant.grantType,
+      number_of_shares: grant.numberOfShares,
+      exercise_price_cents: grant.exercisePriceCents,
+      grant_date: grantDate,
+      vesting_start_date: vestingStartDate,
+      cliff_months: grant.cliffMonths,
+      vesting_duration_months: grant.vestingDurationMonths,
+      schedule: "monthly",
+      status: grant.status,
+      approved_by: approvedById,
+      board_approval_date: boardApprovalDate,
+      notes: grant.notes,
+      deleted_at: null
+    };
+
+    if (existingGrant?.id) {
+      const { error: updateError } = await client
+        .from("equity_grants")
+        .update(payload)
+        .eq("id", existingGrant.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update equity seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("equity_grants").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert equity seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function main() {
   const client = createServiceRoleClient();
   const sharedPassword = process.env.SEED_TEST_PASSWORD ?? "CrewHub123!";
@@ -1507,6 +1887,7 @@ async function main() {
   await upsertSeedDocuments(client, org.id, userIdByKey);
   await upsertSeedOnboarding(client, org.id, userIdByKey);
   await upsertSeedTimeOff(client, org.id, userIdByKey);
+  await upsertSeedCompensation(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
   console.log(`Organization: ${org.name} (${org.id})`);
@@ -1519,6 +1900,9 @@ async function main() {
   console.log(`Leave balances upserted: ${SEED_LEAVE_BALANCES.length}`);
   console.log(`Leave requests upserted: ${SEED_LEAVE_REQUESTS.length}`);
   console.log(`Holidays upserted: ${SEED_HOLIDAYS.length}`);
+  console.log(`Compensation records upserted: ${SEED_COMPENSATION_RECORDS.length}`);
+  console.log(`Allowances upserted: ${SEED_ALLOWANCES.length}`);
+  console.log(`Equity grants upserted: ${SEED_EQUITY_GRANTS.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
 

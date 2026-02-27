@@ -97,6 +97,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/me/documents",
         description: "Personal ID and tax forms for self-service.",
         shortcut: "G M"
+      },
+      {
+        label: "My Compensation",
+        href: "/me/compensation",
+        description: "Salary, allowances, equity, and compensation history.",
+        shortcut: "G B"
       }
     ]
   },
@@ -172,6 +178,12 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Admin",
     adminOnly: true,
     items: [
+      {
+        label: "Compensation Admin",
+        href: "/admin/compensation",
+        description: "Manage salary, allowances, equity grants, and approvals.",
+        shortcut: "A C"
+      },
       {
         label: "Admin Users",
         href: "/admin/users",
