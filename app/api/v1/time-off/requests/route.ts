@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import {
   calculateWorkingDays,
   isIsoDate,
@@ -29,9 +30,11 @@ const createLeaveRequestSchema = z.object({
 const profileRowSchema = z.object({
   id: z.string().uuid(),
   org_id: z.string().uuid(),
+  email: z.string().email(),
   full_name: z.string(),
   department: z.string().nullable(),
-  country_code: z.string().nullable()
+  country_code: z.string().nullable(),
+  manager_id: z.string().uuid().nullable()
 });
 
 const policyRowSchema = z.object({
@@ -229,7 +232,7 @@ export async function POST(request: Request) {
 
   const { data: profileRow, error: profileError } = await supabase
     .from("profiles")
-    .select("id, org_id, full_name, department, country_code")
+    .select("id, org_id, email, full_name, department, country_code, manager_id")
     .eq("id", session.profile.id)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -433,6 +436,43 @@ export async function POST(request: Request) {
   const responseData: TimeOffRequestMutationResponseData = {
     request: toRequestRecord(parsedRequest.data, employeeProfile)
   };
+
+  const { data: approvalRows, error: approvalError } = await supabase
+    .from("profiles")
+    .select("id, roles")
+    .eq("org_id", employeeProfile.org_id)
+    .is("deleted_at", null);
+
+  if (approvalError) {
+    console.error("Unable to load leave approver recipients.", {
+      leaveRequestId: parsedRequest.data.id,
+      message: approvalError.message
+    });
+  } else {
+    const adminApproverIds = (approvalRows ?? [])
+      .filter((row) => {
+        const roles = Array.isArray(row.roles)
+          ? row.roles.filter((role): role is string => typeof role === "string")
+          : [];
+        return roles.includes("HR_ADMIN") || roles.includes("SUPER_ADMIN");
+      })
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === "string");
+
+    const recipientIds = [
+      ...(employeeProfile.manager_id ? [employeeProfile.manager_id] : []),
+      ...adminApproverIds
+    ].filter((id) => id !== employeeProfile.id);
+
+    await createBulkNotifications({
+      orgId: employeeProfile.org_id,
+      userIds: recipientIds,
+      type: "leave_submitted",
+      title: `Leave request submitted by ${employeeProfile.full_name}`,
+      body: `${parsedBody.data.leaveType} leave from ${parsedBody.data.startDate} to ${parsedBody.data.endDate}.`,
+      link: "/time-off/approvals"
+    });
+  }
 
   return jsonResponse<TimeOffRequestMutationResponseData>(201, {
     data: responseData,

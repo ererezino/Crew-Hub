@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
@@ -81,6 +82,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
+  const profile = session.profile;
+
   if (!canManageAnnouncements(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
@@ -140,7 +143,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .from("announcements")
     .select("id")
     .eq("id", announcementId)
-    .eq("org_id", session.profile.org_id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -174,7 +177,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       is_pinned: parsedBody.data.isPinned
     })
     .eq("id", announcementId)
-    .eq("org_id", session.profile.org_id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .select("id, title, body, is_pinned, created_by, created_at, updated_at")
     .single();
@@ -207,13 +210,13 @@ export async function PATCH(request: Request, context: RouteContext) {
   let creatorName = "Unknown user";
 
   if (creatorId === session.profile.id) {
-    creatorName = session.profile.full_name;
+    creatorName = profile.full_name;
   } else {
     const { data: creatorRow } = await supabase
       .from("profiles")
       .select("full_name")
       .eq("id", creatorId)
-      .eq("org_id", session.profile.org_id)
+      .eq("org_id", profile.org_id)
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -226,13 +229,39 @@ export async function PATCH(request: Request, context: RouteContext) {
     .from("announcement_reads")
     .select("read_at")
     .eq("announcement_id", announcementId)
-    .eq("user_id", session.profile.id)
+    .eq("user_id", profile.id)
     .maybeSingle();
 
   const parsedReadRow = readRowSchema.safeParse(readRow);
   const readAt = parsedReadRow.success ? parsedReadRow.data.read_at : null;
 
   const announcement = toAnnouncement(parsedAnnouncement.data, creatorName, readAt);
+
+  const { data: recipientRows, error: recipientError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("org_id", profile.org_id)
+    .is("deleted_at", null);
+
+  if (recipientError) {
+    console.error("Unable to load announcement update recipients.", {
+      announcementId,
+      message: recipientError.message
+    });
+  } else {
+    const recipientUserIds = (recipientRows ?? [])
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === "string" && id !== profile.id);
+
+    await createBulkNotifications({
+      orgId: profile.org_id,
+      userIds: recipientUserIds,
+      type: "announcement",
+      title: `Announcement updated: ${parsedAnnouncement.data.title}`,
+      body: parsedAnnouncement.data.body.slice(0, 220),
+      link: "/announcements"
+    });
+  }
 
   return jsonResponse<{ announcement: Announcement }>(200, {
     data: {

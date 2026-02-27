@@ -7,6 +7,8 @@ import {
   isComplianceCadence,
   isComplianceStatus
 } from "../../../../../../lib/compliance";
+import { sendComplianceReminderEmail } from "../../../../../../lib/notifications/email";
+import { createNotification } from "../../../../../../lib/notifications/service";
 import { normalizeUserRoles } from "../../../../../../lib/navigation";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../types/auth";
@@ -63,6 +65,21 @@ function buildMeta() {
 
 function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return Response.json(payload, { status });
+}
+
+function dueSoonOrOverdue(dueDate: string): boolean {
+  const due = new Date(`${dueDate}T00:00:00.000Z`);
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  if (Number.isNaN(due.getTime())) {
+    return false;
+  }
+
+  const dueSoonLimit = new Date(today);
+  dueSoonLimit.setUTCDate(dueSoonLimit.getUTCDate() + 7);
+
+  return due.getTime() <= dueSoonLimit.getTime();
 }
 
 function mapDeadline({
@@ -402,6 +419,43 @@ export async function PATCH(
       proofDocument
     })
   };
+
+  if (
+    parsedUpdatedDeadline.data.assigned_to &&
+    parsedUpdatedDeadline.data.assigned_to !== parsedDeadline.data.assigned_to
+  ) {
+    await createNotification({
+      orgId,
+      userId: parsedUpdatedDeadline.data.assigned_to,
+      type: "compliance_deadline",
+      title: "Compliance deadline assigned",
+      body: `${parsedItem.data.requirement} is due on ${parsedUpdatedDeadline.data.due_date}.`,
+      link: "/compliance"
+    });
+  }
+
+  if (
+    parsedUpdatedDeadline.data.assigned_to &&
+    (parsedUpdatedDeadline.data.status === "pending" ||
+      parsedUpdatedDeadline.data.status === "in_progress") &&
+    dueSoonOrOverdue(parsedUpdatedDeadline.data.due_date)
+  ) {
+    await createNotification({
+      orgId,
+      userId: parsedUpdatedDeadline.data.assigned_to,
+      type: "compliance_deadline",
+      title: "Compliance reminder",
+      body: `${parsedItem.data.requirement} is due on ${parsedUpdatedDeadline.data.due_date}.`,
+      link: "/compliance"
+    });
+
+    await sendComplianceReminderEmail({
+      orgId,
+      userId: parsedUpdatedDeadline.data.assigned_to,
+      requirement: parsedItem.data.requirement,
+      dueDate: parsedUpdatedDeadline.data.due_date
+    });
+  }
 
   return jsonResponse<UpdateComplianceDeadlineData>(200, {
     data: responseData,

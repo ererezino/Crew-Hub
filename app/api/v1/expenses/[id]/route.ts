@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { createNotification } from "../../../../../lib/notifications/service";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type {
@@ -423,6 +424,23 @@ export async function PATCH(
       reimbursedAt: updatedExpense.reimbursedAt
     }
   });
+
+  if (payload.action === "approve" || payload.action === "reject") {
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      type: "expense_status",
+      title:
+        payload.action === "approve"
+          ? "Expense approved"
+          : "Expense rejected",
+      body:
+        payload.action === "approve"
+          ? `${updatedExpense.category} expense for ${updatedExpense.expenseDate} was approved.`
+          : `${updatedExpense.category} expense for ${updatedExpense.expenseDate} was rejected.${payload.rejectionReason ? ` Reason: ${payload.rejectionReason}` : ""}`,
+      link: "/expenses"
+    });
+  }
 
   const responseData: ExpenseMutationResponseData = {
     expense: updatedExpense

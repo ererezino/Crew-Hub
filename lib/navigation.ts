@@ -203,6 +203,12 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G S"
       },
       {
+        label: "Notifications",
+        href: "/notifications",
+        description: "Inbox for workflow and approval updates.",
+        shortcut: "G H"
+      },
+      {
         label: "Login",
         href: "/login",
         description: "Authentication entry screen placeholder.",

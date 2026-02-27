@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { createBulkNotifications } from "../../../../lib/notifications/service";
 import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
@@ -85,6 +86,8 @@ export async function GET(request: Request) {
     });
   }
 
+  const profile = session.profile;
+
   const requestUrl = new URL(request.url);
   const parsedQuery = listQuerySchema.safeParse(
     Object.fromEntries(requestUrl.searchParams.entries())
@@ -106,7 +109,7 @@ export async function GET(request: Request) {
   let announcementsQuery = supabase
     .from("announcements")
     .select("id, title, body, is_pinned, created_by, created_at, updated_at")
-    .eq("org_id", session.profile.org_id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false });
@@ -151,7 +154,7 @@ export async function GET(request: Request) {
     const { data: rawCreators, error: creatorsError } = await supabase
       .from("profiles")
       .select("id, full_name")
-      .eq("org_id", session.profile.org_id)
+      .eq("org_id", profile.org_id)
       .is("deleted_at", null)
       .in("id", creatorIds);
 
@@ -188,7 +191,7 @@ export async function GET(request: Request) {
     const { data: rawReadRows, error: readRowsError } = await supabase
       .from("announcement_reads")
       .select("announcement_id, read_at")
-      .eq("user_id", session.profile.id)
+      .eq("user_id", profile.id)
       .in("announcement_id", announcementIds);
 
     if (readRowsError) {
@@ -249,7 +252,9 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!canManageAnnouncements(session.profile.roles)) {
+  const profile = session.profile;
+
+  if (!canManageAnnouncements(profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
@@ -293,11 +298,11 @@ export async function POST(request: Request) {
   const { data: insertedAnnouncement, error: insertError } = await supabase
     .from("announcements")
     .insert({
-      org_id: session.profile.org_id,
+      org_id: profile.org_id,
       title: parsedBody.data.title.trim(),
       body: parsedBody.data.body.trim(),
       is_pinned: parsedBody.data.isPinned,
-      created_by: session.profile.id
+      created_by: profile.id
     })
     .select("id, title, body, is_pinned, created_by, created_at, updated_at")
     .single();
@@ -331,7 +336,7 @@ export async function POST(request: Request) {
   const { error: readUpsertError } = await supabase.from("announcement_reads").upsert(
     {
       announcement_id: parsedAnnouncement.data.id,
-      user_id: session.profile.id,
+      user_id: profile.id,
       read_at: createdReadAt
     },
     { onConflict: "announcement_id,user_id" }
@@ -346,9 +351,35 @@ export async function POST(request: Request) {
 
   const announcement = toAnnouncement(
     parsedAnnouncement.data,
-    new Map([[session.profile.id, session.profile.full_name]]),
+    new Map([[profile.id, profile.full_name]]),
     new Map([[parsedAnnouncement.data.id, createdReadAt]])
   );
+
+  const { data: recipientRows, error: recipientError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("org_id", profile.org_id)
+    .is("deleted_at", null);
+
+  if (recipientError) {
+    console.error("Unable to load announcement recipients.", {
+      announcementId: parsedAnnouncement.data.id,
+      message: recipientError.message
+    });
+  } else {
+    const recipientUserIds = (recipientRows ?? [])
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === "string" && id !== profile.id);
+
+    await createBulkNotifications({
+      orgId: profile.org_id,
+      userIds: recipientUserIds,
+      type: "announcement",
+      title: `New announcement: ${parsedAnnouncement.data.title}`,
+      body: parsedAnnouncement.data.body.slice(0, 220),
+      link: "/announcements"
+    });
+  }
 
   return jsonResponse<{ announcement: Announcement }>(201, {
     data: {

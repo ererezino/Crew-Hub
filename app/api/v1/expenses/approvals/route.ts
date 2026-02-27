@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import { isIsoMonth, monthDateRange } from "../../../../../lib/expenses";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type {
@@ -423,6 +424,7 @@ export async function POST(request: Request) {
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
   const expenses = parsedUpdatedRows.data.map((row) => toExpenseRecord(row, profileById));
+  const approvedEmployeeIds = [...new Set(expenses.map((expense) => expense.employeeId))];
 
   await logAudit({
     action: "approved",
@@ -434,6 +436,15 @@ export async function POST(request: Request) {
       approvedCount: expenses.length,
       expenseIds: allowedIds
     }
+  });
+
+  await createBulkNotifications({
+    orgId: session.profile.org_id,
+    userIds: approvedEmployeeIds,
+    type: "expense_status",
+    title: "Expense approved",
+    body: "Your expense submission has been approved.",
+    link: "/expenses"
   });
 
   const responseData: ExpenseBulkApproveResponseData = {

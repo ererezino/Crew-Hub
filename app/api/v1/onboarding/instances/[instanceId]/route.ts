@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { createNotification } from "../../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
@@ -69,6 +70,25 @@ function toProgressPercent(completedTasks: number, totalTasks: number): number {
   return Math.round((completedTasks / totalTasks) * 100);
 }
 
+function dueSoon(dueDate: string | null): boolean {
+  if (!dueDate) {
+    return false;
+  }
+
+  const due = new Date(`${dueDate}T00:00:00.000Z`);
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  if (Number.isNaN(due.getTime())) {
+    return false;
+  }
+
+  const limit = new Date(today);
+  limit.setUTCDate(limit.getUTCDate() + 2);
+
+  return due.getTime() <= limit.getTime();
+}
+
 type RouteContext = {
   params: Promise<{ instanceId: string }>;
 };
@@ -86,6 +106,8 @@ export async function GET(_request: Request, context: RouteContext) {
       meta: buildMeta()
     });
   }
+
+  const profile = session.profile;
 
   const parsedParams = paramsSchema.safeParse(await context.params);
 
@@ -107,7 +129,7 @@ export async function GET(_request: Request, context: RouteContext) {
     .from("onboarding_instances")
     .select("id, employee_id, template_id, type, status, started_at, completed_at")
     .eq("id", instanceId)
-    .eq("org_id", session.profile.org_id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -143,7 +165,7 @@ export async function GET(_request: Request, context: RouteContext) {
       "id, instance_id, title, description, category, status, assigned_to, due_date, completed_at, completed_by, notes"
     )
     .eq("instance_id", instance.id)
-    .eq("org_id", session.profile.org_id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
@@ -189,7 +211,7 @@ export async function GET(_request: Request, context: RouteContext) {
         ? supabase
             .from("profiles")
             .select("id, full_name")
-            .eq("org_id", session.profile.org_id)
+            .eq("org_id", profile.org_id)
             .is("deleted_at", null)
             .in("id", uniqueProfileIds)
         : Promise.resolve({ data: [], error: null }),
@@ -198,7 +220,7 @@ export async function GET(_request: Request, context: RouteContext) {
             .from("onboarding_templates")
             .select("id, name")
             .eq("id", instance.template_id)
-            .eq("org_id", session.profile.org_id)
+            .eq("org_id", profile.org_id)
             .is("deleted_at", null)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null })
@@ -270,6 +292,27 @@ export async function GET(_request: Request, context: RouteContext) {
       : null,
     notes: task.notes
   }));
+
+  const reminderTasks = tasksRows.filter((task) => {
+    return (
+      task.assigned_to === profile.id &&
+      task.status !== "completed" &&
+      dueSoon(task.due_date)
+    );
+  });
+
+  for (const task of reminderTasks) {
+    await createNotification({
+      orgId: profile.org_id,
+      userId: profile.id,
+      type: "onboarding_task",
+      title: `Onboarding task due: ${task.title}`,
+      body: task.due_date
+        ? `Complete this task by ${task.due_date}.`
+        : "This onboarding task is awaiting completion.",
+      link: `/onboarding/${instance.id}`
+    });
+  }
 
   const responseData: OnboardingInstanceDetailResponseData = {
     instance: summary,
