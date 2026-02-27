@@ -1503,6 +1503,325 @@ html.dark .topbar {
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
 
+.currency-display {
+  font-variant-numeric: tabular-nums;
+}
+
+.compensation-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+.compensation-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.compensation-summary-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.9rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.compensation-summary-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.compensation-salary-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.compensation-salary-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.compensation-salary-value {
+  margin-top: 0.2rem;
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.compensation-salary-meta {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.compensation-salary-meta div {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.45rem 0.55rem;
+}
+
+.compensation-salary-meta dt {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.compensation-salary-meta dd {
+  margin: 0.15rem 0 0;
+}
+
+.compensation-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .compensation-row-actions,
+.data-table-row:focus-within .compensation-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.compensation-allowance-details {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.65rem 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.compensation-equity-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compensation-equity-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.compensation-equity-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.compensation-equity-progress {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto 1fr;
+}
+
+.compensation-equity-meta {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.compensation-equity-meta div {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.45rem 0.55rem;
+}
+
+.compensation-equity-meta dt {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.compensation-equity-meta dd {
+  margin: 0.15rem 0 0;
+}
+
+.compensation-vesting-inline {
+  min-width: 180px;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.compensation-vesting-inline span {
+  color: var(--text-secondary);
+}
+
+.vesting-bar-root {
+  position: relative;
+  width: 100%;
+  min-width: 150px;
+  height: 0.95rem;
+}
+
+.vesting-bar-track {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--bg-canvas);
+  overflow: hidden;
+}
+
+.vesting-bar-cliff {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--bg-subtle);
+}
+
+.vesting-bar-vested {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--color-accent);
+}
+
+.vesting-bar-today-marker {
+  position: absolute;
+  top: -0.36rem;
+  width: 0;
+  height: 0;
+  border-left: 0.3rem solid transparent;
+  border-right: 0.3rem solid transparent;
+  border-top: 0.45rem solid var(--color-primary);
+  transform: translateX(-50%);
+}
+
+.compensation-timeline {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.compensation-timeline-item {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  padding: 0.6rem 0.65rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.compensation-timeline-main {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.compensation-timeline-label {
+  font-weight: 600;
+}
+
+.compensation-timeline-time {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.compensation-error-state {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.compensation-skeleton-layout {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.compensation-skeleton-summary,
+.compensation-skeleton-table-header,
+.compensation-skeleton-table-row,
+.compensation-skeleton-equity-card,
+.compensation-skeleton-timeline {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.compensation-skeleton-summary {
+  height: 5.8rem;
+}
+
+.compensation-skeleton-table-header {
+  height: 2rem;
+  border-radius: var(--radius-default);
+}
+
+.compensation-skeleton-table-row {
+  height: 2.7rem;
+  border-radius: var(--radius-default);
+}
+
+.compensation-skeleton-equity-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compensation-skeleton-equity-card {
+  height: 8.2rem;
+}
+
+.compensation-skeleton-timeline {
+  height: 8rem;
+}
+
+.compensation-admin-employee-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.85rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.people-profile-tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.people-profile-tab {
+  border: 1px solid var(--border-default);
+  background: var(--bg-canvas);
+  border-radius: var(--radius-default);
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition: border-color var(--transition-hover), background-color var(--transition-hover);
+}
+
+.people-profile-tab:hover {
+  border-color: var(--text-muted);
+}
+
+.people-profile-tab-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
 .settings-layout {
   display: grid;
   gap: 1rem;
@@ -2187,6 +2506,11 @@ html.dark .topbar {
     grid-template-columns: 1fr;
   }
 
+  .compensation-equity-grid,
+  .compensation-skeleton-equity-grid {
+    grid-template-columns: 1fr;
+  }
+
   .audit-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2286,6 +2610,13 @@ html.dark .topbar {
     flex-wrap: wrap;
   }
 
+  .compensation-row-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    flex-wrap: wrap;
+  }
+
   .audit-filters {
     grid-template-columns: 1fr;
   }
@@ -2317,6 +2648,30 @@ html.dark .topbar {
 
   .timeoff-calendar-day {
     min-height: 4.2rem;
+  }
+
+  .compensation-summary-card,
+  .compensation-salary-header,
+  .compensation-timeline-item,
+  .compensation-admin-employee-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .compensation-summary-meta {
+    justify-content: flex-start;
+  }
+
+  .compensation-salary-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .compensation-equity-progress {
+    grid-template-columns: 1fr;
+  }
+
+  .compensation-vesting-inline {
+    min-width: 0;
   }
 
   .sidebar-collapsed .sidebar-brand-copy,
