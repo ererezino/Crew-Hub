@@ -171,7 +171,9 @@ function PaymentStatementDocument(props: PaymentStatementPdfInput) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contractor</Text>
+          <Text style={styles.sectionTitle}>
+            {props.withholdingApplied ? "Employee" : "Contractor"}
+          </Text>
           <View style={styles.metaGrid}>
             <View style={styles.metaItem}>
               <Text style={styles.metaLabel}>Name</Text>

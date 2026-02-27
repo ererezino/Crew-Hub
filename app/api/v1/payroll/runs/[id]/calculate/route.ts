@@ -25,7 +25,12 @@ const eligibleProfileRowSchema = z.object({
   department: z.string().nullable(),
   country_code: z.string().nullable(),
   primary_currency: z.string().nullable(),
-  start_date: z.string().nullable()
+  start_date: z.string().nullable(),
+  payroll_mode: z.union([
+    z.literal("contractor_usd_no_withholding"),
+    z.literal("employee_local_withholding"),
+    z.literal("employee_usd_withholding")
+  ])
 });
 
 const compensationRowSchema = z.object({
@@ -165,10 +170,12 @@ export async function POST(
 
     const { data: rawEligibleProfiles, error: eligibleProfilesError } = await supabase
       .from("profiles")
-      .select("id, full_name, department, country_code, primary_currency, start_date")
+      .select("id, full_name, department, country_code, primary_currency, start_date, payroll_mode")
       .eq("org_id", profile.org_id)
-      .eq("employment_type", "contractor")
-      .eq("payroll_mode", "contractor_usd_no_withholding")
+      .in("payroll_mode", [
+        "contractor_usd_no_withholding",
+        "employee_local_withholding"
+      ])
       .eq("status", "active")
       .is("deleted_at", null)
       .order("full_name", { ascending: true });
@@ -341,133 +348,139 @@ export async function POST(
     let totalNet: Record<string, number> = {};
     let totalDeductions: Record<string, number> = {};
     let totalEmployerContributions: Record<string, number> = {};
-    let flaggedCount = 0;
 
-    const nextItemRows = parsedProfiles.data.map((employee) => {
-      const compensation = compensationByEmployeeId.get(employee.id) ?? null;
-      const allowanceRows = allowancesByEmployeeId.get(employee.id) ?? [];
-      const adjustments = existingAdjustmentsByEmployeeId.get(employee.id) ?? [];
+    const nextItemRows = await Promise.all(
+      parsedProfiles.data.map(async (employee) => {
+        const compensation = compensationByEmployeeId.get(employee.id) ?? null;
+        const allowanceRows = allowancesByEmployeeId.get(employee.id) ?? [];
+        const adjustments = existingAdjustmentsByEmployeeId.get(employee.id) ?? [];
 
-      const normalizedAllowances = allowanceRows.map((allowance) => ({
-        label: allowance.label,
-        amount: parseAmount(allowance.amount),
-        currency: normalizeCurrencyCode(allowance.currency),
-        isTaxable: allowance.is_taxable
-      }));
-
-      const baseSalaryAmount = compensation ? parseAmount(compensation.base_salary_amount) : 0;
-      const allowanceTotalAmount = normalizedAllowances.reduce(
-        (sum, allowance) => sum + allowance.amount,
-        0
-      );
-      const grossAmount = baseSalaryAmount + allowanceTotalAmount;
-      const currency = normalizeCurrencyCode(
-        compensation?.currency ?? employee.primary_currency ?? "USD"
-      );
-      const payCurrency = normalizeCurrencyCode(employee.primary_currency ?? "USD");
-
-      const calculated = calculatePayrollItem({
-        employee: {
-          id: employee.id,
-          payroll_mode: "contractor_usd_no_withholding",
-          country_code: employee.country_code
-        },
-        monthly_gross_amount: grossAmount,
-        monthly_base_salary_amount: baseSalaryAmount,
-        currency,
-        allowances: normalizedAllowances.map((allowance) => ({
+        const normalizedAllowances = allowanceRows.map((allowance) => ({
           label: allowance.label,
-          amount: allowance.amount,
-          currency: allowance.currency,
-          is_taxable: allowance.isTaxable
-        }))
-      });
+          amount: parseAmount(allowance.amount),
+          currency: normalizeCurrencyCode(allowance.currency),
+          isTaxable: allowance.is_taxable
+        }));
 
-      const mappedDeductions = calculated.deductions.map((row) => ({
-        ruleType: row.rule_type,
-        ruleName: row.rule_name,
-        amount: row.amount,
-        description: row.description
-      }));
+        const baseSalaryAmount = compensation ? parseAmount(compensation.base_salary_amount) : 0;
+        const allowanceTotalAmount = normalizedAllowances.reduce(
+          (sum, allowance) => sum + allowance.amount,
+          0
+        );
+        const grossAmount = baseSalaryAmount + allowanceTotalAmount;
+        const currency = normalizeCurrencyCode(
+          compensation?.currency ?? employee.primary_currency ?? "USD"
+        );
+        const payCurrency = normalizeCurrencyCode(employee.primary_currency ?? "USD");
 
-      const mappedEmployerContributions = calculated.employer_contributions.map((row) => ({
-        ruleType: row.rule_type,
-        ruleName: row.rule_name,
-        amount: row.amount,
-        description: row.description
-      }));
+        const calculated = await calculatePayrollItem({
+          employee: {
+            id: employee.id,
+            org_id: profile.org_id,
+            payroll_mode: employee.payroll_mode,
+            country_code: employee.country_code
+          },
+          monthly_gross_amount: grossAmount,
+          monthly_base_salary_amount: baseSalaryAmount,
+          currency,
+          allowances: normalizedAllowances.map((allowance) => ({
+            label: allowance.label,
+            amount: allowance.amount,
+            currency: allowance.currency,
+            is_taxable: allowance.isTaxable
+          })),
+          effective_date: parsedRun.data.pay_period_end
+        });
 
-      const adjustmentsTotal = adjustmentAmountTotal(adjustments);
-      const netAmount = calculated.net_amount + adjustmentsTotal;
+        const mappedDeductions = calculated.deductions.map((row) => ({
+          ruleType: row.rule_type,
+          ruleName: row.rule_name,
+          amount: row.amount,
+          description: row.description
+        }));
 
-      const flagReasons: string[] = [];
+        const mappedEmployerContributions = calculated.employer_contributions.map((row) => ({
+          ruleType: row.rule_type,
+          ruleName: row.rule_name,
+          amount: row.amount,
+          description: row.description
+        }));
 
-      if (!employeeIdsWithPayment.has(employee.id)) {
-        flagReasons.push("No payment details on file");
-      }
+        const adjustmentsTotal = adjustmentAmountTotal(adjustments);
+        const netAmount = calculated.net_amount + adjustmentsTotal;
 
-      if (!compensation) {
-        flagReasons.push("No compensation record");
-      }
+        const flagReasons: string[] = [];
 
-      if (
-        employee.start_date &&
-        employee.start_date >= parsedRun.data.pay_period_start &&
-        employee.start_date <= parsedRun.data.pay_period_end
-      ) {
-        flagReasons.push("New hire in this pay period");
-      }
+        if (!employeeIdsWithPayment.has(employee.id)) {
+          flagReasons.push("No payment details on file");
+        }
 
-      if (
-        compensation &&
-        compensation.effective_from >= parsedRun.data.pay_period_start &&
-        compensation.effective_from <= parsedRun.data.pay_period_end
-      ) {
-        flagReasons.push("Salary changed this month");
-      }
+        if (!compensation) {
+          flagReasons.push("No compensation record");
+        }
 
-      const flagged = flagReasons.length > 0;
+        if (
+          employee.start_date &&
+          employee.start_date >= parsedRun.data.pay_period_start &&
+          employee.start_date <= parsedRun.data.pay_period_end
+        ) {
+          flagReasons.push("New hire in this pay period");
+        }
 
-      if (flagged) {
-        flaggedCount += 1;
-      }
+        if (
+          compensation &&
+          compensation.effective_from >= parsedRun.data.pay_period_start &&
+          compensation.effective_from <= parsedRun.data.pay_period_end
+        ) {
+          flagReasons.push("Salary changed this month");
+        }
 
-      totalGross = addCurrencyTotal(totalGross, payCurrency, grossAmount);
-      totalNet = addCurrencyTotal(totalNet, payCurrency, netAmount);
+        const flagged = flagReasons.length > 0;
+
+        return {
+          payroll_run_id: runId,
+          employee_id: employee.id,
+          org_id: profile.org_id,
+          gross_amount: grossAmount,
+          currency,
+          pay_currency: payCurrency,
+          base_salary_amount: baseSalaryAmount,
+          allowances: normalizedAllowances,
+          adjustments,
+          deductions: mappedDeductions,
+          employer_contributions: mappedEmployerContributions,
+          net_amount: netAmount,
+          withholding_applied: calculated.withholding_applied,
+          payment_status: "pending" as const,
+          payment_reference: null,
+          payment_id: null,
+          notes: compensation ? null : "Compensation record missing.",
+          flagged,
+          flag_reason: flagReasons.length > 0 ? flagReasons.join("; ") : null,
+          deleted_at: null
+        };
+      })
+    );
+
+    const flaggedCount = nextItemRows.filter((row) => row.flagged).length;
+
+    for (const row of nextItemRows) {
+      totalGross = addCurrencyTotal(totalGross, row.pay_currency, row.gross_amount);
+      totalNet = addCurrencyTotal(totalNet, row.pay_currency, row.net_amount);
       totalDeductions = addCurrencyTotal(
         totalDeductions,
-        payCurrency,
-        calculated.total_deductions
+        row.pay_currency,
+        row.deductions.reduce((sum, deduction) => sum + deduction.amount, 0)
       );
       totalEmployerContributions = addCurrencyTotal(
         totalEmployerContributions,
-        payCurrency,
-        calculated.total_employer_contributions
+        row.pay_currency,
+        row.employer_contributions.reduce(
+          (sum, contribution) => sum + contribution.amount,
+          0
+        )
       );
-
-      return {
-        payroll_run_id: runId,
-        employee_id: employee.id,
-        org_id: profile.org_id,
-        gross_amount: grossAmount,
-        currency,
-        pay_currency: payCurrency,
-        base_salary_amount: baseSalaryAmount,
-        allowances: normalizedAllowances,
-        adjustments,
-        deductions: mappedDeductions,
-        employer_contributions: mappedEmployerContributions,
-        net_amount: netAmount,
-        withholding_applied: calculated.withholding_applied,
-        payment_status: "pending" as const,
-        payment_reference: null,
-        payment_id: null,
-        notes: compensation ? null : "Compensation record missing.",
-        flagged,
-        flag_reason: flagReasons.length > 0 ? flagReasons.join("; ") : null,
-        deleted_at: null
-      };
-    });
+    }
 
     if (nextItemRows.length > 0) {
       const { error: upsertError } = await supabase
@@ -511,9 +524,9 @@ export async function POST(
       ...previousSnapshot,
       lastCalculatedAt: new Date().toISOString(),
       lastCalculatedBy: profile.id,
-      eligibleContractorCount: nextItemRows.length,
+      eligiblePayrollCount: nextItemRows.length,
       flaggedCount,
-      withholdingApplied: false
+      withholdingApplied: nextItemRows.some((row) => row.withholding_applied)
     };
 
     const { error: updateRunError } = await supabase

@@ -2443,6 +2443,11 @@ html.dark .topbar {
   border-color: var(--border-default);
 }
 
+.payroll-country-item-active {
+  border-color: var(--status-success-border);
+  background: var(--status-success-bg);
+}
+
 .payroll-country-copy {
   display: grid;
   gap: 0.2rem;
@@ -2501,6 +2506,34 @@ html.dark .topbar {
   border-radius: 999px;
   background: var(--text-muted);
   border: 1px solid var(--border-default);
+}
+
+.payroll-rate-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.payroll-rate-input {
+  min-width: 6.5rem;
+  display: inline-flex;
+}
+
+.payroll-rules-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.payroll-preview-input-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.payroll-breakdown-row-even {
+  background: var(--bg-surface);
 }
 
 .payroll-dashboard-skeleton {
@@ -2704,6 +2737,7 @@ html.dark .topbar {
 }
 
 .payroll-allowance-list,
+.payroll-deduction-list,
 .payroll-adjustment-list {
   margin: 0;
   padding: 0;
@@ -2713,6 +2747,7 @@ html.dark .topbar {
 }
 
 .payroll-allowance-list li,
+.payroll-deduction-list li,
 .payroll-adjustment-list li {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-default);
@@ -2722,6 +2757,11 @@ html.dark .topbar {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.payroll-deduction-section {
+  display: grid;
+  gap: 0.35rem;
 }
 
 .payroll-run-skeleton {
@@ -3725,6 +3765,11 @@ html.dark .topbar {
 
   .expenses-form-grid,
   .expenses-category-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payroll-rules-grid,
+  .payroll-preview-input-grid {
     grid-template-columns: 1fr;
   }
 

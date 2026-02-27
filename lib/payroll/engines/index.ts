@@ -1,6 +1,9 @@
 import type { CountryPayrollEngine } from "../../../types/payroll";
+import { nigeriaEngine } from "./nigeria";
 
-const COUNTRY_ENGINE_REGISTRY: Readonly<Record<string, CountryPayrollEngine>> = {};
+const COUNTRY_ENGINE_REGISTRY: Readonly<Record<string, CountryPayrollEngine>> = {
+  NG: nigeriaEngine
+};
 
 export function getCountryEngine(countryCode: string | null | undefined): CountryPayrollEngine | null {
   if (!countryCode) {
