@@ -211,8 +211,8 @@ export default async function DashboardPage() {
               </Link>
             </li>
             <li>
-              <Link className="quick-link" href="/payroll">
-                View Payslips
+              <Link className="quick-link" href="/me/payslips">
+                View Payments
               </Link>
             </li>
             <li>

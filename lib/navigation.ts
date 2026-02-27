@@ -105,6 +105,12 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G B"
       },
       {
+        label: "Payments",
+        href: "/me/payslips",
+        description: "View and download monthly payment statements.",
+        shortcut: "G J"
+      },
+      {
         label: "My Payment Details",
         href: "/me/payment-details",
         description: "Manage payout method details with masked destination view.",

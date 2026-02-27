@@ -15,6 +15,7 @@ import {
   labelForPayrollRunStatus,
   toneForPayrollRunStatus
 } from "../../../../../lib/payroll/runs";
+import type { GeneratePayslipsResponse } from "../../../../../types/payslips";
 import type {
   AddPayrollAdjustmentResponse,
   CalculatePayrollRunResponse,
@@ -178,6 +179,7 @@ export function PayrollRunDetailClient({
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [isGeneratingStatements, setIsGeneratingStatements] = useState(false);
   const [activeRunAction, setActiveRunAction] = useState<
     null | "submit" | "approve_first" | "approve_final" | "reject" | "cancel"
   >(null);
@@ -207,6 +209,7 @@ export function PayrollRunDetailClient({
   const isPendingFirst = run?.status === "pending_first_approval";
   const isPendingFinal = run?.status === "pending_final_approval";
   const canCalculateRun = canManage && (run?.status === "draft" || isCalculated);
+  const canGenerateStatements = canManage && isApproved;
   const canAdjustItems = canManage && isCalculated;
   const canSubmitForApproval = canManage && isCalculated;
   const canApproveFirst =
@@ -266,6 +269,52 @@ export function PayrollRunDetailClient({
       showToast("error", error instanceof Error ? error.message : "Unable to calculate payroll run.");
     } finally {
       setIsCalculating(false);
+    }
+  };
+
+  const generateStatements = async () => {
+    setIsGeneratingStatements(true);
+
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/generate-payslips`, {
+        method: "POST"
+      });
+
+      const payload = (await response.json()) as GeneratePayslipsResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? "Unable to generate payment statements.");
+        return;
+      }
+
+      if (payload.data.generatedCount > 0) {
+        showToast(
+          "success",
+          `Generated ${payload.data.generatedCount} payment statement${
+            payload.data.generatedCount === 1 ? "" : "s"
+          }.`
+        );
+      } else {
+        showToast("info", "No payment statements were generated.");
+      }
+
+      if (payload.data.skippedCount > 0) {
+        showToast(
+          "info",
+          `${payload.data.skippedCount} statement${
+            payload.data.skippedCount === 1 ? "" : "s"
+          } skipped due to missing data or file upload issues.`
+        );
+      }
+
+      runQuery.refresh();
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to generate payment statements."
+      );
+    } finally {
+      setIsGeneratingStatements(false);
     }
   };
 
@@ -424,15 +473,30 @@ export function PayrollRunDetailClient({
         title="Payroll Run"
         description="Review contractor payroll calculations, approvals, and item-level adjustments."
         actions={
-          canCalculateRun ? (
-            <button
-              type="button"
-              className="button button-accent"
-              onClick={calculateRun}
-              disabled={isCalculating || activeRunAction !== null}
-            >
-              {isCalculating ? "Calculating..." : "Calculate run"}
-            </button>
+          canCalculateRun || canGenerateStatements ? (
+            <>
+              {canCalculateRun ? (
+                <button
+                  type="button"
+                  className="button button-accent"
+                  onClick={calculateRun}
+                  disabled={isCalculating || isGeneratingStatements || activeRunAction !== null}
+                >
+                  {isCalculating ? "Calculating..." : "Calculate run"}
+                </button>
+              ) : null}
+
+              {canGenerateStatements ? (
+                <button
+                  type="button"
+                  className="button button-accent"
+                  onClick={generateStatements}
+                  disabled={isGeneratingStatements || isCalculating || activeRunAction !== null}
+                >
+                  {isGeneratingStatements ? "Generating..." : "Generate statements"}
+                </button>
+              ) : null}
+            </>
           ) : null
         }
       />
