@@ -162,6 +162,15 @@ export function CommandPalette({
     };
   }, []);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   const handleQueryChange = (value: string) => {
     setQuery(value);
     setSelectedIndex(0);
