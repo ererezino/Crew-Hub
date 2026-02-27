@@ -50,7 +50,7 @@ export type CreatePaymentBatchPayload = {
 
 export type PaymentBatchSummary = {
   createdCount: number;
-  reusedCount: number;
+  rejectedCount: number;
   retriedCount: number;
   completedCount: number;
   failedCount: number;

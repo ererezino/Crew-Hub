@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
@@ -7,6 +8,10 @@ import type { ApiResponse } from "../../../../../types/auth";
 type LoginAuditResponse = {
   logged: boolean;
 };
+
+const requestHeadersSchema = z.object({
+  userAgent: z.string().nullable()
+});
 
 function buildMeta() {
   return {
@@ -18,7 +23,22 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+  const parsedHeaders = requestHeadersSchema.safeParse({
+    userAgent: request.headers.get("user-agent")
+  });
+
+  if (!parsedHeaders.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Invalid request headers."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const supabase = await createSupabaseServerClient();
 
   const {
@@ -42,7 +62,8 @@ export async function POST() {
     tableName: "auth.users",
     recordId: user.id,
     newValue: {
-      event: "login"
+      event: "login",
+      userAgent: parsedHeaders.data.userAgent
     }
   });
 

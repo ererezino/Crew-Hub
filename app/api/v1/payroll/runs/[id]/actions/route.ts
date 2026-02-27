@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
 import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
+import { evaluatePayrollApprovalAction } from "../../../../../../../lib/payroll/approval-policy";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import type { UserRole } from "../../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../../lib/roles";
@@ -34,6 +35,16 @@ function canFinalApprove(roles: readonly UserRole[]): boolean {
 
 function rejectionReasonRequiredMessage(): string {
   return "Rejection reason is required.";
+}
+
+function statusFromDecisionCode(
+  code: "FORBIDDEN" | "INVALID_STATE" | "PAYROLL_LOCKED"
+): number {
+  if (code === "INVALID_STATE") {
+    return 409;
+  }
+
+  return 403;
 }
 
 export async function POST(
@@ -135,12 +146,21 @@ export async function POST(
       });
     }
 
-    if (parsedRun.data.status === "approved") {
-      return jsonResponse<null>(403, {
+    const actionDecision = evaluatePayrollApprovalAction({
+      action,
+      status: parsedRun.data.status,
+      actorId: profile.id,
+      initiatedBy: parsedRun.data.initiated_by,
+      firstApprovedBy: parsedRun.data.first_approved_by,
+      actorRoles: profile.roles
+    });
+
+    if (!actionDecision.allowed) {
+      return jsonResponse<null>(statusFromDecisionCode(actionDecision.code), {
         data: null,
         error: {
-          code: "PAYROLL_LOCKED",
-          message: "Payroll locked. Approved runs cannot be modified."
+          code: actionDecision.code,
+          message: actionDecision.message
         },
         meta: buildMeta()
       });

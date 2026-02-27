@@ -1,5 +1,16 @@
+import { z } from "zod";
+
 import type { PaymentsWebhookResponseData } from "../../../../../types/payments";
 import { buildMeta, jsonResponse } from "../_helpers";
+
+const webhookPayloadSchema = z
+  .object({
+    eventType: z.string().trim().min(1).optional(),
+    paymentId: z.string().uuid().optional(),
+    idempotencyKey: z.string().trim().min(1).optional(),
+    payload: z.unknown().optional()
+  })
+  .passthrough();
 
 export async function POST(request: Request) {
   let payload: unknown = null;
@@ -10,10 +21,8 @@ export async function POST(request: Request) {
     payload = null;
   }
 
-  const eventType =
-    payload && typeof payload === "object" && "eventType" in payload
-      ? (payload as { eventType?: unknown }).eventType
-      : null;
+  const parsedPayload = webhookPayloadSchema.safeParse(payload);
+  const eventType = parsedPayload.success ? parsedPayload.data.eventType ?? null : null;
 
   console.info("Payments webhook stub received.", {
     eventType,
