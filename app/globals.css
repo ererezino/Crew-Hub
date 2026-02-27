@@ -1277,6 +1277,232 @@ html.dark .topbar {
   height: 6.75rem;
 }
 
+.timeoff-balance-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 1rem;
+}
+
+.timeoff-balance-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.timeoff-balance-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.timeoff-balance-metric {
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.timeoff-balance-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.timeoff-balance-breakdown div {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.4rem 0.5rem;
+}
+
+.timeoff-balance-breakdown dt {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.timeoff-balance-breakdown dd {
+  margin: 0.15rem 0 0;
+}
+
+.timeoff-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.timeoff-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .timeoff-row-actions,
+.data-table-row:focus-within .timeoff-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.timeoff-month-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.timeoff-mini-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.timeoff-calendar-weekday {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.timeoff-calendar-day {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  min-height: 4.85rem;
+  padding: 0.4rem;
+  display: grid;
+  gap: 0.2rem;
+  align-content: flex-start;
+}
+
+.timeoff-calendar-day-muted {
+  opacity: 0.45;
+}
+
+.timeoff-calendar-day-approved {
+  border-color: var(--status-success-border);
+  background: color-mix(in srgb, var(--status-success-bg) 70%, var(--bg-canvas));
+}
+
+.timeoff-calendar-day-pending {
+  border-color: var(--status-pending-border);
+  background: color-mix(in srgb, var(--status-pending-bg) 70%, var(--bg-canvas));
+}
+
+.timeoff-calendar-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.timeoff-country-summary {
+  margin-top: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.timeoff-form-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.timeoff-request-summary {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.timeoff-filter-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.timeoff-calendar-entry-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.timeoff-calendar-entry-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.75rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.timeoff-calendar-entry-title {
+  font-weight: 600;
+}
+
+.timeoff-calendar-entry-meta {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: end;
+}
+
+.timeoff-skeleton-layout {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.timeoff-balance-skeleton-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.timeoff-balance-skeleton-card {
+  height: 8.4rem;
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.timeoff-table-skeleton {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.timeoff-table-skeleton-header {
+  height: 2.1rem;
+  border-radius: var(--radius-default);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.timeoff-table-skeleton-row {
+  height: 2.8rem;
+  border-radius: var(--radius-default);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.timeoff-calendar-skeleton {
+  height: 22rem;
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
 .settings-layout {
   display: grid;
   gap: 1rem;
@@ -1969,6 +2195,19 @@ html.dark .topbar {
     grid-template-columns: 1fr;
   }
 
+  .timeoff-balance-grid,
+  .timeoff-balance-skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .timeoff-calendar-entry-card {
+    display: grid;
+  }
+
+  .timeoff-calendar-entry-meta {
+    justify-items: start;
+  }
+
   .announcement-item-header {
     flex-direction: column;
     align-items: flex-start;
@@ -2040,6 +2279,13 @@ html.dark .topbar {
     flex-wrap: wrap;
   }
 
+  .timeoff-row-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    flex-wrap: wrap;
+  }
+
   .audit-filters {
     grid-template-columns: 1fr;
   }
@@ -2051,6 +2297,26 @@ html.dark .topbar {
 
   .my-documents-desktop-table {
     display: none;
+  }
+
+  .timeoff-balance-grid,
+  .timeoff-balance-skeleton-grid,
+  .timeoff-form-grid,
+  .timeoff-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .timeoff-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .timeoff-mini-calendar {
+    gap: 0.3rem;
+  }
+
+  .timeoff-calendar-day {
+    min-height: 4.2rem;
   }
 
   .sidebar-collapsed .sidebar-brand-copy,
