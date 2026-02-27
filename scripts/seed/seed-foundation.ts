@@ -35,6 +35,29 @@ type SeedAnnouncement = {
   authorKey: SeedMember["key"];
 };
 
+type SeedDocumentCategory =
+  | "policy"
+  | "contract"
+  | "id_document"
+  | "tax_form"
+  | "compliance"
+  | "payroll_statement"
+  | "other";
+
+type SeedDocument = {
+  title: string;
+  description: string;
+  category: SeedDocumentCategory;
+  ownerKey: SeedMember["key"] | null;
+  createdByKey: SeedMember["key"];
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  expiryOffsetDays: number | null;
+  countryCode: SeedMember["countryCode"] | null;
+  versionCount: number;
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -176,6 +199,74 @@ const SEED_ANNOUNCEMENTS: SeedAnnouncement[] = [
     body: "People and Finance office hours are open every Friday from 11:00 AM to 1:00 PM WAT for onboarding and policy questions.",
     isPinned: false,
     authorKey: "head_people_finance"
+  }
+];
+
+const SEED_DOCUMENTS: SeedDocument[] = [
+  {
+    title: "Remote Work Policy",
+    description: "Shared policy for distributed work expectations and communication cadence.",
+    category: "policy",
+    ownerKey: null,
+    createdByKey: "head_people_finance",
+    fileName: "remote-work-policy.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 184_220,
+    expiryOffsetDays: 18,
+    countryCode: "NG",
+    versionCount: 2
+  },
+  {
+    title: "Code of Conduct",
+    description: "Company-wide standards on behavior, reporting channels, and accountability.",
+    category: "policy",
+    ownerKey: null,
+    createdByKey: "coo",
+    fileName: "code-of-conduct.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 142_900,
+    expiryOffsetDays: null,
+    countryCode: null,
+    versionCount: 1
+  },
+  {
+    title: "Ifeanyi Eze Passport",
+    description: "Primary ID document for payroll and compliance processing.",
+    category: "id_document",
+    ownerKey: "engineer_1",
+    createdByKey: "engineer_1",
+    fileName: "ifeanyi-passport.jpg",
+    mimeType: "image/jpeg",
+    sizeBytes: 492_040,
+    expiryOffsetDays: 240,
+    countryCode: "NG",
+    versionCount: 1
+  },
+  {
+    title: "Ifeanyi Eze Tax Form",
+    description: "Annual contractor tax form for USD payments.",
+    category: "tax_form",
+    ownerKey: "engineer_1",
+    createdByKey: "engineer_1",
+    fileName: "ifeanyi-tax-form.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 231_004,
+    expiryOffsetDays: 12,
+    countryCode: "NG",
+    versionCount: 2
+  },
+  {
+    title: "Abena Owusu Tax Form",
+    description: "Current contractor tax declaration for reimbursements and payroll records.",
+    category: "tax_form",
+    ownerKey: "ops_associate",
+    createdByKey: "ops_associate",
+    fileName: "abena-tax-form.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 188_210,
+    expiryOffsetDays: 64,
+    countryCode: "GH",
+    versionCount: 1
   }
 ];
 
@@ -415,6 +506,153 @@ async function upsertSeedAnnouncements(
   }
 }
 
+function dateWithOffset(offsetDays: number): string {
+  const baseDate = new Date();
+  baseDate.setUTCDate(baseDate.getUTCDate() + offsetDays);
+  return baseDate.toISOString().slice(0, 10);
+}
+
+function slugifyForPath(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+}
+
+async function upsertSeedDocuments(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  if (SEED_DOCUMENTS.length === 0) {
+    return;
+  }
+
+  const documentTitles = SEED_DOCUMENTS.map((document) => document.title);
+
+  const { data: existingRows, error: existingRowsError } = await client
+    .from("documents")
+    .select("id, title")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .in("title", documentTitles);
+
+  if (existingRowsError) {
+    throw new Error(`Unable to query existing documents: ${existingRowsError.message}`);
+  }
+
+  const existingIdByTitle = new Map(
+    (existingRows ?? []).map((row) => [row.title, row.id] as const)
+  );
+
+  const versionRows: Array<{
+    org_id: string;
+    document_id: string;
+    version: number;
+    file_path: string;
+    uploaded_by: string;
+  }> = [];
+
+  for (const document of SEED_DOCUMENTS) {
+    const ownerUserId = document.ownerKey ? userIdByKey.get(document.ownerKey) ?? null : null;
+    const createdByUserId = userIdByKey.get(document.createdByKey);
+
+    if (!createdByUserId) {
+      throw new Error(`Missing creator user id for document ${document.title}`);
+    }
+
+    if (document.ownerKey && !ownerUserId) {
+      throw new Error(`Missing owner user id for document ${document.title}`);
+    }
+
+    const baseSlug = slugifyForPath(document.title);
+    const latestVersion = Math.max(1, document.versionCount);
+    const latestPath = `${orgId}/seed/${baseSlug}/v${latestVersion}-${document.fileName}`;
+    const expiryDate =
+      document.expiryOffsetDays === null ? null : dateWithOffset(document.expiryOffsetDays);
+    const existingDocumentId = existingIdByTitle.get(document.title);
+
+    let documentId: string;
+
+    if (existingDocumentId) {
+      const { data: updatedRow, error: updateError } = await client
+        .from("documents")
+        .update({
+          owner_user_id: ownerUserId,
+          category: document.category,
+          title: document.title,
+          description: document.description,
+          file_path: latestPath,
+          file_name: document.fileName,
+          mime_type: document.mimeType,
+          size_bytes: document.sizeBytes,
+          expiry_date: expiryDate,
+          country_code: document.countryCode,
+          created_by: createdByUserId,
+          deleted_at: null
+        })
+        .eq("id", existingDocumentId)
+        .eq("org_id", orgId)
+        .select("id")
+        .single();
+
+      if (updateError || !updatedRow) {
+        throw new Error(`Unable to update document ${document.title}: ${updateError?.message ?? "unknown error"}`);
+      }
+
+      documentId = updatedRow.id;
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("documents")
+        .insert({
+          org_id: orgId,
+          owner_user_id: ownerUserId,
+          category: document.category,
+          title: document.title,
+          description: document.description,
+          file_path: latestPath,
+          file_name: document.fileName,
+          mime_type: document.mimeType,
+          size_bytes: document.sizeBytes,
+          expiry_date: expiryDate,
+          country_code: document.countryCode,
+          created_by: createdByUserId
+        })
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow) {
+        throw new Error(`Unable to insert document ${document.title}: ${insertError?.message ?? "unknown error"}`);
+      }
+
+      documentId = insertedRow.id;
+    }
+
+    for (let version = 1; version <= latestVersion; version += 1) {
+      const versionPath = `${orgId}/seed/${baseSlug}/v${version}-${document.fileName}`;
+
+      versionRows.push({
+        org_id: orgId,
+        document_id: documentId,
+        version,
+        file_path: versionPath,
+        uploaded_by: createdByUserId
+      });
+    }
+  }
+
+  if (versionRows.length > 0) {
+    const { error: versionUpsertError } = await client
+      .from("document_versions")
+      .upsert(versionRows, { onConflict: "document_id,version" });
+
+    if (versionUpsertError) {
+      throw new Error(`Unable to upsert document versions: ${versionUpsertError.message}`);
+    }
+  }
+}
+
 async function main() {
   const client = createServiceRoleClient();
   const sharedPassword = process.env.SEED_TEST_PASSWORD ?? "CrewHub123!";
@@ -473,11 +711,13 @@ async function main() {
   await upsertProfiles(client, managementRows);
   await upsertProfiles(client, employeeRows);
   await upsertSeedAnnouncements(client, org.id, userIdByKey);
+  await upsertSeedDocuments(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
   console.log(`Organization: ${org.name} (${org.id})`);
   console.log(`Profiles upserted: ${SEED_MEMBERS.length}`);
   console.log(`Announcements upserted: ${SEED_ANNOUNCEMENTS.length}`);
+  console.log(`Documents upserted: ${SEED_DOCUMENTS.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
 

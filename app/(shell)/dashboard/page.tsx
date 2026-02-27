@@ -216,7 +216,7 @@ export default async function DashboardPage() {
               </Link>
             </li>
             <li>
-              <Link className="quick-link" href="/documents">
+              <Link className="quick-link" href="/me/documents">
                 My Documents
               </Link>
             </li>

@@ -73,6 +73,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/documents",
         description: "Contracts, policies, and signed files.",
         shortcut: "G C"
+      },
+      {
+        label: "My Documents",
+        href: "/me/documents",
+        description: "Personal ID and tax forms for self-service.",
+        shortcut: "G I"
       }
     ]
   },
