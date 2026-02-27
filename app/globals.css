@@ -1999,6 +1999,92 @@ html.dark .topbar {
   color: var(--text-secondary);
 }
 
+.payroll-withholding-note {
+  border-color: var(--status-info-border);
+  background: var(--status-info-bg);
+}
+
+.payroll-country-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.payroll-country-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  transition: border-color var(--transition-hover), background-color var(--transition-hover);
+}
+
+.payroll-country-item:hover {
+  border-color: var(--border-default);
+}
+
+.payroll-country-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.payroll-country-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.payroll-coming-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.payroll-lock-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.payroll-lock-label {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.payroll-country-toggle {
+  width: 2.4rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-subtle);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem;
+  cursor: not-allowed;
+  opacity: 0.8;
+  transition: opacity var(--transition-hover);
+}
+
+.payroll-country-toggle:disabled {
+  opacity: 0.8;
+}
+
+.payroll-country-toggle-thumb {
+  width: 0.98rem;
+  height: 0.98rem;
+  border-radius: 999px;
+  background: var(--text-muted);
+  border: 1px solid var(--border-default);
+}
+
 .settings-form {
   display: grid;
   gap: 0.8rem;
@@ -2810,6 +2896,16 @@ html.dark .topbar {
 
   .payment-details-meta-grid {
     grid-template-columns: 1fr;
+  }
+
+  .payroll-country-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .payroll-country-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .compensation-summary-meta {

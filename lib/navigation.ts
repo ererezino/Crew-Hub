@@ -122,6 +122,12 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G Y"
       },
       {
+        label: "Payroll Settings",
+        href: "/payroll/settings/deductions",
+        description: "View country-by-country tax withholding rollout status.",
+        shortcut: "G Q"
+      },
+      {
         label: "Expenses",
         href: "/expenses",
         description: "Claims, approvals, and reimbursements.",
