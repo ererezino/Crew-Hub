@@ -138,6 +138,17 @@ export async function POST(
       });
     }
 
+    if (parsedRun.data.status === "approved") {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "PAYROLL_LOCKED",
+          message: "Payroll locked. Approved runs cannot be modified."
+        },
+        meta: buildMeta()
+      });
+    }
+
     if (
       parsedRun.data.status !== "draft" &&
       parsedRun.data.status !== "calculated"
