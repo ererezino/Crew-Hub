@@ -103,6 +103,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/me/compensation",
         description: "Salary, allowances, equity, and compensation history.",
         shortcut: "G B"
+      },
+      {
+        label: "My Payment Details",
+        href: "/me/payment-details",
+        description: "Manage payout method details with masked destination view.",
+        shortcut: "G W"
       }
     ]
   },
@@ -183,6 +189,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/admin/compensation",
         description: "Manage salary, allowances, equity grants, and approvals.",
         shortcut: "A C"
+      },
+      {
+        label: "Payment Details",
+        href: "/admin/payment-details",
+        description: "Review masked employee payout destinations and missing details.",
+        shortcut: "A P"
       },
       {
         label: "Admin Users",

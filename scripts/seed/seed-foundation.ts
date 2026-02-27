@@ -1,5 +1,8 @@
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
+import { encryptSensitiveValue } from "../../lib/crypto";
+import { extractLast4Digits } from "../../lib/payment-details";
+
 type SeedRole =
   | "EMPLOYEE"
   | "MANAGER"
@@ -200,6 +203,33 @@ type SeedEquityGrant = {
   boardApprovalOffsetDays: number | null;
   notes: string | null;
 };
+
+type SeedPaymentMethod = "bank_transfer" | "mobile_money" | "wise";
+
+type SeedPaymentDetailBase = {
+  employeeKey: SeedMember["key"];
+  currency: "USD";
+  isVerified: boolean;
+  changeEffectiveOffsetHours: number;
+};
+
+type SeedPaymentDetail =
+  | (SeedPaymentDetailBase & {
+      paymentMethod: "bank_transfer";
+      bankName: string;
+      bankAccountName: string;
+      bankAccountNumber: string;
+      bankRoutingNumber: string | null;
+    })
+  | (SeedPaymentDetailBase & {
+      paymentMethod: "mobile_money";
+      mobileMoneyProvider: string;
+      mobileMoneyNumber: string;
+    })
+  | (SeedPaymentDetailBase & {
+      paymentMethod: "wise";
+      wiseRecipientId: string;
+    });
 
 const SEED_MEMBERS: SeedMember[] = [
   {
@@ -823,6 +853,104 @@ const SEED_EQUITY_GRANTS: SeedEquityGrant[] = [
   }
 ];
 
+const SEED_PAYMENT_DETAILS: SeedPaymentDetail[] = [
+  {
+    employeeKey: "coo",
+    paymentMethod: "bank_transfer",
+    bankName: "United Bank for Africa",
+    bankAccountName: "Amina Okafor",
+    bankAccountNumber: "1200456789",
+    bankRoutingNumber: "044150149",
+    currency: "USD",
+    isVerified: true,
+    changeEffectiveOffsetHours: -96
+  },
+  {
+    employeeKey: "ceo",
+    paymentMethod: "wise",
+    wiseRecipientId: "wise-recipient-9083",
+    currency: "USD",
+    isVerified: true,
+    changeEffectiveOffsetHours: -72
+  },
+  {
+    employeeKey: "head_people_finance",
+    paymentMethod: "mobile_money",
+    mobileMoneyProvider: "MTN Mobile Money",
+    mobileMoneyNumber: "+2348035551290",
+    currency: "USD",
+    isVerified: true,
+    changeEffectiveOffsetHours: -60
+  },
+  {
+    employeeKey: "eng_manager",
+    paymentMethod: "bank_transfer",
+    bankName: "Access Bank",
+    bankAccountName: "Samuel Okeke",
+    bankAccountNumber: "2100458891",
+    bankRoutingNumber: "044150053",
+    currency: "USD",
+    isVerified: false,
+    changeEffectiveOffsetHours: 30
+  },
+  {
+    employeeKey: "ops_manager",
+    paymentMethod: "mobile_money",
+    mobileMoneyProvider: "M-Pesa",
+    mobileMoneyNumber: "+254712345678",
+    currency: "USD",
+    isVerified: true,
+    changeEffectiveOffsetHours: -84
+  },
+  {
+    employeeKey: "engineer_1",
+    paymentMethod: "wise",
+    wiseRecipientId: "wise-recipient-3190",
+    currency: "USD",
+    isVerified: false,
+    changeEffectiveOffsetHours: 22
+  },
+  {
+    employeeKey: "ops_associate",
+    paymentMethod: "mobile_money",
+    mobileMoneyProvider: "MTN MoMo Ghana",
+    mobileMoneyNumber: "+233245556780",
+    currency: "USD",
+    isVerified: true,
+    changeEffectiveOffsetHours: -48
+  },
+  {
+    employeeKey: "engineer_2",
+    paymentMethod: "bank_transfer",
+    bankName: "KCB Bank",
+    bankAccountName: "Musa Bello",
+    bankAccountNumber: "1147829011",
+    bankRoutingNumber: "01100",
+    currency: "USD",
+    isVerified: true,
+    changeEffectiveOffsetHours: -52
+  },
+  {
+    employeeKey: "compliance_officer",
+    paymentMethod: "wise",
+    wiseRecipientId: "wise-recipient-7714",
+    currency: "USD",
+    isVerified: true,
+    changeEffectiveOffsetHours: -64
+  },
+  {
+    employeeKey: "engineer_3",
+    paymentMethod: "bank_transfer",
+    bankName: "Royal Bank of Canada",
+    bankAccountName: "Sofia Campbell",
+    bankAccountNumber: "6130048229",
+    bankRoutingNumber: "003",
+    currency: "USD",
+    isVerified: true,
+    changeEffectiveOffsetHours: -90
+  }
+];
+
 function requiredEnv(name: string): string {
   const value = process.env[name];
 
@@ -1068,6 +1196,12 @@ function dateWithOffset(offsetDays: number): string {
 function timestampWithOffsetDays(offsetDays: number): string {
   const baseDate = new Date();
   baseDate.setUTCDate(baseDate.getUTCDate() + offsetDays);
+  return baseDate.toISOString();
+}
+
+function timestampWithOffsetHours(offsetHours: number): string {
+  const baseDate = new Date();
+  baseDate.setUTCHours(baseDate.getUTCHours() + offsetHours);
   return baseDate.toISOString();
 }
 
@@ -1826,6 +1960,101 @@ async function upsertSeedCompensation(
   }
 }
 
+async function upsertSeedPaymentDetails(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  for (const detail of SEED_PAYMENT_DETAILS) {
+    const employeeId = userIdByKey.get(detail.employeeKey);
+
+    if (!employeeId) {
+      throw new Error(
+        `Missing employee user id for payment detail seed (${detail.employeeKey})`
+      );
+    }
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      payment_method: detail.paymentMethod as SeedPaymentMethod,
+      bank_name_encrypted: null as string | null,
+      bank_account_name_encrypted: null as string | null,
+      bank_account_number_encrypted: null as string | null,
+      bank_routing_number_encrypted: null as string | null,
+      mobile_money_provider_encrypted: null as string | null,
+      mobile_money_number_encrypted: null as string | null,
+      wise_recipient_id: null as string | null,
+      currency: detail.currency,
+      bank_account_last4: null as string | null,
+      mobile_money_last4: null as string | null,
+      is_primary: true,
+      is_verified: detail.isVerified,
+      change_effective_at: timestampWithOffsetHours(detail.changeEffectiveOffsetHours),
+      deleted_at: null as string | null
+    };
+
+    if (detail.paymentMethod === "bank_transfer") {
+      payload.bank_name_encrypted = encryptSensitiveValue(detail.bankName);
+      payload.bank_account_name_encrypted = encryptSensitiveValue(detail.bankAccountName);
+      payload.bank_account_number_encrypted = encryptSensitiveValue(detail.bankAccountNumber);
+      payload.bank_routing_number_encrypted = detail.bankRoutingNumber
+        ? encryptSensitiveValue(detail.bankRoutingNumber)
+        : null;
+      payload.bank_account_last4 = extractLast4Digits(detail.bankAccountNumber);
+    }
+
+    if (detail.paymentMethod === "mobile_money") {
+      payload.mobile_money_provider_encrypted = encryptSensitiveValue(
+        detail.mobileMoneyProvider
+      );
+      payload.mobile_money_number_encrypted = encryptSensitiveValue(detail.mobileMoneyNumber);
+      payload.mobile_money_last4 = extractLast4Digits(detail.mobileMoneyNumber);
+    }
+
+    if (detail.paymentMethod === "wise") {
+      payload.wise_recipient_id = detail.wiseRecipientId;
+    }
+
+    const { data: existingRow, error: existingRowError } = await client
+      .from("employee_payment_details")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("is_primary", true)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingRowError) {
+      throw new Error(
+        `Unable to query payment detail seed data: ${existingRowError.message}`
+      );
+    }
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("employee_payment_details")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update payment detail seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client
+        .from("employee_payment_details")
+        .insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert payment detail seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function main() {
   const client = createServiceRoleClient();
   const sharedPassword = process.env.SEED_TEST_PASSWORD ?? "CrewHub123!";
@@ -1888,6 +2117,7 @@ async function main() {
   await upsertSeedOnboarding(client, org.id, userIdByKey);
   await upsertSeedTimeOff(client, org.id, userIdByKey);
   await upsertSeedCompensation(client, org.id, userIdByKey);
+  await upsertSeedPaymentDetails(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
   console.log(`Organization: ${org.name} (${org.id})`);
@@ -1903,6 +2133,7 @@ async function main() {
   console.log(`Compensation records upserted: ${SEED_COMPENSATION_RECORDS.length}`);
   console.log(`Allowances upserted: ${SEED_ALLOWANCES.length}`);
   console.log(`Equity grants upserted: ${SEED_EQUITY_GRANTS.length}`);
+  console.log(`Payment details upserted: ${SEED_PAYMENT_DETAILS.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
 
