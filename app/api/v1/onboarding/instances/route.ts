@@ -1,0 +1,349 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import type { UserRole } from "../../../../../lib/navigation";
+import { hasRole } from "../../../../../lib/roles";
+import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import type { ApiResponse } from "../../../../../types/auth";
+import {
+  ONBOARDING_INSTANCE_STATUSES,
+  ONBOARDING_TASK_STATUSES,
+  ONBOARDING_TYPES,
+  type OnboardingInstanceSummary,
+  type OnboardingInstancesResponseData
+} from "../../../../../types/onboarding";
+
+const querySchema = z.object({
+  scope: z.enum(["all", "me", "reports"]).default("all"),
+  status: z.enum(ONBOARDING_INSTANCE_STATUSES).optional(),
+  type: z.enum(ONBOARDING_TYPES).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(200),
+  sortBy: z.enum(["started_at", "completed_at"]).default("started_at"),
+  sortDir: z.enum(["asc", "desc"]).default("desc")
+});
+
+const instanceRowSchema = z.object({
+  id: z.string().uuid(),
+  employee_id: z.string().uuid(),
+  template_id: z.string().uuid().nullable(),
+  type: z.enum(ONBOARDING_TYPES),
+  status: z.enum(ONBOARDING_INSTANCE_STATUSES),
+  started_at: z.string(),
+  completed_at: z.string().nullable()
+});
+
+const profileRowSchema = z.object({
+  id: z.string().uuid(),
+  full_name: z.string()
+});
+
+const templateRowSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string()
+});
+
+const taskStatusRowSchema = z.object({
+  instance_id: z.string().uuid(),
+  status: z.enum(ONBOARDING_TASK_STATUSES)
+});
+
+function buildMeta() {
+  return {
+    timestamp: new Date().toISOString()
+  };
+}
+
+function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
+  return NextResponse.json(payload, { status });
+}
+
+function toProgressPercent(completedTasks: number, totalTasks: number): number {
+  if (totalTasks <= 0) {
+    return 0;
+  }
+
+  return Math.round((completedTasks / totalTasks) * 100);
+}
+
+function canViewReportsScope(userRoles: readonly UserRole[]): boolean {
+  return (
+    hasRole(userRoles, "MANAGER") ||
+    hasRole(userRoles, "HR_ADMIN") ||
+    hasRole(userRoles, "SUPER_ADMIN")
+  );
+}
+
+function canViewAllScope(userRoles: readonly UserRole[]): boolean {
+  return (
+    hasRole(userRoles, "HR_ADMIN") ||
+    hasRole(userRoles, "SUPER_ADMIN")
+  );
+}
+
+export async function GET(request: Request) {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be logged in to view onboarding instances."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const requestUrl = new URL(request.url);
+  const parsedQuery = querySchema.safeParse(
+    Object.fromEntries(requestUrl.searchParams.entries())
+  );
+
+  if (!parsedQuery.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedQuery.error.issues[0]?.message ?? "Invalid onboarding query."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const query = parsedQuery.data;
+  const supabase = await createSupabaseServerClient();
+  const userRoles = session.profile.roles;
+  let scope = query.scope;
+
+  if (scope === "all" && !canViewAllScope(userRoles)) {
+    scope = canViewReportsScope(userRoles) ? "reports" : "me";
+  }
+
+  if (scope === "reports" && !canViewReportsScope(userRoles)) {
+    scope = "me";
+  }
+
+  let reportsUserIds: string[] = [];
+
+  if (scope === "reports") {
+    const { data: reportsRows, error: reportsError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .eq("manager_id", session.profile.id);
+
+    if (reportsError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "REPORTS_FETCH_FAILED",
+          message: "Unable to load direct reports for onboarding scope."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    reportsUserIds = (reportsRows ?? [])
+      .map((row) => row.id)
+      .filter((value): value is string => typeof value === "string");
+
+    if (reportsUserIds.length === 0) {
+      return jsonResponse<OnboardingInstancesResponseData>(200, {
+        data: {
+          instances: []
+        },
+        error: null,
+        meta: buildMeta()
+      });
+    }
+  }
+
+  let instancesQuery = supabase
+    .from("onboarding_instances")
+    .select("id, employee_id, template_id, type, status, started_at, completed_at")
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
+    .limit(query.limit)
+    .order(query.sortBy, {
+      ascending: query.sortDir === "asc",
+      nullsFirst: false
+    });
+
+  if (scope === "me") {
+    instancesQuery = instancesQuery.eq("employee_id", session.profile.id);
+  }
+
+  if (scope === "reports") {
+    instancesQuery = instancesQuery.in("employee_id", reportsUserIds);
+  }
+
+  if (query.status) {
+    instancesQuery = instancesQuery.eq("status", query.status);
+  }
+
+  if (query.type) {
+    instancesQuery = instancesQuery.eq("type", query.type);
+  }
+
+  const { data: rawInstances, error: instancesError } = await instancesQuery;
+
+  if (instancesError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "INSTANCES_FETCH_FAILED",
+        message: "Unable to load onboarding instances."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedInstances = z.array(instanceRowSchema).safeParse(rawInstances ?? []);
+
+  if (!parsedInstances.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "INSTANCES_PARSE_FAILED",
+        message: "Onboarding instance data is not in the expected shape."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const instancesRows = parsedInstances.data;
+
+  if (instancesRows.length === 0) {
+    return jsonResponse<OnboardingInstancesResponseData>(200, {
+      data: {
+        instances: []
+      },
+      error: null,
+      meta: buildMeta()
+    });
+  }
+
+  const employeeIds = [...new Set(instancesRows.map((row) => row.employee_id))];
+  const templateIds = [
+    ...new Set(
+      instancesRows
+        .map((row) => row.template_id)
+        .filter((value): value is string => Boolean(value))
+    )
+  ];
+  const instanceIds = instancesRows.map((row) => row.id);
+
+  const [{ data: employeeRows, error: employeeError }, { data: templateRows, error: templateError }, { data: taskStatusRows, error: tasksError }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("org_id", session.profile.org_id)
+        .is("deleted_at", null)
+        .in("id", employeeIds),
+      templateIds.length > 0
+        ? supabase
+            .from("onboarding_templates")
+            .select("id, name")
+            .eq("org_id", session.profile.org_id)
+            .is("deleted_at", null)
+            .in("id", templateIds)
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from("onboarding_tasks")
+        .select("instance_id, status")
+        .eq("org_id", session.profile.org_id)
+        .is("deleted_at", null)
+        .in("instance_id", instanceIds)
+    ]);
+
+  if (employeeError || templateError || tasksError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "INSTANCE_METADATA_FETCH_FAILED",
+        message: "Unable to resolve onboarding metadata."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedEmployees = z.array(profileRowSchema).safeParse(employeeRows ?? []);
+  const parsedTemplates = z.array(templateRowSchema).safeParse(templateRows ?? []);
+  const parsedTaskStatuses = z.array(taskStatusRowSchema).safeParse(taskStatusRows ?? []);
+
+  if (!parsedEmployees.success || !parsedTemplates.success || !parsedTaskStatuses.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "INSTANCE_METADATA_PARSE_FAILED",
+        message: "Onboarding metadata is not in the expected shape."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const employeeNameById = new Map(
+    parsedEmployees.data.map((row) => [row.id, row.full_name])
+  );
+  const templateNameById = new Map(
+    parsedTemplates.data.map((row) => [row.id, row.name])
+  );
+
+  const countsByInstanceId = new Map<
+    string,
+    {
+      totalTasks: number;
+      completedTasks: number;
+    }
+  >();
+
+  for (const task of parsedTaskStatuses.data) {
+    const currentCounts = countsByInstanceId.get(task.instance_id) ?? {
+      totalTasks: 0,
+      completedTasks: 0
+    };
+
+    currentCounts.totalTasks += 1;
+
+    if (task.status === "completed") {
+      currentCounts.completedTasks += 1;
+    }
+
+    countsByInstanceId.set(task.instance_id, currentCounts);
+  }
+
+  const instances: OnboardingInstanceSummary[] = instancesRows.map((row) => {
+    const counts = countsByInstanceId.get(row.id) ?? {
+      totalTasks: 0,
+      completedTasks: 0
+    };
+
+    return {
+      id: row.id,
+      employeeId: row.employee_id,
+      employeeName: employeeNameById.get(row.employee_id) ?? "Unknown user",
+      templateId: row.template_id,
+      templateName: row.template_id
+        ? templateNameById.get(row.template_id) ?? "Unknown template"
+        : "No template",
+      type: row.type,
+      status: row.status,
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      totalTasks: counts.totalTasks,
+      completedTasks: counts.completedTasks,
+      progressPercent: toProgressPercent(counts.completedTasks, counts.totalTasks)
+    };
+  });
+
+  return jsonResponse<OnboardingInstancesResponseData>(200, {
+    data: {
+      instances
+    },
+    error: null,
+    meta: buildMeta()
+  });
+}

@@ -58,6 +58,50 @@ type SeedDocument = {
   versionCount: number;
 };
 
+type SeedOnboardingType = "onboarding" | "offboarding";
+
+type SeedOnboardingInstanceStatus = "active" | "completed" | "cancelled";
+
+type SeedOnboardingTaskStatus = "pending" | "in_progress" | "completed" | "blocked";
+
+type SeedOnboardingTemplateTask = {
+  title: string;
+  description: string;
+  category: string;
+  dueOffsetDays: number | null;
+};
+
+type SeedOnboardingTemplate = {
+  key: string;
+  name: string;
+  type: SeedOnboardingType;
+  countryCode: SeedMember["countryCode"] | null;
+  department: SeedMember["department"] | null;
+  tasks: SeedOnboardingTemplateTask[];
+};
+
+type SeedOnboardingInstanceTask = {
+  title: string;
+  description: string;
+  category: string;
+  status: SeedOnboardingTaskStatus;
+  assignedToKey: SeedMember["key"] | null;
+  dueOffsetDays: number | null;
+  completedOffsetDays: number | null;
+  completedByKey: SeedMember["key"] | null;
+  notes: string | null;
+};
+
+type SeedOnboardingInstance = {
+  templateKey: SeedOnboardingTemplate["key"];
+  employeeKey: SeedMember["key"];
+  type: SeedOnboardingType;
+  status: SeedOnboardingInstanceStatus;
+  startedOffsetDays: number;
+  completedOffsetDays: number | null;
+  tasks: SeedOnboardingInstanceTask[];
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -267,6 +311,167 @@ const SEED_DOCUMENTS: SeedDocument[] = [
     expiryOffsetDays: 64,
     countryCode: "GH",
     versionCount: 1
+  }
+];
+
+const SEED_ONBOARDING_TEMPLATES: SeedOnboardingTemplate[] = [
+  {
+    key: "nigeria-engineering-onboarding",
+    name: "Nigeria Engineering Onboarding",
+    type: "onboarding",
+    countryCode: "NG",
+    department: "Engineering",
+    tasks: [
+      {
+        title: "Complete contractor profile details",
+        description: "Confirm legal name, phone number, and timezone in Crew Hub.",
+        category: "People Ops",
+        dueOffsetDays: 0
+      },
+      {
+        title: "Sign contractor agreement",
+        description: "Review and sign the standard contractor agreement package.",
+        category: "People Ops",
+        dueOffsetDays: 1
+      },
+      {
+        title: "Set up Crew Hub and work accounts",
+        description: "Confirm Crew Hub login, Slack access, and company email setup.",
+        category: "IT",
+        dueOffsetDays: 1
+      },
+      {
+        title: "Configure GitHub and SSO",
+        description: "Accept team invites, enable MFA, and validate SSO access.",
+        category: "IT",
+        dueOffsetDays: 2
+      },
+      {
+        title: "Prepare local development environment",
+        description: "Install toolchain and run the starter service locally.",
+        category: "Engineering",
+        dueOffsetDays: 3
+      },
+      {
+        title: "Review engineering handbook",
+        description: "Read coding standards, PR workflow, and release process.",
+        category: "Engineering",
+        dueOffsetDays: 4
+      },
+      {
+        title: "Complete compliance acknowledgement",
+        description: "Confirm policy training and submit required attestation.",
+        category: "Compliance",
+        dueOffsetDays: 5
+      },
+      {
+        title: "Meet manager for first-week plan",
+        description: "Align on onboarding goals and initial task ownership.",
+        category: "Manager",
+        dueOffsetDays: 6
+      }
+    ]
+  }
+];
+
+const SEED_ONBOARDING_INSTANCES: SeedOnboardingInstance[] = [
+  {
+    templateKey: "nigeria-engineering-onboarding",
+    employeeKey: "engineer_1",
+    type: "onboarding",
+    status: "active",
+    startedOffsetDays: -4,
+    completedOffsetDays: null,
+    tasks: [
+      {
+        title: "Complete contractor profile details",
+        description: "Confirm legal name, phone number, and timezone in Crew Hub.",
+        category: "People Ops",
+        status: "completed",
+        assignedToKey: "engineer_1",
+        dueOffsetDays: -4,
+        completedOffsetDays: -4,
+        completedByKey: "engineer_1",
+        notes: "Profile fields confirmed."
+      },
+      {
+        title: "Sign contractor agreement",
+        description: "Review and sign the standard contractor agreement package.",
+        category: "People Ops",
+        status: "completed",
+        assignedToKey: "engineer_1",
+        dueOffsetDays: -3,
+        completedOffsetDays: -3,
+        completedByKey: "engineer_1",
+        notes: "Signed agreement uploaded to documents."
+      },
+      {
+        title: "Set up Crew Hub and work accounts",
+        description: "Confirm Crew Hub login, Slack access, and company email setup.",
+        category: "IT",
+        status: "completed",
+        assignedToKey: "eng_manager",
+        dueOffsetDays: -3,
+        completedOffsetDays: -2,
+        completedByKey: "eng_manager",
+        notes: "All account access verified."
+      },
+      {
+        title: "Configure GitHub and SSO",
+        description: "Accept team invites, enable MFA, and validate SSO access.",
+        category: "IT",
+        status: "in_progress",
+        assignedToKey: "engineer_1",
+        dueOffsetDays: 1,
+        completedOffsetDays: null,
+        completedByKey: null,
+        notes: "Waiting on repository invite acceptance."
+      },
+      {
+        title: "Prepare local development environment",
+        description: "Install toolchain and run the starter service locally.",
+        category: "Engineering",
+        status: "pending",
+        assignedToKey: "engineer_1",
+        dueOffsetDays: 2,
+        completedOffsetDays: null,
+        completedByKey: null,
+        notes: null
+      },
+      {
+        title: "Review engineering handbook",
+        description: "Read coding standards, PR workflow, and release process.",
+        category: "Engineering",
+        status: "pending",
+        assignedToKey: "engineer_1",
+        dueOffsetDays: 3,
+        completedOffsetDays: null,
+        completedByKey: null,
+        notes: null
+      },
+      {
+        title: "Complete compliance acknowledgement",
+        description: "Confirm policy training and submit required attestation.",
+        category: "Compliance",
+        status: "blocked",
+        assignedToKey: "head_people_finance",
+        dueOffsetDays: 4,
+        completedOffsetDays: null,
+        completedByKey: null,
+        notes: "Awaiting NDA signature from contractor."
+      },
+      {
+        title: "Meet manager for first-week plan",
+        description: "Align on onboarding goals and initial task ownership.",
+        category: "Manager",
+        status: "pending",
+        assignedToKey: "eng_manager",
+        dueOffsetDays: 1,
+        completedOffsetDays: null,
+        completedByKey: null,
+        notes: null
+      }
+    ]
   }
 ];
 
@@ -512,6 +717,12 @@ function dateWithOffset(offsetDays: number): string {
   return baseDate.toISOString().slice(0, 10);
 }
 
+function timestampWithOffsetDays(offsetDays: number): string {
+  const baseDate = new Date();
+  baseDate.setUTCDate(baseDate.getUTCDate() + offsetDays);
+  return baseDate.toISOString();
+}
+
 function slugifyForPath(value: string): string {
   return value
     .toLowerCase()
@@ -653,6 +864,252 @@ async function upsertSeedDocuments(
   }
 }
 
+async function upsertSeedOnboarding(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  if (SEED_ONBOARDING_TEMPLATES.length === 0 && SEED_ONBOARDING_INSTANCES.length === 0) {
+    return;
+  }
+
+  const templateNames = SEED_ONBOARDING_TEMPLATES.map((template) => template.name);
+
+  const { data: existingTemplateRows, error: existingTemplateError } = await client
+    .from("onboarding_templates")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .in("name", templateNames);
+
+  if (existingTemplateError) {
+    throw new Error(`Unable to query existing onboarding templates: ${existingTemplateError.message}`);
+  }
+
+  const existingTemplateIdByName = new Map(
+    (existingTemplateRows ?? []).map((row) => [row.name, row.id] as const)
+  );
+  const templateIdByKey = new Map<string, string>();
+
+  for (const template of SEED_ONBOARDING_TEMPLATES) {
+    const templatePayload = {
+      org_id: orgId,
+      name: template.name,
+      type: template.type,
+      country_code: template.countryCode,
+      department: template.department,
+      tasks: template.tasks.map((task) => ({
+        title: task.title,
+        description: task.description,
+        category: task.category,
+        dueOffsetDays: task.dueOffsetDays
+      }))
+    };
+
+    const existingTemplateId = existingTemplateIdByName.get(template.name);
+    let templateId: string;
+
+    if (existingTemplateId) {
+      const { data: updatedTemplate, error: updateTemplateError } = await client
+        .from("onboarding_templates")
+        .update({
+          ...templatePayload,
+          deleted_at: null
+        })
+        .eq("id", existingTemplateId)
+        .eq("org_id", orgId)
+        .select("id")
+        .single();
+
+      if (updateTemplateError || !updatedTemplate) {
+        throw new Error(
+          `Unable to update onboarding template ${template.name}: ${updateTemplateError?.message ?? "unknown error"}`
+        );
+      }
+
+      templateId = updatedTemplate.id;
+    } else {
+      const { data: insertedTemplate, error: insertTemplateError } = await client
+        .from("onboarding_templates")
+        .insert(templatePayload)
+        .select("id")
+        .single();
+
+      if (insertTemplateError || !insertedTemplate) {
+        throw new Error(
+          `Unable to insert onboarding template ${template.name}: ${insertTemplateError?.message ?? "unknown error"}`
+        );
+      }
+
+      templateId = insertedTemplate.id;
+    }
+
+    templateIdByKey.set(template.key, templateId);
+  }
+
+  for (const instance of SEED_ONBOARDING_INSTANCES) {
+    const templateId = templateIdByKey.get(instance.templateKey);
+
+    if (!templateId) {
+      throw new Error(`Missing template id for onboarding instance template ${instance.templateKey}`);
+    }
+
+    const employeeId = userIdByKey.get(instance.employeeKey);
+
+    if (!employeeId) {
+      throw new Error(`Missing employee user id for onboarding instance ${instance.employeeKey}`);
+    }
+
+    const startedAt = timestampWithOffsetDays(instance.startedOffsetDays);
+    const completedAt =
+      instance.completedOffsetDays === null
+        ? null
+        : timestampWithOffsetDays(instance.completedOffsetDays);
+
+    const { data: existingInstance, error: existingInstanceError } = await client
+      .from("onboarding_instances")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("template_id", templateId)
+      .eq("type", instance.type)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingInstanceError) {
+      throw new Error(`Unable to query existing onboarding instances: ${existingInstanceError.message}`);
+    }
+
+    const instancePayload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      template_id: templateId,
+      type: instance.type,
+      status: instance.status,
+      started_at: startedAt,
+      completed_at: completedAt
+    };
+
+    let instanceId: string;
+
+    if (existingInstance?.id) {
+      const { data: updatedInstance, error: updateInstanceError } = await client
+        .from("onboarding_instances")
+        .update({
+          ...instancePayload,
+          deleted_at: null
+        })
+        .eq("id", existingInstance.id)
+        .eq("org_id", orgId)
+        .select("id")
+        .single();
+
+      if (updateInstanceError || !updatedInstance) {
+        throw new Error(
+          `Unable to update onboarding instance for ${instance.employeeKey}: ${updateInstanceError?.message ?? "unknown error"}`
+        );
+      }
+
+      instanceId = updatedInstance.id;
+    } else {
+      const { data: insertedInstance, error: insertInstanceError } = await client
+        .from("onboarding_instances")
+        .insert(instancePayload)
+        .select("id")
+        .single();
+
+      if (insertInstanceError || !insertedInstance) {
+        throw new Error(
+          `Unable to insert onboarding instance for ${instance.employeeKey}: ${insertInstanceError?.message ?? "unknown error"}`
+        );
+      }
+
+      instanceId = insertedInstance.id;
+    }
+
+    const { data: existingTaskRows, error: existingTasksError } = await client
+      .from("onboarding_tasks")
+      .select("id, title")
+      .eq("org_id", orgId)
+      .eq("instance_id", instanceId)
+      .is("deleted_at", null);
+
+    if (existingTasksError) {
+      throw new Error(`Unable to query existing onboarding tasks: ${existingTasksError.message}`);
+    }
+
+    const existingTaskIdByTitle = new Map(
+      (existingTaskRows ?? []).map((row) => [row.title, row.id] as const)
+    );
+
+    for (const task of instance.tasks) {
+      const assignedToUserId =
+        task.assignedToKey === null ? null : userIdByKey.get(task.assignedToKey) ?? null;
+
+      if (task.assignedToKey && !assignedToUserId) {
+        throw new Error(
+          `Missing assigned user id for onboarding task ${task.title} (${task.assignedToKey})`
+        );
+      }
+
+      const completedByUserId =
+        task.completedByKey === null ? null : userIdByKey.get(task.completedByKey) ?? null;
+
+      if (task.completedByKey && !completedByUserId) {
+        throw new Error(
+          `Missing completed_by user id for onboarding task ${task.title} (${task.completedByKey})`
+        );
+      }
+
+      const taskPayload = {
+        org_id: orgId,
+        instance_id: instanceId,
+        title: task.title,
+        description: task.description,
+        category: task.category,
+        status: task.status,
+        assigned_to: assignedToUserId,
+        due_date: task.dueOffsetDays === null ? null : dateWithOffset(task.dueOffsetDays),
+        completed_at:
+          task.completedOffsetDays === null ? null : timestampWithOffsetDays(task.completedOffsetDays),
+        completed_by: completedByUserId,
+        notes: task.notes
+      };
+
+      const existingTaskId = existingTaskIdByTitle.get(task.title);
+
+      if (existingTaskId) {
+        const { error: updateTaskError } = await client
+          .from("onboarding_tasks")
+          .update({
+            ...taskPayload,
+            deleted_at: null
+          })
+          .eq("id", existingTaskId)
+          .eq("org_id", orgId);
+
+        if (updateTaskError) {
+          throw new Error(
+            `Unable to update onboarding task ${task.title}: ${updateTaskError.message}`
+          );
+        }
+      } else {
+        const { error: insertTaskError } = await client
+          .from("onboarding_tasks")
+          .insert(taskPayload);
+
+        if (insertTaskError) {
+          throw new Error(
+            `Unable to insert onboarding task ${task.title}: ${insertTaskError.message}`
+          );
+        }
+      }
+    }
+  }
+}
+
 async function main() {
   const client = createServiceRoleClient();
   const sharedPassword = process.env.SEED_TEST_PASSWORD ?? "CrewHub123!";
@@ -712,12 +1169,15 @@ async function main() {
   await upsertProfiles(client, employeeRows);
   await upsertSeedAnnouncements(client, org.id, userIdByKey);
   await upsertSeedDocuments(client, org.id, userIdByKey);
+  await upsertSeedOnboarding(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
   console.log(`Organization: ${org.name} (${org.id})`);
   console.log(`Profiles upserted: ${SEED_MEMBERS.length}`);
   console.log(`Announcements upserted: ${SEED_ANNOUNCEMENTS.length}`);
   console.log(`Documents upserted: ${SEED_DOCUMENTS.length}`);
+  console.log(`Onboarding templates upserted: ${SEED_ONBOARDING_TEMPLATES.length}`);
+  console.log(`Onboarding instances upserted: ${SEED_ONBOARDING_INSTANCES.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
 

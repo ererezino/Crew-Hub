@@ -63,6 +63,12 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G O"
       },
       {
+        label: "My Onboarding",
+        href: "/me/onboarding",
+        description: "Personal onboarding tasks and progress tracking.",
+        shortcut: "G I"
+      },
+      {
         label: "Time Off",
         href: "/time-off",
         description: "Requests, balances, and approval queues.",
@@ -78,7 +84,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "My Documents",
         href: "/me/documents",
         description: "Personal ID and tax forms for self-service.",
-        shortcut: "G I"
+        shortcut: "G M"
       }
     ]
   },
