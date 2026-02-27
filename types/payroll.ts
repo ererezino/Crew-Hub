@@ -19,6 +19,7 @@ export type PayrollMode =
 
 export type PayrollEmployeeProfile = {
   id: string;
+  org_id: string;
   payroll_mode: PayrollMode | string;
   country_code: string | null;
 };
@@ -54,8 +55,9 @@ export type CalculatePayrollItemParams = {
   monthly_base_salary_amount: number;
   currency: string;
   allowances: PayrollAllowanceItem[];
+  effective_date?: string | null;
 };
 
 export type CountryPayrollEngine = {
-  calculate: (params: CalculatePayrollItemParams) => PayrollCalculationResult;
+  calculate: (params: CalculatePayrollItemParams) => Promise<PayrollCalculationResult>;
 };

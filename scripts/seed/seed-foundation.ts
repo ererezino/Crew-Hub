@@ -263,6 +263,26 @@ type SeedExpense = {
   reimbursementNotes?: string | null;
 };
 
+type SeedDeductionRule = {
+  countryCode: "NG";
+  ruleType:
+    | "income_tax"
+    | "pension_employee"
+    | "pension_employer"
+    | "housing_fund"
+    | "social_insurance"
+    | "relief";
+  ruleName: string;
+  bracketMin: number | null;
+  bracketMax: number | null;
+  rate: number | null;
+  flatAmount: number | null;
+  employerPortionRate: number | null;
+  calculationOrder: number;
+  notes: string | null;
+  effectiveFrom: string;
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -980,6 +1000,180 @@ const SEED_PAYMENT_DETAILS: SeedPaymentDetail[] = [
     currency: "USD",
     isVerified: true,
     changeEffectiveOffsetHours: -90
+  }
+];
+
+const NIGERIA_DEDUCTION_EFFECTIVE_FROM = "2026-01-01";
+
+const SEED_NIGERIA_DEDUCTION_RULES: SeedDeductionRule[] = [
+  {
+    countryCode: "NG",
+    ruleType: "income_tax",
+    ruleName: "PAYE 0 - 300,000 NGN",
+    bracketMin: 0,
+    bracketMax: 30_000_000,
+    rate: 0.07,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 0,
+    notes: "PAYE bracket 1",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "income_tax",
+    ruleName: "PAYE 300,000 - 600,000 NGN",
+    bracketMin: 30_000_000,
+    bracketMax: 60_000_000,
+    rate: 0.11,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 1,
+    notes: "PAYE bracket 2",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "income_tax",
+    ruleName: "PAYE 600,000 - 1,100,000 NGN",
+    bracketMin: 60_000_000,
+    bracketMax: 110_000_000,
+    rate: 0.15,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 2,
+    notes: "PAYE bracket 3",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "income_tax",
+    ruleName: "PAYE 1,100,000 - 1,600,000 NGN",
+    bracketMin: 110_000_000,
+    bracketMax: 160_000_000,
+    rate: 0.19,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 3,
+    notes: "PAYE bracket 4",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "income_tax",
+    ruleName: "PAYE 1,600,000 - 3,200,000 NGN",
+    bracketMin: 160_000_000,
+    bracketMax: 320_000_000,
+    rate: 0.21,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 4,
+    notes: "PAYE bracket 5",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "income_tax",
+    ruleName: "PAYE Above 3,200,000 NGN",
+    bracketMin: 320_000_000,
+    bracketMax: null,
+    rate: 0.24,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 5,
+    notes: "PAYE top bracket",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "relief",
+    ruleName: "CRA Fixed",
+    bracketMin: null,
+    bracketMax: null,
+    rate: null,
+    flatAmount: 20_000_000,
+    employerPortionRate: null,
+    calculationOrder: 100,
+    notes: "CRA fixed amount",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "relief",
+    ruleName: "CRA 1%",
+    bracketMin: null,
+    bracketMax: null,
+    rate: 0.01,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 101,
+    notes: "CRA 1% component",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "relief",
+    ruleName: "CRA 20%",
+    bracketMin: null,
+    bracketMax: null,
+    rate: 0.2,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 102,
+    notes: "CRA 20% component",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "pension_employee",
+    ruleName: "Pension (Employee)",
+    bracketMin: null,
+    bracketMax: null,
+    rate: 0.08,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 200,
+    notes: "Employee pension contribution",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "pension_employer",
+    ruleName: "Pension (Employer)",
+    bracketMin: null,
+    bracketMax: null,
+    rate: null,
+    flatAmount: null,
+    employerPortionRate: 0.1,
+    calculationOrder: 201,
+    notes: "Employer pension contribution",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "housing_fund",
+    ruleName: "NHF",
+    bracketMin: null,
+    bracketMax: null,
+    rate: 0.025,
+    flatAmount: null,
+    employerPortionRate: null,
+    calculationOrder: 300,
+    notes: "National Housing Fund contribution",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
+  },
+  {
+    countryCode: "NG",
+    ruleType: "social_insurance",
+    ruleName: "NSITF",
+    bracketMin: null,
+    bracketMax: null,
+    rate: 0.01,
+    flatAmount: null,
+    employerPortionRate: 0.01,
+    calculationOrder: 400,
+    notes: "National Social Insurance Trust Fund contribution",
+    effectiveFrom: NIGERIA_DEDUCTION_EFFECTIVE_FROM
   }
 ];
 
@@ -2172,6 +2366,113 @@ async function upsertSeedPaymentDetails(
   }
 }
 
+function deductionRuleKey(rule: {
+  rule_type: string;
+  rule_name: string;
+  bracket_min: number | null;
+  bracket_max: number | null;
+}): string {
+  return [
+    rule.rule_type,
+    rule.rule_name,
+    rule.bracket_min === null ? "null" : String(rule.bracket_min),
+    rule.bracket_max === null ? "null" : String(rule.bracket_max)
+  ].join("|");
+}
+
+async function upsertSeedDeductionRules(
+  client: SupabaseClient,
+  orgId: string
+): Promise<void> {
+  const { data: existingRows, error: existingRowsError } = await client
+    .from("deduction_rules")
+    .select("id, rule_type, rule_name, bracket_min, bracket_max, effective_from")
+    .eq("org_id", orgId)
+    .eq("country_code", "NG");
+
+  if (existingRowsError) {
+    throw new Error(
+      `Unable to query deduction rule seed data: ${existingRowsError.message}`
+    );
+  }
+
+  const existingByKey = new Map<string, string>();
+
+  for (const row of existingRows ?? []) {
+    if (typeof row.id !== "string") {
+      continue;
+    }
+
+    const bracketMin =
+      typeof row.bracket_min === "number"
+        ? Math.trunc(row.bracket_min)
+        : typeof row.bracket_min === "string"
+          ? Math.trunc(Number.parseFloat(row.bracket_min))
+          : null;
+    const bracketMax =
+      typeof row.bracket_max === "number"
+        ? Math.trunc(row.bracket_max)
+        : typeof row.bracket_max === "string"
+          ? Math.trunc(Number.parseFloat(row.bracket_max))
+          : null;
+    const key = deductionRuleKey({
+      rule_type: typeof row.rule_type === "string" ? row.rule_type : "",
+      rule_name: typeof row.rule_name === "string" ? row.rule_name : "",
+      bracket_min: Number.isFinite(bracketMin) ? bracketMin : null,
+      bracket_max: Number.isFinite(bracketMax) ? bracketMax : null
+    });
+    const existingRuleId = existingByKey.get(key);
+
+    if (!existingRuleId) {
+      existingByKey.set(key, row.id);
+    }
+  }
+
+  for (const rule of SEED_NIGERIA_DEDUCTION_RULES) {
+    const payload = {
+      org_id: orgId,
+      country_code: rule.countryCode,
+      rule_type: rule.ruleType,
+      rule_name: rule.ruleName,
+      bracket_min: rule.bracketMin,
+      bracket_max: rule.bracketMax,
+      rate: rule.rate,
+      flat_amount: rule.flatAmount,
+      employer_portion_rate: rule.employerPortionRate,
+      effective_from: rule.effectiveFrom,
+      effective_to: null,
+      calculation_order: rule.calculationOrder,
+      notes: rule.notes
+    };
+
+    const key = deductionRuleKey({
+      rule_type: payload.rule_type,
+      rule_name: payload.rule_name,
+      bracket_min: payload.bracket_min,
+      bracket_max: payload.bracket_max
+    });
+    const existingId = existingByKey.get(key);
+
+    if (existingId) {
+      const { error: updateError } = await client
+        .from("deduction_rules")
+        .update(payload)
+        .eq("id", existingId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update deduction rule seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("deduction_rules").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert deduction rule seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function upsertSeedExpenses(
   client: SupabaseClient,
   orgId: string,
@@ -2348,6 +2649,7 @@ async function main() {
   await upsertSeedOnboarding(client, org.id, userIdByKey);
   await upsertSeedTimeOff(client, org.id, userIdByKey);
   await upsertSeedCompensation(client, org.id, userIdByKey);
+  await upsertSeedDeductionRules(client, org.id);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
   await upsertSeedExpenses(client, org.id, userIdByKey);
 
@@ -2365,6 +2667,7 @@ async function main() {
   console.log(`Compensation records upserted: ${SEED_COMPENSATION_RECORDS.length}`);
   console.log(`Allowances upserted: ${SEED_ALLOWANCES.length}`);
   console.log(`Equity grants upserted: ${SEED_EQUITY_GRANTS.length}`);
+  console.log(`Nigeria deduction rules upserted: ${SEED_NIGERIA_DEDUCTION_RULES.length}`);
   console.log(`Payment details upserted: ${SEED_PAYMENT_DETAILS.length}`);
   console.log(`Expenses upserted: ${SEED_EXPENSES.length}`);
   console.log(`Shared test password: ${sharedPassword}`);

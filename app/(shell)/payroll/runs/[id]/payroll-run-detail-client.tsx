@@ -645,7 +645,7 @@ export function PayrollRunDetailClient({
     <>
       <PageHeader
         title="Payroll Run"
-        description="Review contractor payroll calculations, approvals, and item-level adjustments."
+        description="Review payroll calculations, approvals, and item-level adjustments."
         actions={
           canCalculateRun || canGenerateStatements || canProcessPayments ? (
             <>
@@ -996,16 +996,20 @@ export function PayrollRunDetailClient({
                           </p>
                         </td>
                         <td>
-                          <CurrencyDisplay amount={item.grossAmount} currency="USD" />
+                          <CurrencyDisplay amount={item.grossAmount} currency={item.payCurrency} />
                         </td>
                         <td>
-                          <CurrencyDisplay amount={item.deductionTotal} currency="USD" />
+                          <CurrencyDisplay amount={item.deductionTotal} currency={item.payCurrency} />
                         </td>
                         <td>
-                          <CurrencyDisplay amount={item.netAmount} currency="USD" />
+                          <CurrencyDisplay amount={item.netAmount} currency={item.payCurrency} />
                         </td>
                         <td>
-                          <StatusBadge tone="info">No withholding</StatusBadge>
+                          {item.withholdingApplied ? (
+                            <StatusBadge tone="success">Withholding applied</StatusBadge>
+                          ) : (
+                            <StatusBadge tone="info">No withholding</StatusBadge>
+                          )}
                         </td>
                         <td>
                           <span className="payment-status-inline">
@@ -1097,7 +1101,10 @@ export function PayrollRunDetailClient({
                                   <h3 className="section-title">Breakdown</h3>
                                   <p>
                                     Base salary:{" "}
-                                    <CurrencyDisplay amount={item.baseSalaryAmount} currency="USD" />
+                                    <CurrencyDisplay
+                                      amount={item.baseSalaryAmount}
+                                      currency={item.payCurrency}
+                                    />
                                   </p>
                                   <ul className="payroll-allowance-list">
                                     {item.allowances.length > 0 ? (
@@ -1114,7 +1121,25 @@ export function PayrollRunDetailClient({
                                       <li>No allowances</li>
                                     )}
                                   </ul>
-                                  <p className="settings-card-description">{contractorNote()}</p>
+                                  {item.withholdingApplied ? (
+                                    <div className="payroll-deduction-section">
+                                      <p className="form-label">Deductions</p>
+                                      <ul className="payroll-deduction-list">
+                                      {item.deductions.map((deduction, deductionIndex) => (
+                                        <li key={`${item.id}-deduction-${deductionIndex}`}>
+                                          <span>{deduction.ruleName}</span>
+                                          <CurrencyDisplay
+                                            amount={deduction.amount}
+                                            currency={item.payCurrency}
+                                          />
+                                        </li>
+                                      ))}
+                                      {item.deductions.length === 0 ? <li>No deductions</li> : null}
+                                      </ul>
+                                    </div>
+                                  ) : (
+                                    <p className="settings-card-description">{contractorNote()}</p>
+                                  )}
                                   <p>
                                     Payment status:{" "}
                                     <StatusBadge tone={paymentStatusTone(item.paymentStatus)}>
@@ -1126,7 +1151,7 @@ export function PayrollRunDetailClient({
                                   </p>
                                   <p>
                                     Net pay:{" "}
-                                    <CurrencyDisplay amount={item.netAmount} currency="USD" />
+                                    <CurrencyDisplay amount={item.netAmount} currency={item.payCurrency} />
                                   </p>
                                 </article>
 
@@ -1139,7 +1164,10 @@ export function PayrollRunDetailClient({
                                           <span>
                                             {adjustment.label} ({adjustment.type})
                                           </span>
-                                          <CurrencyDisplay amount={adjustment.amount} currency="USD" />
+                                          <CurrencyDisplay
+                                            amount={adjustment.amount}
+                                            currency={item.payCurrency}
+                                          />
                                         </li>
                                       ))
                                     ) : (
