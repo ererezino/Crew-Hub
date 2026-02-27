@@ -46,8 +46,9 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
   const isLoginRoute = pathname === "/login";
+  const isApiRoute = pathname.startsWith("/api/");
 
-  if (!user && !isLoginRoute) {
+  if (!user && !isLoginRoute && !isApiRoute) {
     const redirectUrl = new URL("/login", request.url);
 
     if (pathname !== "/") {
