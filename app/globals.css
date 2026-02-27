@@ -1,0 +1,33 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #f4f6f8;
+  color: #101828;
+}
+
+main {
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+}
+
+h1,
+h2 {
+  margin: 0 0 1rem;
+}
+
+p {
+  line-height: 1.6;
+}
+
+a {
+  color: #0b63ce;
+}
