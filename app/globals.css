@@ -2417,6 +2417,218 @@ html.dark .topbar {
   color: var(--text-secondary);
 }
 
+.performance-skeleton {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.performance-skeleton-header,
+.performance-skeleton-card,
+.performance-skeleton-form,
+.performance-skeleton-table {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.performance-skeleton-header {
+  height: 3.25rem;
+}
+
+.performance-skeleton-card {
+  height: 6.8rem;
+}
+
+.performance-skeleton-form {
+  height: 16rem;
+}
+
+.performance-skeleton-table {
+  height: 12rem;
+}
+
+.performance-cycle-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.performance-cycle-meta {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  color: var(--text-secondary);
+}
+
+.performance-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.performance-assignment-meta {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.6rem 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.performance-section-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.performance-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.performance-question-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.performance-question-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.performance-question-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.performance-required {
+  color: var(--status-warning-text);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.performance-row-active {
+  background: color-mix(in srgb, var(--status-info-bg) 55%, var(--bg-canvas));
+}
+
+.performance-manager-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.performance-side-card {
+  align-content: start;
+}
+
+.performance-read-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.performance-read-list li {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.55rem 0.6rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.performance-admin-metrics {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.performance-admin-form-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.performance-template-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rating-circles {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.rating-circle {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-canvas);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--transition-hover), border-color var(--transition-hover), color var(--transition-hover), transform var(--transition-hover);
+}
+
+.rating-circle:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.rating-circle:disabled {
+  cursor: default;
+}
+
+.rating-circle-danger {
+  color: var(--status-error-text);
+}
+
+.rating-circle-warning {
+  color: var(--status-warning-text);
+}
+
+.rating-circle-success {
+  color: var(--status-success-text);
+}
+
+.rating-circle-active.rating-circle-danger {
+  background: var(--status-error-bg);
+  border-color: var(--status-error-border);
+}
+
+.rating-circle-active.rating-circle-warning {
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
+}
+
+.rating-circle-active.rating-circle-success {
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
+}
+
 .payroll-withholding-note {
   border-color: var(--status-info-border);
   background: var(--status-info-bg);
@@ -3555,6 +3767,17 @@ html.dark .topbar {
     grid-template-columns: 1fr;
   }
 
+  .performance-manager-grid,
+  .performance-cycle-meta,
+  .performance-template-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-admin-metrics,
+  .performance-admin-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .expenses-metric-grid,
   .expenses-metric-skeleton-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3756,6 +3979,20 @@ html.dark .topbar {
   .payroll-metric-skeleton-grid,
   .payroll-run-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .performance-admin-metrics,
+  .performance-admin-form-grid,
+  .performance-template-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-cycle-header,
+  .performance-form-header,
+  .performance-section-header,
+  .performance-assignment-meta {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .expenses-metric-grid,

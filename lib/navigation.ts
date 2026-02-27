@@ -221,6 +221,12 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "A C"
       },
       {
+        label: "Performance Admin",
+        href: "/performance/admin",
+        description: "Create review cycles, assign reviewers, and track completion.",
+        shortcut: "A F"
+      },
+      {
         label: "Payment Details",
         href: "/admin/payment-details",
         description: "Review masked employee payout destinations and missing details.",
