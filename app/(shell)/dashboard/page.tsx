@@ -6,6 +6,8 @@ import { MetricCard } from "../../../components/shared/metric-card";
 import { PageHeader } from "../../../components/shared/page-header";
 import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
+import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
+import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { isUserRole, type UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
 import { createSupabaseServerClient } from "../../../lib/supabase/server";
@@ -23,6 +25,15 @@ type ExpenseWidgetMetrics = {
   employeePendingCount: number;
   employeePendingAmount: number;
   managerPendingCount: number;
+};
+
+type ComplianceWidgetMetrics = {
+  overdueCount: number;
+  nextDeadline: {
+    dueDate: string;
+    requirement: string;
+    countryCode: string;
+  } | null;
 };
 
 const COUNTRY_LABELS: Record<string, string> = {
@@ -48,6 +59,14 @@ function hasManagerAccess(roles: readonly UserRole[]): boolean {
 
 function hasHrAdminAccess(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "HR_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+}
+
+function hasComplianceAccess(roles: readonly UserRole[]): boolean {
+  return (
+    hasRole(roles, "HR_ADMIN") ||
+    hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "SUPER_ADMIN")
+  );
 }
 
 function getCountrySummary(members: readonly OrgMember[]): {
@@ -222,6 +241,83 @@ async function getExpenseWidgetMetrics({
   }
 }
 
+async function getComplianceWidgetMetrics(orgId: string): Promise<ComplianceWidgetMetrics> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const today = new Date().toISOString().slice(0, 10);
+
+    const [
+      { data: overdueRows, error: overdueError },
+      { data: nextDeadlineRow, error: nextDeadlineError }
+    ] = await Promise.all([
+      supabase
+        .from("compliance_deadlines")
+        .select("id")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .neq("status", "completed")
+        .lt("due_date", today),
+      supabase
+        .from("compliance_deadlines")
+        .select("due_date, item_id")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .neq("status", "completed")
+        .gte("due_date", today)
+        .order("due_date", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+    ]);
+
+    if (overdueError || nextDeadlineError) {
+      return {
+        overdueCount: 0,
+        nextDeadline: null
+      };
+    }
+
+    const overdueCount = (overdueRows ?? []).length;
+    let nextDeadline: ComplianceWidgetMetrics["nextDeadline"] = null;
+
+    if (
+      nextDeadlineRow &&
+      typeof nextDeadlineRow.item_id === "string" &&
+      typeof nextDeadlineRow.due_date === "string"
+    ) {
+      const { data: itemRow, error: itemError } = await supabase
+        .from("compliance_items")
+        .select("requirement, country_code")
+        .eq("org_id", orgId)
+        .eq("id", nextDeadlineRow.item_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (
+        !itemError &&
+        itemRow &&
+        typeof itemRow.requirement === "string" &&
+        typeof itemRow.country_code === "string"
+      ) {
+        nextDeadline = {
+          dueDate: nextDeadlineRow.due_date,
+          requirement: itemRow.requirement,
+          countryCode: itemRow.country_code
+        };
+      }
+    }
+
+    return {
+      overdueCount,
+      nextDeadline
+    };
+  } catch {
+    return {
+      overdueCount: 0,
+      nextDeadline: null
+    };
+  }
+}
+
 export default async function DashboardPage() {
   const session = await getAuthenticatedSession();
 
@@ -272,6 +368,9 @@ export default async function DashboardPage() {
     viewerUserId: profile.id,
     directReportIds
   });
+  const complianceMetrics = hasComplianceAccess(roles)
+    ? await getComplianceWidgetMetrics(profile.org_id)
+    : null;
 
   return (
     <>
@@ -360,6 +459,33 @@ export default async function DashboardPage() {
           <MetricCard label="Pending Expenses" value="--" hint="Expense approvals pending module rollout" />
           <MetricCard label="Total Payroll Cost" value="--" hint="Payroll computation not yet enabled" />
           <MetricCard label="Reimbursement Queue" value="--" hint="Expense queue metrics coming soon" />
+        </section>
+      ) : null}
+
+      {complianceMetrics ? (
+        <section className="dashboard-panel dashboard-compliance-widget" aria-label="Compliance widget">
+          <h3 className="section-title">Compliance</h3>
+          <p className="dashboard-subtitle">
+            <span className="numeric">{complianceMetrics.overdueCount}</span> overdue deadlines
+          </p>
+          {complianceMetrics.nextDeadline ? (
+            <p className="dashboard-subtitle">
+              Next: {countryFlagFromCode(complianceMetrics.nextDeadline.countryCode)}{" "}
+              {countryNameFromCode(complianceMetrics.nextDeadline.countryCode)} •{" "}
+              {complianceMetrics.nextDeadline.requirement}{" "}
+              <span
+                className="numeric"
+                title={formatDateTimeTooltip(complianceMetrics.nextDeadline.dueDate)}
+              >
+                ({formatRelativeTime(complianceMetrics.nextDeadline.dueDate)})
+              </span>
+            </p>
+          ) : (
+            <p className="dashboard-subtitle">No upcoming compliance deadlines.</p>
+          )}
+          <Link className="quick-link" href="/compliance">
+            Open Compliance
+          </Link>
         </section>
       ) : null}
 

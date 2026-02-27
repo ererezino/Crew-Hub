@@ -337,6 +337,41 @@ type SeedReviewResponse = {
   submittedOffsetDays: number | null;
 };
 
+type SeedComplianceCadence = "monthly" | "annual" | "ongoing";
+
+type SeedComplianceCategory =
+  | "tax"
+  | "pension"
+  | "housing"
+  | "social_insurance"
+  | "health_insurance"
+  | "regulatory";
+
+type SeedComplianceStatus = "pending" | "in_progress" | "completed" | "overdue";
+
+type SeedComplianceItem = {
+  key: string;
+  countryCode: SeedMember["countryCode"];
+  authority: string;
+  requirement: string;
+  description: string;
+  cadence: SeedComplianceCadence;
+  category: SeedComplianceCategory;
+  notes: string | null;
+  dueDay: number | "end";
+  assignedToKey: SeedMember["key"];
+  annualMonthOffset?: number;
+};
+
+type SeedComplianceDeadline = {
+  itemKey: SeedComplianceItem["key"];
+  dueDate: string;
+  status: SeedComplianceStatus;
+  assignedToKey: SeedMember["key"];
+  completedAt: string | null;
+  notes: string | null;
+};
+
 type SeedDeductionRule = {
   countryCode: "NG";
   ruleType:
@@ -1499,6 +1534,307 @@ const SEED_REVIEW_RESPONSES: SeedReviewResponse[] = [
     }
   }
 ];
+
+const SEED_COMPLIANCE_ITEMS: SeedComplianceItem[] = [
+  {
+    key: "ng_paye",
+    countryCode: "NG",
+    authority: "FIRS",
+    requirement: "PAYE Filing & Remittance",
+    description: "Submit monthly PAYE return and remit tax deductions.",
+    cadence: "monthly",
+    category: "tax",
+    notes: "Due by the 10th of each month.",
+    dueDay: 10,
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "ng_pension",
+    countryCode: "NG",
+    authority: "PENCOM",
+    requirement: "Pension Contribution Remittance",
+    description: "Remit pension contributions to approved PFAs.",
+    cadence: "monthly",
+    category: "pension",
+    notes: "Due within 7 days after month end.",
+    dueDay: 7,
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "ng_nhf",
+    countryCode: "NG",
+    authority: "Federal Mortgage Bank of Nigeria",
+    requirement: "NHF Contribution Remittance",
+    description: "Remit NHF deductions for eligible workers.",
+    cadence: "monthly",
+    category: "housing",
+    notes: "Due at month end.",
+    dueDay: "end",
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "ng_nsitf",
+    countryCode: "NG",
+    authority: "NSITF",
+    requirement: "NSITF Contribution Remittance",
+    description: "Remit NSITF social insurance contributions.",
+    cadence: "monthly",
+    category: "social_insurance",
+    notes: "Due at month end.",
+    dueDay: "end",
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "gh_paye",
+    countryCode: "GH",
+    authority: "GRA",
+    requirement: "PAYE Filing & Remittance",
+    description: "Submit PAYE filings and settle monthly liabilities.",
+    cadence: "monthly",
+    category: "tax",
+    notes: "Due by the 15th of each month.",
+    dueDay: 15,
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "gh_ssnit",
+    countryCode: "GH",
+    authority: "SSNIT",
+    requirement: "SSNIT Contribution Remittance",
+    description: "Remit monthly social security contributions.",
+    cadence: "monthly",
+    category: "social_insurance",
+    notes: "Due by the 14th of each month.",
+    dueDay: 14,
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "ke_paye",
+    countryCode: "KE",
+    authority: "KRA",
+    requirement: "PAYE Filing & Remittance",
+    description: "Submit PAYE returns and remit statutory deductions.",
+    cadence: "monthly",
+    category: "tax",
+    notes: "Due by the 9th of each month.",
+    dueDay: 9,
+    assignedToKey: "ops_manager"
+  },
+  {
+    key: "ke_nssf",
+    countryCode: "KE",
+    authority: "NSSF",
+    requirement: "NSSF Contribution Remittance",
+    description: "Remit NSSF contributions for applicable employees.",
+    cadence: "monthly",
+    category: "pension",
+    notes: "Due by the 15th of each month.",
+    dueDay: 15,
+    assignedToKey: "ops_manager"
+  },
+  {
+    key: "ke_nhif_shif",
+    countryCode: "KE",
+    authority: "Social Health Authority",
+    requirement: "NHIF/SHIF Contribution Remittance",
+    description: "Remit NHIF/SHIF deductions before due date.",
+    cadence: "monthly",
+    category: "health_insurance",
+    notes: "Due by the 15th of each month.",
+    dueDay: 15,
+    assignedToKey: "ops_manager"
+  },
+  {
+    key: "ke_housing",
+    countryCode: "KE",
+    authority: "KRA",
+    requirement: "Affordable Housing Levy Remittance",
+    description: "File and remit the affordable housing levy.",
+    cadence: "monthly",
+    category: "housing",
+    notes: "Due by the 9th of each month.",
+    dueDay: 9,
+    assignedToKey: "ops_manager"
+  },
+  {
+    key: "za_emp201",
+    countryCode: "ZA",
+    authority: "SARS",
+    requirement: "EMP201 Filing & Payment",
+    description: "Submit EMP201 and settle PAYE/UIF/SDL liabilities.",
+    cadence: "monthly",
+    category: "tax",
+    notes: "Due by the 7th of each month.",
+    dueDay: 7,
+    assignedToKey: "compliance_officer"
+  },
+  {
+    key: "za_uif",
+    countryCode: "ZA",
+    authority: "UIF",
+    requirement: "UIF Contribution Remittance",
+    description: "Submit and settle UIF monthly returns.",
+    cadence: "monthly",
+    category: "social_insurance",
+    notes: "Due by the 7th of each month.",
+    dueDay: 7,
+    assignedToKey: "compliance_officer"
+  },
+  {
+    key: "za_bbbee",
+    countryCode: "ZA",
+    authority: "B-BBEE Commission",
+    requirement: "B-BBEE Annual Compliance Submission",
+    description: "Submit annual B-BBEE compliance report.",
+    cadence: "annual",
+    category: "regulatory",
+    notes: "Annual filing tracked in this cycle.",
+    dueDay: 25,
+    assignedToKey: "compliance_officer",
+    annualMonthOffset: 2
+  },
+  {
+    key: "ca_cra",
+    countryCode: "CA",
+    authority: "CRA",
+    requirement: "Payroll Source Deduction Remittance",
+    description: "Remit payroll source deductions to CRA.",
+    cadence: "monthly",
+    category: "tax",
+    notes: "Due by the 15th of each month.",
+    dueDay: 15,
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "ca_fintrac",
+    countryCode: "CA",
+    authority: "FINTRAC",
+    requirement: "Ongoing AML/ATF Compliance Monitoring",
+    description: "Track and document ongoing FINTRAC obligations.",
+    cadence: "ongoing",
+    category: "regulatory",
+    notes: "Operational monthly compliance checkpoint.",
+    dueDay: "end",
+    assignedToKey: "compliance_officer"
+  }
+];
+
+function padMonthDay(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function monthKeyFromParts(year: number, monthOneBased: number): string {
+  return `${year}-${padMonthDay(monthOneBased)}`;
+}
+
+function monthSeries(nextMonths: number): Array<{ year: number; monthOneBased: number }> {
+  const today = new Date();
+  const series: Array<{ year: number; monthOneBased: number }> = [];
+
+  for (let offset = 0; offset < nextMonths; offset += 1) {
+    const monthDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + offset, 1));
+    series.push({
+      year: monthDate.getUTCFullYear(),
+      monthOneBased: monthDate.getUTCMonth() + 1
+    });
+  }
+
+  return series;
+}
+
+function dueDateFromMonth({
+  year,
+  monthOneBased,
+  dueDay
+}: {
+  year: number;
+  monthOneBased: number;
+  dueDay: number | "end";
+}): string {
+  const lastDay = new Date(Date.UTC(year, monthOneBased, 0)).getUTCDate();
+  const resolvedDay = dueDay === "end" ? lastDay : Math.min(dueDay, lastDay);
+  return `${monthKeyFromParts(year, monthOneBased)}-${padMonthDay(resolvedDay)}`;
+}
+
+function addDaysToIsoDate(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate}T12:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString();
+}
+
+function buildComplianceDeadlines(items: readonly SeedComplianceItem[]): SeedComplianceDeadline[] {
+  const today = new Date().toISOString().slice(0, 10);
+  const dueSoonLimitDate = new Date();
+  dueSoonLimitDate.setUTCDate(dueSoonLimitDate.getUTCDate() + 7);
+  const dueSoonLimit = dueSoonLimitDate.toISOString().slice(0, 10);
+  const months = monthSeries(3);
+  const deadlines: SeedComplianceDeadline[] = [];
+
+  for (const item of items) {
+    if (item.cadence === "annual") {
+      const annualOffset = item.annualMonthOffset ?? 2;
+      const annualMonth = months[Math.min(annualOffset, months.length - 1)];
+
+      if (!annualMonth) {
+        continue;
+      }
+
+      const dueDate = dueDateFromMonth({
+        year: annualMonth.year,
+        monthOneBased: annualMonth.monthOneBased,
+        dueDay: item.dueDay
+      });
+
+      deadlines.push({
+        itemKey: item.key,
+        dueDate,
+        status: dueDate <= dueSoonLimit ? "in_progress" : "pending",
+        assignedToKey: item.assignedToKey,
+        completedAt: null,
+        notes: "Annual filing milestone."
+      });
+
+      continue;
+    }
+
+    for (let monthIndex = 0; monthIndex < months.length; monthIndex += 1) {
+      const month = months[monthIndex];
+      const dueDate = dueDateFromMonth({
+        year: month.year,
+        monthOneBased: month.monthOneBased,
+        dueDay: item.dueDay
+      });
+
+      let status: SeedComplianceStatus = "pending";
+      let completedAt: string | null = null;
+
+      if (item.key === "gh_paye" && monthIndex === 0) {
+        status = "completed";
+        completedAt = addDaysToIsoDate(dueDate, -1);
+      } else if (dueDate < today) {
+        status = "overdue";
+      } else if (dueDate <= dueSoonLimit) {
+        status = "in_progress";
+      }
+
+      deadlines.push({
+        itemKey: item.key,
+        dueDate,
+        status,
+        assignedToKey: item.assignedToKey,
+        completedAt,
+        notes:
+          item.cadence === "ongoing"
+            ? "Ongoing compliance checkpoint."
+            : null
+      });
+    }
+  }
+
+  return deadlines;
+}
+
+const SEED_COMPLIANCE_DEADLINES = buildComplianceDeadlines(SEED_COMPLIANCE_ITEMS);
 
 const SEED_EXPENSES: SeedExpense[] = [
   {
@@ -3178,6 +3514,213 @@ async function upsertSeedPerformance(
   }
 }
 
+function complianceItemKey({
+  countryCode,
+  authority,
+  requirement
+}: {
+  countryCode: string;
+  authority: string;
+  requirement: string;
+}): string {
+  return [countryCode, authority, requirement].join("|").toLowerCase();
+}
+
+function complianceDeadlineKey({
+  itemId,
+  dueDate
+}: {
+  itemId: string;
+  dueDate: string;
+}): string {
+  return `${itemId}|${dueDate}`;
+}
+
+async function upsertSeedCompliance(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  const { data: existingItemRows, error: existingItemRowsError } = await client
+    .from("compliance_items")
+    .select("id, country_code, authority, requirement")
+    .eq("org_id", orgId)
+    .is("deleted_at", null);
+
+  if (existingItemRowsError) {
+    throw new Error(`Unable to query compliance items seed data: ${existingItemRowsError.message}`);
+  }
+
+  const existingItemByKey = new Map<string, string>();
+
+  for (const row of existingItemRows ?? []) {
+    if (
+      typeof row.id !== "string" ||
+      typeof row.country_code !== "string" ||
+      typeof row.authority !== "string" ||
+      typeof row.requirement !== "string"
+    ) {
+      continue;
+    }
+
+    const key = complianceItemKey({
+      countryCode: row.country_code,
+      authority: row.authority,
+      requirement: row.requirement
+    });
+
+    if (!existingItemByKey.has(key)) {
+      existingItemByKey.set(key, row.id);
+    }
+  }
+
+  const itemIdByKey = new Map<string, string>();
+
+  for (const item of SEED_COMPLIANCE_ITEMS) {
+    const payload = {
+      org_id: orgId,
+      country_code: item.countryCode,
+      authority: item.authority,
+      requirement: item.requirement,
+      description: item.description,
+      cadence: item.cadence,
+      category: item.category,
+      notes: item.notes,
+      deleted_at: null as string | null
+    };
+
+    const existingItemId = existingItemByKey.get(
+      complianceItemKey({
+        countryCode: item.countryCode,
+        authority: item.authority,
+        requirement: item.requirement
+      })
+    );
+
+    if (existingItemId) {
+      const { error: updateError } = await client
+        .from("compliance_items")
+        .update(payload)
+        .eq("id", existingItemId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update compliance item seed data: ${updateError.message}`);
+      }
+
+      itemIdByKey.set(item.key, existingItemId);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("compliance_items")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(`Unable to insert compliance item seed data: ${insertError?.message ?? "unknown error"}`);
+      }
+
+      itemIdByKey.set(item.key, insertedRow.id);
+      existingItemByKey.set(
+        complianceItemKey({
+          countryCode: item.countryCode,
+          authority: item.authority,
+          requirement: item.requirement
+        }),
+        insertedRow.id
+      );
+    }
+  }
+
+  const itemIds = [...itemIdByKey.values()];
+  const dueDates = [...new Set(SEED_COMPLIANCE_DEADLINES.map((deadline) => deadline.dueDate))];
+  const existingDeadlineByKey = new Map<string, string>();
+
+  if (itemIds.length > 0 && dueDates.length > 0) {
+    const { data: existingDeadlineRows, error: existingDeadlineRowsError } = await client
+      .from("compliance_deadlines")
+      .select("id, item_id, due_date")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("item_id", itemIds)
+      .in("due_date", dueDates);
+
+    if (existingDeadlineRowsError) {
+      throw new Error(`Unable to query compliance deadlines seed data: ${existingDeadlineRowsError.message}`);
+    }
+
+    for (const row of existingDeadlineRows ?? []) {
+      if (
+        typeof row.id !== "string" ||
+        typeof row.item_id !== "string" ||
+        typeof row.due_date !== "string"
+      ) {
+        continue;
+      }
+
+      const key = complianceDeadlineKey({
+        itemId: row.item_id,
+        dueDate: row.due_date
+      });
+
+      if (!existingDeadlineByKey.has(key)) {
+        existingDeadlineByKey.set(key, row.id);
+      }
+    }
+  }
+
+  for (const deadline of SEED_COMPLIANCE_DEADLINES) {
+    const itemId = itemIdByKey.get(deadline.itemKey);
+    const assignedToId = userIdByKey.get(deadline.assignedToKey);
+
+    if (!itemId) {
+      throw new Error(`Missing compliance item id for deadline seed (${deadline.itemKey})`);
+    }
+
+    if (!assignedToId) {
+      throw new Error(`Missing assignee id for compliance deadline seed (${deadline.assignedToKey})`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      item_id: itemId,
+      due_date: deadline.dueDate,
+      status: deadline.status,
+      assigned_to: assignedToId,
+      proof_document_id: null as string | null,
+      completed_at: deadline.completedAt,
+      notes: deadline.notes,
+      deleted_at: null as string | null
+    };
+
+    const deadlineKey = complianceDeadlineKey({
+      itemId,
+      dueDate: deadline.dueDate
+    });
+    const existingDeadlineId = existingDeadlineByKey.get(deadlineKey);
+
+    if (existingDeadlineId) {
+      const { error: updateError } = await client
+        .from("compliance_deadlines")
+        .update(payload)
+        .eq("id", existingDeadlineId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update compliance deadline seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client
+        .from("compliance_deadlines")
+        .insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert compliance deadline seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function upsertSeedExpenses(
   client: SupabaseClient,
   orgId: string,
@@ -3357,6 +3900,7 @@ async function main() {
   await upsertSeedDeductionRules(client, org.id);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
   await upsertSeedPerformance(client, org.id, userIdByKey);
+  await upsertSeedCompliance(client, org.id, userIdByKey);
   await upsertSeedExpenses(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
@@ -3379,6 +3923,8 @@ async function main() {
   console.log(`Performance templates upserted: ${SEED_REVIEW_TEMPLATES.length}`);
   console.log(`Performance assignments upserted: ${SEED_REVIEW_ASSIGNMENTS.length}`);
   console.log(`Performance responses upserted: ${SEED_REVIEW_RESPONSES.length}`);
+  console.log(`Compliance items upserted: ${SEED_COMPLIANCE_ITEMS.length}`);
+  console.log(`Compliance deadlines upserted: ${SEED_COMPLIANCE_DEADLINES.length}`);
   console.log(`Expenses upserted: ${SEED_EXPENSES.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
