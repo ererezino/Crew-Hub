@@ -2072,6 +2072,304 @@ html.dark .topbar {
   background: var(--color-accent-subtle);
 }
 
+.money-input {
+  width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.65rem;
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
+}
+
+.money-input:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+.money-input-error {
+  border-color: var(--status-error-text);
+}
+
+.money-input-prefix {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.money-input-field {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  outline: none;
+  padding: 0.6rem 0;
+}
+
+.expenses-toolbar {
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.75rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.expenses-error-state {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.expenses-metric-grid,
+.expenses-metric-skeleton-grid {
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.expenses-skeleton-layout,
+.expenses-reports-skeleton {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.expenses-metric-skeleton-card,
+.expenses-table-skeleton-header,
+.expenses-table-skeleton-row,
+.expenses-report-chart-skeleton {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.expenses-metric-skeleton-card {
+  min-height: 7rem;
+}
+
+.expenses-table-skeleton {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.expenses-table-skeleton-header {
+  height: 2.1rem;
+  border-radius: var(--radius-default);
+}
+
+.expenses-table-skeleton-row {
+  height: 2.8rem;
+  border-radius: var(--radius-default);
+}
+
+.expenses-category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.expenses-category-icon,
+.expenses-category-option-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.expenses-category-icon svg,
+.expenses-category-option-icon svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.expenses-description {
+  max-width: 380px;
+  color: var(--text-secondary);
+}
+
+.expenses-row-actions,
+.expenses-approval-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .expenses-row-actions,
+.data-table-row:focus-within .expenses-row-actions,
+.data-table-row:hover .expenses-approval-row-actions,
+.data-table-row:focus-within .expenses-approval-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.expenses-category-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.expenses-category-option {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  padding: 0.45rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  cursor: pointer;
+  transition: border-color var(--transition-hover), background-color var(--transition-hover);
+}
+
+.expenses-category-option:hover {
+  border-color: var(--text-muted);
+  background: var(--bg-surface);
+}
+
+.expenses-category-option-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.expenses-form-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.expenses-receipt-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.expenses-hidden-input {
+  display: none;
+}
+
+.expenses-upload-progress {
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius-default);
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.6rem;
+}
+
+.expenses-upload-progress-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--status-info-text);
+  transition: width var(--transition-hover);
+}
+
+.expenses-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expenses-checkbox input {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.expenses-report-layout {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.expenses-report-chart-skeleton-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.expenses-report-chart-skeleton {
+  min-height: 16rem;
+}
+
+.expenses-report-card {
+  gap: 0.8rem;
+}
+
+.expenses-report-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.expenses-report-bars {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.expenses-report-row {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.expenses-report-row-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.expenses-report-row-title {
+  font-weight: 600;
+}
+
+.expenses-report-row-meta {
+  color: var(--text-secondary);
+}
+
+.expenses-report-row-bar-track {
+  width: 100%;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+}
+
+.expenses-report-row-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
+  transition: width var(--transition-panel);
+}
+
+.dashboard-expense-widget {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
 .settings-layout {
   display: grid;
   gap: 1rem;
@@ -3217,6 +3515,20 @@ html.dark .topbar {
     grid-template-columns: 1fr;
   }
 
+  .expenses-metric-grid,
+  .expenses-metric-skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .expenses-report-layout,
+  .expenses-report-chart-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .timeoff-calendar-entry-card {
     display: grid;
   }
@@ -3324,6 +3636,14 @@ html.dark .topbar {
     flex-wrap: wrap;
   }
 
+  .expenses-row-actions,
+  .expenses-approval-row-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    flex-wrap: wrap;
+  }
+
   .audit-filters {
     grid-template-columns: 1fr;
   }
@@ -3396,6 +3716,25 @@ html.dark .topbar {
   .payroll-metric-skeleton-grid,
   .payroll-run-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .expenses-metric-grid,
+  .expenses-metric-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-form-grid,
+  .expenses-category-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-toolbar {
+    align-items: flex-start;
+  }
+
+  .expenses-report-row-copy {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .payroll-status-timeline {

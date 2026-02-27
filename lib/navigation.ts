@@ -144,6 +144,18 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/expenses",
         description: "Claims, approvals, and reimbursements.",
         shortcut: "G E"
+      },
+      {
+        label: "Expense Approvals",
+        href: "/expenses/approvals",
+        description: "Review and approve pending expense submissions.",
+        shortcut: "G X"
+      },
+      {
+        label: "Expense Reports",
+        href: "/expenses/reports",
+        description: "View monthly expense analytics and export CSV.",
+        shortcut: "G Z"
       }
     ]
   },

@@ -4,6 +4,7 @@ import { DashboardAnnouncementsWidget } from "../../../components/shared/dashboa
 import { EmptyState } from "../../../components/shared/empty-state";
 import { MetricCard } from "../../../components/shared/metric-card";
 import { PageHeader } from "../../../components/shared/page-header";
+import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
 import { isUserRole, type UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
@@ -16,6 +17,12 @@ type OrgMember = {
   country_code: string | null;
   status: "active" | "inactive" | "onboarding" | "offboarding";
   roles: UserRole[];
+};
+
+type ExpenseWidgetMetrics = {
+  employeePendingCount: number;
+  employeePendingAmount: number;
+  managerPendingCount: number;
 };
 
 const COUNTRY_LABELS: Record<string, string> = {
@@ -135,6 +142,86 @@ async function getOrgMembers(orgId: string): Promise<OrgMember[]> {
   }
 }
 
+function parseExpenseAmount(value: unknown): number {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? Math.trunc(value) : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+async function getExpenseWidgetMetrics({
+  orgId,
+  viewerUserId,
+  directReportIds
+}: {
+  orgId: string;
+  viewerUserId: string;
+  directReportIds: readonly string[];
+}): Promise<ExpenseWidgetMetrics> {
+  try {
+    const supabase = await createSupabaseServerClient();
+
+    const pendingEmployeeQuery = supabase
+      .from("expenses")
+      .select("amount")
+      .eq("org_id", orgId)
+      .eq("employee_id", viewerUserId)
+      .eq("status", "pending")
+      .is("deleted_at", null);
+
+    const pendingManagerQuery =
+      directReportIds.length > 0
+        ? supabase
+            .from("expenses")
+            .select("amount")
+            .eq("org_id", orgId)
+            .eq("status", "pending")
+            .is("deleted_at", null)
+            .in("employee_id", [...directReportIds])
+        : Promise.resolve<{ data: { amount: unknown }[]; error: null }>({
+            data: [],
+            error: null
+          });
+
+    const [{ data: employeeRows, error: employeeError }, managerResult] = await Promise.all([
+      pendingEmployeeQuery,
+      pendingManagerQuery
+    ]);
+
+    if (employeeError || managerResult.error) {
+      return {
+        employeePendingCount: 0,
+        employeePendingAmount: 0,
+        managerPendingCount: 0
+      };
+    }
+
+    const employeePendingCount = (employeeRows ?? []).length;
+    const employeePendingAmount = (employeeRows ?? []).reduce((sum, row) => {
+      return sum + parseExpenseAmount(row.amount);
+    }, 0);
+    const managerPendingCount = (managerResult.data ?? []).length;
+
+    return {
+      employeePendingCount,
+      employeePendingAmount,
+      managerPendingCount
+    };
+  } catch {
+    return {
+      employeePendingCount: 0,
+      employeePendingAmount: 0,
+      managerPendingCount: 0
+    };
+  }
+}
+
 export default async function DashboardPage() {
   const session = await getAuthenticatedSession();
 
@@ -174,9 +261,17 @@ export default async function DashboardPage() {
       ];
 
   const reportCount = members.filter((member) => member.manager_id === profile.id).length;
+  const directReportIds = members
+    .filter((member) => member.manager_id === profile.id)
+    .map((member) => member.id);
   const activeHeadcount = members.filter((member) => member.status !== "inactive").length;
   const onboardingCount = members.filter((member) => member.status === "onboarding").length;
   const countrySummary = getCountrySummary(members);
+  const expenseMetrics = await getExpenseWidgetMetrics({
+    orgId: profile.org_id,
+    viewerUserId: profile.id,
+    directReportIds
+  });
 
   return (
     <>
@@ -221,6 +316,19 @@ export default async function DashboardPage() {
               </Link>
             </li>
           </ul>
+          <div className="dashboard-expense-widget">
+            <h4 className="section-title">Pending Expenses</h4>
+            <p className="dashboard-subtitle">
+              <span className="numeric">{expenseMetrics.employeePendingCount}</span>{" "}
+              submissions awaiting approval
+            </p>
+            <p>
+              <CurrencyDisplay amount={expenseMetrics.employeePendingAmount} currency="USD" />
+            </p>
+            <Link className="quick-link" href="/expenses">
+              Open Expenses
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -228,7 +336,11 @@ export default async function DashboardPage() {
         <section className="metric-grid" aria-label="Manager metrics">
           <MetricCard label="Team Report Count" value={String(reportCount)} hint="Direct reports in your team" />
           <MetricCard label="Who's Out" value="--" hint="Time Off status data pending" />
-          <MetricCard label="Pending Approvals" value="--" hint="Approval queues come in Phase 2" />
+          <MetricCard
+            label="Pending Approvals"
+            value={String(expenseMetrics.managerPendingCount)}
+            hint="Pending expense approvals from your direct reports"
+          />
           <MetricCard label="Team Health" value="--" hint="Performance health metrics pending" />
         </section>
       ) : null}
