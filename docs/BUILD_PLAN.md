@@ -1,49 +1,42 @@
-# Build Plan
+# Crew Hub Build Plan
 
-## Phases (1-5)
+## Phase 0 -- Guardrails
+- 0.1 North Star, Build Plan, and CI baseline
+- 0.2 Local environment and configuration standards
+- 0.3 Seed data baseline for development and QA
 
-### Phase 1: Foundation
+## Phase 1 -- Foundation
+- 1.1 Design system foundation (tokens, typography, shared states)
+- 1.2 App shell, navigation, and command palette routing
+- 1.3 Auth middleware and server-enforced RBAC baseline
 
-Modules:
-- Project setup and environment configuration
-- Authentication and authorization baseline
-- Core layout/navigation shell
-- Design tokens and base component primitives
+## Phase 2 -- Core People Operations
+- 2.1 People
+- 2.2 Onboarding
+- 2.3 Time Off
+- 2.4 Documents
 
-### Phase 2: Identity & Organization Core
+## Phase 3 -- Financial Operations
+- 3.1 Payroll
+- 3.2 Expenses
 
-Modules:
-- Organization model and tenant boundaries
-- User profile and role assignment flows
-- Invitation/onboarding flows
-- Role-aware dashboard entry points
+## Phase 4 -- Performance, Governance, and Insights
+- 4.1 Performance
+- 4.2 Compliance
+- 4.3 Analytics
 
-### Phase 3: Workforce Operations
+## Phase 5 -- Communications and Launch Readiness
+- 5.1 Announcements
+- 5.2 Security hardening, testing, and release readiness
 
-Modules:
-- Employee-facing request/record modules
-- Manager approval and team oversight modules
-- HR Admin operational modules
-- Notification/event triggers for operational actions
-
-### Phase 4: Governance, Compliance, and Auditability
-
-Modules:
-- Audit log ingestion and review interfaces
-- Policy enforcement and permission hardening
-- Reporting exports and compliance-oriented views
-- Data lifecycle controls (soft delete, restore, retention policies)
-
-### Phase 5: Reliability, Scale, and Launch Readiness
-
-Modules:
-- Performance optimization and query tuning
-- Observability and error monitoring
-- Security review and RLS verification pass
-- Release hardening and production readiness checks
-
-## Stop Conditions
-
-- Only one module may be implemented per task.
-- Before a task is considered complete, `npm run build` must pass.
-- If build fails, resolve build failures before stopping.
+## Module Order (Canonical)
+1. People
+2. Onboarding
+3. Time Off
+4. Documents
+5. Payroll
+6. Expenses
+7. Performance
+8. Compliance
+9. Analytics
+10. Announcements
