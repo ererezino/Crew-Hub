@@ -1926,6 +1926,126 @@ html.dark .topbar {
   border-radius: var(--radius-default);
 }
 
+.payslips-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.payslips-skeleton-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.payslips-skeleton-card,
+.payslips-skeleton-metric,
+.payslip-viewer-skeleton {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.payslips-skeleton-card {
+  height: 11.5rem;
+}
+
+.payslips-skeleton-metric {
+  height: 7rem;
+}
+
+.payslip-card-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 1rem;
+}
+
+.payslip-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.65rem;
+  transition: border-color var(--transition-hover), background-color var(--transition-hover);
+}
+
+.payslip-card:hover {
+  border-color: var(--color-accent);
+}
+
+.payslip-card-active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-subtle) 35%, var(--bg-canvas));
+}
+
+.payslip-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.payslip-card-amount {
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.payslip-card-meta {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payslip-card-meta div {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.45rem 0.55rem;
+}
+
+.payslip-card-meta dt {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.payslip-card-meta dd {
+  margin: 0.15rem 0 0;
+}
+
+.payslip-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.payslip-viewer-card {
+  margin-top: 1rem;
+}
+
+.payslip-viewer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.payslip-viewer-skeleton {
+  height: min(65vh, 700px);
+}
+
+.payslip-viewer-frame {
+  width: 100%;
+  height: min(65vh, 700px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+}
+
 .people-profile-tabs {
   display: flex;
   align-items: center;
@@ -3029,6 +3149,15 @@ html.dark .topbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .payslip-card-grid,
+  .payslips-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payslip-card-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .audit-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3218,6 +3347,20 @@ html.dark .topbar {
   }
 
   .payment-details-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payslips-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .payslip-card-header,
+  .payslip-viewer-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .payslip-card-meta {
     grid-template-columns: 1fr;
   }
 
