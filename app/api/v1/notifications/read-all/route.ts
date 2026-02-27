@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import type { ApiResponse } from "../../../../../types/auth";
@@ -12,7 +13,9 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-export async function PATCH() {
+const querySchema = z.object({}).passthrough();
+
+export async function PATCH(request: Request) {
   const session = await getAuthenticatedSession();
 
   if (!session?.profile) {
@@ -28,6 +31,20 @@ export async function PATCH() {
 
   const supabase = await createSupabaseServerClient();
   const readAt = new Date().toISOString();
+  const parsedQuery = querySchema.safeParse(
+    Object.fromEntries(new URL(request.url).searchParams.entries())
+  );
+
+  if (!parsedQuery.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedQuery.error.issues[0]?.message ?? "Invalid request query."
+      },
+      meta: buildMeta()
+    });
+  }
 
   const { error } = await supabase
     .from("notifications")

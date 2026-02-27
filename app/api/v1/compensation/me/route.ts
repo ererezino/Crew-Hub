@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { fetchCompensationSnapshot } from "../../../../../lib/compensation-store";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import type { MeCompensationResponseData } from "../../../../../types/compensation";
+
+const querySchema = z.object({}).passthrough();
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -14,7 +17,7 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getAuthenticatedSession();
 
   if (!session?.profile) {
@@ -29,6 +32,20 @@ export async function GET() {
   }
 
   const supabase = await createSupabaseServerClient();
+  const parsedQuery = querySchema.safeParse(
+    Object.fromEntries(new URL(request.url).searchParams.entries())
+  );
+
+  if (!parsedQuery.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedQuery.error.issues[0]?.message ?? "Invalid request query."
+      },
+      meta: buildMeta()
+    });
+  }
 
   try {
     const snapshot = await fetchCompensationSnapshot({

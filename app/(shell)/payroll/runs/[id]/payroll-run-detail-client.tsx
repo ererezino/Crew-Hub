@@ -423,12 +423,12 @@ export function PayrollRunDetailClient({
         `Payments processed: ${summary.completedCount} completed, ${summary.failedCount} failed.`
       );
 
-      if (summary.reusedCount > 0) {
+      if (summary.rejectedCount > 0) {
         showToast(
           "info",
-          `${summary.reusedCount} payment${
-            summary.reusedCount === 1 ? "" : "s"
-          } reused via idempotency.`
+          `${summary.rejectedCount} duplicate payment key${
+            summary.rejectedCount === 1 ? "" : "s"
+          } rejected by idempotency protection.`
         );
       }
 

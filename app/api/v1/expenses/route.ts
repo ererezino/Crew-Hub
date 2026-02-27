@@ -4,6 +4,7 @@ import { logAudit } from "../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { createBulkNotifications } from "../../../../lib/notifications/service";
 import {
+  ALLOWED_RECEIPT_EXTENSIONS,
   isAllowedReceiptUpload,
   isIsoMonth,
   MAX_RECEIPT_FILE_BYTES,
@@ -13,6 +14,7 @@ import {
   summarizeExpenses,
   RECEIPTS_BUCKET_NAME
 } from "../../../../lib/expenses";
+import { validateUploadMagicBytes } from "../../../../lib/security/upload-signatures";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
 import type { ExpenseMutationResponseData, ExpensesListResponseData } from "../../../../types/expenses";
 import {
@@ -273,6 +275,24 @@ export async function POST(request: Request) {
       error: {
         code: "VALIDATION_ERROR",
         message: "Unsupported file type. Allowed formats: pdf, png, jpg."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const magicBytesResult = await validateUploadMagicBytes({
+    file: rawFile,
+    fileName: rawFile.name,
+    allowedExtensions: ALLOWED_RECEIPT_EXTENSIONS
+  });
+
+  if (!magicBytesResult.valid) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message:
+          "Receipt signature validation failed. Upload a file whose binary format matches the selected extension."
       },
       meta: buildMeta()
     });

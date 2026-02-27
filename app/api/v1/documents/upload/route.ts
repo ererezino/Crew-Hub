@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import {
+  ALLOWED_DOCUMENT_EXTENSIONS,
   DOCUMENT_BUCKET_NAME,
   MAX_DOCUMENT_FILE_BYTES,
   isAllowedDocumentUpload,
@@ -11,6 +12,7 @@ import {
   sanitizeFileName
 } from "../../../../../lib/documents";
 import { hasRole } from "../../../../../lib/roles";
+import { validateUploadMagicBytes } from "../../../../../lib/security/upload-signatures";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import { DOCUMENT_CATEGORIES, type DocumentRecord } from "../../../../../types/documents";
@@ -160,6 +162,24 @@ export async function POST(request: Request) {
         code: "VALIDATION_ERROR",
         message:
           "Unsupported file type. Allowed formats: pdf, docx, doc, xlsx, xls, png, jpg."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const magicBytesResult = await validateUploadMagicBytes({
+    file: rawFile,
+    fileName: rawFile.name,
+    allowedExtensions: ALLOWED_DOCUMENT_EXTENSIONS
+  });
+
+  if (!magicBytesResult.valid) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message:
+          "File signature validation failed. Upload a file whose binary format matches the selected extension."
       },
       meta: buildMeta()
     });

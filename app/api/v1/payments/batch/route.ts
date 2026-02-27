@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
+import { decideIdempotencyAction } from "../../../../../lib/payments/idempotency";
 import {
   processMockPayment,
   resolvePaymentProvider
@@ -512,8 +513,29 @@ export async function POST(request: Request) {
         payPeriod
       });
       const existing = existingLedgerByKey.get(idempotencyKey);
-      return !existing || existing.status === "failed";
+      return decideIdempotencyAction(existing?.status) !== "reject_duplicate";
     });
+    const duplicateItems = parsedItems.data.filter((item) => {
+      const idempotencyKey = toIdempotencyKey({
+        runId: parsedRun.data.id,
+        employeeId: item.employee_id,
+        payPeriod
+      });
+      const existing = existingLedgerByKey.get(idempotencyKey);
+      return decideIdempotencyAction(existing?.status) === "reject_duplicate";
+    });
+
+    if (itemsNeedingProcessing.length === 0 && duplicateItems.length > 0) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "DUPLICATE_IDEMPOTENCY_KEY",
+          message:
+            "Duplicate payment idempotency keys were rejected. Failed payments can be retried."
+        },
+        meta: buildMeta()
+      });
+    }
 
     let batchId: string | null = null;
 
@@ -593,7 +615,7 @@ export async function POST(request: Request) {
     }
 
     let createdCount = 0;
-    let reusedCount = 0;
+    let rejectedCount = 0;
     let retriedCount = 0;
 
     for (const item of parsedItems.data) {
@@ -620,8 +642,11 @@ export async function POST(request: Request) {
         paymentDetails: details
       });
 
-      if (existingLedger && existingLedger.status !== "failed") {
-        reusedCount += 1;
+      if (
+        existingLedger &&
+        decideIdempotencyAction(existingLedger.status) === "reject_duplicate"
+      ) {
+        rejectedCount += 1;
 
         await updatePayrollItemPaymentState({
           supabase,
@@ -890,7 +915,7 @@ export async function POST(request: Request) {
         completedCount,
         failedCount,
         createdCount,
-        reusedCount,
+        rejectedCount,
         retriedCount
       }
     });
@@ -906,7 +931,7 @@ export async function POST(request: Request) {
       payments,
       summary: {
         createdCount,
-        reusedCount,
+        rejectedCount,
         retriedCount,
         completedCount,
         failedCount

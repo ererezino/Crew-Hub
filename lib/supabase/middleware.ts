@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { applySecurityHeaders } from "../security/csp";
+import { validateCsrfRequest } from "../security/csrf";
+import { evaluateRateLimit } from "../security/rate-limit";
+
 function getSupabasePublicEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -13,10 +17,81 @@ function getSupabasePublicEnv() {
 }
 
 export async function applySupabaseAuthMiddleware(request: NextRequest) {
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api/");
+  const isMutationRequest = ["POST", "PUT", "PATCH", "DELETE"].includes(
+    request.method.toUpperCase()
+  );
+
+  if (isApiRoute && isMutationRequest) {
+    const csrfDecision = validateCsrfRequest(request);
+
+    if (!csrfDecision.valid) {
+      return applySecurityHeaders(
+        NextResponse.json(
+          {
+            data: null,
+            error: {
+              code: "CSRF_VALIDATION_FAILED",
+              message:
+                csrfDecision.reason ??
+                "Mutation blocked by CSRF protection."
+            },
+            meta: {
+              timestamp: new Date().toISOString()
+            }
+          },
+          { status: 403 }
+        )
+      );
+    }
+
+    const rateLimitDecision = evaluateRateLimit(request);
+
+    if (!rateLimitDecision.allowed) {
+      const response = NextResponse.json(
+        {
+          data: null,
+          error: {
+            code: "RATE_LIMIT_EXCEEDED",
+            message: `Rate limit exceeded for ${rateLimitDecision.bucket ?? "this action"}.`
+          },
+          meta: {
+            timestamp: new Date().toISOString()
+          }
+        },
+        { status: 429 }
+      );
+
+      if (rateLimitDecision.retryAfterSeconds !== null) {
+        response.headers.set(
+          "Retry-After",
+          String(rateLimitDecision.retryAfterSeconds)
+        );
+      }
+
+      if (rateLimitDecision.limit !== null) {
+        response.headers.set("X-RateLimit-Limit", String(rateLimitDecision.limit));
+      }
+
+      if (rateLimitDecision.remaining !== null) {
+        response.headers.set(
+          "X-RateLimit-Remaining",
+          String(rateLimitDecision.remaining)
+        );
+      }
+
+      if (rateLimitDecision.bucket) {
+        response.headers.set("X-RateLimit-Bucket", rateLimitDecision.bucket);
+      }
+
+      return applySecurityHeaders(response);
+    }
+  }
+
   const env = getSupabasePublicEnv();
 
   if (!env) {
-    return NextResponse.next({ request });
+    return applySecurityHeaders(NextResponse.next({ request }));
   }
 
   let response = NextResponse.next({ request });
@@ -46,7 +121,6 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
   const isLoginRoute = pathname === "/login";
-  const isApiRoute = pathname.startsWith("/api/");
 
   if (!user && !isLoginRoute && !isApiRoute) {
     const redirectUrl = new URL("/login", request.url);
@@ -55,12 +129,14 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
       redirectUrl.searchParams.set("redirectTo", `${pathname}${search}`);
     }
 
-    return NextResponse.redirect(redirectUrl);
+    return applySecurityHeaders(NextResponse.redirect(redirectUrl));
   }
 
   if (user && isLoginRoute) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL("/dashboard", request.url))
+    );
   }
 
-  return response;
+  return applySecurityHeaders(response);
 }
