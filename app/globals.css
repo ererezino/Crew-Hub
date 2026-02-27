@@ -2370,6 +2370,10 @@ html.dark .topbar {
   gap: 0.4rem;
 }
 
+.dashboard-compliance-widget {
+  gap: 0.45rem;
+}
+
 .settings-layout {
   display: grid;
   gap: 1rem;
@@ -2415,6 +2419,174 @@ html.dark .topbar {
 
 .settings-card-description {
   color: var(--text-secondary);
+}
+
+.compliance-toolbar {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.compliance-toolbar-actions {
+  display: grid;
+  align-content: end;
+  gap: 0.45rem;
+}
+
+.compliance-metric-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.compliance-next-card {
+  gap: 0.45rem;
+}
+
+.compliance-due-overdue {
+  color: var(--status-error-text);
+  font-weight: 600;
+}
+
+.compliance-due-soon {
+  color: var(--status-warning-text);
+  font-weight: 600;
+}
+
+.compliance-due-upcoming {
+  color: var(--text-primary);
+}
+
+.compliance-due-completed {
+  color: var(--status-success-text);
+}
+
+.compliance-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .compliance-row-actions,
+.data-table-row:focus-within .compliance-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.compliance-calendar {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.compliance-calendar-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.compliance-calendar-list {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compliance-calendar-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.55rem 0.6rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.compliance-calendar-item-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.compliance-update-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.compliance-update-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--color-primary) 48%, transparent);
+}
+
+.compliance-update-panel {
+  position: relative;
+  width: min(560px, 100%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-modal);
+  background: var(--bg-canvas);
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  box-shadow: 0 20px 48px color-mix(in srgb, var(--color-primary) 24%, transparent);
+  animation: panel-enter var(--transition-panel);
+}
+
+.compliance-update-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.compliance-skeleton {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.compliance-skeleton-toolbar,
+.compliance-skeleton-card,
+.compliance-skeleton-table {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.compliance-skeleton-toolbar {
+  height: 4.8rem;
+}
+
+.compliance-skeleton-metrics {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.compliance-skeleton-card {
+  height: 6.8rem;
+}
+
+.compliance-skeleton-table {
+  height: 10.5rem;
 }
 
 .performance-skeleton {
@@ -3915,6 +4087,20 @@ html.dark .topbar {
     grid-column: span 1;
   }
 
+  .compliance-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compliance-toolbar-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compliance-metric-grid,
+  .compliance-skeleton-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .expenses-metric-grid,
   .expenses-metric-skeleton-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4148,6 +4334,26 @@ html.dark .topbar {
   .analytics-metric-grid,
   .analytics-skeleton-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .compliance-toolbar,
+  .compliance-toolbar-actions,
+  .compliance-metric-grid,
+  .compliance-skeleton-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .compliance-calendar-header,
+  .compliance-calendar-item,
+  .compliance-update-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .compliance-row-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
   }
 
   .analytics-chip-item {
