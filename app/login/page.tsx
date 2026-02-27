@@ -144,6 +144,11 @@ export default function LoginPage() {
       return;
     }
 
+    await fetch("/api/v1/audit/login", {
+      method: "POST",
+      keepalive: true
+    }).catch(() => undefined);
+
     const nextPath = getRedirectTarget();
     router.replace(nextPath);
     router.refresh();
