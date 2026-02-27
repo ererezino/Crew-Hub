@@ -3700,6 +3700,14 @@ html.dark .topbar {
   margin-bottom: 0.75rem;
 }
 
+.notification-dropdown-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -3721,12 +3729,25 @@ html.dark .topbar {
   border: 1px solid var(--border-default);
   padding: 0.55rem 0.625rem;
   display: grid;
-  gap: 0.2rem;
+  gap: 0.3rem;
 }
 
 .notification-item-unread {
   background: var(--status-info-bg);
   border-color: var(--status-info-border);
+}
+
+.notification-item-skeleton {
+  height: 4.2rem;
+  border-radius: var(--radius-default);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.notification-link {
+  display: grid;
+  gap: 0.25rem;
 }
 
 .notification-title {
@@ -3737,10 +3758,66 @@ html.dark .topbar {
   color: var(--text-secondary);
 }
 
+.notification-time {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
 .notification-footer {
   margin-top: 0.75rem;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+.notifications-toolbar {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.notifications-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .notifications-row-actions,
+.data-table-row:focus-within .notifications-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.notifications-skeleton {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.notifications-skeleton-toolbar,
+.notifications-skeleton-row {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.notifications-skeleton-toolbar {
+  height: 4.8rem;
+}
+
+.notifications-skeleton-row {
+  height: 3.8rem;
 }
 
 .command-overlay {
@@ -4322,6 +4399,11 @@ html.dark .topbar {
     grid-template-columns: 1fr;
   }
 
+  .notifications-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .analytics-toolbar-actions {
     justify-items: start;
   }
@@ -4359,6 +4441,12 @@ html.dark .topbar {
   .analytics-chip-item {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .notifications-row-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
   }
 
   .expenses-metric-grid,

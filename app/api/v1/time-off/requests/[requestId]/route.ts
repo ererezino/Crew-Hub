@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { sendLeaveStatusEmail } from "../../../../../../lib/notifications/email";
+import { createNotification } from "../../../../../../lib/notifications/service";
 import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
 import { parseNumeric } from "../../../../../../lib/time-off";
@@ -40,6 +42,7 @@ const leaveRequestRowSchema = z.object({
 
 const employeeProfileSchema = z.object({
   id: z.string().uuid(),
+  email: z.string().email(),
   full_name: z.string(),
   department: z.string().nullable(),
   country_code: z.string().nullable(),
@@ -293,7 +296,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { data: employeeRow, error: employeeError } = await supabase
     .from("profiles")
-    .select("id, full_name, department, country_code, manager_id")
+    .select("id, email, full_name, department, country_code, manager_id")
     .eq("id", existingRequest.employee_id)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -507,6 +510,36 @@ export async function PATCH(request: Request, context: RouteContext) {
       approverName
     })
   };
+
+  if (
+    existingRequest.status === "pending" &&
+    (nextStatus === "approved" || nextStatus === "rejected")
+  ) {
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: employeeProfile.id,
+      type: "leave_status",
+      title:
+        nextStatus === "approved"
+          ? "Leave request approved"
+          : "Leave request rejected",
+      body:
+        nextStatus === "approved"
+          ? `${existingRequest.leave_type} leave (${existingRequest.start_date} to ${existingRequest.end_date}) was approved.`
+          : `${existingRequest.leave_type} leave (${existingRequest.start_date} to ${existingRequest.end_date}) was rejected.`,
+      link: "/time-off"
+    });
+
+    await sendLeaveStatusEmail({
+      orgId: session.profile.org_id,
+      userId: employeeProfile.id,
+      leaveType: existingRequest.leave_type,
+      status: nextStatus,
+      startDate: existingRequest.start_date,
+      endDate: existingRequest.end_date,
+      rejectionReason: nextStatus === "rejected" ? nextRejectionReason : null
+    });
+  }
 
   return jsonResponse<TimeOffRequestMutationResponseData>(200, {
     data: responseData,

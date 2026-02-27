@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
+import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import type { UserRole } from "../../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../../lib/roles";
@@ -473,6 +474,35 @@ export async function POST(
         reason
       }
     });
+
+    if (action === "approve_final" && nextStatus === "approved") {
+      const { data: payrollItemRows, error: payrollItemsError } = await supabase
+        .from("payroll_items")
+        .select("employee_id")
+        .eq("org_id", profile.org_id)
+        .eq("payroll_run_id", runId)
+        .is("deleted_at", null);
+
+      if (payrollItemsError) {
+        console.error("Unable to load payroll notification recipients.", {
+          runId,
+          message: payrollItemsError.message
+        });
+      } else {
+        const employeeIds = [...new Set((payrollItemRows ?? [])
+          .map((row) => row.employee_id)
+          .filter((value): value is string => typeof value === "string"))];
+
+        await createBulkNotifications({
+          orgId: profile.org_id,
+          userIds: employeeIds,
+          type: "payroll_approved",
+          title: "Payroll approved",
+          body: `Payroll for ${parsedUpdated.data.pay_period_end.slice(0, 7)} has been approved.`,
+          link: `/payroll/runs/${runId}`
+        });
+      }
+    }
 
     const responseRun: PayrollRunSummary = toPayrollRunSummary(
       parsedUpdated.data,

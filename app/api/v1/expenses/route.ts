@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { createBulkNotifications } from "../../../../lib/notifications/service";
 import {
   isAllowedReceiptUpload,
   isIsoMonth,
@@ -417,6 +418,7 @@ export async function POST(request: Request) {
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
   const expense = toExpenseRecord(parsedExpense.data, profileById);
+  const employeeProfile = profileById.get(expense.employeeId) ?? null;
 
   await logAudit({
     action: "created",
@@ -433,6 +435,48 @@ export async function POST(request: Request) {
       category: expense.category
     }
   });
+
+  const { data: approvalRows, error: approvalError } = await supabase
+    .from("profiles")
+    .select("id, roles")
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null);
+
+  if (approvalError) {
+    console.error("Unable to load expense approval recipients.", {
+      expenseId: expense.id,
+      message: approvalError.message
+    });
+  } else {
+    const adminApproverIds = (approvalRows ?? [])
+      .filter((row) => {
+        const roles = Array.isArray(row.roles)
+          ? row.roles.filter((role): role is string => typeof role === "string")
+          : [];
+
+        return (
+          roles.includes("FINANCE_ADMIN") ||
+          roles.includes("HR_ADMIN") ||
+          roles.includes("SUPER_ADMIN")
+        );
+      })
+      .map((row) => row.id)
+      .filter((id): id is string => typeof id === "string");
+
+    const recipientIds = [
+      ...(employeeProfile?.manager_id ? [employeeProfile.manager_id] : []),
+      ...adminApproverIds
+    ].filter((id) => id !== expense.employeeId);
+
+    await createBulkNotifications({
+      orgId: session.profile.org_id,
+      userIds: recipientIds,
+      type: "expense_submitted",
+      title: `Expense submitted by ${expense.employeeName}`,
+      body: `${expense.category} expense for ${expense.expenseDate} is pending approval.`,
+      link: "/expenses/approvals"
+    });
+  }
 
   const responseData: ExpenseMutationResponseData = {
     expense

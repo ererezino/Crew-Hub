@@ -8,6 +8,8 @@ import {
   sanitizeFileName
 } from "../../../../../../../lib/documents";
 import { renderPaymentStatementPdf } from "../../../../../../../lib/payroll/payment-statement-pdf";
+import { sendPayslipReadyEmail } from "../../../../../../../lib/notifications/email";
+import { createNotification } from "../../../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import type {
@@ -42,6 +44,7 @@ const payrollItemRowSchema = z.object({
 
 const profileRowSchema = z.object({
   id: z.string().uuid(),
+  email: z.string().email(),
   full_name: z.string(),
   department: z.string().nullable(),
   title: z.string().nullable(),
@@ -186,7 +189,7 @@ export async function POST(
       await Promise.all([
         supabase
           .from("profiles")
-          .select("id, full_name, department, title, country_code")
+          .select("id, email, full_name, department, title, country_code")
           .eq("org_id", session.profile.org_id)
           .is("deleted_at", null)
           .in("id", employeeIds),
@@ -222,6 +225,7 @@ export async function POST(
     }
 
     const profileById = new Map(parsedProfiles.data.map((profile) => [profile.id, profile]));
+    const payrollItemById = new Map(parsedItems.data.map((item) => [item.id, item]));
     const organizationName =
       typeof orgRow?.name === "string" && orgRow.name.trim().length > 0
         ? orgRow.name
@@ -356,6 +360,30 @@ export async function POST(
           });
         }
       }
+    }
+
+    for (const statement of generatedStatements) {
+      const item = payrollItemById.get(statement.payrollItemId);
+      const profile = profileById.get(statement.employeeId);
+
+      if (!item || !profile) {
+        continue;
+      }
+
+      await createNotification({
+        orgId: session.profile.org_id,
+        userId: statement.employeeId,
+        type: "payslip_ready",
+        title: "Payment statement ready",
+        body: `Your ${payPeriod} payment statement is available.`,
+        link: "/me/payslips"
+      });
+
+      await sendPayslipReadyEmail({
+        orgId: session.profile.org_id,
+        userId: statement.employeeId,
+        payPeriod
+      });
     }
 
     await logAudit({

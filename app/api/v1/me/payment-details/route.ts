@@ -12,6 +12,10 @@ import {
   extractLast4Digits
 } from "../../../../../lib/payment-details";
 import { notifyHrPaymentDetailsChanged } from "../../../../../lib/notifications/payment-details";
+import {
+  createBulkNotifications,
+  createNotification
+} from "../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
@@ -370,6 +374,47 @@ export async function PUT(request: Request) {
       employeeEmail: session.profile.email,
       paymentMethod: maskedDetail.paymentMethod,
       changeEffectiveAt: maskedDetail.changeEffectiveAt
+    });
+
+    const { data: hrRows, error: hrRowsError } = await supabase
+      .from("profiles")
+      .select("id, roles")
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null);
+
+    if (hrRowsError) {
+      console.error("Unable to load payment detail notification recipients.", {
+        employeeId: session.profile.id,
+        message: hrRowsError.message
+      });
+    } else {
+      const hrRecipientIds = (hrRows ?? [])
+        .filter((row) => {
+          const roles = Array.isArray(row.roles)
+            ? row.roles.filter((role): role is string => typeof role === "string")
+            : [];
+          return roles.includes("HR_ADMIN") || roles.includes("SUPER_ADMIN");
+        })
+        .map((row) => row.id)
+        .filter((id): id is string => typeof id === "string");
+
+      await createBulkNotifications({
+        orgId: session.profile.org_id,
+        userIds: hrRecipientIds,
+        type: "payment_details_changed",
+        title: "Payment details changed",
+        body: `${session.profile.full_name} updated payment details. Change holds for 48 hours.`,
+        link: "/admin/payment-details"
+      });
+    }
+
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: session.profile.id,
+      type: "payment_details_changed",
+      title: "Payment details updated",
+      body: "Your payment details were updated and will become effective in 48 hours.",
+      link: "/me/payment-details"
     });
 
     return jsonResponse<MePaymentDetailsMutationData>(200, {

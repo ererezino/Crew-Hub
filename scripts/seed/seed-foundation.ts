@@ -372,6 +372,16 @@ type SeedComplianceDeadline = {
   notes: string | null;
 };
 
+type SeedNotification = {
+  userKey: SeedMember["key"];
+  type: string;
+  title: string;
+  body: string;
+  link: string | null;
+  isRead: boolean;
+  createdOffsetDays: number;
+};
+
 type SeedDeductionRule = {
   countryCode: "NG";
   ruleType:
@@ -1918,6 +1928,72 @@ const SEED_EXPENSES: SeedExpense[] = [
     status: "approved",
     approvedByKey: "head_people_finance",
     approvedOffsetDays: -6
+  }
+];
+
+const SEED_NOTIFICATIONS: SeedNotification[] = [
+  {
+    userKey: "engineer_1",
+    type: "leave_status",
+    title: "Leave request approved",
+    body: "Your annual leave request for next week was approved.",
+    link: "/time-off",
+    isRead: false,
+    createdOffsetDays: -1
+  },
+  {
+    userKey: "ops_associate",
+    type: "expense_status",
+    title: "Expense approved",
+    body: "Your transport expense has been approved.",
+    link: "/expenses",
+    isRead: false,
+    createdOffsetDays: -2
+  },
+  {
+    userKey: "engineer_2",
+    type: "payslip_ready",
+    title: "Payment statement ready",
+    body: "Your latest payment statement is available.",
+    link: "/me/payslips",
+    isRead: false,
+    createdOffsetDays: -3
+  },
+  {
+    userKey: "head_people_finance",
+    type: "expense_submitted",
+    title: "Expense submitted by Jordan Okoye",
+    body: "A new expense submission needs review.",
+    link: "/expenses/approvals",
+    isRead: false,
+    createdOffsetDays: -1
+  },
+  {
+    userKey: "ops_manager",
+    type: "leave_submitted",
+    title: "Leave request submitted by Sofia Campbell",
+    body: "A new leave request is pending approval.",
+    link: "/time-off/approvals",
+    isRead: true,
+    createdOffsetDays: -5
+  },
+  {
+    userKey: "compliance_officer",
+    type: "compliance_deadline",
+    title: "Compliance reminder",
+    body: "EMP201 filing is due this week.",
+    link: "/compliance",
+    isRead: false,
+    createdOffsetDays: -1
+  },
+  {
+    userKey: "coo",
+    type: "announcement",
+    title: "New announcement: Crew retreat planning",
+    body: "New team announcement is available in Announcements.",
+    link: "/announcements",
+    isRead: true,
+    createdOffsetDays: -6
   }
 ];
 
@@ -3835,6 +3911,118 @@ async function upsertSeedExpenses(
   }
 }
 
+function notificationSeedKey({
+  userId,
+  type,
+  title
+}: {
+  userId: string;
+  type: string;
+  title: string;
+}): string {
+  return `${userId}|${type}|${title}`.toLowerCase();
+}
+
+async function upsertSeedNotifications(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  const targetUserIds = [...new Set(SEED_NOTIFICATIONS
+    .map((row) => userIdByKey.get(row.userKey))
+    .filter((value): value is string => typeof value === "string"))];
+
+  if (targetUserIds.length === 0) {
+    return;
+  }
+
+  const { data: existingRows, error: existingRowsError } = await client
+    .from("notifications")
+    .select("id, user_id, type, title")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .in("user_id", targetUserIds);
+
+  if (existingRowsError) {
+    throw new Error(`Unable to query notification seed data: ${existingRowsError.message}`);
+  }
+
+  const existingIdByKey = new Map<string, string>();
+
+  for (const row of existingRows ?? []) {
+    if (
+      typeof row.id !== "string" ||
+      typeof row.user_id !== "string" ||
+      typeof row.type !== "string" ||
+      typeof row.title !== "string"
+    ) {
+      continue;
+    }
+
+    const key = notificationSeedKey({
+      userId: row.user_id,
+      type: row.type,
+      title: row.title
+    });
+
+    if (!existingIdByKey.has(key)) {
+      existingIdByKey.set(key, row.id);
+    }
+  }
+
+  for (const notification of SEED_NOTIFICATIONS) {
+    const userId = userIdByKey.get(notification.userKey);
+
+    if (!userId) {
+      throw new Error(`Missing user id for notification seed (${notification.userKey})`);
+    }
+
+    const readAt = notification.isRead
+      ? timestampWithOffsetDays(notification.createdOffsetDays)
+      : null;
+
+    const payload = {
+      org_id: orgId,
+      user_id: userId,
+      type: notification.type,
+      title: notification.title,
+      body: notification.body,
+      link: notification.link,
+      is_read: notification.isRead,
+      read_at: readAt,
+      created_at: timestampWithOffsetDays(notification.createdOffsetDays),
+      deleted_at: null as string | null
+    };
+
+    const key = notificationSeedKey({
+      userId,
+      type: notification.type,
+      title: notification.title
+    });
+    const existingId = existingIdByKey.get(key);
+
+    if (existingId) {
+      const { error: updateError } = await client
+        .from("notifications")
+        .update(payload)
+        .eq("id", existingId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update notification seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client
+        .from("notifications")
+        .insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert notification seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function main() {
   const client = createServiceRoleClient();
   const sharedPassword = process.env.SEED_TEST_PASSWORD ?? "CrewHub123!";
@@ -3902,6 +4090,7 @@ async function main() {
   await upsertSeedPerformance(client, org.id, userIdByKey);
   await upsertSeedCompliance(client, org.id, userIdByKey);
   await upsertSeedExpenses(client, org.id, userIdByKey);
+  await upsertSeedNotifications(client, org.id, userIdByKey);
 
   console.log("Seed completed successfully.");
   console.log(`Organization: ${org.name} (${org.id})`);
@@ -3926,6 +4115,7 @@ async function main() {
   console.log(`Compliance items upserted: ${SEED_COMPLIANCE_ITEMS.length}`);
   console.log(`Compliance deadlines upserted: ${SEED_COMPLIANCE_DEADLINES.length}`);
   console.log(`Expenses upserted: ${SEED_EXPENSES.length}`);
+  console.log(`Notifications upserted: ${SEED_NOTIFICATIONS.length}`);
   console.log(`Shared test password: ${sharedPassword}`);
 }
 

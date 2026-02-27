@@ -1,40 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-type NotificationItem = {
-  id: string;
-  title: string;
-  detail: string;
-  isUnread: boolean;
-};
+import { useNotifications } from "../../hooks/use-notifications";
+import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
 
-const STATIC_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    title: "Payroll checklist queued",
-    detail: "Placeholder notification for payroll module setup.",
-    isUnread: true
-  },
-  {
-    id: "notif-2",
-    title: "Onboarding reminder",
-    detail: "3 onboarding tasks are due this week.",
-    isUnread: true
-  },
-  {
-    id: "notif-3",
-    title: "Compliance window",
-    detail: "Country compliance tracker placeholder entry.",
-    isUnread: false
-  }
-];
+const POLL_INTERVAL_MS = 60_000;
+
+function useNotificationsPreviewLimit(): number {
+  return 8;
+}
 
 export function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const previewLimit = useNotificationsPreviewLimit();
 
-  const unreadCount = STATIC_NOTIFICATIONS.filter((item) => item.isUnread).length;
+  const notifications = useNotifications({ limit: previewLimit });
+  const unreadCount = notifications.data?.unreadCount ?? 0;
+  const refreshNotifications = notifications.refresh;
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -53,6 +38,29 @@ export function NotificationCenter() {
       window.removeEventListener("pointerdown", handlePointerDown);
     };
   }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      refreshNotifications();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [refreshNotifications]);
+
+  const previewNotifications = useMemo(
+    () => notifications.data?.notifications.slice(0, previewLimit) ?? [],
+    [notifications.data?.notifications, previewLimit]
+  );
+
+  const handleNotificationClick = async (notificationId: string, isRead: boolean) => {
+    if (isRead) {
+      return;
+    }
+
+    await notifications.markRead(notificationId);
+  };
 
   return (
     <div className="notification-center" ref={containerRef}>
@@ -88,23 +96,79 @@ export function NotificationCenter() {
             <span className="pill numeric">{unreadCount} unread</span>
           </div>
 
-          <ul className="notification-list">
-            {STATIC_NOTIFICATIONS.map((notification) => (
-              <li
-                key={notification.id}
-                className={
-                  notification.isUnread
-                    ? "notification-item notification-item-unread"
-                    : "notification-item"
-                }
-              >
-                <p className="notification-title">{notification.title}</p>
-                <p className="notification-detail">{notification.detail}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="notification-dropdown-actions">
+            <button
+              type="button"
+              className="table-row-action"
+              disabled={unreadCount === 0}
+              onClick={() => void notifications.markAllRead()}
+            >
+              Mark all read
+            </button>
+            <Link className="table-row-action" href="/notifications" onClick={() => setIsOpen(false)}>
+              View all
+            </Link>
+          </div>
 
-          <p className="notification-footer">Placeholder center. Live events arrive in Phase 5.2.</p>
+          {notifications.isLoading ? (
+            <div className="notification-list">
+              {Array.from({ length: 3 }, (_, index) => (
+                <div key={`notification-skeleton-${index}`} className="notification-item notification-item-skeleton" />
+              ))}
+            </div>
+          ) : null}
+
+          {!notifications.isLoading && notifications.errorMessage ? (
+            <p className="notification-footer">{notifications.errorMessage}</p>
+          ) : null}
+
+          {!notifications.isLoading && !notifications.errorMessage ? (
+            <>
+              {previewNotifications.length > 0 ? (
+                <ul className="notification-list">
+                  {previewNotifications.map((notification) => (
+                    <li
+                      key={notification.id}
+                      className={
+                        notification.isRead
+                          ? "notification-item"
+                          : "notification-item notification-item-unread"
+                      }
+                    >
+                      <Link
+                        href={notification.link ?? "/notifications"}
+                        className="notification-link"
+                        onClick={() => {
+                          void handleNotificationClick(notification.id, notification.isRead);
+                          setIsOpen(false);
+                        }}
+                      >
+                        <p className="notification-title">{notification.title}</p>
+                        <p className="notification-detail">{notification.body}</p>
+                        <p
+                          className="notification-time numeric"
+                          title={formatDateTimeTooltip(notification.createdAt)}
+                        >
+                          {formatRelativeTime(notification.createdAt)}
+                        </p>
+                      </Link>
+                      {!notification.isRead ? (
+                        <button
+                          type="button"
+                          className="table-row-action"
+                          onClick={() => void notifications.markRead(notification.id)}
+                        >
+                          Mark read
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="notification-footer">No notifications yet.</p>
+              )}
+            </>
+          ) : null}
         </section>
       ) : null}
     </div>
