@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "seed": "npx tsx scripts/seed/seed-foundation.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -22,6 +23,7 @@
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
+    "tsx": "^4.21.0",
     "typescript": "latest"
   }
 }

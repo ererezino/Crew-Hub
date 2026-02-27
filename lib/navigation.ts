@@ -1,9 +1,26 @@
-export type UserRole =
-  | "EMPLOYEE"
-  | "MANAGER"
-  | "HR_ADMIN"
-  | "FINANCE_ADMIN"
-  | "SUPER_ADMIN";
+export const USER_ROLES = [
+  "EMPLOYEE",
+  "MANAGER",
+  "HR_ADMIN",
+  "FINANCE_ADMIN",
+  "SUPER_ADMIN"
+] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
+
+export function isUserRole(value: string): value is UserRole {
+  return USER_ROLES.includes(value as UserRole);
+}
+
+export function normalizeUserRoles(
+  roles: readonly string[] | null | undefined
+): UserRole[] {
+  if (!roles) {
+    return [];
+  }
+
+  return roles.filter(isUserRole);
+}
 
 export type NavItem = {
   label: string;

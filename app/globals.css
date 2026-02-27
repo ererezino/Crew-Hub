@@ -446,6 +446,46 @@ html.dark .topbar {
   gap: 0.75rem;
 }
 
+.dashboard-two-column {
+  margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.dashboard-panel {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.875rem;
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-subtitle {
+  color: var(--text-secondary);
+}
+
+.quick-links-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.quick-link {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  display: block;
+  padding: 0.55rem 0.65rem;
+  transition: border-color var(--transition-hover), background-color var(--transition-hover);
+}
+
+.quick-link:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
 .metric-card {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
@@ -831,6 +871,10 @@ html.dark .topbar {
 @media (max-width: 1024px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-two-column {
+    grid-template-columns: 1fr;
   }
 
   .command-trigger span,

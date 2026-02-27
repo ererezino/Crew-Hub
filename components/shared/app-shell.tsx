@@ -13,8 +13,6 @@ import { ThemeToggle } from "./theme-toggle";
 const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
 const RECENT_ROUTE_LIMIT = 6;
 
-const MOCK_USER_ROLES: UserRole[] = ["EMPLOYEE"];
-
 function canAccessAdmin(userRoles: readonly UserRole[]): boolean {
   return (
     hasRole(userRoles, "HR_ADMIN") ||
@@ -75,10 +73,11 @@ function resolveTopbarRoute(pathname: string, routes: NavItem[]): NavItem | unde
 }
 
 type AppShellProps = {
+  currentUserRoles: readonly UserRole[];
   children: ReactNode;
 };
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ currentUserRoles, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -87,7 +86,7 @@ export function AppShell({ children }: AppShellProps) {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [recentRouteHrefs, setRecentRouteHrefs] = useState<string[]>(readRecentRoutes);
 
-  const showAdminSection = canAccessAdmin(MOCK_USER_ROLES);
+  const showAdminSection = canAccessAdmin(currentUserRoles);
 
   const navigationGroups = useMemo(
     () => NAV_GROUPS.filter((group) => !group.adminOnly || showAdminSection),
