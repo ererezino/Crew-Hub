@@ -128,6 +128,12 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G Q"
       },
       {
+        label: "New Payroll Run",
+        href: "/payroll/runs/new",
+        description: "Create a payroll run for the current pay period.",
+        shortcut: "G U"
+      },
+      {
         label: "Expenses",
         href: "/expenses",
         description: "Claims, approvals, and reimbursements.",
