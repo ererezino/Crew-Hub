@@ -1,5 +1,6 @@
 export const USER_ROLES = [
   "EMPLOYEE",
+  "TEAM_LEAD",
   "MANAGER",
   "HR_ADMIN",
   "FINANCE_ADMIN",
@@ -91,6 +92,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/scheduling/manage",
         description: "Create schedules, assign shifts, and publish to employees.",
         shortcut: "G 2"
+      },
+      {
+        label: "Shift Templates",
+        href: "/admin/scheduling/templates",
+        description: "Manage reusable shift templates for schedule planning.",
+        shortcut: "G 8"
       },
       {
         label: "Open Shifts",
@@ -311,12 +318,6 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "A T"
       },
       {
-        label: "Scheduling Templates",
-        href: "/admin/scheduling/templates",
-        description: "Manage reusable shift templates for schedule planning.",
-        shortcut: "A M"
-      },
-      {
         label: "Learning Admin",
         href: "/admin/learning",
         description: "Manage learning courses and assignment rollout.",
@@ -357,6 +358,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/admin/roles",
         description: "Configure role assignment controls.",
         shortcut: "A R"
+      },
+      {
+        label: "Access Control",
+        href: "/admin/access-control",
+        description: "Control navigation and dashboard visibility by role.",
+        shortcut: "A X"
       },
       {
         label: "System Config",

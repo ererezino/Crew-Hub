@@ -9,6 +9,7 @@ import { useTimeAttendanceApprovals } from "../../../../hooks/use-time-attendanc
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { formatHoursFromMinutes } from "../../../../lib/time-attendance";
+import type { TimeAttendanceApprovalMutationResponse } from "../../../../types/time-attendance";
 
 type SortDirection = "asc" | "desc";
 
@@ -45,6 +46,8 @@ export function TimeAttendanceApprovalsClient() {
     status: "submitted"
   });
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [activeActionTimesheetId, setActiveActionTimesheetId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const sortedTimesheets = useMemo(() => {
     const rows = approvalsQuery.data?.timesheets ?? [];
@@ -56,6 +59,59 @@ export function TimeAttendanceApprovalsClient() {
       return sortDirection === "asc" ? leftValue - rightValue : rightValue - leftValue;
     });
   }, [approvalsQuery.data?.timesheets, sortDirection]);
+
+  const handleTimesheetAction = async (
+    timesheetId: string,
+    action: "approve" | "reject"
+  ) => {
+    setActionMessage(null);
+
+    const rejectionReason =
+      action === "reject"
+        ? window.prompt("Provide a rejection reason for this timesheet:")?.trim() ?? ""
+        : undefined;
+
+    if (action === "reject" && (!rejectionReason || rejectionReason.length === 0)) {
+      setActionMessage("Rejection reason is required.");
+      return;
+    }
+
+    setActiveActionTimesheetId(timesheetId);
+
+    try {
+      const response = await fetch("/api/v1/time-attendance/approvals", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          timesheetId,
+          action,
+          rejectionReason
+        })
+      });
+
+      const payload = (await response.json()) as TimeAttendanceApprovalMutationResponse;
+
+      if (!response.ok || !payload.data) {
+        setActionMessage(payload.error?.message ?? "Unable to update timesheet approval.");
+        return;
+      }
+
+      setActionMessage(
+        action === "approve"
+          ? "Timesheet approved."
+          : "Timesheet rejected."
+      );
+      approvalsQuery.refresh();
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error ? error.message : "Unable to update timesheet approval."
+      );
+    } finally {
+      setActiveActionTimesheetId(null);
+    }
+  };
 
   return (
     <>
@@ -104,6 +160,12 @@ export function TimeAttendanceApprovalsClient() {
             </div>
             <StatusBadge tone="pending">Submitted</StatusBadge>
           </article>
+
+          {actionMessage ? (
+            <p className="settings-feedback" role="status">
+              {actionMessage}
+            </p>
+          ) : null}
 
           <div className="data-table-container">
             <table className="data-table" aria-label="Submitted timesheets">
@@ -168,8 +230,25 @@ export function TimeAttendanceApprovalsClient() {
                     </td>
                     <td className="table-row-action-cell">
                       <div className="timeatt-row-actions">
-                        <button type="button" className="table-row-action">
-                          Review
+                        <button
+                          type="button"
+                          className="table-row-action"
+                          disabled={activeActionTimesheetId === timesheet.id}
+                          onClick={() => {
+                            void handleTimesheetAction(timesheet.id, "approve");
+                          }}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="table-row-action"
+                          disabled={activeActionTimesheetId === timesheet.id}
+                          onClick={() => {
+                            void handleTimesheetAction(timesheet.id, "reject");
+                          }}
+                        >
+                          Reject
                         </button>
                       </div>
                     </td>

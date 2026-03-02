@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { parseInteger, resolveWorkedMinutes } from "../../../../../lib/time-attendance";
 import type { UserRole } from "../../../../../lib/navigation";
-import { hasRole } from "../../../../../lib/roles";
+import { hasRole, isDepartmentScopedTeamLead } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
@@ -60,6 +60,7 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
 
 function canViewTeamEntries(userRoles: readonly UserRole[]): boolean {
   return (
+    hasRole(userRoles, "TEAM_LEAD") ||
     hasRole(userRoles, "MANAGER") ||
     hasRole(userRoles, "HR_ADMIN") ||
     hasRole(userRoles, "FINANCE_ADMIN") ||
@@ -122,6 +123,7 @@ export async function GET(request: Request) {
   const scope = query.scope;
   const canViewTeam = canViewTeamEntries(session.profile.roles);
   const canViewAll = canViewAllEntries(session.profile.roles);
+  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
 
   if (scope === "team" && !canViewTeam) {
     return jsonResponse<null>(403, {
@@ -134,12 +136,56 @@ export async function GET(request: Request) {
     });
   }
 
+  if (scope === "team" && isScopedTeamLead && !session.profile.department) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead attendance review requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
   let filterEmployeeIds: string[] = [];
 
   if (scope === "mine") {
     filterEmployeeIds = [session.profile.id];
   } else if (query.employeeId) {
     if (canViewAll) {
+      filterEmployeeIds = [query.employeeId];
+    } else if (isScopedTeamLead) {
+      const { data: reportRow, error: reportError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("org_id", session.profile.org_id)
+        .eq("id", query.employeeId)
+        .ilike("department", session.profile.department as string)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (reportError) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "REPORT_FETCH_FAILED",
+            message: "Unable to resolve team lead scope for time entries."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      if (!reportRow?.id) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "You can only view time entries for employees in your department."
+          },
+          meta: buildMeta()
+        });
+      }
+
       filterEmployeeIds = [query.employeeId];
     } else {
       const { data: reportRow, error: reportError } = await supabase
@@ -176,19 +222,24 @@ export async function GET(request: Request) {
       filterEmployeeIds = [query.employeeId];
     }
   } else if (!canViewAll) {
-    const { data: reportRows, error: reportError } = await supabase
+    const reportQuery = supabase
       .from("profiles")
       .select("id")
       .eq("org_id", session.profile.org_id)
-      .eq("manager_id", session.profile.id)
       .is("deleted_at", null);
+
+    const { data: reportRows, error: reportError } = isScopedTeamLead
+      ? await reportQuery.ilike("department", session.profile.department as string)
+      : await reportQuery.eq("manager_id", session.profile.id);
 
     if (reportError) {
       return jsonResponse<null>(500, {
         data: null,
         error: {
           code: "REPORTS_FETCH_FAILED",
-          message: "Unable to load direct reports for team entries."
+          message: isScopedTeamLead
+            ? "Unable to load department scope for team entries."
+            : "Unable to load direct reports for team entries."
         },
         meta: buildMeta()
       });

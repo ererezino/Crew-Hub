@@ -15,6 +15,7 @@ export type SessionProfile = {
   email: string;
   full_name: string;
   avatar_url: string | null;
+  department: string | null;
   phone: string | null;
   notification_preferences: Record<string, unknown> | null;
   roles: UserRole[];
@@ -50,7 +51,7 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "id, org_id, email, full_name, avatar_url, phone, notification_preferences, roles, manager_id, country_code, status"
+      "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, status"
     )
     .eq("id", user.id)
     .is("deleted_at", null)
@@ -72,6 +73,7 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
     email: profileData.email,
     full_name: profileData.full_name,
     avatar_url: profileData.avatar_url,
+    department: profileData.department,
     phone: profileData.phone,
     notification_preferences: profileData.notification_preferences,
     roles,

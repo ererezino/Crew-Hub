@@ -1,10 +1,15 @@
 "use client";
 
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 
+import {
+  defaultNavVisibilityForRoles,
+  isSuperAdmin
+} from "../../lib/access-control";
 import {
   NAV_GROUPS,
   ROUTE_ITEMS,
@@ -12,21 +17,13 @@ import {
   type NavItem,
   type UserRole
 } from "../../lib/navigation";
-import { hasRole } from "../../lib/roles";
+import type { MeAccessConfigResponse } from "../../types/access-control";
 import { CommandPalette } from "./command-palette";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
 
 const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
 const RECENT_ROUTE_LIMIT = 6;
-
-function canAccessAdmin(userRoles: readonly UserRole[]): boolean {
-  return (
-    hasRole(userRoles, "HR_ADMIN") ||
-    hasRole(userRoles, "FINANCE_ADMIN") ||
-    hasRole(userRoles, "SUPER_ADMIN")
-  );
-}
 
 function readRecentRoutes(): string[] {
   if (typeof window === "undefined") {
@@ -132,12 +129,25 @@ function getMobileViewportSnapshot(): boolean {
   return window.matchMedia("(max-width: 767px)").matches;
 }
 
+async function fetchMyAccessConfig() {
+  const response = await fetch("/api/v1/me/access-config", {
+    method: "GET"
+  });
+  const payload = (await response.json()) as MeAccessConfigResponse;
+
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load access configuration.");
+  }
+
+  return payload.data;
+}
+
 type AppShellProps = {
   currentUserRoles: readonly UserRole[];
   children: ReactNode;
 };
 
-export function AppShell({ currentUserRoles, children }: AppShellProps) {
+function AppShellContent({ currentUserRoles, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -155,16 +165,41 @@ export function AppShell({ currentUserRoles, children }: AppShellProps) {
     () => false
   );
 
-  const showAdminSection = canAccessAdmin(currentUserRoles);
+  const accessConfigQuery = useQuery({
+    queryKey: ["me-access-config"],
+    queryFn: fetchMyAccessConfig,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    retry: 1
+  });
 
-  const navigationGroups = useMemo(
-    () => NAV_GROUPS.filter((group) => !group.adminOnly || showAdminSection),
-    [showAdminSection]
+  const fallbackAllowedRouteKeys = useMemo(
+    () => new Set(defaultNavVisibilityForRoles(currentUserRoles)),
+    [currentUserRoles]
   );
 
+  const allowedRouteKeys = useMemo(() => {
+    if (isSuperAdmin(currentUserRoles)) {
+      return new Set(ROUTE_ITEMS.map((route) => route.href));
+    }
+
+    if (accessConfigQuery.data?.configExists) {
+      return new Set(accessConfigQuery.data.allowedNavItemKeys);
+    }
+
+    return fallbackAllowedRouteKeys;
+  }, [accessConfigQuery.data, currentUserRoles, fallbackAllowedRouteKeys]);
+
+  const navigationGroups = useMemo(() => {
+    return NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) => allowedRouteKeys.has(item.href))
+    })).filter((group) => group.items.length > 0);
+  }, [allowedRouteKeys]);
+
   const commandRoutes = useMemo(
-    () => ROUTE_ITEMS.filter((route) => !route.href.startsWith("/admin") || showAdminSection),
-    [showAdminSection]
+    () => ROUTE_ITEMS.filter((route) => allowedRouteKeys.has(route.href)),
+    [allowedRouteKeys]
   );
 
   const activePathname = pathname ?? "/dashboard";
@@ -456,5 +491,25 @@ export function AppShell({ currentUserRoles, children }: AppShellProps) {
         />
       ) : null}
     </div>
+  );
+}
+
+export function AppShell({ currentUserRoles, children }: AppShellProps) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 5 * 60 * 1000,
+            gcTime: 15 * 60 * 1000
+          }
+        }
+      })
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppShellContent currentUserRoles={currentUserRoles}>{children}</AppShellContent>
+    </QueryClientProvider>
   );
 }

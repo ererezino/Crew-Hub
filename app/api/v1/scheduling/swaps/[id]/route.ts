@@ -3,11 +3,13 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
+import { areDepartmentsEqual } from "../../../../../../lib/department";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import {
   areTimeRangesOverlapping,
   isSchedulingManager
 } from "../../../../../../lib/scheduling";
+import { isDepartmentScopedTeamLead } from "../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
@@ -192,7 +194,19 @@ export async function PUT(
 
   const action = parsedBody.data.action;
   const isManager = isSchedulingManager(session.profile.roles);
+  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
   const supabase = await createSupabaseServerClient();
+
+  if (isScopedTeamLead && !session.profile.department) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead scheduling requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
 
   const { data: rawSwapRow, error: swapError } = await supabase
     .from("shift_swaps")
@@ -353,6 +367,52 @@ export async function PUT(
       },
       meta: buildMeta()
     });
+  }
+
+  const isManagerDrivenAction =
+    action === "approve" || ((action === "accept" || action === "reject") && !isTarget);
+
+  if (isScopedTeamLead && isManagerDrivenAction) {
+    const { data: requesterProfile, error: requesterProfileError } = await supabase
+      .from("profiles")
+      .select("id, department")
+      .eq("id", swap.requester_id)
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (requesterProfileError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_SCOPE_FETCH_FAILED",
+          message: "Unable to verify team lead department scope."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (!requesterProfile?.id) {
+      return jsonResponse<null>(404, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_REQUESTER_NOT_FOUND",
+          message: "Swap requester profile was not found."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (!areDepartmentsEqual(requesterProfile.department, session.profile.department)) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Team lead can only manage swap requests inside their department."
+        },
+        meta: buildMeta()
+      });
+    }
   }
 
   let nextStatus: ShiftSwapRecord["status"] = swap.status;

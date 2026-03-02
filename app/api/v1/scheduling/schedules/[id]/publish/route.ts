@@ -3,8 +3,10 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
+import { areDepartmentsEqual } from "../../../../../../../lib/department";
 import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { isSchedulingManager } from "../../../../../../../lib/scheduling";
+import { isDepartmentScopedTeamLead } from "../../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../../types/auth";
 import {
@@ -118,6 +120,34 @@ export async function POST(
       error: {
         code: "SCHEDULE_PARSE_FAILED",
         message: "Schedule data is not in the expected shape."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (
+    isDepartmentScopedTeamLead(session.profile.roles) &&
+    !session.profile.department
+  ) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead scheduling requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (
+    isDepartmentScopedTeamLead(session.profile.roles) &&
+    !areDepartmentsEqual(parsedExistingSchedule.data.department, session.profile.department)
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Team lead can only publish schedules for their own department."
       },
       meta: buildMeta()
     });

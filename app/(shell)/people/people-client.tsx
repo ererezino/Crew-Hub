@@ -87,6 +87,7 @@ const createPersonSchema = z.object({
 
 const roleLabels: Record<AppRole, string> = {
   EMPLOYEE: "Employee",
+  TEAM_LEAD: "Team Lead",
   MANAGER: "Manager",
   HR_ADMIN: "HR Admin",
   FINANCE_ADMIN: "Finance Admin",
