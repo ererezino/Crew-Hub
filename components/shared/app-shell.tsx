@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -276,18 +277,22 @@ export function AppShell({ currentUserRoles, children }: AppShellProps) {
             onClick={() => handleSidebarItemClick("/dashboard")}
           >
             <span className="sidebar-brand-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path
-                  d="M4 8.2 12 3l8 5.2V18a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V8.2Z"
-                  fill="currentColor"
-                />
-                <path
-                  d="M9 15h6"
-                  stroke="#FFFFFF"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <Image
+                src="/brand/crew-hub-app-logo.svg"
+                alt=""
+                width={30}
+                height={30}
+                className="sidebar-brand-image sidebar-brand-image-light"
+                priority
+              />
+              <Image
+                src="/brand/crew-hub-site-logo.svg"
+                alt=""
+                width={30}
+                height={30}
+                className="sidebar-brand-image sidebar-brand-image-dark"
+                priority
+              />
             </span>
             <span className="sidebar-brand-copy">Crew Hub</span>
           </Link>
