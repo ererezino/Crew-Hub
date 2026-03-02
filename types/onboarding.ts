@@ -28,6 +28,13 @@ export type OnboardingTemplateTask = {
   dueOffsetDays: number | null;
 };
 
+export type OnboardingTemplateTaskInput = {
+  title: string;
+  description?: string;
+  category: string;
+  dueOffsetDays?: number | null;
+};
+
 export type OnboardingTemplate = {
   id: string;
   name: string;
@@ -76,11 +83,23 @@ export type OnboardingTemplatesResponseData = {
 
 export type OnboardingTemplatesResponse = ApiResponse<OnboardingTemplatesResponseData>;
 
+export type OnboardingTemplateCreateResponseData = {
+  template: OnboardingTemplate;
+};
+
+export type OnboardingTemplateCreateResponse = ApiResponse<OnboardingTemplateCreateResponseData>;
+
 export type OnboardingInstancesResponseData = {
   instances: OnboardingInstanceSummary[];
 };
 
 export type OnboardingInstancesResponse = ApiResponse<OnboardingInstancesResponseData>;
+
+export type OnboardingInstanceCreateResponseData = {
+  instance: OnboardingInstanceSummary;
+};
+
+export type OnboardingInstanceCreateResponse = ApiResponse<OnboardingInstanceCreateResponseData>;
 
 export type OnboardingInstanceDetailResponseData = {
   instance: OnboardingInstanceSummary;

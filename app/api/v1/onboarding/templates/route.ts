@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { logAudit } from "../../../../../lib/audit";
+import type { UserRole } from "../../../../../lib/navigation";
+import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
   ONBOARDING_TYPES,
+  type OnboardingTemplateCreateResponseData,
   type OnboardingTemplate,
   type OnboardingTemplateTask,
   type OnboardingTemplatesResponseData
@@ -13,6 +17,26 @@ import {
 
 const querySchema = z.object({
   type: z.enum(ONBOARDING_TYPES).optional()
+});
+
+const templateTaskInputSchema = z.object({
+  title: z.string().trim().min(1, "Task title is required.").max(200, "Task title is too long."),
+  description: z.string().trim().max(1000, "Task description is too long.").optional(),
+  category: z.string().trim().min(1, "Task category is required.").max(50, "Task category is too long."),
+  dueOffsetDays: z.number().int().min(-365).max(365).nullable().optional()
+});
+
+const createTemplateSchema = z.object({
+  name: z.string().trim().min(1, "Template name is required.").max(200, "Template name is too long."),
+  type: z.enum(ONBOARDING_TYPES).default("onboarding"),
+  countryCode: z
+    .string()
+    .trim()
+    .max(2, "Country code must be 2 letters.")
+    .optional()
+    .refine((value) => value === undefined || value.length === 0 || /^[a-zA-Z]{2}$/.test(value), "Country code must be 2 letters."),
+  department: z.string().trim().max(100, "Department is too long.").optional(),
+  tasks: z.array(templateTaskInputSchema).default([])
 });
 
 const templateRowSchema = z.object({
@@ -44,6 +68,10 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
+function canManageTemplates(userRoles: readonly UserRole[]): boolean {
+  return hasRole(userRoles, "HR_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
+}
+
 function normalizeTemplateTasks(value: unknown): OnboardingTemplateTask[] {
   if (!Array.isArray(value)) {
     return [];
@@ -70,6 +98,19 @@ function normalizeTemplateTasks(value: unknown): OnboardingTemplateTask[] {
   }
 
   return normalizedTasks;
+}
+
+function mapTemplateRow(row: z.infer<typeof templateRowSchema>): OnboardingTemplate {
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    countryCode: row.country_code,
+    department: row.department,
+    tasks: normalizeTemplateTasks(row.tasks),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
 }
 
 export async function GET(request: Request) {
@@ -141,22 +182,148 @@ export async function GET(request: Request) {
     });
   }
 
-  const templates: OnboardingTemplate[] = parsedTemplates.data.map((template) => ({
-    id: template.id,
-    name: template.name,
-    type: template.type,
-    countryCode: template.country_code,
-    department: template.department,
-    tasks: normalizeTemplateTasks(template.tasks),
-    createdAt: template.created_at,
-    updatedAt: template.updated_at
-  }));
+  const templates: OnboardingTemplate[] = parsedTemplates.data.map(mapTemplateRow);
 
   const responseData: OnboardingTemplatesResponseData = {
     templates
   };
 
   return jsonResponse<OnboardingTemplatesResponseData>(200, {
+    data: responseData,
+    error: null,
+    meta: buildMeta()
+  });
+}
+
+export async function POST(request: Request) {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be logged in to create onboarding templates."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!canManageTemplates(session.profile.roles)) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only HR Admin and Super Admin users can create onboarding templates."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse<null>(400, {
+      data: null,
+      error: {
+        code: "BAD_REQUEST",
+        message: "Request body must be valid JSON."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedBody = createTemplateSchema.safeParse(body);
+
+  if (!parsedBody.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedBody.error.issues[0]?.message ?? "Invalid template payload."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const payload = parsedBody.data;
+  const supabase = await createSupabaseServerClient();
+
+  const normalizedCountryCode =
+    payload.countryCode && payload.countryCode.trim().length > 0
+      ? payload.countryCode.trim().toUpperCase()
+      : null;
+  const normalizedDepartment =
+    payload.department && payload.department.trim().length > 0
+      ? payload.department.trim()
+      : null;
+
+  const templateTaskPayload = payload.tasks.map((task) => ({
+    title: task.title.trim(),
+    description: task.description?.trim() ?? "",
+    category: task.category.trim(),
+    dueOffsetDays: task.dueOffsetDays ?? null
+  }));
+
+  const { data: insertedTemplate, error: insertError } = await supabase
+    .from("onboarding_templates")
+    .insert({
+      org_id: session.profile.org_id,
+      name: payload.name.trim(),
+      type: payload.type,
+      country_code: normalizedCountryCode,
+      department: normalizedDepartment,
+      tasks: templateTaskPayload
+    })
+    .select("id, name, type, country_code, department, tasks, created_at, updated_at")
+    .single();
+
+  if (insertError || !insertedTemplate) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "TEMPLATE_CREATE_FAILED",
+        message: "Unable to create onboarding template."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedTemplate = templateRowSchema.safeParse(insertedTemplate);
+
+  if (!parsedTemplate.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "TEMPLATE_PARSE_FAILED",
+        message: "Created template data is not in the expected shape."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const template = mapTemplateRow(parsedTemplate.data);
+
+  await logAudit({
+    action: "created",
+    tableName: "onboarding_templates",
+    recordId: template.id,
+    newValue: {
+      name: template.name,
+      type: template.type,
+      countryCode: template.countryCode,
+      department: template.department,
+      taskCount: template.tasks.length
+    }
+  });
+
+  const responseData: OnboardingTemplateCreateResponseData = {
+    template
+  };
+
+  return jsonResponse<OnboardingTemplateCreateResponseData>(201, {
     data: responseData,
     error: null,
     meta: buildMeta()
