@@ -550,6 +550,56 @@ type SeedShiftSwap = {
   approvedOffsetHours: number | null;
 };
 
+type SeedLearningCourseContentType =
+  | "video"
+  | "document"
+  | "scorm"
+  | "link"
+  | "quiz"
+  | "multi_module";
+
+type SeedLearningCourseDifficulty = "beginner" | "intermediate" | "advanced";
+
+type SeedLearningCourseRecurrence = "annual" | "semi_annual" | "quarterly";
+
+type SeedLearningCourse = {
+  key: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  contentType: SeedLearningCourseContentType;
+  contentUrl: string | null;
+  modules: unknown[];
+  durationMinutes: number | null;
+  difficulty: SeedLearningCourseDifficulty | null;
+  passingScore: number | null;
+  isMandatory: boolean;
+  allowRetake: boolean;
+  recurrence: SeedLearningCourseRecurrence | null;
+  createdByKey: SeedMember["key"];
+  isPublished: boolean;
+};
+
+type SeedLearningAssignmentStatus =
+  | "assigned"
+  | "in_progress"
+  | "completed"
+  | "overdue"
+  | "failed";
+
+type SeedLearningAssignment = {
+  courseKey: SeedLearningCourse["key"];
+  employeeKey: SeedMember["key"];
+  status: SeedLearningAssignmentStatus;
+  progressPct: number;
+  quizScore: number | null;
+  quizAttempts: number;
+  dueOffsetDays: number | null;
+  startedOffsetDays: number | null;
+  completedOffsetDays: number | null;
+  assignedByKey: SeedMember["key"];
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -1781,6 +1831,167 @@ const SEED_SHIFT_SWAPS: SeedShiftSwap[] = [
     status: "pending",
     approvedByKey: null,
     approvedOffsetHours: null
+  }
+];
+
+const SEED_LEARNING_COURSES: SeedLearningCourse[] = [
+  {
+    key: "security-fundamentals",
+    title: "Security Fundamentals",
+    description: "Annual security refresher covering phishing prevention and data handling.",
+    category: "security",
+    contentType: "quiz",
+    contentUrl: "https://example.com/security-fundamentals",
+    modules: [
+      {
+        id: "sec-1",
+        title: "Phishing Risks",
+        type: "video",
+        duration_minutes: 18
+      },
+      {
+        id: "sec-2",
+        title: "Security Assessment",
+        type: "quiz",
+        duration_minutes: 12
+      }
+    ],
+    durationMinutes: 30,
+    difficulty: "beginner",
+    passingScore: 80,
+    isMandatory: true,
+    allowRetake: true,
+    recurrence: "annual",
+    createdByKey: "head_people_finance",
+    isPublished: true
+  },
+  {
+    key: "manager-coaching",
+    title: "Manager Coaching Essentials",
+    description: "Coaching techniques for managers running weekly one-on-ones.",
+    category: "leadership",
+    contentType: "video",
+    contentUrl: "https://example.com/manager-coaching",
+    modules: [],
+    durationMinutes: 45,
+    difficulty: "intermediate",
+    passingScore: null,
+    isMandatory: false,
+    allowRetake: true,
+    recurrence: null,
+    createdByKey: "coo",
+    isPublished: true
+  },
+  {
+    key: "new-hire-orientation",
+    title: "New Hire Orientation",
+    description: "Core onboarding training for distributed teams joining Crew Hub.",
+    category: "onboarding",
+    contentType: "multi_module",
+    contentUrl: null,
+    modules: [
+      {
+        id: "ori-1",
+        title: "Culture and values",
+        type: "document",
+        duration_minutes: 10
+      },
+      {
+        id: "ori-2",
+        title: "Tools and workflows",
+        type: "video",
+        duration_minutes: 20
+      },
+      {
+        id: "ori-3",
+        title: "Policy acknowledgement",
+        type: "quiz",
+        duration_minutes: 10
+      }
+    ],
+    durationMinutes: 40,
+    difficulty: "beginner",
+    passingScore: 70,
+    isMandatory: true,
+    allowRetake: true,
+    recurrence: null,
+    createdByKey: "head_people_finance",
+    isPublished: true
+  }
+];
+
+const SEED_LEARNING_ASSIGNMENTS: SeedLearningAssignment[] = [
+  {
+    courseKey: "security-fundamentals",
+    employeeKey: "engineer_1",
+    status: "in_progress",
+    progressPct: 50,
+    quizScore: null,
+    quizAttempts: 0,
+    dueOffsetDays: 7,
+    startedOffsetDays: -3,
+    completedOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    courseKey: "security-fundamentals",
+    employeeKey: "engineer_2",
+    status: "assigned",
+    progressPct: 0,
+    quizScore: null,
+    quizAttempts: 0,
+    dueOffsetDays: 10,
+    startedOffsetDays: null,
+    completedOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    courseKey: "security-fundamentals",
+    employeeKey: "ops_associate",
+    status: "completed",
+    progressPct: 100,
+    quizScore: 88,
+    quizAttempts: 1,
+    dueOffsetDays: -4,
+    startedOffsetDays: -15,
+    completedOffsetDays: -5,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    courseKey: "manager-coaching",
+    employeeKey: "eng_manager",
+    status: "completed",
+    progressPct: 100,
+    quizScore: null,
+    quizAttempts: 0,
+    dueOffsetDays: -10,
+    startedOffsetDays: -20,
+    completedOffsetDays: -12,
+    assignedByKey: "coo"
+  },
+  {
+    courseKey: "new-hire-orientation",
+    employeeKey: "engineer_3",
+    status: "overdue",
+    progressPct: 30,
+    quizScore: null,
+    quizAttempts: 0,
+    dueOffsetDays: -2,
+    startedOffsetDays: -12,
+    completedOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    courseKey: "new-hire-orientation",
+    employeeKey: "compliance_officer",
+    status: "failed",
+    progressPct: 100,
+    quizScore: 62,
+    quizAttempts: 1,
+    dueOffsetDays: -1,
+    startedOffsetDays: -9,
+    completedOffsetDays: null,
+    assignedByKey: "head_people_finance"
   }
 ];
 
@@ -4602,6 +4813,213 @@ async function upsertSeedScheduling(
   }
 }
 
+function learningAssignmentSeedKey({
+  courseId,
+  employeeId
+}: {
+  courseId: string;
+  employeeId: string;
+}): string {
+  return `${courseId}:${employeeId}`;
+}
+
+async function upsertSeedLearning(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  const courseIdByKey = new Map<string, string>();
+
+  for (const course of SEED_LEARNING_COURSES) {
+    const createdById = userIdByKey.get(course.createdByKey);
+
+    if (!createdById) {
+      throw new Error(`Missing creator id for learning course seed (${course.createdByKey})`);
+    }
+
+    const { data: existingRow, error: existingError } = await client
+      .from("courses")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("title", course.title)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(`Unable to query learning course seed data: ${existingError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      title: course.title,
+      description: course.description,
+      category: course.category,
+      content_type: course.contentType,
+      content_url: course.contentUrl,
+      content_file_path: null as string | null,
+      thumbnail_url: null as string | null,
+      modules: course.modules,
+      duration_minutes: course.durationMinutes,
+      difficulty: course.difficulty,
+      passing_score: course.passingScore,
+      auto_assign_rules: [] as unknown[],
+      is_mandatory: course.isMandatory,
+      allow_retake: course.allowRetake,
+      certificate_template: null as string | null,
+      recurrence: course.recurrence,
+      created_by: createdById,
+      is_published: course.isPublished,
+      deleted_at: null as string | null
+    };
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("courses")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update learning course seed data: ${updateError.message}`);
+      }
+
+      courseIdByKey.set(course.key, existingRow.id);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("courses")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(
+          `Unable to insert learning course seed data: ${insertError?.message ?? "unknown error"}`
+        );
+      }
+
+      courseIdByKey.set(course.key, insertedRow.id);
+    }
+  }
+
+  const courseIds = [...courseIdByKey.values()];
+  const existingAssignmentIdByKey = new Map<string, string>();
+
+  if (courseIds.length > 0) {
+    const { data: existingAssignmentRows, error: existingAssignmentsError } = await client
+      .from("course_assignments")
+      .select("id, course_id, employee_id")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("course_id", courseIds);
+
+    if (existingAssignmentsError) {
+      throw new Error(
+        `Unable to query learning assignment seed data: ${existingAssignmentsError.message}`
+      );
+    }
+
+    for (const row of existingAssignmentRows ?? []) {
+      if (
+        typeof row.id !== "string" ||
+        typeof row.course_id !== "string" ||
+        typeof row.employee_id !== "string"
+      ) {
+        continue;
+      }
+
+      const key = learningAssignmentSeedKey({
+        courseId: row.course_id,
+        employeeId: row.employee_id
+      });
+
+      if (!existingAssignmentIdByKey.has(key)) {
+        existingAssignmentIdByKey.set(key, row.id);
+      }
+    }
+  }
+
+  for (const assignment of SEED_LEARNING_ASSIGNMENTS) {
+    const courseId = courseIdByKey.get(assignment.courseKey);
+    const employeeId = userIdByKey.get(assignment.employeeKey);
+    const assignedById = userIdByKey.get(assignment.assignedByKey);
+
+    if (!courseId) {
+      throw new Error(`Missing course id for learning assignment seed (${assignment.courseKey})`);
+    }
+
+    if (!employeeId) {
+      throw new Error(
+        `Missing employee id for learning assignment seed (${assignment.employeeKey})`
+      );
+    }
+
+    if (!assignedById) {
+      throw new Error(
+        `Missing assigner id for learning assignment seed (${assignment.assignedByKey})`
+      );
+    }
+
+    const payload = {
+      org_id: orgId,
+      course_id: courseId,
+      employee_id: employeeId,
+      status: assignment.status,
+      progress_pct: assignment.progressPct,
+      module_progress: {} as Record<string, unknown>,
+      quiz_score: assignment.quizScore,
+      quiz_attempts: assignment.quizAttempts,
+      due_date: assignment.dueOffsetDays === null ? null : dateWithOffset(assignment.dueOffsetDays),
+      started_at:
+        assignment.startedOffsetDays === null
+          ? null
+          : timestampWithOffsetDays(assignment.startedOffsetDays),
+      completed_at:
+        assignment.completedOffsetDays === null
+          ? null
+          : timestampWithOffsetDays(assignment.completedOffsetDays),
+      certificate_url:
+        assignment.status === "completed"
+          ? `${orgId}/learning/certificates/seed-${assignment.courseKey}-${assignment.employeeKey}.pdf`
+          : null,
+      assigned_by: assignedById,
+      deleted_at: null as string | null
+    };
+
+    const existingAssignmentId = existingAssignmentIdByKey.get(
+      learningAssignmentSeedKey({
+        courseId,
+        employeeId
+      })
+    );
+
+    if (existingAssignmentId) {
+      const { error: updateError } = await client
+        .from("course_assignments")
+        .update(payload)
+        .eq("id", existingAssignmentId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(
+          `Unable to update learning assignment seed data: ${updateError.message}`
+        );
+      }
+    } else {
+      const { error: insertError } = await client
+        .from("course_assignments")
+        .insert(payload);
+
+      if (insertError) {
+        throw new Error(
+          `Unable to insert learning assignment seed data: ${insertError.message}`
+        );
+      }
+    }
+  }
+}
+
 async function upsertSeedPaymentDetails(
   client: SupabaseClient,
   orgId: string,
@@ -5684,6 +6102,7 @@ async function main() {
   await upsertSeedCompensationBands(client, org.id, userIdByKey);
   await upsertSeedTimeAttendance(client, org.id, userIdByKey);
   await upsertSeedScheduling(client, org.id, userIdByKey);
+  await upsertSeedLearning(client, org.id, userIdByKey);
   await upsertSeedDeductionRules(client, org.id);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
   await upsertSeedPerformance(client, org.id, userIdByKey);
@@ -5715,6 +6134,8 @@ async function main() {
   console.log(`Schedules upserted: ${SEED_SCHEDULES.length}`);
   console.log(`Shifts upserted: ${SEED_SCHEDULE_SHIFTS.length}`);
   console.log(`Shift swaps upserted: ${SEED_SHIFT_SWAPS.length}`);
+  console.log(`Learning courses upserted: ${SEED_LEARNING_COURSES.length}`);
+  console.log(`Learning assignments upserted: ${SEED_LEARNING_ASSIGNMENTS.length}`);
   console.log(`Nigeria deduction rules upserted: ${SEED_NIGERIA_DEDUCTION_RULES.length}`);
   console.log(`Payment details upserted: ${SEED_PAYMENT_DETAILS.length}`);
   console.log(`Performance cycles upserted: ${SEED_REVIEW_CYCLES.length}`);

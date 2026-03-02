@@ -105,6 +105,18 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G 4"
       },
       {
+        label: "Learning",
+        href: "/learning",
+        description: "Track assigned courses, progress, and completion.",
+        shortcut: "G 5"
+      },
+      {
+        label: "Learning Certificates",
+        href: "/learning/certificates",
+        description: "View and download course completion certificates.",
+        shortcut: "G 6"
+      },
+      {
         label: "Attendance Approvals",
         href: "/time-attendance/approvals",
         description: "Review submitted timesheets from direct reports.",
@@ -297,6 +309,24 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/admin/scheduling/templates",
         description: "Manage reusable shift templates for schedule planning.",
         shortcut: "A M"
+      },
+      {
+        label: "Learning Admin",
+        href: "/admin/learning",
+        description: "Manage learning courses and assignment rollout.",
+        shortcut: "A L"
+      },
+      {
+        label: "Learning Reports",
+        href: "/admin/learning/reports",
+        description: "Review completion rates and overdue learning assignments.",
+        shortcut: "A E"
+      },
+      {
+        label: "New Learning Course",
+        href: "/admin/learning/courses/new",
+        description: "Create and publish a new learning course.",
+        shortcut: "A N"
       },
       {
         label: "Admin Users",
