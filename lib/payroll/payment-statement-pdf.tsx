@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   },
   period: {
     marginTop: 2,
-    color: "#475569"
+    color: "#666666"
   },
   section: {
     borderWidth: 1,
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     width: "48%"
   },
   metaLabel: {
-    color: "#475569"
+    color: "#666666"
   },
   amountRow: {
     display: "flex",
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     fontWeight: 600
   },
   muted: {
-    color: "#475569"
+    color: "#666666"
   },
   totalRow: {
     borderTopWidth: 1,
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     color: "#15803D"
   },
   note: {
-    color: "#475569"
+    color: "#666666"
   },
   footer: {
     borderTopWidth: 1,

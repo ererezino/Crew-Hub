@@ -1,25 +1,26 @@
 :root {
   color-scheme: light;
 
-  --color-primary: #0f172a;
-  --color-accent: #22c55e;
-  --color-accent-hover: #16a34a;
-  --color-accent-subtle: #f0fdf4;
-  --color-accent-dark: #4ade80;
+  --color-primary: #4A0039;
+  --color-accent: #4A0039;
+  --color-accent-hover: #5C1049;
+  --color-accent-subtle: #F5EDF2;
+  --color-accent-dark: #C4A7B6;
+  --color-accent-yellow: #FFCC1C;
 
   --bg-canvas: #ffffff;
-  --bg-surface: #f8fafc;
-  --bg-subtle: #f1f5f9;
+  --bg-surface: #F9F7F6;
+  --bg-subtle: #F2EEEB;
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --text-soft: #cbd5e1;
-  --text-inverse-primary: #f8fafc;
-  --text-inverse-secondary: #94a3b8;
+  --text-primary: #402530;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --text-soft: #CCCCCC;
+  --text-inverse-primary: #f8f6f7;
+  --text-inverse-secondary: #C4A7B6;
 
-  --border-default: #e2e8f0;
-  --border-subtle: #f1f5f9;
+  --border-default: #E0DEDE;
+  --border-subtle: #EDEBEB;
 
   --status-success-bg: #f0fdf4;
   --status-success-text: #15803d;
@@ -36,21 +37,21 @@
   --status-pending-bg: #f5f3ff;
   --status-pending-text: #6d28d9;
   --status-pending-border: #ddd6fe;
-  --status-draft-bg: #f8fafc;
-  --status-draft-text: #475569;
-  --status-draft-border: #e2e8f0;
+  --status-draft-bg: #F9F7F6;
+  --status-draft-text: #666666;
+  --status-draft-border: #E0DEDE;
   --status-processing-bg: #f0f9ff;
   --status-processing-text: #0369a1;
   --status-processing-border: #bae6fd;
 
-  --radius-default: 6px;
-  --radius-card: 8px;
+  --radius-default: 8px;
+  --radius-card: 12px;
   --radius-modal: 12px;
 
-  --transition-hover: 150ms ease-out;
+  --transition-hover: 150ms ease-in-out;
   --transition-panel: 200ms ease-out;
 
-  --topbar-height: 72px;
+  --topbar-height: 56px;
   --sidebar-width: 16rem;
   --sidebar-collapsed-width: 4.75rem;
 }
@@ -58,19 +59,19 @@
 html.dark {
   color-scheme: dark;
 
-  --bg-canvas: #0f172a;
-  --bg-surface: #1e293b;
-  --bg-subtle: #334155;
+  --bg-canvas: #141311;
+  --bg-surface: #1E1C1A;
+  --bg-subtle: #2A2826;
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-soft: #475569;
-  --text-inverse-primary: #f8fafc;
-  --text-inverse-secondary: #94a3b8;
+  --text-primary: #F2EEEB;
+  --text-secondary: #B0B0B0;
+  --text-muted: #7A7A7A;
+  --text-soft: #4A4A4A;
+  --text-inverse-primary: #F2EEEB;
+  --text-inverse-secondary: #B0B0B0;
 
-  --border-default: #334155;
-  --border-subtle: #1e293b;
+  --border-default: #3A3735;
+  --border-subtle: #2A2826;
 
   --status-success-bg: #1a2f21;
   --status-success-text: #4ade80;
@@ -84,12 +85,12 @@ html.dark {
   --status-info-bg: #17263c;
   --status-info-text: #93c5fd;
   --status-info-border: #233d60;
-  --status-pending-bg: #241f37;
+  --status-pending-bg: #271C2E;
   --status-pending-text: #c4b5fd;
   --status-pending-border: #3f345f;
-  --status-draft-bg: #1e293b;
-  --status-draft-text: #94a3b8;
-  --status-draft-border: #334155;
+  --status-draft-bg: #1E1C1A;
+  --status-draft-text: #B0B0B0;
+  --status-draft-border: #3A3735;
   --status-processing-bg: #132b3d;
   --status-processing-text: #7dd3fc;
   --status-processing-border: #20455f;
@@ -108,7 +109,7 @@ body {
   margin: 0;
   background: var(--bg-subtle);
   color: var(--text-primary);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;
 }
@@ -146,7 +147,7 @@ textarea {
 code,
 kbd,
 .numeric {
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -157,8 +158,10 @@ kbd,
   gap: 0.5rem;
   border-radius: var(--radius-default);
   border: 1px solid var(--border-default);
-  padding: 0.5rem 0.875rem;
+  padding: 0.625rem 1.25rem;
   font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.015em;
   transition: background-color var(--transition-hover), color var(--transition-hover), border-color var(--transition-hover);
 }
 
@@ -256,9 +259,9 @@ kbd,
 .sidebar-group-title {
   margin: 0;
   padding: 0 0.5rem;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.25;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-inverse-secondary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -326,7 +329,7 @@ kbd,
   top: 0;
   z-index: 20;
   height: var(--topbar-height);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(249, 247, 246, 0.92);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-default);
   padding: 0 1rem;
@@ -337,7 +340,7 @@ kbd,
 }
 
 html.dark .topbar {
-  background: rgba(15, 23, 42, 0.82);
+  background: rgba(20, 19, 17, 0.88);
 }
 
 .topbar-leading {
@@ -469,7 +472,7 @@ html.dark .topbar {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   background: var(--bg-canvas);
-  padding: 0.875rem;
+  padding: 1.25rem;
   display: grid;
   gap: 0.6rem;
   margin-bottom: 1rem;
@@ -713,7 +716,7 @@ html.dark .topbar {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(15, 23, 42, 0.42);
+  background: rgba(40, 22, 29, 0.42);
 }
 
 .slide-panel {
@@ -722,7 +725,7 @@ html.dark .topbar {
   height: 100dvh;
   background: var(--bg-canvas);
   border-left: 1px solid var(--border-default);
-  box-shadow: -24px 0 42px rgba(15, 23, 42, 0.18);
+  box-shadow: -24px 0 42px rgba(40, 22, 29, 0.18);
   display: grid;
   grid-template-rows: auto 1fr;
   animation: slide-panel-enter var(--transition-panel);
@@ -768,7 +771,7 @@ html.dark .topbar {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   background: var(--bg-canvas);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 10px 24px rgba(40, 22, 29, 0.12);
   padding: 0.6rem 0.7rem;
   display: flex;
   align-items: center;
@@ -3360,7 +3363,7 @@ html.dark .topbar {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(15, 23, 42, 0.48);
+  background: rgba(40, 22, 29, 0.48);
 }
 
 .payroll-reject-panel {
@@ -3372,7 +3375,7 @@ html.dark .topbar {
   padding: 1rem;
   display: grid;
   gap: 0.75rem;
-  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.24);
+  box-shadow: 0 20px 48px rgba(40, 22, 29, 0.24);
   animation: panel-enter var(--transition-panel);
 }
 
@@ -3638,7 +3641,7 @@ html.dark .topbar {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   background: var(--bg-canvas);
-  padding: 0.875rem;
+  padding: 1.125rem;
   display: grid;
   gap: 0.35rem;
   min-height: 110px;
@@ -3710,7 +3713,7 @@ html.dark .topbar {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-modal);
   background: var(--bg-canvas);
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 20px 45px rgba(40, 22, 29, 0.18);
   padding: 0.75rem;
   z-index: 70;
   animation: panel-enter var(--transition-panel);
@@ -3857,7 +3860,7 @@ html.dark .topbar {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(40, 22, 29, 0.45);
 }
 
 .command-dialog {
@@ -3867,7 +3870,7 @@ html.dark .topbar {
   border-radius: var(--radius-modal);
   background: var(--bg-canvas);
   overflow: hidden;
-  box-shadow: 0 24px 52px rgba(15, 23, 42, 0.26);
+  box-shadow: 0 24px 52px rgba(40, 22, 29, 0.26);
   animation: panel-enter var(--transition-panel);
 }
 
@@ -3908,7 +3911,7 @@ html.dark .topbar {
 .command-section-title {
   font-size: 12px;
   line-height: 1.25;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
@@ -4025,7 +4028,7 @@ html.dark .topbar {
 
 .form-label {
   color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .form-input {
@@ -4039,8 +4042,7 @@ html.dark .topbar {
 }
 
 .form-input:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  border-color: #402530;
 }
 
 .form-input:disabled {
@@ -4075,7 +4077,7 @@ html.dark .topbar {
   inset: 0;
   z-index: 35;
   border: 0;
-  background: rgba(15, 23, 42, 0.42);
+  background: rgba(40, 22, 29, 0.42);
 }
 
 .mobile-only {

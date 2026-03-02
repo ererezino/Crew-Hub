@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { ThemeProvider } from "../components/shared/theme-provider";
 import "./globals.css";
 
-const geistSans = Geist({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-geist-sans"
+  variable: "--font-inter"
 });
 
-const geistMono = Geist_Mono({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-geist-mono"
+  variable: "--font-mono"
 });
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className={`${inter.variable} ${jetbrainsMono.variable}`}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
