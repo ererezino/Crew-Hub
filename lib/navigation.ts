@@ -117,6 +117,12 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G 6"
       },
       {
+        label: "Surveys",
+        href: "/surveys",
+        description: "Respond to pulse and engagement surveys assigned to you.",
+        shortcut: "G 7"
+      },
+      {
         label: "Attendance Approvals",
         href: "/time-attendance/approvals",
         description: "Review submitted timesheets from direct reports.",
@@ -327,6 +333,18 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/admin/learning/courses/new",
         description: "Create and publish a new learning course.",
         shortcut: "A N"
+      },
+      {
+        label: "Survey Admin",
+        href: "/admin/surveys",
+        description: "Create, launch, and monitor employee survey responses.",
+        shortcut: "A V"
+      },
+      {
+        label: "New Survey",
+        href: "/admin/surveys/new",
+        description: "Build a new pulse or engagement survey.",
+        shortcut: "A W"
       },
       {
         label: "Admin Users",
