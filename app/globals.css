@@ -2776,6 +2776,94 @@ html.dark .topbar {
   color: var(--text-secondary);
 }
 
+.admin-users-form-header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.admin-users-form-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-users-role-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-users-access-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-users-access-group {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.admin-users-access-options {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.admin-users-access-description {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.admin-users-password-box {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.5rem;
+  background: var(--bg-surface);
+}
+
+.admin-users-password-value {
+  display: inline-block;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+}
+
+.admin-users-review-card {
+  border-style: dashed;
+}
+
+.admin-users-review-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-users-review-grid dt {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.admin-users-review-grid dd {
+  margin: 0.1rem 0 0;
+}
+
+.admin-users-filters {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-users-row-actions {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
 .compliance-toolbar {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
@@ -4569,6 +4657,13 @@ html.dark .topbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-users-form-grid,
+  .admin-users-access-grid,
+  .admin-users-review-grid,
+  .admin-users-filters {
+    grid-template-columns: 1fr;
+  }
+
   .timeoff-calendar-entry-card {
     display: grid;
   }
@@ -4678,6 +4773,10 @@ html.dark .topbar {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.35rem 0.7rem;
+  }
+
+  .admin-users-role-grid {
+    grid-template-columns: 1fr;
   }
 
   .slide-panel {

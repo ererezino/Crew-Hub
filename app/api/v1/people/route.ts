@@ -2,8 +2,19 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import {
+  applyUserNavigationAccess,
+  resolveEffectiveUserNavSelection
+} from "../../../../lib/auth/navigation-access";
+import { generateStrongPassword } from "../../../../lib/auth/generate-password";
 import { logAudit } from "../../../../lib/audit";
+import {
+  getDepartmentsValidationMessage,
+  parseDepartment
+} from "../../../../lib/departments";
 import { USER_ROLES, type UserRole } from "../../../../lib/navigation";
+import { createNotification } from "../../../../lib/notifications/service";
+import { createOnboardingInstance } from "../../../../lib/onboarding/create-instance";
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
@@ -32,7 +43,8 @@ const createPersonSchema = z.object({
     .string()
     .trim()
     .min(8, "Password must be at least 8 characters.")
-    .max(72, "Password must be 72 characters or fewer."),
+    .max(72, "Password must be 72 characters or fewer.")
+    .optional(),
   roles: z.array(z.enum(USER_ROLES)).min(1, "Select at least one role."),
   department: z.string().trim().max(100, "Department is too long.").optional(),
   title: z.string().trim().max(200, "Title is too long.").optional(),
@@ -59,7 +71,18 @@ const createPersonSchema = z.object({
     .trim()
     .length(3, "Currency must be a 3-letter code.")
     .default("USD"),
-  status: z.enum(PROFILE_STATUSES).default("active")
+  status: z.enum(PROFILE_STATUSES).optional(),
+  isNewEmployee: z.boolean().optional().default(true),
+  accessOverrides: z
+    .object({
+      granted: z.array(z.string().trim().min(1).max(100)).default([]),
+      revoked: z.array(z.string().trim().min(1).max(100)).default([])
+    })
+    .optional()
+    .default({
+      granted: [],
+      revoked: []
+    })
 });
 
 const profileRowSchema = z.object({
@@ -370,7 +393,20 @@ export async function POST(request: Request) {
     });
   }
 
-  const parsedBody = createPersonSchema.safeParse(body);
+  const normalizedBody =
+    body && typeof body === "object" && !Array.isArray(body)
+      ? ({
+          ...(body as Record<string, unknown>),
+          isNewEmployee:
+            (body as Record<string, unknown>).isNewEmployee ??
+            (body as Record<string, unknown>).is_new_employee,
+          accessOverrides:
+            (body as Record<string, unknown>).accessOverrides ??
+            (body as Record<string, unknown>).access_overrides
+        } satisfies Record<string, unknown>)
+      : body;
+
+  const parsedBody = createPersonSchema.safeParse(normalizedBody);
 
   if (!parsedBody.success) {
     return jsonResponse<null>(422, {
@@ -384,7 +420,7 @@ export async function POST(request: Request) {
   }
 
   const payload = parsedBody.data;
-  const roles = [...new Set(payload.roles)];
+  const roles = [...new Set(["EMPLOYEE", ...payload.roles])];
 
   if (roles.includes("SUPER_ADMIN") && !hasRole(profile.roles, "SUPER_ADMIN")) {
     return jsonResponse<null>(403, {
@@ -392,6 +428,22 @@ export async function POST(request: Request) {
       error: {
         code: "FORBIDDEN",
         message: "Only a Super Admin can assign the Super Admin role."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const normalizedDepartment =
+    payload.department && payload.department.trim().length > 0
+      ? parseDepartment(payload.department)
+      : null;
+
+  if (payload.department && payload.department.trim().length > 0 && !normalizedDepartment) {
+    return jsonResponse<null>(400, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: getDepartmentsValidationMessage()
       },
       meta: buildMeta()
     });
@@ -405,17 +457,6 @@ export async function POST(request: Request) {
       error: {
         code: "VALIDATION_ERROR",
         message: "Country code must be a valid 2-letter code."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  if (payload.managerId === profile.id) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "A person cannot report to themselves."
       },
       meta: buildMeta()
     });
@@ -456,10 +497,68 @@ export async function POST(request: Request) {
   }
 
   const serviceRoleClient = createSupabaseServiceRoleClient();
+  const normalizedEmail = payload.email.trim().toLowerCase();
+  const generatedPassword = payload.password?.trim().length
+    ? payload.password
+    : generateStrongPassword();
+
+  const isNewEmployee = payload.isNewEmployee;
+  const profileStatus: ProfileStatus = isNewEmployee ? "onboarding" : "active";
+  const startDate = payload.startDate?.trim() || null;
+  const payrollMode = normalizePayrollMode(payload.employmentType, payload.payrollMode);
+  const primaryCurrency = payload.primaryCurrency.trim().toUpperCase();
+  const effectiveSelection = resolveEffectiveUserNavSelection({
+    roles: roles as UserRole[],
+    overrides: payload.accessOverrides
+  });
+
+  let onboardingTemplate: {
+    id: string;
+    name: string;
+    type: "onboarding" | "offboarding";
+    tasks: unknown;
+  } | null = null;
+
+  if (isNewEmployee && normalizedDepartment) {
+    const { data: templateRow, error: templateError } = await serviceRoleClient
+      .from("onboarding_templates")
+      .select("id, name, type, tasks")
+      .eq("org_id", profile.org_id)
+      .is("deleted_at", null)
+      .eq("type", "onboarding")
+      .eq("department", normalizedDepartment)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (templateError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "ONBOARDING_TEMPLATE_FETCH_FAILED",
+          message: "Unable to fetch onboarding template for this department."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    onboardingTemplate =
+      templateRow &&
+      typeof templateRow.id === "string" &&
+      typeof templateRow.name === "string" &&
+      (templateRow.type === "onboarding" || templateRow.type === "offboarding")
+        ? {
+            id: templateRow.id,
+            name: templateRow.name,
+            type: templateRow.type,
+            tasks: templateRow.tasks
+          }
+        : null;
+  }
 
   const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
-    email: payload.email.trim().toLowerCase(),
-    password: payload.password,
+    email: normalizedEmail,
+    password: generatedPassword,
     email_confirm: true,
     user_metadata: {
       full_name: payload.fullName.trim()
@@ -484,29 +583,25 @@ export async function POST(request: Request) {
 
   const createdUserId = authData.user.id;
 
-  const payrollMode = normalizePayrollMode(payload.employmentType, payload.payrollMode);
-  const primaryCurrency = payload.primaryCurrency.trim().toUpperCase();
-  const status = payload.status as ProfileStatus;
-
   const { data: insertedProfile, error: insertProfileError } = await serviceRoleClient
     .from("profiles")
     .insert({
       id: createdUserId,
       org_id: profile.org_id,
-      email: payload.email.trim().toLowerCase(),
+      email: normalizedEmail,
       full_name: payload.fullName.trim(),
       roles,
-      department: payload.department?.trim() || null,
+      department: normalizedDepartment,
       title: payload.title?.trim() || null,
       country_code: countryCode,
       timezone: payload.timezone?.trim() || null,
       phone: payload.phone?.trim() || null,
-      start_date: payload.startDate?.trim() || null,
+      start_date: startDate,
       manager_id: payload.managerId ?? null,
       employment_type: payload.employmentType as EmploymentType,
       payroll_mode: payrollMode,
       primary_currency: primaryCurrency,
-      status
+      status: profileStatus
     })
     .select(
       "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, created_at, updated_at"
@@ -562,6 +657,79 @@ export async function POST(request: Request) {
   }
 
   const person = mapPersonRow(parsedInsertedProfile.data, managerNameById);
+  let onboardingInstanceId: string | null = null;
+  let accessConfigChangedKeys: string[] = [];
+
+  try {
+    const accessUpdate = await applyUserNavigationAccess({
+      supabase: serviceRoleClient,
+      orgId: profile.org_id,
+      employeeId: createdUserId,
+      actorUserId: profile.id,
+      roles: roles as UserRole[],
+      overrides: payload.accessOverrides
+    });
+
+    accessConfigChangedKeys = accessUpdate.changedNavItemKeys;
+  } catch (error) {
+    console.error("Unable to apply navigation access during user invite.", {
+      employeeId: createdUserId,
+      message: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  if (isNewEmployee && onboardingTemplate) {
+    try {
+      const onboardingCreateResult = await createOnboardingInstance({
+        supabase: serviceRoleClient,
+        orgId: profile.org_id,
+        employee: {
+          id: createdUserId,
+          fullName: payload.fullName.trim()
+        },
+        template: onboardingTemplate,
+        type: "onboarding",
+        startedAt: startDate ?? undefined
+      });
+
+      onboardingInstanceId = onboardingCreateResult.instance.id;
+
+      await createNotification({
+        orgId: profile.org_id,
+        userId: createdUserId,
+        type: "onboarding_task",
+        title: "Onboarding started",
+        body: "A new onboarding plan has been assigned to you.",
+        link: `/onboarding/${onboardingCreateResult.instance.id}`
+      });
+
+      await logAudit({
+        action: "created",
+        tableName: "onboarding_instances",
+        recordId: onboardingCreateResult.instance.id,
+        newValue: {
+          employeeId: onboardingCreateResult.instance.employeeId,
+          templateId: onboardingCreateResult.instance.templateId,
+          type: onboardingCreateResult.instance.type,
+          totalTasks: onboardingCreateResult.instance.totalTasks
+        }
+      });
+    } catch (error) {
+      console.error("Unable to auto-create onboarding instance during user invite.", {
+        employeeId: createdUserId,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  await createNotification({
+    orgId: profile.org_id,
+    userId: createdUserId,
+    type: "welcome",
+    title: "Welcome to Crew Hub",
+    body: "Welcome to the team! Please update your profile and change your password.",
+    link: "/settings"
+  });
 
   await logAudit({
     action: "created",
@@ -575,13 +743,31 @@ export async function POST(request: Request) {
       countryCode: person.countryCode,
       employmentType: person.employmentType,
       payrollMode: person.payrollMode,
-      status: person.status
+      status: person.status,
+      isNewEmployee,
+      onboardingTemplateId: onboardingTemplate?.id ?? null,
+      onboardingInstanceId
     }
   });
 
+  if (accessConfigChangedKeys.length > 0) {
+    await logAudit({
+      action: "updated",
+      tableName: "navigation_access_config",
+      recordId: createdUserId,
+      newValue: {
+        employeeId: createdUserId,
+        defaultGrantedNavItemKeys: effectiveSelection.granted,
+        revokedNavItemKeys: effectiveSelection.revoked,
+        changedNavItemKeys: accessConfigChangedKeys
+      }
+    });
+  }
+
   return jsonResponse<PeopleCreateResponseData>(201, {
     data: {
-      person
+      person,
+      temporaryPassword: generatedPassword
     },
     error: null,
     meta: buildMeta()

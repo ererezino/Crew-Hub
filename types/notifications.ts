@@ -11,6 +11,7 @@ export const NOTIFICATION_TYPES = [
   "payment_details_changed",
   "compliance_deadline",
   "announcement",
+  "welcome",
   "signature_requested",
   "signature_signed",
   "signature_completed"
