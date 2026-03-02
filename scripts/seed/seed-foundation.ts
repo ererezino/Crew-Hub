@@ -444,6 +444,62 @@ type SeedCompensationBandAssignment = {
   assignedByKey: SeedMember["key"];
 };
 
+type SeedTimePolicyRoundingRule = "none" | "nearest_5" | "nearest_15" | "nearest_30";
+
+type SeedTimePolicy = {
+  key: string;
+  name: string;
+  appliesToDepartments: SeedMember["department"][] | null;
+  appliesToTypes: SeedCompensationEmploymentType[] | null;
+  countryCode: SeedMember["countryCode"] | null;
+  weeklyHoursTarget: number;
+  dailyHoursMax: number;
+  overtimeAfterDaily: number | null;
+  overtimeAfterWeekly: number | null;
+  overtimeMultiplier: number;
+  doubleTimeAfter: number | null;
+  doubleTimeMultiplier: number;
+  breakAfterHours: number;
+  breakDurationMinutes: number;
+  paidBreak: boolean;
+  roundingRule: SeedTimePolicyRoundingRule;
+  requireGeolocation: boolean;
+  allowedLocations: Array<Record<string, unknown>>;
+  isActive: boolean;
+};
+
+type SeedTimeEntryMethod = "web" | "mobile" | "kiosk" | "manual";
+
+type SeedTimeEntry = {
+  employeeKey: SeedMember["key"];
+  policyKey: SeedTimePolicy["key"];
+  clockInOffsetHours: number;
+  durationMinutes: number | null;
+  breakMinutes: number;
+  overtimeMinutes: number;
+  doubleTimeMinutes: number;
+  clockInMethod: SeedTimeEntryMethod;
+  clockOutMethod: SeedTimeEntryMethod | null;
+  notes: string | null;
+};
+
+type SeedTimesheetStatus = "pending" | "submitted" | "approved" | "rejected" | "locked";
+
+type SeedTimesheet = {
+  employeeKey: SeedMember["key"];
+  weekOffset: number;
+  totalRegularMinutes: number;
+  totalOvertimeMinutes: number;
+  totalDoubleTimeMinutes: number;
+  totalBreakMinutes: number;
+  totalWorkedMinutes: number;
+  status: SeedTimesheetStatus;
+  submittedOffsetHours: number | null;
+  approvedByKey: SeedMember["key"] | null;
+  approvedOffsetHours: number | null;
+  rejectionReason: string | null;
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -1266,6 +1322,245 @@ const SEED_COMPENSATION_BAND_ASSIGNMENTS: SeedCompensationBandAssignment[] = [
     effectiveOffsetDays: -180,
     effectiveToOffsetDays: null,
     assignedByKey: "head_people_finance"
+  }
+];
+
+const SEED_TIME_POLICIES: SeedTimePolicy[] = [
+  {
+    key: "global-contractor-standard",
+    name: "Global Contractor Standard",
+    appliesToDepartments: null,
+    appliesToTypes: ["contractor"],
+    countryCode: null,
+    weeklyHoursTarget: 40,
+    dailyHoursMax: 12,
+    overtimeAfterDaily: 8,
+    overtimeAfterWeekly: 40,
+    overtimeMultiplier: 1.5,
+    doubleTimeAfter: 12,
+    doubleTimeMultiplier: 2,
+    breakAfterHours: 6,
+    breakDurationMinutes: 30,
+    paidBreak: false,
+    roundingRule: "nearest_15",
+    requireGeolocation: false,
+    allowedLocations: [],
+    isActive: true
+  },
+  {
+    key: "nigeria-operations-standard",
+    name: "Nigeria Operations Schedule",
+    appliesToDepartments: ["Operations", "Compliance"],
+    appliesToTypes: ["contractor"],
+    countryCode: "NG",
+    weeklyHoursTarget: 42,
+    dailyHoursMax: 12,
+    overtimeAfterDaily: 8,
+    overtimeAfterWeekly: 42,
+    overtimeMultiplier: 1.5,
+    doubleTimeAfter: 12,
+    doubleTimeMultiplier: 2,
+    breakAfterHours: 5.5,
+    breakDurationMinutes: 30,
+    paidBreak: false,
+    roundingRule: "nearest_15",
+    requireGeolocation: false,
+    allowedLocations: [],
+    isActive: true
+  }
+];
+
+const SEED_TIME_ENTRIES: SeedTimeEntry[] = [
+  {
+    employeeKey: "coo",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -2,
+    durationMinutes: null,
+    breakMinutes: 0,
+    overtimeMinutes: 0,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: null,
+    notes: "Active strategy block."
+  },
+  {
+    employeeKey: "coo",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -26,
+    durationMinutes: 545,
+    breakMinutes: 30,
+    overtimeMinutes: 35,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: "web",
+    notes: "Cross-functional planning sync."
+  },
+  {
+    employeeKey: "head_people_finance",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -28,
+    durationMinutes: 510,
+    breakMinutes: 30,
+    overtimeMinutes: 0,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: "web",
+    notes: "Payroll readiness review."
+  },
+  {
+    employeeKey: "eng_manager",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -30,
+    durationMinutes: 560,
+    breakMinutes: 30,
+    overtimeMinutes: 50,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: "web",
+    notes: "Sprint planning and unblockers."
+  },
+  {
+    employeeKey: "ops_manager",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -32,
+    durationMinutes: 500,
+    breakMinutes: 30,
+    overtimeMinutes: 0,
+    doubleTimeMinutes: 0,
+    clockInMethod: "mobile",
+    clockOutMethod: "mobile",
+    notes: "Vendor and incident follow-up."
+  },
+  {
+    employeeKey: "engineer_1",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -24,
+    durationMinutes: 530,
+    breakMinutes: 30,
+    overtimeMinutes: 20,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: "web",
+    notes: "Feature development and PR reviews."
+  },
+  {
+    employeeKey: "engineer_1",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -48,
+    durationMinutes: 520,
+    breakMinutes: 30,
+    overtimeMinutes: 10,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: "web",
+    notes: "Bug fixing and QA support."
+  },
+  {
+    employeeKey: "ops_associate",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -22,
+    durationMinutes: 480,
+    breakMinutes: 30,
+    overtimeMinutes: 0,
+    doubleTimeMinutes: 0,
+    clockInMethod: "mobile",
+    clockOutMethod: "mobile",
+    notes: "Onboarding workflow checks."
+  },
+  {
+    employeeKey: "engineer_2",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -46,
+    durationMinutes: 540,
+    breakMinutes: 30,
+    overtimeMinutes: 30,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: "web",
+    notes: "Integration and release prep."
+  },
+  {
+    employeeKey: "compliance_officer",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -44,
+    durationMinutes: 495,
+    breakMinutes: 30,
+    overtimeMinutes: 0,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: "web",
+    notes: "Regulatory policy reconciliation."
+  },
+  {
+    employeeKey: "engineer_3",
+    policyKey: "global-contractor-standard",
+    clockInOffsetHours: -42,
+    durationMinutes: 505,
+    breakMinutes: 25,
+    overtimeMinutes: 0,
+    doubleTimeMinutes: 0,
+    clockInMethod: "web",
+    clockOutMethod: "web",
+    notes: "Platform migration support."
+  }
+];
+
+const SEED_TIMESHEETS: SeedTimesheet[] = [
+  {
+    employeeKey: "engineer_1",
+    weekOffset: 0,
+    totalRegularMinutes: 2280,
+    totalOvertimeMinutes: 120,
+    totalDoubleTimeMinutes: 0,
+    totalBreakMinutes: 150,
+    totalWorkedMinutes: 2400,
+    status: "submitted",
+    submittedOffsetHours: -4,
+    approvedByKey: null,
+    approvedOffsetHours: null,
+    rejectionReason: null
+  },
+  {
+    employeeKey: "ops_associate",
+    weekOffset: 0,
+    totalRegularMinutes: 2220,
+    totalOvertimeMinutes: 60,
+    totalDoubleTimeMinutes: 0,
+    totalBreakMinutes: 120,
+    totalWorkedMinutes: 2280,
+    status: "pending",
+    submittedOffsetHours: null,
+    approvedByKey: null,
+    approvedOffsetHours: null,
+    rejectionReason: null
+  },
+  {
+    employeeKey: "engineer_2",
+    weekOffset: -1,
+    totalRegularMinutes: 2300,
+    totalOvertimeMinutes: 100,
+    totalDoubleTimeMinutes: 0,
+    totalBreakMinutes: 150,
+    totalWorkedMinutes: 2400,
+    status: "approved",
+    submittedOffsetHours: -120,
+    approvedByKey: "eng_manager",
+    approvedOffsetHours: -110,
+    rejectionReason: null
+  },
+  {
+    employeeKey: "compliance_officer",
+    weekOffset: -1,
+    totalRegularMinutes: 2160,
+    totalOvertimeMinutes: 40,
+    totalDoubleTimeMinutes: 0,
+    totalBreakMinutes: 120,
+    totalWorkedMinutes: 2200,
+    status: "rejected",
+    submittedOffsetHours: -118,
+    approvedByKey: "ops_manager",
+    approvedOffsetHours: -108,
+    rejectionReason: "Missing supporting notes on two manual edits."
   }
 ];
 
@@ -2490,6 +2785,21 @@ function oneDayBeforeDate(isoDate: string): string {
   return parsedDate.toISOString().slice(0, 10);
 }
 
+function startOfWeekWithOffset(offsetWeeks: number): string {
+  const baseDate = new Date();
+  const day = baseDate.getUTCDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+
+  baseDate.setUTCDate(baseDate.getUTCDate() + mondayOffset + offsetWeeks * 7);
+  return baseDate.toISOString().slice(0, 10);
+}
+
+function endOfWeekFromStart(weekStartDate: string): string {
+  const parsedDate = new Date(`${weekStartDate}T00:00:00.000Z`);
+  parsedDate.setUTCDate(parsedDate.getUTCDate() + 6);
+  return parsedDate.toISOString().slice(0, 10);
+}
+
 function timestampWithOffsetDays(offsetDays: number): string {
   const baseDate = new Date();
   baseDate.setUTCDate(baseDate.getUTCDate() + offsetDays);
@@ -3535,6 +3845,242 @@ async function upsertSeedCompensationBands(
       throw new Error(
         `Unable to insert compensation band assignment seed data: ${insertError.message}`
       );
+    }
+  }
+}
+
+async function upsertSeedTimeAttendance(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  const policyIdByKey = new Map<string, string>();
+
+  for (const policy of SEED_TIME_POLICIES) {
+    const policyQuery = client
+      .from("time_policies")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("name", policy.name)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const { data: existingRows, error: existingError } =
+      policy.countryCode === null
+        ? await policyQuery.is("country_code", null)
+        : await policyQuery.eq("country_code", policy.countryCode);
+
+    if (existingError) {
+      throw new Error(`Unable to query time policy seed data: ${existingError.message}`);
+    }
+
+    const existingPolicyId =
+      (existingRows ?? [])
+        .map((row) => (typeof row.id === "string" ? row.id : null))
+        .find((value): value is string => Boolean(value)) ?? null;
+
+    const payload = {
+      org_id: orgId,
+      name: policy.name,
+      applies_to_departments: policy.appliesToDepartments,
+      applies_to_types: policy.appliesToTypes,
+      country_code: policy.countryCode,
+      weekly_hours_target: policy.weeklyHoursTarget,
+      daily_hours_max: policy.dailyHoursMax,
+      overtime_after_daily: policy.overtimeAfterDaily,
+      overtime_after_weekly: policy.overtimeAfterWeekly,
+      overtime_multiplier: policy.overtimeMultiplier,
+      double_time_after: policy.doubleTimeAfter,
+      double_time_multiplier: policy.doubleTimeMultiplier,
+      break_after_hours: policy.breakAfterHours,
+      break_duration_minutes: policy.breakDurationMinutes,
+      paid_break: policy.paidBreak,
+      rounding_rule: policy.roundingRule,
+      require_geolocation: policy.requireGeolocation,
+      allowed_locations: policy.allowedLocations,
+      is_active: policy.isActive,
+      deleted_at: null as string | null
+    };
+
+    if (existingPolicyId) {
+      const { error: updateError } = await client
+        .from("time_policies")
+        .update(payload)
+        .eq("id", existingPolicyId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update time policy seed data: ${updateError.message}`);
+      }
+
+      policyIdByKey.set(policy.key, existingPolicyId);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("time_policies")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(
+          `Unable to insert time policy seed data: ${insertError?.message ?? "unknown error"}`
+        );
+      }
+
+      policyIdByKey.set(policy.key, insertedRow.id);
+    }
+  }
+
+  for (const entry of SEED_TIME_ENTRIES) {
+    const employeeId = userIdByKey.get(entry.employeeKey);
+    const policyId = policyIdByKey.get(entry.policyKey);
+
+    if (!employeeId) {
+      throw new Error(`Missing employee id for time entry seed (${entry.employeeKey})`);
+    }
+
+    if (!policyId) {
+      throw new Error(`Missing policy id for time entry seed (${entry.policyKey})`);
+    }
+
+    const clockIn = timestampWithOffsetHours(entry.clockInOffsetHours);
+    const clockOut =
+      entry.durationMinutes === null
+        ? null
+        : new Date(Date.parse(clockIn) + entry.durationMinutes * 60_000).toISOString();
+    const workedMinutes =
+      entry.durationMinutes === null ? 0 : Math.max(entry.durationMinutes - entry.breakMinutes, 0);
+    const totalMinutes = workedMinutes;
+    const overtimeMinutes = Math.max(0, entry.overtimeMinutes);
+    const doubleTimeMinutes = Math.max(0, entry.doubleTimeMinutes);
+    const regularMinutes = Math.max(totalMinutes - overtimeMinutes - doubleTimeMinutes, 0);
+
+    const { data: existingRow, error: existingError } = await client
+      .from("time_entries")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("clock_in", clockIn)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(`Unable to query time entry seed data: ${existingError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      policy_id: policyId,
+      clock_in: clockIn,
+      clock_out: clockOut,
+      regular_minutes: regularMinutes,
+      overtime_minutes: overtimeMinutes,
+      double_time_minutes: doubleTimeMinutes,
+      break_minutes: entry.breakMinutes,
+      total_minutes: totalMinutes,
+      breaks: entry.breakMinutes > 0 ? [{ duration_minutes: entry.breakMinutes }] : [],
+      clock_in_method: entry.clockInMethod,
+      clock_out_method: entry.clockOutMethod,
+      notes: entry.notes,
+      deleted_at: null as string | null
+    };
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("time_entries")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update time entry seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("time_entries").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert time entry seed data: ${insertError.message}`);
+      }
+    }
+  }
+
+  for (const timesheet of SEED_TIMESHEETS) {
+    const employeeId = userIdByKey.get(timesheet.employeeKey);
+
+    if (!employeeId) {
+      throw new Error(`Missing employee id for timesheet seed (${timesheet.employeeKey})`);
+    }
+
+    const approvedById = timesheet.approvedByKey
+      ? userIdByKey.get(timesheet.approvedByKey) ?? null
+      : null;
+
+    if (timesheet.approvedByKey && !approvedById) {
+      throw new Error(`Missing approver id for timesheet seed (${timesheet.approvedByKey})`);
+    }
+
+    const weekStart = startOfWeekWithOffset(timesheet.weekOffset);
+    const weekEnd = endOfWeekFromStart(weekStart);
+    const submittedAt =
+      timesheet.submittedOffsetHours === null
+        ? null
+        : timestampWithOffsetHours(timesheet.submittedOffsetHours);
+    const approvedAt =
+      timesheet.approvedOffsetHours === null
+        ? null
+        : timestampWithOffsetHours(timesheet.approvedOffsetHours);
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      week_start: weekStart,
+      week_end: weekEnd,
+      total_regular_minutes: timesheet.totalRegularMinutes,
+      total_overtime_minutes: timesheet.totalOvertimeMinutes,
+      total_double_time_minutes: timesheet.totalDoubleTimeMinutes,
+      total_break_minutes: timesheet.totalBreakMinutes,
+      total_worked_minutes: timesheet.totalWorkedMinutes,
+      status: timesheet.status,
+      submitted_at: submittedAt,
+      approved_by: approvedById,
+      approved_at: approvedAt,
+      rejection_reason: timesheet.rejectionReason,
+      deleted_at: null as string | null
+    };
+
+    const { data: existingRow, error: existingError } = await client
+      .from("timesheets")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("week_start", weekStart)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(`Unable to query timesheet seed data: ${existingError.message}`);
+    }
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("timesheets")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update timesheet seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("timesheets").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert timesheet seed data: ${insertError.message}`);
+      }
     }
   }
 }
@@ -4619,6 +5165,7 @@ async function main() {
   await upsertSeedTimeOff(client, org.id, userIdByKey);
   await upsertSeedCompensation(client, org.id, userIdByKey);
   await upsertSeedCompensationBands(client, org.id, userIdByKey);
+  await upsertSeedTimeAttendance(client, org.id, userIdByKey);
   await upsertSeedDeductionRules(client, org.id);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
   await upsertSeedPerformance(client, org.id, userIdByKey);
@@ -4643,6 +5190,9 @@ async function main() {
   console.log(`Compensation bands upserted: ${SEED_COMPENSATION_BANDS.length}`);
   console.log(`Benchmark rows upserted: ${SEED_BENCHMARK_DATA.length}`);
   console.log(`Band assignments upserted: ${SEED_COMPENSATION_BAND_ASSIGNMENTS.length}`);
+  console.log(`Time policies upserted: ${SEED_TIME_POLICIES.length}`);
+  console.log(`Time entries upserted: ${SEED_TIME_ENTRIES.length}`);
+  console.log(`Timesheets upserted: ${SEED_TIMESHEETS.length}`);
   console.log(`Nigeria deduction rules upserted: ${SEED_NIGERIA_DEDUCTION_RULES.length}`);
   console.log(`Payment details upserted: ${SEED_PAYMENT_DETAILS.length}`);
   console.log(`Performance cycles upserted: ${SEED_REVIEW_CYCLES.length}`);

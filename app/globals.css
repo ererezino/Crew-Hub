@@ -1517,6 +1517,23 @@ html.dark .topbar {
   pointer-events: auto;
 }
 
+.timeatt-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .timeatt-row-actions,
+.data-table-row:focus-within .timeatt-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 .timeoff-month-controls {
   display: inline-flex;
   align-items: center;
@@ -4616,6 +4633,13 @@ html.dark .topbar {
   }
 
   .timeoff-row-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    flex-wrap: wrap;
+  }
+
+  .timeatt-row-actions {
     opacity: 1;
     transform: none;
     pointer-events: auto;
