@@ -54,6 +54,11 @@
   --topbar-height: 56px;
   --sidebar-width: 16rem;
   --sidebar-collapsed-width: 4.75rem;
+
+  --dashboard-card-hover-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary) 16%, transparent);
+  --dashboard-tooltip-bg: color-mix(in srgb, var(--bg-canvas) 82%, transparent);
+  --dashboard-tooltip-border: color-mix(in srgb, var(--border-default) 60%, transparent);
+  --dashboard-tooltip-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 
 html.dark {
@@ -1084,6 +1089,13 @@ html.dark .topbar {
   margin-bottom: 1rem;
 }
 
+.onboarding-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .onboarding-tab {
   border: 1px solid var(--border-default);
   background: var(--bg-canvas);
@@ -1140,6 +1152,11 @@ html.dark .topbar {
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
 
+.onboarding-empty-state {
+  display: grid;
+  gap: 0.75rem;
+}
+
 .onboarding-template-preview {
   margin-top: 1rem;
   border: 1px solid var(--border-default);
@@ -1183,6 +1200,44 @@ html.dark .topbar {
   gap: 0.35rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.onboarding-template-editor {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.onboarding-template-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.onboarding-template-editor-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.65rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.onboarding-template-editor-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.onboarding-template-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
 }
 
 .progress-ring {
@@ -2105,6 +2160,82 @@ html.dark .topbar {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-default);
   background: var(--bg-canvas);
+}
+
+.people-empty-state {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.people-table-skeleton {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.people-table-skeleton-header {
+  height: 2.1rem;
+  border-radius: var(--radius-default);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.people-table-skeleton-row {
+  height: 2.8rem;
+  border-radius: var(--radius-default);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.people-cell-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.people-cell-title {
+  font-weight: 600;
+}
+
+.people-cell-description {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.people-role-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.people-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .people-row-actions,
+.data-table-row:focus-within .people-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.people-role-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.people-role-selection {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
 }
 
 .people-profile-tabs {
@@ -4726,5 +4857,325 @@ html.dark .topbar {
   100% {
     transform: scale(0.95);
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--status-processing-text) 0%, transparent);
+  }
+}
+
+/* ───────────────────────────────────────────
+   Dashboard v2 — Modern Animated Dashboard
+   ─────────────────────────────────────────── */
+
+.dashboard-v2-role-badge {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-v2-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.hero-metric-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 1.5rem;
+  display: grid;
+  gap: 0.75rem;
+  cursor: default;
+  transition: box-shadow var(--transition-hover), border-color var(--transition-hover);
+}
+
+.hero-metric-card:hover {
+  border-color: var(--border-default);
+  box-shadow: var(--dashboard-card-hover-shadow);
+}
+
+.hero-metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.hero-metric-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.hero-metric-body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.hero-metric-value {
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-metric-sparkline {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* Delta Badge */
+
+.delta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: 999px;
+}
+
+.delta-badge-up {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.delta-badge-down {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}
+
+.delta-badge-neutral {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+/* Primary Chart */
+
+.dashboard-v2-primary-chart {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-v2-primary-chart .section-title {
+  margin-bottom: 1rem;
+}
+
+/* Frosted Glass Tooltip */
+
+.chart-tooltip-frosted {
+  background: var(--dashboard-tooltip-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--dashboard-tooltip-border);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  box-shadow: var(--dashboard-tooltip-shadow);
+}
+
+html.dark .chart-tooltip-frosted {
+  background: var(--dashboard-tooltip-bg);
+  border-color: var(--dashboard-tooltip-border);
+}
+
+.chart-tooltip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.3rem;
+}
+
+.chart-tooltip-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 13px;
+}
+
+.chart-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.chart-tooltip-name {
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.chart-tooltip-value {
+  font-weight: 600;
+}
+
+/* Two-column panel grid */
+
+.dashboard-v2-two-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-v2-panel {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: 1.5rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dashboard-v2-expense-widget {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* Breakdown bars */
+
+.dashboard-v2-breakdown-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.dashboard-v2-breakdown-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dashboard-v2-breakdown-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dashboard-v2-breakdown-bar-track {
+  height: 6px;
+  background: var(--bg-subtle);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.dashboard-v2-breakdown-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 999px;
+}
+
+.dashboard-v2-breakdown-value {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 3.5rem;
+  text-align: right;
+}
+
+/* Skeleton */
+
+.dashboard-v2-skeleton {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.dashboard-v2-skeleton-greeting {
+  height: 1.6rem;
+  width: 200px;
+  border-radius: var(--radius-default);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.dashboard-v2-hero-skeleton {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-v2-hero-skeleton-card {
+  height: 130px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.dashboard-v2-chart-skeleton {
+  height: 340px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+.dashboard-v2-panels-skeleton {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-v2-panel-skeleton {
+  height: 200px;
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background-size: 240% 100%;
+  animation: skeleton-wave 1.4s ease-in-out infinite;
+}
+
+/* Responsive: Dashboard v2 */
+
+@media (max-width: 1024px) {
+  .dashboard-v2-hero-grid,
+  .dashboard-v2-hero-skeleton {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-metric-value {
+    font-size: 32px;
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-v2-hero-grid,
+  .dashboard-v2-hero-skeleton {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-v2-two-column,
+  .dashboard-v2-panels-skeleton {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-metric-value {
+    font-size: 36px;
+  }
+}
+
+@media (max-width: 640px) {
+  .onboarding-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .onboarding-template-editor-grid {
+    grid-template-columns: 1fr;
   }
 }

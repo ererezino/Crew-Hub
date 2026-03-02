@@ -37,6 +37,7 @@ export default async function OnboardingPage() {
     <OnboardingClient
       instanceScope={canViewAll ? "all" : "reports"}
       canViewTemplates={canViewAll}
+      canManageOnboarding={canViewAll}
     />
   );
 }
