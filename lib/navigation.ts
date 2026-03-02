@@ -81,6 +81,30 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G H"
       },
       {
+        label: "Scheduling",
+        href: "/scheduling",
+        description: "View upcoming shifts and weekly schedule assignments.",
+        shortcut: "G 1"
+      },
+      {
+        label: "Schedule Manage",
+        href: "/scheduling/manage",
+        description: "Create schedules, assign shifts, and publish to employees.",
+        shortcut: "G 2"
+      },
+      {
+        label: "Open Shifts",
+        href: "/scheduling/open-shifts",
+        description: "Browse and claim open shifts available to your team.",
+        shortcut: "G 3"
+      },
+      {
+        label: "Shift Swaps",
+        href: "/scheduling/swaps",
+        description: "Request and resolve shift swap requests.",
+        shortcut: "G 4"
+      },
+      {
         label: "Attendance Approvals",
         href: "/time-attendance/approvals",
         description: "Review submitted timesheets from direct reports.",
@@ -267,6 +291,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/admin/time-policies",
         description: "Review attendance rules for overtime, breaks, and rounding.",
         shortcut: "A T"
+      },
+      {
+        label: "Scheduling Templates",
+        href: "/admin/scheduling/templates",
+        description: "Manage reusable shift templates for schedule planning.",
+        shortcut: "A M"
       },
       {
         label: "Admin Users",

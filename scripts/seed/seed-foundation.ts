@@ -500,6 +500,56 @@ type SeedTimesheet = {
   rejectionReason: string | null;
 };
 
+type SeedShiftTemplate = {
+  key: string;
+  name: string;
+  department: SeedMember["department"] | null;
+  startTime: string;
+  endTime: string;
+  breakMinutes: number;
+  color: string | null;
+};
+
+type SeedScheduleStatus = "draft" | "published" | "locked";
+
+type SeedSchedule = {
+  key: string;
+  name: string;
+  department: SeedMember["department"] | null;
+  weekOffset: number;
+  status: SeedScheduleStatus;
+  publishedByKey: SeedMember["key"] | null;
+  publishedOffsetHours: number | null;
+};
+
+type SeedShiftStatus = "scheduled" | "swap_requested" | "swapped" | "cancelled";
+
+type SeedShift = {
+  key: string;
+  scheduleKey: SeedSchedule["key"];
+  templateKey: SeedShiftTemplate["key"] | null;
+  employeeKey: SeedMember["key"] | null;
+  dayOffset: number;
+  startTime: string;
+  durationMinutes: number;
+  breakMinutes: number;
+  status: SeedShiftStatus;
+  notes: string | null;
+  color: string | null;
+};
+
+type SeedShiftSwapStatus = "pending" | "accepted" | "rejected" | "cancelled";
+
+type SeedShiftSwap = {
+  shiftKey: SeedShift["key"];
+  requesterKey: SeedMember["key"];
+  targetKey: SeedMember["key"] | null;
+  reason: string | null;
+  status: SeedShiftSwapStatus;
+  approvedByKey: SeedMember["key"] | null;
+  approvedOffsetHours: number | null;
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -1561,6 +1611,176 @@ const SEED_TIMESHEETS: SeedTimesheet[] = [
     approvedByKey: "ops_manager",
     approvedOffsetHours: -108,
     rejectionReason: "Missing supporting notes on two manual edits."
+  }
+];
+
+const SEED_SHIFT_TEMPLATES: SeedShiftTemplate[] = [
+  {
+    key: "engineering-day",
+    name: "Engineering Day Shift",
+    department: "Engineering",
+    startTime: "09:00",
+    endTime: "17:00",
+    breakMinutes: 60,
+    color: "#4A0039"
+  },
+  {
+    key: "operations-early",
+    name: "Operations Early Shift",
+    department: "Operations",
+    startTime: "08:00",
+    endTime: "16:00",
+    breakMinutes: 45,
+    color: "#5C1049"
+  }
+];
+
+const SEED_SCHEDULES: SeedSchedule[] = [
+  {
+    key: "engineering-current-week",
+    name: "Engineering Current Week",
+    department: "Engineering",
+    weekOffset: 0,
+    status: "published",
+    publishedByKey: "eng_manager",
+    publishedOffsetHours: -8
+  },
+  {
+    key: "operations-current-week",
+    name: "Operations Current Week",
+    department: "Operations",
+    weekOffset: 0,
+    status: "draft",
+    publishedByKey: null,
+    publishedOffsetHours: null
+  },
+  {
+    key: "engineering-next-week",
+    name: "Engineering Next Week",
+    department: "Engineering",
+    weekOffset: 1,
+    status: "draft",
+    publishedByKey: null,
+    publishedOffsetHours: null
+  }
+];
+
+const SEED_SCHEDULE_SHIFTS: SeedShift[] = [
+  {
+    key: "eng-week-mon-engineer1",
+    scheduleKey: "engineering-current-week",
+    templateKey: "engineering-day",
+    employeeKey: "engineer_1",
+    dayOffset: 0,
+    startTime: "09:00",
+    durationMinutes: 480,
+    breakMinutes: 60,
+    status: "scheduled",
+    notes: "Sprint execution and code reviews.",
+    color: "#4A0039"
+  },
+  {
+    key: "eng-week-mon-engineer2",
+    scheduleKey: "engineering-current-week",
+    templateKey: "engineering-day",
+    employeeKey: "engineer_2",
+    dayOffset: 0,
+    startTime: "10:00",
+    durationMinutes: 480,
+    breakMinutes: 60,
+    status: "scheduled",
+    notes: "Integration and release support.",
+    color: "#4A0039"
+  },
+  {
+    key: "eng-week-tue-open",
+    scheduleKey: "engineering-current-week",
+    templateKey: "engineering-day",
+    employeeKey: null,
+    dayOffset: 1,
+    startTime: "09:00",
+    durationMinutes: 480,
+    breakMinutes: 60,
+    status: "scheduled",
+    notes: "Open shift for QA pairing.",
+    color: "#4A0039"
+  },
+  {
+    key: "eng-week-wed-swap-requested",
+    scheduleKey: "engineering-current-week",
+    templateKey: "engineering-day",
+    employeeKey: "engineer_1",
+    dayOffset: 2,
+    startTime: "09:00",
+    durationMinutes: 480,
+    breakMinutes: 60,
+    status: "swap_requested",
+    notes: "Requires swap due to client workshop.",
+    color: "#5C1049"
+  },
+  {
+    key: "ops-week-thu-associate",
+    scheduleKey: "operations-current-week",
+    templateKey: "operations-early",
+    employeeKey: "ops_associate",
+    dayOffset: 3,
+    startTime: "08:00",
+    durationMinutes: 480,
+    breakMinutes: 45,
+    status: "scheduled",
+    notes: "Onboarding and support queue.",
+    color: "#5C1049"
+  },
+  {
+    key: "ops-week-fri-open",
+    scheduleKey: "operations-current-week",
+    templateKey: "operations-early",
+    employeeKey: null,
+    dayOffset: 4,
+    startTime: "08:00",
+    durationMinutes: 480,
+    breakMinutes: 45,
+    status: "scheduled",
+    notes: "Open shift for operations coverage.",
+    color: "#5C1049"
+  },
+  {
+    key: "eng-next-mon-engineer3",
+    scheduleKey: "engineering-next-week",
+    templateKey: "engineering-day",
+    employeeKey: "engineer_3",
+    dayOffset: 0,
+    startTime: "09:00",
+    durationMinutes: 480,
+    breakMinutes: 60,
+    status: "scheduled",
+    notes: "Platform migration implementation.",
+    color: "#4A0039"
+  },
+  {
+    key: "ops-week-fri-compliance-cancelled",
+    scheduleKey: "operations-current-week",
+    templateKey: "operations-early",
+    employeeKey: "compliance_officer",
+    dayOffset: 4,
+    startTime: "09:00",
+    durationMinutes: 420,
+    breakMinutes: 30,
+    status: "cancelled",
+    notes: "Cancelled due to regional holiday activity.",
+    color: "#5C1049"
+  }
+];
+
+const SEED_SHIFT_SWAPS: SeedShiftSwap[] = [
+  {
+    shiftKey: "eng-week-wed-swap-requested",
+    requesterKey: "engineer_1",
+    targetKey: "engineer_2",
+    reason: "Client workshop overlaps with shift coverage.",
+    status: "pending",
+    approvedByKey: null,
+    approvedOffsetHours: null
   }
 ];
 
@@ -2798,6 +3018,16 @@ function endOfWeekFromStart(weekStartDate: string): string {
   const parsedDate = new Date(`${weekStartDate}T00:00:00.000Z`);
   parsedDate.setUTCDate(parsedDate.getUTCDate() + 6);
   return parsedDate.toISOString().slice(0, 10);
+}
+
+function dateFromWeekStartAndOffset(weekStartDate: string, dayOffset: number): string {
+  const parsedDate = new Date(`${weekStartDate}T00:00:00.000Z`);
+  parsedDate.setUTCDate(parsedDate.getUTCDate() + dayOffset);
+  return parsedDate.toISOString().slice(0, 10);
+}
+
+function timestampFromDateAndTime(isoDate: string, isoTime: string): string {
+  return `${isoDate}T${isoTime}:00.000Z`;
 }
 
 function timestampWithOffsetDays(offsetDays: number): string {
@@ -4085,6 +4315,293 @@ async function upsertSeedTimeAttendance(
   }
 }
 
+async function upsertSeedScheduling(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  const templateIdByKey = new Map<string, string>();
+
+  for (const template of SEED_SHIFT_TEMPLATES) {
+    const { data: existingRow, error: existingError } = await client
+      .from("shift_templates")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("name", template.name)
+      .eq("start_time", `${template.startTime}:00`)
+      .eq("end_time", `${template.endTime}:00`)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(`Unable to query shift template seed data: ${existingError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      name: template.name,
+      department: template.department,
+      start_time: `${template.startTime}:00`,
+      end_time: `${template.endTime}:00`,
+      break_minutes: template.breakMinutes,
+      color: template.color,
+      deleted_at: null as string | null
+    };
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("shift_templates")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update shift template seed data: ${updateError.message}`);
+      }
+
+      templateIdByKey.set(template.key, existingRow.id);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("shift_templates")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(
+          `Unable to insert shift template seed data: ${insertError?.message ?? "unknown error"}`
+        );
+      }
+
+      templateIdByKey.set(template.key, insertedRow.id);
+    }
+  }
+
+  const scheduleIdByKey = new Map<string, string>();
+  const scheduleWeekStartByKey = new Map<string, string>();
+
+  for (const schedule of SEED_SCHEDULES) {
+    const weekStart = startOfWeekWithOffset(schedule.weekOffset);
+    const weekEnd = endOfWeekFromStart(weekStart);
+    const publishedById = schedule.publishedByKey
+      ? userIdByKey.get(schedule.publishedByKey) ?? null
+      : null;
+
+    if (schedule.publishedByKey && !publishedById) {
+      throw new Error(`Missing publisher id for schedule seed (${schedule.publishedByKey})`);
+    }
+
+    const { data: existingRow, error: existingError } = await client
+      .from("schedules")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("name", schedule.name)
+      .eq("week_start", weekStart)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(`Unable to query schedule seed data: ${existingError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      name: schedule.name,
+      department: schedule.department,
+      week_start: weekStart,
+      week_end: weekEnd,
+      status: schedule.status,
+      published_at:
+        schedule.status === "published" && schedule.publishedOffsetHours !== null
+          ? timestampWithOffsetHours(schedule.publishedOffsetHours)
+          : null,
+      published_by: schedule.status === "published" ? publishedById : null,
+      deleted_at: null as string | null
+    };
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("schedules")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update schedule seed data: ${updateError.message}`);
+      }
+
+      scheduleIdByKey.set(schedule.key, existingRow.id);
+      scheduleWeekStartByKey.set(schedule.key, weekStart);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("schedules")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(
+          `Unable to insert schedule seed data: ${insertError?.message ?? "unknown error"}`
+        );
+      }
+
+      scheduleIdByKey.set(schedule.key, insertedRow.id);
+      scheduleWeekStartByKey.set(schedule.key, weekStart);
+    }
+  }
+
+  const shiftIdByKey = new Map<string, string>();
+
+  for (const shift of SEED_SCHEDULE_SHIFTS) {
+    const scheduleId = scheduleIdByKey.get(shift.scheduleKey);
+    const weekStart = scheduleWeekStartByKey.get(shift.scheduleKey);
+    const templateId = shift.templateKey ? templateIdByKey.get(shift.templateKey) ?? null : null;
+    const employeeId = shift.employeeKey ? userIdByKey.get(shift.employeeKey) ?? null : null;
+
+    if (!scheduleId || !weekStart) {
+      throw new Error(`Missing schedule id for shift seed (${shift.scheduleKey})`);
+    }
+
+    if (shift.templateKey && !templateId) {
+      throw new Error(`Missing template id for shift seed (${shift.templateKey})`);
+    }
+
+    if (shift.employeeKey && !employeeId) {
+      throw new Error(`Missing employee id for shift seed (${shift.employeeKey})`);
+    }
+
+    const shiftDate = dateFromWeekStartAndOffset(weekStart, shift.dayOffset);
+    const startTime = timestampFromDateAndTime(shiftDate, shift.startTime);
+    const endTime = new Date(Date.parse(startTime) + shift.durationMinutes * 60_000).toISOString();
+
+    const { data: existingRow, error: existingError } = await client
+      .from("shifts")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("schedule_id", scheduleId)
+      .eq("shift_date", shiftDate)
+      .eq("start_time", startTime)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(`Unable to query schedule shift seed data: ${existingError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      schedule_id: scheduleId,
+      template_id: templateId,
+      employee_id: employeeId,
+      shift_date: shiftDate,
+      start_time: startTime,
+      end_time: endTime,
+      break_minutes: shift.breakMinutes,
+      status: shift.status,
+      notes: shift.notes,
+      color: shift.color,
+      deleted_at: null as string | null
+    };
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("shifts")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update schedule shift seed data: ${updateError.message}`);
+      }
+
+      shiftIdByKey.set(shift.key, existingRow.id);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("shifts")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(
+          `Unable to insert schedule shift seed data: ${insertError?.message ?? "unknown error"}`
+        );
+      }
+
+      shiftIdByKey.set(shift.key, insertedRow.id);
+    }
+  }
+
+  for (const swap of SEED_SHIFT_SWAPS) {
+    const shiftId = shiftIdByKey.get(swap.shiftKey);
+    const requesterId = userIdByKey.get(swap.requesterKey);
+    const targetId = swap.targetKey ? userIdByKey.get(swap.targetKey) ?? null : null;
+    const approvedById = swap.approvedByKey ? userIdByKey.get(swap.approvedByKey) ?? null : null;
+
+    if (!shiftId) {
+      throw new Error(`Missing shift id for shift swap seed (${swap.shiftKey})`);
+    }
+
+    if (!requesterId) {
+      throw new Error(`Missing requester id for shift swap seed (${swap.requesterKey})`);
+    }
+
+    if (swap.targetKey && !targetId) {
+      throw new Error(`Missing target id for shift swap seed (${swap.targetKey})`);
+    }
+
+    if (swap.approvedByKey && !approvedById) {
+      throw new Error(`Missing approver id for shift swap seed (${swap.approvedByKey})`);
+    }
+
+    const { data: existingRow, error: existingError } = await client
+      .from("shift_swaps")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("shift_id", shiftId)
+      .eq("requester_id", requesterId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingError) {
+      throw new Error(`Unable to query shift swap seed data: ${existingError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      shift_id: shiftId,
+      requester_id: requesterId,
+      target_id: targetId,
+      reason: swap.reason,
+      status: swap.status,
+      approved_by: approvedById,
+      approved_at:
+        approvedById && swap.approvedOffsetHours !== null
+          ? timestampWithOffsetHours(swap.approvedOffsetHours)
+          : null,
+      deleted_at: null as string | null
+    };
+
+    if (existingRow?.id) {
+      const { error: updateError } = await client
+        .from("shift_swaps")
+        .update(payload)
+        .eq("id", existingRow.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update shift swap seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("shift_swaps").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert shift swap seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 async function upsertSeedPaymentDetails(
   client: SupabaseClient,
   orgId: string,
@@ -5166,6 +5683,7 @@ async function main() {
   await upsertSeedCompensation(client, org.id, userIdByKey);
   await upsertSeedCompensationBands(client, org.id, userIdByKey);
   await upsertSeedTimeAttendance(client, org.id, userIdByKey);
+  await upsertSeedScheduling(client, org.id, userIdByKey);
   await upsertSeedDeductionRules(client, org.id);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
   await upsertSeedPerformance(client, org.id, userIdByKey);
@@ -5193,6 +5711,10 @@ async function main() {
   console.log(`Time policies upserted: ${SEED_TIME_POLICIES.length}`);
   console.log(`Time entries upserted: ${SEED_TIME_ENTRIES.length}`);
   console.log(`Timesheets upserted: ${SEED_TIMESHEETS.length}`);
+  console.log(`Shift templates upserted: ${SEED_SHIFT_TEMPLATES.length}`);
+  console.log(`Schedules upserted: ${SEED_SCHEDULES.length}`);
+  console.log(`Shifts upserted: ${SEED_SCHEDULE_SHIFTS.length}`);
+  console.log(`Shift swaps upserted: ${SEED_SHIFT_SWAPS.length}`);
   console.log(`Nigeria deduction rules upserted: ${SEED_NIGERIA_DEDUCTION_RULES.length}`);
   console.log(`Payment details upserted: ${SEED_PAYMENT_DETAILS.length}`);
   console.log(`Performance cycles upserted: ${SEED_REVIEW_CYCLES.length}`);

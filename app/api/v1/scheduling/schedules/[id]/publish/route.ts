@@ -1,0 +1,259 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
+import { logAudit } from "../../../../../../../lib/audit";
+import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
+import { isSchedulingManager } from "../../../../../../../lib/scheduling";
+import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
+import type { ApiResponse } from "../../../../../../../types/auth";
+import {
+  SCHEDULE_STATUSES,
+  type SchedulingScheduleMutationResponseData
+} from "../../../../../../../types/scheduling";
+
+const scheduleRowSchema = z.object({
+  id: z.string().uuid(),
+  org_id: z.string().uuid(),
+  name: z.string().nullable(),
+  department: z.string().nullable(),
+  week_start: z.string(),
+  week_end: z.string(),
+  status: z.enum(SCHEDULE_STATUSES),
+  published_at: z.string().nullable(),
+  published_by: z.string().uuid().nullable(),
+  created_at: z.string(),
+  updated_at: z.string()
+});
+
+function buildMeta() {
+  return { timestamp: new Date().toISOString() };
+}
+
+function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
+  return NextResponse.json(payload, { status });
+}
+
+export async function POST(
+  _request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be logged in to publish schedules."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!isSchedulingManager(session.profile.roles)) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only managers and admins can publish schedules."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const params = await context.params;
+  const scheduleId = params.id;
+
+  if (!z.string().uuid().safeParse(scheduleId).success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Schedule id must be a valid UUID."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: rawExistingSchedule, error: existingScheduleError } = await supabase
+    .from("schedules")
+    .select(
+      "id, org_id, name, department, week_start, week_end, status, published_at, published_by, created_at, updated_at"
+    )
+    .eq("id", scheduleId)
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existingScheduleError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SCHEDULE_FETCH_FAILED",
+        message: "Unable to load schedule."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!rawExistingSchedule) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: {
+        code: "SCHEDULE_NOT_FOUND",
+        message: "Schedule was not found."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedExistingSchedule = scheduleRowSchema.safeParse(rawExistingSchedule);
+
+  if (!parsedExistingSchedule.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SCHEDULE_PARSE_FAILED",
+        message: "Schedule data is not in the expected shape."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (parsedExistingSchedule.data.status === "locked") {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "SCHEDULE_LOCKED",
+        message: "Locked schedules cannot be republished."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const { data: rawShiftRows, error: shiftsError } = await supabase
+    .from("shifts")
+    .select("id, employee_id")
+    .eq("org_id", session.profile.org_id)
+    .eq("schedule_id", scheduleId)
+    .is("deleted_at", null);
+
+  if (shiftsError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SCHEDULE_SHIFTS_FETCH_FAILED",
+        message: "Unable to load schedule shifts."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if ((rawShiftRows ?? []).length === 0) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "SCHEDULE_HAS_NO_SHIFTS",
+        message: "Add at least one shift before publishing."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const { data: rawPublishedSchedule, error: publishError } = await supabase
+    .from("schedules")
+    .update({
+      status: "published",
+      published_at: new Date().toISOString(),
+      published_by: session.profile.id
+    })
+    .eq("id", scheduleId)
+    .eq("org_id", session.profile.org_id)
+    .select(
+      "id, org_id, name, department, week_start, week_end, status, published_at, published_by, created_at, updated_at"
+    )
+    .single();
+
+  if (publishError || !rawPublishedSchedule) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SCHEDULE_PUBLISH_FAILED",
+        message: "Unable to publish schedule."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedPublishedSchedule = scheduleRowSchema.safeParse(rawPublishedSchedule);
+
+  if (!parsedPublishedSchedule.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SCHEDULE_PUBLISHED_PARSE_FAILED",
+        message: "Published schedule data is not in the expected shape."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const assignedUserIds = [
+    ...new Set(
+      (rawShiftRows ?? [])
+        .map((row) => (typeof row.employee_id === "string" ? row.employee_id : null))
+        .filter((value): value is string => Boolean(value))
+    )
+  ];
+
+  void createBulkNotifications({
+    orgId: session.profile.org_id,
+    userIds: assignedUserIds,
+    type: "schedule_published",
+    title: "New schedule published",
+    body: `${parsedPublishedSchedule.data.name ?? "Weekly schedule"} has been published.`,
+    link: "/scheduling"
+  });
+
+  void logAudit({
+    action: "updated",
+    tableName: "schedules",
+    recordId: scheduleId,
+    oldValue: {
+      status: parsedExistingSchedule.data.status
+    },
+    newValue: {
+      status: parsedPublishedSchedule.data.status
+    }
+  });
+
+  const publisherName =
+    parsedPublishedSchedule.data.published_by === session.profile.id
+      ? session.profile.full_name
+      : null;
+
+  return jsonResponse<SchedulingScheduleMutationResponseData>(200, {
+    data: {
+      schedule: {
+        id: parsedPublishedSchedule.data.id,
+        orgId: parsedPublishedSchedule.data.org_id,
+        name: parsedPublishedSchedule.data.name,
+        department: parsedPublishedSchedule.data.department,
+        weekStart: parsedPublishedSchedule.data.week_start,
+        weekEnd: parsedPublishedSchedule.data.week_end,
+        status: parsedPublishedSchedule.data.status,
+        publishedAt: parsedPublishedSchedule.data.published_at,
+        publishedBy: parsedPublishedSchedule.data.published_by,
+        publishedByName: publisherName,
+        createdAt: parsedPublishedSchedule.data.created_at,
+        updatedAt: parsedPublishedSchedule.data.updated_at,
+        shiftCount: rawShiftRows?.length ?? 0
+      }
+    },
+    error: null,
+    meta: buildMeta()
+  });
+}
