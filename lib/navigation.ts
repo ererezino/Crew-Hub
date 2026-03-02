@@ -233,6 +233,12 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "A C"
       },
       {
+        label: "Compensation Bands",
+        href: "/admin/compensation-bands",
+        description: "Define salary bands, benchmark market ranges, and review out-of-band alerts.",
+        shortcut: "A B"
+      },
+      {
         label: "Performance Admin",
         href: "/performance/admin",
         description: "Create review cycles, assign reviewers, and track completion.",

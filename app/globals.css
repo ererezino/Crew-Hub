@@ -1762,6 +1762,23 @@ html.dark .topbar {
   pointer-events: auto;
 }
 
+.comp-bands-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  opacity: 0;
+  transform: translateY(2px);
+  pointer-events: none;
+  transition: opacity var(--transition-hover), transform var(--transition-hover);
+}
+
+.data-table-row:hover .comp-bands-row-actions,
+.data-table-row:focus-within .comp-bands-row-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 .compensation-allowance-details {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-default);
@@ -4606,6 +4623,13 @@ html.dark .topbar {
   }
 
   .compensation-row-actions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    flex-wrap: wrap;
+  }
+
+  .comp-bands-row-actions {
     opacity: 1;
     transform: none;
     pointer-events: auto;
