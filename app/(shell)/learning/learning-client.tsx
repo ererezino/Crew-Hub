@@ -59,7 +59,7 @@ function completionPercent(rows: readonly LearningAssignmentRecord[]): number {
   return Number(((completedCount / rows.length) * 100).toFixed(1));
 }
 
-export function LearningClient() {
+export function LearningClient({ embedded = false }: { embedded?: boolean }) {
   const assignmentsQuery = useLearningMyAssignments();
   const coursesQuery = useLearningCourses();
 
@@ -91,10 +91,12 @@ export function LearningClient() {
 
   return (
     <>
-      <PageHeader
-        title="Learning"
-        description="Track assigned training, complete courses, and access certificates."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Learning"
+          description="Track assigned training, complete courses, and access certificates."
+        />
+      ) : null}
 
       {isLoading ? learningSkeleton() : null}
 
@@ -152,7 +154,7 @@ export function LearningClient() {
               </p>
             </div>
             <div className="documents-row-actions">
-              <Link href="/learning/certificates" className="button">
+              <Link href="/learning?tab=certificates" className="button">
                 Certificates
               </Link>
               <Link href="/admin/learning" className="button">
@@ -230,7 +232,7 @@ export function LearningClient() {
                               Open
                             </Link>
                             {assignment.status === "completed" ? (
-                              <Link href="/learning/certificates" className="table-row-action">
+                              <Link href="/learning?tab=certificates" className="table-row-action">
                                 Certificate
                               </Link>
                             ) : null}

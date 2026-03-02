@@ -57,6 +57,7 @@ const SCHEDULING_ROLES: readonly UserRole[] = [
   "EMPLOYEE",
   "MANAGER",
   "TEAM_LEAD",
+  "FINANCE_ADMIN",
   "HR_ADMIN",
   "SUPER_ADMIN"
 ];
@@ -66,32 +67,35 @@ const SCHEDULING_MANAGE_ROLES: readonly UserRole[] = [
   "HR_ADMIN",
   "SUPER_ADMIN"
 ];
-const ATTENDANCE_APPROVAL_ROLES: readonly UserRole[] = [
+const APPROVAL_ROLES: readonly UserRole[] = [
   "MANAGER",
   "TEAM_LEAD",
   "HR_ADMIN",
   "FINANCE_ADMIN",
   "SUPER_ADMIN"
 ];
+const MANAGE_GROUP_ROLES: readonly UserRole[] = [
+  "MANAGER",
+  "TEAM_LEAD",
+  "HR_ADMIN",
+  "SUPER_ADMIN"
+];
+const INSIGHTS_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"];
 
 const DEFAULT_NAV_ROLE_OVERRIDES: Readonly<Record<string, readonly UserRole[]>> = {
-  "/analytics": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/compliance": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/payroll": ["FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/payroll/settings/deductions": ["FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/payroll/runs/new": ["FINANCE_ADMIN", "SUPER_ADMIN"],
+  "/approvals": APPROVAL_ROLES,
+  "/people": MANAGE_GROUP_ROLES,
+  "/scheduling/manage": SCHEDULING_MANAGE_ROLES,
+  "/onboarding": MANAGE_GROUP_ROLES,
+  "/analytics": INSIGHTS_ROLES,
+  "/compliance": INSIGHTS_ROLES,
+  "/admin/users": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
   "/admin/compensation": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/admin/compensation-bands": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/performance/admin": ["HR_ADMIN", "SUPER_ADMIN"],
-  "/admin/time-policies": ["HR_ADMIN", "SUPER_ADMIN"],
+  "/payroll": ["FINANCE_ADMIN", "SUPER_ADMIN"],
+  "/admin/payment-details": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
   "/admin/access-control": ["SUPER_ADMIN"],
   "/scheduling": SCHEDULING_ROLES,
-  "/scheduling/open-shifts": SCHEDULING_ROLES,
-  "/scheduling/swaps": SCHEDULING_ROLES,
-  "/scheduling/manage": SCHEDULING_MANAGE_ROLES,
-  "/admin/scheduling/templates": SCHEDULING_MANAGE_ROLES,
-  "/time-attendance": SCHEDULING_ROLES,
-  "/time-attendance/approvals": ATTENDANCE_APPROVAL_ROLES
+  "/time-attendance": SCHEDULING_ROLES
 };
 
 const DEFAULT_WIDGET_ROLE_OVERRIDES: Readonly<

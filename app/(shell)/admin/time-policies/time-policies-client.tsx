@@ -21,7 +21,7 @@ function policiesSkeleton() {
   );
 }
 
-export function TimePoliciesClient() {
+export function TimePoliciesClient({ embedded = false }: { embedded?: boolean }) {
   const policiesQuery = useTimeAttendancePolicies();
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -36,10 +36,12 @@ export function TimePoliciesClient() {
 
   return (
     <>
-      <PageHeader
-        title="Time Policies"
-        description="Review attendance rules for overtime thresholds, breaks, and rounding behavior."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Time Policies"
+          description="Review attendance rules for overtime thresholds, breaks, and rounding behavior."
+        />
+      ) : null}
 
       {policiesQuery.isLoading ? policiesSkeleton() : null}
 
@@ -65,7 +67,7 @@ export function TimePoliciesClient() {
         <EmptyState
           title="No policies configured"
           description="Create an attendance policy to enforce breaks and overtime rules."
-          ctaLabel="Open Time & Attendance"
+          ctaLabel="Open Hours"
           ctaHref="/time-attendance"
         />
       ) : null}

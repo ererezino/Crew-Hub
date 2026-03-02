@@ -26,349 +26,206 @@ export function normalizeUserRoles(
 export type NavItem = {
   label: string;
   href: string;
+  icon: string;
   description: string;
   shortcut: string;
 };
 
 export type NavGroup = {
   label: string;
+  description?: string;
+  requiredRoles?: UserRole[];
   adminOnly?: boolean;
   items: NavItem[];
 };
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Core",
+    label: "",
     items: [
       {
         label: "Dashboard",
         href: "/dashboard",
+        icon: "LayoutDashboard",
         description: "Operations overview and quick health metrics.",
         shortcut: "G D"
-      }
-    ]
-  },
-  {
-    label: "People Ops",
-    items: [
-      {
-        label: "People",
-        href: "/people",
-        description: "Directory, lifecycle, and people records.",
-        shortcut: "G P"
       },
       {
-        label: "Onboarding",
-        href: "/onboarding",
-        description: "Task checklists and onboarding progress.",
-        shortcut: "G O"
-      },
-      {
-        label: "My Onboarding",
-        href: "/me/onboarding",
-        description: "Personal onboarding tasks and progress tracking.",
-        shortcut: "G I"
-      },
-      {
-        label: "Time Off",
-        href: "/time-off",
-        description: "Requests, balances, and approval queues.",
-        shortcut: "G T"
-      },
-      {
-        label: "Time & Attendance",
-        href: "/time-attendance",
-        description: "Track clock-ins, worked hours, and weekly attendance totals.",
-        shortcut: "G H"
-      },
-      {
-        label: "Scheduling",
-        href: "/scheduling",
-        description: "View upcoming shifts and weekly schedule assignments.",
-        shortcut: "G 1"
-      },
-      {
-        label: "Schedule Manage",
-        href: "/scheduling/manage",
-        description: "Create schedules, assign shifts, and publish to employees.",
-        shortcut: "G 2"
-      },
-      {
-        label: "Shift Templates",
-        href: "/admin/scheduling/templates",
-        description: "Manage reusable shift templates for schedule planning.",
-        shortcut: "G 8"
-      },
-      {
-        label: "Open Shifts",
-        href: "/scheduling/open-shifts",
-        description: "Browse and claim open shifts available to your team.",
-        shortcut: "G 3"
-      },
-      {
-        label: "Shift Swaps",
-        href: "/scheduling/swaps",
-        description: "Request and resolve shift swap requests.",
-        shortcut: "G 4"
-      },
-      {
-        label: "Learning",
-        href: "/learning",
-        description: "Track assigned courses, progress, and completion.",
-        shortcut: "G 5"
-      },
-      {
-        label: "Learning Certificates",
-        href: "/learning/certificates",
-        description: "View and download course completion certificates.",
-        shortcut: "G 6"
-      },
-      {
-        label: "Surveys",
-        href: "/surveys",
-        description: "Respond to pulse and engagement surveys assigned to you.",
-        shortcut: "G 7"
-      },
-      {
-        label: "Attendance Approvals",
-        href: "/time-attendance/approvals",
-        description: "Review submitted timesheets from direct reports.",
-        shortcut: "G W"
-      },
-      {
-        label: "Time Off Approvals",
-        href: "/time-off/approvals",
-        description: "Approve or reject pending leave requests.",
-        shortcut: "G V"
-      },
-      {
-        label: "Time Off Calendar",
-        href: "/time-off/calendar",
-        description: "Monthly team leave calendar with filters.",
-        shortcut: "G K"
-      },
-      {
-        label: "Documents",
-        href: "/documents",
-        description: "Contracts, policies, and signed files.",
-        shortcut: "G C"
-      },
-      {
-        label: "Signatures",
-        href: "/signatures",
-        description: "Send and sign document requests with status tracking.",
-        shortcut: "G F"
-      },
-      {
-        label: "My Documents",
-        href: "/me/documents",
-        description: "Personal ID and tax forms for self-service.",
-        shortcut: "G M"
-      },
-      {
-        label: "My Compensation",
-        href: "/me/compensation",
-        description: "Salary, allowances, equity, and compensation history.",
-        shortcut: "G B"
-      },
-      {
-        label: "Payments",
-        href: "/me/payslips",
-        description: "View and download monthly payment statements.",
-        shortcut: "G J"
-      },
-      {
-        label: "My Payment Details",
-        href: "/me/payment-details",
-        description: "Manage payout method details with masked destination view.",
-        shortcut: "G W"
-      }
-    ]
-  },
-  {
-    label: "Finance",
-    items: [
-      {
-        label: "Payroll",
-        href: "/payroll",
-        description: "Run preparation and payout tracking.",
-        shortcut: "G Y"
-      },
-      {
-        label: "Payroll Settings",
-        href: "/payroll/settings/deductions",
-        description: "View country-by-country tax withholding rollout status.",
-        shortcut: "G Q"
-      },
-      {
-        label: "New Payroll Run",
-        href: "/payroll/runs/new",
-        description: "Create a payroll run for the current pay period.",
-        shortcut: "G U"
-      },
-      {
-        label: "Expenses",
-        href: "/expenses",
-        description: "Claims, approvals, and reimbursements.",
-        shortcut: "G E"
-      },
-      {
-        label: "Expense Approvals",
-        href: "/expenses/approvals",
-        description: "Review and approve pending expense submissions.",
-        shortcut: "G X"
-      },
-      {
-        label: "Expense Reports",
-        href: "/expenses/reports",
-        description: "View monthly expense analytics and export CSV.",
-        shortcut: "G Z"
-      }
-    ]
-  },
-  {
-    label: "Performance & Risk",
-    items: [
-      {
-        label: "Performance",
-        href: "/performance",
-        description: "Review cycles, goals, and feedback.",
-        shortcut: "G R"
-      },
-      {
-        label: "Compliance",
-        href: "/compliance",
-        description: "Policy tracking and due-date monitoring.",
-        shortcut: "G M"
-      },
-      {
-        label: "Analytics",
-        href: "/analytics",
-        description: "Workforce insights and trend reporting.",
+        label: "Announcements",
+        href: "/announcements",
+        icon: "Megaphone",
+        description: "Internal notices and company updates.",
         shortcut: "G A"
       }
     ]
   },
   {
-    label: "Comms",
+    label: "My Stuff",
     items: [
       {
-        label: "Announcements",
-        href: "/announcements",
-        description: "Internal notices and company updates.",
-        shortcut: "G N"
+        label: "Time Off",
+        href: "/time-off",
+        icon: "CalendarOff",
+        description: "Requests, balances, and leave calendar.",
+        shortcut: "G T"
+      },
+      {
+        label: "Expenses",
+        href: "/expenses",
+        icon: "Receipt",
+        description: "Claims, approvals, and reimbursements.",
+        shortcut: "G E"
+      },
+      {
+        label: "Schedule",
+        href: "/scheduling",
+        icon: "CalendarClock",
+        description: "My shifts, open shifts, and swap requests.",
+        shortcut: "G S"
+      },
+      {
+        label: "Hours",
+        href: "/time-attendance",
+        icon: "Clock",
+        description: "Track clock-ins, worked hours, and weekly attendance totals.",
+        shortcut: "G H"
+      },
+      {
+        label: "Documents",
+        href: "/documents",
+        icon: "FileText",
+        description: "Contracts, policies, and signed files.",
+        shortcut: "G C"
+      },
+      {
+        label: "Pay",
+        href: "/me/pay",
+        icon: "Wallet",
+        description: "Payslips, payment details, and compensation in one place.",
+        shortcut: "G Y"
+      },
+      {
+        label: "Learning",
+        href: "/learning",
+        icon: "GraduationCap",
+        description: "Courses, certificates, and surveys.",
+        shortcut: "G L"
+      },
+      {
+        label: "Reviews",
+        href: "/performance",
+        icon: "Star",
+        description: "Review cycles, goals, and feedback.",
+        shortcut: "G R"
       }
     ]
   },
   {
-    label: "System",
+    label: "Approvals",
+    description: "Review team requests",
+    requiredRoles: ["MANAGER", "TEAM_LEAD", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
     items: [
       {
-        label: "Settings",
-        href: "/settings",
-        description: "Workspace preferences and controls.",
-        shortcut: "G S"
+        label: "Approvals",
+        href: "/approvals",
+        icon: "CheckCircle",
+        description: "Unified approvals for time off, expenses, and timesheets.",
+        shortcut: "G V"
+      }
+    ]
+  },
+  {
+    label: "Manage",
+    requiredRoles: ["MANAGER", "TEAM_LEAD", "HR_ADMIN", "SUPER_ADMIN"],
+    items: [
+      {
+        label: "People",
+        href: "/people",
+        icon: "Users",
+        description: "Directory, lifecycle, and people records.",
+        shortcut: "G P"
       },
       {
-        label: "Notifications",
-        href: "/notifications",
-        description: "Inbox for workflow and approval updates.",
-        shortcut: "G H"
+        label: "Scheduling",
+        href: "/scheduling/manage",
+        icon: "Calendar",
+        description: "Create schedules, assign shifts, and publish rotas.",
+        shortcut: "G 2"
       },
       {
-        label: "Login",
-        href: "/login",
-        description: "Authentication entry screen placeholder.",
-        shortcut: "G L"
+        label: "Onboarding",
+        href: "/onboarding",
+        icon: "Rocket",
+        description: "Template-driven onboarding and offboarding workflows.",
+        shortcut: "G O"
+      }
+    ]
+  },
+  {
+    label: "Insights",
+    requiredRoles: ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+    items: [
+      {
+        label: "Analytics",
+        href: "/analytics",
+        icon: "BarChart3",
+        description: "Workforce, payroll, and operations trend reporting.",
+        shortcut: "G N"
+      },
+      {
+        label: "Compliance",
+        href: "/compliance",
+        icon: "ShieldCheck",
+        description: "Regulatory deadlines and filing status monitoring.",
+        shortcut: "G M"
       }
     ]
   },
   {
     label: "Admin",
     adminOnly: true,
+    requiredRoles: ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
     items: [
       {
-        label: "Compensation Admin",
+        label: "Users & Roles",
+        href: "/admin/users",
+        icon: "UserCog",
+        description: "Invite employees, assign roles, and manage account lifecycle.",
+        shortcut: "A U"
+      },
+      {
+        label: "Compensation",
         href: "/admin/compensation",
-        description: "Manage salary, allowances, equity grants, and approvals.",
+        icon: "Coins",
+        description: "Manage salary, allowances, and equity records.",
         shortcut: "A C"
       },
       {
-        label: "Compensation Bands",
-        href: "/admin/compensation-bands",
-        description: "Define salary bands, benchmark market ranges, and review out-of-band alerts.",
-        shortcut: "A B"
-      },
-      {
-        label: "Performance Admin",
-        href: "/performance/admin",
-        description: "Create review cycles, assign reviewers, and track completion.",
-        shortcut: "A F"
+        label: "Payroll",
+        href: "/payroll",
+        icon: "Calculator",
+        description: "Payroll runs, approvals, and disbursement tracking.",
+        shortcut: "A P"
       },
       {
         label: "Payment Details",
         href: "/admin/payment-details",
-        description: "Review masked employee payout destinations and missing details.",
-        shortcut: "A P"
-      },
-      {
-        label: "Time Policies",
-        href: "/admin/time-policies",
-        description: "Review attendance rules for overtime, breaks, and rounding.",
-        shortcut: "A T"
-      },
-      {
-        label: "Learning Admin",
-        href: "/admin/learning",
-        description: "Manage learning courses and assignment rollout.",
-        shortcut: "A L"
-      },
-      {
-        label: "Learning Reports",
-        href: "/admin/learning/reports",
-        description: "Review completion rates and overdue learning assignments.",
-        shortcut: "A E"
-      },
-      {
-        label: "New Learning Course",
-        href: "/admin/learning/courses/new",
-        description: "Create and publish a new learning course.",
-        shortcut: "A N"
-      },
-      {
-        label: "Survey Admin",
-        href: "/admin/surveys",
-        description: "Create, launch, and monitor employee survey responses.",
-        shortcut: "A V"
-      },
-      {
-        label: "New Survey",
-        href: "/admin/surveys/new",
-        description: "Build a new pulse or engagement survey.",
-        shortcut: "A W"
-      },
-      {
-        label: "Admin Users",
-        href: "/admin/users",
-        description: "Manage platform-level user access.",
-        shortcut: "A U"
-      },
-      {
-        label: "Admin Roles",
-        href: "/admin/roles",
-        description: "Configure role assignment controls.",
-        shortcut: "A R"
+        icon: "CreditCard",
+        description: "Review employee payout destinations and missing details.",
+        shortcut: "A D"
       },
       {
         label: "Access Control",
         href: "/admin/access-control",
+        icon: "Lock",
         description: "Control navigation and dashboard visibility by role.",
-        shortcut: "A X"
+        shortcut: "A A"
       },
       {
-        label: "System Config",
-        href: "/admin/system-config",
-        description: "Global configuration and feature flags.",
+        label: "Settings",
+        href: "/settings",
+        icon: "Settings",
+        description: "Workspace preferences, organization, and audit logs.",
         shortcut: "A S"
       }
     ]

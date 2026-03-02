@@ -30,7 +30,13 @@ function surveysSkeleton() {
   );
 }
 
-export function SurveysClient({ canManageSurveys }: { canManageSurveys: boolean }) {
+export function SurveysClient({
+  canManageSurveys,
+  embedded = false
+}: {
+  canManageSurveys: boolean;
+  embedded?: boolean;
+}) {
   const pendingQuery = usePendingSurveys();
 
   const pendingSurveys = useMemo(
@@ -45,17 +51,19 @@ export function SurveysClient({ canManageSurveys }: { canManageSurveys: boolean 
 
   return (
     <>
-      <PageHeader
-        title="Surveys"
-        description="Respond to active pulse and engagement surveys assigned to you."
-        actions={
-          canManageSurveys ? (
-            <Link href="/admin/surveys" className="button">
-              Survey admin
-            </Link>
-          ) : null
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Surveys"
+          description="Respond to active pulse and engagement surveys assigned to you."
+          actions={
+            canManageSurveys ? (
+              <Link href="/admin/surveys" className="button">
+                Survey admin
+              </Link>
+            ) : null
+          }
+        />
+      ) : null}
 
       {pendingQuery.isLoading ? surveysSkeleton() : null}
 

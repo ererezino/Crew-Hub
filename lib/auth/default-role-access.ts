@@ -3,46 +3,42 @@ import type { UserRole } from "../navigation";
 
 const EMPLOYEE_DEFAULT_ACCESS = [
   "/dashboard",
+  "/announcements",
   "/time-off",
   "/expenses",
+  "/scheduling",
+  "/time-attendance",
   "/documents",
-  "/me/compensation",
-  "/me/payslips",
-  "/me/payment-details",
-  "/me/onboarding",
+  "/me/pay",
+  "/learning",
   "/performance",
-  "/announcements",
-  "/notifications",
   "/settings"
 ] as const;
 
 const TEAM_LEAD_ADDITIONAL_ACCESS = [
-  "/scheduling",
   "/scheduling/manage",
-  "/time-attendance",
-  "/time-attendance/approvals"
+  "/approvals"
 ] as const;
 
 const MANAGER_ADDITIONAL_ACCESS = [
-  "/time-off/approvals",
-  "/expenses/approvals",
-  "/people"
+  "/people",
+  "/onboarding"
 ] as const;
 
 const HR_ADMIN_ADDITIONAL_ACCESS = [
   "/analytics",
   "/compliance",
-  "/onboarding",
+  "/admin/users",
   "/admin/compensation",
-  "/performance/admin"
+  "/admin/payment-details"
 ] as const;
 
 const FINANCE_ADMIN_ADDITIONAL_ACCESS = [
   "/analytics",
   "/payroll",
   "/compliance",
-  "/expenses/approvals",
-  "/expenses/reports",
+  "/approvals",
+  "/admin/users",
   "/admin/compensation",
   "/admin/payment-details"
 ] as const;

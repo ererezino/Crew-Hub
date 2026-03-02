@@ -254,7 +254,7 @@ function TimeOffSkeleton() {
   );
 }
 
-export function TimeOffClient() {
+export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   const [activeMonth, setActiveMonth] = useState(getCurrentMonthKey());
   const [requestSortDirection, setRequestSortDirection] = useState<SortDirection>("desc");
   const [isRequestPanelOpen, setIsRequestPanelOpen] = useState(false);
@@ -517,10 +517,12 @@ export function TimeOffClient() {
   if (summaryQuery.isLoading) {
     return (
       <>
-        <PageHeader
-          title="Time Off"
-          description="Track leave balances, submit requests, and monitor your monthly calendar."
-        />
+        {!embedded ? (
+          <PageHeader
+            title="Time Off"
+            description="Track leave balances, submit requests, and monitor your monthly calendar."
+          />
+        ) : null}
         <TimeOffSkeleton />
       </>
     );
@@ -529,10 +531,12 @@ export function TimeOffClient() {
   if (summaryQuery.errorMessage || !summaryQuery.data) {
     return (
       <>
-        <PageHeader
-          title="Time Off"
-          description="Track leave balances, submit requests, and monitor your monthly calendar."
-        />
+        {!embedded ? (
+          <PageHeader
+            title="Time Off"
+            description="Track leave balances, submit requests, and monitor your monthly calendar."
+          />
+        ) : null}
         <EmptyState
           title="Time Off data is unavailable"
           description={summaryQuery.errorMessage ?? "Unable to load time off summary."}
@@ -545,15 +549,12 @@ export function TimeOffClient() {
 
   return (
     <>
-      <PageHeader
-        title="Time Off"
-        description="Track leave balances, submit requests, and monitor your monthly calendar."
-        actions={
-          <button type="button" className="button button-accent" onClick={openRequestPanel}>
-            Request Time Off
-          </button>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Time Off"
+          description="Track leave balances, submit requests, and monitor your monthly calendar."
+        />
+      ) : null}
 
       <section className="timeoff-balance-grid" aria-label="Leave balances">
         {summaryQuery.data.balances.length === 0 ? (
@@ -604,17 +605,22 @@ export function TimeOffClient() {
       <section className="settings-card" aria-label="My leave requests">
         <header className="timeoff-section-header">
           <h2 className="section-title">My Requests</h2>
-          <button
-            type="button"
-            className="table-sort-trigger"
-            onClick={() =>
-              setRequestSortDirection((currentDirection) =>
-                currentDirection === "asc" ? "desc" : "asc"
-              )
-            }
-          >
-            Start date {requestSortDirection === "asc" ? "↑" : "↓"}
-          </button>
+          <div className="documents-row-actions" style={{ opacity: 1, transform: "none", pointerEvents: "auto" }}>
+            <button type="button" className="button button-accent" onClick={openRequestPanel}>
+              Request Time Off
+            </button>
+            <button
+              type="button"
+              className="table-sort-trigger"
+              onClick={() =>
+                setRequestSortDirection((currentDirection) =>
+                  currentDirection === "asc" ? "desc" : "asc"
+                )
+              }
+            >
+              Start date {requestSortDirection === "asc" ? "↑" : "↓"}
+            </button>
+          </div>
         </header>
 
         {sortedRequests.length === 0 ? (

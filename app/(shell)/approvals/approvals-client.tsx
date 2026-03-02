@@ -1,0 +1,190 @@
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMemo } from "react";
+
+import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
+import { PageHeader } from "../../../components/shared/page-header";
+import type { UserRole } from "../../../lib/navigation";
+import { hasRole } from "../../../lib/roles";
+import { ExpenseApprovalsClient } from "../expenses/approvals/approvals-client";
+import { TimeAttendanceApprovalsClient } from "../time-attendance/approvals/approvals-client";
+import { TimeOffApprovalsClient } from "../time-off/approvals/approvals-client";
+
+type ApprovalsClientProps = {
+  requestedTab: string;
+  userRoles: UserRole[];
+  canReviewTimeOff: boolean;
+  canReviewExpenses: boolean;
+  canReviewTimesheets: boolean;
+};
+
+function resolveInitialTab(requestedTab: string, visibleTabs: PageTab[]): string {
+  const visibleTabKeys = new Set(visibleTabs.map((tab) => tab.key));
+
+  if (visibleTabKeys.has(requestedTab)) {
+    return requestedTab;
+  }
+
+  return visibleTabs[0]?.key ?? "time-off";
+}
+
+async function fetchCountFromList(url: string, key: string): Promise<number> {
+  const response = await fetch(url, { method: "GET" });
+
+  if (!response.ok) {
+    return 0;
+  }
+
+  const payload = (await response.json()) as {
+    data: Record<string, unknown> | null;
+  };
+  const rows = payload.data?.[key];
+
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
+export function ApprovalsClient({
+  requestedTab,
+  userRoles,
+  canReviewTimeOff,
+  canReviewExpenses,
+  canReviewTimesheets
+}: ApprovalsClientProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const canManagerApproveExpenses =
+    hasRole(userRoles, "MANAGER") || hasRole(userRoles, "SUPER_ADMIN");
+  const canFinanceApproveExpenses =
+    hasRole(userRoles, "FINANCE_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
+
+  const approvalsCountQuery = useQuery({
+    queryKey: [
+      "approvals-tab-counts",
+      userRoles.join("|"),
+      canReviewTimeOff,
+      canReviewExpenses,
+      canReviewTimesheets
+    ],
+    queryFn: async () => {
+      const [timeOffCount, managerExpenseCount, financeExpenseCount, timesheetsCount] =
+        await Promise.all([
+          canReviewTimeOff
+            ? fetchCountFromList("/api/v1/time-off/approvals?status=pending", "requests")
+            : Promise.resolve(0),
+          canManagerApproveExpenses
+            ? fetchCountFromList("/api/v1/expenses/approvals?stage=manager", "expenses")
+            : Promise.resolve(0),
+          canFinanceApproveExpenses
+            ? fetchCountFromList("/api/v1/expenses/approvals?stage=finance", "expenses")
+            : Promise.resolve(0),
+          canReviewTimesheets
+            ? fetchCountFromList("/api/v1/time-attendance/approvals?status=submitted", "timesheets")
+            : Promise.resolve(0)
+        ]);
+
+      return {
+        timeOff: timeOffCount,
+        expenses: managerExpenseCount + financeExpenseCount,
+        timesheets: timesheetsCount
+      };
+    },
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000
+  });
+
+  const timeOffCount = approvalsCountQuery.data?.timeOff ?? 0;
+  const expensesCount = approvalsCountQuery.data?.expenses ?? 0;
+  const timesheetsCount = approvalsCountQuery.data?.timesheets ?? 0;
+
+  const tabs = useMemo<PageTab[]>(
+    () => [
+      {
+        key: "time-off",
+        label: "Time Off",
+        badge: timeOffCount,
+        requiredRoles: ["MANAGER", "HR_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        key: "expenses",
+        label: "Expenses",
+        badge: expensesCount,
+        requiredRoles: ["MANAGER", "FINANCE_ADMIN", "SUPER_ADMIN"]
+      },
+      {
+        key: "timesheets",
+        label: "Timesheets",
+        badge: timesheetsCount,
+        requiredRoles: ["TEAM_LEAD", "MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]
+      }
+    ],
+    [expensesCount, timeOffCount, timesheetsCount]
+  );
+
+  const visibleTabs = tabs.filter((tab) => {
+    if (!tab.requiredRoles || tab.requiredRoles.length === 0) {
+      return true;
+    }
+
+    return tab.requiredRoles.some((role) => hasRole(userRoles, role));
+  });
+
+  const activeTab = resolveInitialTab(requestedTab, visibleTabs);
+
+  const handleTabChange = (tabKey: string) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (tabKey === "time-off") {
+      nextParams.delete("tab");
+    } else {
+      nextParams.set("tab", tabKey);
+    }
+
+    const queryString = nextParams.toString();
+    router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname, {
+      scroll: false
+    });
+  };
+
+  return (
+    <>
+      <PageHeader
+        title="Approvals"
+        description="Review team requests across time off, expenses, and timesheets."
+      />
+
+      <PageTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        userRoles={userRoles}
+      />
+
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.section
+          key={activeTab}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+        >
+          {activeTab === "time-off" ? <TimeOffApprovalsClient embedded /> : null}
+
+          {activeTab === "expenses" ? (
+            <ExpenseApprovalsClient
+              canManagerApprove={canManagerApproveExpenses}
+              canFinanceApprove={canFinanceApproveExpenses}
+              embedded
+            />
+          ) : null}
+
+          {activeTab === "timesheets" ? <TimeAttendanceApprovalsClient embedded /> : null}
+        </motion.section>
+      </AnimatePresence>
+    </>
+  );
+}

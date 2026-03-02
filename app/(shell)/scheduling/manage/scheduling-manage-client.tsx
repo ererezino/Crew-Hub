@@ -109,7 +109,7 @@ const defaultShiftForm: ShiftFormState = {
   notes: ""
 };
 
-export function SchedulingManageClient() {
+export function SchedulingManageClient({ embedded = false }: { embedded?: boolean }) {
   const schedulesQuery = useSchedulingSchedules({
     scope: "team"
   });
@@ -345,10 +345,12 @@ export function SchedulingManageClient() {
 
   return (
     <>
-      <PageHeader
-        title="Schedule Management"
-        description="Create weekly schedules, assign shifts, and publish for employee visibility."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Scheduling"
+          description="Create weekly schedules, assign shifts, and publish for employee visibility."
+        />
+      ) : null}
 
       <section className="compensation-layout" aria-label="Scheduling management">
         <article className="settings-card">
@@ -698,7 +700,7 @@ export function SchedulingManageClient() {
                       </td>
                       <td className="table-row-action-cell">
                         <div className="timeatt-row-actions">
-                          <Link href="/scheduling/swaps" className="table-row-action">
+                          <Link href="/scheduling?tab=swaps" className="table-row-action">
                             View swaps
                           </Link>
                         </div>

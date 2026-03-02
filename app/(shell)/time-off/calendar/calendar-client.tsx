@@ -120,7 +120,7 @@ function CalendarSkeleton() {
   );
 }
 
-export function TimeOffCalendarClient() {
+export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean }) {
   const [activeMonth, setActiveMonth] = useState(getCurrentMonthKey());
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
@@ -175,10 +175,12 @@ export function TimeOffCalendarClient() {
   if (calendarQuery.isLoading) {
     return (
       <>
-        <PageHeader
-          title="Time Off Calendar"
-          description="Team leave calendar with monthly view and scoped filters."
-        />
+        {!embedded ? (
+          <PageHeader
+            title="Time Off Calendar"
+            description="Team leave calendar with monthly view and scoped filters."
+          />
+        ) : null}
         <CalendarSkeleton />
       </>
     );
@@ -187,15 +189,17 @@ export function TimeOffCalendarClient() {
   if (calendarQuery.errorMessage || !calendarQuery.data) {
     return (
       <>
-        <PageHeader
-          title="Time Off Calendar"
-          description="Team leave calendar with monthly view and scoped filters."
-        />
+        {!embedded ? (
+          <PageHeader
+            title="Time Off Calendar"
+            description="Team leave calendar with monthly view and scoped filters."
+          />
+        ) : null}
         <EmptyState
           title="Calendar data is unavailable"
           description={calendarQuery.errorMessage ?? "Unable to load team calendar."}
           ctaLabel="Retry"
-          ctaHref="/time-off/calendar"
+          ctaHref={embedded ? "/time-off?tab=calendar" : "/time-off/calendar"}
         />
       </>
     );
@@ -203,10 +207,12 @@ export function TimeOffCalendarClient() {
 
   return (
     <>
-      <PageHeader
-        title="Time Off Calendar"
-        description="Team leave calendar with monthly view and scoped filters."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Time Off Calendar"
+          description="Team leave calendar with monthly view and scoped filters."
+        />
+      ) : null}
 
       <section className="settings-card" aria-label="Calendar filters">
         <header className="timeoff-section-header">

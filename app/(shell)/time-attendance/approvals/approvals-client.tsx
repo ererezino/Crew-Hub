@@ -41,7 +41,7 @@ function toneForStatus(status: "pending" | "submitted" | "approved" | "rejected"
   }
 }
 
-export function TimeAttendanceApprovalsClient() {
+export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?: boolean }) {
   const approvalsQuery = useTimeAttendanceApprovals({
     status: "submitted"
   });
@@ -115,10 +115,12 @@ export function TimeAttendanceApprovalsClient() {
 
   return (
     <>
-      <PageHeader
-        title="Time & Attendance Approvals"
-        description="Review submitted weekly timesheets from your reports before payroll processing."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Hours Approvals"
+          description="Review submitted weekly timesheets from your reports before payroll processing."
+        />
+      ) : null}
 
       {approvalsQuery.isLoading ? approvalsSkeleton() : null}
 
@@ -128,7 +130,7 @@ export function TimeAttendanceApprovalsClient() {
             title="Approvals are unavailable"
             description={approvalsQuery.errorMessage}
             ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
+            ctaHref={embedded ? "/approvals?tab=timesheets" : "/dashboard"}
           />
           <button
             type="button"

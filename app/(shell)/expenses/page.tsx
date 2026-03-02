@@ -34,7 +34,6 @@ export default async function ExpensesPage() {
   return (
     <ExpensesClient
       currentUserId={session.profile.id}
-      canApprove={canApprove}
       canViewReports={canViewReports}
       showEmployeeColumn={canApprove || isAdmin}
     />

@@ -101,10 +101,12 @@ function ApprovalSkeleton() {
 
 export function ExpenseApprovalsClient({
   canManagerApprove,
-  canFinanceApprove
+  canFinanceApprove,
+  embedded = false
 }: {
   canManagerApprove: boolean;
   canFinanceApprove: boolean;
+  embedded?: boolean;
 }) {
   const availableStages = useMemo<ExpenseApprovalStage[]>(() => {
     const stages: ExpenseApprovalStage[] = [];
@@ -489,26 +491,28 @@ export function ExpenseApprovalsClient({
 
   return (
     <>
-      <PageHeader
-        title="Expense Approvals"
-        description="Manager approval and finance disbursement queues."
-        actions={
-          <button
-            type="button"
-            className="button button-accent"
-            onClick={handleBulkApprove}
-            disabled={selectedIds.length === 0 || isBulkApproving}
-          >
-            {isBulkApproving
-              ? stage === "manager"
-                ? "Approving..."
-                : "Disbursing..."
-              : stage === "manager"
-                ? `Bulk approve (${selectedIds.length})`
-                : `Bulk disburse (${selectedIds.length})`}
-          </button>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Expense Approvals"
+          description="Manager approval and finance disbursement queues."
+          actions={
+            <button
+              type="button"
+              className="button button-accent"
+              onClick={handleBulkApprove}
+              disabled={selectedIds.length === 0 || isBulkApproving}
+            >
+              {isBulkApproving
+                ? stage === "manager"
+                  ? "Approving..."
+                  : "Disbursing..."
+                : stage === "manager"
+                  ? `Bulk approve (${selectedIds.length})`
+                  : `Bulk disburse (${selectedIds.length})`}
+            </button>
+          }
+        />
+      ) : null}
 
       {availableStages.length > 1 ? (
         <section className="expenses-approval-tabs" aria-label="Approval queues">
@@ -552,7 +556,7 @@ export function ExpenseApprovalsClient({
             title="Expense approvals are unavailable"
             description={approvalsQuery.errorMessage}
             ctaLabel="Retry"
-            ctaHref="/expenses/approvals"
+            ctaHref={embedded ? "/approvals?tab=expenses" : "/expenses/approvals"}
           />
           <button type="button" className="button button-accent" onClick={() => approvalsQuery.refresh()}>
             Retry

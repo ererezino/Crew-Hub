@@ -46,10 +46,12 @@ function toneForSwapStatus(status: "pending" | "accepted" | "rejected" | "cancel
 
 export function SchedulingSwapsClient({
   currentUserId,
-  canManageSwaps
+  canManageSwaps,
+  embedded = false
 }: {
   currentUserId: string;
   canManageSwaps: boolean;
+  embedded?: boolean;
 }) {
   const swapsQuery = useSchedulingSwaps({
     scope: canManageSwaps ? "team" : "mine"
@@ -168,10 +170,12 @@ export function SchedulingSwapsClient({
 
   return (
     <>
-      <PageHeader
-        title="Shift Swaps"
-        description="Request, review, and resolve shift swap requests."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Swap Requests"
+          description="Request, review, and resolve shift swap requests."
+        />
+      ) : null}
 
       {(swapsQuery.isLoading || shiftsQuery.isLoading) ? swapsSkeleton() : null}
 

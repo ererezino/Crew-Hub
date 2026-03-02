@@ -50,7 +50,7 @@ function schedulingSkeleton() {
   );
 }
 
-export function SchedulingClient() {
+export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
   const shiftsQuery = useSchedulingShifts({
     scope: "mine"
   });
@@ -78,10 +78,12 @@ export function SchedulingClient() {
 
   return (
     <>
-      <PageHeader
-        title="Scheduling"
-        description="Review your upcoming shifts, open opportunities, and swap requests."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Schedule"
+          description="Review your upcoming shifts, open opportunities, and swap requests."
+        />
+      ) : null}
 
       {(shiftsQuery.isLoading || openShiftsQuery.isLoading || swapsQuery.isLoading) ? schedulingSkeleton() : null}
 
@@ -140,10 +142,10 @@ export function SchedulingClient() {
               </p>
             </div>
             <div className="documents-row-actions">
-              <Link href="/scheduling/open-shifts" className="button">
+              <Link href="/scheduling?tab=open-shifts" className="button">
                 Open shifts
               </Link>
-              <Link href="/scheduling/swaps" className="button">
+              <Link href="/scheduling?tab=swaps" className="button">
                 Shift swaps
               </Link>
             </div>
@@ -164,7 +166,7 @@ export function SchedulingClient() {
                 title="No shifts scheduled yet"
                 description="Your assigned shifts will appear here once a schedule is published."
                 ctaLabel="View open shifts"
-                ctaHref="/scheduling/open-shifts"
+                ctaHref="/scheduling?tab=open-shifts"
               />
             ) : (
               <div className="data-table-container">
@@ -212,7 +214,7 @@ export function SchedulingClient() {
                         </td>
                         <td className="table-row-action-cell">
                           <div className="timeatt-row-actions">
-                            <Link href="/scheduling/swaps" className="table-row-action">
+                            <Link href="/scheduling?tab=swaps" className="table-row-action">
                               Swap
                             </Link>
                           </div>

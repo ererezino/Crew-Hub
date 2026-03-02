@@ -70,7 +70,7 @@ function statementTypeLabel(statement: PaymentStatementRecord): string {
   return statement.withholdingApplied ? "Payslip" : "Payment statement";
 }
 
-export function MePayslipsClient() {
+export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
   const [selectedYear, setSelectedYear] = useState(new Date().getUTCFullYear());
   const [activeStatementId, setActiveStatementId] = useState<string | null>(null);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
@@ -198,10 +198,12 @@ export function MePayslipsClient() {
 
   return (
     <>
-      <PageHeader
-        title="Payments"
-        description="View and download your monthly payment statements in Crew Hub."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Payments"
+          description="View and download your monthly payment statements in Crew Hub."
+        />
+      ) : null}
 
       <section className="payslips-toolbar" aria-label="Payments filters">
         <label className="form-field" htmlFor="payslips-year-filter">
