@@ -2,9 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 
-import { NAV_GROUPS, ROUTE_ITEMS, type NavItem, type UserRole } from "../../lib/navigation";
+import {
+  NAV_GROUPS,
+  ROUTE_ITEMS,
+  type NavGroup,
+  type NavItem,
+  type UserRole
+} from "../../lib/navigation";
 import { hasRole } from "../../lib/roles";
 import { CommandPalette } from "./command-palette";
 import { NotificationCenter } from "./notification-center";
@@ -72,6 +78,59 @@ function resolveTopbarRoute(pathname: string, routes: NavItem[]): NavItem | unde
   return sortedRoutes.find((route) => isRouteActive(pathname, route.href));
 }
 
+function getSidebarGroupId(groupLabel: string): string {
+  const normalizedLabel = groupLabel
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  return `sidebar-group-${normalizedLabel}`;
+}
+
+function getDefaultMobileExpandedGroups(
+  groups: readonly NavGroup[],
+  pathname: string
+): string[] {
+  const activeGroups = groups
+    .filter((group) =>
+      group.items.some((item) => isRouteActive(pathname, item.href))
+    )
+    .map((group) => group.label);
+
+  if (activeGroups.length > 0) {
+    return activeGroups;
+  }
+
+  return groups.length > 0 ? [groups[0].label] : [];
+}
+
+function subscribeToMobileViewport(
+  onViewportChange: () => void
+): () => void {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const mediaQueryList = window.matchMedia("(max-width: 767px)");
+  const handleViewportChange = () => {
+    onViewportChange();
+  };
+
+  mediaQueryList.addEventListener("change", handleViewportChange);
+
+  return () => {
+    mediaQueryList.removeEventListener("change", handleViewportChange);
+  };
+}
+
+function getMobileViewportSnapshot(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.matchMedia("(max-width: 767px)").matches;
+}
+
 type AppShellProps = {
   currentUserRoles: readonly UserRole[];
   children: ReactNode;
@@ -84,7 +143,16 @@ export function AppShell({ currentUserRoles, children }: AppShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [sidebarGroupOverrides, setSidebarGroupOverrides] = useState<
+    Record<string, boolean>
+  >({});
   const [recentRouteHrefs, setRecentRouteHrefs] = useState<string[]>(readRecentRoutes);
+
+  const isMobileViewport = useSyncExternalStore(
+    subscribeToMobileViewport,
+    getMobileViewportSnapshot,
+    () => false
+  );
 
   const showAdminSection = canAccessAdmin(currentUserRoles);
 
@@ -104,6 +172,30 @@ export function AppShell({ currentUserRoles, children }: AppShellProps) {
     () => resolveTopbarRoute(activePathname, commandRoutes),
     [activePathname, commandRoutes]
   );
+
+  const defaultExpandedGroupLabels = useMemo(() => {
+    if (!isMobileViewport) {
+      return navigationGroups.map((group) => group.label);
+    }
+
+    return getDefaultMobileExpandedGroups(navigationGroups, activePathname);
+  }, [activePathname, isMobileViewport, navigationGroups]);
+
+  const expandedGroupLabels = useMemo(() => {
+    const defaultExpandedSet = new Set(defaultExpandedGroupLabels);
+
+    return navigationGroups
+      .map((group) => group.label)
+      .filter((groupLabel) => {
+        const overrideValue = sidebarGroupOverrides[groupLabel];
+
+        if (typeof overrideValue === "boolean") {
+          return overrideValue;
+        }
+
+        return defaultExpandedSet.has(groupLabel);
+      });
+  }, [defaultExpandedGroupLabels, navigationGroups, sidebarGroupOverrides]);
 
   useEffect(() => {
     const handleCommandShortcut = (event: KeyboardEvent) => {
@@ -131,6 +223,31 @@ export function AppShell({ currentUserRoles, children }: AppShellProps) {
     registerRouteVisit(href);
     setIsMobileSidebarOpen(false);
     setIsCommandPaletteOpen(false);
+  };
+
+  const handleSidebarGroupToggle = (groupLabel: string) => {
+    setSidebarGroupOverrides((currentOverrides) => {
+      const hasOverride = Object.prototype.hasOwnProperty.call(
+        currentOverrides,
+        groupLabel
+      );
+      const defaultExpanded = defaultExpandedGroupLabels.includes(groupLabel);
+      const currentlyExpanded = hasOverride
+        ? currentOverrides[groupLabel]
+        : defaultExpanded;
+      const nextExpanded = !currentlyExpanded;
+
+      if (nextExpanded === defaultExpanded) {
+        const remainingOverrides = { ...currentOverrides };
+        delete remainingOverrides[groupLabel];
+        return remainingOverrides;
+      }
+
+      return {
+        ...currentOverrides,
+        [groupLabel]: nextExpanded
+      };
+    });
   };
 
   const handleCommandSelect = (route: NavItem) => {
@@ -195,30 +312,71 @@ export function AppShell({ currentUserRoles, children }: AppShellProps) {
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary">
-          {navigationGroups.map((group) => (
-            <section key={group.label} className="sidebar-group">
-              <h2 className="sidebar-group-title">{group.label}</h2>
-              <ul className="sidebar-links">
-                {group.items.map((item) => (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
+          {navigationGroups.map((group) => {
+            const groupId = getSidebarGroupId(group.label);
+            const isGroupExpanded = expandedGroupLabels.includes(group.label);
+
+            return (
+              <section key={group.label} className="sidebar-group">
+                <h2 className="sidebar-group-heading">
+                  <button
+                    type="button"
+                    className="sidebar-group-trigger"
+                    onClick={() => handleSidebarGroupToggle(group.label)}
+                    aria-expanded={isGroupExpanded}
+                    aria-controls={groupId}
+                  >
+                    <span className="sidebar-group-title">{group.label}</span>
+                    <span
                       className={
-                        isRouteActive(activePathname, item.href)
-                          ? "sidebar-link sidebar-link-active"
-                          : "sidebar-link"
+                        isGroupExpanded
+                          ? "sidebar-group-chevron"
+                          : "sidebar-group-chevron sidebar-group-chevron-collapsed"
                       }
-                      onClick={() => handleSidebarItemClick(item.href)}
+                      aria-hidden="true"
                     >
-                      <span className="sidebar-link-dot" aria-hidden="true" />
-                      <span className="sidebar-link-text">{item.label}</span>
-                      <span className="sidebar-shortcut numeric">{item.shortcut}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+                      <svg viewBox="0 0 20 20">
+                        <path
+                          d="M5.5 7.5 10 12l4.5-4.5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          fill="none"
+                        />
+                      </svg>
+                    </span>
+                  </button>
+                </h2>
+                <ul
+                  id={groupId}
+                  className={
+                    isGroupExpanded
+                      ? "sidebar-links"
+                      : "sidebar-links sidebar-links-collapsed"
+                  }
+                >
+                  {group.items.map((item) => (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        className={
+                          isRouteActive(activePathname, item.href)
+                            ? "sidebar-link sidebar-link-active"
+                            : "sidebar-link"
+                        }
+                        onClick={() => handleSidebarItemClick(item.href)}
+                      >
+                        <span className="sidebar-link-dot" aria-hidden="true" />
+                        <span className="sidebar-link-text">{item.label}</span>
+                        <span className="sidebar-shortcut numeric">{item.shortcut}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </nav>
       </aside>
 
