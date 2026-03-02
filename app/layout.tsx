@@ -16,7 +16,30 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Crew Hub",
-  description: "Crew Hub employee operations platform."
+  description: "Crew Hub employee operations platform.",
+  icons: {
+    icon: [
+      {
+        url: "/brand/crew-hub-app-logo.svg",
+        media: "(prefers-color-scheme: light)"
+      },
+      {
+        url: "/brand/crew-hub-site-logo.svg",
+        media: "(prefers-color-scheme: dark)"
+      }
+    ],
+    shortcut: [
+      {
+        url: "/brand/crew-hub-app-logo.svg",
+        media: "(prefers-color-scheme: light)"
+      },
+      {
+        url: "/brand/crew-hub-site-logo.svg",
+        media: "(prefers-color-scheme: dark)"
+      }
+    ],
+    apple: "/brand/crew-hub-app-logo.svg"
+  }
 };
 
 export default function RootLayout({

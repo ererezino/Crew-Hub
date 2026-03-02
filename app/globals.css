@@ -228,18 +228,31 @@ kbd,
 .sidebar-brand-icon {
   width: 1.875rem;
   height: 1.875rem;
-  border-radius: var(--radius-default);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-accent);
-  color: #ffffff;
   flex-shrink: 0;
+  position: relative;
 }
 
-.sidebar-brand-icon svg {
-  width: 1.1rem;
-  height: 1.1rem;
+.sidebar-brand-image {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute;
+  inset: 0;
+  object-fit: contain;
+}
+
+.sidebar-brand-image-dark {
+  display: none;
+}
+
+html.dark .sidebar-brand-image-light {
+  display: none;
+}
+
+html.dark .sidebar-brand-image-dark {
+  display: block;
 }
 
 .sidebar-brand-copy {
