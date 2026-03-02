@@ -75,6 +75,18 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G T"
       },
       {
+        label: "Time & Attendance",
+        href: "/time-attendance",
+        description: "Track clock-ins, worked hours, and weekly attendance totals.",
+        shortcut: "G H"
+      },
+      {
+        label: "Attendance Approvals",
+        href: "/time-attendance/approvals",
+        description: "Review submitted timesheets from direct reports.",
+        shortcut: "G W"
+      },
+      {
         label: "Time Off Approvals",
         href: "/time-off/approvals",
         description: "Approve or reject pending leave requests.",
@@ -249,6 +261,12 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/admin/payment-details",
         description: "Review masked employee payout destinations and missing details.",
         shortcut: "A P"
+      },
+      {
+        label: "Time Policies",
+        href: "/admin/time-policies",
+        description: "Review attendance rules for overtime, breaks, and rounding.",
+        shortcut: "A T"
       },
       {
         label: "Admin Users",
