@@ -402,6 +402,48 @@ type SeedDeductionRule = {
   effectiveFrom: string;
 };
 
+type SeedCompensationBandLocationType = "global" | "country" | "city" | "zone";
+
+type SeedCompensationBand = {
+  key: string;
+  title: string;
+  level: string | null;
+  department: SeedMember["department"] | null;
+  locationType: SeedCompensationBandLocationType;
+  locationValue: string | null;
+  currency: "USD";
+  minSalaryAmount: number;
+  midSalaryAmount: number;
+  maxSalaryAmount: number;
+  equityMin: number | null;
+  equityMax: number | null;
+  effectiveOffsetDays: number;
+  effectiveToOffsetDays: number | null;
+  createdByKey: SeedMember["key"];
+};
+
+type SeedBenchmarkData = {
+  source: string;
+  title: string;
+  level: string | null;
+  location: string | null;
+  currency: "USD";
+  p25: number | null;
+  p50: number | null;
+  p75: number | null;
+  p90: number | null;
+  importedOffsetDays: number;
+  importedByKey: SeedMember["key"];
+};
+
+type SeedCompensationBandAssignment = {
+  employeeKey: SeedMember["key"];
+  bandKey: SeedCompensationBand["key"];
+  effectiveOffsetDays: number;
+  effectiveToOffsetDays: number | null;
+  assignedByKey: SeedMember["key"];
+};
+
 const SEED_MEMBERS: SeedMember[] = [
   {
     key: "coo",
@@ -1021,6 +1063,209 @@ const SEED_EQUITY_GRANTS: SeedEquityGrant[] = [
     approvedByKey: "coo",
     boardApprovalOffsetDays: -754,
     notes: "Executive founding grant."
+  }
+];
+
+const SEED_COMPENSATION_BANDS: SeedCompensationBand[] = [
+  {
+    key: "executive-global",
+    title: "Executive Leadership",
+    level: "L1",
+    department: null,
+    locationType: "global",
+    locationValue: null,
+    currency: "USD",
+    minSalaryAmount: 1_800_000,
+    midSalaryAmount: 2_200_000,
+    maxSalaryAmount: 2_600_000,
+    equityMin: 20_000,
+    equityMax: 45_000,
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    createdByKey: "coo"
+  },
+  {
+    key: "engineering-individual-contributor",
+    title: "Software Engineer",
+    level: "IC2",
+    department: "Engineering",
+    locationType: "global",
+    locationValue: null,
+    currency: "USD",
+    minSalaryAmount: 900_000,
+    midSalaryAmount: 1_050_000,
+    maxSalaryAmount: 1_200_000,
+    equityMin: 8_000,
+    equityMax: 18_000,
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    createdByKey: "head_people_finance"
+  },
+  {
+    key: "engineering-manager",
+    title: "Engineering Manager",
+    level: "M1",
+    department: "Engineering",
+    locationType: "global",
+    locationValue: null,
+    currency: "USD",
+    minSalaryAmount: 1_250_000,
+    midSalaryAmount: 1_450_000,
+    maxSalaryAmount: 1_700_000,
+    equityMin: 14_000,
+    equityMax: 24_000,
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    createdByKey: "head_people_finance"
+  },
+  {
+    key: "operations-generalist",
+    title: "Operations",
+    level: "M1",
+    department: "Operations",
+    locationType: "global",
+    locationValue: null,
+    currency: "USD",
+    minSalaryAmount: 780_000,
+    midSalaryAmount: 1_000_000,
+    maxSalaryAmount: 1_250_000,
+    equityMin: 5_000,
+    equityMax: 12_000,
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    createdByKey: "head_people_finance"
+  },
+  {
+    key: "compliance-specialist",
+    title: "Compliance Officer",
+    level: "IC3",
+    department: "Compliance",
+    locationType: "global",
+    locationValue: null,
+    currency: "USD",
+    minSalaryAmount: 820_000,
+    midSalaryAmount: 900_000,
+    maxSalaryAmount: 1_060_000,
+    equityMin: 4_500,
+    equityMax: 10_000,
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    createdByKey: "head_people_finance"
+  }
+];
+
+const SEED_BENCHMARK_DATA: SeedBenchmarkData[] = [
+  {
+    source: "Radford 2026",
+    title: "Software Engineer",
+    level: "IC2",
+    location: "Global Remote",
+    currency: "USD",
+    p25: 880_000,
+    p50: 1_040_000,
+    p75: 1_230_000,
+    p90: 1_360_000,
+    importedOffsetDays: -10,
+    importedByKey: "head_people_finance"
+  },
+  {
+    source: "Mercer 2026",
+    title: "Engineering Manager",
+    level: "M1",
+    location: "Global Remote",
+    currency: "USD",
+    p25: 1_240_000,
+    p50: 1_450_000,
+    p75: 1_700_000,
+    p90: 1_900_000,
+    importedOffsetDays: -10,
+    importedByKey: "head_people_finance"
+  },
+  {
+    source: "Figures 2026",
+    title: "Operations Manager",
+    level: "M1",
+    location: "Global Remote",
+    currency: "USD",
+    p25: 760_000,
+    p50: 980_000,
+    p75: 1_180_000,
+    p90: 1_320_000,
+    importedOffsetDays: -8,
+    importedByKey: "head_people_finance"
+  }
+];
+
+const SEED_COMPENSATION_BAND_ASSIGNMENTS: SeedCompensationBandAssignment[] = [
+  {
+    employeeKey: "coo",
+    bandKey: "executive-global",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "coo"
+  },
+  {
+    employeeKey: "ceo",
+    bandKey: "executive-global",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "coo"
+  },
+  {
+    employeeKey: "head_people_finance",
+    bandKey: "executive-global",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "coo"
+  },
+  {
+    employeeKey: "eng_manager",
+    bandKey: "engineering-manager",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    employeeKey: "ops_manager",
+    bandKey: "operations-generalist",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    employeeKey: "engineer_1",
+    bandKey: "engineering-individual-contributor",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    employeeKey: "engineer_2",
+    bandKey: "engineering-individual-contributor",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    employeeKey: "engineer_3",
+    bandKey: "engineering-individual-contributor",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    employeeKey: "ops_associate",
+    bandKey: "operations-generalist",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "head_people_finance"
+  },
+  {
+    employeeKey: "compliance_officer",
+    bandKey: "compliance-specialist",
+    effectiveOffsetDays: -180,
+    effectiveToOffsetDays: null,
+    assignedByKey: "head_people_finance"
   }
 ];
 
@@ -2239,6 +2484,12 @@ function dateWithOffset(offsetDays: number): string {
   return baseDate.toISOString().slice(0, 10);
 }
 
+function oneDayBeforeDate(isoDate: string): string {
+  const parsedDate = new Date(`${isoDate}T00:00:00.000Z`);
+  parsedDate.setUTCDate(parsedDate.getUTCDate() - 1);
+  return parsedDate.toISOString().slice(0, 10);
+}
+
 function timestampWithOffsetDays(offsetDays: number): string {
   const baseDate = new Date();
   baseDate.setUTCDate(baseDate.getUTCDate() + offsetDays);
@@ -3002,6 +3253,288 @@ async function upsertSeedCompensation(
       if (insertError) {
         throw new Error(`Unable to insert equity seed data: ${insertError.message}`);
       }
+    }
+  }
+}
+
+async function upsertSeedCompensationBands(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  const bandIdByKey = new Map<string, string>();
+
+  for (const band of SEED_COMPENSATION_BANDS) {
+    const createdById = userIdByKey.get(band.createdByKey);
+
+    if (!createdById) {
+      throw new Error(`Missing creator id for compensation band seed (${band.createdByKey})`);
+    }
+
+    const effectiveFrom = dateWithOffset(band.effectiveOffsetDays);
+    const effectiveTo =
+      band.effectiveToOffsetDays === null ? null : dateWithOffset(band.effectiveToOffsetDays);
+
+    const { data: existingBand, error: existingBandError } = await client
+      .from("compensation_bands")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("title", band.title)
+      .eq("level", band.level)
+      .eq("location_type", band.locationType)
+      .eq("location_value", band.locationValue)
+      .eq("effective_from", effectiveFrom)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingBandError) {
+      throw new Error(`Unable to query compensation bands seed data: ${existingBandError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      title: band.title,
+      level: band.level,
+      department: band.department,
+      location_type: band.locationType,
+      location_value: band.locationValue,
+      currency: band.currency,
+      min_salary_amount: band.minSalaryAmount,
+      mid_salary_amount: band.midSalaryAmount,
+      max_salary_amount: band.maxSalaryAmount,
+      equity_min: band.equityMin,
+      equity_max: band.equityMax,
+      effective_from: effectiveFrom,
+      effective_to: effectiveTo,
+      created_by: createdById,
+      updated_by: createdById,
+      deleted_at: null as string | null
+    };
+
+    if (existingBand?.id) {
+      const { error: updateError } = await client
+        .from("compensation_bands")
+        .update(payload)
+        .eq("id", existingBand.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update compensation band seed data: ${updateError.message}`);
+      }
+
+      bandIdByKey.set(band.key, existingBand.id);
+    } else {
+      const { data: insertedBand, error: insertError } = await client
+        .from("compensation_bands")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedBand?.id) {
+        throw new Error(
+          `Unable to insert compensation band seed data: ${insertError?.message ?? "unknown error"}`
+        );
+      }
+
+      bandIdByKey.set(band.key, insertedBand.id);
+    }
+  }
+
+  for (const benchmark of SEED_BENCHMARK_DATA) {
+    const importedById = userIdByKey.get(benchmark.importedByKey);
+
+    if (!importedById) {
+      throw new Error(`Missing importer id for benchmark seed (${benchmark.importedByKey})`);
+    }
+
+    const { data: existingBenchmark, error: existingBenchmarkError } = await client
+      .from("benchmark_data")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("source", benchmark.source)
+      .eq("title", benchmark.title)
+      .eq("level", benchmark.level)
+      .eq("location", benchmark.location)
+      .is("deleted_at", null)
+      .order("imported_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingBenchmarkError) {
+      throw new Error(`Unable to query benchmark seed data: ${existingBenchmarkError.message}`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      source: benchmark.source,
+      title: benchmark.title,
+      level: benchmark.level,
+      location: benchmark.location,
+      currency: benchmark.currency,
+      p25: benchmark.p25,
+      p50: benchmark.p50,
+      p75: benchmark.p75,
+      p90: benchmark.p90,
+      imported_by: importedById,
+      imported_at: timestampWithOffsetDays(benchmark.importedOffsetDays),
+      deleted_at: null as string | null
+    };
+
+    if (existingBenchmark?.id) {
+      const { error: updateError } = await client
+        .from("benchmark_data")
+        .update(payload)
+        .eq("id", existingBenchmark.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update benchmark seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("benchmark_data").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert benchmark seed data: ${insertError.message}`);
+      }
+    }
+  }
+
+  for (const assignment of SEED_COMPENSATION_BAND_ASSIGNMENTS) {
+    const employeeId = userIdByKey.get(assignment.employeeKey);
+    const assignedById = userIdByKey.get(assignment.assignedByKey);
+    const bandId = bandIdByKey.get(assignment.bandKey);
+
+    if (!employeeId) {
+      throw new Error(`Missing employee id for compensation band assignment (${assignment.employeeKey})`);
+    }
+
+    if (!assignedById) {
+      throw new Error(`Missing assigner id for compensation band assignment (${assignment.assignedByKey})`);
+    }
+
+    if (!bandId) {
+      throw new Error(`Missing band id for compensation band assignment (${assignment.bandKey})`);
+    }
+
+    const effectiveFrom = dateWithOffset(assignment.effectiveOffsetDays);
+    const effectiveTo =
+      assignment.effectiveToOffsetDays === null
+        ? null
+        : dateWithOffset(assignment.effectiveToOffsetDays);
+
+    const payload = {
+      org_id: orgId,
+      employee_id: employeeId,
+      band_id: bandId,
+      assigned_by: assignedById,
+      effective_from: effectiveFrom,
+      effective_to: effectiveTo,
+      deleted_at: null as string | null
+    };
+
+    const { data: existingAssignment, error: existingAssignmentError } = await client
+      .from("compensation_band_assignments")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("band_id", bandId)
+      .eq("effective_from", effectiveFrom)
+      .is("deleted_at", null)
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingAssignmentError) {
+      throw new Error(
+        `Unable to query compensation band assignment seed data: ${existingAssignmentError.message}`
+      );
+    }
+
+    if (existingAssignment?.id) {
+      const { error: updateError } = await client
+        .from("compensation_band_assignments")
+        .update(payload)
+        .eq("id", existingAssignment.id)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(
+          `Unable to update compensation band assignment seed data: ${updateError.message}`
+        );
+      }
+
+      continue;
+    }
+
+    const { data: activeAssignments, error: activeAssignmentsError } = await client
+      .from("compensation_band_assignments")
+      .select("id, effective_from")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .is("effective_to", null)
+      .order("effective_from", { ascending: false });
+
+    if (activeAssignmentsError) {
+      throw new Error(
+        `Unable to query active compensation band assignments: ${activeAssignmentsError.message}`
+      );
+    }
+
+    const sameStartAssignment = (activeAssignments ?? []).find(
+      (row) => typeof row.effective_from === "string" && row.effective_from === effectiveFrom
+    );
+
+    if (sameStartAssignment?.id) {
+      const { error: sameStartUpdateError } = await client
+        .from("compensation_band_assignments")
+        .update(payload)
+        .eq("id", sameStartAssignment.id)
+        .eq("org_id", orgId);
+
+      if (sameStartUpdateError) {
+        throw new Error(
+          `Unable to update compensation band assignment with same start date: ${sameStartUpdateError.message}`
+        );
+      }
+
+      continue;
+    }
+
+    const closeDate = oneDayBeforeDate(effectiveFrom);
+
+    for (const row of activeAssignments ?? []) {
+      if (typeof row.id !== "string" || typeof row.effective_from !== "string") {
+        continue;
+      }
+
+      if (row.effective_from >= effectiveFrom) {
+        continue;
+      }
+
+      const { error: closeError } = await client
+        .from("compensation_band_assignments")
+        .update({ effective_to: closeDate })
+        .eq("id", row.id)
+        .eq("org_id", orgId);
+
+      if (closeError) {
+        throw new Error(
+          `Unable to close active compensation band assignment: ${closeError.message}`
+        );
+      }
+    }
+
+    const { error: insertError } = await client
+      .from("compensation_band_assignments")
+      .insert(payload);
+
+    if (insertError) {
+      throw new Error(
+        `Unable to insert compensation band assignment seed data: ${insertError.message}`
+      );
     }
   }
 }
@@ -4085,6 +4618,7 @@ async function main() {
   await upsertSeedOnboarding(client, org.id, userIdByKey);
   await upsertSeedTimeOff(client, org.id, userIdByKey);
   await upsertSeedCompensation(client, org.id, userIdByKey);
+  await upsertSeedCompensationBands(client, org.id, userIdByKey);
   await upsertSeedDeductionRules(client, org.id);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
   await upsertSeedPerformance(client, org.id, userIdByKey);
@@ -4106,6 +4640,9 @@ async function main() {
   console.log(`Compensation records upserted: ${SEED_COMPENSATION_RECORDS.length}`);
   console.log(`Allowances upserted: ${SEED_ALLOWANCES.length}`);
   console.log(`Equity grants upserted: ${SEED_EQUITY_GRANTS.length}`);
+  console.log(`Compensation bands upserted: ${SEED_COMPENSATION_BANDS.length}`);
+  console.log(`Benchmark rows upserted: ${SEED_BENCHMARK_DATA.length}`);
+  console.log(`Band assignments upserted: ${SEED_COMPENSATION_BAND_ASSIGNMENTS.length}`);
   console.log(`Nigeria deduction rules upserted: ${SEED_NIGERIA_DEDUCTION_RULES.length}`);
   console.log(`Payment details upserted: ${SEED_PAYMENT_DETAILS.length}`);
   console.log(`Performance cycles upserted: ${SEED_REVIEW_CYCLES.length}`);
