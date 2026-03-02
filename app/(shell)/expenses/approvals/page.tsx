@@ -5,13 +5,12 @@ import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import { ExpenseApprovalsClient } from "./approvals-client";
 
-function canApproveExpenses(roles: readonly UserRole[]): boolean {
-  return (
-    hasRole(roles, "MANAGER") ||
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN")
-  );
+function canManagerApproveExpenses(roles: readonly UserRole[]): boolean {
+  return hasRole(roles, "MANAGER") || hasRole(roles, "SUPER_ADMIN");
+}
+
+function canFinanceApproveExpenses(roles: readonly UserRole[]): boolean {
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export default async function ExpenseApprovalsPage() {
@@ -34,16 +33,19 @@ export default async function ExpenseApprovalsPage() {
     );
   }
 
-  if (!canApproveExpenses(session.profile.roles)) {
+  const canManagerApprove = canManagerApproveExpenses(session.profile.roles);
+  const canFinanceApprove = canFinanceApproveExpenses(session.profile.roles);
+
+  if (!canManagerApprove && !canFinanceApprove) {
     return (
       <>
         <PageHeader
           title="Expense Approvals"
-          description="Review pending expense submissions and process approvals."
+          description="Review manager approvals and finance disbursements."
         />
         <EmptyState
           title="Access denied"
-          description="Only managers and admin roles can approve expense submissions."
+          description="Only managers, finance admins, and super admins can process expense approvals."
           ctaLabel="Open expenses"
           ctaHref="/expenses"
         />
@@ -51,5 +53,10 @@ export default async function ExpenseApprovalsPage() {
     );
   }
 
-  return <ExpenseApprovalsClient />;
+  return (
+    <ExpenseApprovalsClient
+      canManagerApprove={canManagerApprove}
+      canFinanceApprove={canFinanceApprove}
+    />
+  );
 }

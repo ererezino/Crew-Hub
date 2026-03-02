@@ -19,13 +19,12 @@ export default async function ExpensesPage() {
 
   const canApprove =
     hasRole(session.profile.roles, "MANAGER") ||
-    hasRole(session.profile.roles, "HR_ADMIN") ||
     hasRole(session.profile.roles, "FINANCE_ADMIN") ||
     hasRole(session.profile.roles, "SUPER_ADMIN");
 
-  const canReimburse =
-    hasRole(session.profile.roles, "FINANCE_ADMIN") ||
-    hasRole(session.profile.roles, "SUPER_ADMIN");
+  const canViewReports =
+    canApprove ||
+    hasRole(session.profile.roles, "HR_ADMIN");
 
   const isAdmin =
     hasRole(session.profile.roles, "HR_ADMIN") ||
@@ -36,7 +35,7 @@ export default async function ExpensesPage() {
     <ExpensesClient
       currentUserId={session.profile.id}
       canApprove={canApprove}
-      canReimburse={canReimburse}
+      canViewReports={canViewReports}
       showEmployeeColumn={canApprove || isAdmin}
     />
   );

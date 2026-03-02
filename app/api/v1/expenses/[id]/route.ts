@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
-import { createNotification } from "../../../../../lib/notifications/service";
+import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
+import { parseIntegerAmount } from "../../../../../lib/expenses";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type {
@@ -12,19 +13,20 @@ import type {
 } from "../../../../../types/expenses";
 import {
   buildMeta,
-  canApproveExpenses,
-  canReimburseExpenses,
+  canFinanceApproveExpenses,
+  canManagerApproveExpenses,
   collectProfileIds,
   expenseRowSchema,
+  expenseSelectColumns,
   jsonResponse,
   profileRowSchema,
-  toExpenseRecord,
-  isExpenseAdmin
+  toExpenseRecord
 } from "../_helpers";
 
 const expenseActionSchema = z.object({
   action: z.enum(["approve", "reject", "cancel", "mark_reimbursed"]),
   rejectionReason: z.string().trim().max(2000).optional(),
+  financeRejectionReason: z.string().trim().max(2000).optional(),
   reimbursementReference: z.string().trim().max(120).optional(),
   reimbursementNotes: z.string().trim().max(2000).optional()
 });
@@ -32,6 +34,11 @@ const expenseActionSchema = z.object({
 const profileManagerSchema = z.object({
   id: z.string().uuid(),
   manager_id: z.string().uuid().nullable()
+});
+
+const approverProfileSchema = z.object({
+  id: z.string().uuid(),
+  roles: z.array(z.string()).nullable()
 });
 
 function auditActionFromExpenseAction(action: ExpenseAction): "approved" | "rejected" | "cancelled" | "updated" {
@@ -47,6 +54,55 @@ function auditActionFromExpenseAction(action: ExpenseAction): "approved" | "reje
     default:
       return "updated";
   }
+}
+
+function formatMinorUnits(amount: number, currency: string): string {
+  const safeAmount = parseIntegerAmount(amount);
+  const major = safeAmount / 100;
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(major);
+  } catch {
+    return `${currency} ${major.toFixed(2)}`;
+  }
+}
+
+async function listFinanceAdminIds({
+  supabase,
+  orgId
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  orgId: string;
+}): Promise<string[]> {
+  const { data: rawRows, error } = await supabase
+    .from("profiles")
+    .select("id, roles")
+    .eq("org_id", orgId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.error("Unable to load finance approver recipients.", {
+      orgId,
+      message: error.message
+    });
+
+    return [];
+  }
+
+  const parsedRows = z.array(approverProfileSchema).safeParse(rawRows ?? []);
+
+  if (!parsedRows.success) {
+    return [];
+  }
+
+  return parsedRows.data
+    .filter((row) => row.roles?.includes("FINANCE_ADMIN"))
+    .map((row) => row.id);
 }
 
 export async function PATCH(
@@ -112,9 +168,7 @@ export async function PATCH(
 
   const { data: rawExpenseRow, error: expenseError } = await supabase
     .from("expenses")
-    .select(
-      "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at"
-    )
+    .select(expenseSelectColumns)
     .eq("id", expenseId)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -145,14 +199,14 @@ export async function PATCH(
   }
 
   const expense = parsedExpense.data;
-  const canManageAsAdmin = isExpenseAdmin(session.profile.roles);
-  const hasManagerApprovalAccess =
-    hasRole(session.profile.roles, "MANAGER") || canManageAsAdmin;
-  const hasReimbursementAccess = canReimburseExpenses(session.profile.roles);
+  const isSuperAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
+  const hasManagerApprovalAccess = canManagerApproveExpenses(session.profile.roles);
+  const hasFinanceApprovalAccess = canFinanceApproveExpenses(session.profile.roles);
+  const canCancelAsOwner = session.profile.id === expense.employee_id;
+  const nowIso = new Date().toISOString();
 
   let managerOwnsEmployee = false;
-
-  if (!canManageAsAdmin && hasManagerApprovalAccess) {
+  if (!isSuperAdmin && hasManagerApprovalAccess) {
     const { data: rawEmployeeProfile, error: employeeProfileError } = await supabase
       .from("profiles")
       .select("id, manager_id")
@@ -175,94 +229,192 @@ export async function PATCH(
     const parsedEmployeeProfile = profileManagerSchema.safeParse(rawEmployeeProfile);
     managerOwnsEmployee =
       parsedEmployeeProfile.success &&
-      parsedEmployeeProfile.data.manager_id === session.profile.id;
+      parsedEmployeeProfile.data.manager_id === session.profile.id &&
+      parsedEmployeeProfile.data.id !== session.profile.id;
   }
 
-  const canApproveThisExpense = canManageAsAdmin || managerOwnsEmployee;
-  const canCancelAsOwner = session.profile.id === expense.employee_id;
-  const nowIso = new Date().toISOString();
+  const canManagerApproveThisExpense = isSuperAdmin || managerOwnsEmployee;
+  const normalizedAction: ExpenseAction =
+    payload.action === "mark_reimbursed" ? "approve" : payload.action;
 
   let updatePayload: Record<string, unknown> | null = null;
 
-  if (payload.action === "approve") {
-    if (!canApproveExpenses(session.profile.roles) || !canApproveThisExpense) {
-      return jsonResponse<null>(403, {
-        data: null,
-        error: {
-          code: "FORBIDDEN",
-          message: "You are not allowed to approve this expense."
-        },
-        meta: buildMeta()
-      });
-    }
+  if (normalizedAction === "approve") {
+    if (expense.status === "pending") {
+      if (!hasManagerApprovalAccess || !canManagerApproveThisExpense) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only a direct manager or Super Admin can manager-approve this expense."
+          },
+          meta: buildMeta()
+        });
+      }
 
-    if (expense.status !== "pending") {
+      if (session.profile.id === expense.employee_id) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "You cannot approve your own expense."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      updatePayload = {
+        status: "manager_approved",
+        manager_approved_by: session.profile.id,
+        manager_approved_at: nowIso,
+        approved_by: session.profile.id,
+        approved_at: nowIso,
+        rejected_by: null,
+        rejected_at: null,
+        rejection_reason: null,
+        finance_rejected_by: null,
+        finance_rejected_at: null,
+        finance_rejection_reason: null
+      };
+    } else if (expense.status === "manager_approved" || expense.status === "approved") {
+      if (!hasFinanceApprovalAccess) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only Finance Admin or Super Admin can disburse this expense."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      const reimbursementReference = payload.reimbursementReference?.trim();
+
+      if (!reimbursementReference) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Reimbursement reference is required for finance disbursement."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      updatePayload = {
+        status: "reimbursed",
+        finance_approved_by: session.profile.id,
+        finance_approved_at: nowIso,
+        reimbursed_by: session.profile.id,
+        reimbursed_at: nowIso,
+        reimbursement_reference: reimbursementReference,
+        reimbursement_notes: payload.reimbursementNotes?.trim() || null,
+        finance_rejected_by: null,
+        finance_rejected_at: null,
+        finance_rejection_reason: null
+      };
+    } else {
       return jsonResponse<null>(409, {
         data: null,
         error: {
           code: "INVALID_STATE",
-          message: "Only pending expenses can be approved."
+          message: "Expense cannot be approved from the current status."
         },
         meta: buildMeta()
       });
     }
-
-    updatePayload = {
-      status: "approved",
-      approved_by: session.profile.id,
-      approved_at: nowIso,
-      rejected_by: null,
-      rejected_at: null,
-      rejection_reason: null
-    };
   }
 
-  if (payload.action === "reject") {
-    if (!canApproveExpenses(session.profile.roles) || !canApproveThisExpense) {
-      return jsonResponse<null>(403, {
-        data: null,
-        error: {
-          code: "FORBIDDEN",
-          message: "You are not allowed to reject this expense."
-        },
-        meta: buildMeta()
-      });
-    }
+  if (normalizedAction === "reject") {
+    if (expense.status === "pending") {
+      if (!hasManagerApprovalAccess || !canManagerApproveThisExpense) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only a direct manager or Super Admin can reject this pending expense."
+          },
+          meta: buildMeta()
+        });
+      }
 
-    if (expense.status !== "pending") {
+      if (!payload.rejectionReason || payload.rejectionReason.trim().length === 0) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Rejection reason is required."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      updatePayload = {
+        status: "rejected",
+        rejected_by: session.profile.id,
+        rejected_at: nowIso,
+        rejection_reason: payload.rejectionReason.trim(),
+        manager_approved_by: null,
+        manager_approved_at: null,
+        approved_by: null,
+        approved_at: null,
+        finance_approved_by: null,
+        finance_approved_at: null,
+        finance_rejected_by: null,
+        finance_rejected_at: null,
+        finance_rejection_reason: null
+      };
+    } else if (expense.status === "manager_approved" || expense.status === "approved") {
+      if (!hasFinanceApprovalAccess) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only Finance Admin or Super Admin can issue a finance rejection."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      const financeRejectionReason = payload.financeRejectionReason?.trim();
+
+      if (!financeRejectionReason) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Finance rejection reason is required."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      updatePayload = {
+        status: "finance_rejected",
+        finance_rejected_by: session.profile.id,
+        finance_rejected_at: nowIso,
+        finance_rejection_reason: financeRejectionReason,
+        finance_approved_by: null,
+        finance_approved_at: null,
+        reimbursed_by: null,
+        reimbursed_at: null,
+        reimbursement_reference: null,
+        reimbursement_notes: null
+      };
+    } else {
       return jsonResponse<null>(409, {
         data: null,
         error: {
           code: "INVALID_STATE",
-          message: "Only pending expenses can be rejected."
+          message: "Expense cannot be rejected from the current status."
         },
         meta: buildMeta()
       });
     }
-
-    if (!payload.rejectionReason || payload.rejectionReason.trim().length === 0) {
-      return jsonResponse<null>(422, {
-        data: null,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Rejection reason is required."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    updatePayload = {
-      status: "rejected",
-      rejected_by: session.profile.id,
-      rejected_at: nowIso,
-      rejection_reason: payload.rejectionReason.trim(),
-      approved_by: null,
-      approved_at: null
-    };
   }
 
-  if (payload.action === "cancel") {
-    if (!canCancelAsOwner && !canManageAsAdmin) {
+  if (normalizedAction === "cancel") {
+    if (!canCancelAsOwner && !isSuperAdmin) {
       return jsonResponse<null>(403, {
         data: null,
         error: {
@@ -289,38 +441,6 @@ export async function PATCH(
     };
   }
 
-  if (payload.action === "mark_reimbursed") {
-    if (!hasReimbursementAccess) {
-      return jsonResponse<null>(403, {
-        data: null,
-        error: {
-          code: "FORBIDDEN",
-          message: "Only Finance Admin and Super Admin can mark reimbursements."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    if (expense.status !== "approved") {
-      return jsonResponse<null>(409, {
-        data: null,
-        error: {
-          code: "INVALID_STATE",
-          message: "Only approved expenses can be reimbursed."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    updatePayload = {
-      status: "reimbursed",
-      reimbursed_by: session.profile.id,
-      reimbursed_at: nowIso,
-      reimbursement_reference: payload.reimbursementReference?.trim() || null,
-      reimbursement_notes: payload.reimbursementNotes?.trim() || null
-    };
-  }
-
   if (!updatePayload) {
     return jsonResponse<null>(400, {
       data: null,
@@ -337,17 +457,19 @@ export async function PATCH(
     .update(updatePayload)
     .eq("id", expenseId)
     .eq("org_id", session.profile.org_id)
-    .select(
-      "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at"
-    )
+    .select(expenseSelectColumns)
     .single();
 
   if (updateExpenseError || !updatedExpenseRaw) {
-    return jsonResponse<null>(500, {
+    const isPermissionError = updateExpenseError?.code === "42501" || updateExpenseError?.code === "PGRST301";
+
+    return jsonResponse<null>(isPermissionError ? 403 : 500, {
       data: null,
       error: {
-        code: "EXPENSE_UPDATE_FAILED",
-        message: "Unable to update expense."
+        code: isPermissionError ? "FORBIDDEN" : "EXPENSE_UPDATE_FAILED",
+        message: isPermissionError
+          ? "You are not allowed to perform this expense transition."
+          : "Unable to update expense."
       },
       meta: buildMeta()
     });
@@ -407,37 +529,100 @@ export async function PATCH(
     recordId: updatedExpense.id,
     oldValue: {
       status: expense.status,
+      managerApprovedBy: expense.manager_approved_by,
+      managerApprovedAt: expense.manager_approved_at,
+      financeApprovedBy: expense.finance_approved_by,
+      financeApprovedAt: expense.finance_approved_at,
+      financeRejectedBy: expense.finance_rejected_by,
+      financeRejectedAt: expense.finance_rejected_at,
       approvedBy: expense.approved_by,
       approvedAt: expense.approved_at,
       rejectedBy: expense.rejected_by,
       rejectedAt: expense.rejected_at,
       reimbursedBy: expense.reimbursed_by,
-      reimbursedAt: expense.reimbursed_at
+      reimbursedAt: expense.reimbursed_at,
+      reimbursementReference: expense.reimbursement_reference
     },
     newValue: {
       status: updatedExpense.status,
+      managerApprovedBy: updatedExpense.managerApprovedBy,
+      managerApprovedAt: updatedExpense.managerApprovedAt,
+      financeApprovedBy: updatedExpense.financeApprovedBy,
+      financeApprovedAt: updatedExpense.financeApprovedAt,
+      financeRejectedBy: updatedExpense.financeRejectedBy,
+      financeRejectedAt: updatedExpense.financeRejectedAt,
       approvedBy: updatedExpense.approvedBy,
       approvedAt: updatedExpense.approvedAt,
       rejectedBy: updatedExpense.rejectedBy,
       rejectedAt: updatedExpense.rejectedAt,
       reimbursedBy: updatedExpense.reimbursedBy,
-      reimbursedAt: updatedExpense.reimbursedAt
+      reimbursedAt: updatedExpense.reimbursedAt,
+      reimbursementReference: updatedExpense.reimbursementReference
     }
   });
 
-  if (payload.action === "approve" || payload.action === "reject") {
+  if (normalizedAction === "approve" && updatedExpense.status === "manager_approved") {
+    const financeAdminUserIds = await listFinanceAdminIds({
+      supabase,
+      orgId: session.profile.org_id
+    });
+
     await createNotification({
       orgId: session.profile.org_id,
       userId: updatedExpense.employeeId,
       type: "expense_status",
-      title:
-        payload.action === "approve"
-          ? "Expense approved"
-          : "Expense rejected",
-      body:
-        payload.action === "approve"
-          ? `${updatedExpense.category} expense for ${updatedExpense.expenseDate} was approved.`
-          : `${updatedExpense.category} expense for ${updatedExpense.expenseDate} was rejected.${payload.rejectionReason ? ` Reason: ${payload.rejectionReason}` : ""}`,
+      title: "Expense manager-approved",
+      body: `Your expense was approved by your manager and is pending finance disbursement.`,
+      link: "/expenses"
+    });
+
+    await createBulkNotifications({
+      orgId: session.profile.org_id,
+      userIds: financeAdminUserIds.filter((userId) => userId !== updatedExpense.employeeId),
+      type: "expense_status",
+      title: "Expense ready for disbursement",
+      body: `${updatedExpense.employeeName}'s expense was approved by a manager and is ready for finance disbursement.`,
+      link: "/expenses/approvals"
+    });
+  }
+
+  if (normalizedAction === "approve" && updatedExpense.status === "reimbursed") {
+    const amountText = formatMinorUnits(updatedExpense.amount, updatedExpense.currency);
+    const referenceText = updatedExpense.reimbursementReference ?? "N/A";
+
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      type: "expense_status",
+      title: "Expense reimbursed",
+      body: `Your expense of ${amountText} has been reimbursed. Reference: ${referenceText}.`,
+      link: "/expenses"
+    });
+  }
+
+  if (normalizedAction === "reject" && updatedExpense.status === "rejected") {
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      type: "expense_status",
+      title: "Expense rejected",
+      body: `Your expense was rejected.${updatedExpense.rejectionReason ? ` Reason: ${updatedExpense.rejectionReason}` : ""}`,
+      link: "/expenses"
+    });
+  }
+
+  if (normalizedAction === "reject" && updatedExpense.status === "finance_rejected") {
+    const recipientIds = [
+      updatedExpense.employeeId,
+      updatedExpense.managerApprovedBy
+    ].filter((id): id is string => Boolean(id));
+
+    await createBulkNotifications({
+      orgId: session.profile.org_id,
+      userIds: recipientIds,
+      type: "expense_status",
+      title: "Expense rejected by finance",
+      body: `Finance rejected this expense.${updatedExpense.financeRejectionReason ? ` Reason: ${updatedExpense.financeRejectionReason}` : ""}`,
       link: "/expenses"
     });
   }

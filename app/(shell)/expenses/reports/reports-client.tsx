@@ -155,6 +155,24 @@ export function ExpenseReportsClient() {
               </p>
               <p className="metric-hint">Marked as reimbursed this month</p>
             </article>
+            <article className="metric-card">
+              <p className="metric-label">Avg Manager Approval Time</p>
+              <p className="metric-value numeric">
+                {reportsQuery.data.timings.avgSubmissionToManagerApprovalHours === null
+                  ? "--"
+                  : `${reportsQuery.data.timings.avgSubmissionToManagerApprovalHours.toFixed(2)}h`}
+              </p>
+              <p className="metric-hint">From submission to manager approval</p>
+            </article>
+            <article className="metric-card">
+              <p className="metric-label">Avg Disbursement Time</p>
+              <p className="metric-value numeric">
+                {reportsQuery.data.timings.avgManagerApprovalToDisbursementHours === null
+                  ? "--"
+                  : `${reportsQuery.data.timings.avgManagerApprovalToDisbursementHours.toFixed(2)}h`}
+              </p>
+              <p className="metric-hint">From manager approval to disbursement</p>
+            </article>
           </section>
 
           {reportsQuery.data.totals.expenseCount === 0 ? (
@@ -166,6 +184,28 @@ export function ExpenseReportsClient() {
             />
           ) : (
             <section className="expenses-report-layout">
+              <article className="settings-card expenses-report-card">
+                <header className="expenses-report-card-header">
+                  <h2 className="section-title">By Status</h2>
+                </header>
+                {reportsQuery.data.statusBreakdown.length === 0 ? (
+                  <p className="settings-card-description">No status data for this period.</p>
+                ) : (
+                  <ul className="expenses-report-bars" aria-label="Expense status breakdown">
+                    {reportsQuery.data.statusBreakdown.map((row) => (
+                      <li key={row.status} className="expenses-report-row">
+                        <div className="expenses-report-row-copy">
+                          <p className="expenses-report-row-title">{row.label}</p>
+                          <p className="expenses-report-row-meta">
+                            <CurrencyDisplay amount={row.totalAmount} currency="USD" /> |{" "}
+                            <span className="numeric">{row.count}</span> items
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </article>
               <ExpenseReportBars title="By Category" rows={reportsQuery.data.byCategory} />
               <ExpenseReportBars title="By Employee" rows={reportsQuery.data.byEmployee} />
               <ExpenseReportBars title="By Department" rows={reportsQuery.data.byDepartment} />

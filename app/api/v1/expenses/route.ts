@@ -22,6 +22,7 @@ import {
   collectProfileIds,
   expenseCategorySchema,
   expenseRowSchema,
+  expenseSelectColumns,
   expenseStatusSchema,
   jsonResponse,
   profileRowSchema,
@@ -96,9 +97,7 @@ export async function GET(request: Request) {
 
   let expenseQuery = supabase
     .from("expenses")
-    .select(
-      "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at"
-    )
+    .select(expenseSelectColumns)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
     .order("expense_date", { ascending: false })
@@ -372,9 +371,7 @@ export async function POST(request: Request) {
   const { data: insertedExpense, error: insertExpenseError } = await supabase
     .from("expenses")
     .insert(mutationPayload)
-    .select(
-      "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at"
-    )
+    .select(expenseSelectColumns)
     .single();
 
   if (insertExpenseError || !insertedExpense) {
@@ -456,41 +453,12 @@ export async function POST(request: Request) {
     }
   });
 
-  const { data: approvalRows, error: approvalError } = await supabase
-    .from("profiles")
-    .select("id, roles")
-    .eq("org_id", session.profile.org_id)
-    .is("deleted_at", null);
+  const managerRecipientId = employeeProfile?.manager_id;
 
-  if (approvalError) {
-    console.error("Unable to load expense approval recipients.", {
-      expenseId: expense.id,
-      message: approvalError.message
-    });
-  } else {
-    const adminApproverIds = (approvalRows ?? [])
-      .filter((row) => {
-        const roles = Array.isArray(row.roles)
-          ? row.roles.filter((role): role is string => typeof role === "string")
-          : [];
-
-        return (
-          roles.includes("FINANCE_ADMIN") ||
-          roles.includes("HR_ADMIN") ||
-          roles.includes("SUPER_ADMIN")
-        );
-      })
-      .map((row) => row.id)
-      .filter((id): id is string => typeof id === "string");
-
-    const recipientIds = [
-      ...(employeeProfile?.manager_id ? [employeeProfile.manager_id] : []),
-      ...adminApproverIds
-    ].filter((id) => id !== expense.employeeId);
-
+  if (managerRecipientId && managerRecipientId !== expense.employeeId) {
     await createBulkNotifications({
       orgId: session.profile.org_id,
-      userIds: recipientIds,
+      userIds: [managerRecipientId],
       type: "expense_submitted",
       title: `Expense submitted by ${expense.employeeName}`,
       body: `${expense.category} expense for ${expense.expenseDate} is pending approval.`,

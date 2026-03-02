@@ -2393,6 +2393,13 @@ html.dark .topbar {
   flex-wrap: wrap;
 }
 
+.expenses-approval-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
 .expenses-error-state {
   display: grid;
   gap: 0.75rem;
@@ -2490,6 +2497,80 @@ html.dark .topbar {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+.expenses-detail-row td {
+  padding: 0;
+  border-top: 0;
+}
+
+.expenses-detail-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: 0.75rem;
+  margin: 0.45rem 0.75rem 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.expenses-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.expenses-timeline-item {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  padding: 0.55rem 0.65rem;
+  display: grid;
+  gap: 0.2rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.expenses-timeline-marker {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  margin-top: 0.28rem;
+  background: var(--status-info-border);
+}
+
+.expenses-timeline-item-success .expenses-timeline-marker {
+  background: var(--status-success-border);
+}
+
+.expenses-timeline-item-pending .expenses-timeline-marker {
+  background: var(--status-pending-border);
+}
+
+.expenses-timeline-item-error .expenses-timeline-marker {
+  background: var(--status-error-border);
+}
+
+.expenses-timeline-main {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.expenses-timeline-title {
+  font-weight: 600;
+}
+
+.expenses-timeline-description {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.expenses-timeline-time {
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: right;
 }
 
 .expenses-category-grid {
@@ -4680,6 +4761,24 @@ html.dark .topbar {
     transform: none;
     pointer-events: auto;
     flex-wrap: wrap;
+  }
+
+  .expenses-approval-tabs {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-detail-card {
+    margin: 0.45rem 0 0.75rem;
+  }
+
+  .expenses-timeline-item {
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-timeline-time {
+    text-align: left;
   }
 
   .audit-filters {

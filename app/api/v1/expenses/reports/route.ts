@@ -2,17 +2,20 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import {
+  getExpenseStatusLabel,
   currentMonthKey,
   getExpenseCategoryLabel,
   isIsoMonth,
   monthDateRange
 } from "../../../../../lib/expenses";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
-import type { ExpenseReportsResponseData } from "../../../../../types/expenses";
+import type { ExpenseReportsResponseData, ExpenseStatus } from "../../../../../types/expenses";
 import {
   buildMeta,
   canViewExpenseReports,
+  collectProfileIds,
   expenseRowSchema,
+  expenseSelectColumns,
   isExpenseAdmin,
   jsonResponse,
   profileRowSchema
@@ -139,9 +142,7 @@ export async function GET(request: Request) {
 
   let expensesQuery = supabase
     .from("expenses")
-    .select(
-      "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at"
-    )
+    .select(expenseSelectColumns)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
     .gte("expense_date", range.startDate)
@@ -183,13 +184,71 @@ export async function GET(request: Request) {
     });
   }
 
-  const employeeIds = [...new Set(parsedExpenses.data.map((expense) => expense.employee_id))];
+  if (parsedExpenses.data.length === 0) {
+    const emptyResponse: ExpenseReportsResponseData = {
+      month,
+      totals: {
+        expenseCount: 0,
+        totalAmount: 0,
+        pendingAmount: 0,
+        reimbursedAmount: 0
+      },
+      statusBreakdown: [],
+      timings: {
+        avgSubmissionToManagerApprovalHours: null,
+        avgManagerApprovalToDisbursementHours: null
+      },
+      byCategory: [],
+      byEmployee: [],
+      byDepartment: []
+    };
+
+    if (query.format === "csv") {
+      const csvHeader = [
+        "Month",
+        "Expense Date",
+        "Employee",
+        "Department",
+        "Category",
+        "Description",
+        "Amount (minor units)",
+        "Currency",
+        "Status",
+        "Manager Approved By",
+        "Manager Approved At",
+        "Finance Approved By",
+        "Finance Approved At",
+        "Finance Rejected By",
+        "Finance Rejected At",
+        "Finance Rejection Reason",
+        "Reimbursement Reference",
+        "Reimbursed At"
+      ];
+      const fileName = `crew-hub-expenses-${month}.csv`;
+
+      return new Response(csvHeader.join(","), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename=\"${fileName}\"`
+        }
+      });
+    }
+
+    return jsonResponse<ExpenseReportsResponseData>(200, {
+      data: emptyResponse,
+      error: null,
+      meta: buildMeta()
+    });
+  }
+
+  const profileIds = collectProfileIds(parsedExpenses.data);
   const { data: rawProfiles, error: profilesError } = await supabase
     .from("profiles")
     .select("id, full_name, department, country_code, manager_id")
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
-    .in("id", employeeIds);
+    .in("id", profileIds);
 
   if (profilesError) {
     return jsonResponse<null>(500, {
@@ -219,17 +278,26 @@ export async function GET(request: Request) {
   const categoryTotals = new Map<string, { label: string; totalAmount: number; count: number }>();
   const employeeTotals = new Map<string, { label: string; totalAmount: number; count: number }>();
   const departmentTotals = new Map<string, { label: string; totalAmount: number; count: number }>();
+  const statusTotals = new Map<string, { label: string; totalAmount: number; count: number }>();
 
   let pendingAmount = 0;
   let reimbursedAmount = 0;
   let totalAmount = 0;
+  let submissionToManagerApprovalHoursTotal = 0;
+  let submissionToManagerApprovalCount = 0;
+  let managerApprovalToDisbursementHoursTotal = 0;
+  let managerApprovalToDisbursementCount = 0;
 
   for (const expense of parsedExpenses.data) {
     const amount = typeof expense.amount === "number" ? expense.amount : Number.parseInt(expense.amount, 10);
     const safeAmount = Number.isFinite(amount) ? Math.trunc(amount) : 0;
     totalAmount += safeAmount;
 
-    if (expense.status === "pending") {
+    if (
+      expense.status === "pending" ||
+      expense.status === "manager_approved" ||
+      expense.status === "approved"
+    ) {
       pendingAmount += safeAmount;
     }
 
@@ -267,6 +335,38 @@ export async function GET(request: Request) {
     departmentEntry.totalAmount += safeAmount;
     departmentEntry.count += 1;
     departmentTotals.set(departmentLabel, departmentEntry);
+
+    const statusLabel = getExpenseStatusLabel(expense.status);
+    const statusEntry = statusTotals.get(expense.status) ?? {
+      label: statusLabel,
+      totalAmount: 0,
+      count: 0
+    };
+    statusEntry.totalAmount += safeAmount;
+    statusEntry.count += 1;
+    statusTotals.set(expense.status, statusEntry);
+
+    const submittedAt = Date.parse(expense.created_at);
+    const managerApprovedAt = Date.parse(
+      expense.manager_approved_at ?? expense.approved_at ?? ""
+    );
+    const reimbursedAt = Date.parse(expense.reimbursed_at ?? "");
+
+    if (Number.isFinite(submittedAt) && Number.isFinite(managerApprovedAt)) {
+      const elapsed = managerApprovedAt - submittedAt;
+      if (elapsed >= 0) {
+        submissionToManagerApprovalHoursTotal += elapsed / (1000 * 60 * 60);
+        submissionToManagerApprovalCount += 1;
+      }
+    }
+
+    if (Number.isFinite(managerApprovedAt) && Number.isFinite(reimbursedAt)) {
+      const elapsed = reimbursedAt - managerApprovedAt;
+      if (elapsed >= 0) {
+        managerApprovalToDisbursementHoursTotal += elapsed / (1000 * 60 * 60);
+        managerApprovalToDisbursementCount += 1;
+      }
+    }
   }
 
   if (query.format === "csv") {
@@ -279,11 +379,31 @@ export async function GET(request: Request) {
       "Description",
       "Amount (minor units)",
       "Currency",
-      "Status"
+      "Status",
+      "Manager Approved By",
+      "Manager Approved At",
+      "Finance Approved By",
+      "Finance Approved At",
+      "Finance Rejected By",
+      "Finance Rejected At",
+      "Finance Rejection Reason",
+      "Reimbursement Reference",
+      "Reimbursed At"
     ];
 
     const csvRows = parsedExpenses.data.map((expense) => {
       const profile = profileById.get(expense.employee_id);
+      const managerApprover = expense.manager_approved_by
+        ? profileById.get(expense.manager_approved_by)
+        : expense.approved_by
+          ? profileById.get(expense.approved_by)
+          : null;
+      const financeApprover = expense.finance_approved_by
+        ? profileById.get(expense.finance_approved_by)
+        : null;
+      const financeRejector = expense.finance_rejected_by
+        ? profileById.get(expense.finance_rejected_by)
+        : null;
       const amount = typeof expense.amount === "number" ? expense.amount : Number.parseInt(expense.amount, 10);
       const safeAmount = Number.isFinite(amount) ? Math.trunc(amount) : 0;
 
@@ -296,7 +416,16 @@ export async function GET(request: Request) {
         expense.description,
         safeAmount,
         expense.currency,
-        expense.status
+        expense.status,
+        managerApprover?.full_name ?? "",
+        expense.manager_approved_at ?? expense.approved_at ?? "",
+        financeApprover?.full_name ?? "",
+        expense.finance_approved_at ?? "",
+        financeRejector?.full_name ?? "",
+        expense.finance_rejected_at ?? "",
+        expense.finance_rejection_reason ?? "",
+        expense.reimbursement_reference ?? "",
+        expense.reimbursed_at ?? ""
       ]
         .map((value) => csvEscape(value))
         .join(",");
@@ -341,6 +470,15 @@ export async function GET(request: Request) {
     }))
     .sort((left, right) => right.totalAmount - left.totalAmount);
 
+  const statusBreakdown = [...statusTotals.entries()]
+    .map(([status, value]) => ({
+      status: status as ExpenseStatus,
+      label: value.label,
+      totalAmount: value.totalAmount,
+      count: value.count
+    }))
+    .sort((left, right) => right.totalAmount - left.totalAmount);
+
   const responseData: ExpenseReportsResponseData = {
     month,
     totals: {
@@ -348,6 +486,17 @@ export async function GET(request: Request) {
       totalAmount,
       pendingAmount,
       reimbursedAmount
+    },
+    statusBreakdown,
+    timings: {
+      avgSubmissionToManagerApprovalHours:
+        submissionToManagerApprovalCount > 0
+          ? Number((submissionToManagerApprovalHoursTotal / submissionToManagerApprovalCount).toFixed(2))
+          : null,
+      avgManagerApprovalToDisbursementHours:
+        managerApprovalToDisbursementCount > 0
+          ? Number((managerApprovalToDisbursementHoursTotal / managerApprovalToDisbursementCount).toFixed(2))
+          : null
     },
     byCategory,
     byEmployee,
