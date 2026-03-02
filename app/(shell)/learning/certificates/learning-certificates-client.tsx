@@ -22,7 +22,7 @@ function certificatesSkeleton() {
   );
 }
 
-export function LearningCertificatesClient() {
+export function LearningCertificatesClient({ embedded = false }: { embedded?: boolean }) {
   const assignmentsQuery = useLearningMyAssignments({
     status: "completed"
   });
@@ -71,10 +71,12 @@ export function LearningCertificatesClient() {
 
   return (
     <>
-      <PageHeader
-        title="Learning Certificates"
-        description="View and download completion certificates for your finished courses."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Certificates"
+          description="View and download completion certificates for your finished courses."
+        />
+      ) : null}
 
       {assignmentsQuery.isLoading ? certificatesSkeleton() : null}
 

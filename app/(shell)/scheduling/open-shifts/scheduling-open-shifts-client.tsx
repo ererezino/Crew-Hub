@@ -22,7 +22,7 @@ function openShiftsSkeleton() {
   );
 }
 
-export function SchedulingOpenShiftsClient() {
+export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: boolean }) {
   const openShiftsQuery = useOpenShifts();
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isClaimingShiftId, setIsClaimingShiftId] = useState<string | null>(null);
@@ -72,10 +72,12 @@ export function SchedulingOpenShiftsClient() {
 
   return (
     <>
-      <PageHeader
-        title="Open Shifts"
-        description="Claim available shifts published by your managers."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Open Shifts"
+          description="Claim available shifts published by your managers."
+        />
+      ) : null}
 
       {openShiftsQuery.isLoading ? openShiftsSkeleton() : null}
 

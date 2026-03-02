@@ -61,7 +61,7 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
   return (
     <>
       <PageHeader
-        title="My Compensation"
+        title="Compensation"
         description="Review salary, allowances, equity vesting, and compensation history in Crew Hub."
       />
       {content}

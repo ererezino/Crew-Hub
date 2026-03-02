@@ -219,7 +219,7 @@ function detailsCardSkeleton() {
   );
 }
 
-export function MePaymentDetailsClient() {
+export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolean }) {
   const paymentDetailsQuery = useMePaymentDetails();
 
   const [formValues, setFormValues] = useState<PaymentDetailsFormValues>(INITIAL_FORM_VALUES);
@@ -388,10 +388,12 @@ export function MePaymentDetailsClient() {
 
   return (
     <>
-      <PageHeader
-        title="My Payment Details"
-        description="Manage payout destination details for Crew Hub payroll disbursements."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Payment Details"
+          description="Manage payout destination details for Crew Hub payroll disbursements."
+        />
+      ) : null}
 
       {paymentDetailsQuery.isLoading ? detailsCardSkeleton() : null}
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useState } from "react";
@@ -8,6 +8,7 @@ import { useState } from "react";
 import { DashboardChart } from "../../../components/dashboard/dashboard-chart";
 import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skeleton";
 import { HeroMetricCard } from "../../../components/dashboard/hero-metric-card";
+import { OnboardingBanner } from "../../../components/dashboard/onboarding-banner";
 import { DashboardAnnouncementsWidget } from "../../../components/shared/dashboard-announcements-widget";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -15,6 +16,7 @@ import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { useDashboard } from "../../../hooks/use-dashboard";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import type { OnboardingInstancesResponse } from "../../../types/onboarding";
 
 const panelStagger = {
   initial: {},
@@ -35,8 +37,33 @@ const panelItem = {
   }
 };
 
-function DashboardContent() {
+async function fetchMyOnboardingSummary() {
+  const response = await fetch(
+    "/api/v1/onboarding/instances?scope=me&status=active&type=onboarding",
+    {
+      method: "GET"
+    }
+  );
+
+  const payload = (await response.json()) as OnboardingInstancesResponse;
+
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load onboarding summary.");
+  }
+
+  return payload.data.instances[0] ?? null;
+}
+
+function DashboardContent({ profileStatus }: { profileStatus: string }) {
   const dashboardQuery = useDashboard();
+  const onboardingSummaryQuery = useQuery({
+    queryKey: ["dashboard-onboarding-summary"],
+    queryFn: fetchMyOnboardingSummary,
+    enabled: profileStatus === "onboarding",
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 1
+  });
 
   if (dashboardQuery.isPending) {
     return (
@@ -83,6 +110,14 @@ function DashboardContent() {
         description={`Welcome back, ${data.greeting.firstName}`}
       />
 
+      {profileStatus === "onboarding" && onboardingSummaryQuery.data ? (
+        <OnboardingBanner
+          progressPercent={onboardingSummaryQuery.data.progressPercent}
+          totalTasks={onboardingSummaryQuery.data.totalTasks}
+          completedTasks={onboardingSummaryQuery.data.completedTasks}
+        />
+      ) : null}
+
       <motion.p
         className="dashboard-v2-role-badge"
         initial={{ opacity: 0 }}
@@ -127,7 +162,7 @@ function DashboardContent() {
               </Link>
             </li>
             <li>
-              <Link className="quick-link" href="/me/payslips">
+              <Link className="quick-link" href="/me/pay">
                 View Payments
               </Link>
             </li>
@@ -252,7 +287,7 @@ function DashboardContent() {
   );
 }
 
-export function DashboardClient() {
+export function DashboardClient({ profileStatus }: { profileStatus: string }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -267,7 +302,7 @@ export function DashboardClient() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <DashboardContent />
+      <DashboardContent profileStatus={profileStatus} />
     </QueryClientProvider>
   );
 }

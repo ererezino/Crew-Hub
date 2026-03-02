@@ -420,12 +420,10 @@ function ExpenseTimelineItem({
 
 export function ExpensesClient({
   currentUserId,
-  canApprove,
   canViewReports,
   showEmployeeColumn
 }: {
   currentUserId: string;
-  canApprove: boolean;
   canViewReports: boolean;
   showEmployeeColumn: boolean;
 }) {
@@ -692,11 +690,6 @@ export function ExpensesClient({
         description="Submit expenses with receipts, track approvals, and monitor reimbursement status."
         actions={
           <>
-            {canApprove ? (
-              <Link className="button" href="/expenses/approvals">
-                Approvals
-              </Link>
-            ) : null}
             {canViewReports ? (
               <Link className="button" href="/expenses/reports">
                 Reports

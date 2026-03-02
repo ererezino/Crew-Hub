@@ -68,7 +68,7 @@ function toneForStatus(status: LeaveRequestRecord["status"]) {
   }
 }
 
-export function TimeOffApprovalsClient() {
+export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolean }) {
   const approvalsQuery = useTimeOffApprovals();
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -203,10 +203,12 @@ export function TimeOffApprovalsClient() {
 
   return (
     <>
-      <PageHeader
-        title="Time Off Approvals"
-        description="Review pending leave requests from your team and process approvals."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Time Off Approvals"
+          description="Review pending leave requests from your team and process approvals."
+        />
+      ) : null}
 
       {approvalsQuery.isLoading ? <ApprovalTableSkeleton /> : null}
 
@@ -215,7 +217,7 @@ export function TimeOffApprovalsClient() {
           title="Approvals are unavailable"
           description={approvalsQuery.errorMessage}
           ctaLabel="Retry"
-          ctaHref="/time-off/approvals"
+          ctaHref={embedded ? "/approvals?tab=time-off" : "/time-off/approvals"}
         />
       ) : null}
 

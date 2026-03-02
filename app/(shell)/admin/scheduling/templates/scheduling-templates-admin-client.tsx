@@ -39,7 +39,7 @@ function templatesSkeleton() {
   );
 }
 
-export function SchedulingTemplatesAdminClient() {
+export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?: boolean }) {
   const templatesQuery = useSchedulingTemplates();
   const [templateForm, setTemplateForm] = useState<TemplateFormState>(defaultTemplateForm);
   const [formError, setFormError] = useState<string | null>(null);
@@ -105,10 +105,12 @@ export function SchedulingTemplatesAdminClient() {
 
   return (
     <>
-      <PageHeader
-        title="Scheduling Templates"
-        description="Manage reusable shift templates for weekly schedule planning."
-      />
+      {!embedded ? (
+        <PageHeader
+          title="Templates"
+          description="Manage reusable shift templates for weekly schedule planning."
+        />
+      ) : null}
 
       {templatesQuery.isLoading ? templatesSkeleton() : null}
 

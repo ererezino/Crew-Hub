@@ -50,7 +50,7 @@ export function TimeAttendanceClient() {
   return (
     <>
       <PageHeader
-        title="Time & Attendance"
+        title="Hours"
         description="Track clock-ins, review worked hours, and monitor weekly attendance totals."
       />
 
