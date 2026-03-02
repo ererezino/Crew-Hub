@@ -175,7 +175,7 @@ export function AppShell({ currentUserRoles, children }: AppShellProps) {
 
   const defaultExpandedGroupLabels = useMemo(() => {
     if (!isMobileViewport) {
-      return navigationGroups.map((group) => group.label);
+      return [];
     }
 
     return getDefaultMobileExpandedGroups(navigationGroups, activePathname);
