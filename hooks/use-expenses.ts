@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
+  ExpenseApprovalStage,
   ExpenseApprovalsResponse,
   ExpenseApprovalsResponseData,
   ExpenseReportsResponse,
@@ -26,6 +27,7 @@ type ExpensesQuery = {
 
 type ExpenseApprovalsQuery = {
   month?: string;
+  stage?: ExpenseApprovalStage;
 };
 
 type ExpenseReportsQuery = {
@@ -52,6 +54,10 @@ function buildApprovalsUrl(query: ExpenseApprovalsQuery): string {
 
   if (query.month) {
     searchParams.set("month", query.month);
+  }
+
+  if (query.stage) {
+    searchParams.set("stage", query.stage);
   }
 
   const queryString = searchParams.toString();
@@ -147,12 +153,13 @@ export function useExpenseApprovals(
   query: ExpenseApprovalsQuery = {}
 ): UseFetchState<ExpenseApprovalsResponseData> {
   const month = query.month;
+  const stage = query.stage;
   const [data, setData] = useState<ExpenseApprovalsResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const endpoint = useMemo(() => buildApprovalsUrl({ month }), [month]);
+  const endpoint = useMemo(() => buildApprovalsUrl({ month, stage }), [month, stage]);
 
   useEffect(() => {
     const abortController = new AbortController();

@@ -2,20 +2,23 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
-import { createBulkNotifications } from "../../../../../lib/notifications/service";
-import { isIsoMonth, monthDateRange } from "../../../../../lib/expenses";
+import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
+import { currentMonthKey, isIsoMonth, monthDateRange, parseIntegerAmount } from "../../../../../lib/expenses";
+import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type {
+  ExpenseApprovalStage,
   ExpenseApprovalsResponseData,
   ExpenseBulkApprovePayload,
   ExpenseBulkApproveResponseData
 } from "../../../../../types/expenses";
 import {
   buildMeta,
-  canApproveExpenses,
+  canFinanceApproveExpenses,
+  canManagerApproveExpenses,
   collectProfileIds,
   expenseRowSchema,
-  isExpenseAdmin,
+  expenseSelectColumns,
   jsonResponse,
   profileRowSchema,
   toExpenseRecord
@@ -25,12 +28,69 @@ const approvalsQuerySchema = z.object({
   month: z
     .string()
     .optional()
-    .refine((value) => (value ? isIsoMonth(value) : true), "Month must be in YYYY-MM format")
+    .refine((value) => (value ? isIsoMonth(value) : true), "Month must be in YYYY-MM format"),
+  stage: z.enum(["manager", "finance"]).optional()
 });
 
 const bulkApprovePayloadSchema = z.object({
-  expenseIds: z.array(z.string().uuid()).min(1, "Select at least one expense to approve.").max(200)
+  expenseIds: z.array(z.string().uuid()).min(1, "Select at least one expense to approve.").max(200),
+  stage: z.enum(["manager", "finance"])
 });
+
+const approverProfileSchema = z.object({
+  id: z.string().uuid(),
+  roles: z.array(z.string()).nullable()
+});
+
+function statusForStage(stage: ExpenseApprovalStage): "pending" | "manager_approved" {
+  return stage === "manager" ? "pending" : "manager_approved";
+}
+
+function stageLabel(stage: ExpenseApprovalStage): string {
+  return stage === "manager" ? "manager approval" : "finance disbursement";
+}
+
+function resolveStage({
+  requestedStage,
+  canManagerApprove,
+  canFinanceApprove
+}: {
+  requestedStage: ExpenseApprovalStage | undefined;
+  canManagerApprove: boolean;
+  canFinanceApprove: boolean;
+}): ExpenseApprovalStage | null {
+  const stage = requestedStage ?? (canManagerApprove ? "manager" : canFinanceApprove ? "finance" : null);
+
+  if (!stage) {
+    return null;
+  }
+
+  if (stage === "manager" && !canManagerApprove) {
+    return null;
+  }
+
+  if (stage === "finance" && !canFinanceApprove) {
+    return null;
+  }
+
+  return stage;
+}
+
+function formatMinorUnits(amount: number, currency: string): string {
+  const safeAmount = parseIntegerAmount(amount);
+  const major = safeAmount / 100;
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(major);
+  } catch {
+    return `${currency} ${major.toFixed(2)}`;
+  }
+}
 
 async function listManagerReportIds({
   supabase,
@@ -57,6 +117,39 @@ async function listManagerReportIds({
     .filter((id): id is string => typeof id === "string");
 }
 
+async function listFinanceAdminIds({
+  supabase,
+  orgId
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  orgId: string;
+}): Promise<string[]> {
+  const { data: rows, error } = await supabase
+    .from("profiles")
+    .select("id, roles")
+    .eq("org_id", orgId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.error("Unable to load finance admin recipients for expense bulk approval.", {
+      orgId,
+      message: error.message
+    });
+
+    return [];
+  }
+
+  const parsedRows = z.array(approverProfileSchema).safeParse(rows ?? []);
+
+  if (!parsedRows.success) {
+    return [];
+  }
+
+  return parsedRows.data
+    .filter((row) => row.roles?.includes("FINANCE_ADMIN"))
+    .map((row) => row.id);
+}
+
 export async function GET(request: Request) {
   const session = await getAuthenticatedSession();
 
@@ -71,7 +164,11 @@ export async function GET(request: Request) {
     });
   }
 
-  if (!canApproveExpenses(session.profile.roles)) {
+  const profile = session.profile;
+  const canManagerApprove = canManagerApproveExpenses(profile.roles);
+  const canFinanceApprove = canFinanceApproveExpenses(profile.roles);
+
+  if (!canManagerApprove && !canFinanceApprove) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
@@ -98,22 +195,40 @@ export async function GET(request: Request) {
     });
   }
 
-  const supabase = await createSupabaseServerClient();
   const query = parsedQuery.data;
-  const adminScope = isExpenseAdmin(session.profile.roles);
+  const stage = resolveStage({
+    requestedStage: query.stage,
+    canManagerApprove,
+    canFinanceApprove
+  });
+
+  if (!stage) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You do not have permission to view this approval stage."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const isSuperAdmin = hasRole(profile.roles, "SUPER_ADMIN");
+  const targetStatus = statusForStage(stage);
 
   let allowedEmployeeIds: string[] = [];
-
-  if (!adminScope) {
+  if (stage === "manager" && !isSuperAdmin) {
     allowedEmployeeIds = await listManagerReportIds({
       supabase,
-      orgId: session.profile.org_id,
-      managerId: session.profile.id
+      orgId: profile.org_id,
+      managerId: profile.id
     });
 
     if (allowedEmployeeIds.length === 0) {
       return jsonResponse<ExpenseApprovalsResponseData>(200, {
         data: {
+          stage,
           expenses: [],
           pendingCount: 0,
           pendingAmount: 0
@@ -126,15 +241,13 @@ export async function GET(request: Request) {
 
   let expenseQuery = supabase
     .from("expenses")
-    .select(
-      "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at"
-    )
-    .eq("org_id", session.profile.org_id)
-    .eq("status", "pending")
+    .select(expenseSelectColumns)
+    .eq("org_id", profile.org_id)
+    .eq("status", targetStatus)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
-  if (!adminScope) {
+  if (stage === "manager" && !isSuperAdmin) {
     expenseQuery = expenseQuery.in("employee_id", allowedEmployeeIds);
   }
 
@@ -162,7 +275,7 @@ export async function GET(request: Request) {
       data: null,
       error: {
         code: "EXPENSE_APPROVALS_FETCH_FAILED",
-        message: "Unable to load pending expenses."
+        message: `Unable to load expenses for ${stageLabel(stage)}.`
       },
       meta: buildMeta()
     });
@@ -181,11 +294,24 @@ export async function GET(request: Request) {
     });
   }
 
+  if (parsedExpenses.data.length === 0) {
+    return jsonResponse<ExpenseApprovalsResponseData>(200, {
+      data: {
+        stage,
+        expenses: [],
+        pendingCount: 0,
+        pendingAmount: 0
+      },
+      error: null,
+      meta: buildMeta()
+    });
+  }
+
   const profileIds = collectProfileIds(parsedExpenses.data);
   const { data: rawProfiles, error: profilesError } = await supabase
     .from("profiles")
     .select("id, full_name, department, country_code, manager_id")
-    .eq("org_id", session.profile.org_id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .in("id", profileIds);
 
@@ -218,6 +344,7 @@ export async function GET(request: Request) {
   const pendingAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
 
   const responseData: ExpenseApprovalsResponseData = {
+    stage,
     expenses,
     pendingCount: expenses.length,
     pendingAmount
@@ -244,7 +371,11 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!canApproveExpenses(session.profile.roles)) {
+  const profile = session.profile;
+  const canManagerApprove = canManagerApproveExpenses(profile.roles);
+  const canFinanceApprove = canFinanceApproveExpenses(profile.roles);
+
+  if (!canManagerApprove && !canFinanceApprove) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
@@ -284,18 +415,35 @@ export async function POST(request: Request) {
   }
 
   const payload: ExpenseBulkApprovePayload = parsedPayload.data;
+  const stage = resolveStage({
+    requestedStage: payload.stage,
+    canManagerApprove,
+    canFinanceApprove
+  });
+
+  if (!stage) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You do not have permission to bulk process this stage."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const supabase = await createSupabaseServerClient();
-  const adminScope = isExpenseAdmin(session.profile.roles);
+  const isSuperAdmin = hasRole(profile.roles, "SUPER_ADMIN");
   const nowIso = new Date().toISOString();
+  const currentMonth = currentMonthKey();
+  const targetStatus = statusForStage(stage);
 
   const { data: rawTargetRows, error: targetRowsError } = await supabase
     .from("expenses")
-    .select(
-      "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at"
-    )
-    .eq("org_id", session.profile.org_id)
+    .select(expenseSelectColumns)
+    .eq("org_id", profile.org_id)
     .in("id", payload.expenseIds)
-    .eq("status", "pending")
+    .eq("status", targetStatus)
     .is("deleted_at", null);
 
   if (targetRowsError) {
@@ -324,15 +472,18 @@ export async function POST(request: Request) {
 
   let allowedRows = parsedTargetRows.data;
 
-  if (!adminScope) {
+  if (stage === "manager" && !isSuperAdmin) {
+    const currentUserId = profile.id;
     const reportIds = await listManagerReportIds({
       supabase,
-      orgId: session.profile.org_id,
-      managerId: session.profile.id
+      orgId: profile.org_id,
+      managerId: profile.id
     });
 
     const reportIdSet = new Set(reportIds);
-    allowedRows = allowedRows.filter((row) => reportIdSet.has(row.employee_id));
+    allowedRows = allowedRows.filter(
+      (row) => reportIdSet.has(row.employee_id) && row.employee_id !== currentUserId
+    );
   }
 
   const allowedIds = allowedRows.map((row) => row.id);
@@ -341,6 +492,7 @@ export async function POST(request: Request) {
   if (allowedIds.length === 0) {
     return jsonResponse<ExpenseBulkApproveResponseData>(200, {
       data: {
+        stage,
         expenses: [],
         approvedCount: 0,
         skippedIds
@@ -350,28 +502,53 @@ export async function POST(request: Request) {
     });
   }
 
+  const batchReference = `EXP-${currentMonth.replace("-", "")}-${Date.now()}`;
+
+  const updatePayload =
+    stage === "manager"
+      ? {
+          status: "manager_approved" as const,
+          manager_approved_by: profile.id,
+          manager_approved_at: nowIso,
+          approved_by: profile.id,
+          approved_at: nowIso,
+          rejected_by: null,
+          rejected_at: null,
+          rejection_reason: null,
+          finance_rejected_by: null,
+          finance_rejected_at: null,
+          finance_rejection_reason: null
+        }
+      : {
+          status: "reimbursed" as const,
+          finance_approved_by: profile.id,
+          finance_approved_at: nowIso,
+          reimbursed_by: profile.id,
+          reimbursed_at: nowIso,
+          reimbursement_reference: batchReference,
+          reimbursement_notes: "Bulk reimbursement run",
+          finance_rejected_by: null,
+          finance_rejected_at: null,
+          finance_rejection_reason: null
+        };
+
   const { data: updatedRowsRaw, error: updatedRowsError } = await supabase
     .from("expenses")
-    .update({
-      status: "approved",
-      approved_by: session.profile.id,
-      approved_at: nowIso,
-      rejected_by: null,
-      rejected_at: null,
-      rejection_reason: null
-    })
-    .eq("org_id", session.profile.org_id)
+    .update(updatePayload)
+    .eq("org_id", profile.org_id)
     .in("id", allowedIds)
-    .select(
-      "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at"
-    );
+    .select(expenseSelectColumns);
 
   if (updatedRowsError) {
-    return jsonResponse<null>(500, {
+    const isPermissionError = updatedRowsError.code === "42501" || updatedRowsError.code === "PGRST301";
+
+    return jsonResponse<null>(isPermissionError ? 403 : 500, {
       data: null,
       error: {
-        code: "EXPENSE_BULK_APPROVE_FAILED",
-        message: "Unable to approve selected expenses."
+        code: isPermissionError ? "FORBIDDEN" : "EXPENSE_BULK_APPROVE_FAILED",
+        message: isPermissionError
+          ? "You are not allowed to bulk process one or more selected expenses."
+          : "Unable to process selected expenses."
       },
       meta: buildMeta()
     });
@@ -384,7 +561,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "EXPENSE_BULK_APPROVE_PARSE_FAILED",
-        message: "Approved expenses are not in the expected shape."
+        message: "Processed expenses are not in the expected shape."
       },
       meta: buildMeta()
     });
@@ -394,7 +571,7 @@ export async function POST(request: Request) {
   const { data: rawProfiles, error: profilesError } = await supabase
     .from("profiles")
     .select("id, full_name, department, country_code, manager_id")
-    .eq("org_id", session.profile.org_id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .in("id", profileIds);
 
@@ -403,7 +580,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "EXPENSE_BULK_APPROVE_PROFILES_FETCH_FAILED",
-        message: "Unable to resolve profile metadata for approved expenses."
+        message: "Unable to resolve profile metadata for processed expenses."
       },
       meta: buildMeta()
     });
@@ -416,7 +593,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "EXPENSE_BULK_APPROVE_PROFILES_PARSE_FAILED",
-        message: "Approved expense profile metadata is not in the expected shape."
+        message: "Processed expense profile metadata is not in the expected shape."
       },
       meta: buildMeta()
     });
@@ -424,30 +601,61 @@ export async function POST(request: Request) {
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
   const expenses = parsedUpdatedRows.data.map((row) => toExpenseRecord(row, profileById));
-  const approvedEmployeeIds = [...new Set(expenses.map((expense) => expense.employeeId))];
+  const employeeIds = [...new Set(expenses.map((expense) => expense.employeeId))];
 
   await logAudit({
-    action: "approved",
+    action: stage === "manager" ? "approved" : "updated",
     tableName: "expenses",
     recordId: null,
     oldValue: null,
     newValue: {
       bulk: true,
+      stage,
       approvedCount: expenses.length,
       expenseIds: allowedIds
     }
   });
 
-  await createBulkNotifications({
-    orgId: session.profile.org_id,
-    userIds: approvedEmployeeIds,
-    type: "expense_status",
-    title: "Expense approved",
-    body: "Your expense submission has been approved.",
-    link: "/expenses"
-  });
+  if (stage === "manager") {
+    await createBulkNotifications({
+      orgId: profile.org_id,
+      userIds: employeeIds,
+      type: "expense_status",
+      title: "Expense manager-approved",
+      body: "Your expense was approved by your manager and is pending finance disbursement.",
+      link: "/expenses"
+    });
+
+    const financeAdminIds = await listFinanceAdminIds({
+      supabase,
+      orgId: profile.org_id
+    });
+
+    await createBulkNotifications({
+      orgId: profile.org_id,
+      userIds: financeAdminIds,
+      type: "expense_status",
+      title: "Expenses ready for disbursement",
+      body: `${expenses.length} expense${expenses.length === 1 ? "" : "s"} are ready for finance disbursement.`,
+      link: "/expenses/approvals"
+    });
+  } else {
+    await Promise.all(
+      expenses.map((expense) =>
+        createNotification({
+          orgId: profile.org_id,
+          userId: expense.employeeId,
+          type: "expense_status",
+          title: "Expense reimbursed",
+          body: `Your expense of ${formatMinorUnits(expense.amount, expense.currency)} has been reimbursed. Reference: ${expense.reimbursementReference ?? batchReference}.`,
+          link: "/expenses"
+        })
+      )
+    );
+  }
 
   const responseData: ExpenseBulkApproveResponseData = {
+    stage,
     expenses,
     approvedCount: expenses.length,
     skippedIds

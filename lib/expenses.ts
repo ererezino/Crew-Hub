@@ -45,10 +45,14 @@ export function getExpenseStatusLabel(status: ExpenseStatus): string {
   switch (status) {
     case "pending":
       return "Pending";
+    case "manager_approved":
+      return "Awaiting Finance";
     case "approved":
       return "Approved";
     case "rejected":
       return "Rejected";
+    case "finance_rejected":
+      return "Finance Rejected";
     case "reimbursed":
       return "Reimbursed";
     case "cancelled":
@@ -64,9 +68,13 @@ export function toneForExpenseStatus(
   switch (status) {
     case "pending":
       return "pending";
+    case "manager_approved":
+      return "warning";
     case "approved":
       return "info";
     case "rejected":
+      return "error";
+    case "finance_rejected":
       return "error";
     case "reimbursed":
       return "success";
@@ -133,6 +141,11 @@ export function summarizeExpenses(expenses: readonly ExpenseRecord[]): ExpensesS
         summary.pendingAmount += expense.amount;
       }
 
+      if (expense.status === "manager_approved") {
+        summary.managerApprovedCount += 1;
+        summary.pendingAmount += expense.amount;
+      }
+
       if (expense.status === "approved") {
         summary.approvedCount += 1;
       }
@@ -144,6 +157,10 @@ export function summarizeExpenses(expenses: readonly ExpenseRecord[]): ExpensesS
 
       if (expense.status === "rejected") {
         summary.rejectedCount += 1;
+      }
+
+      if (expense.status === "finance_rejected") {
+        summary.financeRejectedCount += 1;
       }
 
       if (expense.status === "cancelled") {
@@ -158,9 +175,11 @@ export function summarizeExpenses(expenses: readonly ExpenseRecord[]): ExpensesS
       pendingCount: 0,
       pendingAmount: 0,
       approvedCount: 0,
+      managerApprovedCount: 0,
       reimbursedCount: 0,
       reimbursedAmount: 0,
       rejectedCount: 0,
+      financeRejectedCount: 0,
       cancelledCount: 0
     }
   );

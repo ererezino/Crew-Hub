@@ -3,6 +3,7 @@
 import {
   type ChangeEvent,
   type FormEvent,
+  useEffect,
   useMemo,
   useState
 } from "react";
@@ -20,9 +21,11 @@ import {
   currentMonthKey,
   formatMonthLabel,
   getExpenseCategoryLabel,
+  getExpenseStatusLabel,
   toneForExpenseStatus
 } from "../../../../lib/expenses";
 import type {
+  ExpenseApprovalStage,
   ExpenseBulkApproveResponse,
   ExpenseReceiptSignedUrlResponse,
   ExpenseRecord,
@@ -38,16 +41,36 @@ type ToastMessage = {
   message: string;
 };
 
+type RejectMode = "manager" | "finance";
+
 type RejectFormValues = {
-  rejectionReason: string;
+  reason: string;
 };
 
 type RejectFormErrors = {
-  rejectionReason?: string;
+  reason?: string;
+};
+
+type DisburseFormValues = {
+  reimbursementReference: string;
+  reimbursementNotes: string;
+};
+
+type DisburseFormErrors = {
+  reimbursementReference?: string;
 };
 
 const rejectSchema = z.object({
-  rejectionReason: z.string().trim().min(1, "Rejection reason is required").max(2000, "Reason is too long")
+  reason: z.string().trim().min(1, "Rejection reason is required").max(2000, "Reason is too long")
+});
+
+const disburseSchema = z.object({
+  reimbursementReference: z
+    .string()
+    .trim()
+    .min(1, "Reimbursement reference is required")
+    .max(120, "Reference is too long"),
+  reimbursementNotes: z.string().trim().max(2000, "Notes are too long")
 });
 
 function createToastId() {
@@ -76,18 +99,46 @@ function ApprovalSkeleton() {
   );
 }
 
-export function ExpenseApprovalsClient() {
+export function ExpenseApprovalsClient({
+  canManagerApprove,
+  canFinanceApprove
+}: {
+  canManagerApprove: boolean;
+  canFinanceApprove: boolean;
+}) {
+  const availableStages = useMemo<ExpenseApprovalStage[]>(() => {
+    const stages: ExpenseApprovalStage[] = [];
+
+    if (canManagerApprove) {
+      stages.push("manager");
+    }
+
+    if (canFinanceApprove) {
+      stages.push("finance");
+    }
+
+    return stages;
+  }, [canFinanceApprove, canManagerApprove]);
   const [month, setMonth] = useState(currentMonthKey());
-  const approvalsQuery = useExpenseApprovals({ month });
+  const [stage, setStage] = useState<ExpenseApprovalStage>(availableStages[0] ?? "manager");
+  const approvalsQuery = useExpenseApprovals({ month, stage });
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isMutatingId, setIsMutatingId] = useState<string | null>(null);
   const [isBulkApproving, setIsBulkApproving] = useState(false);
   const [isOpeningReceiptById, setIsOpeningReceiptById] = useState<Record<string, boolean>>({});
   const [rejectTarget, setRejectTarget] = useState<ExpenseRecord | null>(null);
-  const [rejectValues, setRejectValues] = useState<RejectFormValues>({ rejectionReason: "" });
+  const [rejectMode, setRejectMode] = useState<RejectMode>("manager");
+  const [rejectValues, setRejectValues] = useState<RejectFormValues>({ reason: "" });
   const [rejectErrors, setRejectErrors] = useState<RejectFormErrors>({});
   const [isRejecting, setIsRejecting] = useState(false);
+  const [disburseTarget, setDisburseTarget] = useState<ExpenseRecord | null>(null);
+  const [disburseValues, setDisburseValues] = useState<DisburseFormValues>({
+    reimbursementReference: "",
+    reimbursementNotes: ""
+  });
+  const [disburseErrors, setDisburseErrors] = useState<DisburseFormErrors>({});
+  const [isDisbursing, setIsDisbursing] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const expenses = useMemo(() => {
@@ -99,6 +150,16 @@ export function ExpenseApprovalsClient() {
       return sortDirection === "asc" ? leftTime - rightTime : rightTime - leftTime;
     });
   }, [approvalsQuery.data?.expenses, sortDirection]);
+
+  useEffect(() => {
+    if (!availableStages.includes(stage) && availableStages[0]) {
+      setStage(availableStages[0]);
+    }
+  }, [availableStages, stage]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [month, stage]);
 
   const allSelected = expenses.length > 0 && expenses.every((expense) => selectedIds.includes(expense.id));
 
@@ -132,7 +193,7 @@ export function ExpenseApprovalsClient() {
     setSelectedIds(expenses.map((expense) => expense.id));
   };
 
-  const handleSingleApprove = async (expense: ExpenseRecord) => {
+  const handleSingleManagerApprove = async (expense: ExpenseRecord) => {
     setIsMutatingId(expense.id);
 
     try {
@@ -155,10 +216,105 @@ export function ExpenseApprovalsClient() {
 
       setSelectedIds((current) => current.filter((id) => id !== expense.id));
       approvalsQuery.refresh();
-      showToast("success", "Expense approved.");
+      showToast("success", "Expense moved to finance disbursement.");
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to approve expense.");
     } finally {
+      setIsMutatingId(null);
+    }
+  };
+
+  const openDisbursePanel = (expense: ExpenseRecord) => {
+    const defaultReference = `EXP-${expense.expenseDate.replaceAll("-", "")}-${expense.id.slice(0, 8).toUpperCase()}`;
+
+    setDisburseTarget(expense);
+    setDisburseValues({
+      reimbursementReference: defaultReference,
+      reimbursementNotes: ""
+    });
+    setDisburseErrors({});
+  };
+
+  const closeDisbursePanel = () => {
+    if (isDisbursing) {
+      return;
+    }
+
+    setDisburseTarget(null);
+    setDisburseValues({
+      reimbursementReference: "",
+      reimbursementNotes: ""
+    });
+    setDisburseErrors({});
+  };
+
+  const handleDisburseFieldChange =
+    (field: keyof DisburseFormValues) =>
+    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const nextValues = {
+        ...disburseValues,
+        [field]: event.currentTarget.value
+      };
+
+      setDisburseValues(nextValues);
+
+      const validation = disburseSchema.safeParse(nextValues);
+      setDisburseErrors(
+        validation.success
+          ? {}
+          : {
+              reimbursementReference: validation.error.flatten().fieldErrors.reimbursementReference?.[0]
+            }
+      );
+    };
+
+  const submitDisbursement = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!disburseTarget) {
+      return;
+    }
+
+    const validation = disburseSchema.safeParse(disburseValues);
+
+    if (!validation.success) {
+      setDisburseErrors({
+        reimbursementReference: validation.error.flatten().fieldErrors.reimbursementReference?.[0]
+      });
+      return;
+    }
+
+    setIsDisbursing(true);
+    setIsMutatingId(disburseTarget.id);
+
+    try {
+      const response = await fetch(`/api/v1/expenses/${disburseTarget.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "approve",
+          reimbursementReference: disburseValues.reimbursementReference.trim(),
+          reimbursementNotes: disburseValues.reimbursementNotes.trim() || undefined
+        })
+      });
+
+      const payload = (await response.json()) as UpdateExpenseResponse;
+
+      if (!response.ok || !payload.data?.expense) {
+        showToast("error", payload.error?.message ?? "Unable to disburse expense.");
+        return;
+      }
+
+      closeDisbursePanel();
+      setSelectedIds((current) => current.filter((id) => id !== disburseTarget.id));
+      approvalsQuery.refresh();
+      showToast("success", "Expense disbursed.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to disburse expense.");
+    } finally {
+      setIsDisbursing(false);
       setIsMutatingId(null);
     }
   };
@@ -177,30 +333,37 @@ export function ExpenseApprovalsClient() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          expenseIds: selectedIds
+          expenseIds: selectedIds,
+          stage
         })
       });
 
       const payload = (await response.json()) as ExpenseBulkApproveResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to bulk approve expenses.");
+        showToast("error", payload.error?.message ?? "Unable to process selected expenses.");
         return;
       }
 
       setSelectedIds([]);
       approvalsQuery.refresh();
-      showToast("success", `Approved ${payload.data.approvedCount} expenses.`);
+      showToast(
+        "success",
+        stage === "manager"
+          ? `Moved ${payload.data.approvedCount} expenses to finance.`
+          : `Disbursed ${payload.data.approvedCount} expenses.`
+      );
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to bulk approve expenses.");
+      showToast("error", error instanceof Error ? error.message : "Unable to process selected expenses.");
     } finally {
       setIsBulkApproving(false);
     }
   };
 
-  const openRejectPanel = (expense: ExpenseRecord) => {
+  const openRejectPanel = (expense: ExpenseRecord, mode: RejectMode) => {
     setRejectTarget(expense);
-    setRejectValues({ rejectionReason: "" });
+    setRejectMode(mode);
+    setRejectValues({ reason: "" });
     setRejectErrors({});
   };
 
@@ -210,13 +373,13 @@ export function ExpenseApprovalsClient() {
     }
 
     setRejectTarget(null);
-    setRejectValues({ rejectionReason: "" });
+    setRejectValues({ reason: "" });
     setRejectErrors({});
   };
 
   const handleRejectReasonChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const nextValues = {
-      rejectionReason: event.currentTarget.value
+      reason: event.currentTarget.value
     };
 
     setRejectValues(nextValues);
@@ -224,7 +387,7 @@ export function ExpenseApprovalsClient() {
     const validation = rejectSchema.safeParse(nextValues);
 
     setRejectErrors(
-      validation.success ? {} : { rejectionReason: validation.error.flatten().fieldErrors.rejectionReason?.[0] }
+      validation.success ? {} : { reason: validation.error.flatten().fieldErrors.reason?.[0] }
     );
   };
 
@@ -239,12 +402,13 @@ export function ExpenseApprovalsClient() {
 
     if (!validation.success) {
       setRejectErrors({
-        rejectionReason: validation.error.flatten().fieldErrors.rejectionReason?.[0]
+        reason: validation.error.flatten().fieldErrors.reason?.[0]
       });
       return;
     }
 
     setIsRejecting(true);
+    setIsMutatingId(rejectTarget.id);
 
     try {
       const response = await fetch(`/api/v1/expenses/${rejectTarget.id}`, {
@@ -252,10 +416,17 @@ export function ExpenseApprovalsClient() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          action: "reject",
-          rejectionReason: rejectValues.rejectionReason.trim()
-        })
+        body: JSON.stringify(
+          rejectMode === "manager"
+            ? {
+                action: "reject",
+                rejectionReason: rejectValues.reason.trim()
+              }
+            : {
+                action: "reject",
+                financeRejectionReason: rejectValues.reason.trim()
+              }
+        )
       });
 
       const payload = (await response.json()) as UpdateExpenseResponse;
@@ -268,11 +439,15 @@ export function ExpenseApprovalsClient() {
       closeRejectPanel();
       setSelectedIds((current) => current.filter((id) => id !== rejectTarget.id));
       approvalsQuery.refresh();
-      showToast("info", "Expense rejected.");
+      showToast(
+        rejectMode === "manager" ? "info" : "error",
+        rejectMode === "manager" ? "Expense rejected." : "Expense finance-rejected."
+      );
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to reject expense.");
     } finally {
       setIsRejecting(false);
+      setIsMutatingId(null);
     }
   };
 
@@ -306,11 +481,17 @@ export function ExpenseApprovalsClient() {
     }
   };
 
+  const stageTitle = stage === "manager" ? "Pending My Approval" : "Pending Disbursement";
+  const stageDescription =
+    stage === "manager"
+      ? "Expenses from your direct reports awaiting manager approval."
+      : "Manager-approved expenses ready for finance disbursement.";
+
   return (
     <>
       <PageHeader
         title="Expense Approvals"
-        description="Review pending expense requests, approve or reject submissions, and process batches."
+        description="Manager approval and finance disbursement queues."
         actions={
           <button
             type="button"
@@ -318,10 +499,35 @@ export function ExpenseApprovalsClient() {
             onClick={handleBulkApprove}
             disabled={selectedIds.length === 0 || isBulkApproving}
           >
-            {isBulkApproving ? "Approving..." : `Bulk approve (${selectedIds.length})`}
+            {isBulkApproving
+              ? stage === "manager"
+                ? "Approving..."
+                : "Disbursing..."
+              : stage === "manager"
+                ? `Bulk approve (${selectedIds.length})`
+                : `Bulk disburse (${selectedIds.length})`}
           </button>
         }
       />
+
+      {availableStages.length > 1 ? (
+        <section className="expenses-approval-tabs" aria-label="Approval queues">
+          <button
+            type="button"
+            className={stage === "manager" ? "settings-tab settings-tab-active" : "settings-tab"}
+            onClick={() => setStage("manager")}
+          >
+            Pending My Approval
+          </button>
+          <button
+            type="button"
+            className={stage === "finance" ? "settings-tab settings-tab-active" : "settings-tab"}
+            onClick={() => setStage("finance")}
+          >
+            Pending Disbursement
+          </button>
+        </section>
+      ) : null}
 
       <section className="expenses-toolbar" aria-label="Approvals filters">
         <label className="form-field">
@@ -333,7 +539,9 @@ export function ExpenseApprovalsClient() {
             onChange={(event) => setMonth(event.currentTarget.value)}
           />
         </label>
-        <p className="settings-card-description">Showing {formatMonthLabel(month)} pending expenses.</p>
+        <p className="settings-card-description">
+          {stageTitle}: {formatMonthLabel(month)}.
+        </p>
       </section>
 
       {approvalsQuery.isLoading ? <ApprovalSkeleton /> : null}
@@ -356,23 +564,23 @@ export function ExpenseApprovalsClient() {
         <>
           <section className="expenses-metric-grid" aria-label="Pending approvals summary">
             <article className="metric-card">
-              <p className="metric-label">Pending Count</p>
+              <p className="metric-label">{stage === "manager" ? "Pending Manager Approval" : "Pending Disbursement"}</p>
               <p className="metric-value numeric">{approvalsQuery.data.pendingCount}</p>
-              <p className="metric-hint">Awaiting manager or admin review</p>
+              <p className="metric-hint">{stageDescription}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Pending Amount</p>
+              <p className="metric-label">Queue Amount</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={approvalsQuery.data.pendingAmount} currency="USD" />
               </p>
-              <p className="metric-hint">Total amount currently in approval queue</p>
+              <p className="metric-hint">Total amount currently in this queue</p>
             </article>
           </section>
 
           {expenses.length === 0 ? (
             <EmptyState
-              title="No pending expenses"
-              description="All current expense submissions have been processed."
+              title={stage === "manager" ? "No expenses pending manager approval" : "No expenses pending disbursement"}
+              description="All current expense submissions have been processed for this stage."
               ctaLabel="Open expenses"
               ctaHref="/expenses"
             />
@@ -387,7 +595,7 @@ export function ExpenseApprovalsClient() {
                           type="checkbox"
                           checked={allSelected}
                           onChange={toggleSelectAll}
-                          aria-label="Select all pending expenses"
+                          aria-label={`Select all ${stageTitle.toLowerCase()} expenses`}
                         />
                       </label>
                     </th>
@@ -457,7 +665,7 @@ export function ExpenseApprovalsClient() {
                       </td>
                       <td>
                         <StatusBadge tone={toneForExpenseStatus(expense.status)}>
-                          {expense.status}
+                          {getExpenseStatusLabel(expense.status)}
                         </StatusBadge>
                       </td>
                       <td>
@@ -478,22 +686,45 @@ export function ExpenseApprovalsClient() {
                           >
                             {isOpeningReceiptById[expense.id] ? "Opening..." : "Receipt"}
                           </button>
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => handleSingleApprove(expense)}
-                            disabled={isMutatingId === expense.id}
-                          >
-                            {isMutatingId === expense.id ? "Saving..." : "Approve"}
-                          </button>
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => openRejectPanel(expense)}
-                            disabled={isMutatingId === expense.id}
-                          >
-                            Reject
-                          </button>
+                          {stage === "manager" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => handleSingleManagerApprove(expense)}
+                                disabled={isMutatingId === expense.id}
+                              >
+                                {isMutatingId === expense.id ? "Saving..." : "Approve"}
+                              </button>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => openRejectPanel(expense, "manager")}
+                                disabled={isMutatingId === expense.id}
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => openDisbursePanel(expense)}
+                                disabled={isMutatingId === expense.id}
+                              >
+                                {isMutatingId === expense.id ? "Saving..." : "Disburse"}
+                              </button>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => openRejectPanel(expense, "finance")}
+                                disabled={isMutatingId === expense.id}
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -507,24 +738,28 @@ export function ExpenseApprovalsClient() {
 
       <SlidePanel
         isOpen={Boolean(rejectTarget)}
-        title="Reject expense"
-        description={rejectTarget ? `Provide a reason for rejecting ${rejectTarget.employeeName}'s expense.` : undefined}
+        title={rejectMode === "manager" ? "Reject expense" : "Finance reject expense"}
+        description={
+          rejectTarget
+            ? rejectMode === "manager"
+              ? `Provide a reason for rejecting ${rejectTarget.employeeName}'s expense.`
+              : `Provide a finance rejection reason for ${rejectTarget.employeeName}'s expense.`
+            : undefined
+        }
         onClose={closeRejectPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={submitReject}>
           <label className="form-field">
             <span className="form-label">Rejection reason</span>
             <textarea
-              className={rejectErrors.rejectionReason ? "form-input form-input-error" : "form-input"}
+              className={rejectErrors.reason ? "form-input form-input-error" : "form-input"}
               rows={4}
-              value={rejectValues.rejectionReason}
+              value={rejectValues.reason}
               onChange={handleRejectReasonChange}
               placeholder="Explain why this expense cannot be approved."
               disabled={isRejecting}
             />
-            {rejectErrors.rejectionReason ? (
-              <p className="form-field-error">{rejectErrors.rejectionReason}</p>
-            ) : null}
+            {rejectErrors.reason ? <p className="form-field-error">{rejectErrors.reason}</p> : null}
           </label>
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeRejectPanel} disabled={isRejecting}>
@@ -532,6 +767,52 @@ export function ExpenseApprovalsClient() {
             </button>
             <button type="submit" className="button button-accent" disabled={isRejecting}>
               {isRejecting ? "Submitting..." : "Submit rejection"}
+            </button>
+          </div>
+        </form>
+      </SlidePanel>
+
+      <SlidePanel
+        isOpen={Boolean(disburseTarget)}
+        title="Disburse expense"
+        description={
+          disburseTarget
+            ? `Finalize reimbursement for ${disburseTarget.employeeName}.`
+            : undefined
+        }
+        onClose={closeDisbursePanel}
+      >
+        <form className="slide-panel-form-wrapper" onSubmit={submitDisbursement}>
+          <label className="form-field">
+            <span className="form-label">Reimbursement reference</span>
+            <input
+              className={disburseErrors.reimbursementReference ? "form-input form-input-error" : "form-input"}
+              value={disburseValues.reimbursementReference}
+              onChange={handleDisburseFieldChange("reimbursementReference")}
+              placeholder="BANK-REF-1234"
+              disabled={isDisbursing}
+            />
+            {disburseErrors.reimbursementReference ? (
+              <p className="form-field-error">{disburseErrors.reimbursementReference}</p>
+            ) : null}
+          </label>
+          <label className="form-field">
+            <span className="form-label">Notes</span>
+            <textarea
+              className="form-input"
+              rows={4}
+              value={disburseValues.reimbursementNotes}
+              onChange={handleDisburseFieldChange("reimbursementNotes")}
+              placeholder="Optional disbursement notes."
+              disabled={isDisbursing}
+            />
+          </label>
+          <div className="slide-panel-actions">
+            <button type="button" className="button" onClick={closeDisbursePanel} disabled={isDisbursing}>
+              Cancel
+            </button>
+            <button type="submit" className="button button-accent" disabled={isDisbursing}>
+              {isDisbursing ? "Disbursing..." : "Confirm disbursement"}
             </button>
           </div>
         </form>

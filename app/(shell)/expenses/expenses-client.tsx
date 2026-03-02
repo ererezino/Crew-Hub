@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  Fragment,
   type ChangeEvent,
   type DragEvent,
   type FormEvent,
@@ -25,6 +26,7 @@ import {
   currentMonthKey,
   formatMonthLabel,
   getExpenseCategoryLabel,
+  getExpenseStatusLabel,
   isAllowedReceiptUpload,
   MAX_RECEIPT_FILE_BYTES,
   toneForExpenseStatus
@@ -391,15 +393,40 @@ function ExpensesSkeleton() {
   );
 }
 
+function ExpenseTimelineItem({
+  title,
+  timestamp,
+  description,
+  tone
+}: {
+  title: string;
+  timestamp: string | null;
+  description: string;
+  tone: "pending" | "success" | "error" | "info";
+}) {
+  return (
+    <li className={`expenses-timeline-item expenses-timeline-item-${tone}`}>
+      <div className="expenses-timeline-marker" aria-hidden="true" />
+      <div className="expenses-timeline-main">
+        <p className="expenses-timeline-title">{title}</p>
+        <p className="expenses-timeline-description">{description}</p>
+      </div>
+      <p className="expenses-timeline-time" title={timestamp ? formatDateTimeTooltip(timestamp) : undefined}>
+        {timestamp ? formatRelativeTime(timestamp) : "Pending"}
+      </p>
+    </li>
+  );
+}
+
 export function ExpensesClient({
   currentUserId,
   canApprove,
-  canReimburse,
+  canViewReports,
   showEmployeeColumn
 }: {
   currentUserId: string;
   canApprove: boolean;
-  canReimburse: boolean;
+  canViewReports: boolean;
   showEmployeeColumn: boolean;
 }) {
   const [month, setMonth] = useState(currentMonthKey());
@@ -416,6 +443,7 @@ export function ExpensesClient({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isOpeningReceiptById, setIsOpeningReceiptById] = useState<Record<string, boolean>>({});
   const [isMutatingExpenseId, setIsMutatingExpenseId] = useState<string | null>(null);
+  const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -626,7 +654,7 @@ export function ExpensesClient({
     action
   }: {
     expense: ExpenseRecord;
-    action: "cancel" | "mark_reimbursed";
+    action: "cancel";
   }) => {
     setIsMutatingExpenseId(expense.id);
 
@@ -649,10 +677,7 @@ export function ExpensesClient({
       }
 
       expensesQuery.refresh();
-      showToast(
-        "success",
-        action === "cancel" ? "Expense cancelled." : "Expense marked as reimbursed."
-      );
+      showToast("success", "Expense cancelled.");
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to update expense.");
     } finally {
@@ -672,7 +697,7 @@ export function ExpensesClient({
                 Approvals
               </Link>
             ) : null}
-            {canApprove ? (
+            {canViewReports ? (
               <Link className="button" href="/expenses/reports">
                 Reports
               </Link>
@@ -730,12 +755,16 @@ export function ExpensesClient({
               <p className="metric-value">
                 <CurrencyDisplay amount={expensesQuery.data.summary.pendingAmount} currency="USD" />
               </p>
-              <p className="metric-hint">{expensesQuery.data.summary.pendingCount} pending</p>
+              <p className="metric-hint">
+                {expensesQuery.data.summary.pendingCount + expensesQuery.data.summary.managerApprovedCount} pending
+              </p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Approved</p>
-              <p className="metric-value numeric">{expensesQuery.data.summary.approvedCount}</p>
-              <p className="metric-hint">Approved but not reimbursed yet</p>
+              <p className="metric-label">Awaiting Finance</p>
+              <p className="metric-value numeric">
+                {expensesQuery.data.summary.managerApprovedCount + expensesQuery.data.summary.approvedCount}
+              </p>
+              <p className="metric-hint">Manager-approved and awaiting disbursement</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Reimbursed</p>
@@ -783,100 +812,155 @@ export function ExpensesClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {expenses.map((expense) => (
-                    <tr key={expense.id} className="data-table-row">
-                      <td>
-                        <time
-                          dateTime={expense.expenseDate}
-                          title={formatDateTimeTooltip(expense.expenseDate)}
-                        >
-                          {expense.expenseDate}
-                        </time>
-                      </td>
-                      {showEmployeeColumn ? (
-                        <td>
-                          <div className="documents-cell-copy">
-                            <p className="documents-cell-title">{expense.employeeName}</p>
-                            <p className="documents-cell-description">
-                              {expense.employeeDepartment ?? "No department"}
-                            </p>
-                          </div>
-                        </td>
-                      ) : null}
-                      <td>
-                        <span className="expenses-category-chip">
-                          <span className="expenses-category-icon">
-                            <CategoryIcon category={expense.category} />
-                          </span>
-                          <span>{getExpenseCategoryLabel(expense.category)}</span>
-                        </span>
-                      </td>
-                      <td>
-                        <p className="expenses-description">{expense.description}</p>
-                      </td>
-                      <td>
-                        <CurrencyDisplay amount={expense.amount} currency={expense.currency} />
-                      </td>
-                      <td>
-                        <span className="country-chip">
-                          <span>{countryFlagFromCode(expense.employeeCountryCode)}</span>
-                          <span>{countryNameFromCode(expense.employeeCountryCode)}</span>
-                        </span>
-                      </td>
-                      <td>
-                        <StatusBadge tone={toneForExpenseStatus(expense.status)}>
-                          {expense.status}
-                        </StatusBadge>
-                      </td>
-                      <td>
-                        <time
-                          dateTime={expense.createdAt}
-                          title={formatDateTimeTooltip(expense.createdAt)}
-                        >
-                          {formatRelativeTime(expense.createdAt)}
-                        </time>
-                      </td>
-                      <td className="table-row-action-cell">
-                        <div className="expenses-row-actions">
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => openReceipt(expense)}
-                            disabled={Boolean(isOpeningReceiptById[expense.id])}
-                          >
-                            {isOpeningReceiptById[expense.id] ? "Opening..." : "Receipt"}
-                          </button>
+                  {expenses.map((expense) => {
+                    const isExpanded = expandedExpenseId === expense.id;
 
-                          {expense.employeeId === currentUserId && expense.status === "pending" ? (
-                            <button
-                              type="button"
-                              className="table-row-action"
-                              onClick={() => mutateExpense({ expense, action: "cancel" })}
-                              disabled={isMutatingExpenseId === expense.id}
-                            >
-                              {isMutatingExpenseId === expense.id ? "Saving..." : "Cancel"}
-                            </button>
-                          ) : null}
+                    const managerDescription = expense.managerApprovedByName
+                      ? `Approved by ${expense.managerApprovedByName}.`
+                      : expense.status === "rejected"
+                        ? "Rejected before manager approval."
+                        : "Awaiting manager decision.";
 
-                          {canReimburse && expense.status === "approved" ? (
-                            <button
-                              type="button"
-                              className="table-row-action"
-                              onClick={() =>
-                                mutateExpense({
-                                  expense,
-                                  action: "mark_reimbursed"
-                                })
-                              }
-                              disabled={isMutatingExpenseId === expense.id}
+                    const financeDescription = expense.reimbursedAt
+                      ? `Disbursed by ${expense.reimbursedByName ?? "Finance"}${expense.reimbursementReference ? ` (Ref: ${expense.reimbursementReference})` : ""}.`
+                      : expense.financeRejectedAt
+                        ? `Finance rejected.${expense.financeRejectionReason ? ` Reason: ${expense.financeRejectionReason}` : ""}`
+                        : "Awaiting finance disbursement.";
+
+                    return (
+                      <Fragment key={expense.id}>
+                        <tr className="data-table-row">
+                          <td>
+                            <time
+                              dateTime={expense.expenseDate}
+                              title={formatDateTimeTooltip(expense.expenseDate)}
                             >
-                              {isMutatingExpenseId === expense.id ? "Saving..." : "Mark paid"}
-                            </button>
+                              {expense.expenseDate}
+                            </time>
+                          </td>
+                          {showEmployeeColumn ? (
+                            <td>
+                              <div className="documents-cell-copy">
+                                <p className="documents-cell-title">{expense.employeeName}</p>
+                                <p className="documents-cell-description">
+                                  {expense.employeeDepartment ?? "No department"}
+                                </p>
+                              </div>
+                            </td>
                           ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                          <td>
+                            <span className="expenses-category-chip">
+                              <span className="expenses-category-icon">
+                                <CategoryIcon category={expense.category} />
+                              </span>
+                              <span>{getExpenseCategoryLabel(expense.category)}</span>
+                            </span>
+                          </td>
+                          <td>
+                            <p className="expenses-description">{expense.description}</p>
+                          </td>
+                          <td>
+                            <CurrencyDisplay amount={expense.amount} currency={expense.currency} />
+                          </td>
+                          <td>
+                            <span className="country-chip">
+                              <span>{countryFlagFromCode(expense.employeeCountryCode)}</span>
+                              <span>{countryNameFromCode(expense.employeeCountryCode)}</span>
+                            </span>
+                          </td>
+                          <td>
+                            <StatusBadge tone={toneForExpenseStatus(expense.status)}>
+                              {getExpenseStatusLabel(expense.status)}
+                            </StatusBadge>
+                          </td>
+                          <td>
+                            <time
+                              dateTime={expense.createdAt}
+                              title={formatDateTimeTooltip(expense.createdAt)}
+                            >
+                              {formatRelativeTime(expense.createdAt)}
+                            </time>
+                          </td>
+                          <td className="table-row-action-cell">
+                            <div className="expenses-row-actions">
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => openReceipt(expense)}
+                                disabled={Boolean(isOpeningReceiptById[expense.id])}
+                              >
+                                {isOpeningReceiptById[expense.id] ? "Opening..." : "Receipt"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() =>
+                                  setExpandedExpenseId((currentId) =>
+                                    currentId === expense.id ? null : expense.id
+                                  )
+                                }
+                              >
+                                {isExpanded ? "Hide details" : "Details"}
+                              </button>
+
+                              {expense.employeeId === currentUserId && expense.status === "pending" ? (
+                                <button
+                                  type="button"
+                                  className="table-row-action"
+                                  onClick={() => mutateExpense({ expense, action: "cancel" })}
+                                  disabled={isMutatingExpenseId === expense.id}
+                                >
+                                  {isMutatingExpenseId === expense.id ? "Saving..." : "Cancel"}
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded ? (
+                          <tr className="expenses-detail-row">
+                            <td colSpan={showEmployeeColumn ? 10 : 9}>
+                              <div className="expenses-detail-card">
+                                <h3 className="section-title">Approval Timeline</h3>
+                                <ul className="expenses-timeline">
+                                  <ExpenseTimelineItem
+                                    title="Submitted"
+                                    timestamp={expense.createdAt}
+                                    description={`Submitted by ${expense.employeeName}.`}
+                                    tone="success"
+                                  />
+                                  <ExpenseTimelineItem
+                                    title="Manager Approval"
+                                    timestamp={expense.managerApprovedAt}
+                                    description={managerDescription}
+                                    tone={
+                                      expense.managerApprovedAt
+                                        ? "success"
+                                        : expense.status === "rejected"
+                                          ? "error"
+                                          : "pending"
+                                    }
+                                  />
+                                  <ExpenseTimelineItem
+                                    title="Finance Disbursement"
+                                    timestamp={expense.reimbursedAt ?? expense.financeRejectedAt}
+                                    description={financeDescription}
+                                    tone={
+                                      expense.reimbursedAt
+                                        ? "success"
+                                        : expense.financeRejectedAt
+                                          ? "error"
+                                          : "info"
+                                    }
+                                  />
+                                </ul>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </section>
