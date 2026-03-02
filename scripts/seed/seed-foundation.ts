@@ -382,6 +382,48 @@ type SeedNotification = {
   createdOffsetDays: number;
 };
 
+type SeedSurveyType = "engagement" | "pulse" | "onboarding" | "exit" | "custom";
+
+type SeedSurveyStatus = "draft" | "active" | "closed" | "archived";
+
+type SeedSurveyQuestionType = "rating" | "text" | "select" | "likert";
+
+type SeedSurveyRecurrence = "weekly" | "monthly" | "quarterly";
+
+type SeedSurveyQuestion = {
+  id: string;
+  text: string;
+  type: SeedSurveyQuestionType;
+  required: boolean;
+  scale?: number;
+  options?: string[];
+};
+
+type SeedSurvey = {
+  key: string;
+  title: string;
+  description: string | null;
+  type: SeedSurveyType;
+  questions: SeedSurveyQuestion[];
+  isAnonymous: boolean;
+  minResponsesForResults: number;
+  targetDepartments: SeedMember["department"][];
+  targetEmploymentTypes: SeedCompensationEmploymentType[];
+  targetCountries: SeedMember["countryCode"][];
+  status: SeedSurveyStatus;
+  startOffsetDays: number | null;
+  endOffsetDays: number | null;
+  recurrence: SeedSurveyRecurrence | null;
+  createdByKey: SeedMember["key"];
+};
+
+type SeedSurveyResponse = {
+  surveyKey: SeedSurvey["key"];
+  respondentKey: SeedMember["key"];
+  answers: Record<string, string | number | boolean | null>;
+  submittedOffsetDays: number;
+};
+
 type SeedDeductionRule = {
   countryCode: "NG";
   ruleType:
@@ -2512,6 +2554,179 @@ const SEED_REVIEW_RESPONSES: SeedReviewResponse[] = [
         rating: null,
         text: "Increase delegation to create room for mentoring junior engineers."
       }
+    }
+  }
+];
+
+const SEED_SURVEYS: SeedSurvey[] = [
+  {
+    key: "engagement-q1",
+    title: "Q1 Team Engagement Pulse",
+    description: "Share how supported and effective you feel in your day-to-day work.",
+    type: "engagement",
+    questions: [
+      {
+        id: "q_satisfaction",
+        text: "How satisfied are you with your current work setup?",
+        type: "rating",
+        required: true,
+        scale: 10
+      },
+      {
+        id: "q_value",
+        text: "I feel valued by my manager and teammates.",
+        type: "likert",
+        required: true,
+        options: ["strongly_disagree", "disagree", "neutral", "agree", "strongly_agree"]
+      },
+      {
+        id: "q_improve",
+        text: "What is one thing Crew Hub should improve this quarter?",
+        type: "text",
+        required: false
+      }
+    ],
+    isAnonymous: true,
+    minResponsesForResults: 3,
+    targetDepartments: [],
+    targetEmploymentTypes: ["contractor"],
+    targetCountries: [],
+    status: "active",
+    startOffsetDays: -12,
+    endOffsetDays: 18,
+    recurrence: "quarterly",
+    createdByKey: "head_people_finance"
+  },
+  {
+    key: "engineering-weekly-pulse",
+    title: "Engineering Weekly Check-in",
+    description: "Quick pulse for engineering execution confidence and blockers.",
+    type: "pulse",
+    questions: [
+      {
+        id: "q_confidence",
+        text: "How confident are you in this sprint's priorities?",
+        type: "rating",
+        required: true,
+        scale: 5
+      },
+      {
+        id: "q_blocker",
+        text: "Do you currently have blockers?",
+        type: "select",
+        required: true,
+        options: ["yes", "no"]
+      },
+      {
+        id: "q_blocker_detail",
+        text: "If yes, what blocker needs escalation?",
+        type: "text",
+        required: false
+      }
+    ],
+    isAnonymous: true,
+    minResponsesForResults: 5,
+    targetDepartments: ["Engineering"],
+    targetEmploymentTypes: ["contractor"],
+    targetCountries: [],
+    status: "active",
+    startOffsetDays: -5,
+    endOffsetDays: 7,
+    recurrence: "weekly",
+    createdByKey: "eng_manager"
+  },
+  {
+    key: "onboarding-feedback-draft",
+    title: "New Hire Onboarding Feedback",
+    description: "Draft onboarding survey for upcoming employee lifecycle rollout.",
+    type: "onboarding",
+    questions: [
+      {
+        id: "q_onboarding_clarity",
+        text: "How clear was your first-week onboarding checklist?",
+        type: "rating",
+        required: true,
+        scale: 10
+      },
+      {
+        id: "q_onboarding_support",
+        text: "What support would have improved your onboarding?",
+        type: "text",
+        required: false
+      }
+    ],
+    isAnonymous: false,
+    minResponsesForResults: 1,
+    targetDepartments: [],
+    targetEmploymentTypes: ["contractor"],
+    targetCountries: [],
+    status: "draft",
+    startOffsetDays: null,
+    endOffsetDays: null,
+    recurrence: null,
+    createdByKey: "head_people_finance"
+  }
+];
+
+const SEED_SURVEY_RESPONSES: SeedSurveyResponse[] = [
+  {
+    surveyKey: "engagement-q1",
+    respondentKey: "engineer_1",
+    submittedOffsetDays: -4,
+    answers: {
+      q_satisfaction: 8,
+      q_value: "agree",
+      q_improve: "Better async decision logs after leadership meetings."
+    }
+  },
+  {
+    surveyKey: "engagement-q1",
+    respondentKey: "engineer_2",
+    submittedOffsetDays: -3,
+    answers: {
+      q_satisfaction: 7,
+      q_value: "neutral",
+      q_improve: "Faster visibility into payroll run timelines."
+    }
+  },
+  {
+    surveyKey: "engagement-q1",
+    respondentKey: "compliance_officer",
+    submittedOffsetDays: -2,
+    answers: {
+      q_satisfaction: 9,
+      q_value: "strongly_agree",
+      q_improve: "Country-level compliance reminders inside dashboards."
+    }
+  },
+  {
+    surveyKey: "engagement-q1",
+    respondentKey: "ops_associate",
+    submittedOffsetDays: -1,
+    answers: {
+      q_satisfaction: 8,
+      q_value: "agree",
+      q_improve: "More onboarding templates for operations."
+    }
+  },
+  {
+    surveyKey: "engineering-weekly-pulse",
+    respondentKey: "engineer_1",
+    submittedOffsetDays: -1,
+    answers: {
+      q_confidence: 4,
+      q_blocker: "yes",
+      q_blocker_detail: "Waiting on production data snapshot access."
+    }
+  },
+  {
+    surveyKey: "engineering-weekly-pulse",
+    respondentKey: "engineer_3",
+    submittedOffsetDays: -1,
+    answers: {
+      q_confidence: 3,
+      q_blocker: "no",
+      q_blocker_detail: null
     }
   }
 ];
@@ -5604,6 +5819,195 @@ async function upsertSeedPerformance(
   }
 }
 
+function surveyResponseSeedKey({
+  surveyId,
+  respondentId
+}: {
+  surveyId: string;
+  respondentId: string;
+}): string {
+  return `${surveyId}:${respondentId}`;
+}
+
+async function upsertSeedSurveys(
+  client: SupabaseClient,
+  orgId: string,
+  userIdByKey: ReadonlyMap<string, string>
+): Promise<void> {
+  const titles = SEED_SURVEYS.map((survey) => survey.title);
+
+  const { data: existingSurveyRows, error: existingSurveyRowsError } = await client
+    .from("surveys")
+    .select("id, title")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .in("title", titles);
+
+  if (existingSurveyRowsError) {
+    throw new Error(`Unable to query surveys seed data: ${existingSurveyRowsError.message}`);
+  }
+
+  const existingSurveyByTitle = new Map<string, string>();
+
+  for (const row of existingSurveyRows ?? []) {
+    if (typeof row.id !== "string" || typeof row.title !== "string") {
+      continue;
+    }
+
+    if (!existingSurveyByTitle.has(row.title)) {
+      existingSurveyByTitle.set(row.title, row.id);
+    }
+  }
+
+  const surveyIdByKey = new Map<string, string>();
+
+  for (const survey of SEED_SURVEYS) {
+    const createdById = userIdByKey.get(survey.createdByKey);
+
+    if (!createdById) {
+      throw new Error(`Missing survey creator id for survey seed (${survey.createdByKey})`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      title: survey.title,
+      description: survey.description,
+      type: survey.type,
+      questions: survey.questions,
+      is_anonymous: survey.isAnonymous,
+      min_responses_for_results: survey.minResponsesForResults,
+      target_audience: {
+        departments: survey.targetDepartments,
+        employment_types: survey.targetEmploymentTypes,
+        countries: survey.targetCountries
+      },
+      status: survey.status,
+      start_date:
+        survey.startOffsetDays === null
+          ? null
+          : dateWithOffset(survey.startOffsetDays),
+      end_date:
+        survey.endOffsetDays === null ? null : dateWithOffset(survey.endOffsetDays),
+      recurrence: survey.recurrence,
+      created_by: createdById,
+      deleted_at: null as string | null
+    };
+
+    const existingSurveyId = existingSurveyByTitle.get(survey.title);
+
+    if (existingSurveyId) {
+      const { error: updateError } = await client
+        .from("surveys")
+        .update(payload)
+        .eq("id", existingSurveyId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update survey seed data: ${updateError.message}`);
+      }
+
+      surveyIdByKey.set(survey.key, existingSurveyId);
+    } else {
+      const { data: insertedRow, error: insertError } = await client
+        .from("surveys")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (insertError || !insertedRow?.id) {
+        throw new Error(`Unable to insert survey seed data: ${insertError?.message ?? "unknown error"}`);
+      }
+
+      surveyIdByKey.set(survey.key, insertedRow.id);
+      existingSurveyByTitle.set(survey.title, insertedRow.id);
+    }
+  }
+
+  const surveyIds = [...surveyIdByKey.values()];
+  const existingResponseByKey = new Map<string, string>();
+
+  if (surveyIds.length > 0) {
+    const { data: existingResponseRows, error: existingResponseRowsError } = await client
+      .from("survey_responses")
+      .select("id, survey_id, respondent_id")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("survey_id", surveyIds);
+
+    if (existingResponseRowsError) {
+      throw new Error(`Unable to query survey responses seed data: ${existingResponseRowsError.message}`);
+    }
+
+    for (const row of existingResponseRows ?? []) {
+      if (
+        typeof row.id !== "string" ||
+        typeof row.survey_id !== "string" ||
+        typeof row.respondent_id !== "string"
+      ) {
+        continue;
+      }
+
+      const key = surveyResponseSeedKey({
+        surveyId: row.survey_id,
+        respondentId: row.respondent_id
+      });
+
+      if (!existingResponseByKey.has(key)) {
+        existingResponseByKey.set(key, row.id);
+      }
+    }
+  }
+
+  for (const response of SEED_SURVEY_RESPONSES) {
+    const surveyId = surveyIdByKey.get(response.surveyKey);
+    const respondentId = userIdByKey.get(response.respondentKey);
+    const member = SEED_MEMBERS.find((seedMember) => seedMember.key === response.respondentKey);
+
+    if (!surveyId) {
+      throw new Error(`Missing survey id for survey response seed (${response.surveyKey})`);
+    }
+
+    if (!respondentId) {
+      throw new Error(`Missing respondent id for survey response seed (${response.respondentKey})`);
+    }
+
+    const payload = {
+      org_id: orgId,
+      survey_id: surveyId,
+      respondent_id: respondentId,
+      answers: response.answers,
+      department: member?.department ?? null,
+      country_code: member?.countryCode ?? null,
+      submitted_at: timestampWithOffsetDays(response.submittedOffsetDays),
+      deleted_at: null as string | null
+    };
+
+    const key = surveyResponseSeedKey({
+      surveyId,
+      respondentId
+    });
+    const existingResponseId = existingResponseByKey.get(key);
+
+    if (existingResponseId) {
+      const { error: updateError } = await client
+        .from("survey_responses")
+        .update(payload)
+        .eq("id", existingResponseId)
+        .eq("org_id", orgId);
+
+      if (updateError) {
+        throw new Error(`Unable to update survey response seed data: ${updateError.message}`);
+      }
+    } else {
+      const { error: insertError } = await client.from("survey_responses").insert(payload);
+
+      if (insertError) {
+        throw new Error(`Unable to insert survey response seed data: ${insertError.message}`);
+      }
+    }
+  }
+}
+
 function complianceItemKey({
   countryCode,
   authority,
@@ -6106,6 +6510,7 @@ async function main() {
   await upsertSeedDeductionRules(client, org.id);
   await upsertSeedPaymentDetails(client, org.id, userIdByKey);
   await upsertSeedPerformance(client, org.id, userIdByKey);
+  await upsertSeedSurveys(client, org.id, userIdByKey);
   await upsertSeedCompliance(client, org.id, userIdByKey);
   await upsertSeedExpenses(client, org.id, userIdByKey);
   await upsertSeedNotifications(client, org.id, userIdByKey);
