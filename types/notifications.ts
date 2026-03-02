@@ -10,7 +10,10 @@ export const NOTIFICATION_TYPES = [
   "payslip_ready",
   "payment_details_changed",
   "compliance_deadline",
-  "announcement"
+  "announcement",
+  "signature_requested",
+  "signature_signed",
+  "signature_completed"
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

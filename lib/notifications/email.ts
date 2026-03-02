@@ -199,3 +199,39 @@ export async function sendComplianceReminderEmail({
     });
   }
 }
+
+export async function sendSignatureRequestEmail({
+  orgId,
+  userId,
+  requestTitle,
+  requestedByName
+}: {
+  orgId: string;
+  userId: string;
+  requestTitle: string;
+  requestedByName: string;
+}): Promise<void> {
+  try {
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+
+    if (!recipient) {
+      return;
+    }
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Crew Hub: Signature request - ${requestTitle}`,
+      text: [
+        `Hello ${recipient.fullName},`,
+        "",
+        `${requestedByName} requested your signature on "${requestTitle}".`,
+        "",
+        "Open Crew Hub > Signatures to review and sign the document."
+      ].join("\n")
+    });
+  } catch (error) {
+    console.error("Unexpected signature request email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
