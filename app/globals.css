@@ -928,6 +928,41 @@ html.dark .topbar {
   gap: 0.75rem;
 }
 
+.signature-signers-cell {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.signature-signers-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.signature-signer-picker {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.signature-signer-options {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+.signature-signer-option-meta {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
 .documents-table-skeleton {
   display: grid;
   gap: 0.45rem;
