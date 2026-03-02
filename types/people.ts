@@ -50,6 +50,54 @@ export type PeopleListResponse = ApiResponse<PeopleListResponseData>;
 
 export type PeopleCreateResponseData = {
   person: PersonRecord;
+  temporaryPassword?: string;
 };
 
 export type PeopleCreateResponse = ApiResponse<PeopleCreateResponseData>;
+
+export type PeopleAccessOverrides = {
+  granted: string[];
+  revoked: string[];
+};
+
+export type PeopleCreatePayload = {
+  email: string;
+  fullName: string;
+  password?: string;
+  roles: AppRole[];
+  department?: string;
+  title?: string;
+  countryCode?: string;
+  timezone?: string;
+  phone?: string;
+  startDate?: string;
+  managerId?: string;
+  employmentType: EmploymentType;
+  payrollMode?: PayrollMode;
+  primaryCurrency: string;
+  isNewEmployee?: boolean;
+  accessOverrides?: PeopleAccessOverrides;
+};
+
+export type PeopleUpdatePayload = {
+  fullName?: string;
+  roles?: AppRole[];
+  department?: string | null;
+  title?: string | null;
+  managerId?: string | null;
+  status?: ProfileStatus;
+  accessOverrides?: PeopleAccessOverrides;
+};
+
+export type PeopleUpdateResponseData = {
+  person: PersonRecord;
+};
+
+export type PeopleUpdateResponse = ApiResponse<PeopleUpdateResponseData>;
+
+export type PeoplePasswordResetResponseData = {
+  userId: string;
+  temporaryPassword: string;
+};
+
+export type PeoplePasswordResetResponse = ApiResponse<PeoplePasswordResetResponseData>;

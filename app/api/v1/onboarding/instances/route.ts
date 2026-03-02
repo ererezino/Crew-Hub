@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
 import { createNotification } from "../../../../../lib/notifications/service";
+import { createOnboardingInstance } from "../../../../../lib/onboarding/create-instance";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
@@ -69,14 +70,6 @@ const taskStatusRowSchema = z.object({
   status: z.enum(ONBOARDING_TASK_STATUSES)
 });
 
-const templateTaskSchema = z.object({
-  title: z.string(),
-  description: z.string().default(""),
-  category: z.string(),
-  dueOffsetDays: z.number().int().nullable().optional(),
-  due_offset_days: z.number().int().nullable().optional()
-});
-
 const templateDetailRowSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -122,57 +115,6 @@ function canManageInstances(userRoles: readonly UserRole[]): boolean {
     hasRole(userRoles, "HR_ADMIN") ||
     hasRole(userRoles, "SUPER_ADMIN")
   );
-}
-
-function normalizeTemplateTasks(value: unknown): Array<{
-  title: string;
-  description: string;
-  category: string;
-  dueOffsetDays: number | null;
-}> {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  const tasks: Array<{
-    title: string;
-    description: string;
-    category: string;
-    dueOffsetDays: number | null;
-  }> = [];
-
-  for (const task of value) {
-    const parsedTask = templateTaskSchema.safeParse(task);
-
-    if (!parsedTask.success) {
-      continue;
-    }
-
-    tasks.push({
-      title: parsedTask.data.title,
-      description: parsedTask.data.description,
-      category: parsedTask.data.category,
-      dueOffsetDays: parsedTask.data.dueOffsetDays ?? parsedTask.data.due_offset_days ?? null
-    });
-  }
-
-  return tasks;
-}
-
-function formatDateOnly(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function resolveStartTimestamp(rawValue: string | undefined): string {
-  if (!rawValue || rawValue.trim().length === 0) {
-    return new Date().toISOString();
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
-    return new Date(`${rawValue}T00:00:00.000Z`).toISOString();
-  }
-
-  return new Date(rawValue).toISOString();
 }
 
 export async function GET(request: Request) {
@@ -553,109 +495,40 @@ export async function POST(request: Request) {
     });
   }
 
-  const startTimestamp = resolveStartTimestamp(payload.startedAt);
-  const instanceType = payload.type ?? parsedTemplate.data.type;
+  let instance: OnboardingInstanceSummary;
 
-  const { data: insertedInstance, error: insertInstanceError } = await supabase
-    .from("onboarding_instances")
-    .insert({
-      org_id: profile.org_id,
-      employee_id: employeeRow.id,
-      template_id: parsedTemplate.data.id,
-      type: instanceType,
-      status: "active",
-      started_at: startTimestamp
-    })
-    .select("id, employee_id, template_id, type, status, started_at, completed_at")
-    .single();
+  try {
+    const created = await createOnboardingInstance({
+      supabase,
+      orgId: profile.org_id,
+      employee: {
+        id: employeeRow.id,
+        fullName: employeeRow.full_name
+      },
+      template: {
+        id: parsedTemplate.data.id,
+        name: parsedTemplate.data.name,
+        type: parsedTemplate.data.type,
+        tasks: parsedTemplate.data.tasks
+      },
+      type: payload.type,
+      startedAt: payload.startedAt
+    });
 
-  if (insertInstanceError || !insertedInstance) {
+    instance = created.instance;
+  } catch (error) {
     return jsonResponse<null>(500, {
       data: null,
       error: {
         code: "INSTANCE_CREATE_FAILED",
-        message: "Unable to start onboarding instance."
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to start onboarding instance."
       },
       meta: buildMeta()
     });
   }
-
-  const parsedInstance = instanceRowSchema.safeParse(insertedInstance);
-
-  if (!parsedInstance.success) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "INSTANCE_PARSE_FAILED",
-        message: "Created onboarding instance data is not in the expected shape."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  const normalizedTemplateTasks = normalizeTemplateTasks(parsedTemplate.data.tasks);
-  const baseDate = new Date(startTimestamp);
-  const taskRows = normalizedTemplateTasks.map((task) => {
-    const dueDate =
-      task.dueOffsetDays === null
-        ? null
-        : formatDateOnly(
-            new Date(
-              baseDate.getTime() + task.dueOffsetDays * 24 * 60 * 60 * 1000
-            )
-          );
-
-    return {
-      org_id: profile.org_id,
-      instance_id: parsedInstance.data.id,
-      title: task.title,
-      description: task.description || null,
-      category: task.category,
-      status: "pending",
-      assigned_to: employeeRow.id,
-      due_date: dueDate
-    };
-  });
-
-  if (taskRows.length > 0) {
-    const { error: insertTasksError } = await supabase
-      .from("onboarding_tasks")
-      .insert(taskRows);
-
-    if (insertTasksError) {
-      await supabase
-        .from("onboarding_instances")
-        .update({
-          deleted_at: new Date().toISOString()
-        })
-        .eq("id", parsedInstance.data.id)
-        .eq("org_id", profile.org_id);
-
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "ONBOARDING_TASKS_CREATE_FAILED",
-          message: "Onboarding instance was created but tasks could not be generated."
-        },
-        meta: buildMeta()
-      });
-    }
-  }
-
-  const instance: OnboardingInstanceSummary = {
-    id: parsedInstance.data.id,
-    employeeId: parsedInstance.data.employee_id,
-    employeeName: employeeRow.full_name,
-    templateId: parsedInstance.data.template_id,
-    templateName: parsedTemplate.data.name,
-    type: parsedInstance.data.type,
-    status: parsedInstance.data.status,
-    startedAt: parsedInstance.data.started_at,
-    completedAt: parsedInstance.data.completed_at,
-    totalTasks: taskRows.length,
-    completedTasks: 0,
-    progressPercent: 0
-  };
 
   await createNotification({
     orgId: profile.org_id,
