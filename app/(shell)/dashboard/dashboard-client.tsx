@@ -93,11 +93,13 @@ function DashboardContent() {
       </motion.p>
 
       {/* Hero KPIs */}
-      <section className="dashboard-v2-hero-grid" aria-label="Key metrics">
-        {data.heroMetrics.map((metric, index) => (
-          <HeroMetricCard key={metric.key} metric={metric} index={index} />
-        ))}
-      </section>
+      {data.heroMetrics.length > 0 ? (
+        <section className="dashboard-v2-hero-grid" aria-label="Key metrics">
+          {data.heroMetrics.map((metric, index) => (
+            <HeroMetricCard key={metric.key} metric={metric} index={index} />
+          ))}
+        </section>
+      ) : null}
 
       {/* Primary Chart */}
       {data.primaryChart.data.length > 0 && (

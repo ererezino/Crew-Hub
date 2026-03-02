@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
+import { areDepartmentsEqual } from "../../../../../../lib/department";
+import { isDepartmentScopedTeamLead } from "../../../../../../lib/roles";
 import {
   areTimeRangesOverlapping,
   combineDateAndTime,
@@ -328,6 +330,18 @@ export async function PUT(
   }
 
   const supabase = await createSupabaseServerClient();
+  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+
+  if (isScopedTeamLead && !session.profile.department) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead scheduling requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
 
   const { data: rawExistingRow, error: existingError } = await supabase
     .from("shifts")
@@ -375,6 +389,39 @@ export async function PUT(
   }
 
   const existingShift = parsedExistingRow.data;
+  const { data: currentScheduleRow, error: currentScheduleError } = await supabase
+    .from("schedules")
+    .select("id, department")
+    .eq("id", existingShift.schedule_id)
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (currentScheduleError || !currentScheduleRow?.id) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: {
+        code: "SCHEDULE_NOT_FOUND",
+        message: "Shift schedule was not found."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (
+    isScopedTeamLead &&
+    !areDepartmentsEqual(currentScheduleRow.department, session.profile.department)
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Team lead can only manage shifts in their own department."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const nextScheduleId = changes.scheduleId ?? existingShift.schedule_id;
   const nextTemplateId =
     changes.templateId === undefined ? existingShift.template_id : changes.templateId;
@@ -401,7 +448,7 @@ export async function PUT(
   if (changes.scheduleId) {
     const { data: scheduleRow, error: scheduleError } = await supabase
       .from("schedules")
-      .select("id")
+      .select("id, department")
       .eq("id", changes.scheduleId)
       .eq("org_id", session.profile.org_id)
       .is("deleted_at", null)
@@ -413,6 +460,52 @@ export async function PUT(
         error: {
           code: "SCHEDULE_NOT_FOUND",
           message: "Target schedule was not found."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (
+      isScopedTeamLead &&
+      !areDepartmentsEqual(scheduleRow.department, session.profile.department)
+    ) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Team lead can only move shifts to schedules in their own department."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
+  if (nextEmployeeId && isScopedTeamLead) {
+    const { data: employeeRow, error: employeeError } = await supabase
+      .from("profiles")
+      .select("id, department")
+      .eq("id", nextEmployeeId)
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (employeeError || !employeeRow?.id) {
+      return jsonResponse<null>(404, {
+        data: null,
+        error: {
+          code: "EMPLOYEE_NOT_FOUND",
+          message: "Employee for this shift was not found."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (!areDepartmentsEqual(employeeRow.department, session.profile.department)) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Team lead can only assign employees from their own department."
         },
         meta: buildMeta()
       });

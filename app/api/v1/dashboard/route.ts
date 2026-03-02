@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import {
+  DASHBOARD_WIDGET_KEYS,
+  defaultWidgetVisibilityForRoles,
+  getDefaultVisibleRolesForWidget,
+  isSuperAdmin,
+  isWidgetVisibleForUser,
+  sanitizeRoles
+} from "../../../../lib/access-control";
 import { normalizeUserRoles, type UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
@@ -74,8 +83,14 @@ function getRoleBadge(roles: readonly UserRole[]): string {
   if (hasRole(roles, "HR_ADMIN")) return "HR Admin";
   if (hasRole(roles, "FINANCE_ADMIN")) return "Finance Admin";
   if (hasRole(roles, "MANAGER")) return "Manager";
+  if (hasRole(roles, "TEAM_LEAD")) return "Team Lead";
   return "Employee";
 }
+
+const widgetConfigRowSchema = z.object({
+  widget_key: z.enum(DASHBOARD_WIDGET_KEYS),
+  visible_to_roles: z.array(z.string())
+});
 
 function extractSparkline(
   trendArray: unknown[],
@@ -416,7 +431,8 @@ export async function GET() {
       prevPayrollResult,
       prevExpensesResult,
       expenseWidgetResult,
-      complianceResult
+      complianceResult,
+      widgetConfigResult
     ] = await Promise.all([
       supabase.rpc("analytics_people", currentPayload),
       supabase.rpc("analytics_time_off", currentPayload),
@@ -441,7 +457,11 @@ export async function GET() {
         .eq("org_id", profile.org_id)
         .is("deleted_at", null)
         .neq("status", "completed")
-        .lt("due_date", toDateString(endDate))
+        .lt("due_date", toDateString(endDate)),
+      supabase
+        .from("dashboard_widget_config")
+        .select("widget_key, visible_to_roles")
+        .eq("org_id", profile.org_id)
     ]);
 
     const rpcError =
@@ -454,7 +474,8 @@ export async function GET() {
       prevPayrollResult.error ??
       prevExpensesResult.error ??
       expenseWidgetResult.error ??
-      complianceResult.error;
+      complianceResult.error ??
+      widgetConfigResult.error;
 
     if (rpcError) {
       return jsonResponse<null>(500, {
@@ -488,23 +509,87 @@ export async function GET() {
       hasRole(roles, "FINANCE_ADMIN") ||
       hasRole(roles, "SUPER_ADMIN");
 
+    const parsedWidgetRows = z.array(widgetConfigRowSchema).safeParse(widgetConfigResult.data ?? []);
+
+    if (!parsedWidgetRows.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "DASHBOARD_WIDGET_CONFIG_PARSE_FAILED",
+          message: "Dashboard widget configuration is not in the expected shape."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const visibleWidgetKeySet = (() => {
+      if (isSuperAdmin(roles)) {
+        return new Set(DASHBOARD_WIDGET_KEYS);
+      }
+
+      if (parsedWidgetRows.data.length === 0) {
+        return new Set(defaultWidgetVisibilityForRoles(roles));
+      }
+
+      const rowByKey = new Map(
+        parsedWidgetRows.data.map((row) => [row.widget_key, row] as const)
+      );
+      const visibleKeys = DASHBOARD_WIDGET_KEYS.filter((widgetKey) => {
+        const row = rowByKey.get(widgetKey);
+        const visibleToRoles = row
+          ? sanitizeRoles(row.visible_to_roles)
+          : getDefaultVisibleRolesForWidget(widgetKey);
+
+        return isWidgetVisibleForUser({
+          userRoles: roles,
+          visibleToRoles
+        });
+      });
+
+      return new Set(visibleKeys);
+    })();
+
     const responseData: DashboardResponseData = {
       greeting: {
         firstName: getFirstName(profile.full_name),
         roleBadge: getRoleBadge(roles)
       },
-      heroMetrics: buildHeroMetrics(
-        roles, people, timeOff, payroll, expenses,
-        prevPeople, prevTimeOff, prevPayroll, prevExpenses
-      ),
-      primaryChart: buildPrimaryChart(roles, people, payroll),
-      secondaryPanels: buildSecondaryPanels(people, expenses),
-      expenseWidget: {
-        pendingCount: employeePendingCount,
-        pendingAmount: employeePendingAmount,
-        managerPendingCount: 0
-      },
-      complianceWidget: showCompliance
+      heroMetrics: visibleWidgetKeySet.has("hero_metrics")
+        ? buildHeroMetrics(
+            roles,
+            people,
+            timeOff,
+            payroll,
+            expenses,
+            prevPeople,
+            prevTimeOff,
+            prevPayroll,
+            prevExpenses
+          )
+        : [],
+      primaryChart: visibleWidgetKeySet.has("primary_chart")
+        ? buildPrimaryChart(roles, people, payroll)
+        : {
+            title: "",
+            type: "area",
+            dataKey: "value",
+            data: []
+          },
+      secondaryPanels: visibleWidgetKeySet.has("secondary_panels")
+        ? buildSecondaryPanels(people, expenses)
+        : [],
+      expenseWidget: visibleWidgetKeySet.has("expense_widget")
+        ? {
+            pendingCount: employeePendingCount,
+            pendingAmount: employeePendingAmount,
+            managerPendingCount: 0
+          }
+        : {
+            pendingCount: 0,
+            pendingAmount: 0,
+            managerPendingCount: 0
+          },
+      complianceWidget: visibleWidgetKeySet.has("compliance_widget") && showCompliance
         ? { overdueCount, nextDeadline: null }
         : null
     };

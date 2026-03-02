@@ -1,5 +1,6 @@
 export const APP_ROLES = [
   "EMPLOYEE",
+  "TEAM_LEAD",
   "MANAGER",
   "HR_ADMIN",
   "FINANCE_ADMIN",

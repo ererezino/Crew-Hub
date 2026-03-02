@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
+import { areDepartmentsEqual } from "../../../../../lib/department";
+import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
 import {
   isIsoTime,
   isSchedulingManager,
@@ -107,6 +109,33 @@ export async function GET(request: Request) {
 
   const supabase = await createSupabaseServerClient();
   const query = parsedQuery.data;
+  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+
+  if (isScopedTeamLead && !session.profile.department) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead scheduling requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (
+    isScopedTeamLead &&
+    query.department &&
+    !areDepartmentsEqual(query.department, session.profile.department)
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Team lead can only view templates for their own department."
+      },
+      meta: buildMeta()
+    });
+  }
 
   let templatesQuery = supabase
     .from("shift_templates")
@@ -118,7 +147,9 @@ export async function GET(request: Request) {
     .order("name", { ascending: true })
     .limit(query.limit);
 
-  if (query.department && query.department.length > 0) {
+  if (isScopedTeamLead) {
+    templatesQuery = templatesQuery.ilike("department", session.profile.department as string);
+  } else if (query.department && query.department.length > 0) {
     templatesQuery = templatesQuery.eq("department", query.department);
   }
 
@@ -222,13 +253,42 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+
+  if (isScopedTeamLead && !session.profile.department) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead scheduling requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (
+    isScopedTeamLead &&
+    parsedBody.data.department &&
+    !areDepartmentsEqual(parsedBody.data.department, session.profile.department)
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Team lead can only create templates for their own department."
+      },
+      meta: buildMeta()
+    });
+  }
 
   const { data: rawRow, error } = await supabase
     .from("shift_templates")
     .insert({
       org_id: session.profile.org_id,
       name: parsedBody.data.name,
-      department: parsedBody.data.department?.trim() || null,
+      department: isScopedTeamLead
+        ? session.profile.department
+        : parsedBody.data.department?.trim() || null,
       start_time: `${parsedBody.data.startTime}:00`,
       end_time: `${parsedBody.data.endTime}:00`,
       break_minutes: parsedBody.data.breakMinutes,

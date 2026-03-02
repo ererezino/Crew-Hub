@@ -132,6 +132,12 @@ export type TimeAttendanceApprovalsResponseData = {
 
 export type TimeAttendanceApprovalsResponse = ApiResponse<TimeAttendanceApprovalsResponseData>;
 
+export type TimeAttendanceApprovalMutationResponseData = {
+  timesheet: TimesheetRecord;
+};
+
+export type TimeAttendanceApprovalMutationResponse = ApiResponse<TimeAttendanceApprovalMutationResponseData>;
+
 export type TimeAttendancePoliciesResponseData = {
   policies: TimePolicyRecord[];
 };

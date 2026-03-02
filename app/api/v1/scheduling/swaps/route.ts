@@ -5,6 +5,7 @@ import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
 import { createNotification } from "../../../../../lib/notifications/service";
 import { areTimeRangesOverlapping, canViewTeamSchedules } from "../../../../../lib/scheduling";
+import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
@@ -199,7 +200,19 @@ export async function GET(request: Request) {
   const query = parsedQuery.data;
   const canViewTeam = canViewTeamSchedules(session.profile.roles);
   const scope = query.scope === "team" && canViewTeam ? "team" : "mine";
+  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
   const supabase = await createSupabaseServerClient();
+
+  if (scope === "team" && isScopedTeamLead && !session.profile.department) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead scheduling requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
 
   let swapsQuery = supabase
     .from("shift_swaps")
@@ -219,6 +232,68 @@ export async function GET(request: Request) {
     swapsQuery = swapsQuery.or(
       `requester_id.eq.${session.profile.id},target_id.eq.${session.profile.id}`
     );
+  } else if (scope === "team" && isScopedTeamLead) {
+    const { data: scheduleRows, error: schedulesError } = await supabase
+      .from("schedules")
+      .select("id")
+      .eq("org_id", session.profile.org_id)
+      .ilike("department", session.profile.department as string)
+      .is("deleted_at", null);
+
+    if (schedulesError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_SCOPE_FETCH_FAILED",
+          message: "Unable to resolve team lead scope for shift swaps."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const scheduleIds = (scheduleRows ?? [])
+      .map((row) => row.id)
+      .filter((value): value is string => typeof value === "string");
+
+    if (scheduleIds.length === 0) {
+      return jsonResponse<SchedulingSwapsResponseData>(200, {
+        data: { swaps: [] },
+        error: null,
+        meta: buildMeta()
+      });
+    }
+
+    const shiftQueryResult = await supabase
+      .from("shifts")
+      .select("id")
+      .eq("org_id", session.profile.org_id)
+      .in("schedule_id", scheduleIds)
+      .is("deleted_at", null);
+
+    if (shiftQueryResult.error || !shiftQueryResult.data) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_SCOPE_FETCH_FAILED",
+          message: "Unable to resolve team lead scope for shift swaps."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const scopedShiftIds = shiftQueryResult.data
+      .map((row) => row.id)
+      .filter((value): value is string => typeof value === "string");
+
+    if (scopedShiftIds.length === 0) {
+      return jsonResponse<SchedulingSwapsResponseData>(200, {
+        data: { swaps: [] },
+        error: null,
+        meta: buildMeta()
+      });
+    }
+
+    swapsQuery = swapsQuery.in("shift_id", scopedShiftIds);
   }
 
   const { data: rawRows, error } = await swapsQuery;

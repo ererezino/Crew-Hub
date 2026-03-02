@@ -18,6 +18,7 @@ export default async function SchedulingManagePage() {
   }
 
   const canManage =
+    hasRole(session.profile.roles, "TEAM_LEAD") ||
     hasRole(session.profile.roles, "MANAGER") ||
     hasRole(session.profile.roles, "HR_ADMIN") ||
     hasRole(session.profile.roles, "SUPER_ADMIN");
@@ -26,7 +27,7 @@ export default async function SchedulingManagePage() {
     return (
       <EmptyState
         title="Schedule management is restricted"
-        description="Only managers and admins can create or publish schedules."
+        description="Only team leads, managers, and admins can create or publish schedules."
         ctaLabel="Open Scheduling"
         ctaHref="/scheduling"
       />

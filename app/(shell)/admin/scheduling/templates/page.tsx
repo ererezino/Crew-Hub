@@ -18,6 +18,7 @@ export default async function SchedulingTemplatesAdminPage() {
   }
 
   const canManageTemplates =
+    hasRole(session.profile.roles, "TEAM_LEAD") ||
     hasRole(session.profile.roles, "MANAGER") ||
     hasRole(session.profile.roles, "HR_ADMIN") ||
     hasRole(session.profile.roles, "SUPER_ADMIN");
@@ -26,7 +27,7 @@ export default async function SchedulingTemplatesAdminPage() {
     return (
       <EmptyState
         title="Template management is restricted"
-        description="Only managers and admins can manage shift templates."
+        description="Only team leads, managers, and admins can manage shift templates."
         ctaLabel="Open Scheduling"
         ctaHref="/scheduling"
       />

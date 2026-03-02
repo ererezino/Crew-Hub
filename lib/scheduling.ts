@@ -66,6 +66,7 @@ export function endDateFromWeekStart(weekStart: string): string | null {
 
 export function isSchedulingManager(userRoles: readonly UserRole[]): boolean {
   return (
+    userRoles.includes("TEAM_LEAD") ||
     userRoles.includes("MANAGER") ||
     userRoles.includes("HR_ADMIN") ||
     userRoles.includes("SUPER_ADMIN")
@@ -78,6 +79,7 @@ export function isSchedulingAdmin(userRoles: readonly UserRole[]): boolean {
 
 export function canViewTeamSchedules(userRoles: readonly UserRole[]): boolean {
   return (
+    userRoles.includes("TEAM_LEAD") ||
     userRoles.includes("MANAGER") ||
     userRoles.includes("HR_ADMIN") ||
     userRoles.includes("FINANCE_ADMIN") ||

@@ -18,6 +18,7 @@ export default async function TimeAttendanceApprovalsPage() {
   }
 
   const canReview =
+    hasRole(session.profile.roles, "TEAM_LEAD") ||
     hasRole(session.profile.roles, "MANAGER") ||
     hasRole(session.profile.roles, "HR_ADMIN") ||
     hasRole(session.profile.roles, "FINANCE_ADMIN") ||
@@ -26,7 +27,7 @@ export default async function TimeAttendanceApprovalsPage() {
   if (!canReview) {
     return (
       <EmptyState
-        title="Approvals are limited to managers and admins"
+        title="Approvals are limited to team leads, managers, and admins"
         description="You can still review your own records from the Time & Attendance page."
         ctaLabel="Open Time & Attendance"
         ctaHref="/time-attendance"

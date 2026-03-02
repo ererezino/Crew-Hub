@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
+import { areDepartmentsEqual } from "../../../../../lib/department";
+import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
 import {
   canViewTeamSchedules,
   endDateFromWeekStart,
@@ -190,7 +192,19 @@ export async function GET(request: Request) {
   const query = parsedQuery.data;
   const supabase = await createSupabaseServerClient();
   const canViewTeam = canViewTeamSchedules(session.profile.roles);
+  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
   const scope = query.scope === "team" && canViewTeam ? "team" : "mine";
+
+  if (isScopedTeamLead && !session.profile.department) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead scheduling requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
 
   let scheduleIdsForMine: string[] = [];
 
@@ -264,6 +278,8 @@ export async function GET(request: Request) {
 
   if (scope === "mine") {
     schedulesQuery = schedulesQuery.in("id", scheduleIdsForMine);
+  } else if (scope === "team" && isScopedTeamLead) {
+    schedulesQuery = schedulesQuery.ilike("department", session.profile.department as string);
   }
 
   const { data: rawRows, error } = await schedulesQuery;
@@ -397,13 +413,42 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+
+  if (isScopedTeamLead && !session.profile.department) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+        message: "Team lead scheduling requires a department on your profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (
+    isScopedTeamLead &&
+    parsedBody.data.department &&
+    !areDepartmentsEqual(parsedBody.data.department, session.profile.department)
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Team lead can only create schedules for their own department."
+      },
+      meta: buildMeta()
+    });
+  }
 
   const { data: rawRow, error } = await supabase
     .from("schedules")
     .insert({
       org_id: session.profile.org_id,
       name: parsedBody.data.name?.trim() || null,
-      department: parsedBody.data.department?.trim() || null,
+      department: isScopedTeamLead
+        ? session.profile.department
+        : parsedBody.data.department?.trim() || null,
       week_start: weekStart,
       week_end: requestedWeekEnd,
       status: "draft"
