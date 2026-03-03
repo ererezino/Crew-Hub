@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "seed": "npx tsx scripts/seed/seed-foundation.ts"
+    "seed": "npx tsx scripts/seed/seed-foundation.ts",
+    "reset-team": "npx tsx scripts/seed/reset-to-real-team.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",
