@@ -101,6 +101,11 @@ const profileRowSchema = z.object({
   payroll_mode: z.enum(PAYROLL_MODES),
   primary_currency: z.string(),
   status: z.enum(PROFILE_STATUSES),
+  bio: z.string().nullable().default(null),
+  favorite_music: z.string().nullable().default(null),
+  favorite_books: z.string().nullable().default(null),
+  favorite_sports: z.string().nullable().default(null),
+  privacy_settings: z.unknown().default({}),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -114,7 +119,7 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
 }
 
 function canManagePeople(userRoles: readonly UserRole[]): boolean {
-  return hasRole(userRoles, "HR_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
+  return hasRole(userRoles, "SUPER_ADMIN");
 }
 
 function canViewAllPeople(userRoles: readonly UserRole[]): boolean {
@@ -181,6 +186,11 @@ function mapPersonRow(
     payrollMode: row.payroll_mode,
     primaryCurrency: row.primary_currency,
     status: row.status,
+    bio: row.bio ?? null,
+    favoriteMusic: row.favorite_music ?? null,
+    favoriteBooks: row.favorite_books ?? null,
+    favoriteSports: row.favorite_sports ?? null,
+    privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../types/people").PrivacySettings,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -262,7 +272,7 @@ export async function GET(request: Request) {
   let peopleQuery = supabase
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
     )
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
@@ -372,7 +382,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only HR Admin and Super Admin users can add people."
+        message: "Only Super Admin users can add people."
       },
       meta: buildMeta()
     });
@@ -604,7 +614,7 @@ export async function POST(request: Request) {
       status: profileStatus
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
     )
     .single();
 

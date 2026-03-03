@@ -39,13 +39,19 @@ const listQuerySchema = z.object({
 
 const createExpensePayloadSchema = z.object({
   category: expenseCategorySchema,
+  customCategory: z.string().trim().max(100, "Custom category is too long").optional(),
   description: z.string().trim().min(1, "Description is required").max(3000, "Description is too long"),
   amount: z
     .string()
     .trim()
     .regex(/^\d+$/, "Amount must be a whole number in the smallest currency unit."),
   expenseDate: z.iso.date(),
-  currency: z.string().trim().length(3).optional()
+  currency: z.string().trim().length(3).optional(),
+  expenseType: z.enum(["personal_reimbursement", "work_expense"]).default("personal_reimbursement"),
+  vendorName: z.string().trim().max(200, "Vendor name is too long").optional(),
+  vendorBankAccountName: z.string().trim().max(200, "Bank account name is too long").optional(),
+  vendorBankAccountNumber: z.string().trim().max(50, "Bank account number is too long").optional(),
+  saveVendor: z.enum(["true", "false"]).optional()
 });
 
 function getFormString(formData: FormData, key: string): string {
@@ -299,10 +305,16 @@ export async function POST(request: Request) {
 
   const parsedPayload = createExpensePayloadSchema.safeParse({
     category: getFormString(formData, "category"),
+    customCategory: getFormString(formData, "customCategory") || undefined,
     description: getFormString(formData, "description"),
     amount: getFormString(formData, "amount"),
     expenseDate: getFormString(formData, "expenseDate"),
-    currency: getFormString(formData, "currency")
+    currency: getFormString(formData, "currency"),
+    expenseType: getFormString(formData, "expenseType") || "personal_reimbursement",
+    vendorName: getFormString(formData, "vendorName") || undefined,
+    vendorBankAccountName: getFormString(formData, "vendorBankAccountName") || undefined,
+    vendorBankAccountNumber: getFormString(formData, "vendorBankAccountNumber") || undefined,
+    saveVendor: getFormString(formData, "saveVendor") || undefined
   });
 
   if (!parsedPayload.success) {
@@ -330,6 +342,41 @@ export async function POST(request: Request) {
     });
   }
 
+  if (payload.expenseType === "work_expense") {
+    if (!payload.vendorName?.trim()) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Vendor name is required for work expenses."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (!payload.vendorBankAccountName?.trim()) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Vendor bank account name is required for work expenses."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (!payload.vendorBankAccountNumber?.trim()) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Vendor bank account number is required for work expenses."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
   const supabase = await createSupabaseServerClient();
   const timestamp = Date.now();
   const safeFileName = sanitizeFileName(rawFile.name);
@@ -355,17 +402,22 @@ export async function POST(request: Request) {
     });
   }
 
-  const mutationPayload = {
+  const mutationPayload: Record<string, unknown> = {
     id: expenseId,
     org_id: session.profile.org_id,
     employee_id: session.profile.id,
+    expense_type: payload.expenseType,
     category: payload.category,
+    custom_category: payload.category === "other" ? (payload.customCategory?.trim() || null) : null,
     description: payload.description.trim(),
     amount,
     currency: normalizeCurrency(payload.currency),
     receipt_file_path: filePath,
     expense_date: payload.expenseDate,
-    status: "pending" as const
+    status: "pending" as const,
+    vendor_name: payload.expenseType === "work_expense" ? (payload.vendorName?.trim() || null) : null,
+    vendor_bank_account_name: payload.expenseType === "work_expense" ? (payload.vendorBankAccountName?.trim() || null) : null,
+    vendor_bank_account_number: payload.expenseType === "work_expense" ? (payload.vendorBankAccountNumber?.trim() || null) : null
   };
 
   const { data: insertedExpense, error: insertExpenseError } = await supabase
@@ -452,6 +504,26 @@ export async function POST(request: Request) {
       category: expense.category
     }
   });
+
+  if (
+    payload.expenseType === "work_expense" &&
+    payload.saveVendor === "true" &&
+    payload.vendorName?.trim() &&
+    payload.vendorBankAccountName?.trim() &&
+    payload.vendorBankAccountNumber?.trim()
+  ) {
+    try {
+      await supabase.from("vendor_beneficiaries").insert({
+        org_id: session.profile.org_id,
+        employee_id: session.profile.id,
+        vendor_name: payload.vendorName.trim(),
+        bank_account_name: payload.vendorBankAccountName.trim(),
+        bank_account_number: payload.vendorBankAccountNumber.trim()
+      });
+    } catch {
+      // Non-critical — vendor save failure should not block expense creation
+    }
+  }
 
   const managerRecipientId = employeeProfile?.manager_id;
 

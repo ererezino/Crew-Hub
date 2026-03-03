@@ -21,6 +21,14 @@ export const PROFILE_STATUSES = [
 
 export type ProfileStatus = (typeof PROFILE_STATUSES)[number];
 
+export type PrivacySettings = {
+  showEmail?: boolean;
+  showPhone?: boolean;
+  showDepartment?: boolean;
+  showBio?: boolean;
+  showInterests?: boolean;
+};
+
 export type PersonRecord = {
   id: string;
   email: string;
@@ -38,6 +46,11 @@ export type PersonRecord = {
   payrollMode: PayrollMode;
   primaryCurrency: string;
   status: ProfileStatus;
+  bio: string | null;
+  favoriteMusic: string | null;
+  favoriteBooks: string | null;
+  favoriteSports: string | null;
+  privacySettings: PrivacySettings;
   createdAt: string;
   updatedAt: string;
 };
@@ -87,6 +100,11 @@ export type PeopleUpdatePayload = {
   managerId?: string | null;
   status?: ProfileStatus;
   accessOverrides?: PeopleAccessOverrides;
+  bio?: string | null;
+  favoriteMusic?: string | null;
+  favoriteBooks?: string | null;
+  favoriteSports?: string | null;
+  privacySettings?: PrivacySettings;
 };
 
 export type PeopleUpdateResponseData = {

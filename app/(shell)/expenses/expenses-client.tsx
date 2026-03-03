@@ -31,11 +31,13 @@ import {
   MAX_RECEIPT_FILE_BYTES,
   toneForExpenseStatus
 } from "../../../lib/expenses";
+import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries";
 import type {
   CreateExpenseResponse,
   ExpenseCategory,
   ExpenseReceiptSignedUrlResponse,
   ExpenseRecord,
+  ExpenseType,
   UpdateExpenseResponse
 } from "../../../types/expenses";
 
@@ -49,11 +51,17 @@ type ToastMessage = {
 };
 
 type ExpenseFormValues = {
+  expenseType: ExpenseType;
   category: ExpenseCategory;
+  customCategory: string;
   description: string;
   amount: string;
   expenseDate: string;
   currency: string;
+  vendorName: string;
+  vendorBankAccountName: string;
+  vendorBankAccountNumber: string;
+  saveVendor: boolean;
 };
 
 type ExpenseFormField = keyof ExpenseFormValues | "receipt";
@@ -70,6 +78,7 @@ const expenseFormSchema = z.object({
     "office_supplies",
     "software",
     "wellness",
+    "marketing",
     "other"
   ]),
   description: z.string().trim().min(1, "Description is required").max(3000, "Description is too long"),
@@ -82,29 +91,47 @@ const expenseFormSchema = z.object({
 });
 
 const INITIAL_FORM_VALUES: ExpenseFormValues = {
+  expenseType: "personal_reimbursement",
   category: "travel",
+  customCategory: "",
   description: "",
   amount: "",
   expenseDate: new Date().toISOString().slice(0, 10),
-  currency: "USD"
+  currency: "USD",
+  vendorName: "",
+  vendorBankAccountName: "",
+  vendorBankAccountNumber: "",
+  saveVendor: false
 };
 
 const INITIAL_TOUCHED: ExpenseFormTouched = {
+  expenseType: false,
   category: false,
+  customCategory: false,
   description: false,
   amount: false,
   expenseDate: false,
   currency: false,
-  receipt: false
+  receipt: false,
+  vendorName: false,
+  vendorBankAccountName: false,
+  vendorBankAccountNumber: false,
+  saveVendor: false
 };
 
 const ALL_TOUCHED: ExpenseFormTouched = {
+  expenseType: true,
   category: true,
+  customCategory: true,
   description: true,
   amount: true,
   expenseDate: true,
   currency: true,
-  receipt: true
+  receipt: true,
+  vendorName: true,
+  vendorBankAccountName: true,
+  vendorBankAccountNumber: true,
+  saveVendor: true
 };
 
 const categoryOptions: ExpenseCategory[] = [
@@ -116,6 +143,7 @@ const categoryOptions: ExpenseCategory[] = [
   "office_supplies",
   "software",
   "wellness",
+  "marketing",
   "other"
 ];
 
@@ -202,6 +230,24 @@ function getFormErrors(
 
   if (touched.receipt) {
     errors.receipt = validateReceipt(receipt);
+  }
+
+  if (values.category === "other" && touched.customCategory && !values.customCategory.trim()) {
+    errors.customCategory = "Please specify the category.";
+  }
+
+  if (values.expenseType === "work_expense") {
+    if (touched.vendorName && !values.vendorName.trim()) {
+      errors.vendorName = "Vendor name is required for work expenses.";
+    }
+
+    if (touched.vendorBankAccountName && !values.vendorBankAccountName.trim()) {
+      errors.vendorBankAccountName = "Bank account name is required.";
+    }
+
+    if (touched.vendorBankAccountNumber && !values.vendorBankAccountNumber.trim()) {
+      errors.vendorBankAccountNumber = "Bank account number is required.";
+    }
   }
 
   return errors;
@@ -362,6 +408,21 @@ function CategoryIcon({ category }: { category: ExpenseCategory }) {
     );
   }
 
+  if (category === "marketing") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M19 4L10 8H5v8h5l9 4V4zM22 12h-2M22 8h-3M22 16h-3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path
@@ -429,6 +490,7 @@ export function ExpensesClient({
 }) {
   const [month, setMonth] = useState(currentMonthKey());
   const expensesQuery = useExpenses({ month });
+  const vendorBeneficiaries = useVendorBeneficiaries();
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isDraggingReceipt, setIsDraggingReceipt] = useState(false);
@@ -592,12 +654,24 @@ export function ExpensesClient({
     setUploadProgress(0);
 
     const formData = new FormData();
+    formData.set("expenseType", formValues.expenseType);
     formData.set("category", formValues.category);
+    if (formValues.category === "other" && formValues.customCategory.trim()) {
+      formData.set("customCategory", formValues.customCategory.trim());
+    }
     formData.set("description", formValues.description.trim());
     formData.set("amount", String(amountMinorUnits));
     formData.set("expenseDate", formValues.expenseDate);
     formData.set("currency", formValues.currency.trim().toUpperCase());
     formData.set("receipt", receiptFile);
+    if (formValues.expenseType === "work_expense") {
+      formData.set("vendorName", formValues.vendorName.trim());
+      formData.set("vendorBankAccountName", formValues.vendorBankAccountName.trim());
+      formData.set("vendorBankAccountNumber", formValues.vendorBankAccountNumber.trim());
+      if (formValues.saveVendor) {
+        formData.set("saveVendor", "true");
+      }
+    }
 
     try {
       const result = await uploadExpenseWithProgress(formData, setUploadProgress);
@@ -609,6 +683,9 @@ export function ExpensesClient({
 
       closePanel();
       expensesQuery.refresh();
+      if (formValues.saveVendor) {
+        vendorBeneficiaries.refresh();
+      }
       showToast("success", "Expense submitted.");
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Unable to submit expense.");
@@ -841,13 +918,13 @@ export function ExpensesClient({
                     const managerDescription = expense.managerApprovedByName
                       ? `Approved by ${expense.managerApprovedByName}.`
                       : expense.status === "rejected"
-                        ? "Rejected before manager approval."
+                        ? `Rejected by ${expense.rejectedByName ?? "Manager"}.${expense.rejectionReason ? ` Reason: ${expense.rejectionReason}` : ""}`
                         : "Awaiting manager decision.";
 
                     const financeDescription = expense.reimbursedAt
                       ? `Disbursed by ${expense.reimbursedByName ?? "Finance"}${expense.reimbursementReference ? ` (Ref: ${expense.reimbursementReference})` : ""}.`
                       : expense.financeRejectedAt
-                        ? `Finance rejected.${expense.financeRejectionReason ? ` Reason: ${expense.financeRejectionReason}` : ""}`
+                        ? `Rejected by ${expense.financeRejectedByName ?? "Finance"}.${expense.financeRejectionReason ? ` Reason: ${expense.financeRejectionReason}` : ""}`
                         : "Awaiting finance disbursement.";
 
                     return (
@@ -989,6 +1066,44 @@ export function ExpensesClient({
                                   />
                                 </ul>
 
+                                {(expense.status === "rejected" || expense.status === "finance_rejected") ? (
+                                  <div className="expenses-rejection-details">
+                                    <h3 className="section-title">Rejection Details</h3>
+                                    {expense.status === "rejected" && expense.rejectionReason ? (
+                                      <p className="expenses-rejection-reason">
+                                        <strong>Reason:</strong> {expense.rejectionReason}
+                                      </p>
+                                    ) : null}
+                                    {expense.status === "finance_rejected" && expense.financeRejectionReason ? (
+                                      <p className="expenses-rejection-reason">
+                                        <strong>Finance reason:</strong> {expense.financeRejectionReason}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+
+                                {expense.vendorName ? (
+                                  <div className="expenses-transaction-details">
+                                    <h3 className="section-title">Vendor Details</h3>
+                                    <dl className="expenses-detail-grid">
+                                      <dt>Vendor</dt>
+                                      <dd>{expense.vendorName}</dd>
+                                      {expense.vendorBankAccountName ? (
+                                        <>
+                                          <dt>Account Name</dt>
+                                          <dd>{expense.vendorBankAccountName}</dd>
+                                        </>
+                                      ) : null}
+                                      {expense.vendorBankAccountNumber ? (
+                                        <>
+                                          <dt>Account Number</dt>
+                                          <dd className="numeric">{expense.vendorBankAccountNumber}</dd>
+                                        </>
+                                      ) : null}
+                                    </dl>
+                                  </div>
+                                ) : null}
+
                                 {expense.status === "reimbursed" ? (
                                   <div className="expenses-transaction-details">
                                     <h3 className="section-title">Transaction Details</h3>
@@ -1059,6 +1174,44 @@ export function ExpensesClient({
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSubmitExpense}>
           <div className="form-field">
+            <span className="form-label">Expense type</span>
+            <div className="expenses-type-toggle">
+              <button
+                type="button"
+                className={formValues.expenseType === "personal_reimbursement" ? "expenses-type-btn expenses-type-btn-active" : "expenses-type-btn"}
+                onClick={() => {
+                  setFormValues((prev) => ({ ...prev, expenseType: "personal_reimbursement" }));
+                  setSubmitError(null);
+                }}
+                disabled={isSubmitting}
+              >
+                Personal Reimbursement
+              </button>
+              <button
+                type="button"
+                className={formValues.expenseType === "work_expense" ? "expenses-type-btn expenses-type-btn-active" : "expenses-type-btn"}
+                onClick={() => {
+                  setFormValues((prev) => ({ ...prev, expenseType: "work_expense" }));
+                  setSubmitError(null);
+                }}
+                disabled={isSubmitting}
+              >
+                Work Expense
+              </button>
+            </div>
+          </div>
+
+          {formValues.expenseType === "personal_reimbursement" ? (
+            <div className="expenses-info-banner">
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="expenses-info-icon">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.6" />
+                <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              <p>Not all expenses qualify for reimbursement. Reimbursement-eligible expenses must be pre-approved by your manager.</p>
+            </div>
+          ) : null}
+
+          <div className="form-field">
             <span className="form-label">Category</span>
             <div className="expenses-category-grid" onBlur={handleFieldBlur("category")}>
               {categoryOptions.map((category) => (
@@ -1082,6 +1235,25 @@ export function ExpensesClient({
             {formErrors.category ? <p className="form-field-error">{formErrors.category}</p> : null}
           </div>
 
+          {formValues.category === "other" ? (
+            <label className="form-field">
+              <span className="form-label">Custom category name</span>
+              <input
+                className={formErrors.customCategory ? "form-input form-input-error" : "form-input"}
+                type="text"
+                value={formValues.customCategory}
+                onChange={(e) => setFormValues((prev) => ({ ...prev, customCategory: e.target.value }))}
+                onBlur={handleFieldBlur("customCategory")}
+                placeholder="e.g. Conference fees, Training materials"
+                disabled={isSubmitting}
+                maxLength={100}
+              />
+              {formErrors.customCategory ? (
+                <p className="form-field-error">{formErrors.customCategory}</p>
+              ) : null}
+            </label>
+          ) : null}
+
           <label className="form-field">
             <span className="form-label">Description</span>
             <textarea
@@ -1100,6 +1272,28 @@ export function ExpensesClient({
 
           <div className="expenses-form-grid expenses-form-grid-3col">
             <label className="form-field">
+              <span className="form-label">Currency</span>
+              <select
+                className={formErrors.currency ? "form-input form-input-error" : "form-input"}
+                value={formValues.currency}
+                onChange={handleFormFieldChange("currency")}
+                onBlur={handleFieldBlur("currency")}
+                disabled={isSubmitting}
+              >
+                <option value="USD">🇺🇸 USD</option>
+                <option value="NGN">🇳🇬 NGN</option>
+                <option value="GHS">🇬🇭 GHS</option>
+                <option value="KES">🇰🇪 KES</option>
+                <option value="ZAR">🇿🇦 ZAR</option>
+                <option value="XAF">🇨🇲 XAF</option>
+                <option value="CAD">🇨🇦 CAD</option>
+              </select>
+              {formErrors.currency ? (
+                <p className="form-field-error">{formErrors.currency}</p>
+              ) : null}
+            </label>
+
+            <label className="form-field">
               <span className="form-label">Amount</span>
               <MoneyInput
                 id="expense-amount-input"
@@ -1111,28 +1305,6 @@ export function ExpensesClient({
                 hasError={Boolean(formErrors.amount)}
               />
               {formErrors.amount ? <p className="form-field-error">{formErrors.amount}</p> : null}
-            </label>
-
-            <label className="form-field">
-              <span className="form-label">Currency</span>
-              <select
-                className={formErrors.currency ? "form-input form-input-error" : "form-input"}
-                value={formValues.currency}
-                onChange={handleFormFieldChange("currency")}
-                onBlur={handleFieldBlur("currency")}
-                disabled={isSubmitting}
-              >
-                <option value="USD">🇺🇸 USD — US Dollar</option>
-                <option value="NGN">🇳🇬 NGN — Nigerian Naira</option>
-                <option value="GHS">🇬🇭 GHS — Ghanaian Cedi</option>
-                <option value="KES">🇰🇪 KES — Kenyan Shilling</option>
-                <option value="ZAR">🇿🇦 ZAR — South African Rand</option>
-                <option value="XAF">🇨🇲 XAF — Central African CFA Franc</option>
-                <option value="CAD">🇨🇦 CAD — Canadian Dollar</option>
-              </select>
-              {formErrors.currency ? (
-                <p className="form-field-error">{formErrors.currency}</p>
-              ) : null}
             </label>
 
             <label className="form-field">
@@ -1151,16 +1323,117 @@ export function ExpensesClient({
             </label>
           </div>
 
+          {formValues.expenseType === "work_expense" ? (
+            <div className="expenses-vendor-fields">
+              <h4 className="section-title" style={{ marginBottom: "0.5rem" }}>Vendor Details</h4>
+
+              {vendorBeneficiaries.vendors.length > 0 ? (
+                <label className="form-field">
+                  <span className="form-label">Select saved vendor</span>
+                  <select
+                    className="form-input"
+                    value=""
+                    onChange={(e) => {
+                      const vendor = vendorBeneficiaries.vendors.find((v) => v.id === e.target.value);
+                      if (vendor) {
+                        setFormValues((prev) => ({
+                          ...prev,
+                          vendorName: vendor.vendorName,
+                          vendorBankAccountName: vendor.bankAccountName,
+                          vendorBankAccountNumber: vendor.bankAccountNumber
+                        }));
+                      }
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    <option value="">— Choose a saved vendor —</option>
+                    {vendorBeneficiaries.vendors.map((vendor) => (
+                      <option key={vendor.id} value={vendor.id}>
+                        {vendor.vendorName} — {vendor.bankAccountNumber}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              <label className="form-field">
+                <span className="form-label">Vendor name <span className="form-required">*</span></span>
+                <input
+                  className={formErrors.vendorName ? "form-input form-input-error" : "form-input"}
+                  type="text"
+                  value={formValues.vendorName}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, vendorName: e.target.value }))}
+                  onBlur={handleFieldBlur("vendorName")}
+                  placeholder="Company or vendor name"
+                  disabled={isSubmitting}
+                  maxLength={200}
+                />
+                {formErrors.vendorName ? (
+                  <p className="form-field-error">{formErrors.vendorName}</p>
+                ) : null}
+              </label>
+
+              <label className="form-field">
+                <span className="form-label">Bank account name <span className="form-required">*</span></span>
+                <input
+                  className={formErrors.vendorBankAccountName ? "form-input form-input-error" : "form-input"}
+                  type="text"
+                  value={formValues.vendorBankAccountName}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, vendorBankAccountName: e.target.value }))}
+                  onBlur={handleFieldBlur("vendorBankAccountName")}
+                  placeholder="Account holder name"
+                  disabled={isSubmitting}
+                  maxLength={200}
+                />
+                {formErrors.vendorBankAccountName ? (
+                  <p className="form-field-error">{formErrors.vendorBankAccountName}</p>
+                ) : null}
+              </label>
+
+              <label className="form-field">
+                <span className="form-label">Bank account number <span className="form-required">*</span></span>
+                <input
+                  className={formErrors.vendorBankAccountNumber ? "form-input form-input-error" : "form-input"}
+                  type="text"
+                  value={formValues.vendorBankAccountNumber}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, vendorBankAccountNumber: e.target.value }))}
+                  onBlur={handleFieldBlur("vendorBankAccountNumber")}
+                  placeholder="Bank account number"
+                  disabled={isSubmitting}
+                  maxLength={50}
+                />
+                {formErrors.vendorBankAccountNumber ? (
+                  <p className="form-field-error">{formErrors.vendorBankAccountNumber}</p>
+                ) : null}
+              </label>
+
+              <label className="expenses-save-vendor-check">
+                <input
+                  type="checkbox"
+                  checked={formValues.saveVendor}
+                  onChange={(e) => setFormValues((prev) => ({ ...prev, saveVendor: e.target.checked }))}
+                  disabled={isSubmitting}
+                />
+                <span>Save this vendor for future expenses</span>
+              </label>
+            </div>
+          ) : null}
+
           <div className="form-field">
-            <span className="form-label">Receipt</span>
+            <span className="form-label">Receipt <span className="form-required">*</span></span>
             <div
               className={isDraggingReceipt ? "document-dropzone document-dropzone-active" : "document-dropzone"}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
+              onClick={() => receiptInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); receiptInputRef.current?.click(); } }}
+              style={{ cursor: "pointer" }}
             >
               <p className="document-dropzone-title">
-                {receiptFile ? receiptFile.name : "Drag and drop a receipt file"}
+                {receiptFile ? receiptFile.name : "Click or drag and drop a receipt file"}
               </p>
               <p className="document-dropzone-hint">
                 PDF, PNG, JPG up to 10MB. Mobile camera capture is supported.
@@ -1207,11 +1480,8 @@ export function ExpensesClient({
 
           {isSubmitting ? (
             <div className="expenses-upload-progress" aria-live="polite">
-              <div
-                className="expenses-upload-progress-bar"
-                style={{ width: `${uploadProgress}%` }}
-              />
-              <span className="numeric">{uploadProgress}%</span>
+              <div className="expenses-upload-spinner" />
+              <span>Uploading...</span>
             </div>
           ) : null}
 

@@ -37,7 +37,8 @@ export default async function PeoplePage() {
   }
 
   const roles = session.profile.roles;
-  const canManagePeople = hasRole(roles, "HR_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  const canManagePeople = hasRole(roles, "SUPER_ADMIN");
+  const isAdmin = hasRole(roles, "HR_ADMIN") || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
   const scope = resolveScope(roles);
 
   return (
@@ -45,6 +46,7 @@ export default async function PeoplePage() {
       currentUserId={session.profile.id}
       initialScope={scope}
       canManagePeople={canManagePeople}
+      isAdmin={isAdmin}
     />
   );
 }

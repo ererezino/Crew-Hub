@@ -28,7 +28,7 @@ function resolveInitialTab(requestedTab: string, visibleTabs: PageTab[]): string
     return requestedTab;
   }
 
-  return visibleTabs[0]?.key ?? "time-off";
+  return "all";
 }
 
 async function fetchCountFromList(url: string, key: string): Promise<number> {
@@ -101,8 +101,15 @@ export function ApprovalsClient({
   const expensesCount = approvalsCountQuery.data?.expenses ?? 0;
   const timesheetsCount = approvalsCountQuery.data?.timesheets ?? 0;
 
+  const totalPendingCount = timeOffCount + expensesCount + timesheetsCount;
+
   const tabs = useMemo<PageTab[]>(
     () => [
+      {
+        key: "all",
+        label: "All Pending",
+        badge: totalPendingCount
+      },
       {
         key: "time-off",
         label: "Time Off",
@@ -122,7 +129,7 @@ export function ApprovalsClient({
         requiredRoles: ["TEAM_LEAD", "MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]
       }
     ],
-    [expensesCount, timeOffCount, timesheetsCount]
+    [expensesCount, timeOffCount, timesheetsCount, totalPendingCount]
   );
 
   const visibleTabs = tabs.filter((tab) => {
@@ -172,6 +179,52 @@ export function ApprovalsClient({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
         >
+          {activeTab === "all" ? (
+            <section className="all-pending-overview">
+              {totalPendingCount === 0 ? (
+                <div className="all-pending-empty">
+                  <p className="settings-card-description">No pending approvals. You&apos;re all caught up!</p>
+                </div>
+              ) : (
+                <div className="all-pending-items">
+                  {timeOffCount > 0 ? (
+                    <button
+                      type="button"
+                      className="all-pending-item"
+                      onClick={() => handleTabChange("time-off")}
+                    >
+                      <span className="all-pending-badge all-pending-badge-timeoff">Time Off</span>
+                      <span className="all-pending-count">{timeOffCount} pending {timeOffCount === 1 ? "request" : "requests"}</span>
+                      <span className="all-pending-arrow">→</span>
+                    </button>
+                  ) : null}
+                  {expensesCount > 0 ? (
+                    <button
+                      type="button"
+                      className="all-pending-item"
+                      onClick={() => handleTabChange("expenses")}
+                    >
+                      <span className="all-pending-badge all-pending-badge-expenses">Expenses</span>
+                      <span className="all-pending-count">{expensesCount} pending {expensesCount === 1 ? "expense" : "expenses"}</span>
+                      <span className="all-pending-arrow">→</span>
+                    </button>
+                  ) : null}
+                  {timesheetsCount > 0 ? (
+                    <button
+                      type="button"
+                      className="all-pending-item"
+                      onClick={() => handleTabChange("timesheets")}
+                    >
+                      <span className="all-pending-badge all-pending-badge-timesheets">Timesheets</span>
+                      <span className="all-pending-count">{timesheetsCount} pending {timesheetsCount === 1 ? "timesheet" : "timesheets"}</span>
+                      <span className="all-pending-arrow">→</span>
+                    </button>
+                  ) : null}
+                </div>
+              )}
+            </section>
+          ) : null}
+
           {activeTab === "time-off" ? <TimeOffApprovalsClient embedded /> : null}
 
           {activeTab === "expenses" ? (

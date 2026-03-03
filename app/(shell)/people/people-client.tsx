@@ -29,6 +29,7 @@ type PeopleClientProps = {
   currentUserId: string;
   initialScope: PeopleScope;
   canManagePeople: boolean;
+  isAdmin?: boolean;
 };
 
 type ToastMessage = {
@@ -201,7 +202,8 @@ function PeopleTableSkeleton() {
 export function PeopleClient({
   currentUserId,
   initialScope,
-  canManagePeople
+  canManagePeople,
+  isAdmin = false
 }: PeopleClientProps) {
   const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({
     scope: initialScope
@@ -414,12 +416,12 @@ export function PeopleClient({
                     Name {sortDirection === "asc" ? "↑" : "↓"}
                   </button>
                 </th>
-                <th>Roles</th>
+                {isAdmin ? <th>Roles</th> : null}
                 <th>Department</th>
                 <th>Country</th>
-                <th>Status</th>
-                <th>Employment</th>
-                <th>Created</th>
+                {isAdmin ? <th>Status</th> : null}
+                {isAdmin ? <th>Employment</th> : null}
+                <th>Date Joined</th>
                 <th className="table-action-column">Actions</th>
               </tr>
             </thead>
@@ -432,19 +434,21 @@ export function PeopleClient({
                       <p className="people-cell-description">{person.email}</p>
                     </div>
                   </td>
-                  <td>
-                    <div className="people-role-badges">
-                      {person.roles.length > 0 ? (
-                        person.roles.map((role) => (
-                          <StatusBadge key={`${person.id}-${role}`} tone="info">
-                            {roleLabels[role]}
-                          </StatusBadge>
-                        ))
-                      ) : (
-                        <StatusBadge tone="draft">No role</StatusBadge>
-                      )}
-                    </div>
-                  </td>
+                  {isAdmin ? (
+                    <td>
+                      <div className="people-role-badges">
+                        {person.roles.length > 0 ? (
+                          person.roles.map((role) => (
+                            <StatusBadge key={`${person.id}-${role}`} tone="info">
+                              {roleLabels[role]}
+                            </StatusBadge>
+                          ))
+                        ) : (
+                          <StatusBadge tone="draft">No role</StatusBadge>
+                        )}
+                      </div>
+                    </td>
+                  ) : null}
                   <td>{person.department ?? "--"}</td>
                   <td>
                     {person.countryCode ? (
@@ -456,20 +460,24 @@ export function PeopleClient({
                       "--"
                     )}
                   </td>
-                  <td>
-                    <StatusBadge tone={toneForProfileStatus(person.status)}>
-                      {person.status}
-                    </StatusBadge>
-                  </td>
-                  <td>
-                    <StatusBadge tone="processing">{person.employmentType.replace("_", " ")}</StatusBadge>
-                  </td>
+                  {isAdmin ? (
+                    <td>
+                      <StatusBadge tone={toneForProfileStatus(person.status)}>
+                        {person.status}
+                      </StatusBadge>
+                    </td>
+                  ) : null}
+                  {isAdmin ? (
+                    <td>
+                      <StatusBadge tone="processing">{person.employmentType.replace("_", " ")}</StatusBadge>
+                    </td>
+                  ) : null}
                   <td>
                     <time
-                      dateTime={toDateTimeValue(person.createdAt)}
-                      title={formatDateTimeTooltip(toDateTimeValue(person.createdAt))}
+                      dateTime={toDateTimeValue(person.startDate || person.createdAt)}
+                      title={formatDateTimeTooltip(toDateTimeValue(person.startDate || person.createdAt))}
                     >
-                      {formatRelativeTime(toDateTimeValue(person.createdAt))}
+                      {formatRelativeTime(toDateTimeValue(person.startDate || person.createdAt))}
                     </time>
                   </td>
                   <td className="table-row-action-cell">

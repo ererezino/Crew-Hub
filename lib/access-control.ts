@@ -95,7 +95,8 @@ const DEFAULT_NAV_ROLE_OVERRIDES: Readonly<Record<string, readonly UserRole[]>> 
   "/admin/payment-details": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
   "/admin/access-control": ["SUPER_ADMIN"],
   "/scheduling": SCHEDULING_ROLES,
-  "/time-attendance": SCHEDULING_ROLES
+  "/time-attendance": SCHEDULING_ROLES,
+  "/expenses/reports": ["MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]
 };
 
 const DEFAULT_WIDGET_ROLE_OVERRIDES: Readonly<

@@ -17,8 +17,11 @@ import { SchedulingSwapsClient } from "./swaps/scheduling-swaps-client";
 type SchedulingTabsClientProps = {
   requestedTab: string;
   userRoles: UserRole[];
+  userDepartment?: string | null;
   currentUserId: string;
 };
+
+const CS_DEPARTMENT = "Customer Success";
 
 function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
   const visibleKeys = new Set(tabs.map((tab) => tab.key));
@@ -33,19 +36,24 @@ function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
 export function SchedulingTabsClient({
   requestedTab,
   userRoles,
+  userDepartment,
   currentUserId
 }: SchedulingTabsClientProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const canManage =
-    hasRole(userRoles, "TEAM_LEAD") ||
-    hasRole(userRoles, "MANAGER") ||
-    hasRole(userRoles, "HR_ADMIN") ||
-    hasRole(userRoles, "SUPER_ADMIN");
+  const isCSTeam = userDepartment === CS_DEPARTMENT;
+  const isSuperAdmin = hasRole(userRoles, "SUPER_ADMIN");
 
-  const canManageTemplates = hasRole(userRoles, "HR_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
+  const canManage =
+    isSuperAdmin ||
+    (isCSTeam && (
+      hasRole(userRoles, "TEAM_LEAD") ||
+      hasRole(userRoles, "MANAGER")
+    ));
+
+  const canManageTemplates = isSuperAdmin || (isCSTeam && hasRole(userRoles, "HR_ADMIN"));
 
   const tabs = useMemo<PageTab[]>(
     () => [
@@ -140,7 +148,15 @@ export function SchedulingTabsClient({
           ) : null}
           {activeTab === "manage" && canManage ? <SchedulingManageClient embedded /> : null}
           {activeTab === "templates" && canManageTemplates ? (
-            <SchedulingTemplatesAdminClient embedded />
+            <>
+              <div className="scheduling-template-explanation">
+                <p>
+                  Shift templates are reusable time presets for common shift patterns
+                  (e.g. Morning 8–4, Evening 4–12) so you don&apos;t re-enter times each time you create a shift.
+                </p>
+              </div>
+              <SchedulingTemplatesAdminClient embedded />
+            </>
           ) : null}
         </motion.section>
       </AnimatePresence>
