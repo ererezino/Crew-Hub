@@ -1,7 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
-
 import { hasAnyRole } from "../../lib/roles";
 import type { UserRole } from "../../lib/navigation";
 
@@ -49,13 +47,6 @@ export function PageTabs({ tabs, activeTab, onTabChange, userRoles }: PageTabsPr
           >
             <span>{tab.label}</span>
             {badgeValue !== null ? <span className="page-tab-badge numeric">{badgeValue}</span> : null}
-            {isActive ? (
-              <motion.span
-                className="page-tab-indicator"
-                layoutId="page-tab-indicator"
-                transition={{ duration: 0.2, ease: "easeOut" }}
-              />
-            ) : null}
           </button>
         );
       })}
