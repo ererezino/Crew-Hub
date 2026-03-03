@@ -14,19 +14,24 @@ import {
 export const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 export const expenseStatusSchema = z.enum(EXPENSE_STATUSES);
 export const expenseSelectColumns =
-  "id, org_id, employee_id, category, description, amount, currency, receipt_file_path, expense_date, status, manager_approved_by, manager_approved_at, finance_approved_by, finance_approved_at, finance_rejected_by, finance_rejected_at, finance_rejection_reason, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at";
+  "id, org_id, employee_id, expense_type, category, custom_category, description, amount, currency, receipt_file_path, expense_date, status, vendor_name, vendor_bank_account_name, vendor_bank_account_number, manager_approved_by, manager_approved_at, finance_approved_by, finance_approved_at, finance_rejected_by, finance_rejected_at, finance_rejection_reason, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at";
 
 export const expenseRowSchema = z.object({
   id: z.string().uuid(),
   org_id: z.string().uuid(),
   employee_id: z.string().uuid(),
+  expense_type: z.string().default("personal_reimbursement"),
   category: expenseCategorySchema,
+  custom_category: z.string().nullable().default(null),
   description: z.string(),
   amount: z.union([z.number(), z.string()]),
   currency: z.string().length(3),
   receipt_file_path: z.string(),
   expense_date: z.string(),
   status: expenseStatusSchema,
+  vendor_name: z.string().nullable().default(null),
+  vendor_bank_account_name: z.string().nullable().default(null),
+  vendor_bank_account_number: z.string().nullable().default(null),
   manager_approved_by: z.string().uuid().nullable(),
   manager_approved_at: z.string().nullable(),
   finance_approved_by: z.string().uuid().nullable(),
@@ -121,7 +126,9 @@ export function toExpenseRecord(
     employeeName: employee?.full_name ?? "Unknown user",
     employeeDepartment: employee?.department ?? null,
     employeeCountryCode: employee?.country_code ?? null,
+    expenseType: (row.expense_type as "personal_reimbursement" | "work_expense") ?? "personal_reimbursement",
     category: row.category,
+    customCategory: row.custom_category ?? null,
     description: row.description,
     amount: parseIntegerAmount(row.amount),
     currency: row.currency,
@@ -129,6 +136,9 @@ export function toExpenseRecord(
     receiptFileName: receiptFileNameFromPath(row.receipt_file_path),
     expenseDate: row.expense_date,
     status: row.status,
+    vendorName: row.vendor_name ?? null,
+    vendorBankAccountName: row.vendor_bank_account_name ?? null,
+    vendorBankAccountNumber: row.vendor_bank_account_number ?? null,
     managerApprovedBy: row.manager_approved_by ?? row.approved_by,
     managerApprovedByName: managerApprovedBy?.full_name ?? approvedBy?.full_name ?? null,
     managerApprovedAt: row.manager_approved_at ?? row.approved_at,

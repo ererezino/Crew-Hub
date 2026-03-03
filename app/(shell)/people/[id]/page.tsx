@@ -7,6 +7,7 @@ import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import { PeopleCompensationClient } from "./people-compensation-client";
+import { PeopleOverviewClient } from "./people-overview-client";
 
 type PeopleProfilePageProps = {
   params: Promise<{
@@ -151,14 +152,13 @@ export default async function PeopleProfilePage({
       </section>
 
       {activeTab === "overview" ? (
-        <EmptyState
-          title="Profile overview coming soon"
-          description="Use the Compensation tab for salary, allowance, and equity details."
-          ctaLabel={hasCompensationAccess ? "Open compensation" : "Back to dashboard"}
-          ctaHref={
-            hasCompensationAccess
-              ? `/people/${parsedId.data}?tab=compensation`
-              : "/dashboard"
+        <PeopleOverviewClient
+          employeeId={parsedId.data}
+          isSelf={isSelf}
+          isAdmin={
+            hasRole(session.profile.roles, "HR_ADMIN") ||
+            hasRole(session.profile.roles, "FINANCE_ADMIN") ||
+            hasRole(session.profile.roles, "SUPER_ADMIN")
           }
         />
       ) : null}

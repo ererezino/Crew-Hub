@@ -33,6 +33,17 @@ const updatePersonSchema = z.object({
   title: z.string().trim().max(200, "Title is too long.").nullable().optional(),
   managerId: z.string().uuid("Manager must be a valid user id.").nullable().optional(),
   status: z.enum(PROFILE_STATUSES).optional(),
+  bio: z.string().trim().max(500, "Bio must be 500 characters or fewer.").nullable().optional(),
+  favoriteMusic: z.string().trim().max(200, "Favorite music must be 200 characters or fewer.").nullable().optional(),
+  favoriteBooks: z.string().trim().max(200, "Favorite books must be 200 characters or fewer.").nullable().optional(),
+  favoriteSports: z.string().trim().max(200, "Favorite sports must be 200 characters or fewer.").nullable().optional(),
+  privacySettings: z.object({
+    showEmail: z.boolean().optional(),
+    showPhone: z.boolean().optional(),
+    showDepartment: z.boolean().optional(),
+    showBio: z.boolean().optional(),
+    showInterests: z.boolean().optional()
+  }).optional(),
   accessOverrides: z
     .object({
       granted: z.array(z.string().trim().min(1).max(100)).default([]),
@@ -65,6 +76,11 @@ const profileRowSchema = z.object({
   ]),
   primary_currency: z.string(),
   status: z.enum(PROFILE_STATUSES),
+  bio: z.string().nullable().default(null),
+  favorite_music: z.string().nullable().default(null),
+  favorite_books: z.string().nullable().default(null),
+  favorite_sports: z.string().nullable().default(null),
+  privacy_settings: z.unknown().default({}),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -104,6 +120,11 @@ function mapPersonRow(
     payrollMode: row.payroll_mode,
     primaryCurrency: row.primary_currency,
     status: row.status,
+    bio: row.bio ?? null,
+    favoriteMusic: row.favorite_music ?? null,
+    favoriteBooks: row.favorite_books ?? null,
+    favoriteSports: row.favorite_sports ?? null,
+    privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../../types/people").PrivacySettings,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -214,7 +235,7 @@ export async function PUT(
   const { data: existingProfile, error: existingProfileError } = await serviceRoleClient
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
     )
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
@@ -357,6 +378,11 @@ export async function PUT(
     title?: string | null;
     manager_id?: string | null;
     status?: ProfileStatus;
+    bio?: string | null;
+    favorite_music?: string | null;
+    favorite_books?: string | null;
+    favorite_sports?: string | null;
+    privacy_settings?: Record<string, boolean>;
   } = {};
 
   if (payload.fullName !== undefined) {
@@ -383,6 +409,26 @@ export async function PUT(
     updateValues.status = payload.status;
   }
 
+  if (payload.bio !== undefined) {
+    updateValues.bio = payload.bio?.trim() || null;
+  }
+
+  if (payload.favoriteMusic !== undefined) {
+    updateValues.favorite_music = payload.favoriteMusic?.trim() || null;
+  }
+
+  if (payload.favoriteBooks !== undefined) {
+    updateValues.favorite_books = payload.favoriteBooks?.trim() || null;
+  }
+
+  if (payload.favoriteSports !== undefined) {
+    updateValues.favorite_sports = payload.favoriteSports?.trim() || null;
+  }
+
+  if (payload.privacySettings !== undefined) {
+    updateValues.privacy_settings = payload.privacySettings as Record<string, boolean>;
+  }
+
   let updatedProfileRow: unknown = parsedExistingProfile.data;
 
   if (Object.keys(updateValues).length > 0) {
@@ -392,7 +438,7 @@ export async function PUT(
       .eq("id", personId)
       .eq("org_id", session.profile.org_id)
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
       )
       .single();
 
@@ -509,6 +555,195 @@ export async function PUT(
       }
     });
   }
+
+  return jsonResponse<PeopleUpdateResponseData>(200, {
+    data: {
+      person
+    },
+    error: null,
+    meta: buildMeta()
+  });
+}
+
+const selfUpdateSchema = z.object({
+  bio: z.string().trim().max(500, "Bio must be 500 characters or fewer.").nullable().optional(),
+  favoriteMusic: z.string().trim().max(200, "Favorite music must be 200 characters or fewer.").nullable().optional(),
+  favoriteBooks: z.string().trim().max(200, "Favorite books must be 200 characters or fewer.").nullable().optional(),
+  favoriteSports: z.string().trim().max(200, "Favorite sports must be 200 characters or fewer.").nullable().optional(),
+  privacySettings: z.object({
+    showEmail: z.boolean().optional(),
+    showPhone: z.boolean().optional(),
+    showDepartment: z.boolean().optional(),
+    showBio: z.boolean().optional(),
+    showInterests: z.boolean().optional()
+  }).optional()
+});
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be logged in to update your profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedParams = paramsSchema.safeParse(await context.params);
+
+  if (!parsedParams.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedParams.error.issues[0]?.message ?? "Invalid user id."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const personId = parsedParams.data.id;
+  const isSelf = personId === session.profile.id;
+  const isAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
+
+  if (!isSelf && !isAdmin) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You can only update your own profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse<null>(400, {
+      data: null,
+      error: {
+        code: "BAD_REQUEST",
+        message: "Request body must be valid JSON."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedBody = selfUpdateSchema.safeParse(body);
+
+  if (!parsedBody.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedBody.error.issues[0]?.message ?? "Invalid update payload."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const payload = parsedBody.data;
+  const serviceRoleClient = createSupabaseServiceRoleClient();
+
+  const updateValues: Record<string, unknown> = {};
+
+  if (payload.bio !== undefined) {
+    updateValues.bio = payload.bio?.trim() || null;
+  }
+
+  if (payload.favoriteMusic !== undefined) {
+    updateValues.favorite_music = payload.favoriteMusic?.trim() || null;
+  }
+
+  if (payload.favoriteBooks !== undefined) {
+    updateValues.favorite_books = payload.favoriteBooks?.trim() || null;
+  }
+
+  if (payload.favoriteSports !== undefined) {
+    updateValues.favorite_sports = payload.favoriteSports?.trim() || null;
+  }
+
+  if (payload.privacySettings !== undefined) {
+    updateValues.privacy_settings = payload.privacySettings;
+  }
+
+  if (Object.keys(updateValues).length === 0) {
+    return jsonResponse<null>(400, {
+      data: null,
+      error: {
+        code: "BAD_REQUEST",
+        message: "No fields to update."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const { data: updatedRow, error: updateError } = await serviceRoleClient
+    .from("profiles")
+    .update(updateValues)
+    .eq("id", personId)
+    .eq("org_id", session.profile.org_id)
+    .select(
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+    )
+    .single();
+
+  if (updateError || !updatedRow) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "PROFILE_UPDATE_FAILED",
+        message: "Unable to update profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedUpdatedRow = profileRowSchema.safeParse(updatedRow);
+
+  if (!parsedUpdatedRow.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "PROFILE_PARSE_FAILED",
+        message: "Updated profile data is not in the expected shape."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const managerId = parsedUpdatedRow.data.manager_id;
+  let managerNameById = new Map<string, string>();
+
+  if (managerId) {
+    const { data: managerRows } = await serviceRoleClient
+      .from("profiles")
+      .select("id, full_name")
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .eq("id", managerId);
+
+    managerNameById = new Map(
+      (managerRows ?? [])
+        .filter(
+          (row): row is { id: string; full_name: string } =>
+            typeof row?.id === "string" && typeof row?.full_name === "string"
+        )
+        .map((row) => [row.id, row.full_name])
+    );
+  }
+
+  const person = mapPersonRow(parsedUpdatedRow.data, managerNameById);
 
   return jsonResponse<PeopleUpdateResponseData>(200, {
     data: {

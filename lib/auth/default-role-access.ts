@@ -30,7 +30,8 @@ const HR_ADMIN_ADDITIONAL_ACCESS = [
   "/compliance",
   "/admin/users",
   "/admin/compensation",
-  "/admin/payment-details"
+  "/admin/payment-details",
+  "/expenses/reports"
 ] as const;
 
 const FINANCE_ADMIN_ADDITIONAL_ACCESS = [
@@ -40,7 +41,8 @@ const FINANCE_ADMIN_ADDITIONAL_ACCESS = [
   "/approvals",
   "/admin/users",
   "/admin/compensation",
-  "/admin/payment-details"
+  "/admin/payment-details",
+  "/expenses/reports"
 ] as const;
 
 export const DEFAULT_ROLE_ACCESS: Record<UserRole, string[]> = {

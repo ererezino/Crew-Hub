@@ -26,6 +26,7 @@ const categoryLabelByValue: Record<ExpenseCategory, string> = {
   office_supplies: "Office Supplies",
   software: "Software",
   wellness: "Wellness",
+  marketing: "Marketing",
   other: "Other"
 };
 

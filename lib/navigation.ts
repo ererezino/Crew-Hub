@@ -162,6 +162,41 @@ export const NAV_GROUPS: NavGroup[] = [
     ]
   },
   {
+    label: "Finance",
+    description: "Payroll, expenses, and compensation",
+    requiredRoles: ["FINANCE_ADMIN", "HR_ADMIN", "SUPER_ADMIN"],
+    items: [
+      {
+        label: "Payroll",
+        href: "/payroll",
+        icon: "Calculator",
+        description: "Payroll runs, approvals, and disbursement tracking.",
+        shortcut: "F P"
+      },
+      {
+        label: "Expense Reports",
+        href: "/expenses/reports",
+        icon: "FileBarChart",
+        description: "Monthly expense analytics by category, employee, and department.",
+        shortcut: "F E"
+      },
+      {
+        label: "Compensation",
+        href: "/admin/compensation",
+        icon: "Coins",
+        description: "Manage salary, allowances, and equity records.",
+        shortcut: "F C"
+      },
+      {
+        label: "Payment Details",
+        href: "/admin/payment-details",
+        icon: "CreditCard",
+        description: "Review employee payout destinations and missing details.",
+        shortcut: "F D"
+      }
+    ]
+  },
+  {
     label: "Insights",
     requiredRoles: ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
     items: [
@@ -192,27 +227,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "UserCog",
         description: "Invite employees, assign roles, and manage account lifecycle.",
         shortcut: "A U"
-      },
-      {
-        label: "Compensation",
-        href: "/admin/compensation",
-        icon: "Coins",
-        description: "Manage salary, allowances, and equity records.",
-        shortcut: "A C"
-      },
-      {
-        label: "Payroll",
-        href: "/payroll",
-        icon: "Calculator",
-        description: "Payroll runs, approvals, and disbursement tracking.",
-        shortcut: "A P"
-      },
-      {
-        label: "Payment Details",
-        href: "/admin/payment-details",
-        icon: "CreditCard",
-        description: "Review employee payout destinations and missing details.",
-        shortcut: "A D"
       },
       {
         label: "Access Control",

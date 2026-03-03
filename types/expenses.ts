@@ -9,6 +9,7 @@ export const EXPENSE_CATEGORIES = [
   "office_supplies",
   "software",
   "wellness",
+  "marketing",
   "other"
 ] as const;
 
@@ -36,6 +37,9 @@ export const EXPENSE_ACTIONS = [
 
 export type ExpenseAction = (typeof EXPENSE_ACTIONS)[number];
 
+export const EXPENSE_TYPES = ["personal_reimbursement", "work_expense"] as const;
+export type ExpenseType = (typeof EXPENSE_TYPES)[number];
+
 export type ExpenseRecord = {
   id: string;
   orgId: string;
@@ -43,7 +47,9 @@ export type ExpenseRecord = {
   employeeName: string;
   employeeDepartment: string | null;
   employeeCountryCode: string | null;
+  expenseType: ExpenseType;
   category: ExpenseCategory;
+  customCategory: string | null;
   description: string;
   amount: number;
   currency: string;
@@ -51,6 +57,9 @@ export type ExpenseRecord = {
   receiptFileName: string;
   expenseDate: string;
   status: ExpenseStatus;
+  vendorName: string | null;
+  vendorBankAccountName: string | null;
+  vendorBankAccountNumber: string | null;
   managerApprovedBy: string | null;
   managerApprovedByName: string | null;
   managerApprovedAt: string | null;
