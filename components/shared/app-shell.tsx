@@ -635,54 +635,74 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
           .join(" ")}
       >
         <div className="sidebar-header">
-          <button
-            type="button"
-            className="sidebar-brand-toggle desktop-only"
-            onClick={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
-            aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <span className="sidebar-brand-icon" aria-hidden="true">
-              <Image
-                src="/brand/crew-hub-app-logo.svg"
-                alt=""
-                width={30}
-                height={30}
-                className="sidebar-brand-image sidebar-brand-image-light"
-                priority
-              />
-              <Image
-                src="/brand/crew-hub-site-logo.svg"
-                alt=""
-                width={30}
-                height={30}
-                className="sidebar-brand-image sidebar-brand-image-dark"
-                priority
-              />
-            </span>
-            <span className="sidebar-brand-copy">Crew Hub</span>
-            <span className="sidebar-brand-chevron" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
+          {isSidebarCollapsed ? (
+            <button
+              type="button"
+              className="sidebar-expand-btn desktop-only"
+              onClick={() => setIsSidebarCollapsed(false)}
+              aria-label="Expand sidebar"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
-                  d={isSidebarCollapsed ? "M9 5l7 7-7 7" : "M15 5l-7 7 7 7"}
+                  d="M4 7h16M4 12h16M4 17h16"
                   stroke="currentColor"
                   strokeWidth="1.8"
                   strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
                 />
               </svg>
-            </span>
-          </button>
+            </button>
+          ) : (
+            <>
+              <Link
+                href="/dashboard"
+                className="sidebar-brand desktop-only"
+                aria-label="Crew Hub home"
+                onClick={() => handleSidebarItemClick("/dashboard")}
+              >
+                <span className="sidebar-brand-icon" aria-hidden="true">
+                  <Image
+                    src="/brand/icon-dark.png"
+                    alt=""
+                    width={30}
+                    height={30}
+                    className="sidebar-brand-image sidebar-brand-image-light"
+                    priority
+                  />
+                  <Image
+                    src="/brand/icon-light.png"
+                    alt=""
+                    width={30}
+                    height={30}
+                    className="sidebar-brand-image sidebar-brand-image-dark"
+                    priority
+                  />
+                </span>
+                <span className="sidebar-brand-copy">Crew Hub</span>
+              </Link>
+              <button
+                type="button"
+                className="sidebar-collapse-btn desktop-only"
+                onClick={() => setIsSidebarCollapsed(true)}
+                aria-label="Collapse sidebar"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                  <line x1="9" y1="3" x2="9" y2="21" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M14 10l-2 2 2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </svg>
+              </button>
+            </>
+          )}
 
           <Link
             href="/dashboard"
             className="sidebar-brand mobile-only"
-            aria-label="Crew Hub dashboard"
+            aria-label="Crew Hub home"
             onClick={() => handleSidebarItemClick("/dashboard")}
           >
             <span className="sidebar-brand-icon" aria-hidden="true">
               <Image
-                src="/brand/crew-hub-app-logo.svg"
+                src="/brand/icon-dark.png"
                 alt=""
                 width={30}
                 height={30}
@@ -690,7 +710,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                 priority
               />
               <Image
-                src="/brand/crew-hub-site-logo.svg"
+                src="/brand/icon-light.png"
                 alt=""
                 width={30}
                 height={30}
