@@ -151,6 +151,7 @@ export function toExpenseRecord(
     reimbursedAt: row.reimbursed_at,
     reimbursementReference: row.reimbursement_reference,
     reimbursementNotes: row.reimbursement_notes,
+    reimbursementReceiptPath: null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

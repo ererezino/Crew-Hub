@@ -9,6 +9,7 @@ import {
   parseNumeric
 } from "../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
   LEAVE_REQUEST_STATUSES,
@@ -103,7 +104,6 @@ function toRequestRecord(
 }
 
 async function applyPendingBalanceDelta({
-  supabase,
   orgId,
   employeeId,
   leaveType,
@@ -111,7 +111,6 @@ async function applyPendingBalanceDelta({
   pendingDaysDelta,
   fallbackTotalDays
 }: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   orgId: string;
   employeeId: string;
   leaveType: string;
@@ -119,7 +118,9 @@ async function applyPendingBalanceDelta({
   pendingDaysDelta: number;
   fallbackTotalDays: number;
 }): Promise<void> {
-  const { data: rawBalance, error: balanceFetchError } = await supabase
+  const serviceClient = createSupabaseServiceRoleClient();
+
+  const { data: rawBalance, error: balanceFetchError } = await serviceClient
     .from("leave_balances")
     .select("id, total_days, used_days, pending_days, carried_days")
     .eq("org_id", orgId)
@@ -135,7 +136,7 @@ async function applyPendingBalanceDelta({
 
   if (!rawBalance) {
     const nextPendingDays = Math.max(0, pendingDaysDelta);
-    const { error: balanceInsertError } = await supabase.from("leave_balances").insert({
+    const { error: balanceInsertError } = await serviceClient.from("leave_balances").insert({
       org_id: orgId,
       employee_id: employeeId,
       leave_type: leaveType,
@@ -162,7 +163,7 @@ async function applyPendingBalanceDelta({
   const currentPendingDays = parseNumeric(parsedBalance.data.pending_days);
   const nextPendingDays = Math.max(0, currentPendingDays + pendingDaysDelta);
 
-  const { error: balanceUpdateError } = await supabase
+  const { error: balanceUpdateError } = await serviceClient
     .from("leave_balances")
     .update({
       pending_days: nextPendingDays
@@ -388,7 +389,6 @@ export async function POST(request: Request) {
 
   try {
     await applyPendingBalanceDelta({
-      supabase,
       orgId: employeeProfile.org_id,
       employeeId: employeeProfile.id,
       leaveType: parsedBody.data.leaveType,

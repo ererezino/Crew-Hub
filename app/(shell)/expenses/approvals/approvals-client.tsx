@@ -5,6 +5,7 @@ import {
   type FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
 import { z } from "zod";
@@ -141,6 +142,8 @@ export function ExpenseApprovalsClient({
   });
   const [disburseErrors, setDisburseErrors] = useState<DisburseFormErrors>({});
   const [isDisbursing, setIsDisbursing] = useState(false);
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const paymentProofInputRef = useRef<HTMLInputElement>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const expenses = useMemo(() => {
@@ -235,6 +238,7 @@ export function ExpenseApprovalsClient({
       reimbursementNotes: ""
     });
     setDisburseErrors({});
+    setPaymentProofFile(null);
   };
 
   const closeDisbursePanel = () => {
@@ -248,6 +252,7 @@ export function ExpenseApprovalsClient({
       reimbursementNotes: ""
     });
     setDisburseErrors({});
+    setPaymentProofFile(null);
   };
 
   const handleDisburseFieldChange =
@@ -270,6 +275,11 @@ export function ExpenseApprovalsClient({
       );
     };
 
+  const handlePaymentProofChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setPaymentProofFile(file);
+  };
+
   const submitDisbursement = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -290,6 +300,33 @@ export function ExpenseApprovalsClient({
     setIsMutatingId(disburseTarget.id);
 
     try {
+      // Step 1: Upload payment proof file if provided
+      let receiptPath: string | undefined;
+
+      if (paymentProofFile) {
+        const uploadForm = new FormData();
+        uploadForm.set("paymentProof", paymentProofFile);
+
+        const uploadResponse = await fetch(
+          `/api/v1/expenses/${disburseTarget.id}/payment-proof`,
+          { method: "POST", body: uploadForm }
+        );
+
+        if (!uploadResponse.ok) {
+          const uploadPayload = await uploadResponse.json().catch(() => null);
+          showToast(
+            "error",
+            (uploadPayload as { error?: { message?: string } } | null)?.error?.message ??
+              "Unable to upload payment proof."
+          );
+          return;
+        }
+
+        const uploadResult = (await uploadResponse.json()) as { data?: { path?: string } };
+        receiptPath = uploadResult.data?.path;
+      }
+
+      // Step 2: Disburse the expense
       const response = await fetch(`/api/v1/expenses/${disburseTarget.id}`, {
         method: "PATCH",
         headers: {
@@ -298,7 +335,8 @@ export function ExpenseApprovalsClient({
         body: JSON.stringify({
           action: "approve",
           reimbursementReference: disburseValues.reimbursementReference.trim(),
-          reimbursementNotes: disburseValues.reimbursementNotes.trim() || undefined
+          reimbursementNotes: disburseValues.reimbursementNotes.trim() || undefined,
+          reimbursementReceiptPath: receiptPath
         })
       });
 
@@ -312,7 +350,7 @@ export function ExpenseApprovalsClient({
       closeDisbursePanel();
       setSelectedIds((current) => current.filter((id) => id !== disburseTarget.id));
       approvalsQuery.refresh();
-      showToast("success", "Expense disbursed.");
+      showToast("success", "Expense disbursed successfully.");
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to disburse expense.");
     } finally {
@@ -804,13 +842,56 @@ export function ExpenseApprovalsClient({
             <span className="form-label">Notes</span>
             <textarea
               className="form-input"
-              rows={4}
+              rows={3}
               value={disburseValues.reimbursementNotes}
               onChange={handleDisburseFieldChange("reimbursementNotes")}
               placeholder="Optional disbursement notes."
               disabled={isDisbursing}
             />
           </label>
+          <div className="form-field">
+            <span className="form-label">Payment proof receipt</span>
+            <p className="form-hint">Upload a bank transaction receipt or transfer confirmation (PDF, PNG, JPG).</p>
+            <div className="payment-proof-upload">
+              {paymentProofFile ? (
+                <div className="payment-proof-file">
+                  <span className="payment-proof-file-name">{paymentProofFile.name}</span>
+                  <span className="payment-proof-file-size">
+                    {Math.round(paymentProofFile.size / 1024)} KB
+                  </span>
+                  <button
+                    type="button"
+                    className="payment-proof-remove"
+                    onClick={() => {
+                      setPaymentProofFile(null);
+                      if (paymentProofInputRef.current) {
+                        paymentProofInputRef.current.value = "";
+                      }
+                    }}
+                    disabled={isDisbursing}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => paymentProofInputRef.current?.click()}
+                  disabled={isDisbursing}
+                >
+                  Choose file
+                </button>
+              )}
+              <input
+                ref={paymentProofInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                onChange={handlePaymentProofChange}
+                style={{ display: "none" }}
+              />
+            </div>
+          </div>
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeDisbursePanel} disabled={isDisbursing}>
               Cancel

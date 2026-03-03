@@ -73,6 +73,7 @@ export type ExpenseRecord = {
   reimbursedAt: string | null;
   reimbursementReference: string | null;
   reimbursementNotes: string | null;
+  reimbursementReceiptPath: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -159,6 +160,7 @@ export type UpdateExpensePayload = {
   financeRejectionReason?: string;
   reimbursementReference?: string;
   reimbursementNotes?: string;
+  reimbursementReceiptPath?: string;
 };
 export type UpdateExpenseResponse = ApiResponse<ExpenseMutationResponseData>;
 export type ExpensesListResponse = ApiResponse<ExpensesListResponseData>;

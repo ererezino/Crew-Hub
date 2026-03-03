@@ -43,10 +43,23 @@ export type DashboardSecondaryPanel = {
   rows: DashboardBreakdownRow[];
 };
 
+/* ── Home page types ── */
+
+export type TeamMemberSpotlight = {
+  id: string;
+  fullName: string;
+  title: string | null;
+  department: string | null;
+  avatarUrl: string | null;
+  initials: string;
+};
+
 export type DashboardResponseData = {
   greeting: {
     firstName: string;
+    fullName: string;
     roleBadge: string;
+    timeOfDay: "morning" | "afternoon" | "evening";
   };
   heroMetrics: DashboardHeroMetric[];
   primaryChart: DashboardPrimaryChart;
@@ -64,6 +77,12 @@ export type DashboardResponseData = {
       countryCode: string;
     } | null;
   } | null;
+  /* Home page data */
+  teamSpotlight: TeamMemberSpotlight[];
+  newHires: TeamMemberSpotlight[];
+  totalTeamCount: number;
+  companyDescription: string;
+  isAdmin: boolean;
 };
 
 export type DashboardResponse = ApiResponse<DashboardResponseData>;
