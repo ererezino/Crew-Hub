@@ -8,6 +8,7 @@ import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
 import { parseNumeric } from "../../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
   LEAVE_REQUEST_STATUSES,
@@ -83,7 +84,6 @@ function canApproveRequests(userRoles: readonly UserRole[]): boolean {
 }
 
 async function applyBalanceDeltas({
-  supabase,
   orgId,
   employeeId,
   leaveType,
@@ -91,7 +91,6 @@ async function applyBalanceDeltas({
   usedDaysDelta,
   pendingDaysDelta
 }: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   orgId: string;
   employeeId: string;
   leaveType: string;
@@ -99,7 +98,9 @@ async function applyBalanceDeltas({
   usedDaysDelta: number;
   pendingDaysDelta: number;
 }): Promise<void> {
-  const { data: rawBalance, error: balanceFetchError } = await supabase
+  const serviceClient = createSupabaseServiceRoleClient();
+
+  const { data: rawBalance, error: balanceFetchError } = await serviceClient
     .from("leave_balances")
     .select("id, total_days, used_days, pending_days, carried_days")
     .eq("org_id", orgId)
@@ -114,7 +115,7 @@ async function applyBalanceDeltas({
   }
 
   if (!rawBalance) {
-    const { error: insertError } = await supabase.from("leave_balances").insert({
+    const { error: insertError } = await serviceClient.from("leave_balances").insert({
       org_id: orgId,
       employee_id: employeeId,
       leave_type: leaveType,
@@ -144,7 +145,7 @@ async function applyBalanceDeltas({
   const nextUsedDays = Math.max(0, currentUsedDays + usedDaysDelta);
   const nextPendingDays = Math.max(0, currentPendingDays + pendingDaysDelta);
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await serviceClient
     .from("leave_balances")
     .update({
       used_days: nextUsedDays,
@@ -451,7 +452,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (usedDaysDelta !== 0 || pendingDaysDelta !== 0) {
     try {
       await applyBalanceDeltas({
-        supabase,
         orgId: session.profile.org_id,
         employeeId: existingRequest.employee_id,
         leaveType: existingRequest.leave_type,

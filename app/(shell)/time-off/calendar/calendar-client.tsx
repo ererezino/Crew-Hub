@@ -303,7 +303,7 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
                   </p>
                 ) : null}
                 {requestCount > 0 ? (
-                  <p className="timeoff-calendar-note numeric">{requestCount} requests</p>
+                  <p className="timeoff-calendar-note numeric">{requestCount} {requestCount === 1 ? "request" : "requests"}</p>
                 ) : null}
               </article>
             );
@@ -315,7 +315,7 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
         <header className="timeoff-section-header">
           <h2 className="section-title">Entries This Month</h2>
           <StatusBadge tone="processing">
-            {calendarQuery.data.requests.length} requests
+            {calendarQuery.data.requests.length} {calendarQuery.data.requests.length === 1 ? "request" : "requests"}
           </StatusBadge>
         </header>
 

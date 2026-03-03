@@ -20,7 +20,8 @@ import type {
   DashboardPrimaryChart,
   DashboardResponseData,
   DashboardSecondaryPanel,
-  DashboardSparklinePoint
+  DashboardSparklinePoint,
+  TeamMemberSpotlight
 } from "../../../../types/dashboard";
 
 function buildMeta() {
@@ -85,6 +86,32 @@ function getRoleBadge(roles: readonly UserRole[]): string {
   if (hasRole(roles, "MANAGER")) return "Manager";
   if (hasRole(roles, "TEAM_LEAD")) return "Team Lead";
   return "Employee";
+}
+
+function getTimeOfDay(): "morning" | "afternoon" | "evening" {
+  const hour = new Date().getHours();
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
+function getInitials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
+function toTeamMember(row: Record<string, unknown>): TeamMemberSpotlight {
+  const fullName = toStringValue(row.full_name, "Team Member");
+  return {
+    id: toStringValue(row.id, ""),
+    fullName,
+    title: typeof row.title === "string" && row.title.trim() ? row.title.trim() : null,
+    department: typeof row.department === "string" && row.department.trim() ? row.department.trim() : null,
+    avatarUrl: typeof row.avatar_url === "string" && row.avatar_url.trim() ? row.avatar_url.trim() : null,
+    initials: getInitials(fullName)
+  };
 }
 
 const widgetConfigRowSchema = z.object({
@@ -432,7 +459,10 @@ export async function GET() {
       prevExpensesResult,
       expenseWidgetResult,
       complianceResult,
-      widgetConfigResult
+      widgetConfigResult,
+      teamSpotlightResult,
+      newHiresResult,
+      totalTeamCountResult
     ] = await Promise.all([
       supabase.rpc("analytics_people", currentPayload),
       supabase.rpc("analytics_time_off", currentPayload),
@@ -461,7 +491,32 @@ export async function GET() {
       supabase
         .from("dashboard_widget_config")
         .select("widget_key, visible_to_roles")
+        .eq("org_id", profile.org_id),
+      // Team spotlight — random selection of active team members
+      supabase
+        .from("profiles")
+        .select("id, full_name, title, department, avatar_url")
         .eq("org_id", profile.org_id)
+        .eq("status", "active")
+        .is("deleted_at", null)
+        .limit(20),
+      // New hires — most recently started
+      supabase
+        .from("profiles")
+        .select("id, full_name, title, department, avatar_url, start_date")
+        .eq("org_id", profile.org_id)
+        .eq("status", "active")
+        .is("deleted_at", null)
+        .not("start_date", "is", null)
+        .order("start_date", { ascending: false })
+        .limit(5),
+      // Total team count
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", profile.org_id)
+        .eq("status", "active")
+        .is("deleted_at", null)
     ]);
 
     const rpcError =
@@ -473,9 +528,34 @@ export async function GET() {
       prevTimeOffResult.error ??
       prevPayrollResult.error ??
       prevExpensesResult.error ??
-      expenseWidgetResult.error ??
-      complianceResult.error ??
-      widgetConfigResult.error;
+      expenseWidgetResult.error;
+
+    // These tables may not exist yet — gracefully ignore
+    if (complianceResult.error) {
+      complianceResult.data = [] as never;
+    }
+    if (widgetConfigResult.error) {
+      widgetConfigResult.data = [] as never;
+    }
+
+    // Team data — gracefully handle errors
+    const teamSpotlightRows = teamSpotlightResult.error ? [] : (teamSpotlightResult.data ?? []);
+    const newHireRows = newHiresResult.error ? [] : (newHiresResult.data ?? []);
+    const totalTeamCount = totalTeamCountResult.error ? 0 : (totalTeamCountResult.count ?? 0);
+
+    // Shuffle team spotlight and take 8 random members
+    const shuffledTeam = [...teamSpotlightRows].sort(() => Math.random() - 0.5);
+    const teamSpotlight: TeamMemberSpotlight[] = shuffledTeam
+      .slice(0, 8)
+      .map((row) => toTeamMember(asRecord(row)));
+
+    const newHires: TeamMemberSpotlight[] = newHireRows
+      .map((row) => toTeamMember(asRecord(row)));
+
+    const isAdmin =
+      hasRole(roles, "SUPER_ADMIN") ||
+      hasRole(roles, "HR_ADMIN") ||
+      hasRole(roles, "FINANCE_ADMIN");
 
     if (rpcError) {
       return jsonResponse<null>(500, {
@@ -552,7 +632,9 @@ export async function GET() {
     const responseData: DashboardResponseData = {
       greeting: {
         firstName: getFirstName(profile.full_name),
-        roleBadge: getRoleBadge(roles)
+        fullName: profile.full_name,
+        roleBadge: getRoleBadge(roles),
+        timeOfDay: getTimeOfDay()
       },
       heroMetrics: visibleWidgetKeySet.has("hero_metrics")
         ? buildHeroMetrics(
@@ -591,7 +673,13 @@ export async function GET() {
           },
       complianceWidget: visibleWidgetKeySet.has("compliance_widget") && showCompliance
         ? { overdueCount, nextDeadline: null }
-        : null
+        : null,
+      /* Home page data */
+      teamSpotlight,
+      newHires,
+      totalTeamCount,
+      companyDescription: "Accrue is a cross-border payment product that helps businesses and individuals send & receive money across Africa and the US.",
+      isAdmin
     };
 
     return jsonResponse<DashboardResponseData>(200, {

@@ -5,8 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode
@@ -23,6 +25,7 @@ import {
 } from "../../lib/navigation";
 import type { MeAccessConfigResponse } from "../../types/access-control";
 import { CommandPalette } from "./command-palette";
+import { NavIcon } from "./nav-icon";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -322,6 +325,119 @@ async function fetchSidebarApprovalCounts(
   };
 }
 
+type UserMenuProps = {
+  profile: { fullName: string; email: string; avatarUrl: string | null } | null;
+  initials: string;
+  roles: readonly UserRole[];
+};
+
+function getRoleBadgeLabel(roles: readonly UserRole[]): string {
+  if (hasRole(roles, "SUPER_ADMIN")) return "Super Admin";
+  if (hasRole(roles, "HR_ADMIN") && hasRole(roles, "FINANCE_ADMIN")) return "HR & Finance Admin";
+  if (hasRole(roles, "HR_ADMIN")) return "HR Admin";
+  if (hasRole(roles, "FINANCE_ADMIN")) return "Finance Admin";
+  if (hasRole(roles, "MANAGER")) return "Manager";
+  if (hasRole(roles, "TEAM_LEAD")) return "Team Lead";
+  return "Employee";
+}
+
+function UserMenu({ profile, initials, roles }: UserMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  const handleSignOut = useCallback(async () => {
+    setIsSigningOut(true);
+    try {
+      await fetch("/api/auth/sign-out", { method: "POST" });
+      window.location.href = "/login";
+    } catch {
+      setIsSigningOut(false);
+    }
+  }, []);
+
+  const roleBadge = getRoleBadgeLabel(roles);
+
+  return (
+    <div className="user-menu" ref={menuRef}>
+      <button
+        type="button"
+        className="user-menu-trigger"
+        onClick={() => setIsOpen((v) => !v)}
+        aria-label="User menu"
+      >
+        <span className="user-menu-avatar numeric">{initials}</span>
+      </button>
+
+      {isOpen ? (
+        <div className="user-menu-dropdown" role="menu">
+          <div className="user-menu-profile">
+            <span className="user-menu-avatar-lg numeric">{initials}</span>
+            <div className="user-menu-profile-copy">
+              <p className="user-menu-name">{profile?.fullName ?? "User"}</p>
+              <p className="user-menu-email">{profile?.email ?? ""}</p>
+              <span className="user-menu-role-badge">{roleBadge}</span>
+            </div>
+          </div>
+
+          <div className="user-menu-divider" />
+
+          <Link
+            href="/settings?tab=profile"
+            className="user-menu-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="user-menu-item-icon">
+              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.6" fill="none" />
+              <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+            </svg>
+            My Profile
+          </Link>
+
+          <Link
+            href="/settings"
+            className="user-menu-item"
+            onClick={() => setIsOpen(false)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="user-menu-item-icon">
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" fill="none" />
+              <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            Settings
+          </Link>
+
+          <div className="user-menu-divider" />
+
+          <button
+            type="button"
+            className="user-menu-item user-menu-item-danger"
+            onClick={() => void handleSignOut()}
+            disabled={isSigningOut}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" className="user-menu-item-icon">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points="16,17 21,12 16,7" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            {isSigningOut ? "Signing out…" : "Sign out"}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type AppShellProps = {
   currentUserRoles: readonly UserRole[];
   currentUserProfile: {
@@ -519,9 +635,48 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
           .join(" ")}
       >
         <div className="sidebar-header">
+          <button
+            type="button"
+            className="sidebar-brand-toggle desktop-only"
+            onClick={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
+            aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <span className="sidebar-brand-icon" aria-hidden="true">
+              <Image
+                src="/brand/crew-hub-app-logo.svg"
+                alt=""
+                width={30}
+                height={30}
+                className="sidebar-brand-image sidebar-brand-image-light"
+                priority
+              />
+              <Image
+                src="/brand/crew-hub-site-logo.svg"
+                alt=""
+                width={30}
+                height={30}
+                className="sidebar-brand-image sidebar-brand-image-dark"
+                priority
+              />
+            </span>
+            <span className="sidebar-brand-copy">Crew Hub</span>
+            <span className="sidebar-brand-chevron" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d={isSidebarCollapsed ? "M9 5l7 7-7 7" : "M15 5l-7 7 7 7"}
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+            </span>
+          </button>
+
           <Link
             href="/dashboard"
-            className="sidebar-brand"
+            className="sidebar-brand mobile-only"
             aria-label="Crew Hub dashboard"
             onClick={() => handleSidebarItemClick("/dashboard")}
           >
@@ -545,24 +700,6 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
             </span>
             <span className="sidebar-brand-copy">Crew Hub</span>
           </Link>
-
-          <button
-            type="button"
-            className="icon-button desktop-only"
-            onClick={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
-            aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d={isSidebarCollapsed ? "M9 5l7 7-7 7" : "M15 5l-7 7 7 7"}
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </svg>
-          </button>
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary">
@@ -628,14 +765,13 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                           onClick={() => handleSidebarItemClick(item.href)}
                         >
                           <span className="sidebar-link-indicator" aria-hidden="true" />
-                          <span className="sidebar-link-dot" aria-hidden="true" />
+                          <NavIcon name={item.icon} size={18} className="sidebar-link-icon" />
                           <span className="sidebar-link-text">{item.label}</span>
                           {showApprovalsBadge ? (
                             <span className="sidebar-link-badge numeric" aria-label="Pending approvals">
                               {approvalsCountQuery.data?.total ?? 0}
                             </span>
                           ) : null}
-                          <span className="sidebar-shortcut numeric">{item.shortcut}</span>
                         </Link>
                       </li>
                     );
@@ -658,9 +794,8 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
               onClick={() => handleSidebarItemClick("/settings")}
             >
               <span className="sidebar-link-indicator" aria-hidden="true" />
-              <span className="sidebar-link-dot" aria-hidden="true" />
+              <NavIcon name="Settings" size={18} className="sidebar-link-icon" />
               <span className="sidebar-link-text">Settings</span>
-              <span className="sidebar-shortcut numeric">A S</span>
             </Link>
           ) : null}
 
@@ -731,6 +866,11 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
             </button>
             <NotificationCenter />
             <ThemeToggle />
+            <UserMenu
+              profile={currentUserProfile}
+              initials={sidebarProfileInitials}
+              roles={currentUserRoles}
+            />
           </div>
         </header>
 

@@ -647,6 +647,36 @@ export function ExpensesClient({
     }
   };
 
+  const openPaymentProof = async (expense: ExpenseRecord) => {
+    setIsOpeningReceiptById((currentMap) => ({
+      ...currentMap,
+      [`proof-${expense.id}`]: true
+    }));
+
+    try {
+      const response = await fetch(`/api/v1/expenses/${expense.id}/payment-proof`, {
+        method: "GET"
+      });
+
+      const payload = (await response.json()) as ExpenseReceiptSignedUrlResponse;
+
+      if (!response.ok || !payload.data?.url) {
+        showToast("error", payload.error?.message ?? "Payment proof not available.");
+        return;
+      }
+
+      window.open(payload.data.url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to open payment proof.");
+    } finally {
+      setIsOpeningReceiptById((currentMap) => {
+        const nextMap = { ...currentMap };
+        delete nextMap[`proof-${expense.id}`];
+        return nextMap;
+      });
+    }
+  };
+
   const mutateExpense = async ({
     expense,
     action
@@ -741,7 +771,7 @@ export function ExpensesClient({
               <p className="metric-value">
                 <CurrencyDisplay amount={expensesQuery.data.summary.totalAmount} currency="USD" />
               </p>
-              <p className="metric-hint">{expensesQuery.data.summary.totalCount} submissions</p>
+              <p className="metric-hint">{expensesQuery.data.summary.totalCount} {expensesQuery.data.summary.totalCount === 1 ? "submission" : "submissions"}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Pending Reimbursement</p>
@@ -885,6 +915,17 @@ export function ExpensesClient({
                                 {isOpeningReceiptById[expense.id] ? "Opening..." : "Receipt"}
                               </button>
 
+                              {expense.status === "reimbursed" && expense.reimbursementReceiptPath ? (
+                                <button
+                                  type="button"
+                                  className="table-row-action"
+                                  onClick={() => openPaymentProof(expense)}
+                                  disabled={Boolean(isOpeningReceiptById[`proof-${expense.id}`])}
+                                >
+                                  {isOpeningReceiptById[`proof-${expense.id}`] ? "Opening..." : "Payment Proof"}
+                                </button>
+                              ) : null}
+
                               <button
                                 type="button"
                                 className="table-row-action"
@@ -947,6 +988,55 @@ export function ExpensesClient({
                                     }
                                   />
                                 </ul>
+
+                                {expense.status === "reimbursed" ? (
+                                  <div className="expenses-transaction-details">
+                                    <h3 className="section-title">Transaction Details</h3>
+                                    <dl className="expenses-detail-grid">
+                                      {expense.reimbursementReference ? (
+                                        <>
+                                          <dt>Reference</dt>
+                                          <dd className="numeric">{expense.reimbursementReference}</dd>
+                                        </>
+                                      ) : null}
+                                      {expense.reimbursedByName ? (
+                                        <>
+                                          <dt>Disbursed by</dt>
+                                          <dd>{expense.reimbursedByName}</dd>
+                                        </>
+                                      ) : null}
+                                      {expense.reimbursedAt ? (
+                                        <>
+                                          <dt>Disbursed on</dt>
+                                          <dd>
+                                            <time dateTime={expense.reimbursedAt}>
+                                              {formatRelativeTime(expense.reimbursedAt)}
+                                            </time>
+                                          </dd>
+                                        </>
+                                      ) : null}
+                                      {expense.reimbursementNotes ? (
+                                        <>
+                                          <dt>Notes</dt>
+                                          <dd>{expense.reimbursementNotes}</dd>
+                                        </>
+                                      ) : null}
+                                    </dl>
+                                    {expense.reimbursementReceiptPath ? (
+                                      <button
+                                        type="button"
+                                        className="button button-accent"
+                                        style={{ marginTop: "0.75rem" }}
+                                        onClick={() => openPaymentProof(expense)}
+                                        disabled={Boolean(isOpeningReceiptById[`proof-${expense.id}`])}
+                                      >
+                                        {isOpeningReceiptById[`proof-${expense.id}`]
+                                          ? "Opening..."
+                                          : "View Payment Proof"}
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                ) : null}
                               </div>
                             </td>
                           </tr>
@@ -1008,7 +1098,7 @@ export function ExpensesClient({
             ) : null}
           </label>
 
-          <div className="expenses-form-grid">
+          <div className="expenses-form-grid expenses-form-grid-3col">
             <label className="form-field">
               <span className="form-label">Amount</span>
               <MoneyInput
@@ -1021,6 +1111,28 @@ export function ExpensesClient({
                 hasError={Boolean(formErrors.amount)}
               />
               {formErrors.amount ? <p className="form-field-error">{formErrors.amount}</p> : null}
+            </label>
+
+            <label className="form-field">
+              <span className="form-label">Currency</span>
+              <select
+                className={formErrors.currency ? "form-input form-input-error" : "form-input"}
+                value={formValues.currency}
+                onChange={handleFormFieldChange("currency")}
+                onBlur={handleFieldBlur("currency")}
+                disabled={isSubmitting}
+              >
+                <option value="USD">🇺🇸 USD — US Dollar</option>
+                <option value="NGN">🇳🇬 NGN — Nigerian Naira</option>
+                <option value="GHS">🇬🇭 GHS — Ghanaian Cedi</option>
+                <option value="KES">🇰🇪 KES — Kenyan Shilling</option>
+                <option value="ZAR">🇿🇦 ZAR — South African Rand</option>
+                <option value="XAF">🇨🇲 XAF — Central African CFA Franc</option>
+                <option value="CAD">🇨🇦 CAD — Canadian Dollar</option>
+              </select>
+              {formErrors.currency ? (
+                <p className="form-field-error">{formErrors.currency}</p>
+              ) : null}
             </label>
 
             <label className="form-field">

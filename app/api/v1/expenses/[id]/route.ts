@@ -28,7 +28,8 @@ const expenseActionSchema = z.object({
   rejectionReason: z.string().trim().max(2000).optional(),
   financeRejectionReason: z.string().trim().max(2000).optional(),
   reimbursementReference: z.string().trim().max(120).optional(),
-  reimbursementNotes: z.string().trim().max(2000).optional()
+  reimbursementNotes: z.string().trim().max(2000).optional(),
+  reimbursementReceiptPath: z.string().trim().optional()
 });
 
 const profileManagerSchema = z.object({
@@ -309,6 +310,7 @@ export async function PATCH(
         reimbursed_at: nowIso,
         reimbursement_reference: reimbursementReference,
         reimbursement_notes: payload.reimbursementNotes?.trim() || null,
+        reimbursement_receipt_path: payload.reimbursementReceiptPath?.trim() || null,
         finance_rejected_by: null,
         finance_rejected_at: null,
         finance_rejection_reason: null

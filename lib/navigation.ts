@@ -44,10 +44,10 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "",
     items: [
       {
-        label: "Dashboard",
+        label: "Home",
         href: "/dashboard",
         icon: "LayoutDashboard",
-        description: "Operations overview and quick health metrics.",
+        description: "Your home base — updates, links, and insights.",
         shortcut: "G D"
       },
       {
