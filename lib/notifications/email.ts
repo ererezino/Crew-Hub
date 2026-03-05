@@ -348,6 +348,42 @@ export async function sendReviewSharedEmail({
   }
 }
 
+export async function sendReviewAcknowledgedEmail({
+  orgId,
+  userId,
+  cycleName,
+  employeeName
+}: {
+  orgId: string;
+  userId: string;
+  cycleName: string;
+  employeeName: string;
+}): Promise<void> {
+  try {
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+
+    if (!recipient) {
+      return;
+    }
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Crew Hub: ${employeeName} acknowledged ${cycleName}`,
+      text: [
+        `Hello ${recipient.fullName},`,
+        "",
+        `${employeeName} has acknowledged their ${cycleName} review.`,
+        "",
+        "Open Crew Hub > Performance to continue follow-up actions."
+      ].join("\n")
+    });
+  } catch (error) {
+    console.error("Unexpected review acknowledged email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
 export async function sendDocumentExpiryEmail({
   orgId,
   userId,
