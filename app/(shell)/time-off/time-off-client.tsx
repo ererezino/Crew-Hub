@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -276,6 +276,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   const [afkEndTime, setAfkEndTime] = useState("");
   const [afkNotes, setAfkNotes] = useState("");
   const [isAfkSubmitting, setIsAfkSubmitting] = useState(false);
+  const [teamOverlap, setTeamOverlap] = useState<{ name: string; leaveType: string }[]>([]);
 
   const afkQuery = useAfkLogs();
 
@@ -330,6 +331,39 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
     return `Requested days (${calculatedWorkingDays}) exceed available balance (${selectedLeaveBalance.availableDays}).`;
   }, [calculatedWorkingDays, isSelectedTypeUnlimited, selectedLeaveBalance]);
+
+  useEffect(() => {
+    if (!isIsoDate(formValues.startDate) || !isIsoDate(formValues.endDate)) {
+      setTeamOverlap([]);
+      return;
+    }
+
+    if (formValues.endDate < formValues.startDate) {
+      setTeamOverlap([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      startDate: formValues.startDate,
+      endDate: formValues.endDate
+    });
+
+    fetch(`/api/v1/time-off/overlap?${params.toString()}`, {
+      signal: controller.signal
+    })
+      .then((res) => res.json())
+      .then((payload) => {
+        if (payload.data?.overlap) {
+          setTeamOverlap(payload.data.overlap);
+        }
+      })
+      .catch(() => {
+        // Silently ignore overlap fetch errors
+      });
+
+    return () => controller.abort();
+  }, [formValues.startDate, formValues.endDate]);
 
   const sortedRequests = useMemo(() => {
     const requests = summaryQuery.data?.requests ?? [];
@@ -528,6 +562,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     setFormTouched(INITIAL_FORM_TOUCHED);
     setFormErrors({});
     setSubmitError(null);
+    setTeamOverlap([]);
   };
 
   const handleFieldChange =
@@ -1126,6 +1161,20 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
               <p className="settings-card-description">
                 A doctor&apos;s note may be required for sick leave exceeding 2 consecutive working days.
               </p>
+            ) : null}
+            {teamOverlap.length > 0 ? (
+              <div className="timeoff-overlap-notice">
+                <p className="timeoff-overlap-heading">
+                  {teamOverlap.length} team member{teamOverlap.length !== 1 ? "s" : ""} off during this period
+                </p>
+                <ul className="timeoff-overlap-list">
+                  {teamOverlap.map((member, index) => (
+                    <li key={`overlap-${index}`} className="settings-card-description">
+                      {member.name} ({formatLeaveTypeLabel(member.leaveType)})
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
           </section>
 

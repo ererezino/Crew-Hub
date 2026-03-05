@@ -2150,6 +2150,29 @@ html.dark .topbar {
   gap: var(--space-1);
 }
 
+.timeoff-overlap-notice {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--status-warning-bg);
+  border: 1px solid var(--status-warning-border);
+  border-radius: var(--radius-default);
+}
+
+.timeoff-overlap-heading {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--status-warning-text);
+  margin-bottom: var(--space-1);
+}
+
+.timeoff-overlap-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
 .timeoff-filter-grid {
   display: grid;
   gap: var(--space-3);
