@@ -297,7 +297,8 @@ export async function GET(_request: Request, context: RouteContext) {
       : null,
     notes: task.notes,
     documentId: task.document_id,
-    signatureRequestId: task.signature_request_id
+    signatureRequestId: task.signature_request_id,
+    urgency: null
   }));
 
   const reminderTasks = tasksRows.filter((task) => {

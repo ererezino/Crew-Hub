@@ -25,6 +25,10 @@ export const ONBOARDING_TASK_TYPES = ["manual", "e_signature", "link", "form"] a
 
 export type OnboardingTaskType = (typeof ONBOARDING_TASK_TYPES)[number];
 
+export const ONBOARDING_TASK_URGENCIES = ["day_1", "first_week", "first_month"] as const;
+
+export type OnboardingTaskUrgency = (typeof ONBOARDING_TASK_URGENCIES)[number];
+
 export type OnboardingTemplateTask = {
   title: string;
   description: string;
@@ -33,6 +37,7 @@ export type OnboardingTemplateTask = {
   taskType?: OnboardingTaskType;
   documentId?: string | null;
   linkUrl?: string | null;
+  urgency?: OnboardingTaskUrgency | null;
 };
 
 export type OnboardingTemplateTaskInput = {
@@ -43,6 +48,7 @@ export type OnboardingTemplateTaskInput = {
   taskType?: OnboardingTaskType;
   documentId?: string | null;
   linkUrl?: string | null;
+  urgency?: OnboardingTaskUrgency | null;
 };
 
 export type OnboardingTemplate = {
@@ -88,6 +94,7 @@ export type OnboardingTask = {
   notes: string | null;
   documentId: string | null;
   signatureRequestId: string | null;
+  urgency: OnboardingTaskUrgency | null;
 };
 
 export type OnboardingTemplatesResponseData = {

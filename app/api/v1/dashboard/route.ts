@@ -77,6 +77,7 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     org: null,
     managerInfo: null,
     onboardingProgress: null,
+    firstDayTasks: null,
     leaveBalance: null,
     hasTimePolicy: false,
     recentExpenses: [],
@@ -898,7 +899,7 @@ export async function GET() {
         if (activeOnboarding) {
           const { data: tasks } = await supabase
             .from("onboarding_tasks")
-            .select("id, status")
+            .select("id, title, category, status, due_date")
             .eq("instance_id", activeOnboarding.id)
             .is("deleted_at", null);
 
@@ -907,6 +908,34 @@ export async function GET() {
             tasksTotal: taskList.length,
             tasksCompleted: taskList.filter((t) => t.status === "completed").length,
             instanceId: activeOnboarding.id
+          };
+
+          const today = toDateString(new Date());
+          const endOfWeek = new Date();
+          endOfWeek.setDate(endOfWeek.getDate() + (7 - endOfWeek.getDay()));
+          const endOfWeekStr = toDateString(endOfWeek);
+
+          const incomplete = taskList.filter((t) => t.status !== "completed");
+          const todayTasks = incomplete.filter(
+            (t) => !t.due_date || t.due_date <= today
+          );
+          const thisWeekTasks = incomplete.filter(
+            (t) => t.due_date && t.due_date > today && t.due_date <= endOfWeekStr
+          );
+
+          response.firstDayTasks = {
+            today: todayTasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              category: t.category,
+              status: t.status
+            })),
+            thisWeek: thisWeekTasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              category: t.category,
+              status: t.status
+            }))
           };
         }
 

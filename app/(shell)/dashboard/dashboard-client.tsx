@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skeleton";
+import { FirstDayCard } from "../../../components/dashboard/first-day-card";
 import { WidgetErrorBoundary } from "../../../components/dashboard/widget-error-boundary";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
@@ -893,6 +894,7 @@ function DashboardContent() {
   return (
     <div className="home-page">
       <GreetingCard data={data} />
+      {data.persona === "new_hire" ? <FirstDayCard data={data} /> : null}
       <WidgetGrid data={data} />
     </div>
   );

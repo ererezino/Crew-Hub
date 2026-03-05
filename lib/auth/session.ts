@@ -24,6 +24,7 @@ export type SessionProfile = {
   manager_id: string | null;
   country_code: string | null;
   status: "active" | "inactive" | "onboarding" | "offboarding";
+  first_login_at: string | null;
 };
 
 export type AuthenticatedSession = {
@@ -53,7 +54,7 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select(
-      "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, status"
+      "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, status, first_login_at"
     )
     .eq("id", user.id)
     .is("deleted_at", null)
@@ -81,8 +82,19 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
     roles,
     manager_id: profileData.manager_id,
     country_code: profileData.country_code,
-    status: profileData.status
+    status: profileData.status,
+    first_login_at: profileData.first_login_at ?? null
   };
+
+  // Stamp first_login_at on first ever login
+  if (!profileData.first_login_at) {
+    void supabase
+      .from("profiles")
+      .update({ first_login_at: new Date().toISOString() })
+      .eq("id", profileData.id)
+      .then();
+    profile.first_login_at = new Date().toISOString();
+  }
 
   const { data: orgData, error: orgError } = await supabase
     .from("orgs")

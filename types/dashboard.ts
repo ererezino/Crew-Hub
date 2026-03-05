@@ -148,6 +148,10 @@ export type DashboardResponseData = {
     tasksCompleted: number;
     instanceId: string;
   } | null;
+  firstDayTasks: {
+    today: { id: string; title: string; category: string; status: string }[];
+    thisWeek: { id: string; title: string; category: string; status: string }[];
+  } | null;
 
   /* ── employee+ greeting card & widgets ── */
   leaveBalance: {
