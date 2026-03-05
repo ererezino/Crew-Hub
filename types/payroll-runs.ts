@@ -127,10 +127,39 @@ export type PayrollRunItem = {
   updatedAt: string;
 };
 
+export const PAYROLL_ANOMALY_TYPES = [
+  "large_variance",
+  "new_employee",
+  "zero_gross",
+  "negative_net"
+] as const;
+
+export type PayrollAnomalyType = (typeof PAYROLL_ANOMALY_TYPES)[number];
+
+export type PayrollAnomaly = {
+  type: PayrollAnomalyType;
+  label: string;
+  description: string;
+  severity: "warning" | "critical";
+  itemIds: string[];
+};
+
+export type PayrollItemVariance = {
+  employeeId: string;
+  grossChange: number;
+  netChange: number;
+  grossChangePercent: number;
+  netChangePercent: number;
+  previousGross: number;
+  previousNet: number;
+};
+
 export type PayrollRunDetailResponseData = {
   run: PayrollRunSummary;
   items: PayrollRunItem[];
   flaggedCount: number;
+  anomalies: PayrollAnomaly[];
+  variances: Record<string, PayrollItemVariance>;
 };
 
 export type CreatePayrollRunPayload = {

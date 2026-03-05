@@ -5095,6 +5095,120 @@ html.dark .topbar {
   animation: panel-enter var(--transition-panel);
 }
 
+.payroll-anomaly-card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.payroll-anomaly-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.payroll-anomaly-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.payroll-anomaly-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-default);
+}
+
+.payroll-anomaly-warning {
+  background: var(--status-warning-bg);
+  border: 1px solid var(--status-warning-border);
+}
+
+.payroll-anomaly-critical {
+  background: var(--status-error-bg);
+  border: 1px solid var(--status-error-border);
+}
+
+.payroll-anomaly-icon {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.125rem;
+}
+
+.payroll-anomaly-warning .payroll-anomaly-icon {
+  color: var(--status-warning-text);
+}
+
+.payroll-anomaly-critical .payroll-anomaly-icon {
+  color: var(--status-error-text);
+}
+
+.payroll-anomaly-content {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.payroll-anomaly-label {
+  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.payroll-anomaly-description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.payroll-variance-card {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.payroll-variance-grid {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.payroll-variance-stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.payroll-variance-label {
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+
+.payroll-variance-amount {
+  font-weight: var(--weight-medium);
+}
+
+.variance-up .payroll-variance-amount {
+  color: var(--status-error-text);
+}
+
+.variance-down .payroll-variance-amount {
+  color: var(--status-success-text);
+}
+
+.payroll-variance-percent {
+  font-size: var(--text-xs);
+  opacity: 0.8;
+}
+
 .settings-form {
   display: grid;
   gap: var(--space-3);

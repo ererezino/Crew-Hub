@@ -34,6 +34,8 @@ import type {
   AddPayrollAdjustmentResponse,
   CalculatePayrollRunResponse,
   PayrollAdjustmentType,
+  PayrollAnomaly,
+  PayrollItemVariance,
   PayrollRunItem,
   PayrollRunActionResponse,
   PayrollRunStatus
@@ -208,6 +210,125 @@ function getAdjustmentErrors(values: AdjustmentFormValues): AdjustmentFormErrors
 
 function hasErrors(errors: AdjustmentFormErrors): boolean {
   return Object.values(errors).some((value) => Boolean(value));
+}
+
+function formatVariancePercent(value: number): string {
+  const percent = Math.round(value * 100);
+  if (percent > 0) return `+${percent}%`;
+  if (percent < 0) return `${percent}%`;
+  return "0%";
+}
+
+function AnomalyChecklist({ anomalies }: { anomalies: PayrollAnomaly[] }) {
+  if (anomalies.length === 0) {
+    return (
+      <section className="settings-card payroll-anomaly-card" aria-label="Pre-approval checks">
+        <div className="payroll-anomaly-header">
+          <h2 className="section-title">Pre-approval checks</h2>
+          <StatusBadge tone="success">All clear</StatusBadge>
+        </div>
+        <p className="settings-card-description">
+          No anomalies detected. All items are within expected ranges.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="settings-card payroll-anomaly-card" aria-label="Pre-approval checks">
+      <div className="payroll-anomaly-header">
+        <h2 className="section-title">Pre-approval checks</h2>
+        <StatusBadge tone="warning">
+          {anomalies.length} issue{anomalies.length === 1 ? "" : "s"}
+        </StatusBadge>
+      </div>
+      <ul className="payroll-anomaly-list">
+        {anomalies.map((anomaly) => (
+          <li key={anomaly.type} className={`payroll-anomaly-item payroll-anomaly-${anomaly.severity}`}>
+            <span className="payroll-anomaly-icon" aria-hidden="true">
+              {anomaly.severity === "critical" ? (
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M12 9v4m0 4h.01M4.93 19h14.14c1.34 0 2.18-1.46 1.5-2.62L13.5 4.38c-.67-1.16-2.33-1.16-3 0L3.43 16.38C2.75 17.54 3.6 19 4.93 19z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M12 8v4m0 4h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              )}
+            </span>
+            <div className="payroll-anomaly-content">
+              <p className="payroll-anomaly-label">{anomaly.label}</p>
+              <p className="payroll-anomaly-description">{anomaly.description}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function VarianceSummary({
+  variance,
+  currency
+}: {
+  variance: PayrollItemVariance | undefined;
+  currency: string;
+}) {
+  if (!variance) {
+    return null;
+  }
+
+  const hasGrossChange = variance.grossChange !== 0;
+  const hasNetChange = variance.netChange !== 0;
+
+  if (!hasGrossChange && !hasNetChange) {
+    return null;
+  }
+
+  const grossTone =
+    variance.grossChange > 0 ? "variance-up" : variance.grossChange < 0 ? "variance-down" : "";
+  const netTone =
+    variance.netChange > 0 ? "variance-up" : variance.netChange < 0 ? "variance-down" : "";
+
+  return (
+    <article className="payroll-variance-card" aria-label="Changes from prior period">
+      <h4 className="form-label">Changes from prior period</h4>
+      <div className="payroll-variance-grid">
+        {hasGrossChange ? (
+          <p className={`payroll-variance-stat ${grossTone}`}>
+            <span className="payroll-variance-label">Gross</span>
+            <span className="payroll-variance-amount">
+              <CurrencyDisplay amount={Math.abs(variance.grossChange)} currency={currency} />
+              {" "}
+              <span className="payroll-variance-percent">
+                ({formatVariancePercent(variance.grossChangePercent)})
+              </span>
+            </span>
+          </p>
+        ) : null}
+        {hasNetChange ? (
+          <p className={`payroll-variance-stat ${netTone}`}>
+            <span className="payroll-variance-label">Net</span>
+            <span className="payroll-variance-amount">
+              <CurrencyDisplay amount={Math.abs(variance.netChange)} currency={currency} />
+              {" "}
+              <span className="payroll-variance-percent">
+                ({formatVariancePercent(variance.netChangePercent)})
+              </span>
+            </span>
+          </p>
+        ) : null}
+      </div>
+    </article>
+  );
 }
 
 export function PayrollRunDetailClient({
@@ -932,6 +1053,8 @@ export function PayrollRunDetailClient({
             </section>
           ) : null}
 
+          <AnomalyChecklist anomalies={runQuery.data.anomalies ?? []} />
+
           {sortedItems.length === 0 ? (
             <EmptyState
               title="No payroll items yet"
@@ -1087,6 +1210,11 @@ export function PayrollRunDetailClient({
                                   <p>{item.flagReason}</p>
                                 </article>
                               ) : null}
+
+                              <VarianceSummary
+                                variance={(runQuery.data?.variances ?? {})[item.employeeId]}
+                                currency={item.payCurrency}
+                              />
 
                               <div className="payroll-item-detail-grid">
                                 <article className="settings-card">

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { computeVariances, detectAnomalies } from "../../../../../../lib/payroll/anomaly";
 import { adjustmentTotal, deductionTotal } from "../../../../../../lib/payroll/runs";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type {
@@ -293,10 +294,86 @@ export async function GET(
       rawInitiator?.full_name ?? null
     );
 
+    // Fetch previous payroll run items for variance and anomaly detection
+    let previousItems: PayrollRunItem[] = [];
+    const previousEmployeeIds = new Set<string>();
+
+    const { data: prevRuns } = await supabase
+      .from("payroll_runs")
+      .select("id")
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .neq("id", runId)
+      .lt("pay_period_end", parsedRun.data.pay_period_start)
+      .order("pay_period_end", { ascending: false })
+      .limit(1);
+
+    if (prevRuns && prevRuns.length > 0) {
+      const prevRunId = prevRuns[0].id as string;
+
+      const { data: rawPrevItems } = await supabase
+        .from("payroll_items")
+        .select(
+          "id, payroll_run_id, employee_id, org_id, gross_amount, currency, pay_currency, base_salary_amount, allowances, adjustments, deductions, employer_contributions, net_amount, withholding_applied, payment_status, payment_reference, payment_id, notes, flagged, flag_reason, created_at, updated_at"
+        )
+        .eq("org_id", session.profile.org_id)
+        .eq("payroll_run_id", prevRunId)
+        .is("deleted_at", null);
+
+      const parsedPrevItems = z.array(payrollItemRowSchema).safeParse(rawPrevItems ?? []);
+
+      if (parsedPrevItems.success) {
+        previousItems = parsedPrevItems.data.map((row) => {
+          const allowances = parseAllowances(row.allowances);
+          const adjustments = parseAdjustments(row.adjustments);
+          const deductions = parseDeductions(row.deductions);
+          const employerContributions = parseEmployerContributions(row.employer_contributions);
+
+          return {
+            id: row.id,
+            payrollRunId: row.payroll_run_id,
+            employeeId: row.employee_id,
+            fullName: "",
+            department: null,
+            countryCode: null,
+            grossAmount: parseAmount(row.gross_amount),
+            currency: row.currency,
+            payCurrency: row.pay_currency,
+            baseSalaryAmount: parseAmount(row.base_salary_amount),
+            allowances,
+            adjustments,
+            deductions,
+            employerContributions,
+            netAmount: parseAmount(row.net_amount),
+            withholdingApplied: row.withholding_applied,
+            paymentStatus: row.payment_status,
+            paymentReference: row.payment_reference,
+            paymentId: row.payment_id,
+            notes: row.notes,
+            flagged: row.flagged,
+            flagReason: row.flag_reason,
+            deductionTotal: deductionTotal(deductions),
+            adjustmentTotal: adjustmentTotal(adjustments),
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+          };
+        });
+
+        for (const prevItem of previousItems) {
+          previousEmployeeIds.add(prevItem.employeeId);
+        }
+      }
+    }
+
+    const variances = computeVariances(items, previousItems);
+    const anomalies = detectAnomalies(items, variances, previousEmployeeIds);
+
     const responseData: PayrollRunDetailResponseData = {
       run: runSummary,
       items,
-      flaggedCount: items.filter((item) => item.flagged).length
+      flaggedCount: items.filter((item) => item.flagged).length,
+      anomalies,
+      variances
     };
 
     return jsonResponse<PayrollRunDetailResponseData>(200, {
