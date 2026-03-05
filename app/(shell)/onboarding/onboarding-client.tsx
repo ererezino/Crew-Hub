@@ -57,6 +57,9 @@ type TemplateTaskDraft = {
   description: string;
   category: string;
   dueOffsetDays: string;
+  actionUrl: string;
+  actionLabel: string;
+  completionGuidance: string;
 };
 
 type TemplateTaskDraftErrors = {
@@ -64,6 +67,9 @@ type TemplateTaskDraftErrors = {
   description?: string;
   category?: string;
   dueOffsetDays?: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  completionGuidance?: string;
 };
 
 type CreateTemplateFormValues = {
@@ -88,7 +94,10 @@ const initialTemplateTaskDraft: TemplateTaskDraft = {
   title: "",
   description: "",
   category: "",
-  dueOffsetDays: ""
+  dueOffsetDays: "",
+  actionUrl: "",
+  actionLabel: "",
+  completionGuidance: ""
 };
 
 const initialStartOnboardingFormValues: StartOnboardingFormValues = {
@@ -236,6 +245,26 @@ function validateCreateTemplateForm(
       } else if (parsedOffset < -365 || parsedOffset > 365) {
         taskErrors.dueOffsetDays = "Due offset must be between -365 and 365.";
       }
+    }
+
+    if (task.actionUrl.trim().length > 0) {
+      try {
+        const parsedUrl = new URL(task.actionUrl.trim());
+
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          taskErrors.actionUrl = "Action URL must start with http:// or https://.";
+        }
+      } catch {
+        taskErrors.actionUrl = "Action URL must be a valid URL.";
+      }
+    }
+
+    if (task.actionLabel.trim().length > 120) {
+      taskErrors.actionLabel = "Action label is too long.";
+    }
+
+    if (task.completionGuidance.trim().length > 1000) {
+      taskErrors.completionGuidance = "Completion guidance is too long.";
     }
 
     errors.taskErrors[index] = taskErrors;
@@ -533,7 +562,13 @@ export function OnboardingClient({
             dueOffsetDays:
               task.dueOffsetDays.trim().length === 0
                 ? null
-                : Number(task.dueOffsetDays)
+                : Number(task.dueOffsetDays),
+            actionUrl: task.actionUrl.trim().length === 0 ? null : task.actionUrl.trim(),
+            actionLabel: task.actionLabel.trim().length === 0 ? null : task.actionLabel.trim(),
+            completionGuidance:
+              task.completionGuidance.trim().length === 0
+                ? null
+                : task.completionGuidance.trim()
           }))
         })
       });
@@ -985,6 +1020,16 @@ export function OnboardingClient({
                         <div>
                           <p className="onboarding-template-task-title">{task.title}</p>
                           <p className="settings-card-description">{task.description}</p>
+                          {task.actionUrl ? (
+                            <p className="settings-card-description">
+                              Action: {task.actionLabel ?? "Open resource"} ({task.actionUrl})
+                            </p>
+                          ) : null}
+                          {task.completionGuidance ? (
+                            <p className="settings-card-description">
+                              Completion guidance: {task.completionGuidance}
+                            </p>
+                          ) : null}
                         </div>
                         <div className="onboarding-template-task-meta">
                           <StatusBadge tone="info">{toSentenceCase(task.category)}</StatusBadge>
@@ -1344,6 +1389,81 @@ export function OnboardingClient({
                       ) : null}
                     </label>
                   </div>
+
+                  <div className="onboarding-template-editor-grid">
+                    <label className="form-field" htmlFor={`template-task-action_url-${index}`}>
+                      <span className="form-label">Action URL</span>
+                      <input
+                        id={`template-task-action_url-${index}`}
+                        name="action_url"
+                        className={taskErrors.actionUrl ? "form-input form-input-error" : "form-input"}
+                        value={task.actionUrl}
+                        onChange={(event) =>
+                          updateTemplateValues({
+                            ...templateValues,
+                            tasks: templateValues.tasks.map((currentTask, taskIndex) =>
+                              taskIndex === index
+                                ? { ...currentTask, actionUrl: event.currentTarget.value }
+                                : currentTask
+                            )
+                          })
+                        }
+                        placeholder="https://..."
+                      />
+                      {taskErrors.actionUrl ? (
+                        <p className="form-field-error">{taskErrors.actionUrl}</p>
+                      ) : null}
+                    </label>
+
+                    <label className="form-field" htmlFor={`template-task-action_label-${index}`}>
+                      <span className="form-label">Action label</span>
+                      <input
+                        id={`template-task-action_label-${index}`}
+                        name="action_label"
+                        className={taskErrors.actionLabel ? "form-input form-input-error" : "form-input"}
+                        value={task.actionLabel}
+                        onChange={(event) =>
+                          updateTemplateValues({
+                            ...templateValues,
+                            tasks: templateValues.tasks.map((currentTask, taskIndex) =>
+                              taskIndex === index
+                                ? { ...currentTask, actionLabel: event.currentTarget.value }
+                                : currentTask
+                            )
+                          })
+                        }
+                        placeholder="Open handbook"
+                      />
+                      {taskErrors.actionLabel ? (
+                        <p className="form-field-error">{taskErrors.actionLabel}</p>
+                      ) : null}
+                    </label>
+                  </div>
+
+                  <label className="form-field" htmlFor={`template-task-completion_guidance-${index}`}>
+                    <span className="form-label">Completion guidance</span>
+                    <textarea
+                      id={`template-task-completion_guidance-${index}`}
+                      name="completion_guidance"
+                      className={taskErrors.completionGuidance ? "form-input form-input-error" : "form-input"}
+                      rows={2}
+                      value={task.completionGuidance}
+                      onChange={(event) =>
+                        updateTemplateValues({
+                          ...templateValues,
+                          tasks: templateValues.tasks.map((currentTask, taskIndex) =>
+                            taskIndex === index
+                              ? { ...currentTask, completionGuidance: event.currentTarget.value }
+                              : currentTask
+                          )
+                        })
+                      }
+                      placeholder="Explain what completion looks like."
+                    />
+                    {taskErrors.completionGuidance ? (
+                      <p className="form-field-error">{taskErrors.completionGuidance}</p>
+                    ) : null}
+                  </label>
                 </article>
               );
             })}

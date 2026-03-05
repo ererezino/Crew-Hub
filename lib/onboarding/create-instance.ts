@@ -44,7 +44,13 @@ const templateTaskSchema = z.object({
   documentId: z.string().uuid().optional(),
   document_id: z.string().uuid().optional(),
   linkUrl: z.string().optional(),
-  link_url: z.string().optional()
+  link_url: z.string().optional(),
+  actionUrl: z.string().url().nullable().optional(),
+  action_url: z.string().url().nullable().optional(),
+  actionLabel: z.string().max(120).nullable().optional(),
+  action_label: z.string().max(120).nullable().optional(),
+  completionGuidance: z.string().max(1000).nullable().optional(),
+  completion_guidance: z.string().max(1000).nullable().optional()
 });
 
 const createdInstanceRowSchema = z.object({
@@ -81,6 +87,9 @@ export type NormalizedTemplateTask = {
   taskType: OnboardingTaskType;
   documentId: string | null;
   linkUrl: string | null;
+  actionUrl: string | null;
+  actionLabel: string | null;
+  completionGuidance: string | null;
 };
 
 export function normalizeTemplateTasks(value: unknown): NormalizedTemplateTask[] {
@@ -104,7 +113,11 @@ export function normalizeTemplateTasks(value: unknown): NormalizedTemplateTask[]
       dueOffsetDays: parsedTask.data.dueOffsetDays ?? parsedTask.data.due_offset_days ?? null,
       taskType: parsedTask.data.taskType ?? parsedTask.data.task_type ?? "manual",
       documentId: parsedTask.data.documentId ?? parsedTask.data.document_id ?? null,
-      linkUrl: parsedTask.data.linkUrl ?? parsedTask.data.link_url ?? null
+      linkUrl: parsedTask.data.linkUrl ?? parsedTask.data.link_url ?? null,
+      actionUrl: parsedTask.data.actionUrl ?? parsedTask.data.action_url ?? null,
+      actionLabel: parsedTask.data.actionLabel ?? parsedTask.data.action_label ?? null,
+      completionGuidance:
+        parsedTask.data.completionGuidance ?? parsedTask.data.completion_guidance ?? null
     });
   }
 
@@ -170,7 +183,10 @@ export async function createOnboardingInstance({
       assigned_to: employee.id,
       due_date: dueDate,
       task_type: task.taskType,
-      document_id: task.documentId ?? null
+      document_id: task.documentId ?? null,
+      action_url: task.actionUrl ?? task.linkUrl ?? null,
+      action_label: task.actionLabel ?? (task.linkUrl ? "Open resource" : null),
+      completion_guidance: task.completionGuidance
     };
   });
 

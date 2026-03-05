@@ -33,6 +33,9 @@ export type OnboardingTemplateTask = {
   taskType?: OnboardingTaskType;
   documentId?: string | null;
   linkUrl?: string | null;
+  actionUrl?: string | null;
+  actionLabel?: string | null;
+  completionGuidance?: string | null;
 };
 
 export type OnboardingTemplateTaskInput = {
@@ -43,6 +46,9 @@ export type OnboardingTemplateTaskInput = {
   taskType?: OnboardingTaskType;
   documentId?: string | null;
   linkUrl?: string | null;
+  actionUrl?: string | null;
+  actionLabel?: string | null;
+  completionGuidance?: string | null;
 };
 
 export type OnboardingTemplate = {
@@ -88,6 +94,9 @@ export type OnboardingTask = {
   notes: string | null;
   documentId: string | null;
   signatureRequestId: string | null;
+  actionUrl: string | null;
+  actionLabel: string | null;
+  completionGuidance: string | null;
 };
 
 export type OnboardingTemplatesResponseData = {
