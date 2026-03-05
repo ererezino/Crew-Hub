@@ -11,6 +11,7 @@ import {
 } from "react";
 import { z } from "zod";
 
+import { ConfirmDialog } from "../../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
@@ -241,6 +242,7 @@ export function PayrollRunDetailClient({
   const [rejectReason, setRejectReason] = useState("");
   const [rejectReasonError, setRejectReasonError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const paymentPollingIntervalRef = useRef<number | null>(null);
 
   const sortedItems = useMemo(() => {
@@ -632,14 +634,7 @@ export function PayrollRunDetailClient({
   };
 
   const cancelRun = async () => {
-    const confirmed = window.confirm(
-      "Cancel this payroll run? This action is intended for runs that should no longer proceed."
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
+    setIsCancelDialogOpen(false);
     await performRunAction("cancel");
   };
 
@@ -889,15 +884,24 @@ export function PayrollRunDetailClient({
                   type="button"
                   className="button button-subtle"
                   disabled={activeRunAction !== null}
-                  onClick={() => {
-                    void cancelRun();
-                  }}
+                  onClick={() => setIsCancelDialogOpen(true)}
                 >
                   {activeRunAction === "cancel" ? "Cancelling..." : "Cancel run"}
                 </button>
               ) : null}
             </div>
           </section>
+
+          <ConfirmDialog
+            open={isCancelDialogOpen}
+            title="Cancel payroll run"
+            description="This action is intended for runs that should no longer proceed. It cannot be undone."
+            confirmLabel="Cancel run"
+            tone="destructive"
+            loading={activeRunAction === "cancel"}
+            onConfirm={() => { void cancelRun(); }}
+            onCancel={() => setIsCancelDialogOpen(false)}
+          />
 
           {isApproved ? (
             <section className="payroll-lock-banner" aria-label="Payroll locked">

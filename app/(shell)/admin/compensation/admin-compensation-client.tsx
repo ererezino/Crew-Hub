@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { CompensationSkeleton } from "../../../../components/shared/compensation-skeleton";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
@@ -406,6 +407,7 @@ export function AdminCompensationClient({
   const [allowanceFormErrors, setAllowanceFormErrors] = useState<AllowanceFormErrors>({});
   const [isSubmittingAllowance, setIsSubmittingAllowance] = useState(false);
   const [isDeletingAllowanceId, setIsDeletingAllowanceId] = useState<string | null>(null);
+  const [deleteConfirmAllowanceId, setDeleteConfirmAllowanceId] = useState<string | null>(null);
 
   const [isEquityPanelOpen, setIsEquityPanelOpen] = useState(false);
   const [editingEquityGrantId, setEditingEquityGrantId] = useState<string | null>(null);
@@ -682,14 +684,7 @@ export function AdminCompensationClient({
   };
 
   const handleAllowanceDelete = async (allowanceId: string) => {
-    const confirmed = window.confirm(
-      "Delete this allowance? This action is recorded in the audit log."
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
+    setDeleteConfirmAllowanceId(null);
     setIsDeletingAllowanceId(allowanceId);
 
     try {
@@ -1161,7 +1156,7 @@ export function AdminCompensationClient({
                             <button
                               type="button"
                               className="table-row-action"
-                              onClick={() => handleAllowanceDelete(allowance.id)}
+                              onClick={() => setDeleteConfirmAllowanceId(allowance.id)}
                               disabled={isDeletingAllowanceId === allowance.id}
                             >
                               {isDeletingAllowanceId === allowance.id ? "Deleting..." : "Delete"}
@@ -1997,6 +1992,21 @@ export function AdminCompensationClient({
           ))}
         </section>
       ) : null}
+
+      <ConfirmDialog
+        open={deleteConfirmAllowanceId !== null}
+        title="Delete allowance"
+        description="This allowance will be permanently deleted. This action is recorded in the audit log."
+        confirmLabel="Delete"
+        tone="destructive"
+        loading={isDeletingAllowanceId !== null}
+        onConfirm={() => {
+          if (deleteConfirmAllowanceId) {
+            void handleAllowanceDelete(deleteConfirmAllowanceId);
+          }
+        }}
+        onCancel={() => setDeleteConfirmAllowanceId(null)}
+      />
     </>
   );
 }

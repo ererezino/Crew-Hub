@@ -1,8 +1,11 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
+
+import { useUnsavedChanges } from "../../../hooks/use-unsaved-changes";
 import { z } from "zod";
 
+import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -269,7 +272,16 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancellingRequestId, setIsCancellingRequestId] = useState<string | null>(null);
+  const [cancelConfirmRequest, setCancelConfirmRequest] = useState<LeaveRequestRecord | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const isFormDirty =
+    isRequestPanelOpen &&
+    (formValues.leaveType !== "" ||
+      formValues.startDate !== "" ||
+      formValues.endDate !== "" ||
+      formValues.reason !== "");
+  useUnsavedChanges(isFormDirty);
   const [isAfkPanelOpen, setIsAfkPanelOpen] = useState(false);
   const [afkDate, setAfkDate] = useState("");
   const [afkStartTime, setAfkStartTime] = useState("");
@@ -609,12 +621,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   };
 
   const handleCancelRequest = async (requestRecord: LeaveRequestRecord) => {
-    const shouldCancel = window.confirm("Cancel this leave request?");
-
-    if (!shouldCancel) {
-      return;
-    }
-
+    setCancelConfirmRequest(null);
     setIsCancellingRequestId(requestRecord.id);
 
     try {
@@ -883,7 +890,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                           <button
                             type="button"
                             className="table-row-action"
-                            onClick={() => handleCancelRequest(requestRecord)}
+                            onClick={() => setCancelConfirmRequest(requestRecord)}
                             disabled={isCancellingRequestId === requestRecord.id}
                           >
                             {isCancellingRequestId === requestRecord.id ? "Cancelling..." : "Cancel"}
@@ -1258,6 +1265,21 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           ))}
         </section>
       ) : null}
+
+      <ConfirmDialog
+        open={cancelConfirmRequest !== null}
+        title="Cancel leave request"
+        description="This will cancel the selected leave request. This action cannot be undone."
+        confirmLabel="Cancel request"
+        tone="destructive"
+        loading={isCancellingRequestId !== null}
+        onConfirm={() => {
+          if (cancelConfirmRequest) {
+            void handleCancelRequest(cancelConfirmRequest);
+          }
+        }}
+        onCancel={() => setCancelConfirmRequest(null)}
+      />
     </>
   );
 }

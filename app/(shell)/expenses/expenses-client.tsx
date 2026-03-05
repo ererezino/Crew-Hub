@@ -12,6 +12,8 @@ import {
 } from "react";
 import { z } from "zod";
 
+import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
+import { useUnsavedChanges } from "../../../hooks/use-unsaved-changes";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
@@ -503,9 +505,17 @@ export function ExpensesClient({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isOpeningReceiptById, setIsOpeningReceiptById] = useState<Record<string, boolean>>({});
   const [isMutatingExpenseId, setIsMutatingExpenseId] = useState<string | null>(null);
+  const [cancelConfirmExpenseId, setCancelConfirmExpenseId] = useState<string | null>(null);
   const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
+
+  const isExpenseFormDirty =
+    isPanelOpen &&
+    (formValues.description !== "" ||
+      formValues.amount !== "" ||
+      receiptFile !== null);
+  useUnsavedChanges(isExpenseFormDirty);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   const expenses = useMemo(() => {
@@ -1019,7 +1029,7 @@ export function ExpensesClient({
                                 <button
                                   type="button"
                                   className="table-row-action"
-                                  onClick={() => mutateExpense({ expense, action: "cancel" })}
+                                  onClick={() => setCancelConfirmExpenseId(expense.id)}
                                   disabled={isMutatingExpenseId === expense.id}
                                 >
                                   {isMutatingExpenseId === expense.id ? "Saving..." : "Cancel"}
@@ -1525,6 +1535,25 @@ export function ExpensesClient({
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={cancelConfirmExpenseId !== null}
+        title="Cancel expense"
+        description="This will cancel the selected expense claim. This action cannot be undone."
+        confirmLabel="Cancel expense"
+        tone="destructive"
+        loading={isMutatingExpenseId !== null}
+        onConfirm={() => {
+          const expense = (expensesQuery.data?.expenses ?? []).find(
+            (e) => e.id === cancelConfirmExpenseId
+          );
+          if (expense) {
+            setCancelConfirmExpenseId(null);
+            void mutateExpense({ expense, action: "cancel" });
+          }
+        }}
+        onCancel={() => setCancelConfirmExpenseId(null)}
+      />
     </>
   );
 }

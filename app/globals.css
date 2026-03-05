@@ -5095,6 +5095,36 @@ html.dark .topbar {
   animation: panel-enter var(--transition-panel);
 }
 
+.confirm-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.confirm-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(40, 22, 29, 0.48);
+}
+
+.confirm-dialog-panel {
+  position: relative;
+  width: min(440px, 100%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-modal);
+  background: var(--bg-canvas);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+  box-shadow: 0 20px 48px rgba(40, 22, 29, 0.24);
+  animation: panel-enter var(--transition-panel);
+}
+
 .settings-form {
   display: grid;
   gap: var(--space-3);
