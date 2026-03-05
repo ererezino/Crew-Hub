@@ -13,6 +13,7 @@ import type {
   DashboardGreeting,
   DashboardHolidayItem,
   DashboardLeaveBalanceItem,
+  DashboardNewHireProgressItem,
   DashboardPendingApprovals,
   DashboardResponseData,
   DashboardShiftItem,
@@ -82,6 +83,7 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     recentExpenses: [],
     upcomingShifts: [],
     pendingApprovals: null,
+    newHireProgress: null,
     headcount: null,
     onboardingStatus: null,
     complianceDeadlines: null,
@@ -344,6 +346,82 @@ async function fetchPendingApprovals(
     };
   } catch {
     return { leave: 0, expenses: 0, timesheets: 0, total: 0 };
+  }
+}
+
+async function fetchNewHireProgress(
+  supabase: SupabaseClient,
+  orgId: string,
+  managerId: string
+): Promise<DashboardNewHireProgressItem[]> {
+  try {
+    // Get direct reports with active onboarding
+    const { data: reports, error: reportsError } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .eq("org_id", orgId)
+      .eq("manager_id", managerId)
+      .is("deleted_at", null);
+
+    if (reportsError || !reports || reports.length === 0) return [];
+
+    const reportIds = reports.map((r) => r.id).filter((v): v is string => typeof v === "string");
+
+    const { data: instances, error: instancesError } = await supabase
+      .from("onboarding_instances")
+      .select("id, employee_id, started_at")
+      .eq("org_id", orgId)
+      .eq("status", "active")
+      .eq("type", "onboarding")
+      .in("employee_id", reportIds)
+      .is("deleted_at", null);
+
+    if (instancesError || !instances || instances.length === 0) return [];
+
+    const nowMs = Date.now();
+    const results: DashboardNewHireProgressItem[] = [];
+
+    for (const instance of instances) {
+      const employeeId = instance.employee_id as string;
+      const instanceId = instance.id as string;
+      const startedAt = instance.started_at as string;
+      const report = reports.find((r) => r.id === employeeId);
+
+      if (!report) continue;
+
+      const { data: tasks } = await supabase
+        .from("onboarding_tasks")
+        .select("id, status, due_date")
+        .eq("instance_id", instanceId)
+        .is("deleted_at", null);
+
+      const taskList = tasks ?? [];
+      const total = taskList.length;
+      const completed = taskList.filter((t) => t.status === "completed").length;
+      const today = toDateString(new Date());
+      const overdue = taskList.filter(
+        (t) => t.status !== "completed" && t.due_date && t.due_date < today
+      ).length;
+
+      const daysSinceStart = Math.max(
+        0,
+        Math.floor((nowMs - new Date(startedAt).getTime()) / (1000 * 60 * 60 * 24))
+      );
+
+      results.push({
+        instanceId,
+        employeeName: report.full_name ?? "Unknown",
+        avatarUrl: report.avatar_url ?? null,
+        daysSinceStart,
+        tasksTotal: total,
+        tasksCompleted: completed,
+        overdueTasks: overdue
+      });
+    }
+
+    return results;
+  } catch {
+    return [];
   }
 }
 
@@ -932,12 +1010,14 @@ export async function GET() {
       case "manager": {
         const [
           pendingApprovals,
+          newHireProgress,
           leaveBalance,
           upcomingShifts,
           recentExpenses,
           hasPolicy
         ] = await Promise.all([
           fetchPendingApprovals(supabase, profile.org_id, profile.id),
+          fetchNewHireProgress(supabase, profile.org_id, profile.id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
           fetchUpcomingShifts(supabase, profile.org_id, profile.id),
           fetchRecentExpenses(supabase, profile.org_id, profile.id),
@@ -945,6 +1025,7 @@ export async function GET() {
         ]);
 
         response.pendingApprovals = pendingApprovals;
+        response.newHireProgress = newHireProgress;
         response.leaveBalance = leaveBalance;
         response.upcomingShifts = upcomingShifts;
         response.recentExpenses = recentExpenses;

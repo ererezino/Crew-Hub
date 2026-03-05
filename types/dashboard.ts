@@ -121,6 +121,16 @@ export type DashboardAuditLogEntry = {
   timestamp: string;
 };
 
+export type DashboardNewHireProgressItem = {
+  instanceId: string;
+  employeeName: string;
+  avatarUrl: string | null;
+  daysSinceStart: number;
+  tasksTotal: number;
+  tasksCompleted: number;
+  overdueTasks: number;
+};
+
 /**
  * Persona-aware dashboard response.
  *
@@ -160,6 +170,7 @@ export type DashboardResponseData = {
 
   /* ── manager greeting card ── */
   pendingApprovals: DashboardPendingApprovals | null;
+  newHireProgress: DashboardNewHireProgressItem[] | null;
 
   /* ── hr_admin greeting card & widgets ── */
   headcount: { total: number; delta30d: number } | null;

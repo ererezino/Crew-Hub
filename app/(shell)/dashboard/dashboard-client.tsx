@@ -621,6 +621,43 @@ function PendingApprovalsWidget({ data }: { data: DashboardResponseData }) {
   );
 }
 
+function NewHireProgressWidget({ data }: { data: DashboardResponseData }) {
+  if (!data.newHireProgress || data.newHireProgress.length === 0) return null;
+
+  return (
+    <WidgetCard title="New hire progress" icon={<Users size={14} />} viewAllHref="/onboarding">
+      <ul className="dashboard-widget-list">
+        {data.newHireProgress.map((hire) => {
+          const pct = hire.tasksTotal > 0 ? Math.round((hire.tasksCompleted / hire.tasksTotal) * 100) : 0;
+
+          return (
+            <li key={hire.instanceId} className="dashboard-newhire-row">
+              <Link href={`/onboarding/${hire.instanceId}`} className="dashboard-newhire-link">
+                <div className="dashboard-newhire-info">
+                  <span className="dashboard-newhire-name">{hire.employeeName}</span>
+                  <span className="settings-card-description numeric">
+                    Day {hire.daysSinceStart}
+                    {hire.overdueTasks > 0 ? ` \u00B7 ${hire.overdueTasks} overdue` : ""}
+                  </span>
+                </div>
+                <div className="dashboard-newhire-progress">
+                  <div className="dashboard-newhire-bar">
+                    <div
+                      className="dashboard-newhire-bar-fill"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="dashboard-newhire-pct numeric">{pct}%</span>
+                </div>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </WidgetCard>
+  );
+}
+
 function ExpiringDocumentsWidget({ data }: { data: DashboardResponseData }) {
   if (!data.expiringDocuments || data.expiringDocuments.count === 0) return null;
 
@@ -833,9 +870,12 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
         <UpcomingShiftsWidget data={data} />
       </WidgetErrorBoundary>
 
-      {/* Manager+ widget */}
+      {/* Manager+ widgets */}
       <WidgetErrorBoundary title="Pending approvals">
         <PendingApprovalsWidget data={data} />
+      </WidgetErrorBoundary>
+      <WidgetErrorBoundary title="New hire progress">
+        <NewHireProgressWidget data={data} />
       </WidgetErrorBoundary>
 
       {/* HR Admin+ widgets */}

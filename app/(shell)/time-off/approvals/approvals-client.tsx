@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -14,6 +14,13 @@ import { formatDays, formatDateRangeHuman, formatDateTimeTooltip, formatRelative
 import { formatLeaveStatus } from "../../../../lib/format-labels";
 import { formatLeaveTypeLabel } from "../../../../lib/time-off";
 import type { LeaveRequestRecord, TimeOffRequestMutationResponse } from "../../../../types/time-off";
+
+type OverlapMember = {
+  name: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+};
 
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -79,6 +86,9 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
   const [rejectValues, setRejectValues] = useState<RejectFormValues>({ rejectionReason: "" });
   const [rejectErrors, setRejectErrors] = useState<RejectFormErrors>({});
   const [isRejecting, setIsRejecting] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<LeaveRequestRecord | null>(null);
+  const [approvalNote, setApprovalNote] = useState("");
+  const [teamOverlap, setTeamOverlap] = useState<OverlapMember[]>([]);
 
   const requests = useMemo(() => {
     const rows = approvalsQuery.data?.requests ?? [];
@@ -104,6 +114,41 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
     }, 4000);
   };
 
+  const openDetailPanel = useCallback((requestRecord: LeaveRequestRecord) => {
+    setDetailTarget(requestRecord);
+    setApprovalNote("");
+  }, []);
+
+  const closeDetailPanel = useCallback(() => {
+    setDetailTarget(null);
+    setApprovalNote("");
+    setTeamOverlap([]);
+  }, []);
+
+  // Fetch team overlap when detail panel opens
+  useEffect(() => {
+    if (!detailTarget) return;
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      startDate: detailTarget.startDate,
+      endDate: detailTarget.endDate
+    });
+
+    fetch(`/api/v1/time-off/overlap?${params.toString()}`, { signal: controller.signal })
+      .then((res) => res.json())
+      .then((json: { data?: { overlap: OverlapMember[] } }) => {
+        if (json.data?.overlap) {
+          setTeamOverlap(json.data.overlap);
+        }
+      })
+      .catch(() => {
+        // Ignore abort errors
+      });
+
+    return () => controller.abort();
+  }, [detailTarget]);
+
   const handleApprove = async (requestRecord: LeaveRequestRecord) => {
     setIsMutatingRequestId(requestRecord.id);
 
@@ -114,7 +159,8 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          action: "approve"
+          action: "approve",
+          approvalNote: approvalNote.trim() || undefined
         })
       });
 
@@ -126,6 +172,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       }
 
       approvalsQuery.refresh();
+      closeDetailPanel();
       showToast("success", "Leave request approved.");
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to approve leave request.");
@@ -302,6 +349,14 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                     <div className="timeoff-row-actions">
                       <button
                         type="button"
+                        className="button button-accent notification-action-button"
+                        onClick={() => openDetailPanel(requestRecord)}
+                        disabled={isMutatingRequestId === requestRecord.id}
+                      >
+                        Review
+                      </button>
+                      <button
+                        type="button"
                         className="table-row-action"
                         onClick={() => handleApprove(requestRecord)}
                         disabled={isMutatingRequestId === requestRecord.id}
@@ -355,6 +410,83 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
             </button>
           </div>
         </form>
+      </SlidePanel>
+
+      <SlidePanel
+        isOpen={Boolean(detailTarget)}
+        title="Review Leave Request"
+        description={detailTarget ? `${detailTarget.employeeName} - ${formatLeaveTypeLabel(detailTarget.leaveType)}` : undefined}
+        onClose={closeDetailPanel}
+      >
+        {detailTarget ? (
+          <div className="slide-panel-form-wrapper">
+            <dl className="leave-review-summary">
+              <dt>Employee</dt>
+              <dd>{detailTarget.employeeName}</dd>
+              <dt>Department</dt>
+              <dd>{detailTarget.employeeDepartment ?? "N/A"}</dd>
+              <dt>Leave type</dt>
+              <dd>{formatLeaveTypeLabel(detailTarget.leaveType)}</dd>
+              <dt>Dates</dt>
+              <dd>{formatDateRangeHuman(detailTarget.startDate, detailTarget.endDate)}</dd>
+              <dt>Duration</dt>
+              <dd className="numeric">{formatDays(detailTarget.totalDays)}</dd>
+              <dt>Reason</dt>
+              <dd>{detailTarget.reason || "No reason provided"}</dd>
+            </dl>
+
+            {teamOverlap.length > 0 ? (
+              <aside className="leave-review-overlap" aria-label="Team overlap">
+                <p className="leave-review-overlap-heading">Team members also out during this period</p>
+                <ul className="leave-review-overlap-list">
+                  {teamOverlap.map((member, idx) => (
+                    <li key={idx}>
+                      <span>{member.name}</span>
+                      <span className="settings-card-description">
+                        {formatLeaveTypeLabel(member.leaveType)} ({member.startDate} - {member.endDate})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </aside>
+            ) : (
+              <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
+                No other team members are out during this period.
+              </p>
+            )}
+
+            <label className="form-field" htmlFor="leave-approval-note">
+              <span className="form-label">Approval note (optional)</span>
+              <textarea
+                id="leave-approval-note"
+                className="form-input"
+                value={approvalNote}
+                onChange={(e) => setApprovalNote(e.currentTarget.value)}
+                rows={3}
+                placeholder="Add a note visible to the employee"
+                maxLength={500}
+              />
+            </label>
+
+            <div className="slide-panel-actions">
+              <button
+                type="button"
+                className="button"
+                onClick={() => openRejectPanel(detailTarget)}
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => handleApprove(detailTarget)}
+                disabled={isMutatingRequestId === detailTarget.id}
+              >
+                {isMutatingRequestId === detailTarget.id ? "Approving..." : "Approve"}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </SlidePanel>
 
       {toasts.length > 0 ? (
