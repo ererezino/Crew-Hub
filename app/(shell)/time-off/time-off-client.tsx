@@ -3,6 +3,7 @@
 import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
+import { DataTable, type DataTableColumn, type DataTableAction } from "../../../components/shared/data-table";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -679,6 +680,48 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     );
   }
 
+  const leaveRequestColumns: DataTableColumn<LeaveRequestRecord>[] = [
+    { key: "leaveType", label: "Leave type", render: (row) => formatLeaveTypeLabel(row.leaveType) },
+    {
+      key: "dateRange",
+      label: "Date range",
+      render: (row) => (
+        <time dateTime={row.startDate} title={formatDateTimeTooltip(row.startDate)}>
+          {formatDateRangeHuman(row.startDate, row.endDate)}
+        </time>
+      )
+    },
+    { key: "days", label: "Days", className: "numeric", render: (row) => formatDays(row.totalDays) },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <StatusBadge tone={toneForRequestStatus(row.status)}>
+          {formatLeaveStatus(row.status)}
+        </StatusBadge>
+      )
+    },
+    { key: "approver", label: "Approver", render: (row) => row.approverName ?? "--" },
+    {
+      key: "submitted",
+      label: "Submitted",
+      render: (row) => (
+        <time dateTime={row.createdAt} title={formatDateTimeTooltip(row.createdAt)}>
+          {formatRelativeTime(row.createdAt)}
+        </time>
+      )
+    }
+  ];
+
+  const leaveRequestActions: DataTableAction<LeaveRequestRecord>[] = [
+    {
+      label: (row) => (isCancellingRequestId === row.id ? "Cancelling..." : "Cancel"),
+      onClick: (row) => handleCancelRequest(row),
+      hidden: (row) => row.status !== "pending",
+      disabled: (row) => isCancellingRequestId === row.id
+    }
+  ];
+
   return (
     <>
       {!embedded ? (
@@ -829,76 +872,19 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           </div>
         </header>
 
-        {sortedRequests.length === 0 ? (
-          <EmptyState
-            title="No leave requests yet"
-            description="Submit your first leave request to start tracking approvals here."
-            ctaLabel="Request time off"
-            ctaHref="/time-off"
-          />
-        ) : (
-          <div className="data-table-container">
-            <table className="data-table" aria-label="My leave requests">
-              <thead>
-                <tr>
-                  <th>Leave type</th>
-                  <th>Date range</th>
-                  <th>Days</th>
-                  <th>Status</th>
-                  <th>Approver</th>
-                  <th>Submitted</th>
-                  <th className="table-action-column">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedRequests.map((requestRecord) => (
-                  <tr key={requestRecord.id} className="data-table-row">
-                    <td>{formatLeaveTypeLabel(requestRecord.leaveType)}</td>
-                    <td>
-                      <time
-                        dateTime={requestRecord.startDate}
-                        title={formatDateTimeTooltip(requestRecord.startDate)}
-                      >
-                        {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
-                      </time>
-                    </td>
-                    <td className="numeric">{formatDays(requestRecord.totalDays)}</td>
-                    <td>
-                      <StatusBadge tone={toneForRequestStatus(requestRecord.status)}>
-                        {formatLeaveStatus(requestRecord.status)}
-                      </StatusBadge>
-                    </td>
-                    <td>{requestRecord.approverName ?? "--"}</td>
-                    <td>
-                      <time
-                        dateTime={requestRecord.createdAt}
-                        title={formatDateTimeTooltip(requestRecord.createdAt)}
-                      >
-                        {formatRelativeTime(requestRecord.createdAt)}
-                      </time>
-                    </td>
-                    <td className="table-row-action-cell">
-                      <div className="timeoff-row-actions">
-                        {requestRecord.status === "pending" ? (
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => handleCancelRequest(requestRecord)}
-                            disabled={isCancellingRequestId === requestRecord.id}
-                          >
-                            {isCancellingRequestId === requestRecord.id ? "Cancelling..." : "Cancel"}
-                          </button>
-                        ) : (
-                          <span className="settings-card-description">No actions</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable<LeaveRequestRecord>
+          rows={sortedRequests}
+          columns={leaveRequestColumns}
+          rowKey={(row) => row.id}
+          ariaLabel="My leave requests"
+          actions={leaveRequestActions}
+          emptyState={{
+            title: "No leave requests yet",
+            description: "Submit your first leave request to start tracking approvals here.",
+            ctaLabel: "Request time off",
+            ctaHref: "/time-off"
+          }}
+        />
       </section>
 
       <section className="settings-card" aria-label="Monthly mini calendar">

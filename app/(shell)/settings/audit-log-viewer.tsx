@@ -1,10 +1,11 @@
 "use client";
 
-import { Fragment, type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
+import { DataTable, type DataTableColumn, type DataTableAction } from "../../../components/shared/data-table";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
-import { AUDIT_LOG_ACTIONS, type AuditLogAction, type AuditLogsResponse } from "../../../types/settings";
+import { AUDIT_LOG_ACTIONS, type AuditLogAction, type AuditLogEntry, type AuditLogsResponse } from "../../../types/settings";
 
 type AuditFilters = {
   dateFrom: string;
@@ -255,6 +256,35 @@ export function AuditLogViewer() {
     }));
   };
 
+  const auditColumns: DataTableColumn<AuditLogEntry>[] = [
+    {
+      key: "timestamp",
+      label: "Timestamp",
+      render: (entry) => (
+        <time title={new Date(entry.timestamp).toLocaleString()} dateTime={entry.timestamp}>
+          {formatRelativeTime(entry.timestamp)}
+        </time>
+      )
+    },
+    { key: "actor", label: "Actor", render: (entry) => entry.actorName },
+    {
+      key: "action",
+      label: "Action",
+      render: (entry) => (
+        <StatusBadge tone={badgeToneForAction(entry.action)}>{entry.action}</StatusBadge>
+      )
+    },
+    { key: "table", label: "Table", render: (entry) => entry.tableName },
+    { key: "record", label: "Record", className: "numeric", render: (entry) => entry.recordId ?? "--" }
+  ];
+
+  const auditActions: DataTableAction<AuditLogEntry>[] = [
+    {
+      label: (entry) => (expandedRows[entry.id] ? "Hide diff" : "Show diff"),
+      onClick: (entry) => toggleRow(entry.id)
+    }
+  ];
+
   return (
     <section className="settings-card" aria-label="Audit log viewer">
       <h2 className="section-title">Audit Log</h2>
@@ -411,99 +441,47 @@ export function AuditLogViewer() {
 
       {!isLoading && !errorMessage && responseData && responseData.entries.length > 0 ? (
         <>
-          <div className="data-table-container">
-            <table className="data-table" aria-label="Audit log table">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Actor</th>
-                  <th>Action</th>
-                  <th>Table</th>
-                  <th>Record</th>
-                  <th className="table-action-column">Diff</th>
-                </tr>
-              </thead>
-              <tbody>
-                {responseData.entries.map((entry) => {
-                  const isExpanded = Boolean(expandedRows[entry.id]);
-                  const diffLines = diffValues(entry.oldValue, entry.newValue);
-
-                  return (
-                    <Fragment key={entry.id}>
-                      <tr className="data-table-row">
-                        <td>
-                          <time
-                            title={new Date(entry.timestamp).toLocaleString()}
-                            dateTime={entry.timestamp}
-                          >
-                            {formatRelativeTime(entry.timestamp)}
-                          </time>
-                        </td>
-                        <td>{entry.actorName}</td>
-                        <td>
-                          <StatusBadge tone={badgeToneForAction(entry.action)}>
-                            {entry.action}
-                          </StatusBadge>
-                        </td>
-                        <td>{entry.tableName}</td>
-                        <td className="numeric">{entry.recordId ?? "--"}</td>
-                        <td className="table-row-action-cell">
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => toggleRow(entry.id)}
-                          >
-                            {isExpanded ? "Hide" : "Show"} diff
-                          </button>
-                        </td>
-                      </tr>
-
-                      {isExpanded ? (
-                        <tr className="audit-diff-row">
-                          <td colSpan={6}>
-                            {diffLines.length > 0 ? (
-                              <ul className="audit-diff-list">
-                                {diffLines.map((line) => {
-                                  if (line.kind === "added") {
-                                    return (
-                                      <li key={`${entry.id}-${line.key}-added`} className="audit-diff-added">
-                                        + {line.key}: {line.nextValue}
-                                      </li>
-                                    );
-                                  }
-
-                                  if (line.kind === "removed") {
-                                    return (
-                                      <li key={`${entry.id}-${line.key}-removed`} className="audit-diff-removed">
-                                        - {line.key}: {line.previousValue}
-                                      </li>
-                                    );
-                                  }
-
-                                  return (
-                                    <li key={`${entry.id}-${line.key}-changed`} className="audit-diff-changed">
-                                      <span className="audit-diff-removed">
-                                        - {line.key}: {line.previousValue}
-                                      </span>
-                                      <span className="audit-diff-added">
-                                        + {line.key}: {line.nextValue}
-                                      </span>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            ) : (
-                              <p className="audit-diff-empty">No value changes were recorded for this event.</p>
-                            )}
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<AuditLogEntry>
+            rows={responseData.entries}
+            columns={auditColumns}
+            rowKey={(entry) => entry.id}
+            ariaLabel="Audit log table"
+            actions={auditActions}
+            isRowExpanded={(entry) => Boolean(expandedRows[entry.id])}
+            renderExpandedRow={(entry) => {
+              const diffLines = diffValues(entry.oldValue, entry.newValue);
+              if (diffLines.length === 0) {
+                return <p className="audit-diff-empty">No value changes were recorded for this event.</p>;
+              }
+              return (
+                <ul className="audit-diff-list">
+                  {diffLines.map((line) => {
+                    if (line.kind === "added") {
+                      return (
+                        <li key={`${entry.id}-${line.key}-added`} className="audit-diff-added">
+                          + {line.key}: {line.nextValue}
+                        </li>
+                      );
+                    }
+                    if (line.kind === "removed") {
+                      return (
+                        <li key={`${entry.id}-${line.key}-removed`} className="audit-diff-removed">
+                          - {line.key}: {line.previousValue}
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={`${entry.id}-${line.key}-changed`} className="audit-diff-changed">
+                        <span className="audit-diff-removed">- {line.key}: {line.previousValue}</span>
+                        <span className="audit-diff-added">+ {line.key}: {line.nextValue}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              );
+            }}
+            expandedRowClassName="audit-diff-row"
+          />
 
           <footer className="audit-pagination">
             <p className="audit-pagination-summary numeric">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { DataTable, type DataTableColumn, type DataTableAction } from "../../../components/shared/data-table";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
@@ -11,7 +12,8 @@ import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime
 import { toSentenceCase } from "../../../lib/format-labels";
 import type {
   LearningAssignmentRecord,
-  LearningAssignmentStatus
+  LearningAssignmentStatus,
+  LearningCourseRecord
 } from "../../../types/learning";
 
 type SortDirection = "asc" | "desc";
@@ -89,6 +91,72 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
 
   const isLoading = assignmentsQuery.isLoading || coursesQuery.isLoading;
   const errorMessage = assignmentsQuery.errorMessage ?? coursesQuery.errorMessage;
+
+  const assignmentColumns: DataTableColumn<LearningAssignmentRecord>[] = [
+    { key: "course", label: "Course", render: (row) => row.courseTitle },
+    { key: "category", label: "Category", render: (row) => row.courseCategory ?? "General" },
+    {
+      key: "dueDate",
+      label: "Due date",
+      sortable: true,
+      render: (row) =>
+        row.dueDate ? (
+          <span title={formatDateTimeTooltip(`${row.dueDate}T00:00:00.000Z`)}>
+            {formatRelativeTime(`${row.dueDate}T00:00:00.000Z`)}
+          </span>
+        ) : (
+          "No due date"
+        )
+    },
+    { key: "progress", label: "Progress", className: "numeric", render: (row) => `${row.progressPct}%` },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <StatusBadge tone={toneForAssignmentStatus(row.status)}>
+          {toSentenceCase(row.status)}
+        </StatusBadge>
+      )
+    }
+  ];
+
+  const assignmentActions: DataTableAction<LearningAssignmentRecord>[] = [
+    { label: "Open", href: (row) => `/learning/courses/${row.courseId}` },
+    {
+      label: "Certificate",
+      href: "/learning?tab=certificates",
+      hidden: (row) => row.status !== "completed"
+    }
+  ];
+
+  const catalogColumns: DataTableColumn<LearningCourseRecord>[] = [
+    { key: "title", label: "Title", render: (row) => row.title },
+    { key: "category", label: "Category", render: (row) => row.category ?? "General" },
+    {
+      key: "type",
+      label: "Type",
+      render: (row) => <StatusBadge tone="info">{toSentenceCase(row.contentType)}</StatusBadge>
+    },
+    {
+      key: "duration",
+      label: "Duration",
+      className: "numeric",
+      render: (row) => (row.durationMinutes === null ? "--" : `${row.durationMinutes}m`)
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (row) => (
+        <StatusBadge tone={row.isMandatory ? "warning" : "draft"}>
+          {row.isMandatory ? "Mandatory" : "Optional"}
+        </StatusBadge>
+      )
+    }
+  ];
+
+  const catalogActions: DataTableAction<LearningCourseRecord>[] = [
+    { label: "Start", href: (row) => `/learning/courses/${row.id}` }
+  ];
 
   return (
     <>
@@ -174,77 +242,25 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
               </div>
             </header>
 
-            {sortedAssignments.length === 0 ? (
-              <EmptyState
-                title="No assignments yet"
-                description="Your assigned training courses will appear here as soon as they are published to you."
-                ctaLabel="Browse catalog"
-                ctaHref="/learning"
-              />
-            ) : (
-              <div className="data-table-container">
-                <table className="data-table" aria-label="Learning assignments table">
-                  <thead>
-                    <tr>
-                      <th>Course</th>
-                      <th>Category</th>
-                      <th>
-                        <button
-                          type="button"
-                          className="table-sort-trigger"
-                          onClick={() =>
-                            setSortDirection((currentValue) =>
-                              currentValue === "asc" ? "desc" : "asc"
-                            )
-                          }
-                        >
-                          Due date
-                          <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
-                        </button>
-                      </th>
-                      <th>Progress</th>
-                      <th>Status</th>
-                      <th className="table-action-column">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedAssignments.map((assignment) => (
-                      <tr key={assignment.id} className="data-table-row">
-                        <td>{assignment.courseTitle}</td>
-                        <td>{assignment.courseCategory ?? "General"}</td>
-                        <td>
-                          {assignment.dueDate ? (
-                            <span title={formatDateTimeTooltip(`${assignment.dueDate}T00:00:00.000Z`)}>
-                              {formatRelativeTime(`${assignment.dueDate}T00:00:00.000Z`)}
-                            </span>
-                          ) : (
-                            "No due date"
-                          )}
-                        </td>
-                        <td className="numeric">{assignment.progressPct}%</td>
-                        <td>
-                          <StatusBadge tone={toneForAssignmentStatus(assignment.status)}>
-                            {toSentenceCase(assignment.status)}
-                          </StatusBadge>
-                        </td>
-                        <td className="table-row-action-cell">
-                          <div className="timeatt-row-actions">
-                            <Link href={`/learning/courses/${assignment.courseId}`} className="table-row-action">
-                              Open
-                            </Link>
-                            {assignment.status === "completed" ? (
-                              <Link href="/learning?tab=certificates" className="table-row-action">
-                                Certificate
-                              </Link>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <DataTable<LearningAssignmentRecord>
+              rows={sortedAssignments}
+              columns={assignmentColumns}
+              rowKey={(row) => row.id}
+              ariaLabel="Learning assignments table"
+              actions={assignmentActions}
+              sort={{ key: "dueDate", direction: sortDirection }}
+              onSort={() =>
+                setSortDirection((currentValue) =>
+                  currentValue === "asc" ? "desc" : "asc"
+                )
+              }
+              emptyState={{
+                title: "No assignments yet",
+                description: "Your assigned training courses will appear here as soon as they are published to you.",
+                ctaLabel: "Browse catalog",
+                ctaHref: "/learning"
+              }}
+            />
           </article>
 
           <article className="compensation-section">
@@ -257,55 +273,19 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
               </div>
             </header>
 
-            {sortedCourses.length === 0 ? (
-              <EmptyState
-                title="No published courses"
-                description="Course catalog is empty right now. Check back after HR publishes content."
-                ctaLabel="Refresh catalog"
-                ctaHref="/learning"
-              />
-            ) : (
-              <div className="data-table-container">
-                <table className="data-table" aria-label="Learning catalog table">
-                  <thead>
-                    <tr>
-                      <th>Title</th>
-                      <th>Category</th>
-                      <th>Type</th>
-                      <th>Duration</th>
-                      <th>Status</th>
-                      <th className="table-action-column">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedCourses.map((course) => (
-                      <tr key={course.id} className="data-table-row">
-                        <td>{course.title}</td>
-                        <td>{course.category ?? "General"}</td>
-                        <td>
-                          <StatusBadge tone="info">{toSentenceCase(course.contentType)}</StatusBadge>
-                        </td>
-                        <td className="numeric">
-                          {course.durationMinutes === null ? "--" : `${course.durationMinutes}m`}
-                        </td>
-                        <td>
-                          <StatusBadge tone={course.isMandatory ? "warning" : "draft"}>
-                            {course.isMandatory ? "Mandatory" : "Optional"}
-                          </StatusBadge>
-                        </td>
-                        <td className="table-row-action-cell">
-                          <div className="timeatt-row-actions">
-                            <Link href={`/learning/courses/${course.id}`} className="table-row-action">
-                              Start
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <DataTable<LearningCourseRecord>
+              rows={sortedCourses}
+              columns={catalogColumns}
+              rowKey={(row) => row.id}
+              ariaLabel="Learning catalog table"
+              actions={catalogActions}
+              emptyState={{
+                title: "No published courses",
+                description: "Course catalog is empty right now. Check back after HR publishes content.",
+                ctaLabel: "Refresh catalog",
+                ctaHref: "/learning"
+              }}
+            />
           </article>
         </section>
       ) : null}

@@ -2,6 +2,7 @@
 
 import { type FormEvent, useMemo, useState, useEffect } from "react";
 
+import { DataTable, type DataTableColumn, type DataTableAction } from "../../../components/shared/data-table";
 import { DocumentUploadPanel } from "../../../components/shared/document-upload-panel";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -127,16 +128,6 @@ function sortByExpiry(
   });
 }
 
-function DocumentsTableSkeleton() {
-  return (
-    <div className="table-skeleton" aria-hidden="true">
-      <div className="table-skeleton-header" />
-      {Array.from({ length: 7 }, (_, index) => (
-        <div key={`documents-row-skeleton-${index}`} className="table-skeleton-row" />
-      ))}
-    </div>
-  );
-}
 
 export function DocumentsClient({ currentUserId, canManageDocuments }: DocumentsClientProps) {
   const {
@@ -267,6 +258,99 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
     );
   };
 
+  const documentsColumns: DataTableColumn<DocumentRecord>[] = [
+    {
+      key: "title",
+      label: "Document",
+      render: (doc) => (
+        <div className="documents-cell-copy">
+          <p className="documents-cell-title">{doc.title}</p>
+          <p className="documents-cell-description">{doc.description || "No description"}</p>
+        </div>
+      )
+    },
+    {
+      key: "category",
+      label: "Category",
+      render: (doc) => getDocumentCategoryLabel(doc.category)
+    },
+    {
+      key: "owner",
+      label: "Owner",
+      render: (doc) => doc.ownerName
+    },
+    {
+      key: "country",
+      label: "Country",
+      render: (doc) => (
+        <span className="country-chip">
+          <span>{countryFlagFromCode(doc.countryCode)}</span>
+          <span>{countryNameFromCode(doc.countryCode)}</span>
+        </span>
+      )
+    },
+    {
+      key: "expiry",
+      label: "Expiry",
+      sortable: true,
+      render: (doc) =>
+        doc.expiryDate ? (
+          <time dateTime={doc.expiryDate} title={formatDateTimeTooltip(doc.expiryDate)}>
+            {formatRelativeTime(doc.expiryDate)}
+          </time>
+        ) : (
+          "--"
+        )
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (doc) => {
+        const status = getExpiryStatus(doc.expiryDate);
+        return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>;
+      }
+    },
+    {
+      key: "size",
+      label: "Size",
+      className: "numeric",
+      render: (doc) => formatFileSize(doc.sizeBytes)
+    },
+    {
+      key: "updated",
+      label: "Updated",
+      render: (doc) => (
+        <time dateTime={doc.updatedAt} title={formatDateTimeTooltip(doc.updatedAt)}>
+          {formatRelativeTime(doc.updatedAt)}
+        </time>
+      )
+    }
+  ];
+
+  const documentActions: DataTableAction<DocumentRecord>[] = [
+    {
+      label: (doc) => (isOpeningFileById[doc.id] ? "Opening..." : "Open"),
+      onClick: (doc) => handleOpenFile(doc.id),
+      disabled: (doc) => Boolean(isOpeningFileById[doc.id])
+    },
+    {
+      label: "New version",
+      onClick: (doc) => openVersionPanel(doc),
+      hidden: (doc) => !(canManageDocuments || doc.ownerUserId === currentUserId)
+    },
+    {
+      label: "Request signature",
+      onClick: (doc) => {
+        setSigReqTarget(doc);
+        setSigReqTitle(doc.title);
+        setSigReqMessage("");
+        setSigReqSignerIds([]);
+        setSigReqError(null);
+      },
+      hidden: () => !canManageDocuments
+    }
+  ];
+
   const handleOpenFile = async (documentId: string) => {
     setIsOpeningFileById((currentState) => ({
       ...currentState,
@@ -324,8 +408,6 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         ))}
       </section>
 
-      {isLoading ? <DocumentsTableSkeleton /> : null}
-
       {!isLoading && errorMessage ? (
         <EmptyState
           title="Documents are unavailable"
@@ -335,130 +417,27 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         />
       ) : null}
 
-      {!isLoading && !errorMessage && filteredDocuments.length === 0 ? (
-        <section className="error-state">
-          <EmptyState
-            title="No documents match this filter"
-            description="Upload a document or select a different tab to view more records."
-            ctaLabel={canManageDocuments ? "Upload document" : "Go to dashboard"}
-            {...(canManageDocuments
+      {!isLoading && errorMessage ? null : (
+        <DataTable<DocumentRecord>
+          rows={isLoading || errorMessage ? [] : filteredDocuments}
+          columns={documentsColumns}
+          rowKey={(doc) => doc.id}
+          ariaLabel="Documents table"
+          actions={documentActions}
+          sort={{ key: "expiry", direction: expirySortDirection }}
+          onSort={toggleSortDirection}
+          isLoading={isLoading}
+          skeletonRows={7}
+          emptyState={{
+            title: "No documents match this filter",
+            description: "Upload a document or select a different tab to view more records.",
+            ctaLabel: canManageDocuments ? "Upload document" : "Go to dashboard",
+            ...(canManageDocuments
               ? { onCtaClick: openCreatePanel }
-              : { ctaHref: "/dashboard" })}
-          />
-        </section>
-      ) : null}
-
-      {!isLoading && !errorMessage && filteredDocuments.length > 0 ? (
-        <div className="data-table-container">
-          <table className="data-table" aria-label="Documents table">
-            <thead>
-              <tr>
-                <th>Document</th>
-                <th>Category</th>
-                <th>Owner</th>
-                <th>Country</th>
-                <th>
-                  <button type="button" className="table-sort-trigger" onClick={toggleSortDirection}>
-                    Expiry {expirySortDirection === "asc" ? "↑" : "↓"}
-                  </button>
-                </th>
-                <th>Status</th>
-                <th>Size</th>
-                <th>Updated</th>
-                <th className="table-action-column">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDocuments.map((document) => {
-                const expiryStatus = getExpiryStatus(document.expiryDate);
-                const canUploadVersion =
-                  canManageDocuments || document.ownerUserId === currentUserId;
-
-                return (
-                  <tr key={document.id} className="data-table-row">
-                    <td>
-                      <div className="documents-cell-copy">
-                        <p className="documents-cell-title">{document.title}</p>
-                        <p className="documents-cell-description">
-                          {document.description || "No description"}
-                        </p>
-                      </div>
-                    </td>
-                    <td>{getDocumentCategoryLabel(document.category)}</td>
-                    <td>{document.ownerName}</td>
-                    <td>
-                      <span className="country-chip">
-                        <span>{countryFlagFromCode(document.countryCode)}</span>
-                        <span>{countryNameFromCode(document.countryCode)}</span>
-                      </span>
-                    </td>
-                    <td>
-                      {document.expiryDate ? (
-                        <time
-                          dateTime={document.expiryDate}
-                          title={formatDateTimeTooltip(document.expiryDate)}
-                        >
-                          {formatRelativeTime(document.expiryDate)}
-                        </time>
-                      ) : (
-                        "--"
-                      )}
-                    </td>
-                    <td>
-                      <StatusBadge tone={expiryStatus.tone}>{expiryStatus.label}</StatusBadge>
-                    </td>
-                    <td className="numeric">{formatFileSize(document.sizeBytes)}</td>
-                    <td>
-                      <time
-                        dateTime={document.updatedAt}
-                        title={formatDateTimeTooltip(document.updatedAt)}
-                      >
-                        {formatRelativeTime(document.updatedAt)}
-                      </time>
-                    </td>
-                    <td className="table-row-action-cell">
-                      <div className="documents-row-actions">
-                        <button
-                          type="button"
-                          className="table-row-action"
-                          onClick={() => handleOpenFile(document.id)}
-                          disabled={Boolean(isOpeningFileById[document.id])}
-                        >
-                          {isOpeningFileById[document.id] ? "Opening..." : "Open"}
-                        </button>
-                        {canUploadVersion ? (
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => openVersionPanel(document)}
-                          >
-                            New version
-                          </button>
-                        ) : null}
-                        {canManageDocuments ? (
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => {
-                              setSigReqTarget(document);
-                              setSigReqTitle(document.title);
-                              setSigReqMessage("");
-                              setSigReqSignerIds([]);
-                              setSigReqError(null);
-                            }}
-                          >
-                            Request signature
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+              : { ctaHref: "/dashboard" })
+          }}
+        />
+      )}
 
       {isPanelOpen ? (
         <DocumentUploadPanel
