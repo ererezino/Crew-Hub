@@ -2,8 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
-import { createBulkNotifications, createNotification } from "../../../../../../../lib/notifications/service";
-import { sendPayslipReadyEmail } from "../../../../../../../lib/notifications/email";
+import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { evaluatePayrollApprovalAction } from "../../../../../../../lib/payroll/approval-policy";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import type { UserRole } from "../../../../../../../lib/navigation";
@@ -531,21 +530,11 @@ export async function POST(
         await createBulkNotifications({
           orgId: profile.org_id,
           userIds: employeeIds,
-          type: "payslip_ready",
-          title: "Payslip ready",
-          body: `Your payslip for ${payPeriodLabel} is ready.`,
+          type: "payroll_approved",
+          title: "Payroll approved",
+          body: `Payroll for ${payPeriodLabel} is approved and payment processing will begin shortly.`,
           link: "/me/pay?tab=payslips"
         });
-
-        void Promise.all(
-          employeeIds.map((employeeId) =>
-            sendPayslipReadyEmail({
-              orgId: profile.org_id,
-              userId: employeeId,
-              payPeriod: payPeriodLabel
-            })
-          )
-        );
       }
     }
 
