@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
+import { sendReviewAcknowledgedEmail } from "../../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../../types/auth";
@@ -242,6 +243,13 @@ export async function POST(
     title: "Review acknowledged",
     body: `${employeeProfile?.full_name ?? "An employee"} has acknowledged their review.`,
     link: "/performance"
+  });
+
+  void sendReviewAcknowledgedEmail({
+    orgId,
+    userId: parsedUpdated.data.reviewer_id,
+    cycleName: cycle.name,
+    employeeName: employeeProfile?.full_name ?? "An employee"
   });
 
   return jsonResponse<AcknowledgeReviewResponseData>(200, {
