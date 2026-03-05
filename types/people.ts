@@ -40,12 +40,14 @@ export type PersonRecord = {
   timezone: string | null;
   phone: string | null;
   startDate: string | null;
+  dateOfBirth: string | null;
   managerId: string | null;
   managerName: string | null;
   employmentType: EmploymentType;
   payrollMode: PayrollMode;
   primaryCurrency: string;
   status: ProfileStatus;
+  noticePeriodEndDate: string | null;
   bio: string | null;
   favoriteMusic: string | null;
   favoriteBooks: string | null;
@@ -97,6 +99,7 @@ export type PeopleUpdatePayload = {
   roles?: AppRole[];
   department?: string | null;
   title?: string | null;
+  dateOfBirth?: string | null;
   managerId?: string | null;
   status?: ProfileStatus;
   accessOverrides?: PeopleAccessOverrides;

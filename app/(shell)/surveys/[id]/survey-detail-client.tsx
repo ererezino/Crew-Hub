@@ -6,6 +6,7 @@ import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useSurveyDetail } from "../../../../hooks/use-surveys";
+import { toSentenceCase } from "../../../../lib/format-labels";
 import type {
   SurveyAnswerValue,
   SurveyAnswers,
@@ -16,10 +17,10 @@ import type {
 function surveyDetailSkeleton() {
   return (
     <section className="timeoff-skeleton-layout" aria-hidden="true">
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 4 }, (_, index) => (
-          <div key={`survey-detail-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`survey-detail-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -191,7 +192,7 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
       {detailQuery.isLoading ? surveyDetailSkeleton() : null}
 
       {!detailQuery.isLoading && detailQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Survey is unavailable"
             description={detailQuery.errorMessage}
@@ -236,7 +237,7 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
                   </p>
                 </div>
                 <div className="announcement-item-status">
-                  <StatusBadge tone="info">{survey.type}</StatusBadge>
+                  <StatusBadge tone="info">{toSentenceCase(survey.type)}</StatusBadge>
                   <StatusBadge tone="pending">{survey.questions.length} questions</StatusBadge>
                 </div>
               </header>

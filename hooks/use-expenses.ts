@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   ExpenseApprovalStage,
   ExpenseApprovalsResponse,
@@ -32,6 +33,10 @@ type ExpenseApprovalsQuery = {
 
 type ExpenseReportsQuery = {
   month?: string;
+  country?: string;
+  department?: string;
+  status?: string;
+  category?: string;
 };
 
 function buildExpensesUrl(query: ExpensesQuery): string {
@@ -73,6 +78,22 @@ function buildReportsUrl(query: ExpenseReportsQuery): string {
     searchParams.set("month", query.month);
   }
 
+  if (query.country && query.country !== "all") {
+    searchParams.set("country", query.country);
+  }
+
+  if (query.department && query.department !== "all") {
+    searchParams.set("department", query.department);
+  }
+
+  if (query.status && query.status !== "all") {
+    searchParams.set("status", query.status);
+  }
+
+  if (query.category && query.category !== "all") {
+    searchParams.set("category", query.category);
+  }
+
   const queryString = searchParams.toString();
   return queryString.length > 0
     ? `/api/v1/expenses/reports?${queryString}`
@@ -102,10 +123,7 @@ export function useExpenses(query: ExpensesQuery = {}): UseFetchState<ExpensesLi
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as ExpensesListResponse;
 
@@ -169,10 +187,7 @@ export function useExpenseApprovals(
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as ExpenseApprovalsResponse;
 
@@ -222,12 +237,19 @@ export function useExpenseReports(
   query: ExpenseReportsQuery = {}
 ): UseFetchState<ExpenseReportsResponseData> {
   const month = query.month;
+  const country = query.country;
+  const department = query.department;
+  const status = query.status;
+  const category = query.category;
   const [data, setData] = useState<ExpenseReportsResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const endpoint = useMemo(() => buildReportsUrl({ month }), [month]);
+  const endpoint = useMemo(
+    () => buildReportsUrl({ month, country, department, status, category }),
+    [month, country, department, status, category]
+  );
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -237,10 +259,7 @@ export function useExpenseReports(
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as ExpenseReportsResponse;
 

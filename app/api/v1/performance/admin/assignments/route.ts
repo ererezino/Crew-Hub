@@ -169,7 +169,7 @@ export async function POST(request: Request) {
     const { data: rawExistingAssignments, error: existingAssignmentsError } = await supabase
       .from("review_assignments")
       .select(
-        "id, org_id, cycle_id, employee_id, reviewer_id, template_id, status, due_at, created_at, updated_at"
+        "id, org_id, cycle_id, employee_id, reviewer_id, template_id, status, due_at, shared_at, shared_by, acknowledged_at, created_at, updated_at"
       )
       .eq("org_id", orgId)
       .eq("cycle_id", payload.cycleId)
@@ -252,7 +252,7 @@ export async function POST(request: Request) {
         .from("review_assignments")
         .insert(rowsToInsert)
         .select(
-          "id, org_id, cycle_id, employee_id, reviewer_id, template_id, status, due_at, created_at, updated_at"
+          "id, org_id, cycle_id, employee_id, reviewer_id, template_id, status, due_at, shared_at, shared_by, acknowledged_at, created_at, updated_at"
         );
 
       if (insertError) {

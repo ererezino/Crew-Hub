@@ -6,6 +6,7 @@ import { AccessChecklist, type AccessChecklistItem } from "../../../../component
 import { InviteForm } from "../../../../components/admin/invite-form";
 import { UserListTable } from "../../../../components/admin/user-list-table";
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { usePeople } from "../../../../hooks/use-people";
@@ -371,10 +372,10 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
         description="Invite, configure, and manage employee accounts."
       />
 
-      <div className="settings-tabs" role="tablist" aria-label="Admin users tabs">
+      <div className="page-tabs" role="tablist" aria-label="Admin users tabs">
         <button
           type="button"
-          className={activeTab === "invite" ? "settings-tab settings-tab-active" : "settings-tab"}
+          className={activeTab === "invite" ? "page-tab page-tab-active" : "page-tab"}
           onClick={() => setActiveTab("invite")}
           role="tab"
           aria-selected={activeTab === "invite"}
@@ -383,7 +384,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
         </button>
         <button
           type="button"
-          className={activeTab === "users" ? "settings-tab settings-tab-active" : "settings-tab"}
+          className={activeTab === "users" ? "page-tab page-tab-active" : "page-tab"}
           onClick={() => setActiveTab("users")}
           role="tab"
           aria-selected={activeTab === "users"}
@@ -414,11 +415,10 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
             <p className="settings-card-description">Loading users...</p>
           </section>
         ) : errorMessage ? (
-          <EmptyState
+          <ErrorState
             title="Unable to load users"
-            description={errorMessage}
-            ctaLabel="Retry"
-            ctaHref="/admin/users"
+            message={errorMessage}
+            onRetry={refresh}
           />
         ) : (
           <UserListTable

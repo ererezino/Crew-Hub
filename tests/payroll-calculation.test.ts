@@ -61,7 +61,7 @@ const nigeriaRuleConfig = {
   nhfRate: 0.025,
   nsitfEmployeeRate: 0.01,
   nsitfEmployerRate: 0.01
-} as const;
+};
 
 describe("Payroll calculations", () => {
   beforeAll(async () => {

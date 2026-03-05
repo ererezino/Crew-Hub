@@ -1,6 +1,8 @@
 import "server-only";
 
 import { createSupabaseServiceRoleClient } from "../supabase/service-role";
+import { formatDateRangeHuman } from "../datetime";
+import { formatLeaveTypeLabel } from "../time-off";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const RESEND_FROM = "Crew Hub <no-reply@crew-hub.local>";
@@ -109,7 +111,7 @@ export async function sendLeaveStatusEmail({
     const lines = [
       `Hello ${recipient.fullName},`,
       "",
-      `Your ${leaveType} leave request (${startDate} to ${endDate}) is ${status}.`
+      `Your ${formatLeaveTypeLabel(leaveType)} request (${formatDateRangeHuman(startDate, endDate)}) is ${status}.`
     ];
 
     if (status === "rejected" && rejectionReason?.trim()) {
@@ -231,6 +233,152 @@ export async function sendSignatureRequestEmail({
     });
   } catch (error) {
     console.error("Unexpected signature request email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+export async function sendReviewCycleStartedEmail({
+  orgId,
+  userId,
+  cycleName,
+  selfReviewDeadline
+}: {
+  orgId: string;
+  userId: string;
+  cycleName: string;
+  selfReviewDeadline: string | null;
+}): Promise<void> {
+  try {
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+
+    if (!recipient) {
+      return;
+    }
+
+    const deadlineText = selfReviewDeadline
+      ? ` Your self-review is due by ${selfReviewDeadline}.`
+      : "";
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Crew Hub: ${cycleName} review has started`,
+      text: [
+        `Hello ${recipient.fullName},`,
+        "",
+        `Your ${cycleName} review has started.${deadlineText}`,
+        "",
+        "Open Crew Hub > Performance to get started."
+      ].join("\n")
+    });
+  } catch (error) {
+    console.error("Unexpected review cycle started email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+export async function sendReviewReminderEmail({
+  orgId,
+  userId,
+  cycleName,
+  deadline
+}: {
+  orgId: string;
+  userId: string;
+  cycleName: string;
+  deadline: string;
+}): Promise<void> {
+  try {
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+
+    if (!recipient) {
+      return;
+    }
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Crew Hub: Self-review due soon for ${cycleName}`,
+      text: [
+        `Hello ${recipient.fullName},`,
+        "",
+        `Your self-review for ${cycleName} is due in 2 days. Complete it before ${deadline}.`,
+        "",
+        "Open Crew Hub > Performance to submit your self-review."
+      ].join("\n")
+    });
+  } catch (error) {
+    console.error("Unexpected review reminder email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+export async function sendReviewSharedEmail({
+  orgId,
+  userId,
+  cycleName
+}: {
+  orgId: string;
+  userId: string;
+  cycleName: string;
+}): Promise<void> {
+  try {
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+
+    if (!recipient) {
+      return;
+    }
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Crew Hub: Your ${cycleName} review has been shared`,
+      text: [
+        `Hello ${recipient.fullName},`,
+        "",
+        `Your ${cycleName} review has been shared with you. Tap to read.`,
+        "",
+        "Open Crew Hub > Performance to view your review."
+      ].join("\n")
+    });
+  } catch (error) {
+    console.error("Unexpected review shared email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+export async function sendDocumentExpiryEmail({
+  orgId,
+  userId,
+  documentTitle,
+  expiryDate
+}: {
+  orgId: string;
+  userId: string;
+  documentTitle: string;
+  expiryDate: string;
+}): Promise<void> {
+  try {
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+
+    if (!recipient) {
+      return;
+    }
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Crew Hub: ${documentTitle} expires on ${expiryDate}`,
+      text: [
+        `Hello ${recipient.fullName},`,
+        "",
+        `"${documentTitle}" expires on ${expiryDate}. Please renew it.`,
+        "",
+        "Open Crew Hub > Documents to view and renew the document."
+      ].join("\n")
+    });
+  } catch (error) {
+    console.error("Unexpected document expiry email failure.", {
       error: error instanceof Error ? error.message : String(error)
     });
   }

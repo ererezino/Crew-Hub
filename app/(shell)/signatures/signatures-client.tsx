@@ -1,6 +1,15 @@
 "use client";
 
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -9,6 +18,7 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDocuments } from "../../../hooks/use-documents";
 import { useSignatures } from "../../../hooks/use-signatures";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { toSentenceCase } from "../../../lib/format-labels";
 import type {
   CreateSignatureRequestResponse,
   SignSignatureResponse,
@@ -22,7 +32,7 @@ type SignaturesClientProps = {
   canManageSignatures: boolean;
 };
 
-type SignatureTab = "all" | "pending_action" | "completed";
+type SignatureTab = "pending_action" | "sent_by_me" | "completed";
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
 
@@ -53,8 +63,8 @@ type ToastMessage = {
 };
 
 const tabs: Array<{ id: SignatureTab; label: string }> = [
-  { id: "all", label: "All Requests" },
-  { id: "pending_action", label: "Needs My Signature" },
+  { id: "pending_action", label: "Needs my signature" },
+  { id: "sent_by_me", label: "Sent by me" },
   { id: "completed", label: "Completed" }
 ];
 
@@ -75,10 +85,10 @@ function createToastId(): string {
 
 function SignaturesTableSkeleton() {
   return (
-    <div className="documents-table-skeleton" aria-hidden="true">
-      <div className="documents-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 6 }, (_, index) => (
-        <div key={`signatures-row-skeleton-${index}`} className="documents-table-skeleton-row" />
+        <div key={`signatures-row-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -149,7 +159,7 @@ export function SignaturesClient({
     scope: "all"
   });
 
-  const [activeTab, setActiveTab] = useState<SignatureTab>("all");
+  const [activeTab, setActiveTab] = useState<SignatureTab>("pending_action");
   const [createdSortDirection, setCreatedSortDirection] = useState<SortDirection>("desc");
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [createValues, setCreateValues] = useState<CreateFormValues>(INITIAL_FORM_VALUES);
@@ -161,6 +171,16 @@ export function SignaturesClient({
   const [isOpeningByRequestId, setIsOpeningByRequestId] = useState<Record<string, boolean>>({});
   const [isSigningByRequestId, setIsSigningByRequestId] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Signing panel state
+  const [signingRequest, setSigningRequest] = useState<SignatureRequestRecord | null>(null);
+  const [signatureMode, setSignatureMode] = useState<"draw" | "type">("draw");
+  const [typedSignature, setTypedSignature] = useState("");
+  const [signatureConfirmed, setSignatureConfirmed] = useState(false);
+  const [hasCanvasStrokes, setHasCanvasStrokes] = useState(false);
+  const [isSubmittingSignature, setIsSubmittingSignature] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
 
   useEffect(() => {
     if (!canManageSignatures) {
@@ -236,14 +256,15 @@ export function SignaturesClient({
 
   const visibleRequests = useMemo(() => {
     const filteredRequests = signatures.requests.filter((request) => {
-      if (activeTab === "all") {
-        return true;
+      if (activeTab === "sent_by_me") {
+        return request.createdBy === currentUserId;
       }
 
       if (activeTab === "completed") {
         return request.status === "completed";
       }
 
+      // pending_action — requests needing my signature
       return (
         request.isCurrentUserSigner &&
         (request.currentUserSignerStatus === "pending" ||
@@ -320,38 +341,139 @@ export function SignaturesClient({
     }
   };
 
-  const handleSignRequest = async (requestId: string) => {
-    setIsSigningByRequestId((currentState) => ({
-      ...currentState,
-      [requestId]: true
-    }));
+  const openSigningPanel = (request: SignatureRequestRecord) => {
+    setSigningRequest(request);
+    setSignatureMode("draw");
+    setTypedSignature("");
+    setSignatureConfirmed(false);
+    setHasCanvasStrokes(false);
+    setIsSubmittingSignature(false);
+  };
+
+  const closeSigningPanel = () => {
+    setSigningRequest(null);
+  };
+
+  // Canvas drawing functions
+  const getCanvasCoords = useCallback(
+    (event: ReactMouseEvent<HTMLCanvasElement> | ReactTouchEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      if ("touches" in event) {
+        const touch = event.touches[0] ?? event.changedTouches[0];
+        return {
+          x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+          y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+        };
+      }
+      return {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    },
+    []
+  );
+
+  const startDrawing = useCallback(
+    (event: ReactMouseEvent<HTMLCanvasElement> | ReactTouchEvent<HTMLCanvasElement>) => {
+      event.preventDefault();
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!ctx) return;
+      isDrawingRef.current = true;
+      const { x, y } = getCanvasCoords(event);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    },
+    [getCanvasCoords]
+  );
+
+  const draw = useCallback(
+    (event: ReactMouseEvent<HTMLCanvasElement> | ReactTouchEvent<HTMLCanvasElement>) => {
+      event.preventDefault();
+      if (!isDrawingRef.current) return;
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!ctx) return;
+      const { x, y } = getCanvasCoords(event);
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#1a1a2e";
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      setHasCanvasStrokes(true);
+    },
+    [getCanvasCoords]
+  );
+
+  const stopDrawing = useCallback(() => {
+    isDrawingRef.current = false;
+  }, []);
+
+  const clearCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx || !canvas) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasCanvasStrokes(false);
+  }, []);
+
+  // Initialize canvas when signing panel opens in draw mode
+  useEffect(() => {
+    if (signingRequest && signatureMode === "draw") {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          canvas.width = 400;
+          canvas.height = 150;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    }
+  }, [signingRequest, signatureMode]);
+
+  const canSubmitSignature =
+    signatureConfirmed &&
+    (signatureMode === "draw" ? hasCanvasStrokes : typedSignature.trim().length > 0);
+
+  const handleSubmitSignature = async () => {
+    if (!signingRequest || !canSubmitSignature) return;
+
+    setIsSubmittingSignature(true);
+
+    let signatureText: string;
+
+    if (signatureMode === "type") {
+      signatureText = typedSignature.trim();
+    } else {
+      const canvas = canvasRef.current;
+      signatureText = canvas ? canvas.toDataURL("image/png") : "";
+    }
 
     try {
-      const response = await fetch(`/api/v1/signatures/${requestId}/sign`, {
+      const response = await fetch(`/api/v1/signatures/${signingRequest.id}/sign`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({})
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signatureText })
       });
 
       const payload = (await response.json()) as SignSignatureResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to sign request.");
+        showToast("error", payload.error?.message ?? "Unable to submit signature.");
         return;
       }
 
       showToast("success", "Signature recorded.");
+      closeSigningPanel();
       signatures.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to sign request.");
+      showToast("error", error instanceof Error ? error.message : "Unable to submit signature.");
     } finally {
-      setIsSigningByRequestId((currentState) => {
-        const nextState = { ...currentState };
-        delete nextState[requestId];
-        return nextState;
-      });
+      setIsSubmittingSignature(false);
     }
   };
 
@@ -419,12 +541,12 @@ export function SignaturesClient({
         }
       />
 
-      <section className="documents-tabs" aria-label="Signature request filters">
+      <section className="page-tabs" aria-label="Signature request filters">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={activeTab === tab.id ? "documents-tab documents-tab-active" : "documents-tab"}
+            className={activeTab === tab.id ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
@@ -444,7 +566,7 @@ export function SignaturesClient({
       ) : null}
 
       {!signatures.isLoading && !signatures.errorMessage && visibleRequests.length === 0 ? (
-        <section className="documents-empty-state">
+        <section className="error-state">
           <EmptyState
             title="No signature requests yet"
             description={
@@ -565,10 +687,9 @@ export function SignaturesClient({
                           <button
                             type="button"
                             className="table-row-action"
-                            onClick={() => void handleSignRequest(requestRow.id)}
-                            disabled={Boolean(isSigningByRequestId[requestRow.id])}
+                            onClick={() => openSigningPanel(requestRow)}
                           >
-                            {isSigningByRequestId[requestRow.id] ? "Signing..." : "Sign"}
+                            Sign
                           </button>
                         ) : null}
                       </div>
@@ -709,6 +830,159 @@ export function SignaturesClient({
               </button>
             </div>
           </form>
+        </SlidePanel>
+      ) : null}
+
+      {/* Signing Panel */}
+      {signingRequest ? (
+        <SlidePanel
+          isOpen={Boolean(signingRequest)}
+          title={`Sign: ${signingRequest.title}`}
+          description={signingRequest.message || `Requested by ${signingRequest.createdByName}`}
+          onClose={closeSigningPanel}
+        >
+          <div className="slide-panel-form-wrapper">
+            {/* Document info */}
+            <div className="form-field">
+              <span className="form-label">Document</span>
+              <p className="settings-card-description">{signingRequest.documentTitle}</p>
+              <button
+                type="button"
+                className="button button-secondary button-sm"
+                style={{ marginTop: "var(--space-2)" }}
+                onClick={() => void handleOpenDocument(signingRequest)}
+                disabled={Boolean(isOpeningByRequestId[signingRequest.id])}
+              >
+                {isOpeningByRequestId[signingRequest.id] ? "Opening..." : "View document"}
+              </button>
+            </div>
+
+            {/* Signer status */}
+            <div className="form-field">
+              <span className="form-label">Signers</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                {signingRequest.signers.map((signer) => (
+                  <div
+                    key={signer.id}
+                    style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}
+                  >
+                    <span className="settings-card-description">{signer.signerName}</span>
+                    <StatusBadge
+                      tone={signer.status === "signed" ? "success" : "pending"}
+                    >
+                      {toSentenceCase(signer.status)}
+                    </StatusBadge>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Signature mode toggle */}
+            <div className="signature-toggle">
+              <button
+                type="button"
+                className={
+                  signatureMode === "draw"
+                    ? "signature-toggle-button signature-toggle-button-active"
+                    : "signature-toggle-button"
+                }
+                onClick={() => setSignatureMode("draw")}
+              >
+                Draw signature
+              </button>
+              <button
+                type="button"
+                className={
+                  signatureMode === "type"
+                    ? "signature-toggle-button signature-toggle-button-active"
+                    : "signature-toggle-button"
+                }
+                onClick={() => setSignatureMode("type")}
+              >
+                Type signature
+              </button>
+            </div>
+
+            {/* Draw mode */}
+            {signatureMode === "draw" ? (
+              <>
+                <p className="form-label">Draw your signature</p>
+                <div className="signature-canvas-container">
+                  <canvas
+                    ref={canvasRef}
+                    className="signature-canvas"
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={startDrawing}
+                    onTouchMove={draw}
+                    onTouchEnd={stopDrawing}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="button button-ghost button-sm"
+                  onClick={clearCanvas}
+                >
+                  Clear
+                </button>
+              </>
+            ) : (
+              <>
+                <label className="form-field" htmlFor="typed-signature-input">
+                  <span className="form-label">Type your full name as your signature</span>
+                  <input
+                    id="typed-signature-input"
+                    className="form-input"
+                    value={typedSignature}
+                    onChange={(e) => setTypedSignature(e.currentTarget.value)}
+                    placeholder="Your full name"
+                    disabled={isSubmittingSignature}
+                  />
+                </label>
+                {typedSignature.trim().length > 0 ? (
+                  <div className="signature-typed-preview">
+                    {typedSignature}
+                  </div>
+                ) : null}
+              </>
+            )}
+
+            {/* Confirmation */}
+            <div className="signature-confirmation">
+              <input
+                type="checkbox"
+                id="signature-confirm-checkbox"
+                checked={signatureConfirmed}
+                onChange={(e) => setSignatureConfirmed(e.currentTarget.checked)}
+                disabled={isSubmittingSignature}
+              />
+              <label htmlFor="signature-confirm-checkbox">
+                I confirm this is my electronic signature and I agree to the contents of this document.
+              </label>
+            </div>
+
+            {/* Submit */}
+            <div className="slide-panel-actions">
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={closeSigningPanel}
+                disabled={isSubmittingSignature}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => void handleSubmitSignature()}
+                disabled={!canSubmitSignature || isSubmittingSignature}
+              >
+                {isSubmittingSignature ? "Submitting..." : "Submit signature"}
+              </button>
+            </div>
+          </div>
         </SlidePanel>
       ) : null}
 

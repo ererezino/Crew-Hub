@@ -1,13 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
+import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useTimeOffCalendar } from "../../../../hooks/use-time-off";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
-import { formatDateTimeTooltip } from "../../../../lib/datetime";
+import { formatDateRangeHuman, formatDateTimeTooltip } from "../../../../lib/datetime";
+import { formatLeaveStatus } from "../../../../lib/format-labels";
+import type { UserRole } from "../../../../lib/navigation";
+import { hasRole } from "../../../../lib/roles";
 import {
   enumerateIsoDatesInRange,
   formatLeaveTypeLabel,
@@ -15,6 +20,7 @@ import {
   isoDateToUtcDate,
   monthToDateRange
 } from "../../../../lib/time-off";
+import type { LeaveRequestRecord } from "../../../../types/time-off";
 
 type CalendarCell = {
   dateKey: string;
@@ -110,20 +116,30 @@ function CalendarSkeleton() {
   return (
     <section className="timeoff-skeleton-layout" aria-hidden="true">
       <div className="timeoff-calendar-skeleton" />
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 4 }, (_, index) => (
-          <div key={`timeoff-calendar-row-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`timeoff-calendar-row-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
   );
 }
 
-export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean }) {
+export function TimeOffCalendarClient({
+  embedded = false,
+  userRoles
+}: {
+  embedded?: boolean;
+  userRoles?: UserRole[];
+}) {
   const [activeMonth, setActiveMonth] = useState(getCurrentMonthKey());
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+  const canViewDayDetails =
+    hasRole(userRoles ?? [], "SUPER_ADMIN") || hasRole(userRoles ?? [], "HR_ADMIN");
 
   const calendarQuery = useTimeOffCalendar({
     month: activeMonth,
@@ -138,7 +154,11 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
 
     for (const holiday of calendarQuery.data?.holidays ?? []) {
       const existingNames = map.get(holiday.date) ?? [];
-      existingNames.push(holiday.name);
+
+      if (!existingNames.includes(holiday.name)) {
+        existingNames.push(holiday.name);
+      }
+
       map.set(holiday.date, existingNames);
     }
 
@@ -172,6 +192,36 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
     return map;
   }, [activeMonth, calendarQuery.data?.requests]);
 
+  const requestsByDate = useMemo(() => {
+    const map = new Map<string, LeaveRequestRecord[]>();
+    const monthRange = monthToDateRange(activeMonth);
+
+    if (!monthRange) {
+      return map;
+    }
+
+    for (const request of calendarQuery.data?.requests ?? []) {
+      const rangeStart =
+        request.startDate > monthRange.startDate ? request.startDate : monthRange.startDate;
+      const rangeEnd =
+        request.endDate < monthRange.endDate ? request.endDate : monthRange.endDate;
+
+      if (rangeStart > rangeEnd) {
+        continue;
+      }
+
+      for (const dateKey of enumerateIsoDatesInRange(rangeStart, rangeEnd)) {
+        const existing = map.get(dateKey) ?? [];
+        existing.push(request);
+        map.set(dateKey, existing);
+      }
+    }
+
+    return map;
+  }, [activeMonth, calendarQuery.data?.requests]);
+
+  const closePanel = useCallback(() => setSelectedDay(null), []);
+
   if (calendarQuery.isLoading) {
     return (
       <>
@@ -195,11 +245,9 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
             description="Team leave calendar with monthly view and scoped filters."
           />
         ) : null}
-        <EmptyState
+        <ErrorState
           title="Calendar data is unavailable"
-          description={calendarQuery.errorMessage ?? "Unable to load team calendar."}
-          ctaLabel="Retry"
-          ctaHref={embedded ? "/time-off?tab=calendar" : "/time-off/calendar"}
+          message={calendarQuery.errorMessage ?? "Unable to load team calendar."}
         />
       </>
     );
@@ -285,29 +333,60 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
           {calendarCells.map((cell) => {
             const holidayNames = holidayNamesByDate.get(cell.dateKey) ?? [];
             const requestCount = requestCountByDate.get(cell.dateKey) ?? 0;
+            const isHoliday = holidayNames.length > 0;
+            const hasLeave = requestCount > 0;
             const className = [
               "timeoff-calendar-day",
               cell.isCurrentMonth ? "timeoff-calendar-day-current" : "timeoff-calendar-day-muted",
-              requestCount > 0 ? "timeoff-calendar-day-approved" : "",
-              holidayNames.length > 0 ? "timeoff-calendar-day-pending" : ""
+              hasLeave ? "timeoff-calendar-day-approved" : "",
+              isHoliday ? "timeoff-calendar-day-holiday" : ""
             ]
               .filter(Boolean)
               .join(" ");
 
+            const isClickable = canViewDayDetails && (hasLeave || isHoliday) && cell.isCurrentMonth;
+
             return (
-              <article key={cell.dateKey} className={className}>
+              <article
+                key={cell.dateKey}
+                className={className + (isClickable ? " timeoff-calendar-day-clickable" : "")}
+                title={isHoliday ? holidayNames.join(", ") : undefined}
+                onClick={isClickable ? () => setSelectedDay(cell.dateKey) : undefined}
+                role={isClickable ? "button" : undefined}
+                tabIndex={isClickable ? 0 : undefined}
+                onKeyDown={
+                  isClickable
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedDay(cell.dateKey);
+                        }
+                      }
+                    : undefined
+                }
+              >
                 <p className="numeric">{cell.dayNumber}</p>
-                {holidayNames.length > 0 ? (
-                  <p className="timeoff-calendar-note" title={holidayNames.join(", ")}>
-                    Holiday
-                  </p>
-                ) : null}
-                {requestCount > 0 ? (
-                  <p className="timeoff-calendar-note numeric">{requestCount} {requestCount === 1 ? "request" : "requests"}</p>
+                <span className="timeoff-calendar-dots">
+                  {hasLeave ? <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" /> : null}
+                  {isHoliday ? <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" /> : null}
+                </span>
+                {requestCount > 1 ? (
+                  <p className="timeoff-calendar-note numeric">{requestCount}</p>
                 ) : null}
               </article>
             );
           })}
+
+          <div className="timeoff-calendar-legend">
+            <div className="timeoff-calendar-legend-item">
+              <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" />
+              <span>Leave</span>
+            </div>
+            <div className="timeoff-calendar-legend-item">
+              <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" />
+              <span>Public holiday</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -340,7 +419,7 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
                 </div>
                 <div className="timeoff-calendar-entry-meta">
                   <StatusBadge tone={requestRecord.status === "approved" ? "success" : "pending"}>
-                    {requestRecord.status}
+                    {formatLeaveStatus(requestRecord.status)}
                   </StatusBadge>
                   <p className="settings-card-description">{formatLeaveTypeLabel(requestRecord.leaveType)}</p>
                   <p className="settings-card-description">
@@ -348,14 +427,7 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
                       dateTime={requestRecord.startDate}
                       title={formatDateTimeTooltip(requestRecord.startDate)}
                     >
-                      {requestRecord.startDate}
-                    </time>
-                    {" - "}
-                    <time
-                      dateTime={requestRecord.endDate}
-                      title={formatDateTimeTooltip(requestRecord.endDate)}
-                    >
-                      {requestRecord.endDate}
+                      {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
                     </time>
                   </p>
                 </div>
@@ -364,6 +436,60 @@ export function TimeOffCalendarClient({ embedded = false }: { embedded?: boolean
           </ul>
         )}
       </section>
+
+      {selectedDay ? (
+        <SlidePanel
+          isOpen={Boolean(selectedDay)}
+          title={new Date(selectedDay + "T00:00:00Z").toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+            timeZone: "UTC"
+          })}
+          description="Who's off this day"
+          onClose={closePanel}
+        >
+          {(holidayNamesByDate.get(selectedDay) ?? []).length > 0 ? (
+            <div className="timeoff-panel-holidays">
+              {(holidayNamesByDate.get(selectedDay) ?? []).map((name, i) => (
+                <div key={i} className="timeoff-panel-holiday-badge">
+                  <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" />
+                  <span>{name}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {(requestsByDate.get(selectedDay) ?? []).length > 0 ? (
+            <ul className="timeoff-calendar-entry-list">
+              {(requestsByDate.get(selectedDay) ?? []).map((req) => (
+                <li key={req.id} className="timeoff-calendar-entry-card">
+                  <div>
+                    <p className="timeoff-calendar-entry-title">{req.employeeName}</p>
+                    <p className="settings-card-description">
+                      {req.employeeDepartment ?? "No department"} •{" "}
+                      {countryFlagFromCode(req.employeeCountryCode)}{" "}
+                      {countryNameFromCode(req.employeeCountryCode)}
+                    </p>
+                  </div>
+                  <div className="timeoff-calendar-entry-meta">
+                    <StatusBadge tone={req.status === "approved" ? "success" : "pending"}>
+                      {formatLeaveTypeLabel(req.leaveType)}
+                    </StatusBadge>
+                    <p className="settings-card-description">
+                      <time dateTime={req.startDate} title={formatDateTimeTooltip(req.startDate)}>
+                        {formatDateRangeHuman(req.startDate, req.endDate)}
+                      </time>
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="settings-card-description">No leave requests on this day.</p>
+          )}
+        </SlidePanel>
+      ) : null}
     </>
   );
 }

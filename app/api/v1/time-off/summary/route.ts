@@ -24,7 +24,9 @@ const profileRowSchema = z.object({
   id: z.string().uuid(),
   full_name: z.string(),
   department: z.string().nullable(),
-  country_code: z.string().nullable()
+  country_code: z.string().nullable(),
+  status: z.string().nullable(),
+  date_of_birth: z.string().nullable().optional().default(null)
 });
 
 const policyRowSchema = z.object({
@@ -34,6 +36,7 @@ const policyRowSchema = z.object({
   default_days_per_year: z.union([z.number(), z.string()]),
   accrual_type: z.enum(LEAVE_ACCRUAL_TYPES),
   carry_over: z.boolean(),
+  is_unlimited: z.boolean().optional().default(false),
   notes: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string()
@@ -138,13 +141,32 @@ export async function GET(request: Request) {
   const yearStart = `${String(year)}-01-01`;
   const yearEnd = `${String(year)}-12-31`;
 
-  const { data: profileRow, error: profileError } = await supabase
+  let profileRow: Record<string, unknown> | null = null;
+  let profileError: { message: string } | null = null;
+
+  // Try with date_of_birth first; fall back without it if column doesn't exist yet
+  const profileResult = await supabase
     .from("profiles")
-    .select("id, full_name, department, country_code")
+    .select("id, full_name, department, country_code, status, date_of_birth")
     .eq("id", session.profile.id)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
     .single();
+
+  if (profileResult.error) {
+    const fallbackResult = await supabase
+      .from("profiles")
+      .select("id, full_name, department, country_code, status")
+      .eq("id", session.profile.id)
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .single();
+
+    profileRow = fallbackResult.data as Record<string, unknown> | null;
+    profileError = fallbackResult.error;
+  } else {
+    profileRow = profileResult.data as Record<string, unknown> | null;
+  }
 
   if (profileError || !profileRow) {
     return jsonResponse<null>(500, {
@@ -171,27 +193,38 @@ export async function GET(request: Request) {
   }
 
   const employeeProfile = parsedProfile.data;
+  const orgId = session.profile.org_id;
 
-  let policiesQuery = supabase
-    .from("leave_policies")
-    .select(
-      "id, country_code, leave_type, default_days_per_year, accrual_type, carry_over, notes, created_at, updated_at"
-    )
-    .eq("org_id", session.profile.org_id)
-    .is("deleted_at", null)
-    .order("leave_type", { ascending: true });
+  // Build policies query — try with is_unlimited, fall back without it
+  const buildPoliciesQuery = (withUnlimited: boolean) => {
+    const selectCols = withUnlimited
+      ? "id, country_code, leave_type, default_days_per_year, accrual_type, carry_over, is_unlimited, notes, created_at, updated_at"
+      : "id, country_code, leave_type, default_days_per_year, accrual_type, carry_over, notes, created_at, updated_at";
 
-  if (employeeProfile.country_code) {
-    policiesQuery = policiesQuery.eq("country_code", employeeProfile.country_code);
-  }
+    let query = supabase
+      .from("leave_policies")
+      .select(selectCols)
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .order("leave_type", { ascending: true });
+
+    if (employeeProfile.country_code) {
+      query = query.eq("country_code", employeeProfile.country_code);
+    }
+
+    return query;
+  };
+
+  let rawPolicies: unknown[] | null = null;
+  let policiesError: { message: string } | null = null;
 
   const [
-    { data: rawPolicies, error: policiesError },
+    policiesResult,
     { data: rawBalances, error: balancesError },
     { data: rawRequests, error: requestsError },
     { data: rawHolidays, error: holidaysError }
   ] = await Promise.all([
-    policiesQuery,
+    buildPoliciesQuery(true),
     supabase
       .from("leave_balances")
       .select(
@@ -224,6 +257,15 @@ export async function GET(request: Request) {
           .order("date", { ascending: true })
       : Promise.resolve({ data: [], error: null })
   ]);
+
+  // Handle policies with fallback for missing is_unlimited column
+  if (policiesResult.error) {
+    const fallbackResult = await buildPoliciesQuery(false);
+    rawPolicies = fallbackResult.data as unknown[] | null;
+    policiesError = fallbackResult.error;
+  } else {
+    rawPolicies = policiesResult.data as unknown[] | null;
+  }
 
   if (policiesError || balancesError || requestsError || holidaysError) {
     return jsonResponse<null>(500, {
@@ -302,13 +344,19 @@ export async function GET(request: Request) {
     approverNameById = new Map(parsedApprovers.data.map((row) => [row.id, row.full_name]));
   }
 
-  const policies: LeavePolicy[] = parsedPolicies.data.map((row) => ({
+  // Filter policies for probation users: only unpaid_personal_day
+  const filteredPolicyRows = employeeProfile.status === "onboarding"
+    ? parsedPolicies.data.filter((row) => row.leave_type === "unpaid_personal_day")
+    : parsedPolicies.data;
+
+  const policies: LeavePolicy[] = filteredPolicyRows.map((row) => ({
     id: row.id,
     countryCode: row.country_code,
     leaveType: row.leave_type,
     defaultDaysPerYear: parseNumeric(row.default_days_per_year),
     accrualType: row.accrual_type,
     carryOver: row.carry_over,
+    isUnlimited: row.is_unlimited,
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -368,7 +416,9 @@ export async function GET(request: Request) {
       id: employeeProfile.id,
       fullName: employeeProfile.full_name,
       department: employeeProfile.department,
-      countryCode: employeeProfile.country_code
+      countryCode: employeeProfile.country_code,
+      dateOfBirth: employeeProfile.date_of_birth,
+      status: employeeProfile.status
     },
     policies,
     balances,

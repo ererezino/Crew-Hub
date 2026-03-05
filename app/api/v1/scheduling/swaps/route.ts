@@ -603,8 +603,8 @@ export async function POST(request: Request) {
       userId: parsedBody.data.targetId,
       type: "shift_swap_requested",
       title: "Shift swap request",
-      body: `${session.profile.full_name} requested a shift swap.`,
-      link: "/scheduling/swaps"
+      body: `${session.profile.full_name} wants to swap their ${shift.shift_date} shift with yours.`,
+      link: "/scheduling?tab=swaps"
     });
   } else {
     const { data: requesterProfile } = await supabase
@@ -621,8 +621,8 @@ export async function POST(request: Request) {
         userId: requesterProfile.manager_id,
         type: "shift_swap_requested",
         title: "Open shift swap request",
-        body: `${session.profile.full_name} requested a shift swap.`,
-        link: "/scheduling/swaps"
+        body: `${session.profile.full_name} wants to swap their ${shift.shift_date} shift.`,
+        link: "/scheduling?tab=swaps"
       });
     }
   }

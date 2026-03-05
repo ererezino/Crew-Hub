@@ -21,10 +21,10 @@ type SaveState = "idle" | "success" | "error";
 
 function accessControlSkeleton() {
   return (
-    <div className="timeoff-table-skeleton" aria-hidden="true">
-      <div className="timeoff-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 8 }, (_, index) => (
-        <div key={`access-control-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+        <div key={`access-control-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -281,7 +281,7 @@ export function AccessControlAdminClient() {
         description="Control sidebar visibility and dashboard widgets per role with optional per-employee overrides."
       />
 
-      <section className="settings-card" style={{ marginBottom: "1rem" }}>
+      <section className="settings-card">
         <div className="settings-card-header">
           <div>
             <h2 className="section-title">Rules</h2>
@@ -299,8 +299,8 @@ export function AccessControlAdminClient() {
         </div>
       </section>
 
-      <section className="settings-card" style={{ marginBottom: "1rem" }}>
-        <div className="settings-tabs" role="tablist" aria-label="Access control tabs">
+      <section className="settings-card">
+        <div className="page-tabs" role="tablist" aria-label="Access control tabs">
           <button
             type="button"
             role="tab"
@@ -325,7 +325,7 @@ export function AccessControlAdminClient() {
       {isLoading ? accessControlSkeleton() : null}
 
       {!isLoading && errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Access control is unavailable"
             description={errorMessage}
@@ -397,7 +397,7 @@ export function AccessControlAdminClient() {
             </div>
           </section>
 
-          <section className="settings-card" style={{ marginTop: "1rem" }} aria-label="Employee override settings">
+          <section className="settings-card" aria-label="Employee override settings">
             <div className="settings-card-header">
               <div>
                 <h2 className="section-title">Per-Employee Overrides</h2>
@@ -407,7 +407,7 @@ export function AccessControlAdminClient() {
               </div>
             </div>
 
-            <div className="settings-grid settings-grid-two" style={{ marginBottom: "1rem" }}>
+            <div className="settings-grid settings-grid-two">
               <label className="settings-field">
                 <span className="settings-label">Search employee</span>
                 <input
@@ -436,7 +436,7 @@ export function AccessControlAdminClient() {
 
             {selectedEmployee ? (
               <>
-                <p className="settings-card-description" style={{ marginBottom: "0.75rem" }}>
+                <p className="settings-card-description">
                   Editing overrides for <strong>{selectedEmployee.fullName}</strong>
                 </p>
                 <div className="data-table-container">

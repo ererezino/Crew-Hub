@@ -16,5 +16,12 @@ export default async function MyDocumentsPage() {
     );
   }
 
-  return <MyDocumentsClient currentUserId={session.profile.id} />;
+  const isSuperAdmin = session.profile.roles.includes("SUPER_ADMIN");
+
+  return (
+    <MyDocumentsClient
+      currentUserId={session.profile.id}
+      isSuperAdmin={isSuperAdmin}
+    />
+  );
 }

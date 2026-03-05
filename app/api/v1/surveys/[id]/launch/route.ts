@@ -2,7 +2,9 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
+import { createBulkNotifications } from "../../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { SurveyLaunchResponseData } from "../../../../../../types/surveys";
 import {
   buildMeta,
@@ -189,6 +191,52 @@ export async function POST(_request: Request, context: RouteContext) {
       startDate: launchedSurvey.startDate
     }
   });
+
+  // Notify matching employees based on target_audience
+  const serviceClient = createSupabaseServiceRoleClient();
+  const audience = launchedSurvey.targetAudience;
+  const hasDeptFilter = audience.departments.length > 0;
+  const hasCountryFilter = audience.countries.length > 0;
+
+  let recipientQuery = serviceClient
+    .from("profiles")
+    .select("id")
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null);
+
+  if (hasDeptFilter) {
+    recipientQuery = recipientQuery.in("department", audience.departments);
+  }
+
+  if (hasCountryFilter) {
+    recipientQuery = recipientQuery.in("country_code", audience.countries);
+  }
+
+  const { data: recipientRows, error: recipientError } = await recipientQuery;
+
+  if (recipientError) {
+    console.error("Unable to load survey notification recipients.", {
+      surveyId: launchedSurvey.id,
+      message: recipientError.message
+    });
+  } else {
+    const recipientIds = (recipientRows ?? [])
+      .map((row) => row.id)
+      .filter((value): value is string => typeof value === "string");
+
+    const closesText = launchedSurvey.endDate
+      ? ` Closes ${launchedSurvey.endDate}.`
+      : "";
+
+    void createBulkNotifications({
+      orgId: session.profile.org_id,
+      userIds: recipientIds,
+      type: "survey_launched",
+      title: "New survey available",
+      body: `${launchedSurvey.title} is now open.${closesText}`,
+      link: `/surveys/${launchedSurvey.id}`
+    });
+  }
 
   return jsonResponse<SurveyLaunchResponseData>(200, {
     data: {

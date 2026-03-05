@@ -47,7 +47,8 @@ const profileRowSchema = z.object({
   id: z.string().uuid(),
   full_name: z.string(),
   department: z.string().nullable(),
-  country_code: z.string().nullable()
+  country_code: z.string().nullable(),
+  timezone: z.string().nullable()
 });
 
 function buildMeta() {
@@ -322,7 +323,7 @@ export async function GET(request: Request) {
 
   const { data: rawProfiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("id, full_name, department, country_code")
+    .select("id, full_name, department, country_code, timezone")
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
     .in("id", employeeIds);
@@ -364,6 +365,7 @@ export async function GET(request: Request) {
       employeeName: profile?.full_name ?? "Unknown user",
       employeeDepartment: profile?.department ?? null,
       employeeCountryCode: profile?.country_code ?? null,
+      employeeTimezone: profile?.timezone ?? null,
       policyId: entry.policy_id,
       clockIn: entry.clock_in,
       clockOut: entry.clock_out,

@@ -9,6 +9,7 @@ import {
   useState
 } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type { DocumentCategory, DocumentRecord, DocumentsResponse } from "../types/documents";
 
 type DocumentsScope = "all" | "mine";
@@ -63,10 +64,7 @@ export function useDocuments(options: UseDocumentsOptions = {}): UseDocumentsRes
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as DocumentsResponse;
 

@@ -271,58 +271,17 @@ export async function POST(
       });
     }
 
-    const { data: rawRunItems, error: runItemsError } = await supabase
-      .from("payroll_items")
-      .select("net_amount, pay_currency")
-      .eq("org_id", session.profile.org_id)
-      .eq("payroll_run_id", runId)
-      .is("deleted_at", null);
+    // Recalculate run totals atomically via RPC
+    const { error: recalcError } = await supabase.rpc("recalculate_payroll_run_totals", {
+      p_run_id: runId
+    });
 
-    if (runItemsError) {
+    if (recalcError) {
       return jsonResponse<null>(500, {
         data: null,
         error: {
           code: "PAYROLL_ADJUSTMENT_FAILED",
-          message: `Unable to refresh run totals after adjustment: ${runItemsError.message}`
-        },
-        meta: buildMeta()
-      });
-    }
-
-    let nextTotalNet: Record<string, number> = {};
-
-    for (const row of rawRunItems ?? []) {
-      const rowNetAmount =
-        typeof row.net_amount === "number"
-          ? Math.trunc(row.net_amount)
-          : typeof row.net_amount === "string"
-            ? Number.parseInt(row.net_amount, 10)
-            : 0;
-
-      if (!Number.isFinite(rowNetAmount)) {
-        continue;
-      }
-
-      const rowCurrency =
-        typeof row.pay_currency === "string"
-          ? normalizeCurrencyCode(row.pay_currency)
-          : "USD";
-
-      nextTotalNet = addCurrencyTotal(nextTotalNet, rowCurrency, rowNetAmount);
-    }
-
-    const { error: runUpdateError } = await supabase
-      .from("payroll_runs")
-      .update({ total_net: nextTotalNet })
-      .eq("org_id", session.profile.org_id)
-      .eq("id", runId);
-
-    if (runUpdateError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "PAYROLL_ADJUSTMENT_FAILED",
-          message: `Unable to update run totals after adjustment: ${runUpdateError.message}`
+          message: `Unable to refresh run totals after adjustment: ${recalcError.message}`
         },
         meta: buildMeta()
       });

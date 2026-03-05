@@ -4,12 +4,14 @@ import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useTimeOffApprovals } from "../../../../hooks/use-time-off";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { formatDays, formatDateRangeHuman, formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { formatLeaveStatus } from "../../../../lib/format-labels";
 import { formatLeaveTypeLabel } from "../../../../lib/time-off";
 import type { LeaveRequestRecord, TimeOffRequestMutationResponse } from "../../../../types/time-off";
 
@@ -44,10 +46,10 @@ function createToastId() {
 
 function ApprovalTableSkeleton() {
   return (
-    <div className="timeoff-table-skeleton" aria-hidden="true">
-      <div className="timeoff-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 6 }, (_, index) => (
-        <div key={`timeoff-approval-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+        <div key={`timeoff-approval-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -213,11 +215,10 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       {approvalsQuery.isLoading ? <ApprovalTableSkeleton /> : null}
 
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
-        <EmptyState
+        <ErrorState
           title="Approvals are unavailable"
-          description={approvalsQuery.errorMessage}
-          ctaLabel="Retry"
-          ctaHref={embedded ? "/approvals?tab=time-off" : "/time-off/approvals"}
+          message={approvalsQuery.errorMessage}
+          onRetry={approvalsQuery.refresh}
         />
       ) : null}
 
@@ -248,10 +249,9 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       )
                     }
                   >
-                    Start date {sortDirection === "asc" ? "↑" : "↓"}
+                    Dates {sortDirection === "asc" ? "↑" : "↓"}
                   </button>
                 </th>
-                <th>End date</th>
                 <th>Days</th>
                 <th>Status</th>
                 <th>Requested</th>
@@ -281,21 +281,13 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       dateTime={requestRecord.startDate}
                       title={formatDateTimeTooltip(requestRecord.startDate)}
                     >
-                      {requestRecord.startDate}
+                      {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
                     </time>
                   </td>
-                  <td>
-                    <time
-                      dateTime={requestRecord.endDate}
-                      title={formatDateTimeTooltip(requestRecord.endDate)}
-                    >
-                      {requestRecord.endDate}
-                    </time>
-                  </td>
-                  <td className="numeric">{requestRecord.totalDays.toFixed(1)}</td>
+                  <td className="numeric">{formatDays(requestRecord.totalDays)}</td>
                   <td>
                     <StatusBadge tone={toneForStatus(requestRecord.status)}>
-                      {requestRecord.status}
+                      {formatLeaveStatus(requestRecord.status)}
                     </StatusBadge>
                   </td>
                   <td>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   BenchmarkCreateResponse,
   CompensationBandAssignmentCreateResponse,
@@ -88,10 +89,7 @@ export function useCompensationBands(): UseCompensationBandsState {
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/v1/compensation/admin/bands", {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry("/api/v1/compensation/admin/bands", abortController.signal);
 
         const payload = (await response.json()) as CompensationBandsResponse;
 

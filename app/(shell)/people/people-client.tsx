@@ -11,6 +11,7 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { usePeople } from "../../../hooks/use-people";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatEmploymentType, formatProfileStatus } from "../../../lib/format-labels";
 import { USER_ROLES } from "../../../lib/navigation";
 import type { AppRole } from "../../../types/auth";
 import {
@@ -190,10 +191,10 @@ function hasValidationErrors(errors: CreatePersonFormErrors): boolean {
 
 function PeopleTableSkeleton() {
   return (
-    <div className="people-table-skeleton" aria-hidden="true">
-      <div className="people-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 8 }, (_, index) => (
-        <div key={`people-table-skeleton-${index}`} className="people-table-skeleton-row" />
+        <div key={`table-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -379,7 +380,7 @@ export function PeopleClient({
       ) : null}
 
       {!isLoading && !errorMessage && sortedPeople.length === 0 ? (
-        <section className="people-empty-state">
+        <section className="error-state">
           <EmptyState
             title="No people records found"
             description="Create a profile to start managing your team in Crew Hub."
@@ -463,13 +464,13 @@ export function PeopleClient({
                   {isAdmin ? (
                     <td>
                       <StatusBadge tone={toneForProfileStatus(person.status)}>
-                        {person.status}
+                        {formatProfileStatus(person.status)}
                       </StatusBadge>
                     </td>
                   ) : null}
                   {isAdmin ? (
                     <td>
-                      <StatusBadge tone="processing">{person.employmentType.replace("_", " ")}</StatusBadge>
+                      <StatusBadge tone="processing">{formatEmploymentType(person.employmentType)}</StatusBadge>
                     </td>
                   ) : null}
                   <td>
@@ -722,7 +723,7 @@ export function PeopleClient({
             >
               {EMPLOYMENT_TYPES.map((employmentType) => (
                 <option key={employmentType} value={employmentType}>
-                  {employmentType.replace("_", " ")}
+                  {formatEmploymentType(employmentType)}
                 </option>
               ))}
             </select>
@@ -767,7 +768,7 @@ export function PeopleClient({
             >
               {PROFILE_STATUSES.map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {formatProfileStatus(status)}
                 </option>
               ))}
             </select>

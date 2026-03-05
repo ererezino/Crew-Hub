@@ -30,7 +30,8 @@ const profileRowSchema = z.object({
   id: z.string().uuid(),
   full_name: z.string(),
   department: z.string().nullable(),
-  country_code: z.string().nullable()
+  country_code: z.string().nullable(),
+  timezone: z.string().nullable()
 });
 
 const entryRowSchema = z.object({
@@ -101,6 +102,7 @@ function mapEntryRow({
     employeeName: profile.full_name,
     employeeDepartment: profile.department,
     employeeCountryCode: profile.country_code,
+    employeeTimezone: profile.timezone,
     policyId: entry.policy_id,
     clockIn: entry.clock_in,
     clockOut: entry.clock_out,
@@ -170,7 +172,7 @@ export async function GET(request: Request) {
 
   const { data: rawProfile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, full_name, department, country_code")
+    .select("id, full_name, department, country_code, timezone")
     .eq("org_id", session.profile.org_id)
     .eq("id", session.profile.id)
     .is("deleted_at", null)
@@ -441,7 +443,8 @@ export async function GET(request: Request) {
       id: profile.id,
       fullName: profile.full_name,
       department: profile.department,
-      countryCode: profile.country_code
+      countryCode: profile.country_code,
+      timezone: profile.timezone
     },
     activeEntry,
     recentEntries,

@@ -5,6 +5,7 @@ import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { usePayrollRunsDashboard } from "../../../../../hooks/use-payroll-runs";
@@ -186,21 +187,11 @@ export function CreatePayrollRunClient() {
       ) : null}
 
       {!dashboardQuery.isLoading && dashboardQuery.errorMessage ? (
-        <section className="payroll-dashboard-error">
-          <EmptyState
-            title="Contractor count unavailable"
-            description={dashboardQuery.errorMessage}
-            ctaLabel="Back to payroll"
-            ctaHref="/payroll"
-          />
-          <button
-            type="button"
-            className="button button-accent"
-            onClick={() => dashboardQuery.refresh()}
-          >
-            Retry
-          </button>
-        </section>
+        <ErrorState
+          title="Contractor count unavailable"
+          message={dashboardQuery.errorMessage}
+          onRetry={() => dashboardQuery.refresh()}
+        />
       ) : null}
 
       {!dashboardQuery.isLoading && !dashboardQuery.errorMessage ? (

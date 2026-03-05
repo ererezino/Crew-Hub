@@ -114,13 +114,45 @@ export type SurveyQuestionResult = {
   textResponses: string[];
 };
 
+export type SurveyHeatmapCell = {
+  department: string;
+  questionId: string;
+  averageScore: number | null;
+  responseCount: number;
+  protected: boolean;
+};
+
+export type SurveyHeatmapData = {
+  departments: string[];
+  questions: Array<{ id: string; text: string }>;
+  cells: SurveyHeatmapCell[];
+};
+
+export type SurveyTrendPoint = {
+  surveyId: string;
+  surveyTitle: string;
+  closedAt: string;
+  questionId: string;
+  questionText: string;
+  averageScore: number | null;
+};
+
+export type SurveyTrendData = {
+  instanceCount: number;
+  trendDirection: "up" | "down" | "flat";
+  points: SurveyTrendPoint[];
+};
+
 export type SurveyResultsResponseData = {
   survey: SurveyRecord;
   totalResponses: number;
   minResponsesForResults: number;
   hasMinimumResponses: boolean;
+  protected: boolean;
   message: string | null;
   questionResults: SurveyQuestionResult[];
+  heatmap: SurveyHeatmapData | null;
+  trend: SurveyTrendData | null;
 };
 
 export type SurveySignedExportResponseData = {

@@ -18,7 +18,7 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
       {compensationQuery.isLoading ? <CompensationSkeleton /> : null}
 
       {!compensationQuery.isLoading && compensationQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Compensation is unavailable"
             description={compensationQuery.errorMessage}

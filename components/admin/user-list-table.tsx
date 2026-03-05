@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { StatusBadge } from "../shared/status-badge";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
+import { formatProfileStatus } from "../../lib/format-labels";
 import { USER_ROLES } from "../../lib/navigation";
 import type { AppRole } from "../../types/auth";
 import type { PersonRecord } from "../../types/people";
@@ -160,7 +161,7 @@ export function UserListTable({
                   </td>
                   <td>
                     <StatusBadge tone={toneForProfileStatus(person.status)}>
-                      {person.status}
+                      {formatProfileStatus(person.status)}
                     </StatusBadge>
                   </td>
                   <td>

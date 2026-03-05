@@ -90,10 +90,10 @@ function ApprovalSkeleton() {
           <div key={`expenses-approval-metric-skeleton-${index}`} className="expenses-metric-skeleton-card" />
         ))}
       </div>
-      <div className="expenses-table-skeleton">
-        <div className="expenses-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 7 }, (_, index) => (
-          <div key={`expenses-approval-skeleton-${index}`} className="expenses-table-skeleton-row" />
+          <div key={`expenses-approval-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -553,17 +553,17 @@ export function ExpenseApprovalsClient({
       ) : null}
 
       {availableStages.length > 1 ? (
-        <section className="expenses-approval-tabs" aria-label="Approval queues">
+        <section className="page-tabs" aria-label="Approval queues">
           <button
             type="button"
-            className={stage === "manager" ? "settings-tab settings-tab-active" : "settings-tab"}
+            className={stage === "manager" ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setStage("manager")}
           >
             Pending My Approval
           </button>
           <button
             type="button"
-            className={stage === "finance" ? "settings-tab settings-tab-active" : "settings-tab"}
+            className={stage === "finance" ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setStage("finance")}
           >
             Pending Disbursement
@@ -589,7 +589,7 @@ export function ExpenseApprovalsClient({
       {approvalsQuery.isLoading ? <ApprovalSkeleton /> : null}
 
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
-        <section className="expenses-error-state">
+        <section className="error-state">
           <EmptyState
             title="Expense approvals are unavailable"
             description={approvalsQuery.errorMessage}

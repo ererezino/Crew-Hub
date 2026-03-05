@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   TimeAttendanceApprovalsResponse,
   TimeAttendanceApprovalsResponseData,
@@ -92,10 +93,7 @@ export function useTimeAttendanceOverview(weekStart?: string): UseFetchState<Tim
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as TimeAttendanceOverviewResponse;
 
@@ -164,10 +162,7 @@ export function useTimeAttendanceEntries(query: EntriesQuery = {}): UseFetchStat
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as TimeAttendanceEntriesResponse;
 
@@ -233,10 +228,7 @@ export function useTimeAttendanceApprovals(query: ApprovalsQuery = {}): UseFetch
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as TimeAttendanceApprovalsResponse;
 
@@ -294,10 +286,7 @@ export function useTimeAttendancePolicies(): UseFetchState<TimeAttendancePolicie
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/v1/time-attendance/policies", {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry("/api/v1/time-attendance/policies", abortController.signal);
 
         const payload = (await response.json()) as TimeAttendancePoliciesResponse;
 

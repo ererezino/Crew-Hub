@@ -139,11 +139,41 @@ export type ExpenseReportStatusBucket = {
   count: number;
 };
 
+export type EnhancedEmployeeBucket = {
+  key: string;
+  label: string;
+  department: string | null;
+  totalAmount: number;
+  count: number;
+  avgProcessingHours: number | null;
+  statusCounts: Record<string, number>;
+};
+
+export type EnhancedCategoryBucket = {
+  key: string;
+  label: string;
+  totalAmount: number;
+  count: number;
+  pctOfTotal: number;
+  mostCommonVendor: string | null;
+};
+
+export type EnhancedDepartmentBucket = {
+  key: string;
+  label: string;
+  totalAmount: number;
+  count: number;
+  uniqueEmployees: number;
+  topCategory: string | null;
+};
+
 export type ExpenseReportsResponseData = {
   month: string;
   totals: {
     expenseCount: number;
     totalAmount: number;
+    managerApprovedAmount: number;
+    financeApprovedAmount: number;
     pendingAmount: number;
     reimbursedAmount: number;
   };
@@ -155,6 +185,9 @@ export type ExpenseReportsResponseData = {
   byCategory: ExpenseReportBucket[];
   byEmployee: ExpenseReportBucket[];
   byDepartment: ExpenseReportBucket[];
+  enhancedByEmployee: EnhancedEmployeeBucket[];
+  enhancedByCategory: EnhancedCategoryBucket[];
+  enhancedByDepartment: EnhancedDepartmentBucket[];
 };
 
 export type ExpenseReceiptSignedUrlResponseData = {

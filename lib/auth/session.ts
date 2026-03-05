@@ -1,5 +1,7 @@
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
+
 import { normalizeUserRoles, type UserRole } from "../navigation";
 import { createSupabaseServerClient } from "../supabase/server";
 
@@ -95,6 +97,14 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
       org: null
     };
   }
+
+  // Set Sentry context with non-PII data for every authenticated request
+  const highestRole = roles.length > 0 ? roles[0] : "EMPLOYEE";
+  Sentry.setContext("crew_hub", {
+    org_id: profile.org_id,
+    user_role: highestRole
+  });
+  Sentry.setUser({ id: profile.id });
 
   return {
     userId: user.id,

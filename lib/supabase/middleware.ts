@@ -33,8 +33,7 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
             error: {
               code: "CSRF_VALIDATION_FAILED",
               message:
-                csrfDecision.reason ??
-                "Mutation blocked by CSRF protection."
+                "Your request could not be processed. Please refresh the page and try again."
             },
             meta: {
               timestamp: new Date().toISOString()
@@ -53,7 +52,7 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
           data: null,
           error: {
             code: "RATE_LIMIT_EXCEEDED",
-            message: `Rate limit exceeded for ${rateLimitDecision.bucket ?? "this action"}.`
+            message: "You're making requests too quickly. Please wait a moment and try again."
           },
           meta: {
             timestamp: new Date().toISOString()

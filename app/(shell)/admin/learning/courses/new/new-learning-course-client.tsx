@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { PageHeader } from "../../../../../../components/shared/page-header";
+import { toSentenceCase } from "../../../../../../lib/format-labels";
 import {
   LEARNING_COURSE_CONTENT_TYPES,
   LEARNING_COURSE_DIFFICULTIES,
@@ -228,7 +229,7 @@ export function NewLearningCourseClient() {
               >
                 {LEARNING_COURSE_CONTENT_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {type.replace("_", " ")}
+                    {toSentenceCase(type)}
                   </option>
                 ))}
               </select>
@@ -301,7 +302,7 @@ export function NewLearningCourseClient() {
                 <option value="">Not recurring</option>
                 {LEARNING_COURSE_RECURRENCES.map((recurrence) => (
                   <option key={recurrence} value={recurrence}>
-                    {recurrence.replace("_", " ")}
+                    {toSentenceCase(recurrence)}
                   </option>
                 ))}
               </select>

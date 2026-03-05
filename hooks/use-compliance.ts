@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   ComplianceResponse,
   ComplianceResponseData,
@@ -53,10 +54,7 @@ export function useCompliance(query: ComplianceQuery): UseComplianceResult {
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as ComplianceResponse;
 

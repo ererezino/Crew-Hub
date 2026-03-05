@@ -52,9 +52,15 @@ export const assignmentRowSchema = z.object({
   template_id: z.string().uuid(),
   status: z.string(),
   due_at: z.string().nullable(),
+  shared_at: z.string().nullable().default(null),
+  shared_by: z.string().uuid().nullable().default(null),
+  acknowledged_at: z.string().nullable().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
+
+export const assignmentSelectColumns =
+  "id, org_id, cycle_id, employee_id, reviewer_id, template_id, status, due_at, shared_at, shared_by, acknowledged_at, created_at, updated_at";
 
 export const responseRowSchema = z.object({
   id: z.string().uuid(),
@@ -187,6 +193,10 @@ export function mapAssignmentRows({
       managerResponse: null
     };
 
+    const sharedByProfile = assignment.shared_by
+      ? profilesById.get(assignment.shared_by)
+      : null;
+
     mapped.push({
       id: assignment.id,
       cycleId: cycle.id,
@@ -203,6 +213,10 @@ export function mapAssignmentRows({
       templateSections: template.sections,
       status: assignment.status,
       dueAt: assignment.due_at,
+      sharedAt: assignment.shared_at,
+      sharedBy: assignment.shared_by,
+      sharedByName: sharedByProfile?.full_name ?? null,
+      acknowledgedAt: assignment.acknowledged_at,
       createdAt: assignment.created_at,
       updatedAt: assignment.updated_at,
       selfResponse: responses.selfResponse,

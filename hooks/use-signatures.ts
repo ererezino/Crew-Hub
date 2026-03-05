@@ -9,6 +9,7 @@ import {
   useState
 } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import {
   type SignatureRequestRecord,
   type SignatureRequestStatus,
@@ -67,10 +68,7 @@ export function useSignatures(options: UseSignaturesOptions = {}): UseSignatures
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as SignaturesResponse;
 

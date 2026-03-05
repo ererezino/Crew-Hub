@@ -398,7 +398,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
       {paymentDetailsQuery.isLoading ? detailsCardSkeleton() : null}
 
       {!paymentDetailsQuery.isLoading && paymentDetailsQuery.errorMessage ? (
-        <section className="payment-details-error-state">
+        <section className="error-state">
           <EmptyState
             title="Payment details are unavailable"
             description={paymentDetailsQuery.errorMessage}

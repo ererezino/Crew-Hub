@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   PayrollRunDetailResponse,
   PayrollRunDetailResponseData,
@@ -47,10 +48,7 @@ export function usePayrollRunsDashboard(
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/v1/payroll/runs", {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry("/api/v1/payroll/runs", abortController.signal);
 
         const payload = (await response.json()) as PayrollRunsDashboardResponse;
 
@@ -123,10 +121,7 @@ export function usePayrollRunDetail({
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as PayrollRunDetailResponse;
 

@@ -8,6 +8,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { usePendingSurveys } from "../../../hooks/use-surveys";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { toSentenceCase } from "../../../lib/format-labels";
 
 function toDateTimeValue(value: string | null): string | null {
   if (!value) {
@@ -20,10 +21,10 @@ function toDateTimeValue(value: string | null): string | null {
 function surveysSkeleton() {
   return (
     <section className="timeoff-skeleton-layout" aria-hidden="true">
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 5 }, (_, index) => (
-          <div key={`survey-row-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`survey-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -68,7 +69,7 @@ export function SurveysClient({
       {pendingQuery.isLoading ? surveysSkeleton() : null}
 
       {!pendingQuery.isLoading && pendingQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Surveys are unavailable"
             description={pendingQuery.errorMessage}
@@ -110,7 +111,7 @@ export function SurveysClient({
                     </div>
                     <div className="announcement-item-status">
                       <StatusBadge tone="pending">Pending</StatusBadge>
-                      <StatusBadge tone="info">{survey.type}</StatusBadge>
+                      <StatusBadge tone="info">{toSentenceCase(survey.type)}</StatusBadge>
                     </div>
                   </header>
 

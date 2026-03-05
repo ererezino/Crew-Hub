@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   SurveyAdminListResponse,
   SurveyAdminListResponseData,
@@ -73,10 +74,7 @@ function useDataFetch<TPayload, TData>({
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as TPayload;
         const extracted = extractor(payload);
@@ -165,8 +163,11 @@ export function useSurveyResults(surveyId: string): UseFetchState<SurveyResultsR
       totalResponses: 0,
       minResponsesForResults: 0,
       hasMinimumResponses: false,
+      protected: false,
       message: null,
-      questionResults: []
+      questionResults: [],
+      heatmap: null,
+      trend: null
     },
     errorFallback: "Unable to load survey results."
   });

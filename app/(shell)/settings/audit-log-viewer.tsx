@@ -384,9 +384,9 @@ export function AuditLogViewer() {
       </form>
 
       {isLoading ? (
-        <div className="audit-table-skeleton" aria-hidden="true">
+        <div className="table-skeleton" aria-hidden="true">
           {Array.from({ length: 8 }, (_, index) => (
-            <div key={`skeleton-${index}`} className="audit-table-skeleton-row" />
+            <div key={`skeleton-${index}`} className="table-skeleton-row" />
           ))}
         </div>
       ) : null}

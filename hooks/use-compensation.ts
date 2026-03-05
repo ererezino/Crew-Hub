@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   AdminCompensationResponse,
   AdminCompensationResponseData,
@@ -53,10 +54,7 @@ export function useMeCompensation(
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/v1/compensation/me", {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry("/api/v1/compensation/me", abortController.signal);
 
         const payload = (await response.json()) as MeCompensationResponse;
 
@@ -126,10 +124,7 @@ export function useAdminCompensation({
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as AdminCompensationResponse;
 

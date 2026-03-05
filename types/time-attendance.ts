@@ -28,6 +28,7 @@ export type TimeAttendanceProfile = {
   fullName: string;
   department: string | null;
   countryCode: string | null;
+  timezone: string | null;
 };
 
 export type TimePolicyRecord = {
@@ -62,6 +63,7 @@ export type TimeEntryRecord = {
   employeeName: string;
   employeeDepartment: string | null;
   employeeCountryCode: string | null;
+  employeeTimezone: string | null;
   policyId: string | null;
   clockIn: string;
   clockOut: string | null;

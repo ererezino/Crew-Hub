@@ -7,7 +7,7 @@ import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useMePayslips } from "../../../../hooks/use-payslips";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { formatMonth, formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import type {
   PaymentStatementRecord,
   PaymentStatementSignedUrlResponse
@@ -38,12 +38,8 @@ function formatPayPeriod(payPeriod: string): string {
     return payPeriod;
   }
 
-  const date = new Date(Date.UTC(year, month - 1, 1));
-  return date.toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC"
-  });
+  const isoDate = `${yearValue}-${monthValue}-01`;
+  return formatMonth(isoDate);
 }
 
 function statementCardSkeleton() {
@@ -231,7 +227,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
       {payslipsQuery.isLoading ? metricsSkeleton() : null}
 
       {!payslipsQuery.isLoading && payslipsQuery.errorMessage ? (
-        <section className="payment-details-error-state">
+        <section className="error-state">
           <EmptyState
             title="Payments are unavailable"
             description={payslipsQuery.errorMessage}

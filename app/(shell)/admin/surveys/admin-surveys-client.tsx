@@ -8,6 +8,7 @@ import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useAdminSurveys } from "../../../../hooks/use-surveys";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { toSentenceCase } from "../../../../lib/format-labels";
 import type { SurveyLaunchResponse, SurveyRecord } from "../../../../types/surveys";
 
 type SortDirection = "asc" | "desc";
@@ -43,10 +44,10 @@ function adminSurveysSkeleton() {
           <div key={`admin-surveys-metric-skeleton-${index}`} className="timeoff-balance-skeleton-card" />
         ))}
       </div>
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`admin-surveys-row-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`admin-surveys-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -122,7 +123,7 @@ export function AdminSurveysClient() {
       {adminQuery.isLoading ? adminSurveysSkeleton() : null}
 
       {!adminQuery.isLoading && (adminQuery.errorMessage || errorMessage) ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Survey admin is unavailable"
             description={errorMessage ?? adminQuery.errorMessage ?? "Unable to load survey admin."}
@@ -216,10 +217,10 @@ export function AdminSurveysClient() {
                           <p className="metric-description">{survey.description ?? "No description"}</p>
                         </td>
                         <td>
-                          <StatusBadge tone={toneForSurveyStatus(survey.status)}>{survey.status}</StatusBadge>
+                          <StatusBadge tone={toneForSurveyStatus(survey.status)}>{toSentenceCase(survey.status)}</StatusBadge>
                         </td>
                         <td>
-                          <StatusBadge tone="info">{survey.type}</StatusBadge>
+                          <StatusBadge tone="info">{toSentenceCase(survey.type)}</StatusBadge>
                         </td>
                         <td className="numeric">{survey.questions.length}</td>
                         <td className="numeric">{survey.responseCount}</td>

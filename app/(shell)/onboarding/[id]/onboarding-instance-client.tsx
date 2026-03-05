@@ -3,11 +3,13 @@
 import { useMemo } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { ProgressRing } from "../../../../components/shared/progress-ring";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useOnboardingInstanceDetail } from "../../../../hooks/use-onboarding";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { toSentenceCase } from "../../../../lib/format-labels";
 import type { OnboardingTask } from "../../../../types/onboarding";
 
 type OnboardingInstanceClientProps = {
@@ -71,11 +73,9 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
 
   if (errorMessage || !detail) {
     return (
-      <EmptyState
+      <ErrorState
         title="Onboarding instance is unavailable"
-        description={errorMessage ?? "Unable to load onboarding instance."}
-        ctaLabel="Back to onboarding"
-        ctaHref="/onboarding"
+        message={errorMessage ?? "Unable to load onboarding instance."}
       />
     );
   }
@@ -83,7 +83,7 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
   return (
     <>
       <PageHeader
-        title={`${detail.instance.employeeName} - ${detail.instance.type}`}
+        title={`${detail.instance.employeeName} - ${toSentenceCase(detail.instance.type)}`}
         description={`Template: ${detail.instance.templateName}`}
       />
 
@@ -95,7 +95,7 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
             <StatusBadge
               tone={detail.instance.status === "completed" ? "success" : "processing"}
             >
-              {detail.instance.status}
+              {toSentenceCase(detail.instance.status)}
             </StatusBadge>
           </article>
           <article className="onboarding-instance-metric">
@@ -158,7 +158,7 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
                       </p>
                     </div>
                     <div className="onboarding-task-meta">
-                      <StatusBadge tone={toneForTaskStatus(task.status)}>{task.status}</StatusBadge>
+                      <StatusBadge tone={toneForTaskStatus(task.status)}>{toSentenceCase(task.status)}</StatusBadge>
                       <p className="settings-card-description">Assigned: {task.assignedToName}</p>
                       <p className="settings-card-description">
                         Due:{" "}

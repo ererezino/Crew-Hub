@@ -164,3 +164,51 @@ export function parseNumeric(value: number | string): number {
   const parsed = typeof value === "number" ? value : Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
+
+/**
+ * Given an employee's DOB, compute the birthday date for a given year
+ * and return up to 3 working-day options for birthday leave.
+ *
+ * If the birthday falls on a working day (not weekend, not holiday),
+ * returns just that date (auto-granted, no choice needed).
+ *
+ * If the birthday falls on a weekend or public holiday,
+ * returns up to 3 next working days after the birthday.
+ */
+export function getBirthdayLeaveOptions(
+  dateOfBirth: string,
+  year: number,
+  holidayDateKeys: ReadonlySet<string>
+): { birthdayDate: string; needsChoice: boolean; options: string[] } {
+  const dob = isoDateToUtcDate(dateOfBirth);
+
+  if (!dob) {
+    return { birthdayDate: "", needsChoice: false, options: [] };
+  }
+
+  const birthday = new Date(Date.UTC(year, dob.getUTCMonth(), dob.getUTCDate()));
+  const birthdayStr = utcDateToIsoDate(birthday);
+  const isWorkday = !isWeekendUtc(birthday) && !holidayDateKeys.has(birthdayStr);
+
+  if (isWorkday) {
+    return { birthdayDate: birthdayStr, needsChoice: false, options: [birthdayStr] };
+  }
+
+  const options: string[] = [];
+  const cursor = new Date(birthday.getTime());
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+
+  while (options.length < 3) {
+    if (!isWeekendUtc(cursor) && !holidayDateKeys.has(utcDateToIsoDate(cursor))) {
+      options.push(utcDateToIsoDate(cursor));
+    }
+
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+
+    if (options.length === 0 && cursor.getTime() - birthday.getTime() > 14 * 86_400_000) {
+      break;
+    }
+  }
+
+  return { birthdayDate: birthdayStr, needsChoice: true, options };
+}

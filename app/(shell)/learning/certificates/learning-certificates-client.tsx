@@ -13,10 +13,10 @@ type SortDirection = "asc" | "desc";
 
 function certificatesSkeleton() {
   return (
-    <div className="timeoff-table-skeleton" aria-hidden="true">
-      <div className="timeoff-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 6 }, (_, index) => (
-        <div key={`learning-certificate-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+        <div key={`learning-certificate-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -81,7 +81,7 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
       {assignmentsQuery.isLoading ? certificatesSkeleton() : null}
 
       {!assignmentsQuery.isLoading && assignmentsQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Certificate data is unavailable"
             description={assignmentsQuery.errorMessage}

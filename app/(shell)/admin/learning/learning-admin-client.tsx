@@ -9,6 +9,7 @@ import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useLearningCourses } from "../../../../hooks/use-learning";
 import { usePeople } from "../../../../hooks/use-people";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { toSentenceCase } from "../../../../lib/format-labels";
 import type {
   LearningAssignmentsBulkMutationResponse,
   LearningCourseRecord
@@ -36,10 +37,10 @@ function learningAdminSkeleton() {
           <div key={`learning-admin-metric-skeleton-${index}`} className="timeoff-balance-skeleton-card" />
         ))}
       </div>
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`learning-admin-row-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`learning-admin-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -157,7 +158,7 @@ export function LearningAdminClient() {
       {isLoading ? learningAdminSkeleton() : null}
 
       {!isLoading && errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Learning admin data is unavailable"
             description={errorMessage}
@@ -197,7 +198,7 @@ export function LearningAdminClient() {
             </article>
           </article>
 
-          <article className="compensation-summary-card">
+          <article className="metric-card">
             <div>
               <h2 className="section-title">Admin actions</h2>
               <p className="settings-card-description">
@@ -338,7 +339,7 @@ export function LearningAdminClient() {
                       <tr key={course.id} className="data-table-row">
                         <td>{course.title}</td>
                         <td>
-                          <StatusBadge tone="info">{course.contentType.replace("_", " ")}</StatusBadge>
+                          <StatusBadge tone="info">{toSentenceCase(course.contentType)}</StatusBadge>
                         </td>
                         <td className="numeric">{course.assignmentCount}</td>
                         <td className="numeric">{course.completionCount}</td>

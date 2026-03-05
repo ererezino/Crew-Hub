@@ -78,5 +78,17 @@ export type UpdateComplianceDeadlineData = {
   deadline: ComplianceDeadlineRecord;
 };
 
+export type GenerateDeadlinesPayload = {
+  year: number;
+};
+
+export type GenerateDeadlinesData = {
+  created: number;
+  skipped: number;
+};
+
+export type GenerateDeadlinesResponse = ApiResponse<GenerateDeadlinesData>;
+
 export type ComplianceResponse = ApiResponse<ComplianceResponseData>;
 export type UpdateComplianceDeadlineResponse = ApiResponse<UpdateComplianceDeadlineData>;
+export type GenerateComplianceDeadlinesResponse = ApiResponse<GenerateDeadlinesData>;

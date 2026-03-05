@@ -9,16 +9,17 @@ import { useTimeAttendanceApprovals } from "../../../../hooks/use-time-attendanc
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { formatHoursFromMinutes } from "../../../../lib/time-attendance";
+import { toSentenceCase } from "../../../../lib/format-labels";
 import type { TimeAttendanceApprovalMutationResponse } from "../../../../types/time-attendance";
 
 type SortDirection = "asc" | "desc";
 
 function approvalsSkeleton() {
   return (
-    <div className="timeoff-table-skeleton" aria-hidden="true">
-      <div className="timeoff-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 6 }, (_, index) => (
-        <div key={`time-attendance-approval-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+        <div key={`time-attendance-approval-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -125,7 +126,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
       {approvalsQuery.isLoading ? approvalsSkeleton() : null}
 
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Approvals are unavailable"
             description={approvalsQuery.errorMessage}
@@ -153,7 +154,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && sortedTimesheets.length > 0 ? (
         <section className="compensation-layout" aria-label="Timesheet approvals table">
-          <article className="compensation-summary-card">
+          <article className="metric-card">
             <div>
               <h2 className="section-title">Pending review</h2>
               <p className="settings-card-description">
@@ -219,7 +220,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                     <td className="numeric">{formatHoursFromMinutes(timesheet.totalWorkedMinutes)}h</td>
                     <td className="numeric">{formatHoursFromMinutes(timesheet.totalOvertimeMinutes)}h</td>
                     <td>
-                      <StatusBadge tone={toneForStatus(timesheet.status)}>{timesheet.status}</StatusBadge>
+                      <StatusBadge tone={toneForStatus(timesheet.status)}>{toSentenceCase(timesheet.status)}</StatusBadge>
                     </td>
                     <td>
                       {timesheet.submittedAt ? (

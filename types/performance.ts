@@ -22,6 +22,9 @@ export type ReviewAssignmentStatus = (typeof REVIEW_ASSIGNMENT_STATUSES)[number]
 export type ReviewResponseType = (typeof REVIEW_RESPONSE_TYPES)[number];
 export type ReviewQuestionType = (typeof REVIEW_QUESTION_TYPES)[number];
 
+export const GOAL_STATUSES = ["active", "completed", "cancelled"] as const;
+export type GoalStatus = (typeof GOAL_STATUSES)[number];
+
 export type ReviewQuestionDefinition = {
   id: string;
   title: string;
@@ -94,6 +97,10 @@ export type ReviewAssignmentSummary = {
   templateSections: ReviewSectionDefinition[];
   status: ReviewAssignmentStatus;
   dueAt: string | null;
+  sharedAt: string | null;
+  sharedBy: string | null;
+  sharedByName: string | null;
+  acknowledgedAt: string | null;
   createdAt: string;
   updatedAt: string;
   selfResponse: ReviewResponseRecord | null;
@@ -179,9 +186,98 @@ export type AssignReviewData = {
   skippedCount: number;
 };
 
+// ── Goals ──
+
+export type GoalRecord = {
+  id: string;
+  orgId: string;
+  employeeId: string;
+  employeeName: string;
+  cycleId: string | null;
+  cycleName: string | null;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  status: GoalStatus;
+  progressPct: number;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GoalsListResponseData = {
+  goals: GoalRecord[];
+};
+
+export type GoalMutationResponseData = {
+  goal: GoalRecord;
+};
+
+export type CreateGoalPayload = {
+  employeeId: string;
+  cycleId?: string | null;
+  title: string;
+  description?: string | null;
+  dueDate?: string | null;
+};
+
+export type UpdateGoalPayload = {
+  title?: string;
+  description?: string | null;
+  dueDate?: string | null;
+  status?: GoalStatus;
+};
+
+export type UpdateGoalProgressPayload = {
+  progressPct: number;
+};
+
+// ── Review Sharing ──
+
+export type ShareReviewResponseData = {
+  assignment: ReviewAssignmentSummary;
+};
+
+export type AcknowledgeReviewResponseData = {
+  assignment: ReviewAssignmentSummary;
+};
+
+// ── Calibration ──
+
+export type CalibrationRow = {
+  assignmentId: string;
+  employeeId: string;
+  employeeName: string;
+  department: string | null;
+  countryCode: string | null;
+  reviewType: ReviewCycleType;
+  selfScore: number | null;
+  managerScore: number | null;
+  variance: number | null;
+  status: "unshared" | "shared" | "acknowledged";
+};
+
+export type CalibrationResponseData = {
+  cycle: ReviewCycleSummary;
+  rows: CalibrationRow[];
+  summary: {
+    totalAssignments: number;
+    completedAssignments: number;
+    completionPct: number;
+    avgSelfScore: number | null;
+    avgManagerScore: number | null;
+  };
+};
+
 export type PerformanceOverviewResponse = ApiResponse<PerformanceOverviewResponseData>;
 export type PerformanceAdminResponse = ApiResponse<PerformanceAdminResponseData>;
 export type SaveReviewResponseApiResponse = ApiResponse<SaveReviewResponseData>;
 export type CreateReviewCycleApiResponse = ApiResponse<CreateReviewCycleData>;
 export type CreateReviewTemplateApiResponse = ApiResponse<CreateReviewTemplateData>;
 export type AssignReviewApiResponse = ApiResponse<AssignReviewData>;
+export type GoalsListResponse = ApiResponse<GoalsListResponseData>;
+export type GoalMutationResponse = ApiResponse<GoalMutationResponseData>;
+export type ShareReviewResponse = ApiResponse<ShareReviewResponseData>;
+export type AcknowledgeReviewResponse = ApiResponse<AcknowledgeReviewResponseData>;
+export type CalibrationResponse = ApiResponse<CalibrationResponseData>;

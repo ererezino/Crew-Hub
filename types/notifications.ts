@@ -14,7 +14,15 @@ export const NOTIFICATION_TYPES = [
   "welcome",
   "signature_requested",
   "signature_signed",
-  "signature_completed"
+  "signature_completed",
+  "shift_swap_requested",
+  "shift_swap_accepted",
+  "shift_swap_rejected",
+  "course_assigned",
+  "review_cycle_started",
+  "review_reminder",
+  "survey_launched",
+  "document_expiry_warning"
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

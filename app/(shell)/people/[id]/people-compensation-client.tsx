@@ -40,7 +40,7 @@ export function PeopleCompensationClient({
       {isLoading ? <CompensationSkeleton /> : null}
 
       {!isLoading && errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Compensation data is unavailable"
             description={errorMessage}

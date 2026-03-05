@@ -1,7 +1,7 @@
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
-import type { UserRole } from "../../../lib/navigation";
+import { normalizeUserRoles, type UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
 import { AnalyticsClient } from "./analytics-client";
 
@@ -33,7 +33,9 @@ export default async function AnalyticsPage() {
     );
   }
 
-  if (!canViewAnalytics(session.profile.roles)) {
+  const userRoles = normalizeUserRoles(session.profile.roles);
+
+  if (!canViewAnalytics(userRoles)) {
     return (
       <>
         <PageHeader
@@ -50,5 +52,5 @@ export default async function AnalyticsPage() {
     );
   }
 
-  return <AnalyticsClient />;
+  return <AnalyticsClient userRoles={userRoles} />;
 }

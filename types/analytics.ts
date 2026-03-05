@@ -1,5 +1,7 @@
 import type { ApiResponse } from "./auth";
 
+/* ── People ── */
+
 export type AnalyticsPeopleDepartmentRow = {
   key: string;
   label: string;
@@ -16,6 +18,11 @@ export type AnalyticsPeopleEmploymentTypeRow = {
   count: number;
 };
 
+export type AnalyticsPeopleStatusRow = {
+  key: string;
+  count: number;
+};
+
 export type AnalyticsPeopleTrendRow = {
   month: string;
   headcount: number;
@@ -26,14 +33,20 @@ export type AnalyticsPeopleSection = {
   metrics: {
     activeHeadcount: number;
     newHires: number;
+    departures: number;
+    avgTenureMonths: number;
+    newHiresThisMonth: number;
     activeDepartments: number;
     activeCountries: number;
   };
   byDepartment: AnalyticsPeopleDepartmentRow[];
   byCountry: AnalyticsPeopleCountryRow[];
   employmentType: AnalyticsPeopleEmploymentTypeRow[];
+  statusDistribution: AnalyticsPeopleStatusRow[];
   trend: AnalyticsPeopleTrendRow[];
 };
+
+/* ── Time Off ── */
 
 export type AnalyticsTimeOffByTypeRow = {
   key: string;
@@ -57,8 +70,26 @@ export type AnalyticsTimeOffCurrentlyOutRow = {
   endDate: string;
 };
 
+export type AnalyticsTimeOffByDeptRow = {
+  department: string;
+  totalAllocated: number;
+  totalUsed: number;
+  utilizationPct: number;
+};
+
+export type AnalyticsTimeOffTopUserRow = {
+  employeeId: string;
+  fullName: string;
+  department: string | null;
+  totalDays: number;
+  mainType: string;
+};
+
 export type AnalyticsTimeOffSection = {
   metrics: {
+    totalDaysTaken: number;
+    mostCommonType: string | null;
+    avgLeaveBalance: number;
     requestedDays: number;
     approvedDays: number;
     pendingRequests: number;
@@ -67,8 +98,12 @@ export type AnalyticsTimeOffSection = {
   };
   byType: AnalyticsTimeOffByTypeRow[];
   trend: AnalyticsTimeOffTrendRow[];
+  byDepartment: AnalyticsTimeOffByDeptRow[];
+  topUsers: AnalyticsTimeOffTopUserRow[];
   currentlyOut: AnalyticsTimeOffCurrentlyOutRow[];
 };
+
+/* ── Payroll ── */
 
 export type AnalyticsPayrollTrendRow = {
   month: string;
@@ -93,6 +128,10 @@ export type AnalyticsPayrollCountryRow = {
 
 export type AnalyticsPayrollSection = {
   metrics: {
+    lastRunGross: number;
+    lastRunNet: number;
+    avgGrossSalary: number;
+    totalAllowances: number;
     totalGross: number;
     totalNet: number;
     totalDeductions: number;
@@ -102,7 +141,14 @@ export type AnalyticsPayrollSection = {
   trend: AnalyticsPayrollTrendRow[];
   byDepartment: AnalyticsPayrollDepartmentRow[];
   byCountry: AnalyticsPayrollCountryRow[];
+  compensationBands: {
+    belowMidpoint: number;
+    atMidpoint: number;
+    aboveMidpoint: number;
+  };
 };
+
+/* ── Expenses ── */
 
 export type AnalyticsExpensesCategoryRow = {
   key: string;
@@ -128,8 +174,10 @@ export type AnalyticsExpensesTopSpenderRow = {
 export type AnalyticsExpensesSection = {
   metrics: {
     totalAmount: number;
-    approvedAmount: number;
+    reimbursedAmount: number;
     pendingAmount: number;
+    avgProcessingDays: number;
+    approvedAmount: number;
     expenseCount: number;
   };
   byCategory: AnalyticsExpensesCategoryRow[];
@@ -137,17 +185,46 @@ export type AnalyticsExpensesSection = {
   topSpenders: AnalyticsExpensesTopSpenderRow[];
 };
 
+/* ── Pipeline ── */
+
+export type AnalyticsPipelineSection = {
+  onboarding: {
+    active: number;
+    overdue: number;
+  };
+  reviewCycles: {
+    active: number;
+    completionPct: number;
+  };
+  learning: {
+    activeCourses: number;
+    completionPct: number;
+  };
+  complianceHealth: {
+    completedOnTimePct: number;
+  };
+};
+
+/* ── Response Envelope ── */
+
+export type AnalyticsFilterOptions = {
+  countries: string[];
+  departments: string[];
+};
+
 export type AnalyticsResponseData = {
   dateRange: {
     startDate: string;
     endDate: string;
   };
+  filterOptions: AnalyticsFilterOptions;
   people: AnalyticsPeopleSection;
   timeOff: AnalyticsTimeOffSection;
   payroll: AnalyticsPayrollSection;
   expenses: AnalyticsExpensesSection;
+  pipeline: AnalyticsPipelineSection;
 };
 
-export type AnalyticsCsvSection = "people" | "time_off" | "payroll" | "expenses";
+export type AnalyticsCsvSection = "people" | "time_off" | "payroll" | "expenses" | "pipeline";
 
 export type AnalyticsResponse = ApiResponse<AnalyticsResponseData>;

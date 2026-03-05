@@ -608,16 +608,32 @@ export async function PUT(
     });
   }
 
-  const targetNotificationUserId = swap.requester_id === session.profile.id ? swap.target_id : swap.requester_id;
-
-  if (targetNotificationUserId) {
+  if (action === "accept" || action === "approve") {
     void createNotification({
       orgId: session.profile.org_id,
-      userId: targetNotificationUserId,
-      type: "shift_swap_updated",
-      title: "Shift swap updated",
-      body: `${session.profile.full_name} ${action}ed a shift swap request.`,
-      link: "/scheduling/swaps"
+      userId: swap.requester_id,
+      type: "shift_swap_accepted",
+      title: "Shift swap accepted",
+      body: `${session.profile.full_name} accepted your shift swap for ${shift.shift_date}.`,
+      link: "/scheduling?tab=swaps"
+    });
+  } else if (action === "reject") {
+    void createNotification({
+      orgId: session.profile.org_id,
+      userId: swap.requester_id,
+      type: "shift_swap_rejected",
+      title: "Shift swap declined",
+      body: `${session.profile.full_name} declined your shift swap for ${shift.shift_date}.`,
+      link: "/scheduling?tab=swaps"
+    });
+  } else if (action === "cancel" && swap.target_id) {
+    void createNotification({
+      orgId: session.profile.org_id,
+      userId: swap.target_id,
+      type: "shift_swap_rejected",
+      title: "Shift swap cancelled",
+      body: `${session.profile.full_name} cancelled their shift swap request for ${shift.shift_date}.`,
+      link: "/scheduling?tab=swaps"
     });
   }
 

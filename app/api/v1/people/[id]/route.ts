@@ -31,6 +31,7 @@ const updatePersonSchema = z.object({
   roles: z.array(z.enum(USER_ROLES)).min(1, "Select at least one role.").optional(),
   department: z.string().trim().max(100, "Department is too long.").nullable().optional(),
   title: z.string().trim().max(200, "Title is too long.").nullable().optional(),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be YYYY-MM-DD.").nullable().optional(),
   managerId: z.string().uuid("Manager must be a valid user id.").nullable().optional(),
   status: z.enum(PROFILE_STATUSES).optional(),
   bio: z.string().trim().max(500, "Bio must be 500 characters or fewer.").nullable().optional(),
@@ -67,6 +68,7 @@ const profileRowSchema = z.object({
   timezone: z.string().nullable(),
   phone: z.string().nullable(),
   start_date: z.string().nullable(),
+  date_of_birth: z.string().nullable().default(null),
   manager_id: z.string().uuid().nullable(),
   employment_type: z.enum(["full_time", "part_time", "contractor"]),
   payroll_mode: z.enum([
@@ -76,6 +78,7 @@ const profileRowSchema = z.object({
   ]),
   primary_currency: z.string(),
   status: z.enum(PROFILE_STATUSES),
+  notice_period_end_date: z.string().nullable().default(null),
   bio: z.string().nullable().default(null),
   favorite_music: z.string().nullable().default(null),
   favorite_books: z.string().nullable().default(null),
@@ -114,12 +117,14 @@ function mapPersonRow(
     timezone: row.timezone,
     phone: row.phone,
     startDate: row.start_date,
+    dateOfBirth: row.date_of_birth,
     managerId: row.manager_id,
     managerName: row.manager_id ? managerNameById.get(row.manager_id) ?? null : null,
     employmentType: row.employment_type,
     payrollMode: row.payroll_mode,
     primaryCurrency: row.primary_currency,
     status: row.status,
+    noticePeriodEndDate: row.notice_period_end_date ?? null,
     bio: row.bio ?? null,
     favoriteMusic: row.favorite_music ?? null,
     favoriteBooks: row.favorite_books ?? null,
@@ -235,7 +240,7 @@ export async function PUT(
   const { data: existingProfile, error: existingProfileError } = await serviceRoleClient
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
     )
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
@@ -376,6 +381,7 @@ export async function PUT(
     roles?: string[];
     department?: string | null;
     title?: string | null;
+    date_of_birth?: string | null;
     manager_id?: string | null;
     status?: ProfileStatus;
     bio?: string | null;
@@ -399,6 +405,10 @@ export async function PUT(
 
   if (payload.title !== undefined) {
     updateValues.title = payload.title?.trim() || null;
+  }
+
+  if (payload.dateOfBirth !== undefined) {
+    updateValues.date_of_birth = payload.dateOfBirth ?? null;
   }
 
   if (payload.managerId !== undefined) {
@@ -438,7 +448,7 @@ export async function PUT(
       .eq("id", personId)
       .eq("org_id", session.profile.org_id)
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
       )
       .single();
 
@@ -467,6 +477,84 @@ export async function PUT(
       },
       meta: buildMeta()
     });
+  }
+
+  // Auto-create leave balances for all applicable types when status changes to "active"
+  if (
+    payload.status === "active" &&
+    parsedExistingProfile.data.status !== "active"
+  ) {
+    try {
+      const currentYear = new Date().getUTCFullYear();
+      const employeeCountryCode = parsedUpdatedRow.data.country_code;
+
+      // Fetch all leave policies for the employee's country
+      const { data: policies } = await serviceRoleClient
+        .from("leave_policies")
+        .select("leave_type, default_days_per_year, is_unlimited")
+        .eq("org_id", session.profile.org_id)
+        .eq("country_code", employeeCountryCode ?? "")
+        .is("deleted_at", null);
+
+      // Determine which leave types need balances (skip unlimited and probation-only)
+      const balanceTypes = (policies ?? []).filter(
+        (p) => !p.is_unlimited && p.leave_type !== "unpaid_personal_day"
+      );
+
+      for (const policy of balanceTypes) {
+        const { data: existingBalance } = await serviceRoleClient
+          .from("leave_balances")
+          .select("id")
+          .eq("org_id", session.profile.org_id)
+          .eq("employee_id", personId)
+          .eq("year", currentYear)
+          .eq("leave_type", policy.leave_type)
+          .is("deleted_at", null)
+          .maybeSingle();
+
+        if (!existingBalance) {
+          let totalDays = policy.leave_type === "annual_leave" ? 20 : 5;
+
+          if (policy.default_days_per_year) {
+            const policyDays =
+              typeof policy.default_days_per_year === "string"
+                ? Number.parseFloat(policy.default_days_per_year)
+                : (policy.default_days_per_year as number);
+
+            if (Number.isFinite(policyDays) && policyDays > 0) {
+              totalDays = policyDays;
+            }
+          }
+
+          const { error: balanceError } = await serviceRoleClient
+            .from("leave_balances")
+            .insert({
+              org_id: session.profile.org_id,
+              employee_id: personId,
+              leave_type: policy.leave_type,
+              year: currentYear,
+              total_days: totalDays,
+              used_days: 0,
+              pending_days: 0,
+              carried_days: 0
+            });
+
+          if (balanceError) {
+            console.error("Unable to auto-create leave balance on activation.", {
+              personId,
+              leaveType: policy.leave_type,
+              year: currentYear,
+              message: balanceError.message
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Leave balance auto-creation failed (non-blocking).", {
+        personId,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 
   const managerId = parsedUpdatedRow.data.manager_id;
@@ -694,7 +782,7 @@ export async function PATCH(
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
     )
     .single();
 

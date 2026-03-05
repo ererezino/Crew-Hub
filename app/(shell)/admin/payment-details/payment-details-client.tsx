@@ -15,10 +15,10 @@ type SortDirection = "asc" | "desc";
 
 function detailsTableSkeleton() {
   return (
-    <div className="payment-details-table-skeleton" aria-hidden="true">
-      <div className="payment-details-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 8 }, (_, index) => (
-        <div key={`payment-details-row-skeleton-${index}`} className="payment-details-table-skeleton-row" />
+        <div key={`payment-details-row-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -69,7 +69,7 @@ export function AdminPaymentDetailsClient() {
       {paymentDetailsQuery.isLoading ? detailsTableSkeleton() : null}
 
       {!paymentDetailsQuery.isLoading && paymentDetailsQuery.errorMessage ? (
-        <section className="payment-details-error-state">
+        <section className="error-state">
           <EmptyState
             title="Payment details are unavailable"
             description={paymentDetailsQuery.errorMessage}

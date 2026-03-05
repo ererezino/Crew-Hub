@@ -13,6 +13,7 @@ import { VestingBar } from "../../../../components/shared/vesting-bar";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useAdminCompensation } from "../../../../hooks/use-compensation";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { toSentenceCase } from "../../../../lib/format-labels";
 import {
   calculateVestingProgress,
   formatAllowanceTypeLabel,
@@ -860,7 +861,7 @@ export function AdminCompensationClient({
       {compensationQuery.isLoading ? <CompensationSkeleton /> : null}
 
       {!compensationQuery.isLoading && compensationQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Compensation admin data is unavailable"
             description={compensationQuery.errorMessage}
@@ -893,7 +894,7 @@ export function AdminCompensationClient({
       !compensationQuery.errorMessage &&
       selectedEmployee ? (
         <section className="compensation-layout" aria-label="Compensation admin sections">
-          <article className="compensation-summary-card" aria-label="Selected employee summary">
+          <article className="metric-card" aria-label="Selected employee summary">
             <div>
               <h2 className="section-title">{selectedEmployee.fullName}</h2>
               <p className="settings-card-description">
@@ -1246,7 +1247,7 @@ export function AdminCompensationClient({
                           <td className="numeric">{grant.numberOfShares.toLocaleString()}</td>
                           <td>
                             <StatusBadge tone={toneForEquityStatus(grant.status)}>
-                              {grant.status}
+                              {toSentenceCase(grant.status)}
                             </StatusBadge>
                           </td>
                           <td>

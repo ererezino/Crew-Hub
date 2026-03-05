@@ -28,6 +28,8 @@ const instanceRowSchema = z.object({
   completed_at: z.string().nullable()
 });
 
+const TASK_TYPE_VALUES = ["manual", "e_signature", "link", "form"] as const;
+
 const taskRowSchema = z.object({
   id: z.string().uuid(),
   instance_id: z.string().uuid(),
@@ -35,11 +37,14 @@ const taskRowSchema = z.object({
   description: z.string().nullable(),
   category: z.string(),
   status: z.enum(ONBOARDING_TASK_STATUSES),
+  task_type: z.enum(TASK_TYPE_VALUES).default("manual"),
   assigned_to: z.string().uuid().nullable(),
   due_date: z.string().nullable(),
   completed_at: z.string().nullable(),
   completed_by: z.string().uuid().nullable(),
-  notes: z.string().nullable()
+  notes: z.string().nullable(),
+  document_id: z.string().uuid().nullable().default(null),
+  signature_request_id: z.string().uuid().nullable().default(null)
 });
 
 const profileRowSchema = z.object({
@@ -162,7 +167,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { data: rawTasks, error: tasksError } = await supabase
     .from("onboarding_tasks")
     .select(
-      "id, instance_id, title, description, category, status, assigned_to, due_date, completed_at, completed_by, notes"
+      "id, instance_id, title, description, category, status, task_type, assigned_to, due_date, completed_at, completed_by, notes, document_id, signature_request_id"
     )
     .eq("instance_id", instance.id)
     .eq("org_id", profile.org_id)
@@ -220,7 +225,6 @@ export async function GET(_request: Request, context: RouteContext) {
             .from("onboarding_templates")
             .select("id, name")
             .eq("id", instance.template_id)
-            .eq("org_id", profile.org_id)
             .is("deleted_at", null)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null })
@@ -280,6 +284,7 @@ export async function GET(_request: Request, context: RouteContext) {
     description: task.description,
     category: task.category,
     status: task.status,
+    taskType: task.task_type ?? "manual",
     assignedTo: task.assigned_to,
     assignedToName: task.assigned_to
       ? profileNameById.get(task.assigned_to) ?? "Unknown user"
@@ -290,7 +295,9 @@ export async function GET(_request: Request, context: RouteContext) {
     completedByName: task.completed_by
       ? profileNameById.get(task.completed_by) ?? "Unknown user"
       : null,
-    notes: task.notes
+    notes: task.notes,
+    documentId: task.document_id,
+    signatureRequestId: task.signature_request_id
   }));
 
   const reminderTasks = tasksRows.filter((task) => {

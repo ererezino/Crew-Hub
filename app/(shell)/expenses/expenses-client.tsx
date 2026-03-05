@@ -20,7 +20,7 @@ import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { MoneyInput } from "../../../components/ui/money-input";
 import { useExpenses } from "../../../hooks/use-expenses";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../lib/datetime";
 import {
   ALLOWED_RECEIPT_EXTENSIONS,
   currentMonthKey,
@@ -444,10 +444,10 @@ function ExpensesSkeleton() {
           <div key={`expenses-metric-skeleton-${index}`} className="expenses-metric-skeleton-card" />
         ))}
       </div>
-      <div className="expenses-table-skeleton">
-        <div className="expenses-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 8 }, (_, index) => (
-          <div key={`expenses-table-skeleton-${index}`} className="expenses-table-skeleton-row" />
+          <div key={`table-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -827,7 +827,7 @@ export function ExpensesClient({
       {expensesQuery.isLoading ? <ExpensesSkeleton /> : null}
 
       {!expensesQuery.isLoading && expensesQuery.errorMessage ? (
-        <section className="expenses-error-state">
+        <section className="error-state">
           <EmptyState
             title="Expenses are unavailable"
             description={expensesQuery.errorMessage}
@@ -935,7 +935,7 @@ export function ExpensesClient({
                               dateTime={expense.expenseDate}
                               title={formatDateTimeTooltip(expense.expenseDate)}
                             >
-                              {expense.expenseDate}
+                              {formatSingleDateHuman(expense.expenseDate)}
                             </time>
                           </td>
                           {showEmployeeColumn ? (
@@ -1203,8 +1203,8 @@ export function ExpensesClient({
 
           {formValues.expenseType === "personal_reimbursement" ? (
             <div className="expenses-info-banner">
-              <svg viewBox="0 0 24 24" aria-hidden="true" className="expenses-info-icon">
-                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="expenses-info-icon">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
                 <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
               <p>Not all expenses qualify for reimbursement. Reimbursement-eligible expenses must be pre-approved by your manager.</p>

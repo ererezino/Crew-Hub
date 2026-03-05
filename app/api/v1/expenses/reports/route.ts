@@ -26,7 +26,11 @@ const reportQuerySchema = z.object({
     .string()
     .optional()
     .refine((value) => (value ? isIsoMonth(value) : true), "Month must be in YYYY-MM format"),
-  format: z.enum(["json", "csv"]).optional()
+  format: z.enum(["json", "csv"]).optional(),
+  country: z.string().min(2).max(2).optional(),
+  department: z.string().min(1).max(200).optional(),
+  status: z.string().optional(),
+  category: z.string().optional()
 });
 
 function csvEscape(value: string | number): string {
@@ -158,6 +162,14 @@ export async function GET(request: Request) {
     expensesQuery = expensesQuery.in("employee_id", scopedEmployeeIds);
   }
 
+  if (query.status) {
+    expensesQuery = expensesQuery.eq("status", query.status);
+  }
+
+  if (query.category) {
+    expensesQuery = expensesQuery.eq("category", query.category);
+  }
+
   const { data: rawExpenses, error: expensesError } = await expensesQuery;
 
   if (expensesError) {
@@ -190,6 +202,8 @@ export async function GET(request: Request) {
       totals: {
         expenseCount: 0,
         totalAmount: 0,
+        managerApprovedAmount: 0,
+        financeApprovedAmount: 0,
         pendingAmount: 0,
         reimbursedAmount: 0
       },
@@ -200,7 +214,10 @@ export async function GET(request: Request) {
       },
       byCategory: [],
       byEmployee: [],
-      byDepartment: []
+      byDepartment: [],
+      enhancedByEmployee: [],
+      enhancedByCategory: [],
+      enhancedByDepartment: []
     };
 
     if (query.format === "csv") {
@@ -275,20 +292,62 @@ export async function GET(request: Request) {
   }
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
+
+  // Apply country/department post-filters
+  let filteredExpenses = parsedExpenses.data;
+  if (query.country) {
+    filteredExpenses = filteredExpenses.filter((expense) => {
+      const profile = profileById.get(expense.employee_id);
+      return profile?.country_code === query.country;
+    });
+  }
+  if (query.department) {
+    filteredExpenses = filteredExpenses.filter((expense) => {
+      const profile = profileById.get(expense.employee_id);
+      return profile?.department === query.department;
+    });
+  }
+
   const categoryTotals = new Map<string, { label: string; totalAmount: number; count: number }>();
   const employeeTotals = new Map<string, { label: string; totalAmount: number; count: number }>();
   const departmentTotals = new Map<string, { label: string; totalAmount: number; count: number }>();
   const statusTotals = new Map<string, { label: string; totalAmount: number; count: number }>();
 
+  // Enhanced breakdown maps
+  const enhEmployeeMap = new Map<string, {
+    label: string;
+    department: string | null;
+    totalAmount: number;
+    count: number;
+    processingHoursTotal: number;
+    processingCount: number;
+    statusCounts: Record<string, number>;
+  }>();
+  const enhCategoryMap = new Map<string, {
+    label: string;
+    totalAmount: number;
+    count: number;
+    vendorCounts: Record<string, number>;
+  }>();
+  const enhDeptMap = new Map<string, {
+    label: string;
+    totalAmount: number;
+    count: number;
+    employees: Set<string>;
+    categoryCounts: Record<string, number>;
+  }>();
+
   let pendingAmount = 0;
   let reimbursedAmount = 0;
+  let managerApprovedAmount = 0;
+  let financeApprovedAmount = 0;
   let totalAmount = 0;
   let submissionToManagerApprovalHoursTotal = 0;
   let submissionToManagerApprovalCount = 0;
   let managerApprovalToDisbursementHoursTotal = 0;
   let managerApprovalToDisbursementCount = 0;
 
-  for (const expense of parsedExpenses.data) {
+  for (const expense of filteredExpenses) {
     const amount = typeof expense.amount === "number" ? expense.amount : Number.parseInt(expense.amount, 10);
     const safeAmount = Number.isFinite(amount) ? Math.trunc(amount) : 0;
     totalAmount += safeAmount;
@@ -299,6 +358,14 @@ export async function GET(request: Request) {
       expense.status === "approved"
     ) {
       pendingAmount += safeAmount;
+    }
+
+    if (expense.status === "manager_approved") {
+      managerApprovedAmount += safeAmount;
+    }
+
+    if (expense.status === "approved") {
+      financeApprovedAmount += safeAmount;
     }
 
     if (expense.status === "reimbursed") {
@@ -367,7 +434,108 @@ export async function GET(request: Request) {
         managerApprovalToDisbursementCount += 1;
       }
     }
+
+    // ── Enhanced employee breakdown ──
+    const empEnh = enhEmployeeMap.get(expense.employee_id) ?? {
+      label: employeeLabel,
+      department: employeeProfile?.department ?? null,
+      totalAmount: 0,
+      count: 0,
+      processingHoursTotal: 0,
+      processingCount: 0,
+      statusCounts: {}
+    };
+    empEnh.totalAmount += safeAmount;
+    empEnh.count += 1;
+    empEnh.statusCounts[expense.status] = (empEnh.statusCounts[expense.status] ?? 0) + 1;
+    if (Number.isFinite(submittedAt) && Number.isFinite(reimbursedAt) && reimbursedAt > submittedAt) {
+      empEnh.processingHoursTotal += (reimbursedAt - submittedAt) / (1000 * 60 * 60);
+      empEnh.processingCount += 1;
+    }
+    enhEmployeeMap.set(expense.employee_id, empEnh);
+
+    // ── Enhanced category breakdown ──
+    const catEnh = enhCategoryMap.get(expense.category) ?? {
+      label: categoryLabel,
+      totalAmount: 0,
+      count: 0,
+      vendorCounts: {}
+    };
+    catEnh.totalAmount += safeAmount;
+    catEnh.count += 1;
+    const vendor = (expense as Record<string, unknown>).vendor_name as string | null;
+    if (vendor) {
+      catEnh.vendorCounts[vendor] = (catEnh.vendorCounts[vendor] ?? 0) + 1;
+    }
+    enhCategoryMap.set(expense.category, catEnh);
+
+    // ── Enhanced department breakdown ──
+    const deptEnh = enhDeptMap.get(departmentLabel) ?? {
+      label: departmentLabel,
+      totalAmount: 0,
+      count: 0,
+      employees: new Set<string>(),
+      categoryCounts: {}
+    };
+    deptEnh.totalAmount += safeAmount;
+    deptEnh.count += 1;
+    deptEnh.employees.add(expense.employee_id);
+    deptEnh.categoryCounts[expense.category] = (deptEnh.categoryCounts[expense.category] ?? 0) + 1;
+    enhDeptMap.set(departmentLabel, deptEnh);
   }
+
+  // ── Build enhanced breakdown arrays from maps ──
+  const enhancedByEmployee = [...enhEmployeeMap.entries()]
+    .map(([key, value]) => ({
+      key,
+      label: value.label,
+      department: value.department,
+      totalAmount: value.totalAmount,
+      count: value.count,
+      avgProcessingHours:
+        value.processingCount > 0
+          ? Number((value.processingHoursTotal / value.processingCount).toFixed(2))
+          : null,
+      statusCounts: value.statusCounts
+    }))
+    .sort((left, right) => right.totalAmount - left.totalAmount);
+
+  const grandTotal = totalAmount || 1;
+  const enhancedByCategory = [...enhCategoryMap.entries()]
+    .map(([key, value]) => {
+      const vendorEntries = Object.entries(value.vendorCounts);
+      const mostCommonVendor =
+        vendorEntries.length > 0
+          ? vendorEntries.sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+          : null;
+      return {
+        key,
+        label: value.label,
+        totalAmount: value.totalAmount,
+        count: value.count,
+        pctOfTotal: Number(((value.totalAmount / grandTotal) * 100).toFixed(1)),
+        mostCommonVendor
+      };
+    })
+    .sort((left, right) => right.totalAmount - left.totalAmount);
+
+  const enhancedByDepartment = [...enhDeptMap.entries()]
+    .map(([key, value]) => {
+      const catEntries = Object.entries(value.categoryCounts);
+      const topCategory =
+        catEntries.length > 0
+          ? catEntries.sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+          : null;
+      return {
+        key,
+        label: value.label,
+        totalAmount: value.totalAmount,
+        count: value.count,
+        uniqueEmployees: value.employees.size,
+        topCategory
+      };
+    })
+    .sort((left, right) => right.totalAmount - left.totalAmount);
 
   if (query.format === "csv") {
     const csvHeader = [
@@ -391,7 +559,7 @@ export async function GET(request: Request) {
       "Reimbursed At"
     ];
 
-    const csvRows = parsedExpenses.data.map((expense) => {
+    const csvRows = filteredExpenses.map((expense) => {
       const profile = profileById.get(expense.employee_id);
       const managerApprover = expense.manager_approved_by
         ? profileById.get(expense.manager_approved_by)
@@ -482,8 +650,10 @@ export async function GET(request: Request) {
   const responseData: ExpenseReportsResponseData = {
     month,
     totals: {
-      expenseCount: parsedExpenses.data.length,
+      expenseCount: filteredExpenses.length,
       totalAmount,
+      managerApprovedAmount,
+      financeApprovedAmount,
       pendingAmount,
       reimbursedAmount
     },
@@ -500,7 +670,10 @@ export async function GET(request: Request) {
     },
     byCategory,
     byEmployee,
-    byDepartment
+    byDepartment,
+    enhancedByEmployee,
+    enhancedByCategory,
+    enhancedByDepartment
   };
 
   return jsonResponse<ExpenseReportsResponseData>(200, {

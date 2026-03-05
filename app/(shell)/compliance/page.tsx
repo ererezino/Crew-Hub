@@ -4,6 +4,7 @@ import { getAuthenticatedSession } from "../../../lib/auth/session";
 import { normalizeUserRoles } from "../../../lib/navigation";
 import { canManageCompliance } from "../../../lib/compliance";
 import { ComplianceClient } from "./compliance-client";
+import { ComplianceEmployeeClient } from "./compliance-employee-client";
 
 export default async function CompliancePage() {
   const session = await getAuthenticatedSession();
@@ -26,22 +27,10 @@ export default async function CompliancePage() {
   }
 
   const userRoles = normalizeUserRoles(session.profile.roles);
+  const isAdmin = canManageCompliance(userRoles);
 
-  if (!canManageCompliance(userRoles)) {
-    return (
-      <>
-        <PageHeader
-          title="Compliance"
-          description="Track statutory deadlines and proof of filing across all operating countries."
-        />
-        <EmptyState
-          title="Access denied"
-          description="Only HR Admin, Finance Admin, and Super Admin can access compliance."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
-        />
-      </>
-    );
+  if (!isAdmin) {
+    return <ComplianceEmployeeClient userId={session.profile.id} />;
   }
 
   return <ComplianceClient />;

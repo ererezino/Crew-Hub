@@ -24,11 +24,10 @@ export default async function PlaceholderPage({ params }: PlaceholderPageProps) 
     <>
       <PageHeader
         title={routeName}
-        description="Placeholder route connected to the Crew Hub app shell."
       />
       <EmptyState
-        title="Page module is not implemented yet"
-        description={`This placeholder confirms navigation wiring for ${targetPath}.`}
+        title="Coming soon"
+        description={`The ${routeName.toLowerCase()} module is under development. Check back later.`}
         ctaLabel="Go to dashboard"
         ctaHref="/dashboard"
       />

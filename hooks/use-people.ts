@@ -9,6 +9,7 @@ import {
   useState
 } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type { PersonRecord, PeopleListResponse } from "../types/people";
 
 type PeopleScope = "all" | "reports" | "me";
@@ -57,10 +58,7 @@ export function usePeople(options: UsePeopleOptions = {}): UsePeopleResult {
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as PeopleListResponse;
 
