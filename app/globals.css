@@ -3487,6 +3487,62 @@ html.dark .topbar {
   gap: var(--space-2);
 }
 
+/* PROD-21: Local guidance and authority link */
+
+.compliance-local-guidance {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.compliance-local-guidance-summary {
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+  background: var(--bg-sunken);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.compliance-local-guidance-summary::before {
+  content: "\25B6";
+  font-size: var(--text-xs);
+  transition: transform 0.15s ease;
+}
+
+.compliance-local-guidance[open] .compliance-local-guidance-summary::before {
+  transform: rotate(90deg);
+}
+
+.compliance-local-guidance-body {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.compliance-authority-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.compliance-authority-link:hover {
+  text-decoration: underline;
+}
+
 .compliance-due-overdue {
   color: var(--status-error-text);
   font-weight: 600;
@@ -8043,6 +8099,60 @@ html.dark .home-quote-text {
   margin: 0;
 }
 
+/* PROD-20: Employee 360 Summary */
+
+.summary-360-card {
+  border-left: 3px solid var(--color-accent);
+}
+
+.summary-360-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.summary-360-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-md);
+}
+
+.summary-360-stat-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.summary-360-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.summary-360-latest {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.summary-360-latest-empty {
+  font-style: italic;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 480px) {
+  .summary-360-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .profile-overview-privacy-desc {
   font-size: var(--text-sm);
   color: var(--text-secondary);
@@ -8517,6 +8627,55 @@ html.dark .home-quote-text {
 .dashboard-audit-time {
   margin-left: auto;
   white-space: nowrap;
+}
+
+/* PROD-24: Health alert cards */
+
+.health-alert-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.health-alert-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--status-warning-border);
+  background: var(--status-warning-bg);
+  text-decoration: none;
+  transition: box-shadow var(--transition-hover);
+}
+
+.health-alert-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.health-alert-error {
+  border-left-color: var(--status-error-border);
+  background: var(--status-error-bg);
+}
+
+.health-alert-icon {
+  flex-shrink: 0;
+  color: var(--status-warning-text);
+}
+
+.health-alert-error .health-alert-icon {
+  color: var(--status-error-text);
+}
+
+.health-alert-label {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.health-alert-arrow {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
 }
 
 /* ── Pending approvals widget — counter grid ── */

@@ -121,6 +121,16 @@ export type DashboardAuditLogEntry = {
   timestamp: string;
 };
 
+/* ── PROD-24: Health Alert ── */
+
+export type DashboardHealthAlert = {
+  key: string;
+  label: string;
+  count: number;
+  severity: "warning" | "error";
+  href: string;
+};
+
 /**
  * Persona-aware dashboard response.
  *
@@ -202,6 +212,9 @@ export type DashboardResponseData = {
     inProgress: number;
     overdue: number;
   } | null;
+
+  /* ── PROD-24: admin health alerts ── */
+  healthAlerts: DashboardHealthAlert[];
 };
 
 export type DashboardResponse = ApiResponse<DashboardResponseData>;

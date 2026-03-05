@@ -11,6 +11,7 @@ import type {
   DashboardAuditLogEntry,
   DashboardExpenseItem,
   DashboardGreeting,
+  DashboardHealthAlert,
   DashboardHolidayItem,
   DashboardLeaveBalanceItem,
   DashboardPendingApprovals,
@@ -94,7 +95,8 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     headcountByCountry: null,
     headcountByDept: null,
     recentAuditLog: null,
-    complianceHealth: null
+    complianceHealth: null,
+    healthAlerts: []
   };
 }
 
@@ -805,6 +807,124 @@ async function fetchComplianceHealth(
   }
 }
 
+/* ── PROD-24: Health alerts ── */
+
+async function fetchHealthAlerts(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<DashboardHealthAlert[]> {
+  const alerts: DashboardHealthAlert[] = [];
+  const today = toDateString(new Date());
+  const in14Days = toDateString(
+    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+  );
+  const in30Days = toDateString(
+    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  );
+  const sevenDaysAgo = toDateString(
+    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  );
+  const threeDaysAgo = toDateString(
+    new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+  );
+
+  try {
+    const [
+      staleOnboardingsResult,
+      complianceDueResult,
+      stuckExpensesResult,
+      expiringDocsResult
+    ] = await Promise.all([
+      // Onboarding instances inactive 3+ days
+      supabase
+        .from("onboarding_instances")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "active")
+        .is("deleted_at", null)
+        .lte("updated_at", `${threeDaysAgo}T23:59:59.999Z`),
+
+      // Compliance deadlines due within 14 days (not completed)
+      supabase
+        .from("compliance_deadlines")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .neq("status", "completed")
+        .gte("due_date", today)
+        .lte("due_date", in14Days),
+
+      // Expenses stuck after manager approval (7+ days)
+      supabase
+        .from("expenses")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "manager_approved")
+        .is("deleted_at", null)
+        .lte("updated_at", `${sevenDaysAgo}T23:59:59.999Z`),
+
+      // Documents expiring within 30 days
+      supabase
+        .from("documents")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .not("expiry_date", "is", null)
+        .gte("expiry_date", today)
+        .lte("expiry_date", in30Days)
+    ]);
+
+    const staleOnboardings = staleOnboardingsResult.count ?? 0;
+    const complianceDue = complianceDueResult.count ?? 0;
+    const stuckExpenses = stuckExpensesResult.count ?? 0;
+    const expiringDocs = expiringDocsResult.count ?? 0;
+
+    if (staleOnboardings > 0) {
+      alerts.push({
+        key: "stale_onboardings",
+        label: `${staleOnboardings} onboarding instance${staleOnboardings === 1 ? "" : "s"} inactive 3+ days`,
+        count: staleOnboardings,
+        severity: staleOnboardings >= 3 ? "error" : "warning",
+        href: "/onboarding"
+      });
+    }
+
+    if (complianceDue > 0) {
+      alerts.push({
+        key: "compliance_due",
+        label: `${complianceDue} compliance deadline${complianceDue === 1 ? "" : "s"} due in 14 days`,
+        count: complianceDue,
+        severity: "warning",
+        href: "/compliance"
+      });
+    }
+
+    if (stuckExpenses > 0) {
+      alerts.push({
+        key: "stuck_expenses",
+        label: `${stuckExpenses} expense${stuckExpenses === 1 ? "" : "s"} stuck after manager approval`,
+        count: stuckExpenses,
+        severity: stuckExpenses >= 5 ? "error" : "warning",
+        href: "/finance"
+      });
+    }
+
+    if (expiringDocs > 0) {
+      alerts.push({
+        key: "expiring_documents",
+        label: `${expiringDocs} document${expiringDocs === 1 ? "" : "s"} expiring in 30 days`,
+        count: expiringDocs,
+        severity: "warning",
+        href: "/documents"
+      });
+    }
+  } catch {
+    // Graceful fallback: return whatever alerts we collected
+  }
+
+  return alerts;
+}
+
 /* ── Main handler ── */
 
 export async function GET() {
@@ -960,7 +1080,8 @@ export async function GET() {
           activeReviewCycles,
           expiringDocuments,
           leaveBalance,
-          hasPolicy
+          hasPolicy,
+          healthAlerts
         ] = await Promise.all([
           fetchHeadcount(supabase, profile.org_id),
           fetchOnboardingStatus(supabase, profile.org_id),
@@ -968,7 +1089,8 @@ export async function GET() {
           fetchActiveReviewCycles(supabase, profile.org_id),
           fetchExpiringDocuments(supabase, profile.org_id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department),
+          fetchHealthAlerts(supabase, profile.org_id)
         ]);
 
         response.headcount = headcount;
@@ -978,6 +1100,7 @@ export async function GET() {
         response.expiringDocuments = expiringDocuments;
         response.leaveBalance = leaveBalance;
         response.hasTimePolicy = hasPolicy;
+        response.healthAlerts = healthAlerts;
         break;
       }
 
@@ -1016,7 +1139,8 @@ export async function GET() {
           recentAuditLog,
           expiringDocuments,
           leaveBalance,
-          hasPolicy
+          hasPolicy,
+          healthAlerts
         ] = await Promise.all([
           fetchHeadcount(supabase, profile.org_id),
           fetchHeadcountByCountry(supabase, profile.org_id),
@@ -1028,7 +1152,8 @@ export async function GET() {
           fetchRecentAuditLog(supabase, profile.org_id),
           fetchExpiringDocuments(supabase, profile.org_id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department),
+          fetchHealthAlerts(supabase, profile.org_id)
         ]);
 
         response.headcount = headcount;
@@ -1042,6 +1167,7 @@ export async function GET() {
         response.expiringDocuments = expiringDocuments;
         response.leaveBalance = leaveBalance;
         response.hasTimePolicy = hasPolicy;
+        response.healthAlerts = healthAlerts;
         break;
       }
     }

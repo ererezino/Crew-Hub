@@ -704,6 +704,34 @@ export function ComplianceClient() {
               </p>
             ) : null}
 
+            {/* PROD-21: Local guidance expandable section */}
+            {selectedDeadline.localGuidance ? (
+              <details className="compliance-local-guidance">
+                <summary className="compliance-local-guidance-summary">What is this?</summary>
+                <p className="compliance-local-guidance-body">{selectedDeadline.localGuidance}</p>
+                {selectedDeadline.authorityUrl ? (
+                  <a
+                    className="compliance-authority-link"
+                    href={selectedDeadline.authorityUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Visit {selectedDeadline.authority} portal
+                  </a>
+                ) : null}
+              </details>
+            ) : selectedDeadline.authorityUrl ? (
+              <a
+                className="compliance-authority-link"
+                href={selectedDeadline.authorityUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ marginBottom: "var(--space-3)", display: "inline-block" }}
+              >
+                Visit {selectedDeadline.authority} portal
+              </a>
+            ) : null}
+
             <label className="form-field" htmlFor="compliance-status">
               <span className="form-label">Status</span>
               <select

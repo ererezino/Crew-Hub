@@ -44,7 +44,9 @@ const itemRowSchema = z.object({
   description: z.string().nullable(),
   cadence: z.string(),
   category: z.string(),
-  notes: z.string().nullable()
+  notes: z.string().nullable(),
+  authority_url: z.string().nullable().optional(),
+  local_guidance: z.string().nullable().optional()
 });
 
 const assigneeRowSchema = z.object({
@@ -116,6 +118,8 @@ function mapDeadlineRows({
       cadence,
       category: item.category,
       itemNotes: item.notes,
+      authorityUrl: item.authority_url ?? null,
+      localGuidance: item.local_guidance ?? null,
       dueDate: deadline.due_date,
       status,
       urgency,
@@ -264,7 +268,7 @@ export async function GET(request: Request) {
   const { data: rawItems, error: itemsError } = itemIds.length
     ? await supabase
         .from("compliance_items")
-        .select("id, country_code, authority, requirement, description, cadence, category, notes")
+        .select("id, country_code, authority, requirement, description, cadence, category, notes, authority_url, local_guidance")
         .eq("org_id", orgId)
         .is("deleted_at", null)
         .in("id", itemIds)

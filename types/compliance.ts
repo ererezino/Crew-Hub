@@ -29,6 +29,8 @@ export type ComplianceDeadlineRecord = {
   cadence: ComplianceCadence;
   category: string;
   itemNotes: string | null;
+  authorityUrl: string | null;
+  localGuidance: string | null;
   dueDate: string;
   status: ComplianceStatus;
   urgency: ComplianceUrgency;

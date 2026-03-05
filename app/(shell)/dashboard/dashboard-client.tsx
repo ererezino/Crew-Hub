@@ -776,6 +776,36 @@ function AuditLogWidget({ data }: { data: DashboardResponseData }) {
   );
 }
 
+/* ── PROD-24: Needs Attention Widget ── */
+
+function NeedsAttentionWidget({ data }: { data: DashboardResponseData }) {
+  if (data.healthAlerts.length === 0) return null;
+
+  const totalCount = data.healthAlerts.reduce((sum, a) => sum + a.count, 0);
+
+  return (
+    <WidgetCard
+      title={`Needs attention (${totalCount})`}
+      icon={<AlertTriangle size={14} />}
+      fullWidth
+    >
+      <div className="health-alert-list">
+        {data.healthAlerts.map((alert) => (
+          <Link
+            key={alert.key}
+            href={alert.href}
+            className={`health-alert-card health-alert-${alert.severity}`}
+          >
+            <AlertTriangle size={16} className="health-alert-icon" />
+            <span className="health-alert-label">{alert.label}</span>
+            <ArrowRight size={14} className="health-alert-arrow" />
+          </Link>
+        ))}
+      </div>
+    </WidgetCard>
+  );
+}
+
 /* ══════════════════════════════════════════════
    GREETING CARD SWITCH
    ══════════════════════════════════════════════ */
@@ -857,6 +887,11 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
       </WidgetErrorBoundary>
       <WidgetErrorBoundary title="Recent audit activity">
         <AuditLogWidget data={data} />
+      </WidgetErrorBoundary>
+
+      {/* PROD-24: Admin health alerts */}
+      <WidgetErrorBoundary title="Needs attention">
+        <NeedsAttentionWidget data={data} />
       </WidgetErrorBoundary>
     </motion.div>
   );

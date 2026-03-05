@@ -16,6 +16,16 @@ import type {
 } from "../../../../types/people";
 import type { ApiResponse } from "../../../../types/auth";
 
+/* ── PROD-20: 360 Summary Types ── */
+
+type Employee360Summary = {
+  tenureMonths: number;
+  reviewsCompleted: number;
+  activeGoals: number;
+  latestReviewCycle: string | null;
+  latestReviewStatus: string | null;
+};
+
 /* ── Types ── */
 
 type PeopleOverviewClientProps = {
@@ -76,6 +86,9 @@ export function PeopleOverviewClient({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+
+  // 360 summary state
+  const [summary360, setSummary360] = useState<Employee360Summary | null>(null);
 
   // Edit panel state
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -142,6 +155,68 @@ export function PeopleOverviewClient({
       abortController.abort();
     };
   }, [employeeId, reloadToken]);
+
+  // 360 summary: compute from person + performance data
+  useEffect(() => {
+    if (!person || !isAdmin) {
+      setSummary360(null);
+      return;
+    }
+
+    const tenureMonths = person.startDate
+      ? Math.max(0, Math.round(
+          (Date.now() - new Date(person.startDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44)
+        ))
+      : 0;
+
+    // Try to fetch performance data for this employee
+    const ac = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/performance/overview", { signal: ac.signal });
+        const payload = (await res.json()) as {
+          data?: {
+            pastAssignments?: Array<{ status: string; cycleName: string }>;
+          } | null;
+        };
+
+        const past = payload.data?.pastAssignments ?? [];
+        const completed = past.filter((a) => a.status === "completed");
+
+        // Also fetch goals
+        const goalsRes = await fetch("/api/v1/performance/goals?status=active", { signal: ac.signal });
+        const goalsPayload = (await goalsRes.json()) as {
+          data?: { goals?: Array<{ id: string }> } | null;
+        };
+
+        const activeGoals = goalsPayload.data?.goals?.length ?? 0;
+
+        if (!ac.signal.aborted) {
+          setSummary360({
+            tenureMonths,
+            reviewsCompleted: completed.length,
+            activeGoals,
+            latestReviewCycle: completed.length > 0 ? completed[0].cycleName : null,
+            latestReviewStatus: completed.length > 0 ? "completed" : null
+          });
+        }
+      } catch {
+        // Graceful fallback: just compute tenure
+        if (!ac.signal.aborted) {
+          setSummary360({
+            tenureMonths,
+            reviewsCompleted: 0,
+            activeGoals: 0,
+            latestReviewCycle: null,
+            latestReviewStatus: null
+          });
+        }
+      }
+    })();
+
+    return () => { ac.abort(); };
+  }, [person, isAdmin]);
 
   const refresh = useCallback(() => {
     setReloadToken((v) => v + 1);
@@ -397,6 +472,40 @@ export function PeopleOverviewClient({
               <dt>Sports</dt>
               <dd>{person.favoriteSports || (isSelf ? "Not set" : "--")}</dd>
             </dl>
+          </div>
+        ) : null}
+
+        {/* PROD-20: Employee 360 Summary (admin only, non-self) */}
+        {isAdmin && !isSelf && summary360 ? (
+          <div className="profile-overview-card summary-360-card">
+            <h3 className="profile-overview-card-title">Employee 360 Summary</h3>
+            <div className="summary-360-grid">
+              <div className="summary-360-stat">
+                <span className="summary-360-stat-value">
+                  {summary360.tenureMonths >= 12
+                    ? `${Math.floor(summary360.tenureMonths / 12)}y ${summary360.tenureMonths % 12}m`
+                    : `${summary360.tenureMonths}m`}
+                </span>
+                <span className="summary-360-stat-label">Tenure</span>
+              </div>
+              <div className="summary-360-stat">
+                <span className="summary-360-stat-value">{summary360.reviewsCompleted}</span>
+                <span className="summary-360-stat-label">Reviews Completed</span>
+              </div>
+              <div className="summary-360-stat">
+                <span className="summary-360-stat-value">{summary360.activeGoals}</span>
+                <span className="summary-360-stat-label">Active Goals</span>
+              </div>
+            </div>
+            {summary360.latestReviewCycle ? (
+              <p className="summary-360-latest">
+                Latest review: <strong>{summary360.latestReviewCycle}</strong>
+              </p>
+            ) : (
+              <p className="summary-360-latest summary-360-latest-empty">
+                No completed reviews yet.
+              </p>
+            )}
           </div>
         ) : null}
 

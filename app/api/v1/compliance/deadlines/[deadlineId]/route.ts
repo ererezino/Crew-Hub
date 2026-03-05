@@ -47,7 +47,9 @@ const itemRowSchema = z.object({
   description: z.string().nullable(),
   cadence: z.string(),
   category: z.string(),
-  notes: z.string().nullable()
+  notes: z.string().nullable(),
+  authority_url: z.string().nullable().optional(),
+  local_guidance: z.string().nullable().optional()
 });
 
 const assigneeRowSchema = z.object({
@@ -111,6 +113,8 @@ function mapDeadline({
     cadence,
     category: item.category,
     itemNotes: item.notes,
+    authorityUrl: item.authority_url ?? null,
+    localGuidance: item.local_guidance ?? null,
     dueDate: deadline.due_date,
     status,
     urgency,
@@ -236,7 +240,7 @@ export async function PATCH(
 
   const { data: rawItemRow, error: itemFetchError } = await supabase
     .from("compliance_items")
-    .select("id, country_code, authority, requirement, description, cadence, category, notes")
+    .select("id, country_code, authority, requirement, description, cadence, category, notes, authority_url, local_guidance")
     .eq("id", parsedDeadline.data.item_id)
     .eq("org_id", orgId)
     .is("deleted_at", null)
