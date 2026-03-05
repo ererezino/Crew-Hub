@@ -18,14 +18,36 @@ const paramsSchema = z.object({
   requestId: z.string().uuid("Request id must be a valid uuid.")
 });
 
-const payloadSchema = z.object({
-  signatureText: z
-    .string()
-    .trim()
-    .min(2, "Signature text must be at least 2 characters.")
-    .max(120, "Signature text must be 120 characters or fewer.")
-    .optional()
-});
+const SIGNATURE_STORAGE_BUCKET = "documents";
+const MAX_SIGNATURE_IMAGE_BYTES = 2_500_000;
+
+const payloadSchema = z
+  .object({
+    signatureMode: z.enum(["typed", "drawn"]).optional(),
+    signatureText: z
+      .string()
+      .trim()
+      .min(2, "Signature text must be at least 2 characters.")
+      .max(120, "Signature text must be 120 characters or fewer.")
+      .optional(),
+    signatureImageData: z
+      .string()
+      .trim()
+      .min(1000, "Drawn signatures must include image data.")
+      .max(3_000_000, "Drawn signature image data is too large.")
+      .optional()
+  })
+  .superRefine((value, context) => {
+    const mode = value.signatureMode ?? (value.signatureImageData ? "drawn" : "typed");
+
+    if (mode === "drawn" && !value.signatureImageData) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["signatureImageData"],
+        message: "Drawn signatures require signature image data."
+      });
+    }
+  });
 
 const requestRowSchema = z.object({
   id: z.string().uuid(),
@@ -46,6 +68,33 @@ function buildMeta() {
 
 function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
+}
+
+function parseSignatureImagePayload(payload: string): {
+  base64: string;
+  contentType: "image/png" | "image/jpeg";
+  extension: "png" | "jpg";
+} {
+  const trimmed = payload.trim();
+  const dataUrlMatch = trimmed.match(
+    /^data:(image\/png|image\/jpeg);base64,([A-Za-z0-9+/=]+)$/i
+  );
+
+  if (dataUrlMatch) {
+    const matchedContentType = dataUrlMatch[1]?.toLowerCase() as "image/png" | "image/jpeg";
+    const base64Value = dataUrlMatch[2] ?? "";
+    return {
+      base64: base64Value,
+      contentType: matchedContentType,
+      extension: matchedContentType === "image/jpeg" ? "jpg" : "png"
+    };
+  }
+
+  return {
+    base64: trimmed,
+    contentType: "image/png",
+    extension: "png"
+  };
 }
 
 export async function POST(
@@ -219,14 +268,83 @@ export async function POST(
     });
   }
 
+  const resolvedSignatureMode =
+    parsedBody.data.signatureMode ?? (parsedBody.data.signatureImageData ? "drawn" : "typed");
+  let signatureImagePath: string | null = null;
+
+  if (resolvedSignatureMode === "drawn") {
+    const imagePayload = parsedBody.data.signatureImageData;
+
+    if (!imagePayload) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Drawn signatures require signature image data."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedImage = parseSignatureImagePayload(imagePayload);
+    const signatureBytes = Buffer.from(parsedImage.base64, "base64");
+
+    if (!signatureBytes.length) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Drawn signature image data is invalid."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (signatureBytes.length > MAX_SIGNATURE_IMAGE_BYTES) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Drawn signature image exceeds the size limit."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    signatureImagePath = `${session.profile.org_id}/signatures/${parsedRequestRow.data.id}/${session.profile.id}-${Date.now()}.${parsedImage.extension}`;
+    const { error: uploadSignatureError } = await serviceRoleClient.storage
+      .from(SIGNATURE_STORAGE_BUCKET)
+      .upload(signatureImagePath, signatureBytes, {
+        contentType: parsedImage.contentType,
+        upsert: false
+      });
+
+    if (uploadSignatureError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SIGNATURE_UPLOAD_FAILED",
+          message: "Unable to upload drawn signature image."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
   const signedAt = new Date().toISOString();
+  const signatureTextValue =
+    resolvedSignatureMode === "typed"
+      ? parsedBody.data.signatureText ?? session.profile.full_name
+      : null;
 
   const { error: updateSignerError } = await supabase
     .from("signature_signers")
     .update({
       status: "signed",
       signed_at: signedAt,
-      signature_text: parsedBody.data.signatureText ?? session.profile.full_name
+      signature_text: signatureTextValue,
+      signature_mode: resolvedSignatureMode,
+      signature_image_path: signatureImagePath
     })
     .eq("id", parsedSignerRow.data.id)
     .eq("org_id", session.profile.org_id);
@@ -248,7 +366,8 @@ export async function POST(
     actor_user_id: session.profile.id,
     event_type: "signed",
     event_payload: {
-      signerId: session.profile.id
+      signerId: session.profile.id,
+      signatureMode: resolvedSignatureMode
     }
   });
 
@@ -332,7 +451,9 @@ export async function POST(
     newValue: {
       requestId: parsedRequestRow.data.id,
       signerUserId: session.profile.id,
-      signedAt
+      signedAt,
+      signatureMode: resolvedSignatureMode,
+      signatureImagePath
     }
   });
 
