@@ -289,7 +289,7 @@ export function AccessControlAdminClient() {
               Super Admin always has full access and cannot be locked out by configuration.
             </p>
           </div>
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
             {saveState === "success" ? <StatusBadge tone="success">Saved</StatusBadge> : null}
             {saveState === "error" ? <StatusBadge tone="error">Save failed</StatusBadge> : null}
             <button type="button" className="button button-accent" onClick={handleSave} disabled={isSaving || isLoading}>

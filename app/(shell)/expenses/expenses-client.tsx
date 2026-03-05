@@ -1141,7 +1141,7 @@ export function ExpensesClient({
                                       <button
                                         type="button"
                                         className="button button-accent"
-                                        style={{ marginTop: "0.75rem" }}
+                                        style={{ marginTop: "var(--space-3)" }}
                                         onClick={() => openPaymentProof(expense)}
                                         disabled={Boolean(isOpeningReceiptById[`proof-${expense.id}`])}
                                       >
@@ -1325,7 +1325,7 @@ export function ExpensesClient({
 
           {formValues.expenseType === "work_expense" ? (
             <div className="expenses-vendor-fields">
-              <h4 className="section-title" style={{ marginBottom: "0.5rem" }}>Vendor Details</h4>
+              <h4 className="section-title" style={{ marginBottom: "var(--space-2)" }}>Vendor Details</h4>
 
               {vendorBeneficiaries.vendors.length > 0 ? (
                 <label className="form-field">
