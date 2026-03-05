@@ -337,7 +337,7 @@ type SeedReviewResponse = {
   submittedOffsetDays: number | null;
 };
 
-type SeedComplianceCadence = "monthly" | "annual" | "ongoing";
+type SeedComplianceCadence = "monthly" | "quarterly" | "annual" | "ongoing";
 
 type SeedComplianceCategory =
   | "tax"
@@ -2912,6 +2912,200 @@ const SEED_COMPLIANCE_ITEMS: SeedComplianceItem[] = [
     notes: "Operational monthly compliance checkpoint.",
     dueDay: "end",
     assignedToKey: "compliance_officer"
+  },
+  // NG additional items (4 more to reach 8)
+  {
+    key: "ng_itf",
+    countryCode: "NG",
+    authority: "ITF",
+    requirement: "Industrial Training Fund Levy",
+    description: "Remit annual ITF levy contribution.",
+    cadence: "annual",
+    category: "regulatory",
+    notes: "Due by March 31 each year.",
+    dueDay: 31,
+    assignedToKey: "head_people_finance",
+    annualMonthOffset: 0
+  },
+  {
+    key: "ng_wht",
+    countryCode: "NG",
+    authority: "FIRS",
+    requirement: "Withholding Tax on Contractor Payments",
+    description: "Deduct and remit WHT on contractor invoices.",
+    cadence: "monthly",
+    category: "tax",
+    notes: "Due by the 21st of each month.",
+    dueDay: 21,
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "ng_annual_tax",
+    countryCode: "NG",
+    authority: "FIRS",
+    requirement: "Annual Tax Returns Filing",
+    description: "File annual company income tax returns with FIRS.",
+    cadence: "annual",
+    category: "tax",
+    notes: "Due by June 30 each year.",
+    dueDay: 30,
+    assignedToKey: "head_people_finance",
+    annualMonthOffset: 2
+  },
+  {
+    key: "ng_cac_audit",
+    countryCode: "NG",
+    authority: "CAC",
+    requirement: "Annual Audit Filing",
+    description: "File audited financial statements with the CAC.",
+    cadence: "annual",
+    category: "regulatory",
+    notes: "Due within 42 days of AGM.",
+    dueDay: 28,
+    assignedToKey: "compliance_officer",
+    annualMonthOffset: 2
+  },
+  // GH additional items (3 more to reach 5)
+  {
+    key: "gh_annual_tax",
+    countryCode: "GH",
+    authority: "GRA",
+    requirement: "Annual Tax Returns",
+    description: "File annual income tax returns with the GRA.",
+    cadence: "annual",
+    category: "tax",
+    notes: "Due by April 30 each year.",
+    dueDay: 30,
+    assignedToKey: "head_people_finance",
+    annualMonthOffset: 1
+  },
+  {
+    key: "gh_wht",
+    countryCode: "GH",
+    authority: "GRA",
+    requirement: "Withholding Tax Returns",
+    description: "File and remit monthly WHT deductions.",
+    cadence: "monthly",
+    category: "tax",
+    notes: "Due by the 15th of each month.",
+    dueDay: 15,
+    assignedToKey: "head_people_finance"
+  },
+  {
+    key: "gh_provisional_tax",
+    countryCode: "GH",
+    authority: "GRA",
+    requirement: "Provisional Tax Assessment",
+    description: "Submit quarterly provisional tax estimates.",
+    cadence: "quarterly",
+    category: "tax",
+    notes: "Due at end of each quarter.",
+    dueDay: "end",
+    assignedToKey: "head_people_finance"
+  },
+  // KE additional items (2 more to reach 6)
+  {
+    key: "ke_annual_tax",
+    countryCode: "KE",
+    authority: "KRA",
+    requirement: "Annual Tax Returns",
+    description: "File annual corporate and employee tax returns with KRA.",
+    cadence: "annual",
+    category: "tax",
+    notes: "Due by June 30 each year.",
+    dueDay: 30,
+    assignedToKey: "ops_manager",
+    annualMonthOffset: 2
+  },
+  {
+    key: "ke_wht",
+    countryCode: "KE",
+    authority: "KRA",
+    requirement: "Withholding Tax on Contractor Payments",
+    description: "Deduct and remit WHT on contractor payments to KRA.",
+    cadence: "monthly",
+    category: "tax",
+    notes: "Due by the 20th of each month.",
+    dueDay: 20,
+    assignedToKey: "ops_manager"
+  },
+  // ZA additional items (3 more to reach 6)
+  {
+    key: "za_sdl",
+    countryCode: "ZA",
+    authority: "SARS",
+    requirement: "Skills Development Levy",
+    description: "Remit monthly SDL contribution to SARS.",
+    cadence: "monthly",
+    category: "regulatory",
+    notes: "Due by the 7th of each month.",
+    dueDay: 7,
+    assignedToKey: "compliance_officer"
+  },
+  {
+    key: "za_emp501",
+    countryCode: "ZA",
+    authority: "SARS",
+    requirement: "Annual Employer Reconciliation (EMP501)",
+    description: "Submit annual employer reconciliation to SARS.",
+    cadence: "annual",
+    category: "tax",
+    notes: "Due by May 31 each year.",
+    dueDay: 31,
+    assignedToKey: "compliance_officer",
+    annualMonthOffset: 2
+  },
+  {
+    key: "za_coida",
+    countryCode: "ZA",
+    authority: "Compensation Fund",
+    requirement: "COIDA Assessment",
+    description: "Submit annual COIDA return of earnings.",
+    cadence: "annual",
+    category: "regulatory",
+    notes: "Due by March 31 each year.",
+    dueDay: 31,
+    assignedToKey: "compliance_officer",
+    annualMonthOffset: 0
+  },
+  // CA additional items (3 more to reach 5)
+  {
+    key: "ca_t4",
+    countryCode: "CA",
+    authority: "CRA",
+    requirement: "T4 Annual Information Return",
+    description: "File T4 slips and summary for all employees.",
+    cadence: "annual",
+    category: "tax",
+    notes: "Due by end of February each year.",
+    dueDay: 28,
+    assignedToKey: "head_people_finance",
+    annualMonthOffset: 0
+  },
+  {
+    key: "ca_annual_reconciliation",
+    countryCode: "CA",
+    authority: "CRA",
+    requirement: "Annual Reconciliation of Deductions",
+    description: "Reconcile annual payroll deductions with CRA records.",
+    cadence: "annual",
+    category: "tax",
+    notes: "Due by end of February each year.",
+    dueDay: 28,
+    assignedToKey: "head_people_finance",
+    annualMonthOffset: 0
+  },
+  {
+    key: "ca_cpp_ei",
+    countryCode: "CA",
+    authority: "CRA",
+    requirement: "CPP/EI Employer Contributions",
+    description: "Remit CPP and EI employer contributions monthly.",
+    cadence: "monthly",
+    category: "social_insurance",
+    notes: "Due by the 15th of each month.",
+    dueDay: 15,
+    assignedToKey: "head_people_finance"
   }
 ];
 
@@ -2989,6 +3183,43 @@ function buildComplianceDeadlines(items: readonly SeedComplianceItem[]): SeedCom
         completedAt: null,
         notes: "Annual filing milestone."
       });
+
+      continue;
+    }
+
+    if (item.cadence === "quarterly") {
+      // Generate deadlines for quarter-ends within the 3-month window
+      const currentYear = months[0].year;
+      const quarterEndMonths = [3, 6, 9, 12]; // 1-based month values
+
+      for (const qMonth of quarterEndMonths) {
+        const dueDate = dueDateFromMonth({
+          year: qMonth === 12 ? currentYear : currentYear,
+          monthOneBased: qMonth,
+          dueDay: item.dueDay
+        });
+
+        // Only include if within our seed window (roughly next 3 months)
+        const firstMonth = months[0];
+        const lastMonth = months[months.length - 1];
+        const windowStart = `${firstMonth.year}-${padMonthDay(firstMonth.monthOneBased)}-01`;
+        const windowEnd = dueDateFromMonth({
+          year: lastMonth.year,
+          monthOneBased: lastMonth.monthOneBased,
+          dueDay: "end"
+        });
+
+        if (dueDate >= windowStart && dueDate <= windowEnd) {
+          deadlines.push({
+            itemKey: item.key,
+            dueDate,
+            status: dueDate <= dueSoonLimit ? "in_progress" : "pending",
+            assignedToKey: item.assignedToKey,
+            completedAt: null,
+            notes: "Quarterly filing deadline."
+          });
+        }
+      }
 
       continue;
     }
