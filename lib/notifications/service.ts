@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createSupabaseServiceRoleClient } from "../supabase/service-role";
-import type { NotificationType } from "../../types/notifications";
+import type { NotificationAction, NotificationType } from "../../types/notifications";
 
 type CreateNotificationParams = {
   orgId: string;
@@ -10,6 +10,7 @@ type CreateNotificationParams = {
   title: string;
   body: string;
   link?: string | null;
+  actions?: NotificationAction[];
   skipIfUnreadDuplicate?: boolean;
 };
 
@@ -20,6 +21,7 @@ type CreateBulkNotificationsParams = {
   title: string;
   body: string;
   link?: string | null;
+  actions?: NotificationAction[];
   skipIfUnreadDuplicate?: boolean;
 };
 
@@ -43,6 +45,7 @@ export async function createNotification({
   title,
   body,
   link,
+  actions,
   skipIfUnreadDuplicate = true
 }: CreateNotificationParams): Promise<void> {
   try {
@@ -93,7 +96,8 @@ export async function createNotification({
       type,
       title: notificationTitle,
       body: notificationBody,
-      link: notificationLink
+      link: notificationLink,
+      ...(actions && actions.length > 0 ? { actions } : {})
     });
 
     if (insertError) {
@@ -121,6 +125,7 @@ export async function createBulkNotifications({
   title,
   body,
   link,
+  actions,
   skipIfUnreadDuplicate = true
 }: CreateBulkNotificationsParams): Promise<void> {
   const uniqueUserIds = [...new Set(userIds.filter((value) => value.trim().length > 0))];
@@ -138,6 +143,7 @@ export async function createBulkNotifications({
         title,
         body,
         link,
+        actions,
         skipIfUnreadDuplicate
       })
     )

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { Employee360 } from "../../../../components/people/employee-360";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
@@ -443,6 +444,9 @@ export function PeopleOverviewClient({
           </div>
         ) : null}
       </div>
+
+      {/* Employee 360 Overview */}
+      <Employee360 employeeId={employeeId} />
 
       {/* Offboarding Banner */}
       {person.status === "offboarding" ? (

@@ -4,10 +4,12 @@ import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { getDashboardPersona, type DashboardPersona } from "../../../../lib/dashboard-persona";
 import { normalizeUserRoles, type UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
+import { getOrgHealthAlerts } from "../../../../lib/dashboard/health-alerts";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../types/auth";
 import type {
   DashboardAnnouncement,
+  DashboardApprovalItem,
   DashboardAuditLogEntry,
   DashboardExpenseItem,
   DashboardGreeting,
@@ -82,6 +84,7 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     recentExpenses: [],
     upcomingShifts: [],
     pendingApprovals: null,
+    pendingApprovalItems: null,
     headcount: null,
     onboardingStatus: null,
     complianceDeadlines: null,
@@ -94,7 +97,8 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     headcountByCountry: null,
     headcountByDept: null,
     recentAuditLog: null,
-    complianceHealth: null
+    complianceHealth: null,
+    healthAlerts: null
   };
 }
 
@@ -361,6 +365,91 @@ async function fetchPendingApprovals(
     };
   } catch {
     return { leave: 0, expenses: 0, timesheets: 0, total: 0 };
+  }
+}
+
+async function fetchPendingApprovalItems(
+  supabase: SupabaseClient,
+  orgId: string,
+  userId: string
+): Promise<DashboardApprovalItem[]> {
+  try {
+    const reportsResult = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("org_id", orgId)
+      .eq("manager_id", userId)
+      .is("deleted_at", null);
+
+    const reports = reportsResult.data ?? [];
+    const reportIds = reports.map((r) => r.id);
+
+    if (reportIds.length === 0) return [];
+
+    const nameMap = new Map<string, string>();
+    for (const r of reports) {
+      nameMap.set(r.id, r.full_name ?? "Team member");
+    }
+
+    const [leaveResult, expenseResult] = await Promise.all([
+      supabase
+        .from("leave_requests")
+        .select("id, employee_id, leave_type, start_date, end_date, total_days, created_at")
+        .eq("org_id", orgId)
+        .eq("status", "pending")
+        .in("employee_id", reportIds)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("expenses")
+        .select("id, employee_id, description, amount, currency, created_at")
+        .eq("org_id", orgId)
+        .eq("status", "pending")
+        .in("employee_id", reportIds)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(5)
+    ]);
+
+    const items: DashboardApprovalItem[] = [];
+
+    if (leaveResult.data) {
+      for (const lr of leaveResult.data) {
+        const empName = nameMap.get(lr.employee_id) ?? "Team member";
+        const days = lr.total_days ?? 1;
+        items.push({
+          id: lr.id,
+          type: "leave",
+          title: `${empName}`,
+          subtitle: `${lr.leave_type ?? "Leave"} - ${days} day${days !== 1 ? "s" : ""}`,
+          detail: `${lr.start_date ?? ""} to ${lr.end_date ?? ""}`,
+          date: lr.created_at ? toDateString(new Date(lr.created_at)) : ""
+        });
+      }
+    }
+
+    if (expenseResult.data) {
+      for (const ex of expenseResult.data) {
+        const empName = nameMap.get(ex.employee_id) ?? "Team member";
+        const amount = typeof ex.amount === "number" ? ex.amount : 0;
+        const currency = ex.currency ?? "USD";
+        items.push({
+          id: ex.id,
+          type: "expense",
+          title: `${empName}`,
+          subtitle: ex.description ?? "Expense",
+          detail: `${currency} ${amount.toFixed(2)}`,
+          date: ex.created_at ? toDateString(new Date(ex.created_at)) : ""
+        });
+      }
+    }
+
+    // Sort by date descending (most recent first), limit to 6 items max
+    items.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
+    return items.slice(0, 6);
+  } catch {
+    return [];
   }
 }
 
@@ -949,12 +1038,14 @@ export async function GET() {
       case "manager": {
         const [
           pendingApprovals,
+          pendingApprovalItems,
           leaveBalance,
           upcomingShifts,
           recentExpenses,
           hasPolicy
         ] = await Promise.all([
           fetchPendingApprovals(supabase, profile.org_id, profile.id),
+          fetchPendingApprovalItems(supabase, profile.org_id, profile.id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
           fetchUpcomingShifts(supabase, profile.org_id, profile.id),
           fetchRecentExpenses(supabase, profile.org_id, profile.id),
@@ -962,6 +1053,7 @@ export async function GET() {
         ]);
 
         response.pendingApprovals = pendingApprovals;
+        response.pendingApprovalItems = pendingApprovalItems;
         response.leaveBalance = leaveBalance;
         response.upcomingShifts = upcomingShifts;
         response.recentExpenses = recentExpenses;
@@ -977,7 +1069,8 @@ export async function GET() {
           activeReviewCycles,
           expiringDocuments,
           leaveBalance,
-          hasPolicy
+          hasPolicy,
+          healthAlerts
         ] = await Promise.all([
           fetchHeadcount(supabase, profile.org_id),
           fetchOnboardingStatus(supabase, profile.org_id),
@@ -985,7 +1078,8 @@ export async function GET() {
           fetchActiveReviewCycles(supabase, profile.org_id),
           fetchExpiringDocuments(supabase, profile.org_id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department),
+          getOrgHealthAlerts(supabase, profile.org_id)
         ]);
 
         response.headcount = headcount;
@@ -995,6 +1089,7 @@ export async function GET() {
         response.expiringDocuments = expiringDocuments;
         response.leaveBalance = leaveBalance;
         response.hasTimePolicy = hasPolicy;
+        response.healthAlerts = healthAlerts;
         break;
       }
 
@@ -1027,31 +1122,36 @@ export async function GET() {
           headcountByCountry,
           headcountByDept,
           pendingApprovals,
+          pendingApprovalItems,
           payroll,
           complianceDeadlines,
           complianceHealth,
           recentAuditLog,
           expiringDocuments,
           leaveBalance,
-          hasPolicy
+          hasPolicy,
+          healthAlerts
         ] = await Promise.all([
           fetchHeadcount(supabase, profile.org_id),
           fetchHeadcountByCountry(supabase, profile.org_id),
           fetchHeadcountByDept(supabase, profile.org_id),
           fetchPendingApprovals(supabase, profile.org_id, profile.id),
+          fetchPendingApprovalItems(supabase, profile.org_id, profile.id),
           fetchPayrollStatus(supabase, profile.org_id),
           fetchComplianceDeadlines(supabase, profile.org_id),
           fetchComplianceHealth(supabase, profile.org_id),
           fetchRecentAuditLog(supabase, profile.org_id),
           fetchExpiringDocuments(supabase, profile.org_id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department),
+          getOrgHealthAlerts(supabase, profile.org_id)
         ]);
 
         response.headcount = headcount;
         response.headcountByCountry = headcountByCountry;
         response.headcountByDept = headcountByDept;
         response.pendingApprovals = pendingApprovals;
+        response.pendingApprovalItems = pendingApprovalItems;
         response.payroll = payroll;
         response.complianceDeadlines = complianceDeadlines;
         response.complianceHealth = complianceHealth;
@@ -1059,6 +1159,7 @@ export async function GET() {
         response.expiringDocuments = expiringDocuments;
         response.leaveBalance = leaveBalance;
         response.hasTimePolicy = hasPolicy;
+        response.healthAlerts = healthAlerts;
         break;
       }
     }

@@ -9,6 +9,7 @@ import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { usePayrollRunsDashboard } from "../../../../../hooks/use-payroll-runs";
+import { useUnsavedGuard } from "../../../../../hooks/use-unsaved-guard";
 import { currentMonthPeriod } from "../../../../../lib/payroll/runs";
 import type {
   CreatePayrollRunPayload,
@@ -93,6 +94,8 @@ export function CreatePayrollRunClient() {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [createRunDirty, setCreateRunDirty] = useState(false);
+  useUnsavedGuard(createRunDirty);
 
   const activeContractorCount = useMemo(
     () => dashboardQuery.data?.metrics.activeContractorCount ?? 0,
@@ -116,6 +119,7 @@ export function CreatePayrollRunClient() {
         setFormErrors(getFormErrors(nextValues, formTouched));
         return nextValues;
       });
+      setCreateRunDirty(true);
     };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -163,6 +167,7 @@ export function CreatePayrollRunClient() {
         return;
       }
 
+      setCreateRunDirty(false);
       router.push(`/payroll/runs/${responsePayload.data.run.id}`);
       router.refresh();
     } catch (error) {

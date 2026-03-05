@@ -92,3 +92,26 @@ export type GenerateDeadlinesResponse = ApiResponse<GenerateDeadlinesData>;
 export type ComplianceResponse = ApiResponse<ComplianceResponseData>;
 export type UpdateComplianceDeadlineResponse = ApiResponse<UpdateComplianceDeadlineData>;
 export type GenerateComplianceDeadlinesResponse = ApiResponse<GenerateDeadlinesData>;
+
+export type PolicyAcknowledgment = {
+  id: string;
+  org_id: string;
+  policy_id: string;
+  employee_id: string;
+  acknowledged_at: string | null;
+  ip_address: string | null;
+  created_at: string;
+};
+
+export type PolicyAckStatus = {
+  policy_id: string;
+  policy_name: string;
+  total_required: number;
+  acknowledged_count: number;
+  pending_count: number;
+  pending_employees: Array<{
+    id: string;
+    full_name: string;
+    email: string;
+  }>;
+};

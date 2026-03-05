@@ -8,6 +8,7 @@ import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
+import { TeamAvailabilityPanel } from "../../../components/time-off/team-availability-panel";
 import { useAfkLogs, useTimeOffSummary } from "../../../hooks/use-time-off";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDays, formatDateRangeHuman, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
@@ -1113,6 +1114,10 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
               {formErrors.endDate ? <p className="form-field-error">{formErrors.endDate}</p> : null}
             </label>
           </div>
+
+          {isIsoDate(formValues.startDate) && isIsoDate(formValues.endDate) && formValues.endDate >= formValues.startDate ? (
+            <TeamAvailabilityPanel startDate={formValues.startDate} endDate={formValues.endDate} />
+          ) : null}
 
           <label className="form-field" htmlFor="timeoff-reason">
             <span className="form-label">Reason</span>

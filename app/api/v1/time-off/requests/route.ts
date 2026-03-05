@@ -550,7 +550,32 @@ export async function POST(request: Request) {
       type: "leave_submitted",
       title: `${leaveLabel} request submitted by ${employeeProfile.full_name}`,
       body: `${leaveLabel} for ${dateLabel}.`,
-      link: "/time-off/approvals"
+      link: "/time-off/approvals",
+      actions: [
+        {
+          label: "Approve",
+          variant: "primary",
+          action_type: "api",
+          api_endpoint: `/api/v1/time-off/requests/${parsedRequest.data.id}`,
+          api_method: "PATCH",
+          api_body: { action: "approve" }
+        },
+        {
+          label: "Decline",
+          variant: "destructive",
+          action_type: "api",
+          api_endpoint: `/api/v1/time-off/requests/${parsedRequest.data.id}`,
+          api_method: "PATCH",
+          api_body: { action: "reject" },
+          requires_reason: true
+        },
+        {
+          label: "View",
+          variant: "outline",
+          action_type: "navigate",
+          navigate_url: "/time-off/approvals"
+        }
+      ]
     });
 
     // Notify HR when sick leave may require documentation (>2 consecutive working days)

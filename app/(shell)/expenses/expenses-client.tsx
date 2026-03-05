@@ -19,6 +19,7 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { MoneyInput } from "../../../components/ui/money-input";
 import { useExpenses } from "../../../hooks/use-expenses";
+import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../lib/datetime";
 import {
@@ -508,6 +509,8 @@ export function ExpensesClient({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const [expenseFormDirty, setExpenseFormDirty] = useState(false);
+  useUnsavedGuard(expenseFormDirty);
 
   const summaryCurrency = useMemo(() => {
     const rows = expensesQuery.data?.expenses ?? [];
@@ -563,6 +566,7 @@ export function ExpensesClient({
     setSubmitError(null);
     setUploadProgress(0);
     setIsDraggingReceipt(false);
+    setExpenseFormDirty(false);
   };
 
   const handleFormFieldChange =
@@ -579,6 +583,7 @@ export function ExpensesClient({
       };
 
       setFormValues(nextValues);
+      setExpenseFormDirty(true);
 
       if (formTouched[field]) {
         setFormErrors(getFormErrors(nextValues, formTouched, receiptFile));

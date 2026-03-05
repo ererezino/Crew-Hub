@@ -617,6 +617,13 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
     setIsMobileSidebarOpen(false);
   };
 
+  const handleCommandNavigate = (url: string) => {
+    registerRouteVisit(url);
+    router.push(url);
+    setIsCommandPaletteOpen(false);
+    setIsMobileSidebarOpen(false);
+  };
+
   const settingsAllowed =
     isSuperAdmin(currentUserRoles) || allowedRouteKeys.has("/settings");
 
@@ -915,6 +922,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
           recentRouteHrefs={recentRouteHrefs}
           onClose={() => setIsCommandPaletteOpen(false)}
           onSelect={handleCommandSelect}
+          onNavigate={handleCommandNavigate}
         />
       ) : null}
     </div>

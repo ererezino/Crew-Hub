@@ -246,7 +246,23 @@ export async function POST(
     type: "review_shared",
     title: "Your review has been shared",
     body: `Your ${cycle.name} review has been shared with you. Tap to read.`,
-    link: "/performance"
+    link: "/performance",
+    actions: [
+      {
+        label: "Acknowledge",
+        variant: "primary",
+        action_type: "api",
+        api_endpoint: `/api/v1/performance/assignments/${parsedUpdated.data.id}/acknowledge`,
+        api_method: "POST",
+        api_body: {}
+      },
+      {
+        label: "View",
+        variant: "outline",
+        action_type: "navigate",
+        navigate_url: "/performance"
+      }
+    ]
   });
 
   // Send email

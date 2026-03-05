@@ -17,10 +17,11 @@ import {
 } from "../../../lib/compliance";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { useCompliance, updateComplianceDeadline } from "../../../hooks/use-compliance";
-import { ShieldCheck } from "lucide-react";
+import { ChevronDown, ChevronRight, ShieldCheck } from "lucide-react";
 import type {
   ComplianceDeadlineRecord,
   ComplianceStatus,
+  PolicyAckStatus,
   UpdateComplianceDeadlinePayload
 } from "../../../types/compliance";
 
@@ -159,11 +160,41 @@ export function ComplianceClient() {
   const [generateYear, setGenerateYear] = useState(new Date().getFullYear());
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Acknowledgment tracking state
+  const [ackStatuses, setAckStatuses] = useState<PolicyAckStatus[]>([]);
+  const [ackLoading, setAckLoading] = useState(true);
+  const [ackError, setAckError] = useState<string | null>(null);
+  const [expandedPolicies, setExpandedPolicies] = useState<Set<string>>(new Set());
+  const [requestingAckFor, setRequestingAckFor] = useState<string | null>(null);
+
   const complianceQuery = useCompliance(range);
 
   useEffect(() => {
     setOptimisticDeadlines(null);
   }, [complianceQuery.data?.deadlines]);
+
+  // Fetch acknowledgment statuses
+  const fetchAckStatuses = useCallback(async () => {
+    setAckLoading(true);
+    setAckError(null);
+    try {
+      const response = await fetch("/api/v1/compliance/acknowledgments");
+      const json = await response.json();
+      if (!response.ok || json.error) {
+        setAckError(json.error?.message ?? "Unable to load acknowledgment data.");
+        return;
+      }
+      setAckStatuses((json.data as PolicyAckStatus[]) ?? []);
+    } catch {
+      setAckError("Unable to load acknowledgment data.");
+    } finally {
+      setAckLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAckStatuses();
+  }, [fetchAckStatuses]);
 
   const invalidRange = draftStartDate > draftEndDate;
   const sourceDeadlines = useMemo(
@@ -385,6 +416,43 @@ export function ComplianceClient() {
       showToast("error", "Unable to generate deadlines.");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  /* ── Acknowledgment helpers ── */
+
+  const togglePolicyExpansion = (policyId: string) => {
+    setExpandedPolicies((current) => {
+      const next = new Set(current);
+      if (next.has(policyId)) {
+        next.delete(policyId);
+      } else {
+        next.add(policyId);
+      }
+      return next;
+    });
+  };
+
+  const requestAcknowledgment = async (policyId: string) => {
+    setRequestingAckFor(policyId);
+    try {
+      const response = await fetch("/api/v1/compliance/acknowledgments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ policy_id: policyId }),
+      });
+      const json = await response.json();
+      if (!response.ok || json.error) {
+        showToast("error", json.error?.message ?? "Unable to request acknowledgments.");
+        return;
+      }
+      const count = (json.data as { created: number })?.created ?? 0;
+      showToast("success", `Acknowledgment requested from ${count} employee(s).`);
+      void fetchAckStatuses();
+    } catch {
+      showToast("error", "Unable to request acknowledgments.");
+    } finally {
+      setRequestingAckFor(null);
     }
   };
 
@@ -688,6 +756,98 @@ export function ComplianceClient() {
               ))}
             </section>
           ) : null}
+
+          {/* ── Acknowledgment Tracking ── */}
+          <section className="ack-tracking-section" aria-label="Policy acknowledgment tracking">
+            <h2 className="ack-tracking-title">Acknowledgment Tracking</h2>
+
+            {ackLoading ? (
+              <div className="compliance-skeleton" aria-hidden="true">
+                <div className="compliance-skeleton-card" />
+                <div className="compliance-skeleton-card" />
+              </div>
+            ) : null}
+
+            {!ackLoading && ackError ? (
+              <ErrorState
+                title="Acknowledgments unavailable"
+                message={ackError}
+                onRetry={() => void fetchAckStatuses()}
+              />
+            ) : null}
+
+            {!ackLoading && !ackError && ackStatuses.length === 0 ? (
+              <p className="settings-card-description">
+                No published policies require acknowledgment yet.
+              </p>
+            ) : null}
+
+            {!ackLoading && !ackError && ackStatuses.length > 0 ? (
+              <div>
+                {ackStatuses.map((status) => {
+                  const isExpanded = expandedPolicies.has(status.policy_id);
+                  const progressPct =
+                    status.total_required > 0
+                      ? Math.round((status.acknowledged_count / status.total_required) * 100)
+                      : 0;
+
+                  return (
+                    <article key={status.policy_id} className="ack-policy-card">
+                      <div className="ack-policy-header">
+                        <button
+                          type="button"
+                          className="ack-policy-name"
+                          onClick={() => togglePolicyExpansion(status.policy_id)}
+                          style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", padding: 0 }}
+                        >
+                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          {status.policy_name}
+                        </button>
+                        <div className="ack-progress">
+                          <div className="ack-progress-bar">
+                            <div
+                              className="ack-progress-fill"
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                          <span className="ack-progress-text">
+                            {status.acknowledged_count}/{status.total_required}
+                          </span>
+                          <button
+                            type="button"
+                            className="button button-subtle ack-request-btn"
+                            disabled={requestingAckFor === status.policy_id}
+                            onClick={() => void requestAcknowledgment(status.policy_id)}
+                          >
+                            {requestingAckFor === status.policy_id
+                              ? "Requesting..."
+                              : "Request Acknowledgment"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {isExpanded && status.pending_employees.length > 0 ? (
+                        <div className="ack-pending-list">
+                          {status.pending_employees.map((emp) => (
+                            <div key={emp.id} className="ack-pending-employee">
+                              <span>{emp.full_name}</span>
+                              <span className="ack-pending-employee-email">{emp.email}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {isExpanded && status.pending_employees.length === 0 && status.pending_count === 0 ? (
+                        <div className="ack-pending-list">
+                          <p className="settings-card-description">All employees have acknowledged this policy.</p>
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : null}
+          </section>
         </section>
       ) : null}
 

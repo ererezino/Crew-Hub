@@ -534,7 +534,23 @@ export async function POST(request: Request) {
       type: "expense_submitted",
       title: `Expense submitted by ${expense.employeeName}`,
       body: `${expense.category} expense for ${expense.expenseDate} is pending approval.`,
-      link: "/expenses/approvals"
+      link: "/expenses/approvals",
+      actions: [
+        {
+          label: "Approve",
+          variant: "primary",
+          action_type: "api",
+          api_endpoint: `/api/v1/expenses/${expense.id}`,
+          api_method: "PATCH",
+          api_body: { action: "approve" }
+        },
+        {
+          label: "View",
+          variant: "outline",
+          action_type: "navigate",
+          navigate_url: "/expenses/approvals"
+        }
+      ]
     });
   }
 

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
+  AtRiskInstance,
+  AtRiskOnboardingsResponse,
   OnboardingInstanceDetailResponse,
   OnboardingInstanceDetailResponseData,
   OnboardingInstanceSummary,
@@ -283,6 +285,76 @@ export function useOnboardingInstanceDetail(
 
   return {
     detail,
+    isLoading,
+    errorMessage,
+    refresh
+  };
+}
+
+type UseAtRiskOnboardingsResult = {
+  instances: AtRiskInstance[];
+  isLoading: boolean;
+  errorMessage: string | null;
+  refresh: () => void;
+};
+
+export function useAtRiskOnboardings(): UseAtRiskOnboardingsResult {
+  const [instances, setInstances] = useState<AtRiskInstance[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const fetchAtRisk = async () => {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const response = await fetchWithRetry(
+          "/api/v1/onboarding/at-risk",
+          abortController.signal
+        );
+
+        const payload = (await response.json()) as AtRiskOnboardingsResponse;
+
+        if (!response.ok || !payload.data) {
+          setInstances([]);
+          setErrorMessage(payload.error?.message ?? "Unable to load at-risk onboarding data.");
+          return;
+        }
+
+        setInstances(payload.data.instances);
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        setInstances([]);
+        setErrorMessage(
+          error instanceof Error ? error.message : "Unable to load at-risk onboarding data."
+        );
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void fetchAtRisk();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [reloadToken]);
+
+  const refresh = useCallback(() => {
+    setReloadToken((currentValue) => currentValue + 1);
+  }, []);
+
+  return {
+    instances,
     isLoading,
     errorMessage,
     refresh

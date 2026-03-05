@@ -601,7 +601,15 @@ export async function POST(request: Request) {
     type: "signature_requested",
     title: "Signature request received",
     body: `${profile.full_name} requested your signature on "${payload.title}".`,
-    link: "/signatures"
+    link: "/signatures",
+    actions: [
+      {
+        label: "Sign Now",
+        variant: "primary",
+        action_type: "navigate",
+        navigate_url: "/signatures"
+      }
+    ]
   });
 
   await Promise.all(

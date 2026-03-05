@@ -1,11 +1,14 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
+import { DecisionCard } from "../../../components/dashboard/decision-card";
 import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skeleton";
+import { HealthAlerts } from "../../../components/dashboard/health-alerts";
+import { SetupChecklist } from "../../../components/dashboard/setup-checklist";
 import { WidgetErrorBoundary } from "../../../components/dashboard/widget-error-boundary";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
@@ -777,6 +780,99 @@ function AuditLogWidget({ data }: { data: DashboardResponseData }) {
   );
 }
 
+function PendingDecisionsWidget({ data }: { data: DashboardResponseData }) {
+  const queryClient = useQueryClient();
+  const items = data.pendingApprovalItems;
+
+  const handleApprove = useCallback(
+    async (id: string) => {
+      const item = items?.find((i) => i.id === id);
+      if (!item) return;
+
+      const endpoint =
+        item.type === "leave"
+          ? `/api/v1/time-off/requests/${id}`
+          : `/api/v1/expenses/${id}`;
+
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve" }),
+      });
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(
+          (payload as { error?: { message?: string } } | null)?.error?.message ??
+            "Failed to approve"
+        );
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    [items, queryClient]
+  );
+
+  const handleDecline = useCallback(
+    async (id: string, reason?: string) => {
+      const item = items?.find((i) => i.id === id);
+      if (!item) return;
+
+      const endpoint =
+        item.type === "leave"
+          ? `/api/v1/time-off/requests/${id}`
+          : `/api/v1/expenses/${id}`;
+
+      const res = await fetch(endpoint, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reject",
+          ...(reason ? { rejectionReason: reason } : {}),
+        }),
+      });
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(
+          (payload as { error?: { message?: string } } | null)?.error?.message ??
+            "Failed to decline"
+        );
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    [items, queryClient]
+  );
+
+  if (!items || items.length === 0) return null;
+
+  return (
+    <WidgetCard
+      title="Pending decisions"
+      icon={<CheckCircle size={14} />}
+      viewAllHref="/approvals"
+      fullWidth
+    >
+      <div className="decision-cards-section">
+        {items.map((item) => (
+          <DecisionCard
+            key={item.id}
+            id={item.id}
+            type={item.type}
+            title={item.title}
+            subtitle={item.subtitle}
+            detail={item.detail}
+            date={item.date}
+            onApprove={handleApprove}
+            onDecline={handleDecline}
+          />
+        ))}
+      </div>
+    </WidgetCard>
+  );
+}
+
 /* ══════════════════════════════════════════════
    GREETING CARD SWITCH
    ══════════════════════════════════════════════ */
@@ -834,9 +930,12 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
         <UpcomingShiftsWidget data={data} />
       </WidgetErrorBoundary>
 
-      {/* Manager+ widget */}
+      {/* Manager+ widgets */}
       <WidgetErrorBoundary title="Pending approvals">
         <PendingApprovalsWidget data={data} />
+      </WidgetErrorBoundary>
+      <WidgetErrorBoundary title="Pending decisions">
+        <PendingDecisionsWidget data={data} />
       </WidgetErrorBoundary>
 
       {/* HR Admin+ widgets */}
@@ -890,10 +989,16 @@ function DashboardContent() {
   }
 
   const data = dashboardQuery.data;
+  const showHealthAlerts =
+    (data.persona === "super_admin" || data.persona === "hr_admin") &&
+    data.healthAlerts &&
+    data.healthAlerts.length > 0;
 
   return (
     <div className="home-page">
+      {data.persona === "super_admin" && <SetupChecklist />}
       <GreetingCard data={data} />
+      {showHealthAlerts ? <HealthAlerts alerts={data.healthAlerts!} /> : null}
       <WidgetGrid data={data} />
     </div>
   );

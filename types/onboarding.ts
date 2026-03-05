@@ -120,3 +120,32 @@ export type OnboardingInstanceDetailResponseData = {
 };
 
 export type OnboardingInstanceDetailResponse = ApiResponse<OnboardingInstanceDetailResponseData>;
+
+export type AtRiskStuckTask = {
+  id: string;
+  title: string;
+  daysPastDue: number;
+};
+
+export type AtRiskInstance = {
+  instanceId: string;
+  employeeId: string;
+  employeeName: string;
+  startedAt: string;
+  daysSinceLastActivity: number;
+  totalTasks: number;
+  completedTasks: number;
+  stuckTask: AtRiskStuckTask | null;
+};
+
+export type AtRiskOnboardingsResponseData = {
+  instances: AtRiskInstance[];
+};
+
+export type AtRiskOnboardingsResponse = ApiResponse<AtRiskOnboardingsResponseData>;
+
+export type OnboardingRemindResponseData = {
+  sent: boolean;
+};
+
+export type OnboardingRemindResponse = ApiResponse<OnboardingRemindResponseData>;

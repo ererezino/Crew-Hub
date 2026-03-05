@@ -20,6 +20,7 @@ import {
   toneForReviewCycleStatus
 } from "../../../lib/performance/reviews";
 import { useGoals, usePerformanceOverview } from "../../../hooks/use-performance";
+import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { Star } from "lucide-react";
 import type {
   AcknowledgeReviewResponse,
@@ -586,6 +587,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
   const [selectedManagerAssignmentId, setSelectedManagerAssignmentId] = useState<string | null>(null);
   const [managerAnswers, setManagerAnswers] = useState<ReviewAnswers>({});
   const [managerDirty, setManagerDirty] = useState(false);
+  useUnsavedGuard(selfDirty || managerDirty);
   const [isSavingManager, setIsSavingManager] = useState(false);
   const [isSubmittingManager, setIsSubmittingManager] = useState(false);
 

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import type { ApiResponse } from "../../../../types/auth";
 import type {
+  NotificationAction,
   NotificationRecord,
   NotificationsResponseData
 } from "../../../../types/notifications";
@@ -17,6 +18,17 @@ const querySchema = z.object({
     .transform((value) => value === "true")
 });
 
+const notificationActionSchema = z.object({
+  label: z.string(),
+  variant: z.enum(["primary", "destructive", "outline"]),
+  action_type: z.enum(["api", "navigate"]),
+  api_endpoint: z.string().optional(),
+  api_method: z.enum(["POST", "PUT", "PATCH"]).optional(),
+  api_body: z.record(z.string(), z.unknown()).optional(),
+  navigate_url: z.string().optional(),
+  requires_reason: z.boolean().optional()
+});
+
 const notificationRowSchema = z.object({
   id: z.string().uuid(),
   org_id: z.string().uuid(),
@@ -27,7 +39,8 @@ const notificationRowSchema = z.object({
   link: z.string().nullable(),
   is_read: z.boolean(),
   read_at: z.string().nullable(),
-  created_at: z.string()
+  created_at: z.string(),
+  actions: z.array(notificationActionSchema).nullable().default(null)
 });
 
 function buildMeta() {
@@ -39,7 +52,7 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
 }
 
 function toNotificationRecord(row: z.infer<typeof notificationRowSchema>): NotificationRecord {
-  return {
+  const record: NotificationRecord = {
     id: row.id,
     orgId: row.org_id,
     userId: row.user_id,
@@ -51,6 +64,12 @@ function toNotificationRecord(row: z.infer<typeof notificationRowSchema>): Notif
     readAt: row.read_at,
     createdAt: row.created_at
   };
+
+  if (row.actions && row.actions.length > 0) {
+    record.actions = row.actions as NotificationAction[];
+  }
+
+  return record;
 }
 
 export async function GET(request: Request) {
@@ -86,7 +105,7 @@ export async function GET(request: Request) {
 
   let notificationsQuery = supabase
     .from("notifications")
-    .select("id, org_id, user_id, type, title, body, link, is_read, read_at, created_at")
+    .select("id, org_id, user_id, type, title, body, link, is_read, read_at, created_at, actions")
     .eq("org_id", session.profile.org_id)
     .eq("user_id", session.profile.id)
     .is("deleted_at", null)

@@ -2,6 +2,8 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useMemo, useState } from "react";
+
+import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -189,6 +191,9 @@ export function SettingsClient({
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [isNotificationSaving, setIsNotificationSaving] = useState(false);
 
+  const [formDirty, setFormDirty] = useState(false);
+  useUnsavedGuard(formDirty);
+
   const handleTabChange = (tabKey: string) => {
     const nextTab = tabKey as SettingsTab;
     setActiveTab(nextTab);
@@ -239,6 +244,7 @@ export function SettingsClient({
       }
 
       setProfileMessage("Profile settings saved.");
+      setFormDirty(false);
     } catch (error) {
       setProfileMessage(error instanceof Error ? error.message : "Unable to update profile settings.");
     } finally {
@@ -280,6 +286,7 @@ export function SettingsClient({
       }
 
       setOrganizationMessage("Organization settings saved.");
+      setFormDirty(false);
     } catch (error) {
       setOrganizationMessage(
         error instanceof Error ? error.message : "Unable to update organization settings."
@@ -316,6 +323,7 @@ export function SettingsClient({
       }
 
       setNotificationMessage("Notification settings saved.");
+      setFormDirty(false);
     } catch (error) {
       setNotificationMessage(
         error instanceof Error ? error.message : "Unable to update notification settings."
@@ -357,6 +365,7 @@ export function SettingsClient({
 
                     setProfileValues(nextValues);
                     setProfileErrors(validateProfile(nextValues));
+                    setFormDirty(true);
                   }}
                 />
                 {profileErrors.fullName ? (
@@ -380,6 +389,7 @@ export function SettingsClient({
 
                     setProfileValues(nextValues);
                     setProfileErrors(validateProfile(nextValues));
+                    setFormDirty(true);
                   }}
                 />
                 {profileErrors.avatarUrl ? (
@@ -401,6 +411,7 @@ export function SettingsClient({
 
                     setProfileValues(nextValues);
                     setProfileErrors(validateProfile(nextValues));
+                    setFormDirty(true);
                   }}
                 />
                 {profileErrors.phone ? (
@@ -436,12 +447,13 @@ export function SettingsClient({
                 <input
                   type="checkbox"
                   checked={notificationValues.emailAnnouncements}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setNotificationValues((previous) => ({
                       ...previous,
                       emailAnnouncements: event.currentTarget.checked
-                    }))
-                  }
+                    }));
+                    setFormDirty(true);
+                  }}
                 />
                 <span>Email announcements</span>
               </label>
@@ -450,12 +462,13 @@ export function SettingsClient({
                 <input
                   type="checkbox"
                   checked={notificationValues.emailApprovals}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setNotificationValues((previous) => ({
                       ...previous,
                       emailApprovals: event.currentTarget.checked
-                    }))
-                  }
+                    }));
+                    setFormDirty(true);
+                  }}
                 />
                 <span>Email approval requests</span>
               </label>
@@ -464,12 +477,13 @@ export function SettingsClient({
                 <input
                   type="checkbox"
                   checked={notificationValues.inAppReminders}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setNotificationValues((previous) => ({
                       ...previous,
                       inAppReminders: event.currentTarget.checked
-                    }))
-                  }
+                    }));
+                    setFormDirty(true);
+                  }}
                 />
                 <span>In-app reminders</span>
               </label>
@@ -514,6 +528,7 @@ export function SettingsClient({
 
                       setOrganizationValues(nextValues);
                       setOrganizationErrors(validateOrganization(nextValues));
+                      setFormDirty(true);
                     }}
                   />
                   {organizationErrors.name ? (
@@ -537,6 +552,7 @@ export function SettingsClient({
 
                       setOrganizationValues(nextValues);
                       setOrganizationErrors(validateOrganization(nextValues));
+                      setFormDirty(true);
                     }}
                   />
                   {organizationErrors.logoUrl ? (

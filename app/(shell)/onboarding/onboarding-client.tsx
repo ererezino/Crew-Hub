@@ -7,16 +7,19 @@ import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
-import { useOnboardingInstances, useOnboardingTemplates } from "../../../hooks/use-onboarding";
+import { useAtRiskOnboardings, useOnboardingInstances, useOnboardingTemplates } from "../../../hooks/use-onboarding";
+import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { usePeople } from "../../../hooks/use-people";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
 import {
   ONBOARDING_TYPES,
+  type AtRiskInstance,
   type OnboardingInstanceCreateResponse,
   type OnboardingInstanceStatus,
   type OnboardingInstanceSummary,
+  type OnboardingRemindResponse,
   type OnboardingTemplateCreateResponse,
   type OnboardingType
 } from "../../../types/onboarding";
@@ -27,7 +30,7 @@ type OnboardingClientProps = {
   canManageOnboarding: boolean;
 };
 
-type OnboardingTab = "active" | "completed" | "templates";
+type OnboardingTab = "active" | "completed" | "at_risk" | "templates";
 type InstanceSortKey = "employee" | "startedAt";
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -302,6 +305,8 @@ export function OnboardingClient({
     taskErrors: []
   });
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [templateFormDirty, setTemplateFormDirty] = useState(false);
+  useUnsavedGuard(templateFormDirty);
 
   const activeInstancesQuery = useOnboardingInstances({
     scope: instanceScope,
@@ -312,9 +317,13 @@ export function OnboardingClient({
     status: "completed"
   });
   const templatesQuery = useOnboardingTemplates();
+  const atRiskQuery = useAtRiskOnboardings();
   const peopleQuery = usePeople({
     scope: canManageOnboarding ? "all" : instanceScope
   });
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
+
+  const atRiskCount = atRiskQuery.instances.length;
 
   const tabs = useMemo(
     () =>
@@ -322,13 +331,20 @@ export function OnboardingClient({
         ? [
             { id: "active", label: "Active" },
             { id: "completed", label: "Completed" },
+            { id: "at_risk", label: "At Risk" },
             { id: "templates", label: "Templates" }
           ]
-        : [
-            { id: "active", label: "Active" },
-            { id: "completed", label: "Completed" }
-          ]) as Array<{ id: OnboardingTab; label: string }>,
-    [canViewTemplates]
+        : canManageOnboarding
+          ? [
+              { id: "active", label: "Active" },
+              { id: "completed", label: "Completed" },
+              { id: "at_risk", label: "At Risk" }
+            ]
+          : [
+              { id: "active", label: "Active" },
+              { id: "completed", label: "Completed" }
+            ]) as Array<{ id: OnboardingTab; label: string }>,
+    [canViewTemplates, canManageOnboarding]
   );
 
   const activeInstances = useMemo(
@@ -386,6 +402,7 @@ export function OnboardingClient({
       taskErrors: []
     });
     setIsTemplatePanelOpen(false);
+    setTemplateFormDirty(false);
   };
 
   const handleSort = (nextSortKey: InstanceSortKey) => {
@@ -424,6 +441,7 @@ export function OnboardingClient({
       setTemplateErrors(validateCreateTemplateForm(resolvedValues));
       return resolvedValues;
     });
+    setTemplateFormDirty(true);
   };
 
   const handleStartOnboarding = async (event: FormEvent<HTMLFormElement>) => {
@@ -545,6 +563,37 @@ export function OnboardingClient({
     }
   };
 
+  const handleSendReminder = async (instance: AtRiskInstance) => {
+    if (sendingReminderId) {
+      return;
+    }
+
+    setSendingReminderId(instance.instanceId);
+
+    try {
+      const response = await fetch(
+        `/api/v1/onboarding/instances/${instance.instanceId}/remind`,
+        { method: "POST" }
+      );
+
+      const payload = (await response.json()) as OnboardingRemindResponse;
+
+      if (!response.ok || !payload.data?.sent) {
+        addToast("error", payload.error?.message ?? "Unable to send reminder.");
+        return;
+      }
+
+      addToast("success", `Reminder sent to ${instance.employeeName}.`);
+    } catch (error) {
+      addToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to send reminder."
+      );
+    } finally {
+      setSendingReminderId(null);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -581,11 +630,14 @@ export function OnboardingClient({
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
+            {tab.id === "at_risk" && atRiskCount > 0 ? (
+              <span className="page-tab-badge numeric">{atRiskCount}</span>
+            ) : null}
           </button>
         ))}
       </section>
 
-      {activeTab !== "templates" ? (
+      {activeTab === "active" || activeTab === "completed" ? (
         <>
           {activeInstancesQueryForTab.isLoading ? <OnboardingTableSkeleton /> : null}
 
@@ -687,6 +739,118 @@ export function OnboardingClient({
                           <Link className="table-row-action" href={`/onboarding/${instance.id}`}>
                             View
                           </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {activeTab === "at_risk" ? (
+        <>
+          {atRiskQuery.isLoading ? <OnboardingTableSkeleton /> : null}
+
+          {!atRiskQuery.isLoading && atRiskQuery.errorMessage ? (
+            <EmptyState
+              title="At-risk data is unavailable"
+              description={atRiskQuery.errorMessage}
+              ctaLabel="Retry"
+              ctaHref="/onboarding"
+            />
+          ) : null}
+
+          {!atRiskQuery.isLoading &&
+          !atRiskQuery.errorMessage &&
+          atRiskQuery.instances.length === 0 ? (
+            <section className="error-state">
+              <EmptyState
+                title="No at-risk onboarding instances"
+                description="All active onboarding plans are progressing on schedule."
+                ctaLabel="View active"
+                onCtaClick={() => setActiveTab("active")}
+              />
+            </section>
+          ) : null}
+
+          {!atRiskQuery.isLoading &&
+          !atRiskQuery.errorMessage &&
+          atRiskQuery.instances.length > 0 ? (
+            <div className="data-table-container">
+              <table className="data-table" aria-label="At-risk onboarding instances table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Days Inactive</th>
+                    <th>Progress</th>
+                    <th>Stuck Task</th>
+                    <th>Started</th>
+                    <th className="table-action-column">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {atRiskQuery.instances.map((instance) => (
+                    <tr key={instance.instanceId} className="data-table-row">
+                      <td>{instance.employeeName}</td>
+                      <td>
+                        <span
+                          className={
+                            instance.daysSinceLastActivity >= 6
+                              ? "at-risk-days-red"
+                              : instance.daysSinceLastActivity >= 3
+                                ? "at-risk-days-amber"
+                                : ""
+                          }
+                        >
+                          {instance.daysSinceLastActivity}d
+                        </span>
+                      </td>
+                      <td>
+                        <span className="at-risk-progress">
+                          {instance.completedTasks}/{instance.totalTasks} tasks
+                        </span>
+                      </td>
+                      <td>
+                        {instance.stuckTask ? (
+                          <span title={`${instance.stuckTask.daysPastDue}d overdue`}>
+                            {instance.stuckTask.title}
+                            <span className="at-risk-days-red"> ({instance.stuckTask.daysPastDue}d overdue)</span>
+                          </span>
+                        ) : (
+                          "--"
+                        )}
+                      </td>
+                      <td>
+                        <time
+                          dateTime={instance.startedAt}
+                          title={formatDateTimeTooltip(instance.startedAt)}
+                        >
+                          {formatRelativeTime(instance.startedAt)}
+                        </time>
+                      </td>
+                      <td className="table-row-action-cell">
+                        <div className="onboarding-row-actions">
+                          <Link
+                            className="table-row-action"
+                            href={`/onboarding/${instance.instanceId}`}
+                          >
+                            View
+                          </Link>
+                          {canManageOnboarding ? (
+                            <button
+                              type="button"
+                              className="table-row-action"
+                              disabled={sendingReminderId === instance.instanceId}
+                              onClick={() => handleSendReminder(instance)}
+                            >
+                              {sendingReminderId === instance.instanceId
+                                ? "Sending..."
+                                : "Send Reminder"}
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

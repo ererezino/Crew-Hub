@@ -13,6 +13,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useAnnouncements } from "../../../hooks/use-announcements";
+import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { Megaphone } from "lucide-react";
 import type {
@@ -215,6 +216,8 @@ export function AnnouncementsClient({
   const [isSaving, setIsSaving] = useState(false);
   const [isMarkingReadById, setIsMarkingReadById] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [announcementFormDirty, setAnnouncementFormDirty] = useState(false);
+  useUnsavedGuard(announcementFormDirty);
 
   const pinnedAnnouncements = useMemo(
     () => announcements.filter((announcement) => announcement.isPinned),
@@ -255,6 +258,7 @@ export function AnnouncementsClient({
     setFormTouched(INITIAL_FORM_TOUCHED);
     setFormErrors({});
     setSubmitError(null);
+    setAnnouncementFormDirty(false);
   };
 
   const dismissToast = (toastId: string) => {
@@ -280,6 +284,7 @@ export function AnnouncementsClient({
       };
 
       setFormValues(nextValues);
+      setAnnouncementFormDirty(true);
 
       if (formTouched[field]) {
         setFormErrors(getValidationErrors(nextValues, formTouched));
@@ -307,6 +312,7 @@ export function AnnouncementsClient({
     };
 
     setFormValues(nextValues);
+    setAnnouncementFormDirty(true);
   };
 
   const handleMarkRead = async (announcementId: string) => {

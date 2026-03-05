@@ -27,6 +27,17 @@ export const NOTIFICATION_TYPES = [
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
+export interface NotificationAction {
+  label: string;
+  variant: "primary" | "destructive" | "outline";
+  action_type: "api" | "navigate";
+  api_endpoint?: string;
+  api_method?: "POST" | "PUT" | "PATCH";
+  api_body?: Record<string, unknown>;
+  navigate_url?: string;
+  requires_reason?: boolean;
+}
+
 export type NotificationRecord = {
   id: string;
   orgId: string;
@@ -38,6 +49,7 @@ export type NotificationRecord = {
   isRead: boolean;
   readAt: string | null;
   createdAt: string;
+  actions?: NotificationAction[];
 };
 
 export type NotificationsResponseData = {

@@ -1,5 +1,6 @@
 import type { ApiResponse } from "./auth";
 import type { DashboardPersona } from "../lib/dashboard-persona";
+import type { HealthAlert } from "../lib/dashboard/health-alerts";
 
 /* ── Shared sub-types (used by dashboard components) ── */
 
@@ -107,6 +108,15 @@ export type DashboardPendingApprovals = {
   total: number;
 };
 
+export type DashboardApprovalItem = {
+  id: string;
+  type: "leave" | "expense" | "signature";
+  title: string;
+  subtitle: string;
+  detail: string;
+  date: string;
+};
+
 export type DashboardTeamOnLeaveItem = {
   id: string;
   name: string;
@@ -158,8 +168,9 @@ export type DashboardResponseData = {
   recentExpenses: DashboardExpenseItem[];
   upcomingShifts: DashboardShiftItem[];
 
-  /* ── manager greeting card ── */
+  /* ── manager greeting card & decision cards ── */
   pendingApprovals: DashboardPendingApprovals | null;
+  pendingApprovalItems: DashboardApprovalItem[] | null;
 
   /* ── hr_admin greeting card & widgets ── */
   headcount: { total: number; delta30d: number } | null;
@@ -202,6 +213,9 @@ export type DashboardResponseData = {
     inProgress: number;
     overdue: number;
   } | null;
+
+  /* ── admin health alerts (super_admin + hr_admin) ── */
+  healthAlerts: HealthAlert[] | null;
 };
 
 export type DashboardResponse = ApiResponse<DashboardResponseData>;
