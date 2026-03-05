@@ -532,7 +532,7 @@ export function ExpenseApprovalsClient({
       {!embedded ? (
         <PageHeader
           title="Expense Approvals"
-          description="Manager approval and finance disbursement queues."
+          description="Process manager-approved expenses, disburse reimbursements, and close the finance queue efficiently."
           actions={
             <button
               type="button"

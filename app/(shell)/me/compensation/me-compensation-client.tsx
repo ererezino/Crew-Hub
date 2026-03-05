@@ -62,7 +62,7 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
     <>
       <PageHeader
         title="Compensation"
-        description="Review salary, allowances, equity vesting, and compensation history in Crew Hub."
+        description="Understand your compensation clearly, including current pay, allowances, and vesting progress."
       />
       {content}
     </>

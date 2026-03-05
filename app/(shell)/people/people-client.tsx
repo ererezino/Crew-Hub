@@ -14,6 +14,7 @@ import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime
 import { formatEmploymentType, formatProfileStatus } from "../../../lib/format-labels";
 import { USER_ROLES } from "../../../lib/navigation";
 import type { AppRole } from "../../../types/auth";
+import { Users } from "lucide-react";
 import {
   EMPLOYMENT_TYPES,
   PROFILE_STATUSES,
@@ -354,7 +355,7 @@ export function PeopleClient({
     <>
       <PageHeader
         title="People"
-        description="Employee directory with role-aware access and profile links."
+        description="Find people quickly, review role and status, and open full employee profiles."
         actions={
           canManagePeople ? (
             <button
@@ -382,8 +383,9 @@ export function PeopleClient({
       {!isLoading && !errorMessage && sortedPeople.length === 0 ? (
         <section className="error-state">
           <EmptyState
-            title="No people records found"
-            description="Create a profile to start managing your team in Crew Hub."
+            icon={<Users size={32} />}
+            title="No employees found"
+            description="Add your first team member to start using people workflows."
             ctaLabel={canManagePeople ? "Add person" : "Go to dashboard"}
             ctaHref={canManagePeople ? "/people" : "/dashboard"}
           />

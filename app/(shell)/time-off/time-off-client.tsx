@@ -30,6 +30,7 @@ import type {
   TimeOffRequestMutationResponse
 } from "../../../types/time-off";
 import { AUTO_GRANTED_LEAVE_TYPES, UNLIMITED_LEAVE_TYPES } from "../../../types/time-off";
+import { CalendarOff } from "lucide-react";
 
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -653,7 +654,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         {!embedded ? (
           <PageHeader
             title="Time Off"
-            description="Track leave balances, submit requests, and monitor your monthly calendar."
+            description="Check your leave balance, request time off, and track approvals in one place."
           />
         ) : null}
         <TimeOffSkeleton />
@@ -667,7 +668,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         {!embedded ? (
           <PageHeader
             title="Time Off"
-            description="Track leave balances, submit requests, and monitor your monthly calendar."
+            description="Check your leave balance, request time off, and track approvals in one place."
           />
         ) : null}
         <ErrorState
@@ -684,7 +685,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       {!embedded ? (
         <PageHeader
           title="Time Off"
-          description="Track leave balances, submit requests, and monitor your monthly calendar."
+          description="Check your leave balance, request time off, and track approvals in one place."
         />
       ) : null}
 
@@ -831,8 +832,9 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
         {sortedRequests.length === 0 ? (
           <EmptyState
+            icon={<CalendarOff size={32} />}
             title="No leave requests yet"
-            description="Submit your first leave request to start tracking approvals here."
+            description="Your submitted leave requests will appear here once you create one."
             ctaLabel="Request time off"
             ctaHref="/time-off"
           />
@@ -851,50 +853,66 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                 </tr>
               </thead>
               <tbody>
-                {sortedRequests.map((requestRecord) => (
-                  <tr key={requestRecord.id} className="data-table-row">
-                    <td>{formatLeaveTypeLabel(requestRecord.leaveType)}</td>
-                    <td>
-                      <time
-                        dateTime={requestRecord.startDate}
-                        title={formatDateTimeTooltip(requestRecord.startDate)}
-                      >
-                        {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
-                      </time>
-                    </td>
-                    <td className="numeric">{formatDays(requestRecord.totalDays)}</td>
-                    <td>
-                      <StatusBadge tone={toneForRequestStatus(requestRecord.status)}>
-                        {formatLeaveStatus(requestRecord.status)}
-                      </StatusBadge>
-                    </td>
-                    <td>{requestRecord.approverName ?? "--"}</td>
-                    <td>
-                      <time
-                        dateTime={requestRecord.createdAt}
-                        title={formatDateTimeTooltip(requestRecord.createdAt)}
-                      >
-                        {formatRelativeTime(requestRecord.createdAt)}
-                      </time>
-                    </td>
-                    <td className="table-row-action-cell">
-                      <div className="timeoff-row-actions">
-                        {requestRecord.status === "pending" ? (
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => handleCancelRequest(requestRecord)}
-                            disabled={isCancellingRequestId === requestRecord.id}
-                          >
-                            {isCancellingRequestId === requestRecord.id ? "Cancelling..." : "Cancel"}
-                          </button>
-                        ) : (
-                          <span className="settings-card-description">No actions</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {sortedRequests.flatMap((requestRecord) => {
+                  const rows = [
+                    <tr key={requestRecord.id} className="data-table-row">
+                      <td>{formatLeaveTypeLabel(requestRecord.leaveType)}</td>
+                      <td>
+                        <time
+                          dateTime={requestRecord.startDate}
+                          title={formatDateTimeTooltip(requestRecord.startDate)}
+                        >
+                          {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
+                        </time>
+                      </td>
+                      <td className="numeric">{formatDays(requestRecord.totalDays)}</td>
+                      <td>
+                        <StatusBadge tone={toneForRequestStatus(requestRecord.status)}>
+                          {formatLeaveStatus(requestRecord.status)}
+                        </StatusBadge>
+                      </td>
+                      <td>{requestRecord.approverName ?? "--"}</td>
+                      <td>
+                        <time
+                          dateTime={requestRecord.createdAt}
+                          title={formatDateTimeTooltip(requestRecord.createdAt)}
+                        >
+                          {formatRelativeTime(requestRecord.createdAt)}
+                        </time>
+                      </td>
+                      <td className="table-row-action-cell">
+                        <div className="timeoff-row-actions">
+                          {requestRecord.status === "pending" ? (
+                            <button
+                              type="button"
+                              className="table-row-action"
+                              onClick={() => handleCancelRequest(requestRecord)}
+                              disabled={isCancellingRequestId === requestRecord.id}
+                            >
+                              {isCancellingRequestId === requestRecord.id ? "Cancelling..." : "Cancel"}
+                            </button>
+                          ) : (
+                            <span className="settings-card-description">No actions</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ];
+
+                  if (requestRecord.status === "rejected" && requestRecord.rejectionReason) {
+                    rows.push(
+                      <tr key={`${requestRecord.id}-rejection`} className="rejection-callout-row">
+                        <td colSpan={7}>
+                          <div className="rejection-callout rejection-callout-inline">
+                            <p><strong>Reason:</strong> {requestRecord.rejectionReason}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return rows;
+                })}
               </tbody>
             </table>
           </div>

@@ -58,7 +58,7 @@ export default async function PeopleProfilePage({
       <>
         <PageHeader
           title="People"
-          description="Crew profile details and compensation tabs."
+          description="Find people quickly, review role and status, and open full employee profiles."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -78,7 +78,7 @@ export default async function PeopleProfilePage({
       <>
         <PageHeader
           title="People"
-          description="Crew profile details and compensation tabs."
+          description="Find people quickly, review role and status, and open full employee profiles."
         />
         <EmptyState
           title="Invalid profile id"
@@ -98,7 +98,7 @@ export default async function PeopleProfilePage({
       <>
         <PageHeader
           title="People"
-          description="Crew profile details and compensation tabs."
+          description="Find people quickly, review role and status, and open full employee profiles."
         />
         <EmptyState
           title="Access denied"
@@ -119,7 +119,7 @@ export default async function PeopleProfilePage({
     <>
       <PageHeader
         title="People"
-        description="Crew profile details and compensation records."
+        description="Find people quickly, review role and status, and open full employee profiles."
       />
 
       <section className="page-tabs" role="tablist" aria-label="Profile tabs">

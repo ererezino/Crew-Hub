@@ -549,7 +549,7 @@ export function OnboardingClient({
     <>
       <PageHeader
         title="Onboarding"
-        description="HR onboarding dashboard for active and completed lifecycle instances."
+        description="Launch onboarding plans, monitor progress, and resolve blockers before deadlines slip."
         actions={
           canManageOnboarding ? (
             <div className="onboarding-header-actions">

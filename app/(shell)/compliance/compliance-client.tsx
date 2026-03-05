@@ -17,6 +17,7 @@ import {
 } from "../../../lib/compliance";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { useCompliance, updateComplianceDeadline } from "../../../hooks/use-compliance";
+import { ShieldCheck } from "lucide-react";
 import type {
   ComplianceDeadlineRecord,
   ComplianceStatus,
@@ -561,7 +562,8 @@ export function ComplianceClient() {
 
           {sortedDeadlines.length === 0 ? (
             <EmptyState
-              title="No compliance deadlines"
+              icon={<ShieldCheck size={32} />}
+              title="No deadlines found"
               description={
                 metricFilter || countryFilter !== "all"
                   ? "No deadlines match the current filters."

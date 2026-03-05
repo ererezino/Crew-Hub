@@ -161,7 +161,7 @@ export function ApprovalsClient({
     <>
       <PageHeader
         title="Approvals"
-        description="Review team requests across time off, expenses, and timesheets."
+        description="Review team requests from one consolidated queue."
       />
 
       <PageTabs

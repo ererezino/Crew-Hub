@@ -9,6 +9,7 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { useLearningCourses, useLearningMyAssignments } from "../../../hooks/use-learning";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
+import { GraduationCap } from "lucide-react";
 import type {
   LearningAssignmentRecord,
   LearningAssignmentStatus
@@ -95,7 +96,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
       {!embedded ? (
         <PageHeader
           title="Learning"
-          description="Track assigned training, complete courses, and access certificates."
+          description="Complete assigned learning, access certificates, and respond to learning surveys."
         />
       ) : null}
 
@@ -176,8 +177,9 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
 
             {sortedAssignments.length === 0 ? (
               <EmptyState
-                title="No assignments yet"
-                description="Your assigned training courses will appear here as soon as they are published to you."
+                icon={<GraduationCap size={32} />}
+                title="No courses assigned"
+                description="Assigned learning will appear here when your manager or HR publishes it to you."
                 ctaLabel="Browse catalog"
                 ctaHref="/learning"
               />
@@ -259,8 +261,9 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
 
             {sortedCourses.length === 0 ? (
               <EmptyState
+                icon={<GraduationCap size={32} />}
                 title="No published courses"
-                description="Course catalog is empty right now. Check back after HR publishes content."
+                description="Courses will appear here once they are published by your learning team."
                 ctaLabel="Refresh catalog"
                 ctaHref="/learning"
               />

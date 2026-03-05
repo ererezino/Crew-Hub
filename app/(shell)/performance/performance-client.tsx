@@ -20,6 +20,7 @@ import {
   toneForReviewCycleStatus
 } from "../../../lib/performance/reviews";
 import { useGoals, usePerformanceOverview } from "../../../hooks/use-performance";
+import { Star } from "lucide-react";
 import type {
   AcknowledgeReviewResponse,
   GoalMutationResponse,
@@ -982,8 +983,9 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                   </>
                 ) : (
                   <EmptyState
-                    title="No active cycle"
-                    description="No active performance cycle is currently running."
+                    icon={<Star size={32} />}
+                    title="No active review"
+                    description="There is no active review cycle right now. You will be notified when one starts."
                     ctaLabel={canManagePerformance ? "Open admin" : "Back to dashboard"}
                     ctaHref={canManagePerformance ? "/performance/admin" : "/dashboard"}
                   />

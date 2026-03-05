@@ -82,7 +82,7 @@ export function LearningTabsClient({
     <>
       <PageHeader
         title="Learning"
-        description="Assigned courses, certificates, and surveys in one workspace."
+        description="Complete assigned learning, access certificates, and respond to learning surveys."
       />
 
       <PageTabs

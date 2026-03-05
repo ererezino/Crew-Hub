@@ -208,7 +208,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       {!embedded ? (
         <PageHeader
           title="Time Off Approvals"
-          description="Review pending leave requests from your team and process approvals."
+          description="Approve or decline team leave requests with full date context and clear decision history."
         />
       ) : null}
 

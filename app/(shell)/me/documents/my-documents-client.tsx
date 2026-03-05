@@ -24,6 +24,7 @@ import {
   type DocumentRecord,
   type DocumentSignedUrlResponse
 } from "../../../../types/documents";
+import { FileText } from "lucide-react";
 import type {
   TravelSupportCreatePayload,
   TravelSupportCreateResponse,
@@ -511,7 +512,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
     <>
       <PageHeader
         title="My Documents"
-        description="Upload and manage your personal documents, or request travel support letters."
+        description="Access your personal documents, upload required records, and track expiry reminders."
         actions={
           <div className="page-header-actions-row">
             {showTravelView ? (
@@ -572,8 +573,9 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
           {!isLoading && !errorMessage && visibleDocuments.length === 0 ? (
             <EmptyState
-              title="No personal documents yet"
-              description="Upload your first ID document or tax form to start tracking updates."
+              icon={<FileText size={32} />}
+              title="No documents here"
+              description="Try another filter or upload a document to populate this list."
               ctaLabel="Go to dashboard"
               ctaHref="/dashboard"
             />

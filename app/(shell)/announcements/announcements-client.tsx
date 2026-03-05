@@ -14,6 +14,7 @@ import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useAnnouncements } from "../../../hooks/use-announcements";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { Megaphone } from "lucide-react";
 import type {
   Announcement,
   AnnouncementMutationResponse,
@@ -445,6 +446,7 @@ export function AnnouncementsClient({
       {!isLoading && !errorMessage && announcements.length === 0 ? (
         <section className="error-state">
           <EmptyState
+            icon={<Megaphone size={32} />}
             title="No announcements yet"
             description="Announcements will appear here once updates are published for your team."
             ctaLabel="Back to dashboard"

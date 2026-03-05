@@ -91,7 +91,7 @@ export function MyOnboardingClient() {
       <>
         <PageHeader
           title="My Onboarding"
-          description="Track your assigned onboarding tasks and completion progress."
+          description="Follow your onboarding checklist step by step and complete required tasks on time."
         />
         <EmptyState
           title="No onboarding instance assigned"
@@ -107,7 +107,7 @@ export function MyOnboardingClient() {
     <>
       <PageHeader
         title="My Onboarding"
-        description="Track your assigned onboarding tasks and completion progress."
+        description="Follow your onboarding checklist step by step and complete required tasks on time."
       />
 
       <section className="page-tabs" aria-label="My onboarding instances">

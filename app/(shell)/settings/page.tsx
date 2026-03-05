@@ -39,7 +39,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <>
         <PageHeader
           title="Settings"
-          description="Manage your Crew Hub profile and workspace preferences."
+          description="Update your profile and workspace preferences, with admin controls available by role."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -67,7 +67,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     <>
       <PageHeader
         title="Settings"
-        description="Manage profile, organization, notifications, and audit visibility in Crew Hub."
+        description="Update your profile and workspace preferences, with admin controls available by role."
       />
 
       <SettingsClient

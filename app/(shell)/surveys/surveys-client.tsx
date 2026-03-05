@@ -9,6 +9,7 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { usePendingSurveys } from "../../../hooks/use-surveys";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
+import { MessageSquare } from "lucide-react";
 
 function toDateTimeValue(value: string | null): string | null {
   if (!value) {
@@ -55,7 +56,7 @@ export function SurveysClient({
       {!embedded ? (
         <PageHeader
           title="Surveys"
-          description="Respond to active pulse and engagement surveys assigned to you."
+          description="Share feedback through surveys and track what still needs your response."
           actions={
             canManageSurveys ? (
               <Link href="/admin/surveys" className="button">
@@ -89,8 +90,9 @@ export function SurveysClient({
       {!pendingQuery.isLoading && !pendingQuery.errorMessage ? (
         pendingSurveys.length === 0 ? (
           <EmptyState
-            title="No pending surveys"
-            description="You have responded to all active surveys in your queue."
+            icon={<MessageSquare size={32} />}
+            title="No surveys pending"
+            description="You are caught up. New surveys will appear here when launched."
             ctaLabel="Back to dashboard"
             ctaHref="/dashboard"
           />

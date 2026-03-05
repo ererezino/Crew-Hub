@@ -15,6 +15,7 @@ import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime
 import { formatShiftStatus } from "../../../lib/format-labels";
 import { formatTimeRangeLabel } from "../../../lib/scheduling";
 import type { ShiftStatus } from "../../../types/scheduling";
+import { CalendarClock } from "lucide-react";
 
 type SortDirection = "asc" | "desc";
 
@@ -82,7 +83,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
       {!embedded ? (
         <PageHeader
           title="Schedule"
-          description="Review your upcoming shifts, open opportunities, and swap requests."
+          description="See your shift schedule, claim open shifts, and manage swap requests."
         />
       ) : null}
 
@@ -164,8 +165,9 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
 
             {sortedShifts.length === 0 ? (
               <EmptyState
-                title="No shifts scheduled yet"
-                description="Your assigned shifts will appear here once a schedule is published."
+                icon={<CalendarClock size={32} />}
+                title="No shifts yet"
+                description="Your upcoming shifts will appear after a schedule is published."
                 ctaLabel="View open shifts"
                 ctaHref="/scheduling?tab=open-shifts"
               />
@@ -192,6 +194,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
                       <th>Schedule</th>
                       <th>Template</th>
                       <th>Break</th>
+                      <th>Notes</th>
                       <th>Status</th>
                       <th className="table-action-column">Actions</th>
                     </tr>
@@ -208,6 +211,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
                         <td>{shift.scheduleName ?? "Schedule"}</td>
                         <td>{shift.templateName ?? "--"}</td>
                         <td className="numeric">{shift.breakMinutes}m</td>
+                        <td>{shift.notes ? <span title={shift.notes}>{shift.notes.length > 30 ? `${shift.notes.slice(0, 30)}...` : shift.notes}</span> : "--"}</td>
                         <td>
                           <StatusBadge tone={toneForShiftStatus(shift.status)}>
                             {formatShiftStatus(shift.status)}

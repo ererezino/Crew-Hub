@@ -12,7 +12,7 @@ export default async function DashboardPage() {
       <>
         <PageHeader
           title="Dashboard"
-          description="Role-aware dashboard for Crew Hub users."
+          description="Your personal home in Crew Hub. See what needs attention now and jump to your most-used actions."
         />
         <EmptyState
           title="Profile setup is required"

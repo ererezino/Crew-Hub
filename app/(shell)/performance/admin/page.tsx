@@ -12,7 +12,7 @@ export default async function PerformanceAdminPage() {
       <>
         <PageHeader
           title="Performance Admin"
-          description="Create review cycles, assign reviewers, and track completion in Crew Hub."
+          description="Run review cycles end-to-end, monitor completion, and identify calibration risks early."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -33,7 +33,7 @@ export default async function PerformanceAdminPage() {
       <>
         <PageHeader
           title="Performance Admin"
-          description="Create review cycles, assign reviewers, and track completion in Crew Hub."
+          description="Run review cycles end-to-end, monitor completion, and identify calibration risks early."
         />
         <EmptyState
           title="Access denied"

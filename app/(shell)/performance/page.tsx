@@ -12,7 +12,7 @@ export default async function PerformancePage() {
       <>
         <PageHeader
           title="Performance"
-          description="Manage self reviews, manager feedback, and review cycles in Crew Hub."
+          description="Complete your reviews, track goals, and keep performance conversations moving."
         />
         <EmptyState
           title="Profile is unavailable"

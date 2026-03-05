@@ -23,6 +23,7 @@ import {
 } from "../../../types/documents";
 import type { CreateSignatureRequestResponse } from "../../../types/esignatures";
 import type { PeopleListResponse } from "../../../types/people";
+import { FileText } from "lucide-react";
 
 type DocumentsClientProps = {
   currentUserId: string;
@@ -301,7 +302,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
     <>
       <PageHeader
         title="Documents"
-        description="Org-wide document repository with category filters, expiry alerts, and version tracking."
+        description="Access your personal documents, upload required records, and track expiry reminders."
         actions={
           canManageDocuments ? (
             <button type="button" className="button button-accent" onClick={openCreatePanel}>
@@ -338,7 +339,8 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
       {!isLoading && !errorMessage && filteredDocuments.length === 0 ? (
         <section className="error-state">
           <EmptyState
-            title="No documents match this filter"
+            icon={<FileText size={32} />}
+            title="No documents here"
             description="Upload a document or select a different tab to view more records."
             ctaLabel={canManageDocuments ? "Upload document" : "Go to dashboard"}
             {...(canManageDocuments

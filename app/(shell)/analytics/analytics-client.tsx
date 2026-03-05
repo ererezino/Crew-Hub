@@ -278,7 +278,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
   if (query.isPending) {
     return (
       <>
-        <PageHeader title="Analytics" description="Executive dashboard for people, time off, payroll, and expenses." />
+        <PageHeader title="Analytics" description="Track workforce and operations trends with filters and exports for decision-making." />
         <AnalyticsSkeleton />
       </>
     );
@@ -287,7 +287,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
   if (query.isError || !query.data) {
     return (
       <>
-        <PageHeader title="Analytics" description="Executive dashboard for people, time off, payroll, and expenses." />
+        <PageHeader title="Analytics" description="Track workforce and operations trends with filters and exports for decision-making." />
         <ErrorState
           title="Analytics unavailable"
           message={query.error instanceof Error ? query.error.message : "Unable to load analytics."}
@@ -341,7 +341,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
     <>
       <PageHeader
         title="Analytics"
-        description="Executive dashboard for people, time off, payroll, and expenses."
+        description="Track workforce and operations trends with filters and exports for decision-making."
         actions={query.isFetching ? <StatusBadge tone="processing">Refreshing</StatusBadge> : null}
       />
 

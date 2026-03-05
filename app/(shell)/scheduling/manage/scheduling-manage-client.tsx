@@ -349,7 +349,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       {!embedded ? (
         <PageHeader
           title="Scheduling"
-          description="Create weekly schedules, assign shifts, and publish for employee visibility."
+          description="Build and publish team schedules with templates, assignments, and swap oversight."
         />
       ) : null}
 

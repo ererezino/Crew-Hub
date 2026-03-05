@@ -42,7 +42,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       <>
         <PageHeader
           title="Schedule"
-          description="Shifts, swaps, and team schedule management."
+          description="See your shift schedule, claim open shifts, and manage swap requests."
         />
         <EmptyState
           title="Scheduling is for Customer Success"

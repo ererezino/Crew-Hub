@@ -76,7 +76,7 @@ export function PayrollDashboardClient({
     <>
       <PageHeader
         title="Payroll"
-        description="Create payroll runs and calculate contractor disbursements in Crew Hub."
+        description="Run payroll safely with staged approvals, item-level checks, and clear payout status."
         actions={headerActions}
       />
 

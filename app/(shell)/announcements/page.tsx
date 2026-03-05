@@ -12,7 +12,7 @@ export default async function AnnouncementsPage() {
       <>
         <PageHeader
           title="Announcements"
-          description="Read team updates and company notices in Crew Hub."
+          description="Stay up to date on company updates and see what's new since your last visit."
         />
         <EmptyState
           title="Profile is unavailable"

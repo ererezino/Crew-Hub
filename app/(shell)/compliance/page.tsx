@@ -14,7 +14,7 @@ export default async function CompliancePage() {
       <>
         <PageHeader
           title="Compliance"
-          description="Track statutory deadlines and proof of filing across all operating countries."
+          description="Stay ahead of statutory filings with due dates, ownership, and proof tracking by country."
         />
         <EmptyState
           title="Profile is unavailable"

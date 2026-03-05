@@ -26,6 +26,7 @@ import type {
 } from "../../../types/esignatures";
 import type { DocumentSignedUrlResponse } from "../../../types/documents";
 import type { PeopleListResponse } from "../../../types/people";
+import { PenSquare } from "lucide-react";
 
 type SignaturesClientProps = {
   currentUserId: string;
@@ -527,7 +528,7 @@ export function SignaturesClient({
     <>
       <PageHeader
         title="Signatures"
-        description="Send documents for e-signature, track signing progress, and complete employee acknowledgements."
+        description="Request, sign, and track documents securely with a clear signer timeline."
         actions={
           canManageSignatures ? (
             <button
@@ -568,7 +569,8 @@ export function SignaturesClient({
       {!signatures.isLoading && !signatures.errorMessage && visibleRequests.length === 0 ? (
         <section className="error-state">
           <EmptyState
-            title="No signature requests yet"
+            icon={<PenSquare size={32} />}
+            title="No signatures pending"
             description={
               canManageSignatures
                 ? "Create your first signature request to collect acknowledgements digitally."

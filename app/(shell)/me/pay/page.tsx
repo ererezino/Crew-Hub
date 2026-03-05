@@ -26,7 +26,7 @@ export default async function PayPage({ searchParams }: PayPageProps) {
       <>
         <PageHeader
           title="Pay"
-          description="Review your pay statements, payout details, and compensation."
+          description="Everything about your pay in one view: statements, payout setup, and compensation records."
         />
         <EmptyState
           title="Profile is unavailable"

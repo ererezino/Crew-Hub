@@ -32,6 +32,7 @@ import {
   toneForExpenseStatus
 } from "../../../lib/expenses";
 import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries";
+import { Receipt } from "lucide-react";
 import type {
   CreateExpenseResponse,
   ExpenseCategory,
@@ -794,7 +795,7 @@ export function ExpensesClient({
     <>
       <PageHeader
         title="Expenses"
-        description="Submit expenses with receipts, track approvals, and monitor reimbursement status."
+        description="Submit work expenses, upload receipts, and track where each claim is in the reimbursement flow."
         actions={
           <>
             {canViewReports ? (
@@ -877,8 +878,9 @@ export function ExpensesClient({
 
           {expenses.length === 0 ? (
             <EmptyState
-              title="No expenses found"
-              description="Submit your first expense to start reimbursement tracking."
+              icon={<Receipt size={32} />}
+              title="No expenses yet"
+              description="Submit your first work expense to start reimbursement tracking."
               ctaLabel="Submit expense"
               ctaHref="/expenses"
             />
