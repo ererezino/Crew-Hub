@@ -399,7 +399,7 @@ export function SignaturesClient({
       const { x, y } = getCanvasCoords(event);
       ctx.lineWidth = 2;
       ctx.lineCap = "round";
-      ctx.strokeStyle = "#1a1a2e";
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text-primary").trim() || "#0F172A";
       ctx.lineTo(x, y);
       ctx.stroke();
       setHasCanvasStrokes(true);
@@ -444,20 +444,27 @@ export function SignaturesClient({
 
     setIsSubmittingSignature(true);
 
-    let signatureText: string;
+    let requestBody: Record<string, string>;
 
     if (signatureMode === "type") {
-      signatureText = typedSignature.trim();
+      requestBody = {
+        signatureMode: "typed",
+        signatureText: typedSignature.trim()
+      };
     } else {
       const canvas = canvasRef.current;
-      signatureText = canvas ? canvas.toDataURL("image/png") : "";
+      const dataUrl = canvas ? canvas.toDataURL("image/png") : "";
+      requestBody = {
+        signatureMode: "drawn",
+        signatureImage: dataUrl
+      };
     }
 
     try {
       const response = await fetch(`/api/v1/signatures/${signingRequest.id}/sign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ signatureText })
+        body: JSON.stringify(requestBody)
       });
 
       const payload = (await response.json()) as SignSignatureResponse;

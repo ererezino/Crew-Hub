@@ -18,14 +18,28 @@ const paramsSchema = z.object({
   requestId: z.string().uuid("Request id must be a valid uuid.")
 });
 
-const payloadSchema = z.object({
-  signatureText: z
-    .string()
-    .trim()
-    .min(2, "Signature text must be at least 2 characters.")
-    .max(120, "Signature text must be 120 characters or fewer.")
-    .optional()
-});
+const payloadSchema = z
+  .object({
+    signatureMode: z.enum(["typed", "drawn"]).default("typed"),
+    signatureText: z
+      .string()
+      .trim()
+      .min(2, "Signature text must be at least 2 characters.")
+      .max(120, "Signature text must be 120 characters or fewer.")
+      .optional(),
+    signatureImage: z
+      .string()
+      .max(500000, "Signature image is too large.")
+      .optional()
+  })
+  .refine(
+    (data) => {
+      if (data.signatureMode === "typed") return Boolean(data.signatureText?.trim());
+      if (data.signatureMode === "drawn") return Boolean(data.signatureImage);
+      return false;
+    },
+    { message: "Signature content required for the selected mode." }
+  );
 
 const requestRowSchema = z.object({
   id: z.string().uuid(),
@@ -220,13 +234,48 @@ export async function POST(
   }
 
   const signedAt = new Date().toISOString();
+  const signMode = parsedBody.data.signatureMode;
+
+  let signatureText: string | null = null;
+  let signatureImagePath: string | null = null;
+
+  if (signMode === "drawn" && parsedBody.data.signatureImage) {
+    const raw = parsedBody.data.signatureImage;
+    const base64Data = raw.replace(/^data:image\/\w+;base64,/, "");
+
+    const buf = Buffer.from(base64Data, "base64");
+    const storagePath = `signatures/${parsedParams.data.requestId}_${parsedSignerRow.data.id}_${Date.now()}.png`;
+
+    const { error: uploadError } = await serviceRoleClient.storage
+      .from("signatures")
+      .upload(storagePath, buf, {
+        contentType: "image/png",
+        upsert: false
+      });
+
+    if (uploadError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SIGNATURE_UPLOAD_FAILED",
+          message: "Unable to save drawn signature image."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    signatureImagePath = storagePath;
+  } else {
+    signatureText = parsedBody.data.signatureText ?? session.profile.full_name;
+  }
 
   const { error: updateSignerError } = await supabase
     .from("signature_signers")
     .update({
       status: "signed",
       signed_at: signedAt,
-      signature_text: parsedBody.data.signatureText ?? session.profile.full_name
+      signature_text: signatureText,
+      signature_image_path: signatureImagePath
     })
     .eq("id", parsedSignerRow.data.id)
     .eq("org_id", session.profile.org_id);
