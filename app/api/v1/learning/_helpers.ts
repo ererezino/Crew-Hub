@@ -64,6 +64,61 @@ export function toUnknownArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+/**
+ * Strips answer-revealing fields from quiz modules so employees cannot cheat.
+ * Admins (HR_ADMIN, SUPER_ADMIN) receive the full module data for editing.
+ */
+export function sanitizeModulesForEmployee(
+  modules: unknown[],
+  userRoles: readonly UserRole[]
+): unknown[] {
+  if (canManageLearning(userRoles)) {
+    return modules;
+  }
+
+  return modules.map((mod) => {
+    if (!mod || typeof mod !== "object") return mod;
+
+    const record = mod as Record<string, unknown>;
+
+    if (record.type !== "quiz" && !Array.isArray(record.questions)) {
+      return mod;
+    }
+
+    const questions = Array.isArray(record.questions) ? record.questions : [];
+
+    const sanitizedQuestions = questions.map((q) => {
+      if (!q || typeof q !== "object") return q;
+
+      const question = q as Record<string, unknown>;
+
+      const sanitized: Record<string, unknown> = {
+        question_text: question.question_text,
+        question_type: question.question_type
+      };
+
+      if (question.id !== undefined) {
+        sanitized.id = question.id;
+      }
+
+      if (Array.isArray(question.options)) {
+        sanitized.options = question.options.map((o) => {
+          if (typeof o === "string") return o;
+          if (o && typeof o === "object") {
+            const opt = o as Record<string, unknown>;
+            return { text: opt.text, id: opt.id };
+          }
+          return o;
+        });
+      }
+
+      return sanitized;
+    });
+
+    return { ...record, questions: sanitizedQuestions };
+  });
+}
+
 export function toUnknownRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};

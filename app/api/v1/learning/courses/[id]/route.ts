@@ -15,7 +15,8 @@ import {
   canManageLearning,
   courseRowSchema,
   jsonResponse,
-  mapCourseRow
+  mapCourseRow,
+  sanitizeModulesForEmployee
 } from "../../_helpers";
 
 const paramsSchema = z.object({
@@ -123,6 +124,11 @@ export async function GET(
   }
 
   const course = mapCourseRow(parsedCourse.data);
+
+  course.modules = sanitizeModulesForEmployee(
+    course.modules,
+    session.profile.roles
+  );
 
   return jsonResponse<LearningCourseMutationResponseData>(200, {
     data: {
