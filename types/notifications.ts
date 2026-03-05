@@ -21,6 +21,8 @@ export const NOTIFICATION_TYPES = [
   "course_assigned",
   "review_cycle_started",
   "review_reminder",
+  "review_shared",
+  "review_acknowledged",
   "survey_launched",
   "document_expiry_warning"
 ] as const;
