@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
+import {
+  DASHBOARD_WIDGET_KEYS,
+  defaultWidgetVisibilityForRoles,
+  getDefaultVisibleRolesForWidget,
+  isWidgetVisibleForUser,
+  sanitizeRoles,
+  type DashboardWidgetKey
+} from "../../../../lib/access-control";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { getDashboardPersona, type DashboardPersona } from "../../../../lib/dashboard-persona";
 import { normalizeUserRoles, type UserRole } from "../../../../lib/navigation";
@@ -67,7 +76,11 @@ function buildGreeting(fullName: string, roles: readonly UserRole[]): DashboardG
   };
 }
 
-function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeting): DashboardResponseData {
+function buildEmptyResponse(
+  persona: DashboardPersona,
+  greeting: DashboardGreeting,
+  allowedWidgetKeys: DashboardWidgetKey[]
+): DashboardResponseData {
   return {
     persona,
     greeting,
@@ -94,11 +107,63 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     headcountByCountry: null,
     headcountByDept: null,
     recentAuditLog: null,
-    complianceHealth: null
+    complianceHealth: null,
+    allowedWidgetKeys
   };
 }
 
 type SupabaseClient = ReturnType<typeof createSupabaseServiceRoleClient>;
+
+/* ── Widget config resolution ── */
+
+const widgetRowSchema = z.object({
+  widget_key: z.enum(DASHBOARD_WIDGET_KEYS),
+  visible_to_roles: z.array(z.string())
+});
+
+async function resolveAllowedWidgets(
+  supabase: SupabaseClient,
+  orgId: string,
+  userRoles: readonly UserRole[]
+): Promise<Set<DashboardWidgetKey>> {
+  if (hasRole(userRoles, "SUPER_ADMIN")) {
+    return new Set(DASHBOARD_WIDGET_KEYS);
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("dashboard_widget_config")
+      .select("widget_key, visible_to_roles")
+      .eq("org_id", orgId);
+
+    if (error || !data || data.length === 0) {
+      return new Set(defaultWidgetVisibilityForRoles(userRoles));
+    }
+
+    const parsed = z.array(widgetRowSchema).safeParse(data);
+
+    if (!parsed.success) {
+      return new Set(defaultWidgetVisibilityForRoles(userRoles));
+    }
+
+    const configByKey = new Map(
+      parsed.data.map((row) => [row.widget_key, row] as const)
+    );
+
+    const allowed = DASHBOARD_WIDGET_KEYS.filter((widgetKey) => {
+      const row = configByKey.get(widgetKey);
+      const visibleToRoles = row
+        ? sanitizeRoles(row.visible_to_roles)
+        : getDefaultVisibleRolesForWidget(widgetKey);
+
+      return isWidgetVisibleForUser({ userRoles, visibleToRoles });
+    });
+
+    return new Set(allowed);
+  } catch {
+    return new Set(defaultWidgetVisibilityForRoles(userRoles));
+  }
+}
 
 /* ── Data fetching functions ── */
 
@@ -852,8 +917,11 @@ export async function GET() {
       activeOnboarding ? { status: activeOnboarding.status } : null
     );
 
+    const allowedWidgets = await resolveAllowedWidgets(supabase, profile.org_id, roles);
+    const allowedWidgetKeysArray: DashboardWidgetKey[] = [...allowedWidgets];
+
     const greeting = buildGreeting(profile.full_name, roles);
-    const response = buildEmptyResponse(persona, greeting);
+    const response = buildEmptyResponse(persona, greeting, allowedWidgetKeysArray);
 
     /* ── Step 2: Fetch universal data (all personas) ── */
 
@@ -918,7 +986,9 @@ export async function GET() {
           await Promise.all([
             fetchLeaveBalance(supabase, profile.org_id, profile.id),
             fetchUpcomingShifts(supabase, profile.org_id, profile.id),
-            fetchRecentExpenses(supabase, profile.org_id, profile.id),
+            allowedWidgets.has("expense_widget")
+              ? fetchRecentExpenses(supabase, profile.org_id, profile.id)
+              : Promise.resolve([]),
             checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
           ]);
 
@@ -937,10 +1007,14 @@ export async function GET() {
           recentExpenses,
           hasPolicy
         ] = await Promise.all([
-          fetchPendingApprovals(supabase, profile.org_id, profile.id),
+          allowedWidgets.has("hero_metrics")
+            ? fetchPendingApprovals(supabase, profile.org_id, profile.id)
+            : Promise.resolve(null),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
           fetchUpcomingShifts(supabase, profile.org_id, profile.id),
-          fetchRecentExpenses(supabase, profile.org_id, profile.id),
+          allowedWidgets.has("expense_widget")
+            ? fetchRecentExpenses(supabase, profile.org_id, profile.id)
+            : Promise.resolve([]),
           checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
         ]);
 
@@ -953,6 +1027,22 @@ export async function GET() {
       }
 
       case "hr_admin": {
+        const hrFetches: Promise<unknown>[] = [
+          fetchHeadcount(supabase, profile.org_id),
+          fetchOnboardingStatus(supabase, profile.org_id),
+          allowedWidgets.has("compliance_widget")
+            ? fetchComplianceDeadlines(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("secondary_panels")
+            ? fetchActiveReviewCycles(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("secondary_panels")
+            ? fetchExpiringDocuments(supabase, profile.org_id)
+            : Promise.resolve(null),
+          fetchLeaveBalance(supabase, profile.org_id, profile.id),
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+        ];
+
         const [
           headcount,
           onboardingStatus,
@@ -961,15 +1051,15 @@ export async function GET() {
           expiringDocuments,
           leaveBalance,
           hasPolicy
-        ] = await Promise.all([
-          fetchHeadcount(supabase, profile.org_id),
-          fetchOnboardingStatus(supabase, profile.org_id),
-          fetchComplianceDeadlines(supabase, profile.org_id),
-          fetchActiveReviewCycles(supabase, profile.org_id),
-          fetchExpiringDocuments(supabase, profile.org_id),
-          fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
-        ]);
+        ] = await Promise.all(hrFetches) as [
+          Awaited<ReturnType<typeof fetchHeadcount>>,
+          Awaited<ReturnType<typeof fetchOnboardingStatus>>,
+          Awaited<ReturnType<typeof fetchComplianceDeadlines>> | null,
+          Awaited<ReturnType<typeof fetchActiveReviewCycles>> | null,
+          Awaited<ReturnType<typeof fetchExpiringDocuments>> | null,
+          Awaited<ReturnType<typeof fetchLeaveBalance>>,
+          boolean
+        ];
 
         response.headcount = headcount;
         response.onboardingStatus = onboardingStatus;
@@ -982,19 +1072,31 @@ export async function GET() {
       }
 
       case "finance_admin": {
+        const financeFetches: Promise<unknown>[] = [
+          fetchPayrollStatus(supabase, profile.org_id),
+          allowedWidgets.has("expense_widget")
+            ? fetchPendingExpenseApprovals(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("expense_widget")
+            ? fetchExpensePipeline(supabase, profile.org_id)
+            : Promise.resolve(null),
+          fetchLeaveBalance(supabase, profile.org_id, profile.id),
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+        ];
+
         const [
           payroll,
           pendingExpenseApprovals,
           expensePipeline,
           leaveBalance,
           hasPolicy
-        ] = await Promise.all([
-          fetchPayrollStatus(supabase, profile.org_id),
-          fetchPendingExpenseApprovals(supabase, profile.org_id),
-          fetchExpensePipeline(supabase, profile.org_id),
-          fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
-        ]);
+        ] = await Promise.all(financeFetches) as [
+          Awaited<ReturnType<typeof fetchPayrollStatus>>,
+          Awaited<ReturnType<typeof fetchPendingExpenseApprovals>> | null,
+          Awaited<ReturnType<typeof fetchExpensePipeline>> | null,
+          Awaited<ReturnType<typeof fetchLeaveBalance>>,
+          boolean
+        ];
 
         response.payroll = payroll;
         response.pendingExpenseApprovals = pendingExpenseApprovals;
@@ -1005,6 +1107,36 @@ export async function GET() {
       }
 
       case "super_admin": {
+        const superFetches: Promise<unknown>[] = [
+          allowedWidgets.has("hero_metrics")
+            ? fetchHeadcount(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("primary_chart")
+            ? fetchHeadcountByCountry(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("primary_chart")
+            ? fetchHeadcountByDept(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("hero_metrics")
+            ? fetchPendingApprovals(supabase, profile.org_id, profile.id)
+            : Promise.resolve(null),
+          fetchPayrollStatus(supabase, profile.org_id),
+          allowedWidgets.has("compliance_widget")
+            ? fetchComplianceDeadlines(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("compliance_widget")
+            ? fetchComplianceHealth(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("secondary_panels")
+            ? fetchRecentAuditLog(supabase, profile.org_id)
+            : Promise.resolve(null),
+          allowedWidgets.has("secondary_panels")
+            ? fetchExpiringDocuments(supabase, profile.org_id)
+            : Promise.resolve(null),
+          fetchLeaveBalance(supabase, profile.org_id, profile.id),
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+        ];
+
         const [
           headcount,
           headcountByCountry,
@@ -1017,19 +1149,19 @@ export async function GET() {
           expiringDocuments,
           leaveBalance,
           hasPolicy
-        ] = await Promise.all([
-          fetchHeadcount(supabase, profile.org_id),
-          fetchHeadcountByCountry(supabase, profile.org_id),
-          fetchHeadcountByDept(supabase, profile.org_id),
-          fetchPendingApprovals(supabase, profile.org_id, profile.id),
-          fetchPayrollStatus(supabase, profile.org_id),
-          fetchComplianceDeadlines(supabase, profile.org_id),
-          fetchComplianceHealth(supabase, profile.org_id),
-          fetchRecentAuditLog(supabase, profile.org_id),
-          fetchExpiringDocuments(supabase, profile.org_id),
-          fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
-        ]);
+        ] = await Promise.all(superFetches) as [
+          Awaited<ReturnType<typeof fetchHeadcount>> | null,
+          Awaited<ReturnType<typeof fetchHeadcountByCountry>> | null,
+          Awaited<ReturnType<typeof fetchHeadcountByDept>> | null,
+          Awaited<ReturnType<typeof fetchPendingApprovals>> | null,
+          Awaited<ReturnType<typeof fetchPayrollStatus>>,
+          Awaited<ReturnType<typeof fetchComplianceDeadlines>> | null,
+          Awaited<ReturnType<typeof fetchComplianceHealth>> | null,
+          Awaited<ReturnType<typeof fetchRecentAuditLog>> | null,
+          Awaited<ReturnType<typeof fetchExpiringDocuments>> | null,
+          Awaited<ReturnType<typeof fetchLeaveBalance>>,
+          boolean
+        ];
 
         response.headcount = headcount;
         response.headcountByCountry = headcountByCountry;

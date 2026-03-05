@@ -1,3 +1,4 @@
+import type { DashboardWidgetKey } from "../lib/access-control";
 import type { ApiResponse } from "./auth";
 import type { DashboardPersona } from "../lib/dashboard-persona";
 
@@ -202,6 +203,9 @@ export type DashboardResponseData = {
     inProgress: number;
     overdue: number;
   } | null;
+
+  /* ── Widget visibility (from dashboard_widget_config) ── */
+  allowedWidgetKeys: DashboardWidgetKey[];
 };
 
 export type DashboardResponse = ApiResponse<DashboardResponseData>;

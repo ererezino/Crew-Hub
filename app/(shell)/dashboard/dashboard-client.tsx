@@ -10,6 +10,7 @@ import { WidgetErrorBoundary } from "../../../components/dashboard/widget-error-
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDashboard } from "../../../hooks/use-dashboard";
+import type { DashboardWidgetKey } from "../../../lib/access-control";
 import { formatDate, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
 import type { DashboardResponseData } from "../../../types/dashboard";
@@ -804,6 +805,8 @@ function GreetingCard({ data }: { data: DashboardResponseData }) {
    ══════════════════════════════════════════════ */
 
 function WidgetGrid({ data }: { data: DashboardResponseData }) {
+  const allowed = new Set<DashboardWidgetKey>(data.allowedWidgetKeys);
+
   return (
     <motion.div
       className="dashboard-widget-grid"
@@ -826,38 +829,50 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
       <WidgetErrorBoundary title="My leave balance">
         <LeaveBalanceWidget data={data} />
       </WidgetErrorBoundary>
-      <WidgetErrorBoundary title="Recent expenses">
-        <RecentExpensesWidget data={data} />
-      </WidgetErrorBoundary>
+      {allowed.has("expense_widget") ? (
+        <WidgetErrorBoundary title="Recent expenses">
+          <RecentExpensesWidget data={data} />
+        </WidgetErrorBoundary>
+      ) : null}
       <WidgetErrorBoundary title="Upcoming shifts">
         <UpcomingShiftsWidget data={data} />
       </WidgetErrorBoundary>
 
       {/* Manager+ widget */}
-      <WidgetErrorBoundary title="Pending approvals">
-        <PendingApprovalsWidget data={data} />
-      </WidgetErrorBoundary>
+      {allowed.has("hero_metrics") ? (
+        <WidgetErrorBoundary title="Pending approvals">
+          <PendingApprovalsWidget data={data} />
+        </WidgetErrorBoundary>
+      ) : null}
 
       {/* HR Admin+ widgets */}
-      <WidgetErrorBoundary title="Expiring documents">
-        <ExpiringDocumentsWidget data={data} />
-      </WidgetErrorBoundary>
+      {allowed.has("secondary_panels") ? (
+        <WidgetErrorBoundary title="Expiring documents">
+          <ExpiringDocumentsWidget data={data} />
+        </WidgetErrorBoundary>
+      ) : null}
 
       {/* Finance Admin+ widgets */}
       <WidgetErrorBoundary title="Payroll status">
         <PayrollStatusWidget data={data} />
       </WidgetErrorBoundary>
-      <WidgetErrorBoundary title="Expense pipeline">
-        <ExpensePipelineWidget data={data} />
-      </WidgetErrorBoundary>
+      {allowed.has("expense_widget") ? (
+        <WidgetErrorBoundary title="Expense pipeline">
+          <ExpensePipelineWidget data={data} />
+        </WidgetErrorBoundary>
+      ) : null}
 
       {/* Super Admin widgets */}
-      <WidgetErrorBoundary title="Compliance health">
-        <ComplianceHealthWidget data={data} />
-      </WidgetErrorBoundary>
-      <WidgetErrorBoundary title="Recent audit activity">
-        <AuditLogWidget data={data} />
-      </WidgetErrorBoundary>
+      {allowed.has("compliance_widget") ? (
+        <WidgetErrorBoundary title="Compliance health">
+          <ComplianceHealthWidget data={data} />
+        </WidgetErrorBoundary>
+      ) : null}
+      {allowed.has("secondary_panels") ? (
+        <WidgetErrorBoundary title="Recent audit activity">
+          <AuditLogWidget data={data} />
+        </WidgetErrorBoundary>
+      ) : null}
     </motion.div>
   );
 }
