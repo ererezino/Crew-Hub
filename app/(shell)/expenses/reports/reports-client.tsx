@@ -72,7 +72,7 @@ function ExpenseReportBars({
                 <div className="expenses-report-row-copy">
                   <p className="expenses-report-row-title">{row.label}</p>
                   <p className="expenses-report-row-meta">
-                    <CurrencyDisplay amount={row.totalAmount} currency="USD" /> |{" "}
+                    <CurrencyDisplay amount={row.totalAmount} currency="NGN" /> |{" "}
                     <span className="numeric">{row.count}</span> items
                   </p>
                 </div>
@@ -116,7 +116,7 @@ function EmployeeTable({ rows }: { rows: EnhancedEmployeeBucket[] }) {
               <td>{row.department ?? "—"}</td>
               <td className="numeric">{row.count}</td>
               <td className="numeric">
-                <CurrencyDisplay amount={row.totalAmount} currency="USD" />
+                <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
               </td>
               <td className="numeric">
                 {row.avgProcessingHours !== null
@@ -163,7 +163,7 @@ function CategoryTable({ rows }: { rows: EnhancedCategoryBucket[] }) {
               <td>{row.label}</td>
               <td className="numeric">{row.count}</td>
               <td className="numeric">
-                <CurrencyDisplay amount={row.totalAmount} currency="USD" />
+                <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
               </td>
               <td className="numeric">{row.pctOfTotal}%</td>
               <td>{row.mostCommonVendor ?? "—"}</td>
@@ -198,7 +198,7 @@ function DepartmentTable({ rows }: { rows: EnhancedDepartmentBucket[] }) {
               <td>{row.label}</td>
               <td className="numeric">{row.count}</td>
               <td className="numeric">
-                <CurrencyDisplay amount={row.totalAmount} currency="USD" />
+                <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
               </td>
               <td className="numeric">{row.uniqueEmployees}</td>
               <td>{row.topCategory ? getExpenseCategoryLabel(row.topCategory as never) : "—"}</td>
@@ -357,7 +357,7 @@ export function ExpenseReportsClient() {
             <article className="metric-card">
               <p className="metric-label">Total Submitted</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.totalAmount} currency="USD" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.totalAmount} currency="NGN" />
               </p>
               <p className="metric-hint">
                 <span className="numeric">{reportsQuery.data.totals.expenseCount}</span> expenses
@@ -366,28 +366,28 @@ export function ExpenseReportsClient() {
             <article className="metric-card">
               <p className="metric-label">Manager Approved</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.managerApprovedAmount} currency="USD" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.managerApprovedAmount} currency="NGN" />
               </p>
               <p className="metric-hint">Awaiting finance review</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Finance Approved</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.financeApprovedAmount} currency="USD" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.financeApprovedAmount} currency="NGN" />
               </p>
               <p className="metric-hint">Approved for reimbursement</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Reimbursed</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.reimbursedAmount} currency="USD" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.reimbursedAmount} currency="NGN" />
               </p>
               <p className="metric-hint">Paid out this month</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Pending Reimbursement</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.pendingAmount} currency="USD" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.pendingAmount} currency="NGN" />
               </p>
               <p className="metric-hint">Still owed to employees</p>
             </article>
@@ -439,7 +439,7 @@ export function ExpenseReportsClient() {
                           <div className="expenses-report-row-copy">
                             <p className="expenses-report-row-title">{row.label}</p>
                             <p className="expenses-report-row-meta">
-                              <CurrencyDisplay amount={row.totalAmount} currency="USD" /> |{" "}
+                              <CurrencyDisplay amount={row.totalAmount} currency="NGN" /> |{" "}
                               <span className="numeric">{row.count}</span> items
                             </p>
                           </div>

@@ -85,6 +85,7 @@ export function TimeOffTabsClient({ requestedTab, userRoles }: TimeOffTabsClient
       <AnimatePresence mode="wait" initial={false}>
         <motion.section
           key={activeTab}
+          className="tab-content-layout"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

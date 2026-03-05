@@ -12,6 +12,7 @@ import { usePayrollRunsDashboard } from "../../../hooks/use-payroll-runs";
 import { formatDate, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import {
   getCurrencyTotal,
+  getPrimaryCurrency,
   labelForPayrollRunStatus,
   toneForPayrollRunStatus
 } from "../../../lib/payroll/runs";
@@ -72,6 +73,13 @@ export function PayrollDashboardClient({
     });
   }, [runsQuery.data?.runs, sortDirection]);
 
+  /** Derive the primary currency from the most recent run's totals. */
+  const dashboardCurrency = useMemo(() => {
+    const runs = runsQuery.data?.runs ?? [];
+    if (runs.length === 0) return "NGN";
+    return getPrimaryCurrency(runs[0].totalGross);
+  }, [runsQuery.data?.runs]);
+
   return (
     <>
       <PageHeader
@@ -112,7 +120,7 @@ export function PayrollDashboardClient({
               <p className="metric-value">
                 <CurrencyDisplay
                   amount={runsQuery.data.metrics.latestTotalCostAmount}
-                  currency="USD"
+                  currency={dashboardCurrency}
                 />
               </p>
               <p className="metric-hint">Latest run net total</p>
@@ -196,8 +204,8 @@ export function PayrollDashboardClient({
                       <td className="numeric">{run.employeeCount}</td>
                       <td>
                         <CurrencyDisplay
-                          amount={getCurrencyTotal(run.totalGross, "USD")}
-                          currency="USD"
+                          amount={getCurrencyTotal(run.totalGross, getPrimaryCurrency(run.totalGross))}
+                          currency={getPrimaryCurrency(run.totalGross)}
                         />
                       </td>
                       <td>{run.initiatedByName ?? "--"}</td>

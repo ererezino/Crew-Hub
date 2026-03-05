@@ -66,6 +66,23 @@ export function getCurrencyTotal(
   return totals[currencyCode] ?? 0;
 }
 
+/**
+ * Return the dominant currency code from a PayrollCurrencyTotals record.
+ * Picks the key with the highest amount; falls back to the given default.
+ */
+export function getPrimaryCurrency(
+  totals: PayrollCurrencyTotals,
+  fallback: string = "NGN"
+): string {
+  const entries = Object.entries(totals);
+  if (entries.length === 0) return fallback;
+  let best = entries[0];
+  for (let i = 1; i < entries.length; i++) {
+    if (entries[i][1] > best[1]) best = entries[i];
+  }
+  return best[0] || fallback;
+}
+
 export function labelForPayrollRunStatus(status: PayrollRunStatus): string {
   return status
     .split("_")

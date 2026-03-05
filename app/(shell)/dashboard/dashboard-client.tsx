@@ -9,6 +9,7 @@ import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skele
 import { WidgetErrorBoundary } from "../../../components/dashboard/widget-error-boundary";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
+import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { useDashboard } from "../../../hooks/use-dashboard";
 import { formatDate, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
@@ -559,7 +560,7 @@ function RecentExpensesWidget({ data }: { data: DashboardResponseData }) {
           <li key={e.id} className="dashboard-widget-list-item">
             <span>{e.description}</span>
             <div className="dashboard-expense-meta">
-              <span className="numeric">{e.currency} {e.amount.toLocaleString()}</span>
+              <CurrencyDisplay amount={e.amount} currency={e.currency} />
               <StatusBadge
                 tone={
                   e.status === "reimbursed"

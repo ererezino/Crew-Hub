@@ -22,6 +22,7 @@ import { formatDate, formatDateTimeTooltip } from "../../../../../lib/datetime";
 import { toSentenceCase } from "../../../../../lib/format-labels";
 import {
   getCurrencyTotal,
+  getPrimaryCurrency,
   labelForPayrollRunStatus,
   toneForPayrollRunStatus
 } from "../../../../../lib/payroll/runs";
@@ -252,6 +253,13 @@ export function PayrollRunDetailClient({
     });
   }, [runQuery.data?.items, sortDirection]);
 
+
+  /** Derive the primary currency from the run's gross totals. */
+  const runCurrency = useMemo(() => {
+    const totals = runQuery.data?.run?.totalGross;
+    if (!totals) return "NGN";
+    return getPrimaryCurrency(totals);
+  }, [runQuery.data?.run?.totalGross]);
   const run = runQuery.data?.run ?? null;
   const isApproved = run?.status === "approved";
   const isCalculated = run?.status === "calculated";
@@ -750,8 +758,8 @@ export function PayrollRunDetailClient({
               <p className="metric-label">Gross Total</p>
               <p className="metric-value">
                 <CurrencyDisplay
-                  amount={getCurrencyTotal(runQuery.data.run.totalGross, "USD")}
-                  currency="USD"
+                  amount={getCurrencyTotal(runQuery.data.run.totalGross, runCurrency)}
+                  currency={runCurrency}
                 />
               </p>
               <p className="metric-hint">Calculated gross across items</p>
@@ -761,8 +769,8 @@ export function PayrollRunDetailClient({
               <p className="metric-label">Net Total</p>
               <p className="metric-value">
                 <CurrencyDisplay
-                  amount={getCurrencyTotal(runQuery.data.run.totalNet, "USD")}
-                  currency="USD"
+                  amount={getCurrencyTotal(runQuery.data.run.totalNet, runCurrency)}
+                  currency={runCurrency}
                 />
               </p>
               <p className="metric-hint">All adjustments included</p>

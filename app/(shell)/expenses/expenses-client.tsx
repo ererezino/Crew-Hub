@@ -509,6 +509,11 @@ export function ExpensesClient({
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
+  const summaryCurrency = useMemo(() => {
+    const rows = expensesQuery.data?.expenses ?? [];
+    return rows.length > 0 ? rows[0].currency : "USD";
+  }, [expensesQuery.data?.expenses]);
+
   const expenses = useMemo(() => {
     const rows = expensesQuery.data?.expenses ?? [];
 
@@ -847,14 +852,14 @@ export function ExpensesClient({
             <article className="metric-card">
               <p className="metric-label">Submitted Amount</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={expensesQuery.data.summary.totalAmount} currency="USD" />
+                <CurrencyDisplay amount={expensesQuery.data.summary.totalAmount} currency={summaryCurrency} />
               </p>
               <p className="metric-hint">{expensesQuery.data.summary.totalCount} {expensesQuery.data.summary.totalCount === 1 ? "submission" : "submissions"}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Pending Reimbursement</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={expensesQuery.data.summary.pendingAmount} currency="USD" />
+                <CurrencyDisplay amount={expensesQuery.data.summary.pendingAmount} currency={summaryCurrency} />
               </p>
               <p className="metric-hint">
                 {expensesQuery.data.summary.pendingCount + expensesQuery.data.summary.managerApprovedCount} pending
@@ -871,7 +876,7 @@ export function ExpensesClient({
               <p className="metric-label">Reimbursed</p>
               <p className="metric-value numeric">{expensesQuery.data.summary.reimbursedCount}</p>
               <p className="metric-hint">
-                <CurrencyDisplay amount={expensesQuery.data.summary.reimbursedAmount} currency="USD" />
+                <CurrencyDisplay amount={expensesQuery.data.summary.reimbursedAmount} currency={summaryCurrency} />
               </p>
             </article>
           </section>

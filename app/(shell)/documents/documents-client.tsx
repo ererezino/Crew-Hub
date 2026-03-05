@@ -157,6 +157,9 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   const [isOpeningFileById, setIsOpeningFileById] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // Policy detail panel state
+  const [policyDetail, setPolicyDetail] = useState<DocumentRecord | null>(null);
+
   // Signature request panel state
   const [sigReqTarget, setSigReqTarget] = useState<DocumentRecord | null>(null);
   const [sigReqTitle, setSigReqTitle] = useState("");
@@ -420,6 +423,15 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                     </td>
                     <td className="table-row-action-cell">
                       <div className="documents-row-actions">
+                        {document.category === "policy" ? (
+                          <button
+                            type="button"
+                            className="table-row-action"
+                            onClick={() => setPolicyDetail(document)}
+                          >
+                            View
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="table-row-action"
@@ -604,6 +616,62 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
               </button>
             </div>
           </form>
+        </SlidePanel>
+      ) : null}
+
+      {/* Policy Detail Panel */}
+      {policyDetail ? (
+        <SlidePanel
+          isOpen={Boolean(policyDetail)}
+          title={policyDetail.title}
+          description="Policy document details"
+          onClose={() => setPolicyDetail(null)}
+        >
+          <div className="slide-panel-form-wrapper">
+            <dl className="policy-detail-grid">
+              <dt>Category</dt>
+              <dd>{getDocumentCategoryLabel(policyDetail.category)}</dd>
+              {policyDetail.countryCode ? (
+                <>
+                  <dt>Country</dt>
+                  <dd>{countryFlagFromCode(policyDetail.countryCode)} {countryNameFromCode(policyDetail.countryCode)}</dd>
+                </>
+              ) : null}
+              <dt>Uploaded by</dt>
+              <dd>{policyDetail.createdByName}</dd>
+              <dt>Last updated</dt>
+              <dd>{formatRelativeTime(policyDetail.updatedAt)}</dd>
+              {policyDetail.expiryDate ? (
+                <>
+                  <dt>Expires</dt>
+                  <dd>{formatRelativeTime(policyDetail.expiryDate)}</dd>
+                </>
+              ) : null}
+            </dl>
+            {policyDetail.description ? (
+              <section className="policy-detail-body">
+                <h3 className="section-title">Description</h3>
+                <p className="policy-detail-text">{policyDetail.description}</p>
+              </section>
+            ) : null}
+            <div className="slide-panel-actions">
+              <button
+                type="button"
+                className="button"
+                onClick={() => setPolicyDetail(null)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => handleOpenFile(policyDetail.id)}
+                disabled={Boolean(isOpeningFileById[policyDetail.id])}
+              >
+                {isOpeningFileById[policyDetail.id] ? "Opening..." : "Open file"}
+              </button>
+            </div>
+          </div>
         </SlidePanel>
       ) : null}
 

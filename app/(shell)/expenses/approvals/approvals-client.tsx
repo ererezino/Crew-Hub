@@ -146,6 +146,11 @@ export function ExpenseApprovalsClient({
   const paymentProofInputRef = useRef<HTMLInputElement>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  const queueCurrency = useMemo(() => {
+    const rows = approvalsQuery.data?.expenses ?? [];
+    return rows.length > 0 ? rows[0].currency : "USD";
+  }, [approvalsQuery.data?.expenses]);
+
   const expenses = useMemo(() => {
     const rows = approvalsQuery.data?.expenses ?? [];
 
@@ -613,7 +618,7 @@ export function ExpenseApprovalsClient({
             <article className="metric-card">
               <p className="metric-label">Queue Amount</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={approvalsQuery.data.pendingAmount} currency="USD" />
+                <CurrencyDisplay amount={approvalsQuery.data.pendingAmount} currency={queueCurrency} />
               </p>
               <p className="metric-hint">Total amount currently in this queue</p>
             </article>
