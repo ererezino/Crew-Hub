@@ -149,9 +149,9 @@ function generateDueDates(
     }
 
     case "quarterly": {
-      // End of each quarter + standard offset
+      // End of each quarter + standard offset (months are 0-indexed)
       return [
-        toIsoDate(year, 3, 31),  // Q1: March 31
+        toIsoDate(year, 2, 31),  // Q1: March 31
         toIsoDate(year, 5, 30),  // Q2: June 30
         toIsoDate(year, 8, 30),  // Q3: September 30
         toIsoDate(year, 11, 31)  // Q4: December 31

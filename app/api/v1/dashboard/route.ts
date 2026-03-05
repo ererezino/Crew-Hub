@@ -308,27 +308,44 @@ async function fetchRecentExpenses(
 async function fetchPendingApprovals(
   supabase: SupabaseClient,
   orgId: string,
-  _userId: string
+  userId: string
 ): Promise<DashboardPendingApprovals> {
   try {
+    // Fetch direct-report IDs so managers see only their team's pending items
+    const reportsResult = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("org_id", orgId)
+      .eq("manager_id", userId)
+      .is("deleted_at", null);
+
+    const reportIds = (reportsResult.data ?? []).map((r) => r.id);
+
+    if (reportIds.length === 0) {
+      return { leave: 0, expenses: 0, timesheets: 0, total: 0 };
+    }
+
     const [leaveResult, expenseResult, timesheetResult] = await Promise.all([
       supabase
         .from("leave_requests")
         .select("id", { count: "exact", head: true })
         .eq("org_id", orgId)
         .eq("status", "pending")
+        .in("employee_id", reportIds)
         .is("deleted_at", null),
       supabase
         .from("expenses")
         .select("id", { count: "exact", head: true })
         .eq("org_id", orgId)
         .eq("status", "pending")
+        .in("employee_id", reportIds)
         .is("deleted_at", null),
       supabase
         .from("timesheets")
         .select("id", { count: "exact", head: true })
         .eq("org_id", orgId)
         .eq("status", "submitted")
+        .in("employee_id", reportIds)
         .is("deleted_at", null)
     ]);
 

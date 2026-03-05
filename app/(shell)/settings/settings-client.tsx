@@ -562,7 +562,7 @@ export function SettingsClient({
           ) : (
             <EmptyState
               title="Organization settings are restricted"
-              description="Only SUPER_ADMIN can edit organization name and logo."
+              description="Only a Super Admin can edit organization name and logo."
               ctaLabel="Back to profile"
               ctaHref="/settings"
             />

@@ -400,7 +400,7 @@ export function SignaturesClient({
       const { x, y } = getCanvasCoords(event);
       ctx.lineWidth = 2;
       ctx.lineCap = "round";
-      ctx.strokeStyle = "#1a1a2e";
+      ctx.strokeStyle = "#0F172A";
       ctx.lineTo(x, y);
       ctx.stroke();
       setHasCanvasStrokes(true);
