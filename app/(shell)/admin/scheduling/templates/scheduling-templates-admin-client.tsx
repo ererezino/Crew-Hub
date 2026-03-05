@@ -25,7 +25,7 @@ const defaultTemplateForm: TemplateFormState = {
   startTime: "",
   endTime: "",
   breakMinutes: "0",
-  color: "#4A0039"
+  color: "rgb(74 0 57)"
 };
 
 function templatesSkeleton() {

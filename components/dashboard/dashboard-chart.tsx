@@ -60,12 +60,12 @@ export function DashboardChart({ chart }: DashboardChartProps) {
             />
             <XAxis
               dataKey="label"
-              tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+              tick={{ fill: "var(--text-muted)" }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+              tick={{ fill: "var(--text-muted)" }}
               axisLine={false}
               tickLine={false}
               width={48}
@@ -120,12 +120,12 @@ export function DashboardChart({ chart }: DashboardChartProps) {
             />
             <XAxis
               dataKey="label"
-              tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+              tick={{ fill: "var(--text-muted)" }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: "var(--text-muted)", fontSize: 12 }}
+              tick={{ fill: "var(--text-muted)" }}
               axisLine={false}
               tickLine={false}
               width={48}

@@ -11,7 +11,14 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { TeamAvailabilityPanel } from "../../../components/time-off/team-availability-panel";
 import { useAfkLogs, useTimeOffSummary } from "../../../hooks/use-time-off";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
-import { formatDays, formatDateRangeHuman, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import {
+  formatDays,
+  formatDateRangeHuman,
+  formatDateTimeTooltip,
+  formatRelativeTime,
+  formatSingleDateHuman,
+  todayIsoDate
+} from "../../../lib/datetime";
 import { formatLeaveStatus } from "../../../lib/format-labels";
 import {
   calculateWorkingDays,
@@ -23,7 +30,6 @@ import {
   isIsoDate,
   monthToDateRange
 } from "../../../lib/time-off";
-import { formatSingleDateHuman } from "../../../lib/datetime";
 import type {
   LeaveBalance,
   LeaveRequestRecord,
@@ -456,7 +462,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   }, [afkStartTime, afkEndTime]);
 
   const openAfkPanel = () => {
-    setAfkDate(new Date().toISOString().slice(0, 10));
+    setAfkDate(todayIsoDate());
     setAfkStartTime("");
     setAfkEndTime("");
     setAfkNotes("");

@@ -8,7 +8,12 @@ import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import {
+  formatDateTimeTooltip,
+  formatRelativeTime,
+  toIsoDate,
+  todayIsoDate
+} from "../../../../lib/datetime";
 import { toSentenceCase } from "../../../../lib/format-labels";
 import {
   labelForReviewAssignmentStatus,
@@ -58,7 +63,7 @@ function createToastId() {
 }
 
 function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDate();
 }
 
 function defaultCycleFormValues(): CycleFormValues {
@@ -70,8 +75,8 @@ function defaultCycleFormValues(): CycleFormValues {
     name: "",
     type: "quarterly",
     status: "draft",
-    startDate: startDate.toISOString().slice(0, 10),
-    endDate: endDate.toISOString().slice(0, 10),
+    startDate: toIsoDate(startDate),
+    endDate: toIsoDate(endDate),
     selfReviewDeadline: "",
     managerReviewDeadline: ""
   };

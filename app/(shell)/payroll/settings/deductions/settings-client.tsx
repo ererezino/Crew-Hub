@@ -13,6 +13,7 @@ import {
   type NigeriaRuleConfig
 } from "../../../../../lib/payroll/engines/nigeria-calculation";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../../lib/countries";
+import { todayIsoDate } from "../../../../../lib/datetime";
 
 const COMING_SOON_COUNTRIES = ["GH", "KE", "ZA", "CA"] as const;
 const dateStringRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -51,7 +52,7 @@ type SaveNigeriaConfigResponse = {
 };
 
 function todayAsDateString(): string {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDate();
 }
 
 function rateToPercentString(rate: number): string {

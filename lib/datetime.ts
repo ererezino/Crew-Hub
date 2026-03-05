@@ -13,6 +13,21 @@ function toDate(value: string | Date): Date | null {
   return Number.isNaN(dateValue.getTime()) ? null : dateValue;
 }
 
+export function toIsoDate(value: Date): string {
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function todayIsoDate(): string {
+  return toIsoDate(new Date());
+}
+
+export function nowIsoTimestamp(): string {
+  return new Date().toISOString();
+}
+
 /* ─── Canonical formatting API ─── */
 
 /**
