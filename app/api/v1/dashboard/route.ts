@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import {
+  DASHBOARD_WIDGET_KEYS,
+  defaultWidgetVisibilityForRoles,
+  getDefaultVisibleRolesForWidget,
+  isSuperAdmin,
+  isWidgetVisibleForUser,
+  sanitizeRoles,
+  type DashboardWidgetKey
+} from "../../../../lib/access-control";
 import { getDashboardPersona, type DashboardPersona } from "../../../../lib/dashboard-persona";
 import { normalizeUserRoles, type UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
@@ -103,6 +113,99 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
 }
 
 type SupabaseClient = ReturnType<typeof createSupabaseServiceRoleClient>;
+const widgetConfigRowSchema = z.object({
+  widget_key: z.enum(DASHBOARD_WIDGET_KEYS),
+  visible_to_roles: z.array(z.string())
+});
+
+async function resolveAllowedWidgetKeys(
+  supabase: SupabaseClient,
+  orgId: string,
+  userRoles: readonly UserRole[]
+): Promise<Set<DashboardWidgetKey>> {
+  if (isSuperAdmin(userRoles)) {
+    return new Set(DASHBOARD_WIDGET_KEYS);
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("dashboard_widget_config")
+      .select("widget_key, visible_to_roles")
+      .eq("org_id", orgId);
+
+    if (error) {
+      return new Set(defaultWidgetVisibilityForRoles(userRoles));
+    }
+
+    const parsed = z.array(widgetConfigRowSchema).safeParse(data ?? []);
+
+    if (!parsed.success || parsed.data.length === 0) {
+      return new Set(defaultWidgetVisibilityForRoles(userRoles));
+    }
+
+    const byKey = new Map(parsed.data.map((row) => [row.widget_key, row] as const));
+    const allowedKeys = DASHBOARD_WIDGET_KEYS.filter((widgetKey) => {
+      const row = byKey.get(widgetKey);
+      const visibleToRoles = row
+        ? sanitizeRoles(row.visible_to_roles)
+        : getDefaultVisibleRolesForWidget(widgetKey);
+
+      return isWidgetVisibleForUser({
+        userRoles,
+        visibleToRoles
+      });
+    });
+
+    return new Set(allowedKeys);
+  } catch {
+    return new Set(defaultWidgetVisibilityForRoles(userRoles));
+  }
+}
+
+function applyWidgetVisibility(
+  response: DashboardResponseData,
+  allowedWidgetKeys: Set<DashboardWidgetKey>
+): DashboardResponseData {
+  if (!allowedWidgetKeys.has("hero_metrics")) {
+    response.onboardingProgress = null;
+    response.leaveBalance = null;
+    response.upcomingShifts = [];
+    response.pendingApprovals = null;
+    response.pendingExpenseApprovals = null;
+    response.headcount = null;
+    response.onboardingStatus = null;
+    response.activeReviewCycles = null;
+    response.payroll = null;
+  }
+
+  if (!allowedWidgetKeys.has("primary_chart")) {
+    response.headcountTrend = null;
+  }
+
+  if (!allowedWidgetKeys.has("expense_widget")) {
+    response.recentExpenses = [];
+    response.pendingExpenseApprovals = null;
+    response.expensePipeline = null;
+  }
+
+  if (!allowedWidgetKeys.has("compliance_widget")) {
+    response.complianceDeadlines = null;
+    response.complianceHealth = null;
+    response.expiringDocuments = null;
+  }
+
+  if (!allowedWidgetKeys.has("secondary_panels")) {
+    response.teamOnLeaveToday = [];
+    response.upcomingHolidays = [];
+    response.pendingApprovalItems = null;
+    response.headcountByCountry = null;
+    response.headcountByDept = null;
+    response.recentAuditLog = null;
+    response.healthAlerts = null;
+  }
+
+  return response;
+}
 
 /* ── Data fetching functions ── */
 
@@ -957,6 +1060,11 @@ export async function GET() {
       { roles, startDate },
       activeOnboarding ? { status: activeOnboarding.status } : null
     );
+    const allowedWidgetKeys = await resolveAllowedWidgetKeys(
+      supabase,
+      profile.org_id,
+      roles
+    );
 
     const greeting = buildGreeting(profile.full_name, roles);
     const response = buildEmptyResponse(persona, greeting);
@@ -1164,8 +1272,10 @@ export async function GET() {
       }
     }
 
+    const filteredResponse = applyWidgetVisibility(response, allowedWidgetKeys);
+
     return jsonResponse<DashboardResponseData>(200, {
-      data: response,
+      data: filteredResponse,
       error: null,
       meta: buildMeta()
     });
