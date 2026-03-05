@@ -19,8 +19,10 @@ import {
   DOCUMENT_CATEGORIES,
   SELF_SERVICE_DOCUMENT_CATEGORIES,
   type DocumentRecord,
-  type DocumentSignedUrlResponse
+  type DocumentSignedUrlResponse,
+  type PolicyAcknowledgment
 } from "../../../types/documents";
+import type { ApiResponse } from "../../../types/auth";
 import type { CreateSignatureRequestResponse } from "../../../types/esignatures";
 import type { PeopleListResponse } from "../../../types/people";
 
@@ -155,6 +157,39 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   const [versionTarget, setVersionTarget] = useState<DocumentRecord | null>(null);
   const [isOpeningFileById, setIsOpeningFileById] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Policy acknowledgment state
+  const [acknowledgedDocIds, setAcknowledgedDocIds] = useState<Set<string>>(new Set());
+  const [isAcknowledgingById, setIsAcknowledgingById] = useState<Record<string, boolean>>({});
+
+  const acknowledgePolicy = async (documentId: string) => {
+    setIsAcknowledgingById((prev) => ({ ...prev, [documentId]: true }));
+
+    try {
+      const response = await fetch(`/api/v1/documents/${documentId}/acknowledge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const payload = (await response.json()) as ApiResponse<{ acknowledgment: PolicyAcknowledgment }>;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? "Unable to acknowledge policy.");
+        return;
+      }
+
+      setAcknowledgedDocIds((prev) => new Set([...prev, documentId]));
+      showToast("success", "Policy acknowledged.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to acknowledge policy.");
+    } finally {
+      setIsAcknowledgingById((prev) => {
+        const next = { ...prev };
+        delete next[documentId];
+        return next;
+      });
+    }
+  };
 
   // Signature request panel state
   const [sigReqTarget, setSigReqTarget] = useState<DocumentRecord | null>(null);
@@ -434,6 +469,18 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                           >
                             New version
                           </button>
+                        ) : null}
+                        {document.category === "policy" && !acknowledgedDocIds.has(document.id) ? (
+                          <button
+                            type="button"
+                            className="table-row-action"
+                            disabled={Boolean(isAcknowledgingById[document.id])}
+                            onClick={() => { void acknowledgePolicy(document.id); }}
+                          >
+                            {isAcknowledgingById[document.id] ? "Acknowledging..." : "Acknowledge"}
+                          </button>
+                        ) : document.category === "policy" && acknowledgedDocIds.has(document.id) ? (
+                          <span className="documents-acknowledged-label">Acknowledged</span>
                         ) : null}
                         {canManageDocuments ? (
                           <button

@@ -81,6 +81,13 @@ export type ReviewResponseRecord = {
   updatedAt: string;
 };
 
+export type ReviewActionItem = {
+  id: string;
+  text: string;
+  completed: boolean;
+  completedAt: string | null;
+};
+
 export type ReviewAssignmentSummary = {
   id: string;
   cycleId: string;
@@ -101,6 +108,8 @@ export type ReviewAssignmentSummary = {
   sharedBy: string | null;
   sharedByName: string | null;
   acknowledgedAt: string | null;
+  nextSteps: string | null;
+  actionItems: ReviewActionItem[];
   createdAt: string;
   updatedAt: string;
   selfResponse: ReviewResponseRecord | null;

@@ -24,6 +24,7 @@ import type {
   AcknowledgeReviewResponse,
   GoalMutationResponse,
   GoalRecord,
+  ReviewActionItem,
   ReviewAnswerValue,
   ReviewAnswers,
   ReviewAssignmentSummary,
@@ -592,6 +593,9 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
 
   const [isSharingReview, setIsSharingReview] = useState(false);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
+  const [shareNextSteps, setShareNextSteps] = useState("");
+  const [shareActionItemTexts, setShareActionItemTexts] = useState<string[]>([""]);
+  const [isTogglingActionItem, setIsTogglingActionItem] = useState<string | null>(null);
 
   const activeCycle = overviewQuery.data?.activeCycle ?? null;
   const selfAssignment = overviewQuery.data?.selfAssignment ?? null;
@@ -819,9 +823,19 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
     setIsSharingReview(true);
 
     try {
+      const trimmedNextSteps = shareNextSteps.trim() || null;
+      const actionItems = shareActionItemTexts
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0)
+        .map((text) => ({ text }));
+
       const response = await fetch(`/api/v1/performance/assignments/${assignmentId}/share`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nextSteps: trimmedNextSteps,
+          actionItems: actionItems.length > 0 ? actionItems : null
+        })
       });
 
       const body = (await response.json()) as ShareReviewResponse;
@@ -831,12 +845,42 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
         return;
       }
 
+      setShareNextSteps("");
+      setShareActionItemTexts([""]);
       showToast("success", "Review shared with employee.");
       refreshOverview();
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to share review.");
     } finally {
       setIsSharingReview(false);
+    }
+  };
+
+  const toggleActionItem = async (assignmentId: string, actionItem: ReviewActionItem) => {
+    setIsTogglingActionItem(actionItem.id);
+
+    try {
+      const response = await fetch(`/api/v1/performance/assignments/${assignmentId}/action-items`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionItemId: actionItem.id,
+          completed: !actionItem.completed
+        })
+      });
+
+      const body = (await response.json()) as ShareReviewResponse;
+
+      if (!response.ok || !body.data) {
+        showToast("error", body.error?.message ?? "Unable to update action item.");
+        return;
+      }
+
+      refreshOverview();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to update action item.");
+    } finally {
+      setIsTogglingActionItem(null);
     }
   };
 
@@ -1162,6 +1206,43 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                           </div>
                         ) : null}
 
+                        {selfAssignment.nextSteps ? (
+                          <div className="performance-next-steps">
+                            <h4 className="form-label">Next Steps</h4>
+                            <p className="performance-next-steps-text">{selfAssignment.nextSteps}</p>
+                          </div>
+                        ) : null}
+
+                        {selfAssignment.actionItems.length > 0 ? (
+                          <div className="performance-action-items">
+                            <h4 className="form-label">Action Items</h4>
+                            <ul className="performance-action-items-list">
+                              {selfAssignment.actionItems.map((item) => (
+                                <li key={item.id} className="performance-action-item">
+                                  <label className="performance-action-item-label">
+                                    <input
+                                      type="checkbox"
+                                      checked={item.completed}
+                                      disabled={isTogglingActionItem === item.id}
+                                      onChange={() => {
+                                        void toggleActionItem(selfAssignment.id, item);
+                                      }}
+                                    />
+                                    <span className={item.completed ? "performance-action-item-done" : ""}>
+                                      {item.text}
+                                    </span>
+                                  </label>
+                                  {item.completedAt ? (
+                                    <span className="performance-action-item-date">
+                                      Completed {formatRelativeTime(item.completedAt)}
+                                    </span>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+
                         {!selfAssignmentAcknowledged ? (
                           <div className="performance-acknowledge-section">
                             <p className="settings-card-description">
@@ -1427,6 +1508,84 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                               {isSubmittingManager ? "Submitting..." : "Submit manager review"}
                             </button>
                           </div>
+
+                          {/* Share form: next steps + action items (visible when completed & unshared) */}
+                          {selectedManagerAssignment.status === "completed" && !selectedManagerAssignment.sharedAt ? (
+                            <div className="performance-share-form">
+                              <h4 className="section-title">Share with Employee</h4>
+                              <p className="settings-card-description">
+                                Add optional next steps and action items before sharing this review.
+                              </p>
+
+                              <label className="form-field" htmlFor="share-next-steps">
+                                <span className="form-label">Next steps (optional)</span>
+                                <textarea
+                                  id="share-next-steps"
+                                  className="form-input"
+                                  rows={3}
+                                  maxLength={4000}
+                                  value={shareNextSteps}
+                                  onChange={(e) => setShareNextSteps(e.currentTarget.value)}
+                                  placeholder="Summarize expectations and development areas..."
+                                />
+                              </label>
+
+                              <fieldset className="form-field">
+                                <legend className="form-label">Action items (optional)</legend>
+                                {shareActionItemTexts.map((text, index) => (
+                                  <div key={`action-item-input-${index}`} className="performance-action-item-input">
+                                    <input
+                                      className="form-input"
+                                      type="text"
+                                      maxLength={500}
+                                      value={text}
+                                      placeholder={`Action item ${index + 1}`}
+                                      onChange={(e) => {
+                                        setShareActionItemTexts((prev) => {
+                                          const next = [...prev];
+                                          next[index] = e.target.value;
+                                          return next;
+                                        });
+                                      }}
+                                    />
+                                    {shareActionItemTexts.length > 1 ? (
+                                      <button
+                                        type="button"
+                                        className="button button-ghost button-sm"
+                                        onClick={() => {
+                                          setShareActionItemTexts((prev) =>
+                                            prev.filter((_, i) => i !== index)
+                                          );
+                                        }}
+                                      >
+                                        Remove
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                ))}
+                                {shareActionItemTexts.length < 10 ? (
+                                  <button
+                                    type="button"
+                                    className="button button-ghost button-sm"
+                                    onClick={() => setShareActionItemTexts((prev) => [...prev, ""])}
+                                  >
+                                    + Add action item
+                                  </button>
+                                ) : null}
+                              </fieldset>
+
+                              <div className="settings-actions">
+                                <button
+                                  type="button"
+                                  className="button button-accent"
+                                  disabled={isSharingReview}
+                                  onClick={() => { void shareReview(selectedManagerAssignment.id); }}
+                                >
+                                  {isSharingReview ? "Sharing..." : "Share review with employee"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
                         </article>
                       </section>
                     ) : null}

@@ -4043,6 +4043,100 @@ html.dark .topbar {
   align-items: flex-start;
 }
 
+/* ── PROD-12: Performance follow-through ── */
+
+.performance-next-steps {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--bg-canvas);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.performance-next-steps-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  margin-top: var(--space-2);
+}
+
+.performance-action-items {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--bg-canvas);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.performance-action-items-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.performance-action-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.performance-action-item-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.performance-action-item-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.performance-action-item-done {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.performance-action-item-date {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.performance-share-form {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.performance-action-item-input {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.performance-action-item-input .form-input {
+  flex: 1;
+}
+
+/* ── PROD-13: Policy acknowledgment ── */
+
+.documents-acknowledged-label {
+  font-size: var(--text-xs);
+  color: var(--text-success);
+  font-weight: 500;
+}
+
 /* ── Phase 6C: Calibration ── */
 
 .calibration-filters {

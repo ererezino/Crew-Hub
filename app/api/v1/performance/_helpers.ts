@@ -12,6 +12,7 @@ import { normalizeUserRoles } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import type { ApiResponse } from "../../../../types/auth";
 import type {
+  ReviewActionItem,
   ReviewAssignmentSummary,
   ReviewCycleSummary,
   ReviewResponseRecord,
@@ -55,12 +56,30 @@ export const assignmentRowSchema = z.object({
   shared_at: z.string().nullable().default(null),
   shared_by: z.string().uuid().nullable().default(null),
   acknowledged_at: z.string().nullable().default(null),
+  next_steps: z.string().nullable().default(null),
+  action_items: z.unknown().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
 
 export const assignmentSelectColumns =
-  "id, org_id, cycle_id, employee_id, reviewer_id, template_id, status, due_at, shared_at, shared_by, acknowledged_at, created_at, updated_at";
+  "id, org_id, cycle_id, employee_id, reviewer_id, template_id, status, due_at, shared_at, shared_by, acknowledged_at, next_steps, action_items, created_at, updated_at";
+
+function normalizeActionItems(raw: unknown): ReviewActionItem[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.filter((item): item is ReviewActionItem =>
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as Record<string, unknown>).id === "string" &&
+    typeof (item as Record<string, unknown>).text === "string"
+  ).map((item) => ({
+    id: item.id,
+    text: item.text,
+    completed: Boolean(item.completed),
+    completedAt: typeof item.completedAt === "string" ? item.completedAt : null
+  }));
+}
 
 export const responseRowSchema = z.object({
   id: z.string().uuid(),
@@ -217,6 +236,8 @@ export function mapAssignmentRows({
       sharedBy: assignment.shared_by,
       sharedByName: sharedByProfile?.full_name ?? null,
       acknowledgedAt: assignment.acknowledged_at,
+      nextSteps: assignment.next_steps ?? null,
+      actionItems: normalizeActionItems(assignment.action_items),
       createdAt: assignment.created_at,
       updatedAt: assignment.updated_at,
       selfResponse: responses.selfResponse,

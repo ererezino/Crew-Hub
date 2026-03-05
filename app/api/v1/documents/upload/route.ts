@@ -529,6 +529,7 @@ export async function POST(request: Request) {
     sizeBytes: parseInteger(documentRow.size_bytes),
     expiryDate: documentRow.expiry_date,
     countryCode: documentRow.country_code,
+    requiresAcknowledgment: documentRow.category === "policy",
     createdBy: documentRow.created_by,
     createdByName: profileNameById.get(documentRow.created_by) ?? "Unknown user",
     createdAt: documentRow.created_at,

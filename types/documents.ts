@@ -32,11 +32,28 @@ export type DocumentRecord = {
   sizeBytes: number;
   expiryDate: string | null;
   countryCode: string | null;
+  requiresAcknowledgment: boolean;
   createdBy: string;
   createdByName: string;
   createdAt: string;
   updatedAt: string;
   latestVersion: number;
+};
+
+export type PolicyAcknowledgment = {
+  id: string;
+  documentId: string;
+  userId: string;
+  userName: string;
+  acknowledgedAt: string;
+};
+
+export type PolicyAcknowledgmentStatus = {
+  documentId: string;
+  acknowledged: boolean;
+  acknowledgedAt: string | null;
+  totalRequired: number;
+  totalAcknowledged: number;
 };
 
 export type DocumentsResponseData = {

@@ -2,13 +2,11 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
-import { sendReviewSharedEmail } from "../../../../../../../lib/notifications/email";
-import { createNotification } from "../../../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
-import type { ApiResponse } from "../../../../../../../types/auth";
 import type { ShareReviewResponseData } from "../../../../../../../types/performance";
 import {
   assignmentRowSchema,
+  assignmentSelectColumns,
   buildMeta,
   cycleRowSchema,
   jsonResponse,
@@ -21,17 +19,12 @@ import {
   templateRowSchema
 } from "../../../_helpers";
 
-const assignmentSelectCols =
-  "id, org_id, cycle_id, employee_id, reviewer_id, template_id, status, due_at, shared_at, shared_by, acknowledged_at, next_steps, action_items, created_at, updated_at";
+const patchBodySchema = z.object({
+  actionItemId: z.string().min(1),
+  completed: z.boolean()
+});
 
-const shareBodySchema = z.object({
-  nextSteps: z.string().trim().max(4000).optional().nullable(),
-  actionItems: z.array(z.object({
-    text: z.string().trim().min(1).max(500)
-  })).max(10).optional().nullable()
-}).optional().nullable();
-
-export async function POST(
+export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -55,13 +48,38 @@ export async function POST(
     });
   }
 
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse<null>(400, {
+      data: null,
+      error: { code: "BAD_REQUEST", message: "Invalid JSON body." },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedBody = patchBodySchema.safeParse(body);
+
+  if (!parsedBody.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedBody.error.issues[0]?.message ?? "Invalid request."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const supabase = await createSupabaseServerClient();
   const orgId = session.profile.org_id;
 
   // Fetch assignment
   const { data: rawAssignment, error: fetchError } = await supabase
     .from("review_assignments")
-    .select(assignmentSelectCols)
+    .select(assignmentSelectColumns)
     .eq("id", assignmentId)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -69,7 +87,7 @@ export async function POST(
   if (fetchError) {
     return jsonResponse<null>(500, {
       data: null,
-      error: { code: "SHARE_FAILED", message: "Unable to load assignment." },
+      error: { code: "ACTION_ITEM_FAILED", message: "Unable to load assignment." },
       meta: buildMeta()
     });
   }
@@ -84,92 +102,67 @@ export async function POST(
     });
   }
 
-  // Only the reviewer (manager) can share
-  if (parsedAssignment.data.reviewer_id !== session.profile.id) {
+  // Only the employee can toggle their own action items
+  if (parsedAssignment.data.employee_id !== session.profile.id) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only the reviewer can share this review."
+        message: "Only the assigned employee can update action items."
       },
       meta: buildMeta()
     });
   }
 
-  // Must be completed
-  if (parsedAssignment.data.status !== "completed") {
+  // Must be shared
+  if (!parsedAssignment.data.shared_at) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Assignment must be completed before sharing."
+        message: "Review must be shared before action items can be updated."
       },
       meta: buildMeta()
     });
   }
 
-  // Already shared?
-  if (parsedAssignment.data.shared_at) {
-    return jsonResponse<null>(422, {
+  // Parse existing action items
+  const existingItems = Array.isArray(parsedAssignment.data.action_items)
+    ? (parsedAssignment.data.action_items as Array<Record<string, unknown>>)
+    : [];
+
+  const itemIndex = existingItems.findIndex(
+    (item) => item.id === parsedBody.data.actionItemId
+  );
+
+  if (itemIndex === -1) {
+    return jsonResponse<null>(404, {
       data: null,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "This review has already been shared."
-      },
+      error: { code: "NOT_FOUND", message: "Action item was not found." },
       meta: buildMeta()
     });
   }
 
-  // Parse optional body for next steps and action items
-  let nextSteps: string | null = null;
-  let actionItems: Array<{ id: string; text: string; completed: boolean; completedAt: string | null }> = [];
-
-  try {
-    const body = await request.json();
-    const parsedBody = shareBodySchema.safeParse(body);
-
-    if (parsedBody.success && parsedBody.data) {
-      nextSteps = parsedBody.data.nextSteps?.trim() || null;
-
-      if (parsedBody.data.actionItems && parsedBody.data.actionItems.length > 0) {
-        actionItems = parsedBody.data.actionItems.map((item, index) => ({
-          id: `ai-${Date.now()}-${index}`,
-          text: item.text,
-          completed: false,
-          completedAt: null
-        }));
-      }
-    }
-  } catch {
-    // Body is optional - continue without next steps
-  }
-
-  // Update assignment
-  const updatePayload: Record<string, unknown> = {
-    shared_at: new Date().toISOString(),
-    shared_by: session.profile.id
+  // Update the action item
+  const updatedItems = [...existingItems];
+  updatedItems[itemIndex] = {
+    ...updatedItems[itemIndex],
+    completed: parsedBody.data.completed,
+    completedAt: parsedBody.data.completed ? new Date().toISOString() : null
   };
-
-  if (nextSteps) {
-    updatePayload.next_steps = nextSteps;
-  }
-
-  if (actionItems.length > 0) {
-    updatePayload.action_items = actionItems;
-  }
 
   const { data: rawUpdated, error: updateError } = await supabase
     .from("review_assignments")
-    .update(updatePayload)
+    .update({ action_items: updatedItems })
     .eq("id", assignmentId)
     .eq("org_id", orgId)
-    .select(assignmentSelectCols)
+    .select(assignmentSelectColumns)
     .single();
 
   if (updateError || !rawUpdated) {
     return jsonResponse<null>(500, {
       data: null,
-      error: { code: "SHARE_FAILED", message: "Unable to share review." },
+      error: { code: "ACTION_ITEM_FAILED", message: "Unable to update action item." },
       meta: buildMeta()
     });
   }
@@ -179,7 +172,7 @@ export async function POST(
   if (!parsedUpdated.success) {
     return jsonResponse<null>(500, {
       data: null,
-      error: { code: "SHARE_FAILED", message: "Updated assignment is invalid." },
+      error: { code: "ACTION_ITEM_FAILED", message: "Updated assignment is invalid." },
       meta: buildMeta()
     });
   }
@@ -188,11 +181,8 @@ export async function POST(
     action: "updated",
     tableName: "review_assignments",
     recordId: assignmentId,
-    oldValue: { shared_at: null, shared_by: null },
-    newValue: {
-      shared_at: parsedUpdated.data.shared_at,
-      shared_by: parsedUpdated.data.shared_by
-    }
+    oldValue: { action_items: existingItems },
+    newValue: { action_items: updatedItems }
   });
 
   // Fetch enrichment data for response
@@ -231,7 +221,7 @@ export async function POST(
   if (!parsedCycle.success || !parsedTemplate.success || !parsedProfiles.success) {
     return jsonResponse<null>(500, {
       data: null,
-      error: { code: "SHARE_FAILED", message: "Unable to load enrichment data." },
+      error: { code: "ACTION_ITEM_FAILED", message: "Unable to load enrichment data." },
       meta: buildMeta()
     });
   }
@@ -240,7 +230,6 @@ export async function POST(
   const template = mapTemplateRow(parsedTemplate.data);
   const profilesById = new Map(parsedProfiles.data.map((p) => [p.id, p] as const));
 
-  // Build responses map
   const responsesByAssignmentId = new Map<string, { selfResponse: ReturnType<typeof mapResponseRow>; managerResponse: ReturnType<typeof mapResponseRow> }>();
   if (parsedResponses.success) {
     let selfResp: ReturnType<typeof mapResponseRow> = null;
@@ -256,7 +245,7 @@ export async function POST(
   if (!cycle) {
     return jsonResponse<null>(500, {
       data: null,
-      error: { code: "SHARE_FAILED", message: "Cycle mapping failed." },
+      error: { code: "ACTION_ITEM_FAILED", message: "Cycle mapping failed." },
       meta: buildMeta()
     });
   }
@@ -275,27 +264,10 @@ export async function POST(
   if (assignments.length === 0) {
     return jsonResponse<null>(500, {
       data: null,
-      error: { code: "SHARE_FAILED", message: "Assignment mapping failed." },
+      error: { code: "ACTION_ITEM_FAILED", message: "Assignment mapping failed." },
       meta: buildMeta()
     });
   }
-
-  // Send notification to employee
-  await createNotification({
-    orgId,
-    userId: parsedUpdated.data.employee_id,
-    type: "review_shared",
-    title: "Your review has been shared",
-    body: `Your ${cycle.name} review has been shared with you. Tap to read.`,
-    link: "/performance"
-  });
-
-  // Send email
-  void sendReviewSharedEmail({
-    orgId,
-    userId: parsedUpdated.data.employee_id,
-    cycleName: cycle.name
-  });
 
   return jsonResponse<ShareReviewResponseData>(200, {
     data: { assignment: assignments[0] },

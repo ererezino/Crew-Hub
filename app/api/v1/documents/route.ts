@@ -253,6 +253,7 @@ export async function GET(request: Request) {
     sizeBytes: parseInteger(row.size_bytes),
     expiryDate: row.expiry_date,
     countryCode: row.country_code,
+    requiresAcknowledgment: row.category === "policy",
     createdBy: row.created_by,
     createdByName: profileNameById.get(row.created_by) ?? "Unknown user",
     createdAt: row.created_at,
