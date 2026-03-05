@@ -7740,6 +7740,22 @@ html.dark .home-quote-text {
   margin: 0;
 }
 
+.expenses-policy-hint {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.expenses-receivables-notice {
+  padding: var(--space-3);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
 .expenses-info-icon {
   flex-shrink: 0;
   width: 1rem;

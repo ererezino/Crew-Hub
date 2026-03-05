@@ -875,6 +875,26 @@ export function ExpensesClient({
             </article>
           </section>
 
+          {expensesQuery.data.summary.pendingAmount > 0 || expensesQuery.data.summary.rejectedCount > 0 || expensesQuery.data.summary.financeRejectedCount > 0 ? (
+            <section className="expenses-receivables-notice" aria-label="Receivables summary">
+              {expensesQuery.data.summary.pendingAmount > 0 ? (
+                <p className="settings-card-description">
+                  <CurrencyDisplay amount={expensesQuery.data.summary.pendingAmount} currency="USD" /> awaiting reimbursement across {expensesQuery.data.summary.pendingCount + expensesQuery.data.summary.managerApprovedCount} expense{(expensesQuery.data.summary.pendingCount + expensesQuery.data.summary.managerApprovedCount) !== 1 ? "s" : ""}.
+                </p>
+              ) : null}
+              {expensesQuery.data.summary.rejectedCount > 0 ? (
+                <p className="settings-card-description">
+                  {expensesQuery.data.summary.rejectedCount} expense{expensesQuery.data.summary.rejectedCount !== 1 ? "s" : ""} rejected by manager.
+                </p>
+              ) : null}
+              {expensesQuery.data.summary.financeRejectedCount > 0 ? (
+                <p className="settings-card-description">
+                  {expensesQuery.data.summary.financeRejectedCount} expense{expensesQuery.data.summary.financeRejectedCount !== 1 ? "s" : ""} returned by finance.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+
           {expenses.length === 0 ? (
             <EmptyState
               title="No expenses found"
@@ -1201,15 +1221,30 @@ export function ExpensesClient({
             </div>
           </div>
 
-          {formValues.expenseType === "personal_reimbursement" ? (
-            <div className="expenses-info-banner">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="expenses-info-icon">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
-                <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-              <p>Not all expenses qualify for reimbursement. Reimbursement-eligible expenses must be pre-approved by your manager.</p>
+          <div className="expenses-info-banner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="expenses-info-icon">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+            <div>
+              <p>
+                {formValues.expenseType === "personal_reimbursement"
+                  ? "Reimbursement-eligible expenses must be pre-approved by your manager."
+                  : "Work expenses follow the two-stage approval flow: manager then finance."}
+              </p>
+              {formValues.category ? (
+                <p className="expenses-policy-hint">
+                  {formValues.category === "travel" ? "Travel expenses require receipts and itinerary details." : null}
+                  {formValues.category === "lodging" ? "Lodging must include itemized hotel/accommodation receipts." : null}
+                  {formValues.category === "meals" ? "Meal expenses should include attendee names for group meals." : null}
+                  {formValues.category === "software" ? "Software subscriptions need prior manager approval." : null}
+                  {formValues.category === "wellness" ? "Wellness claims are capped per your country policy." : null}
+                  {formValues.category === "marketing" ? "Marketing spend must reference a campaign or project." : null}
+                  {!["travel", "lodging", "meals", "software", "wellness", "marketing"].includes(formValues.category) ? "Attach a clear receipt or invoice for faster approval." : null}
+                </p>
+              ) : null}
             </div>
-          ) : null}
+          </div>
 
           <div className="form-field">
             <span className="form-label">Category</span>

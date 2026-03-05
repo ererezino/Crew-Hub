@@ -28,6 +28,7 @@ import {
 import type {
   ExpenseApprovalStage,
   ExpenseBulkApproveResponse,
+  ExpenseCategory,
   ExpenseReceiptSignedUrlResponse,
   ExpenseRecord,
   UpdateExpenseResponse
@@ -145,16 +146,25 @@ export function ExpenseApprovalsClient({
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const paymentProofInputRef = useRef<HTMLInputElement>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState("");
+
+  const availableCategories = useMemo(() => {
+    const rows = approvalsQuery.data?.expenses ?? [];
+    return [...new Set(rows.map((e) => e.category))].sort();
+  }, [approvalsQuery.data?.expenses]);
 
   const expenses = useMemo(() => {
     const rows = approvalsQuery.data?.expenses ?? [];
+    const filtered = categoryFilter
+      ? rows.filter((expense) => expense.category === categoryFilter)
+      : rows;
 
-    return [...rows].sort((leftExpense, rightExpense) => {
+    return [...filtered].sort((leftExpense, rightExpense) => {
       const leftTime = Date.parse(leftExpense.expenseDate);
       const rightTime = Date.parse(rightExpense.expenseDate);
       return sortDirection === "asc" ? leftTime - rightTime : rightTime - leftTime;
     });
-  }, [approvalsQuery.data?.expenses, sortDirection]);
+  }, [approvalsQuery.data?.expenses, categoryFilter, sortDirection]);
 
   useEffect(() => {
     if (!availableStages.includes(stage) && availableStages[0]) {
@@ -581,8 +591,26 @@ export function ExpenseApprovalsClient({
             onChange={(event) => setMonth(event.currentTarget.value)}
           />
         </label>
+        {availableCategories.length > 1 ? (
+          <label className="form-field">
+            <span className="form-label">Category</span>
+            <select
+              className="form-input"
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.currentTarget.value)}
+            >
+              <option value="">All categories</option>
+              {availableCategories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {getExpenseCategoryLabel(cat)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <p className="settings-card-description">
           {stageTitle}: {formatMonthLabel(month)}.
+          {categoryFilter ? ` Filtered by ${getExpenseCategoryLabel(categoryFilter as ExpenseCategory)}.` : ""}
         </p>
       </section>
 
