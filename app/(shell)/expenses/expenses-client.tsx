@@ -21,7 +21,12 @@ import { MoneyInput } from "../../../components/ui/money-input";
 import { useExpenses } from "../../../hooks/use-expenses";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../lib/datetime";
+import {
+  formatDateTimeTooltip,
+  formatRelativeTime,
+  formatSingleDateHuman,
+  todayIsoDate
+} from "../../../lib/datetime";
 import {
   ALLOWED_RECEIPT_EXTENSIONS,
   currentMonthKey,
@@ -98,7 +103,7 @@ const INITIAL_FORM_VALUES: ExpenseFormValues = {
   customCategory: "",
   description: "",
   amount: "",
-  expenseDate: new Date().toISOString().slice(0, 10),
+  expenseDate: todayIsoDate(),
   currency: "USD",
   vendorName: "",
   vendorBankAccountName: "",
@@ -544,7 +549,7 @@ export function ExpensesClient({
     setIsPanelOpen(true);
     setFormValues({
       ...INITIAL_FORM_VALUES,
-      expenseDate: new Date().toISOString().slice(0, 10)
+      expenseDate: todayIsoDate()
     });
     setFormTouched(INITIAL_TOUCHED);
     setFormErrors({});

@@ -10,7 +10,11 @@ import { StatusBadge } from "../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useCompensationBands } from "../../../../hooks/use-compensation-bands";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import {
+  formatDateTimeTooltip,
+  formatRelativeTime,
+  todayIsoDate
+} from "../../../../lib/datetime";
 import { type CompensationBandLocationType } from "../../../../types/compensation-bands";
 
 type SortDirection = "asc" | "desc";
@@ -77,7 +81,7 @@ const INITIAL_BAND_FORM: BandFormValues = {
   maxSalaryAmount: "",
   equityMin: "",
   equityMax: "",
-  effectiveFrom: new Date().toISOString().slice(0, 10),
+  effectiveFrom: todayIsoDate(),
   effectiveTo: ""
 };
 
@@ -96,7 +100,7 @@ const INITIAL_BENCHMARK_FORM: BenchmarkFormValues = {
 const INITIAL_ASSIGNMENT_FORM: AssignmentFormValues = {
   employeeId: "",
   bandId: "",
-  effectiveFrom: new Date().toISOString().slice(0, 10),
+  effectiveFrom: todayIsoDate(),
   effectiveTo: ""
 };
 
@@ -298,7 +302,7 @@ function assignmentStatus(
   effectiveFrom: string,
   effectiveTo: string | null
 ): { label: string; tone: "success" | "info" | "draft" } {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
 
   if (effectiveFrom > today) {
     return {

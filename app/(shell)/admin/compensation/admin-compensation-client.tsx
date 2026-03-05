@@ -12,7 +12,11 @@ import { StatusBadge } from "../../../../components/shared/status-badge";
 import { VestingBar } from "../../../../components/shared/vesting-bar";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useAdminCompensation } from "../../../../hooks/use-compensation";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import {
+  formatDateTimeTooltip,
+  formatRelativeTime,
+  todayIsoDate as todayIsoDateValue
+} from "../../../../lib/datetime";
 import { toSentenceCase } from "../../../../lib/format-labels";
 import {
   calculateVestingProgress,
@@ -214,7 +218,7 @@ const equityFormSchema = z
   });
 
 function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  return todayIsoDateValue();
 }
 
 function createToastId() {

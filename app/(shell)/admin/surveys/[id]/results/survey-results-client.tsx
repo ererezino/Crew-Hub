@@ -27,13 +27,13 @@ import type {
 
 const LINE_COLORS = [
   "var(--color-accent)",
-  "var(--color-secondary)",
-  "#10B981",
-  "#F59E0B",
-  "#EF4444",
-  "#8B5CF6",
-  "#EC4899",
-  "#06B6D4"
+  "var(--status-info-text)",
+  "var(--status-success-text)",
+  "var(--status-warning-text)",
+  "var(--status-error-text)",
+  "var(--status-pending-text)",
+  "var(--status-draft-text)",
+  "var(--text-secondary)"
 ];
 
 function heatmapCellClass(score: number | null, isProtected: boolean): string {
@@ -175,11 +175,11 @@ function TrendChart({ trend }: { trend: SurveyTrendData }) {
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 12, fill: "var(--text-muted)" }}
+              tick={{ fill: "var(--text-muted)" }}
             />
             <YAxis
               domain={[0, 5]}
-              tick={{ fontSize: 12, fill: "var(--text-muted)" }}
+              tick={{ fill: "var(--text-muted)" }}
             />
             <Tooltip />
             <Legend />

@@ -15,7 +15,11 @@ import {
   labelForComplianceStatus,
   toneForComplianceStatus
 } from "../../../lib/compliance";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import {
+  formatDateTimeTooltip,
+  formatRelativeTime,
+  nowIsoTimestamp
+} from "../../../lib/datetime";
 import { useCompliance, updateComplianceDeadline } from "../../../hooks/use-compliance";
 import { ChevronDown, ChevronRight, ShieldCheck } from "lucide-react";
 import type {
@@ -349,7 +353,7 @@ export function ComplianceClient() {
         proofDocumentTitle: formState.proofDocumentId
           ? complianceQuery.data?.proofDocuments.find((p) => p.id === formState.proofDocumentId)?.title ?? row.proofDocumentTitle
           : null,
-        completedAt: formState.status === "completed" ? row.completedAt ?? new Date().toISOString() : null,
+        completedAt: formState.status === "completed" ? row.completedAt ?? nowIsoTimestamp() : null,
         notes: formState.notes
       };
     });

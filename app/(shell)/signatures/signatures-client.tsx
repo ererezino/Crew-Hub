@@ -76,6 +76,19 @@ const INITIAL_FORM_VALUES: CreateFormValues = {
   signerUserIds: []
 };
 
+function resolveCssColor(variableName: string, fallback: string): string {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  const value = window
+    .getComputedStyle(document.documentElement)
+    .getPropertyValue(variableName)
+    .trim();
+
+  return value || fallback;
+}
+
 function createToastId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -400,7 +413,7 @@ export function SignaturesClient({
       const { x, y } = getCanvasCoords(event);
       ctx.lineWidth = 2;
       ctx.lineCap = "round";
-      ctx.strokeStyle = "#0F172A";
+      ctx.strokeStyle = resolveCssColor("--text-primary", "rgb(15 23 42)");
       ctx.lineTo(x, y);
       ctx.stroke();
       setHasCanvasStrokes(true);
@@ -429,7 +442,7 @@ export function SignaturesClient({
         if (ctx) {
           canvas.width = 400;
           canvas.height = 150;
-          ctx.fillStyle = "#ffffff";
+          ctx.fillStyle = resolveCssColor("--bg-canvas", "rgb(255 255 255)");
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
       }
