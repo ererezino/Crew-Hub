@@ -120,6 +120,20 @@ function toneForType(type: OnboardingType) {
   return type === "onboarding" ? ("info" as const) : ("pending" as const);
 }
 
+function isStuckInstance(instance: OnboardingInstanceSummary): boolean {
+  if (instance.status !== "active") return false;
+  const startedMs = new Date(instance.startedAt).getTime();
+  const nowMs = Date.now();
+  const daysSinceStart = (nowMs - startedMs) / (1000 * 60 * 60 * 24);
+
+  // Stuck if started > 14 days ago and less than 50% complete
+  if (daysSinceStart > 14 && instance.progressPercent < 50) return true;
+  // Stuck if started > 30 days ago and not fully complete
+  if (daysSinceStart > 30 && instance.progressPercent < 100) return true;
+
+  return false;
+}
+
 function sortInstances(
   instances: readonly OnboardingInstanceSummary[],
   sortKey: InstanceSortKey,
@@ -302,6 +316,7 @@ export function OnboardingClient({
     taskErrors: []
   });
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [showStuckOnly, setShowStuckOnly] = useState(false);
 
   const activeInstancesQuery = useOnboardingInstances({
     scope: instanceScope,
@@ -339,6 +354,10 @@ export function OnboardingClient({
     () => sortInstances(completedInstancesQuery.instances, sortKey, sortDirection),
     [completedInstancesQuery.instances, sortDirection, sortKey]
   );
+  const stuckCount = useMemo(
+    () => activeInstances.filter(isStuckInstance).length,
+    [activeInstances]
+  );
   const templatePreview = useMemo(
     () =>
       templatesQuery.templates.find((template) => template.id === previewTemplateId) ??
@@ -353,7 +372,9 @@ export function OnboardingClient({
     [peopleQuery.people]
   );
 
-  const instancesForTab = activeTab === "active" ? activeInstances : completedInstances;
+  const instancesForTab = activeTab === "active"
+    ? (showStuckOnly ? activeInstances.filter(isStuckInstance) : activeInstances)
+    : completedInstances;
   const activeInstancesQueryForTab =
     activeTab === "active" ? activeInstancesQuery : completedInstancesQuery;
 
@@ -598,17 +619,36 @@ export function OnboardingClient({
             />
           ) : null}
 
+          {activeTab === "active" && stuckCount > 0 && !activeInstancesQueryForTab.isLoading ? (
+            <div className="onboarding-stuck-filter">
+              <label className="onboarding-stuck-toggle">
+                <input
+                  type="checkbox"
+                  checked={showStuckOnly}
+                  onChange={(e) => setShowStuckOnly(e.target.checked)}
+                />
+                <span>
+                  Show stuck only ({stuckCount})
+                </span>
+              </label>
+            </div>
+          ) : null}
+
           {!activeInstancesQueryForTab.isLoading &&
           !activeInstancesQueryForTab.errorMessage &&
           instancesForTab.length === 0 ? (
             <section className="error-state">
               <EmptyState
-                title={`No ${activeTab} onboarding instances`}
-                description="When onboarding records are created, they will appear in this table."
-                ctaLabel={canManageOnboarding ? "Start onboarding" : "Open dashboard"}
-                {...(canManageOnboarding
-                  ? { onCtaClick: () => setIsStartPanelOpen(true) }
-                  : { ctaHref: "/dashboard" })}
+                title={showStuckOnly ? "No stuck onboarding instances" : `No ${activeTab} onboarding instances`}
+                description={showStuckOnly
+                  ? "All active onboarding instances are progressing normally."
+                  : "When onboarding records are created, they will appear in this table."}
+                ctaLabel={showStuckOnly ? "Show all" : (canManageOnboarding ? "Start onboarding" : "Open dashboard")}
+                {...(showStuckOnly
+                  ? { onCtaClick: () => setShowStuckOnly(false) }
+                  : canManageOnboarding
+                    ? { onCtaClick: () => setIsStartPanelOpen(true) }
+                    : { ctaHref: "/dashboard" })}
               />
             </section>
           ) : null}
@@ -655,9 +695,14 @@ export function OnboardingClient({
                         <StatusBadge tone={toneForType(instance.type)}>{toSentenceCase(instance.type)}</StatusBadge>
                       </td>
                       <td>
-                        <StatusBadge tone={toneForInstanceStatus(instance.status)}>
-                          {toSentenceCase(instance.status)}
-                        </StatusBadge>
+                        <div className="onboarding-status-cell">
+                          <StatusBadge tone={toneForInstanceStatus(instance.status)}>
+                            {toSentenceCase(instance.status)}
+                          </StatusBadge>
+                          {isStuckInstance(instance) ? (
+                            <StatusBadge tone="warning">Stuck</StatusBadge>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="numeric">
                         {instance.completedTasks}/{instance.totalTasks} ({instance.progressPercent}%)
