@@ -11,6 +11,7 @@ import { useOnboardingInstances, useOnboardingTemplates } from "../../../hooks/u
 import { usePeople } from "../../../hooks/use-people";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { toSentenceCase } from "../../../lib/format-labels";
 import {
   ONBOARDING_TYPES,
   type OnboardingInstanceCreateResponse,
@@ -265,12 +266,12 @@ function hasCreateTemplateErrors(errors: CreateTemplateFormErrors): boolean {
 
 function OnboardingTableSkeleton() {
   return (
-    <div className="onboarding-table-skeleton" aria-hidden="true">
-      <div className="onboarding-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 6 }, (_, index) => (
         <div
-          key={`onboarding-table-skeleton-${index}`}
-          className="onboarding-table-skeleton-row"
+          key={`table-skeleton-${index}`}
+          className="table-skeleton-row"
         />
       ))}
     </div>
@@ -571,12 +572,12 @@ export function OnboardingClient({
         }
       />
 
-      <section className="onboarding-tabs" aria-label="Onboarding dashboard tabs">
+      <section className="page-tabs" aria-label="Onboarding dashboard tabs">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={activeTab === tab.id ? "onboarding-tab onboarding-tab-active" : "onboarding-tab"}
+            className={activeTab === tab.id ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
@@ -600,22 +601,15 @@ export function OnboardingClient({
           {!activeInstancesQueryForTab.isLoading &&
           !activeInstancesQueryForTab.errorMessage &&
           instancesForTab.length === 0 ? (
-            <section className="onboarding-empty-state">
+            <section className="error-state">
               <EmptyState
                 title={`No ${activeTab} onboarding instances`}
                 description="When onboarding records are created, they will appear in this table."
                 ctaLabel={canManageOnboarding ? "Start onboarding" : "Open dashboard"}
-                ctaHref={canManageOnboarding ? "/onboarding" : "/dashboard"}
+                {...(canManageOnboarding
+                  ? { onCtaClick: () => setIsStartPanelOpen(true) }
+                  : { ctaHref: "/dashboard" })}
               />
-              {canManageOnboarding ? (
-                <button
-                  type="button"
-                  className="button button-accent"
-                  onClick={() => setIsStartPanelOpen(true)}
-                >
-                  Start onboarding
-                </button>
-              ) : null}
             </section>
           ) : null}
 
@@ -658,11 +652,11 @@ export function OnboardingClient({
                       <td>{instance.employeeName}</td>
                       <td>{instance.templateName}</td>
                       <td>
-                        <StatusBadge tone={toneForType(instance.type)}>{instance.type}</StatusBadge>
+                        <StatusBadge tone={toneForType(instance.type)}>{toSentenceCase(instance.type)}</StatusBadge>
                       </td>
                       <td>
                         <StatusBadge tone={toneForInstanceStatus(instance.status)}>
-                          {instance.status}
+                          {toSentenceCase(instance.status)}
                         </StatusBadge>
                       </td>
                       <td className="numeric">
@@ -720,7 +714,7 @@ export function OnboardingClient({
           {!templatesQuery.isLoading &&
           !templatesQuery.errorMessage &&
           templatesQuery.templates.length === 0 ? (
-            <section className="onboarding-empty-state">
+            <section className="error-state">
               <EmptyState
                 title="No onboarding templates"
                 description="Template records will appear here once created."
@@ -761,7 +755,7 @@ export function OnboardingClient({
                       <tr key={template.id} className="data-table-row">
                         <td>{template.name}</td>
                         <td>
-                          <StatusBadge tone={toneForType(template.type)}>{template.type}</StatusBadge>
+                          <StatusBadge tone={toneForType(template.type)}>{toSentenceCase(template.type)}</StatusBadge>
                         </td>
                         <td>
                           <span className="country-chip">
@@ -829,7 +823,7 @@ export function OnboardingClient({
                           <p className="settings-card-description">{task.description}</p>
                         </div>
                         <div className="onboarding-template-task-meta">
-                          <StatusBadge tone="info">{task.category}</StatusBadge>
+                          <StatusBadge tone="info">{toSentenceCase(task.category)}</StatusBadge>
                           <span className="numeric">
                             {task.dueOffsetDays === null
                               ? "No due offset"

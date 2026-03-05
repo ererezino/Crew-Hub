@@ -2,18 +2,20 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { formatDateRangeHuman } from "../../../../../../lib/datetime";
 import { sendLeaveStatusEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
-import { parseNumeric } from "../../../../../../lib/time-off";
+import { formatLeaveTypeLabel, parseNumeric } from "../../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
   LEAVE_REQUEST_STATUSES,
   type LeaveRequestRecord,
-  type TimeOffRequestMutationResponseData
+  type TimeOffRequestMutationResponseData,
+  UNLIMITED_LEAVE_TYPES
 } from "../../../../../../types/time-off";
 
 const paramsSchema = z.object({
@@ -397,6 +399,116 @@ export async function PATCH(request: Request, context: RouteContext) {
     nextApproverId = session.profile.id;
   }
 
+  // Use atomic RPC functions for approve/reject to ensure all-or-nothing transactions.
+  // Cancel still uses the multi-step approach since it's simpler (no balance updates on cancel for approved requests).
+  if (parsedBody.data.action === "approve" || parsedBody.data.action === "reject") {
+    const serviceClient = createSupabaseServiceRoleClient();
+    const rpcName = parsedBody.data.action === "approve" ? "approve_leave_request" : "reject_leave_request";
+    const rpcParams =
+      parsedBody.data.action === "approve"
+        ? { p_request_id: existingRequest.id, p_approver_id: session.profile.id }
+        : { p_request_id: existingRequest.id, p_approver_id: session.profile.id, p_reason: nextRejectionReason ?? "" };
+
+    const { data: rpcResult, error: rpcError } = await serviceClient.rpc(rpcName, rpcParams);
+
+    if (rpcError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "REQUEST_UPDATE_FAILED",
+          message: `Unable to ${parsedBody.data.action} leave request: ${rpcError.message}`
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const rpcData = rpcResult as Record<string, unknown> | null;
+
+    if (rpcData && typeof rpcData === "object" && "error" in rpcData) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "INVALID_STATUS",
+          message: String(rpcData.error)
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedUpdatedRequest = leaveRequestRowSchema.safeParse(rpcData);
+
+    if (!parsedUpdatedRequest.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "REQUEST_PARSE_FAILED",
+          message: "Updated leave request data is not in the expected shape."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    let approverName: string | null = null;
+
+    if (parsedUpdatedRequest.data.approver_id) {
+      const { data: approverRow } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("org_id", session.profile.org_id)
+        .eq("id", parsedUpdatedRequest.data.approver_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      const parsedApprover = approverProfileSchema.safeParse(approverRow);
+      approverName = parsedApprover.success ? parsedApprover.data.full_name : "Unknown user";
+    }
+
+    const responseData: TimeOffRequestMutationResponseData = {
+      request: toLeaveRequestRecord({
+        requestRow: parsedUpdatedRequest.data,
+        employeeRow: employeeProfile,
+        approverName
+      })
+    };
+
+    const leaveLabel = formatLeaveTypeLabel(existingRequest.leave_type);
+    const dateLabel = formatDateRangeHuman(existingRequest.start_date, existingRequest.end_date);
+
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: employeeProfile.id,
+      type: "leave_status",
+      title:
+        nextStatus === "approved"
+          ? `${leaveLabel} request approved`
+          : `${leaveLabel} request rejected`,
+      body:
+        nextStatus === "approved"
+          ? `Your ${leaveLabel} request (${dateLabel}) was approved.`
+          : `Your ${leaveLabel} request (${dateLabel}) was rejected.`,
+      link: "/time-off"
+    });
+
+    const emailStatus = parsedBody.data.action === "approve" ? "approved" as const : "rejected" as const;
+
+    await sendLeaveStatusEmail({
+      orgId: session.profile.org_id,
+      userId: employeeProfile.id,
+      leaveType: existingRequest.leave_type,
+      status: emailStatus,
+      startDate: existingRequest.start_date,
+      endDate: existingRequest.end_date,
+      rejectionReason: emailStatus === "rejected" ? nextRejectionReason : null
+    });
+
+    return jsonResponse<TimeOffRequestMutationResponseData>(200, {
+      data: responseData,
+      error: null,
+      meta: buildMeta()
+    });
+  }
+
+  // Cancel path: standard multi-step (no balance atomicity needed for cancels)
   const { data: updatedRequestRow, error: updateError } = await supabase
     .from("leave_requests")
     .update({
@@ -435,56 +547,22 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
+  // Handle pending_days reduction for cancellations
   const totalDays = parseNumeric(existingRequest.total_days);
-  let usedDaysDelta = 0;
-  let pendingDaysDelta = 0;
+  const isUnlimitedType = UNLIMITED_LEAVE_TYPES.has(existingRequest.leave_type);
 
-  if (existingRequest.status === "pending" && nextStatus === "approved") {
-    pendingDaysDelta = totalDays * -1;
-    usedDaysDelta = totalDays;
-  } else if (
-    existingRequest.status === "pending" &&
-    (nextStatus === "rejected" || nextStatus === "cancelled")
-  ) {
-    pendingDaysDelta = totalDays * -1;
-  }
-
-  if (usedDaysDelta !== 0 || pendingDaysDelta !== 0) {
+  if (!isUnlimitedType && totalDays > 0 && existingRequest.status === "pending" && nextStatus === "cancelled") {
     try {
       await applyBalanceDeltas({
         orgId: session.profile.org_id,
         employeeId: existingRequest.employee_id,
         leaveType: existingRequest.leave_type,
         year: Number.parseInt(existingRequest.start_date.slice(0, 4), 10),
-        usedDaysDelta,
-        pendingDaysDelta
+        usedDaysDelta: 0,
+        pendingDaysDelta: totalDays * -1
       });
-    } catch (error) {
-      const rollbackResponse = await supabase
-        .from("leave_requests")
-        .update({
-          status: existingRequest.status,
-          approver_id: existingRequest.approver_id,
-          rejection_reason: existingRequest.rejection_reason
-        })
-        .eq("id", existingRequest.id)
-        .eq("org_id", session.profile.org_id);
-
-      if (rollbackResponse.error) {
-        console.error("Unable to rollback leave request after balance update error.", {
-          leaveRequestId: existingRequest.id,
-          message: rollbackResponse.error.message
-        });
-      }
-
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "BALANCE_UPDATE_FAILED",
-          message: error instanceof Error ? error.message : "Unable to sync leave balances."
-        },
-        meta: buildMeta()
-      });
+    } catch {
+      // Balance delta for cancel is best-effort — the request is already cancelled
     }
   }
 
@@ -510,36 +588,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       approverName
     })
   };
-
-  if (
-    existingRequest.status === "pending" &&
-    (nextStatus === "approved" || nextStatus === "rejected")
-  ) {
-    await createNotification({
-      orgId: session.profile.org_id,
-      userId: employeeProfile.id,
-      type: "leave_status",
-      title:
-        nextStatus === "approved"
-          ? "Leave request approved"
-          : "Leave request rejected",
-      body:
-        nextStatus === "approved"
-          ? `${existingRequest.leave_type} leave (${existingRequest.start_date} to ${existingRequest.end_date}) was approved.`
-          : `${existingRequest.leave_type} leave (${existingRequest.start_date} to ${existingRequest.end_date}) was rejected.`,
-      link: "/time-off"
-    });
-
-    await sendLeaveStatusEmail({
-      orgId: session.profile.org_id,
-      userId: employeeProfile.id,
-      leaveType: existingRequest.leave_type,
-      status: nextStatus,
-      startDate: existingRequest.start_date,
-      endDate: existingRequest.end_date,
-      rejectionReason: nextStatus === "rejected" ? nextRejectionReason : null
-    });
-  }
 
   return jsonResponse<TimeOffRequestMutationResponseData>(200, {
     data: responseData,

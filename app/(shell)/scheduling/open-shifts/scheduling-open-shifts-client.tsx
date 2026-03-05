@@ -7,16 +7,17 @@ import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useOpenShifts } from "../../../../hooks/use-scheduling";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { formatShiftStatus } from "../../../../lib/format-labels";
 import { formatTimeRangeLabel } from "../../../../lib/scheduling";
 
 type SortDirection = "asc" | "desc";
 
 function openShiftsSkeleton() {
   return (
-    <div className="timeoff-table-skeleton" aria-hidden="true">
-      <div className="timeoff-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 6 }, (_, index) => (
-        <div key={`open-shift-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+        <div key={`open-shift-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -82,7 +83,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
       {openShiftsQuery.isLoading ? openShiftsSkeleton() : null}
 
       {!openShiftsQuery.isLoading && openShiftsQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Open shifts are unavailable"
             description={openShiftsQuery.errorMessage}
@@ -110,7 +111,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
 
       {!openShiftsQuery.isLoading && !openShiftsQuery.errorMessage && sortedShifts.length > 0 ? (
         <section className="compensation-layout" aria-label="Open shifts">
-          <article className="compensation-summary-card">
+          <article className="metric-card">
             <div>
               <h2 className="section-title">Open opportunities</h2>
               <p className="settings-card-description">
@@ -158,7 +159,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
                     <td>{shift.scheduleName ?? "Schedule"}</td>
                     <td>{shift.templateName ?? "--"}</td>
                     <td>
-                      <StatusBadge tone="pending">{shift.status.replace("_", " ")}</StatusBadge>
+                      <StatusBadge tone="pending">{formatShiftStatus(shift.status)}</StatusBadge>
                     </td>
                     <td className="table-row-action-cell">
                       <div className="timeatt-row-actions">

@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { formatDateRangeHuman } from "../../../../../lib/datetime";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import {
   calculateWorkingDays,
+  formatLeaveTypeLabel,
   isIsoDate,
   parseNumeric
 } from "../../../../../lib/time-off";
@@ -12,9 +14,11 @@ import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
+  AUTO_GRANTED_LEAVE_TYPES,
   LEAVE_REQUEST_STATUSES,
   type LeaveRequestRecord,
-  type TimeOffRequestMutationResponseData
+  type TimeOffRequestMutationResponseData,
+  UNLIMITED_LEAVE_TYPES
 } from "../../../../../types/time-off";
 
 const createLeaveRequestSchema = z.object({
@@ -35,13 +39,15 @@ const profileRowSchema = z.object({
   full_name: z.string(),
   department: z.string().nullable(),
   country_code: z.string().nullable(),
-  manager_id: z.string().uuid().nullable()
+  manager_id: z.string().uuid().nullable(),
+  status: z.string().nullable()
 });
 
 const policyRowSchema = z.object({
   id: z.string().uuid(),
   country_code: z.string(),
-  default_days_per_year: z.union([z.number(), z.string()])
+  default_days_per_year: z.union([z.number(), z.string()]),
+  is_unlimited: z.boolean()
 });
 
 const holidayRowSchema = z.object({
@@ -233,7 +239,7 @@ export async function POST(request: Request) {
 
   const { data: profileRow, error: profileError } = await supabase
     .from("profiles")
-    .select("id, org_id, email, full_name, department, country_code, manager_id")
+    .select("id, org_id, email, full_name, department, country_code, manager_id, status")
     .eq("id", session.profile.id)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -265,9 +271,36 @@ export async function POST(request: Request) {
 
   const employeeProfile = parsedProfile.data;
 
+  // Block auto-granted leave types from manual requests
+  if (AUTO_GRANTED_LEAVE_TYPES.has(parsedBody.data.leaveType)) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: `${formatLeaveTypeLabel(parsedBody.data.leaveType)} is automatically granted and cannot be manually requested.`
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // Probation restriction: only unpaid personal days allowed
+  if (
+    employeeProfile.status === "onboarding" &&
+    parsedBody.data.leaveType !== "unpaid_personal_day"
+  ) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "PROBATION_RESTRICTION",
+        message: "During probation, only unpaid personal days can be requested."
+      },
+      meta: buildMeta()
+    });
+  }
+
   let policiesQuery = supabase
     .from("leave_policies")
-    .select("id, default_days_per_year, country_code")
+    .select("id, default_days_per_year, country_code, is_unlimited")
     .eq("org_id", employeeProfile.org_id)
     .eq("leave_type", parsedBody.data.leaveType)
     .is("deleted_at", null)
@@ -359,6 +392,46 @@ export async function POST(request: Request) {
     });
   }
 
+  const isUnlimitedType = selectedPolicy.is_unlimited || UNLIMITED_LEAVE_TYPES.has(parsedBody.data.leaveType);
+
+  // Balance check for non-unlimited types
+  if (!isUnlimitedType) {
+    const requestYear = Number.parseInt(parsedBody.data.startDate.slice(0, 4), 10);
+    const serviceClient = createSupabaseServiceRoleClient();
+
+    const { data: rawBalance } = await serviceClient
+      .from("leave_balances")
+      .select("total_days, used_days, pending_days, carried_days")
+      .eq("org_id", employeeProfile.org_id)
+      .eq("employee_id", employeeProfile.id)
+      .eq("leave_type", parsedBody.data.leaveType)
+      .eq("year", requestYear)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (rawBalance) {
+      const balTotal = parseNumeric(rawBalance.total_days);
+      const balUsed = parseNumeric(rawBalance.used_days);
+      const balPending = parseNumeric(rawBalance.pending_days);
+      const balCarried = parseNumeric(rawBalance.carried_days);
+      const available = balTotal + balCarried - balUsed - balPending;
+
+      if (totalDays > available) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "BALANCE_EXCEEDED",
+            message: `Requested days (${totalDays}) exceed your available balance (${available} days).`
+          },
+          meta: buildMeta()
+        });
+      }
+    }
+  }
+
+  // Sick leave > 2 consecutive working days requires documentation
+  const requiresDocumentation = parsedBody.data.leaveType === "sick_leave" && totalDays > 2;
+
   const { data: insertedRequest, error: requestInsertError } = await supabase
     .from("leave_requests")
     .insert({
@@ -369,7 +442,8 @@ export async function POST(request: Request) {
       end_date: parsedBody.data.endDate,
       total_days: totalDays,
       status: "pending",
-      reason: parsedBody.data.reason.trim()
+      reason: parsedBody.data.reason.trim(),
+      requires_documentation: requiresDocumentation
     })
     .select(
       "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"
@@ -387,37 +461,40 @@ export async function POST(request: Request) {
     });
   }
 
-  try {
-    await applyPendingBalanceDelta({
-      orgId: employeeProfile.org_id,
-      employeeId: employeeProfile.id,
-      leaveType: parsedBody.data.leaveType,
-      year: Number.parseInt(parsedBody.data.startDate.slice(0, 4), 10),
-      pendingDaysDelta: totalDays,
-      fallbackTotalDays: parseNumeric(selectedPolicy.default_days_per_year)
-    });
-  } catch (error) {
-    const rollbackResult = await supabase
-      .from("leave_requests")
-      .delete()
-      .eq("id", insertedRequest.id)
-      .eq("org_id", employeeProfile.org_id);
+  // Skip balance tracking for unlimited leave types (e.g. sick leave)
+  if (!isUnlimitedType) {
+    try {
+      await applyPendingBalanceDelta({
+        orgId: employeeProfile.org_id,
+        employeeId: employeeProfile.id,
+        leaveType: parsedBody.data.leaveType,
+        year: Number.parseInt(parsedBody.data.startDate.slice(0, 4), 10),
+        pendingDaysDelta: totalDays,
+        fallbackTotalDays: parseNumeric(selectedPolicy.default_days_per_year)
+      });
+    } catch (error) {
+      const rollbackResult = await supabase
+        .from("leave_requests")
+        .delete()
+        .eq("id", insertedRequest.id)
+        .eq("org_id", employeeProfile.org_id);
 
-    if (rollbackResult.error) {
-      console.error("Unable to rollback leave request after balance failure.", {
-        leaveRequestId: insertedRequest.id,
-        message: rollbackResult.error.message
+      if (rollbackResult.error) {
+        console.error("Unable to rollback leave request after balance failure.", {
+          leaveRequestId: insertedRequest.id,
+          message: rollbackResult.error.message
+        });
+      }
+
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "BALANCE_UPDATE_FAILED",
+          message: error instanceof Error ? error.message : "Unable to update leave balance."
+        },
+        meta: buildMeta()
       });
     }
-
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "BALANCE_UPDATE_FAILED",
-        message: error instanceof Error ? error.message : "Unable to update leave balance."
-      },
-      meta: buildMeta()
-    });
   }
 
   const parsedRequest = leaveRequestRowSchema.safeParse(insertedRequest);
@@ -464,14 +541,33 @@ export async function POST(request: Request) {
       ...adminApproverIds
     ].filter((id) => id !== employeeProfile.id);
 
+    const leaveLabel = formatLeaveTypeLabel(parsedBody.data.leaveType);
+    const dateLabel = formatDateRangeHuman(parsedBody.data.startDate, parsedBody.data.endDate);
+
     await createBulkNotifications({
       orgId: employeeProfile.org_id,
       userIds: recipientIds,
       type: "leave_submitted",
-      title: `Leave request submitted by ${employeeProfile.full_name}`,
-      body: `${parsedBody.data.leaveType} leave from ${parsedBody.data.startDate} to ${parsedBody.data.endDate}.`,
+      title: `${leaveLabel} request submitted by ${employeeProfile.full_name}`,
+      body: `${leaveLabel} for ${dateLabel}.`,
       link: "/time-off/approvals"
     });
+
+    // Notify HR when sick leave may require documentation (>2 consecutive working days)
+    if (requiresDocumentation) {
+      const hrAdminIds = adminApproverIds.filter((id) => id !== employeeProfile.id);
+
+      if (hrAdminIds.length > 0) {
+        await createBulkNotifications({
+          orgId: employeeProfile.org_id,
+          userIds: hrAdminIds,
+          type: "leave_submitted",
+          title: `Doctor's note may be required`,
+          body: `${employeeProfile.full_name} submitted sick leave for ${totalDays} consecutive working days (${dateLabel}). A doctor's note may be required.`,
+          link: "/time-off/approvals"
+        });
+      }
+    }
   }
 
   return jsonResponse<TimeOffRequestMutationResponseData>(201, {

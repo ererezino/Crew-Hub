@@ -21,11 +21,18 @@ export const ONBOARDING_TASK_STATUSES = [
 
 export type OnboardingTaskStatus = (typeof ONBOARDING_TASK_STATUSES)[number];
 
+export const ONBOARDING_TASK_TYPES = ["manual", "e_signature", "link", "form"] as const;
+
+export type OnboardingTaskType = (typeof ONBOARDING_TASK_TYPES)[number];
+
 export type OnboardingTemplateTask = {
   title: string;
   description: string;
   category: string;
   dueOffsetDays: number | null;
+  taskType?: OnboardingTaskType;
+  documentId?: string | null;
+  linkUrl?: string | null;
 };
 
 export type OnboardingTemplateTaskInput = {
@@ -33,6 +40,9 @@ export type OnboardingTemplateTaskInput = {
   description?: string;
   category: string;
   dueOffsetDays?: number | null;
+  taskType?: OnboardingTaskType;
+  documentId?: string | null;
+  linkUrl?: string | null;
 };
 
 export type OnboardingTemplate = {
@@ -68,6 +78,7 @@ export type OnboardingTask = {
   description: string | null;
   category: string;
   status: OnboardingTaskStatus;
+  taskType: OnboardingTaskType;
   assignedTo: string | null;
   assignedToName: string;
   dueDate: string | null;
@@ -75,6 +86,8 @@ export type OnboardingTask = {
   completedBy: string | null;
   completedByName: string | null;
   notes: string | null;
+  documentId: string | null;
+  signatureRequestId: string | null;
 };
 
 export type OnboardingTemplatesResponseData = {

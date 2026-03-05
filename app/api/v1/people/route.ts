@@ -101,10 +101,12 @@ const profileRowSchema = z.object({
   payroll_mode: z.enum(PAYROLL_MODES),
   primary_currency: z.string(),
   status: z.enum(PROFILE_STATUSES),
+  notice_period_end_date: z.string().nullable().default(null),
   bio: z.string().nullable().default(null),
   favorite_music: z.string().nullable().default(null),
   favorite_books: z.string().nullable().default(null),
   favorite_sports: z.string().nullable().default(null),
+  date_of_birth: z.string().nullable().default(null),
   privacy_settings: z.unknown().default({}),
   created_at: z.string(),
   updated_at: z.string()
@@ -180,12 +182,14 @@ function mapPersonRow(
     timezone: row.timezone,
     phone: row.phone,
     startDate: row.start_date,
+    dateOfBirth: row.date_of_birth,
     managerId: row.manager_id,
     managerName: row.manager_id ? managerNameById.get(row.manager_id) ?? null : null,
     employmentType: row.employment_type,
     payrollMode: row.payroll_mode,
     primaryCurrency: row.primary_currency,
     status: row.status,
+    noticePeriodEndDate: row.notice_period_end_date ?? null,
     bio: row.bio ?? null,
     favoriteMusic: row.favorite_music ?? null,
     favoriteBooks: row.favorite_books ?? null,
@@ -272,7 +276,7 @@ export async function GET(request: Request) {
   let peopleQuery = supabase
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
     )
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
@@ -529,41 +533,103 @@ export async function POST(request: Request) {
     tasks: unknown;
   } | null = null;
 
-  if (isNewEmployee && normalizedDepartment) {
-    const { data: templateRow, error: templateError } = await serviceRoleClient
-      .from("onboarding_templates")
-      .select("id, name, type, tasks")
-      .eq("org_id", profile.org_id)
-      .is("deleted_at", null)
-      .eq("type", "onboarding")
-      .eq("department", normalizedDepartment)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  if (isNewEmployee) {
+    // Step 1: Try org-specific template matching department
+    if (normalizedDepartment) {
+      const { data: orgTemplateRow, error: orgTemplateError } = await serviceRoleClient
+        .from("onboarding_templates")
+        .select("id, name, type, tasks")
+        .eq("org_id", profile.org_id)
+        .is("deleted_at", null)
+        .eq("type", "onboarding")
+        .eq("department", normalizedDepartment)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (templateError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "ONBOARDING_TEMPLATE_FETCH_FAILED",
-          message: "Unable to fetch onboarding template for this department."
-        },
-        meta: buildMeta()
-      });
+      if (orgTemplateError) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "ONBOARDING_TEMPLATE_FETCH_FAILED",
+            message: "Unable to fetch onboarding template for this department."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      if (
+        orgTemplateRow &&
+        typeof orgTemplateRow.id === "string" &&
+        typeof orgTemplateRow.name === "string" &&
+        (orgTemplateRow.type === "onboarding" || orgTemplateRow.type === "offboarding")
+      ) {
+        onboardingTemplate = {
+          id: orgTemplateRow.id,
+          name: orgTemplateRow.name,
+          type: orgTemplateRow.type,
+          tasks: orgTemplateRow.tasks
+        };
+      }
     }
 
-    onboardingTemplate =
-      templateRow &&
-      typeof templateRow.id === "string" &&
-      typeof templateRow.name === "string" &&
-      (templateRow.type === "onboarding" || templateRow.type === "offboarding")
-        ? {
-            id: templateRow.id,
-            name: templateRow.name,
-            type: templateRow.type,
-            tasks: templateRow.tasks
-          }
-        : null;
+    // Step 2: Fallback — system default template matching employee country
+    if (!onboardingTemplate && countryCode) {
+      const { data: countryDefaultRow } = await serviceRoleClient
+        .from("onboarding_templates")
+        .select("id, name, type, tasks")
+        .is("org_id", null)
+        .eq("is_system_default", true)
+        .is("deleted_at", null)
+        .eq("type", "onboarding")
+        .eq("country_code", countryCode)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (
+        countryDefaultRow &&
+        typeof countryDefaultRow.id === "string" &&
+        typeof countryDefaultRow.name === "string" &&
+        (countryDefaultRow.type === "onboarding" || countryDefaultRow.type === "offboarding")
+      ) {
+        onboardingTemplate = {
+          id: countryDefaultRow.id,
+          name: countryDefaultRow.name,
+          type: countryDefaultRow.type,
+          tasks: countryDefaultRow.tasks
+        };
+      }
+    }
+
+    // Step 3: Final fallback — universal system default template
+    if (!onboardingTemplate) {
+      const { data: universalDefaultRow } = await serviceRoleClient
+        .from("onboarding_templates")
+        .select("id, name, type, tasks")
+        .is("org_id", null)
+        .eq("is_system_default", true)
+        .is("deleted_at", null)
+        .eq("type", "onboarding")
+        .is("country_code", null)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (
+        universalDefaultRow &&
+        typeof universalDefaultRow.id === "string" &&
+        typeof universalDefaultRow.name === "string" &&
+        (universalDefaultRow.type === "onboarding" || universalDefaultRow.type === "offboarding")
+      ) {
+        onboardingTemplate = {
+          id: universalDefaultRow.id,
+          name: universalDefaultRow.name,
+          type: universalDefaultRow.type,
+          tasks: universalDefaultRow.tasks
+        };
+      }
+    }
   }
 
   const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
@@ -614,7 +680,7 @@ export async function POST(request: Request) {
       status: profileStatus
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
     )
     .single();
 

@@ -13,6 +13,7 @@ import {
 } from "../../../../hooks/use-scheduling";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { formatScheduleStatus, formatShiftStatus } from "../../../../lib/format-labels";
 import { formatTimeRangeLabel } from "../../../../lib/scheduling";
 import type { PeopleListResponse } from "../../../../types/people";
 import type { ShiftStatus } from "../../../../types/scheduling";
@@ -75,16 +76,16 @@ function toneForScheduleStatus(status: "draft" | "published" | "locked") {
 function manageSkeleton() {
   return (
     <section className="timeoff-skeleton-layout" aria-hidden="true">
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`schedule-manage-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`schedule-manage-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`shift-manage-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`shift-manage-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -332,7 +333,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
 
   if (schedulesQuery.errorMessage || shiftsQuery.errorMessage) {
     return (
-      <section className="compensation-error-state">
+      <section className="error-state">
         <EmptyState
           title="Scheduling management is unavailable"
           description={schedulesQuery.errorMessage ?? shiftsQuery.errorMessage ?? "Unable to load scheduling management data."}
@@ -598,7 +599,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                       <td className="numeric">{schedule.shiftCount}</td>
                       <td>
                         <StatusBadge tone={toneForScheduleStatus(schedule.status)}>
-                          {schedule.status}
+                          {formatScheduleStatus(schedule.status)}
                         </StatusBadge>
                       </td>
                       <td>
@@ -695,7 +696,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                       <td>{shift.scheduleName ?? "Schedule"}</td>
                       <td>
                         <StatusBadge tone={toneForShiftStatus(shift.status)}>
-                          {shift.status.replace("_", " ")}
+                          {formatShiftStatus(shift.status)}
                         </StatusBadge>
                       </td>
                       <td className="table-row-action-cell">

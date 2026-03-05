@@ -225,16 +225,17 @@ export async function POST(
   const assignments = parsedAssignments.data.map((row) => mapAssignmentRow(row));
 
   await Promise.all(
-    assignments.map((assignment) =>
-      createNotification({
+    assignments.map((assignment) => {
+      const dueSuffix = assignment.dueDate ? ` Due ${assignment.dueDate}.` : "";
+      return createNotification({
         orgId: assignment.orgId,
         userId: assignment.employeeId,
-        type: "learning_assignment",
-        title: "New learning assignment",
-        body: `Crew Hub assigned \"${assignment.courseTitle}\" to you.`,
+        type: "course_assigned",
+        title: "New course assigned",
+        body: `You've been enrolled in "${assignment.courseTitle}".${dueSuffix}`,
         link: `/learning/courses/${assignment.courseId}`
-      })
-    )
+      });
+    })
   );
 
   await logAudit({

@@ -1,4 +1,7 @@
 import type { ApiResponse } from "./auth";
+import type { DashboardPersona } from "../lib/dashboard-persona";
+
+/* ── Shared sub-types (used by dashboard components) ── */
 
 export type DashboardSparklinePoint = {
   month: string;
@@ -43,8 +46,6 @@ export type DashboardSecondaryPanel = {
   rows: DashboardBreakdownRow[];
 };
 
-/* ── Home page types ── */
-
 export type TeamMemberSpotlight = {
   id: string;
   fullName: string;
@@ -54,35 +55,153 @@ export type TeamMemberSpotlight = {
   initials: string;
 };
 
+/* ── Persona-aware dashboard types ── */
+
+export type DashboardGreeting = {
+  firstName: string;
+  fullName: string;
+  roleBadge: string;
+  timeOfDay: "morning" | "afternoon" | "evening";
+};
+
+export type DashboardAnnouncement = {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  isPinned: boolean;
+};
+
+export type DashboardLeaveBalanceItem = {
+  leaveType: string;
+  available: number;
+  allocated: number;
+};
+
+export type DashboardShiftItem = {
+  id: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+};
+
+export type DashboardExpenseItem = {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  status: string;
+  createdAt: string;
+};
+
+export type DashboardHolidayItem = {
+  name: string;
+  date: string;
+  countryCode: string;
+};
+
+export type DashboardPendingApprovals = {
+  leave: number;
+  expenses: number;
+  timesheets: number;
+  total: number;
+};
+
+export type DashboardTeamOnLeaveItem = {
+  id: string;
+  name: string;
+  leaveType: string;
+};
+
+export type DashboardAuditLogEntry = {
+  id: string;
+  actorName: string;
+  action: string;
+  tableName: string;
+  timestamp: string;
+};
+
+/**
+ * Persona-aware dashboard response.
+ *
+ * Fields are populated based on the persona. Persona-specific fields
+ * are null when not relevant to the current user's persona.
+ */
 export type DashboardResponseData = {
-  greeting: {
-    firstName: string;
-    fullName: string;
-    roleBadge: string;
-    timeOfDay: "morning" | "afternoon" | "evening";
-  };
-  heroMetrics: DashboardHeroMetric[];
-  primaryChart: DashboardPrimaryChart;
-  secondaryPanels: DashboardSecondaryPanel[];
-  expenseWidget: {
-    pendingCount: number;
-    pendingAmount: number;
-    managerPendingCount: number;
-  };
-  complianceWidget: {
-    overdueCount: number;
-    nextDeadline: {
-      dueDate: string;
-      requirement: string;
-      countryCode: string;
-    } | null;
+  persona: DashboardPersona;
+  greeting: DashboardGreeting;
+
+  /* ── Universal widgets (all roles) ── */
+  announcements: DashboardAnnouncement[];
+  teamOnLeaveToday: DashboardTeamOnLeaveItem[];
+  upcomingHolidays: DashboardHolidayItem[];
+
+  /* ── new_hire greeting card ── */
+  org: { name: string; description: string } | null;
+  managerInfo: {
+    name: string;
+    title: string | null;
+    avatarUrl: string | null;
   } | null;
-  /* Home page data */
-  teamSpotlight: TeamMemberSpotlight[];
-  newHires: TeamMemberSpotlight[];
-  totalTeamCount: number;
-  companyDescription: string;
-  isAdmin: boolean;
+  onboardingProgress: {
+    tasksTotal: number;
+    tasksCompleted: number;
+    instanceId: string;
+  } | null;
+
+  /* ── employee+ greeting card & widgets ── */
+  leaveBalance: {
+    byType: DashboardLeaveBalanceItem[];
+    totalAvailable: number;
+  } | null;
+  hasTimePolicy: boolean;
+  recentExpenses: DashboardExpenseItem[];
+  upcomingShifts: DashboardShiftItem[];
+
+  /* ── manager greeting card ── */
+  pendingApprovals: DashboardPendingApprovals | null;
+
+  /* ── hr_admin greeting card & widgets ── */
+  headcount: { total: number; delta30d: number } | null;
+  onboardingStatus: { active: number; overdue: number } | null;
+  complianceDeadlines: {
+    thisMonth: number;
+    overdue: number;
+    nextDeadline: { name: string; date: string } | null;
+  } | null;
+  activeReviewCycles: number | null;
+  headcountTrend: DashboardChartPoint[] | null;
+  expiringDocuments: {
+    count: number;
+    items: { id: string; title: string; expiryDate: string }[];
+  } | null;
+
+  /* ── finance_admin greeting card & widgets ── */
+  payroll: {
+    lastRunStatus: string | null;
+    lastRunDate: string | null;
+    nextPayDate: string | null;
+  } | null;
+  pendingExpenseApprovals: {
+    financeStage: number;
+    totalAmount: number;
+  } | null;
+  expensePipeline: {
+    submitted: number;
+    pendingManager: number;
+    pendingFinance: number;
+    reimbursed: number;
+  } | null;
+
+  /* ── super_admin specific ── */
+  headcountByCountry: { countryCode: string; count: number }[] | null;
+  headcountByDept: { department: string; count: number }[] | null;
+  recentAuditLog: DashboardAuditLogEntry[] | null;
+  complianceHealth: {
+    completed: number;
+    inProgress: number;
+    overdue: number;
+  } | null;
 };
 
 export type DashboardResponse = ApiResponse<DashboardResponseData>;

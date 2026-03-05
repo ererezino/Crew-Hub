@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   LearningCoursesResponse,
   LearningCoursesResponseData,
@@ -66,10 +67,7 @@ function useDataFetch<TPayload, TData>({
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as TPayload;
         const extracted = extractor(payload);

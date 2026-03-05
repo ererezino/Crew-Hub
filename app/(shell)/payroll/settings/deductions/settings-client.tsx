@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../../components/shared/error-state";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../../components/ui/currency-display";
 import { MoneyInput } from "../../../../../components/ui/money-input";
@@ -414,11 +415,9 @@ export function DeductionsSettingsClient({
         </p>
 
         {initialNigeriaConfigError ? (
-          <EmptyState
+          <ErrorState
             title="Nigeria rules unavailable"
-            description={initialNigeriaConfigError}
-            ctaLabel="Back to payroll"
-            ctaHref="/payroll"
+            message={initialNigeriaConfigError}
           />
         ) : null}
 

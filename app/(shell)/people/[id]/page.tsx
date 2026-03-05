@@ -122,13 +122,13 @@ export default async function PeopleProfilePage({
         description="Crew profile details and compensation records."
       />
 
-      <section className="people-profile-tabs" role="tablist" aria-label="Profile tabs">
+      <section className="page-tabs" role="tablist" aria-label="Profile tabs">
         <Link
           href={`/people/${parsedId.data}?tab=overview`}
           className={
             activeTab === "overview"
-              ? "people-profile-tab people-profile-tab-active"
-              : "people-profile-tab"
+              ? "page-tab page-tab-active"
+              : "page-tab"
           }
           role="tab"
           aria-selected={activeTab === "overview"}
@@ -140,8 +140,8 @@ export default async function PeopleProfilePage({
             href={`/people/${parsedId.data}?tab=compensation`}
             className={
               activeTab === "compensation"
-                ? "people-profile-tab people-profile-tab-active"
-                : "people-profile-tab"
+                ? "page-tab page-tab-active"
+                : "page-tab"
             }
             role="tab"
             aria-selected={activeTab === "compensation"}

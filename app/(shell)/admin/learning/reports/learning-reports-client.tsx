@@ -9,6 +9,7 @@ import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { useLearningReports } from "../../../../../hooks/use-learning";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../../lib/datetime";
+import { toSentenceCase } from "../../../../../lib/format-labels";
 import type { LearningAssignmentStatus } from "../../../../../types/learning";
 
 type SortDirection = "asc" | "desc";
@@ -38,10 +39,10 @@ function learningReportsSkeleton() {
           <div key={`learning-report-metric-skeleton-${index}`} className="timeoff-balance-skeleton-card" />
         ))}
       </div>
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 8 }, (_, index) => (
-          <div key={`learning-report-row-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`learning-report-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -71,7 +72,7 @@ export function LearningReportsClient() {
       {reportsQuery.isLoading ? learningReportsSkeleton() : null}
 
       {!reportsQuery.isLoading && reportsQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Learning reports are unavailable"
             description={reportsQuery.errorMessage}
@@ -224,7 +225,7 @@ export function LearningReportsClient() {
                         </td>
                         <td>
                           <StatusBadge tone={toneForAssignmentStatus(assignment.status)}>
-                            {assignment.status.replace("_", " ")}
+                            {toSentenceCase(assignment.status)}
                           </StatusBadge>
                         </td>
                         <td className="table-row-action-cell">

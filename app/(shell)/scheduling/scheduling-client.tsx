@@ -12,6 +12,7 @@ import {
   useSchedulingSwaps
 } from "../../../hooks/use-scheduling";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatShiftStatus } from "../../../lib/format-labels";
 import { formatTimeRangeLabel } from "../../../lib/scheduling";
 import type { ShiftStatus } from "../../../types/scheduling";
 
@@ -40,10 +41,10 @@ function schedulingSkeleton() {
           <div key={`scheduling-metric-skeleton-${index}`} className="timeoff-balance-skeleton-card" />
         ))}
       </div>
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`scheduling-row-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`scheduling-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -88,7 +89,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
       {(shiftsQuery.isLoading || openShiftsQuery.isLoading || swapsQuery.isLoading) ? schedulingSkeleton() : null}
 
       {!shiftsQuery.isLoading && shiftsQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Scheduling data is unavailable"
             description={shiftsQuery.errorMessage}
@@ -134,7 +135,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
             </article>
           </article>
 
-          <article className="compensation-summary-card">
+          <article className="metric-card">
             <div>
               <h2 className="section-title">Quick actions</h2>
               <p className="settings-card-description">
@@ -209,7 +210,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
                         <td className="numeric">{shift.breakMinutes}m</td>
                         <td>
                           <StatusBadge tone={toneForShiftStatus(shift.status)}>
-                            {shift.status.replace("_", " ")}
+                            {formatShiftStatus(shift.status)}
                           </StatusBadge>
                         </td>
                         <td className="table-row-action-cell">

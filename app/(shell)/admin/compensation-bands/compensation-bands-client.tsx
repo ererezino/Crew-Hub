@@ -322,10 +322,10 @@ function assignmentStatus(
 
 function bandTableSkeleton() {
   return (
-    <div className="documents-table-skeleton" aria-hidden="true">
-      <div className="documents-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 8 }, (_, index) => (
-        <div key={`comp-bands-skeleton-${index}`} className="documents-table-skeleton-row" />
+        <div key={`comp-bands-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -610,7 +610,7 @@ export function CompensationBandsClient() {
       {bandsQuery.isLoading ? bandTableSkeleton() : null}
 
       {!bandsQuery.isLoading && bandsQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Compensation bands are unavailable"
             description={bandsQuery.errorMessage}
@@ -625,7 +625,7 @@ export function CompensationBandsClient() {
 
       {!bandsQuery.isLoading && !bandsQuery.errorMessage && bandsQuery.data ? (
         <section className="compensation-layout" aria-label="Compensation bands overview">
-          <article className="compensation-summary-card">
+          <article className="metric-card">
             <div>
               <h2 className="section-title">Coverage summary</h2>
               <p className="settings-card-description">
@@ -743,7 +743,7 @@ export function CompensationBandsClient() {
             </header>
 
             {sortedBands.length === 0 ? (
-              <section className="documents-empty-state">
+              <section className="error-state">
                 <EmptyState
                   title="No compensation bands"
                   description="Create your first compensation band to begin benchmarking and pay equity reviews."
@@ -862,7 +862,7 @@ export function CompensationBandsClient() {
             </header>
 
             {sortedBenchmarks.length === 0 ? (
-              <section className="documents-empty-state">
+              <section className="error-state">
                 <EmptyState
                   title="No benchmark data"
                   description="Add external benchmark records to compare your bands with market pay data."
@@ -959,7 +959,7 @@ export function CompensationBandsClient() {
             </header>
 
             {sortedAssignments.length === 0 ? (
-              <section className="documents-empty-state">
+              <section className="error-state">
                 <EmptyState
                   title="No assignments"
                   description="Assign employees to bands to enable compa-ratio and out-of-band alerts."

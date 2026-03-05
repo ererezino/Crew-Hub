@@ -9,6 +9,7 @@ import {
   useState
 } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type { Announcement, AnnouncementsResponse } from "../types/announcements";
 
 type UseAnnouncementsOptions = {
@@ -51,10 +52,7 @@ export function useAnnouncements({ limit }: UseAnnouncementsOptions = {}): UseAn
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as AnnouncementsResponse;
 

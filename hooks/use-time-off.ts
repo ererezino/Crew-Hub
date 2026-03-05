@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
+  AfkLogsResponse,
+  AfkLogsResponseData,
   TimeOffApprovalsResponse,
   TimeOffApprovalsResponseData,
   TimeOffCalendarResponse,
@@ -93,10 +96,7 @@ export function useTimeOffSummary(query: SummaryQuery = {}): UseFetchState<TimeO
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
         const payload = (await response.json()) as TimeOffSummaryResponse;
 
         if (!response.ok || !payload.data) {
@@ -155,10 +155,7 @@ export function useTimeOffApprovals(): UseFetchState<TimeOffApprovalsResponseDat
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as TimeOffApprovalsResponse;
 
@@ -226,10 +223,7 @@ export function useTimeOffCalendar(query: CalendarQuery = {}): UseFetchState<Tim
       setErrorMessage(null);
 
       try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry(endpoint, abortController.signal);
 
         const payload = (await response.json()) as TimeOffCalendarResponse;
 
@@ -260,6 +254,64 @@ export function useTimeOffCalendar(query: CalendarQuery = {}): UseFetchState<Tim
       abortController.abort();
     };
   }, [endpoint, reloadToken]);
+
+  const refresh = useCallback(() => {
+    setReloadToken((currentValue) => currentValue + 1);
+  }, []);
+
+  return {
+    data,
+    isLoading,
+    errorMessage,
+    refresh
+  };
+}
+
+export function useAfkLogs(): UseFetchState<AfkLogsResponseData> {
+  const [data, setData] = useState<AfkLogsResponseData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const load = async () => {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      try {
+        const response = await fetchWithRetry("/api/v1/time-off/afk", abortController.signal);
+
+        const payload = (await response.json()) as AfkLogsResponse;
+
+        if (!response.ok || !payload.data) {
+          setData(null);
+          setErrorMessage(payload.error?.message ?? "Unable to load AFK logs.");
+          return;
+        }
+
+        setData(payload.data);
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        setData(null);
+        setErrorMessage(error instanceof Error ? error.message : "Unable to load AFK logs.");
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [reloadToken]);
 
   const refresh = useCallback(() => {
     setReloadToken((currentValue) => currentValue + 1);

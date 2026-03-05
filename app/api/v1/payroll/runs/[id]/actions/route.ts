@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
-import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
+import { createBulkNotifications, createNotification } from "../../../../../../../lib/notifications/service";
+import { sendPayslipReadyEmail } from "../../../../../../../lib/notifications/email";
 import { evaluatePayrollApprovalAction } from "../../../../../../../lib/payroll/approval-policy";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import type { UserRole } from "../../../../../../../lib/navigation";
@@ -20,6 +21,15 @@ const actionBodySchema = z.object({
   action: z.enum(["submit", "approve_first", "approve_final", "reject", "cancel"]),
   reason: z.string().trim().max(500).optional().nullable()
 });
+
+function formatPayPeriodLabel(startDate: string, endDate: string): string {
+  try {
+    const end = new Date(endDate + "T00:00:00Z");
+    return end.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  } catch {
+    return endDate.slice(0, 7);
+  }
+}
 
 function canSubmit(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
@@ -496,6 +506,11 @@ export async function POST(
     });
 
     if (action === "approve_final" && nextStatus === "approved") {
+      const payPeriodLabel = formatPayPeriodLabel(
+        parsedUpdated.data.pay_period_start,
+        parsedUpdated.data.pay_period_end
+      );
+
       const { data: payrollItemRows, error: payrollItemsError } = await supabase
         .from("payroll_items")
         .select("employee_id")
@@ -516,11 +531,21 @@ export async function POST(
         await createBulkNotifications({
           orgId: profile.org_id,
           userIds: employeeIds,
-          type: "payroll_approved",
-          title: "Payroll approved",
-          body: `Payroll for ${parsedUpdated.data.pay_period_end.slice(0, 7)} has been approved.`,
-          link: `/payroll/runs/${runId}`
+          type: "payslip_ready",
+          title: "Payslip ready",
+          body: `Your payslip for ${payPeriodLabel} is ready.`,
+          link: "/me/pay?tab=payslips"
         });
+
+        void Promise.all(
+          employeeIds.map((employeeId) =>
+            sendPayslipReadyEmail({
+              orgId: profile.org_id,
+              userId: employeeId,
+              payPeriod: payPeriodLabel
+            })
+          )
+        );
       }
     }
 

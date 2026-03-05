@@ -7,15 +7,16 @@ import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useTimeAttendancePolicies } from "../../../../hooks/use-time-attendance";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { toSentenceCase } from "../../../../lib/format-labels";
 
 type SortDirection = "asc" | "desc";
 
 function policiesSkeleton() {
   return (
-    <div className="timeoff-table-skeleton" aria-hidden="true">
-      <div className="timeoff-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 6 }, (_, index) => (
-        <div key={`time-policy-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+        <div key={`time-policy-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -46,7 +47,7 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
       {policiesQuery.isLoading ? policiesSkeleton() : null}
 
       {!policiesQuery.isLoading && policiesQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Time policies are unavailable"
             description={policiesQuery.errorMessage}
@@ -74,7 +75,7 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
 
       {!policiesQuery.isLoading && !policiesQuery.errorMessage && sortedPolicies.length > 0 ? (
         <section className="compensation-layout" aria-label="Time policies table">
-          <article className="compensation-summary-card">
+          <article className="metric-card">
             <div>
               <h2 className="section-title">Policy coverage</h2>
               <p className="settings-card-description">
@@ -131,7 +132,7 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
                     <td className="numeric">
                       After {policy.breakAfterHours.toFixed(2)}h / {policy.breakDurationMinutes}m
                     </td>
-                    <td>{policy.roundingRule.replace("_", " ")}</td>
+                    <td>{toSentenceCase(policy.roundingRule)}</td>
                     <td>
                       <StatusBadge tone={policy.isActive ? "success" : "draft"}>
                         {policy.isActive ? "Active" : "Inactive"}

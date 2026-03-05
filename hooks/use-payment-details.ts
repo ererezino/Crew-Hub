@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   HrPaymentDetailsResponse,
   HrPaymentDetailsResponseData,
@@ -30,10 +31,7 @@ export function useMePaymentDetails(): UseFetchState<MePaymentDetailsResponseDat
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/v1/me/payment-details", {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry("/api/v1/me/payment-details", abortController.signal);
 
         const payload = (await response.json()) as MePaymentDetailsResponse;
 
@@ -91,10 +89,7 @@ export function useHrPaymentDetails(): UseFetchState<HrPaymentDetailsResponseDat
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/v1/payment-details/hr", {
-          method: "GET",
-          signal: abortController.signal
-        });
+        const response = await fetchWithRetry("/api/v1/payment-details/hr", abortController.signal);
 
         const payload = (await response.json()) as HrPaymentDetailsResponse;
 

@@ -336,6 +336,58 @@ export async function POST(
     }
   });
 
+  // Auto-complete onboarding tasks linked to this signature request
+  try {
+    const { data: linkedTasks } = await serviceRoleClient
+      .from("onboarding_tasks")
+      .select("id, instance_id, org_id")
+      .eq("signature_request_id", parsedRequestRow.data.id)
+      .eq("org_id", session.profile.org_id)
+      .neq("status", "completed");
+
+    if (linkedTasks && linkedTasks.length > 0) {
+      for (const linkedTask of linkedTasks) {
+        await serviceRoleClient
+          .from("onboarding_tasks")
+          .update({
+            status: "completed",
+            completed_by: session.profile.id,
+            completed_at: signedAt
+          })
+          .eq("id", linkedTask.id)
+          .eq("org_id", session.profile.org_id);
+
+        // Recalculate onboarding instance progress
+        if (linkedTask.instance_id) {
+          const { data: allInstanceTasks } = await serviceRoleClient
+            .from("onboarding_tasks")
+            .select("id, status")
+            .eq("instance_id", linkedTask.instance_id)
+            .eq("org_id", session.profile.org_id);
+
+          if (allInstanceTasks && allInstanceTasks.length > 0) {
+            const completedCount = allInstanceTasks.filter((t) => t.status === "completed").length;
+
+            if (completedCount === allInstanceTasks.length) {
+              await serviceRoleClient
+                .from("onboarding_instances")
+                .update({
+                  status: "completed",
+                  completed_at: signedAt
+                })
+                .eq("id", linkedTask.instance_id)
+                .eq("org_id", session.profile.org_id);
+            }
+          }
+        }
+      }
+    }
+  } catch {
+    console.error("Unable to auto-complete onboarding task for signature request.", {
+      requestId: parsedRequestRow.data.id
+    });
+  }
+
   return jsonResponse<SignSignatureResponseData>(200, {
     data: {
       requestId: parsedRequestRow.data.id,

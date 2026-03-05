@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { ProgressRing } from "../../../../components/shared/progress-ring";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useOnboardingInstanceDetail, useOnboardingInstances } from "../../../../hooks/use-onboarding";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { toSentenceCase } from "../../../../lib/format-labels";
 import type { OnboardingTask } from "../../../../types/onboarding";
 
 function toneForTaskStatus(taskStatus: OnboardingTask["status"]) {
@@ -77,11 +79,9 @@ export function MyOnboardingClient() {
 
   if (instancesError) {
     return (
-      <EmptyState
+      <ErrorState
         title="My onboarding data is unavailable"
-        description={instancesError}
-        ctaLabel="Retry"
-        ctaHref="/me/onboarding"
+        message={instancesError}
       />
     );
   }
@@ -110,15 +110,15 @@ export function MyOnboardingClient() {
         description="Track your assigned onboarding tasks and completion progress."
       />
 
-      <section className="onboarding-instance-tabs" aria-label="My onboarding instances">
+      <section className="page-tabs" aria-label="My onboarding instances">
         {instances.map((instance) => (
           <button
             key={instance.id}
             type="button"
             className={
               resolvedSelectedInstanceId === instance.id
-                ? "onboarding-tab onboarding-tab-active"
-                : "onboarding-tab"
+                ? "page-tab page-tab-active"
+                : "page-tab"
             }
             onClick={() => setSelectedInstanceId(instance.id)}
           >
@@ -130,11 +130,9 @@ export function MyOnboardingClient() {
       {isDetailLoading ? <MyOnboardingSkeleton /> : null}
 
       {!isDetailLoading && detailError ? (
-        <EmptyState
+        <ErrorState
           title="Selected onboarding instance is unavailable"
-          description={detailError}
-          ctaLabel="Back to onboarding list"
-          ctaHref="/me/onboarding"
+          message={detailError}
         />
       ) : null}
 
@@ -152,7 +150,7 @@ export function MyOnboardingClient() {
                 <StatusBadge
                   tone={selectedInstance.status === "completed" ? "success" : "processing"}
                 >
-                  {selectedInstance.status}
+                  {toSentenceCase(selectedInstance.status)}
                 </StatusBadge>
               </article>
               <article className="onboarding-instance-metric">
@@ -188,12 +186,18 @@ export function MyOnboardingClient() {
                 <article key={task.id} className="my-onboarding-task-card">
                   <header className="my-onboarding-task-card-header">
                     <h2 className="section-title">{task.title}</h2>
-                    <StatusBadge tone={toneForTaskStatus(task.status)}>{task.status}</StatusBadge>
+                    <div className="my-onboarding-task-badges">
+                      {task.taskType === "e_signature" && task.status === "completed" ? (
+                        <StatusBadge tone="success">Signed</StatusBadge>
+                      ) : (
+                        <StatusBadge tone={toneForTaskStatus(task.status)}>{toSentenceCase(task.status)}</StatusBadge>
+                      )}
+                    </div>
                   </header>
                   <p className="settings-card-description">
                     {task.description ?? "No description"}
                   </p>
-                  <p className="settings-card-description">Category: {task.category}</p>
+                  <p className="settings-card-description">Category: {toSentenceCase(task.category)}</p>
                   <p className="settings-card-description">Assigned: {task.assignedToName}</p>
                   <p className="settings-card-description">
                     Due:{" "}
@@ -205,10 +209,14 @@ export function MyOnboardingClient() {
                       "--"
                     )}
                   </p>
+                  {task.taskType === "e_signature" && task.status !== "completed" ? (
+                    <Link href="/signatures" className="button button-accent button-sm">
+                      Sign now
+                    </Link>
+                  ) : null}
                   <p className="settings-card-description">
                     Completed by: {task.completedByName ?? "--"}
                   </p>
-                  <p className="settings-card-description">{task.notes ?? "No notes"}</p>
                 </article>
               ))}
             </section>

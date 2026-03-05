@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
+import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
+import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import {
@@ -21,9 +23,12 @@ import type {
   UpdateComplianceDeadlinePayload
 } from "../../../types/compliance";
 
+/* ── Local types ── */
+
 type ViewMode = "table" | "calendar";
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
+type MetricFilter = "overdue" | "this_month" | "next_30" | null;
 
 type ToastMessage = {
   id: string;
@@ -37,6 +42,8 @@ type DeadlineFormState = {
   proofDocumentId: string | null;
   notes: string | null;
 };
+
+/* ── Helpers ── */
 
 function toDateInputValue(date: Date): string {
   const year = date.getFullYear();
@@ -65,23 +72,6 @@ function createToastId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function summarizeDeadlines(deadlines: readonly ComplianceDeadlineRecord[]) {
-  const overdueCount = deadlines.filter((row) => row.urgency === "overdue").length;
-  const dueSoonCount = deadlines.filter((row) => row.urgency === "due_soon").length;
-  const upcomingCount = deadlines.filter((row) => row.urgency === "upcoming").length;
-  const completedCount = deadlines.filter((row) => row.urgency === "completed").length;
-  const today = new Date().toISOString().slice(0, 10);
-
-  return {
-    overdueCount,
-    dueSoonCount,
-    upcomingCount,
-    completedCount,
-    nextDeadline:
-      deadlines.find((row) => row.status !== "completed" && row.dueDate >= today) ?? null
-  };
-}
-
 function dueDateToneClass(urgency: ComplianceDeadlineRecord["urgency"]): string {
   switch (urgency) {
     case "overdue":
@@ -95,6 +85,38 @@ function dueDateToneClass(urgency: ComplianceDeadlineRecord["urgency"]): string 
   }
 }
 
+function isThisMonth(dateStr: string): boolean {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const target = new Date(`${dateStr}T00:00:00.000Z`);
+  return target.getUTCFullYear() === year && target.getUTCMonth() === month;
+}
+
+function isNext30Days(dateStr: string): boolean {
+  const now = new Date();
+  now.setUTCHours(0, 0, 0, 0);
+  const target = new Date(`${dateStr}T00:00:00.000Z`);
+  const diff = target.getTime() - now.getTime();
+  return diff >= 0 && diff <= 30 * 24 * 60 * 60 * 1000;
+}
+
+function computeSummary(deadlines: readonly ComplianceDeadlineRecord[]) {
+  const overdueCount = deadlines.filter((r) => r.urgency === "overdue").length;
+  const dueThisMonthCount = deadlines.filter(
+    (r) => r.status !== "completed" && isThisMonth(r.dueDate)
+  ).length;
+  const dueNext30Count = deadlines.filter(
+    (r) => r.status !== "completed" && isNext30Days(r.dueDate)
+  ).length;
+
+  const totalAnnual = deadlines.length;
+  const completedOnTime = deadlines.filter((r) => r.status === "completed").length;
+  const onTrackPct = totalAnnual > 0 ? Math.round((completedOnTime / totalAnnual) * 100) : 100;
+
+  return { overdueCount, dueThisMonthCount, dueNext30Count, onTrackPct };
+}
+
 function complianceSkeleton() {
   return (
     <section className="compliance-skeleton" aria-hidden="true">
@@ -104,11 +126,13 @@ function complianceSkeleton() {
           <div key={`compliance-metric-skeleton-${index}`} className="compliance-skeleton-card" />
         ))}
       </div>
-      <div className="compliance-skeleton-table" />
-      <div className="compliance-skeleton-table" />
+      <div className="table-skeleton" />
+      <div className="table-skeleton" />
     </section>
   );
 }
+
+/* ── Main component ── */
 
 export function ComplianceClient() {
   const initialRange = useMemo(() => defaultDateRange(), []);
@@ -123,6 +147,17 @@ export function ComplianceClient() {
   const [optimisticDeadlines, setOptimisticDeadlines] = useState<ComplianceDeadlineRecord[] | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // Country filter
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+
+  // Metric card filter
+  const [metricFilter, setMetricFilter] = useState<MetricFilter>(null);
+
+  // Generate deadlines state
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [generateYear, setGenerateYear] = useState(new Date().getFullYear());
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const complianceQuery = useCompliance(range);
 
   useEffect(() => {
@@ -135,8 +170,49 @@ export function ComplianceClient() {
     [optimisticDeadlines, complianceQuery.data?.deadlines]
   );
 
+  // Country tabs data
+  const countryTabs = useMemo(() => {
+    const countryMap = new Map<string, { total: number; overdue: number }>();
+
+    for (const d of sourceDeadlines) {
+      const entry = countryMap.get(d.countryCode) ?? { total: 0, overdue: 0 };
+      entry.total++;
+      if (d.urgency === "overdue") entry.overdue++;
+      countryMap.set(d.countryCode, entry);
+    }
+
+    return [...countryMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([code, counts]) => ({
+        code,
+        label: countryNameFromCode(code),
+        flag: countryFlagFromCode(code),
+        total: counts.total,
+        overdue: counts.overdue
+      }));
+  }, [sourceDeadlines]);
+
+  // Filtered deadlines (country + metric)
+  const filteredDeadlines = useMemo(() => {
+    let result = sourceDeadlines;
+
+    if (countryFilter !== "all") {
+      result = result.filter((d) => d.countryCode === countryFilter);
+    }
+
+    if (metricFilter === "overdue") {
+      result = result.filter((d) => d.urgency === "overdue");
+    } else if (metricFilter === "this_month") {
+      result = result.filter((d) => d.status !== "completed" && isThisMonth(d.dueDate));
+    } else if (metricFilter === "next_30") {
+      result = result.filter((d) => d.status !== "completed" && isNext30Days(d.dueDate));
+    }
+
+    return result;
+  }, [sourceDeadlines, countryFilter, metricFilter]);
+
   const sortedDeadlines = useMemo(() => {
-    return [...sourceDeadlines].sort((left, right) => {
+    return [...filteredDeadlines].sort((left, right) => {
       const dueComparison = left.dueDate.localeCompare(right.dueDate);
 
       if (dueComparison !== 0) {
@@ -145,9 +221,9 @@ export function ComplianceClient() {
 
       return left.requirement.localeCompare(right.requirement);
     });
-  }, [sourceDeadlines, sortDirection]);
+  }, [filteredDeadlines, sortDirection]);
 
-  const summary = useMemo(() => summarizeDeadlines(sourceDeadlines), [sourceDeadlines]);
+  const summary = useMemo(() => computeSummary(sourceDeadlines), [sourceDeadlines]);
 
   const selectedDeadline = useMemo(
     () => sourceDeadlines.find((row) => row.id === selectedDeadlineId) ?? null,
@@ -166,6 +242,8 @@ export function ComplianceClient() {
     return [...groups.entries()];
   }, [sortedDeadlines]);
 
+  /* ── Toast helpers ── */
+
   const dismissToast = (toastId: string) => {
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   };
@@ -173,29 +251,30 @@ export function ComplianceClient() {
   const showToast = (variant: ToastVariant, message: string) => {
     const toastId = createToastId();
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
-
-    window.setTimeout(() => {
-      dismissToast(toastId);
-    }, 4000);
+    window.setTimeout(() => dismissToast(toastId), 4000);
   };
+
+  /* ── Range filter ── */
 
   const applyRange = () => {
-    if (invalidRange) {
-      return;
-    }
-
-    setRange({
-      startDate: draftStartDate,
-      endDate: draftEndDate
-    });
+    if (invalidRange) return;
+    setRange({ startDate: draftStartDate, endDate: draftEndDate });
   };
 
-  const openUpdateDialog = (deadlineId: string) => {
-    const deadline = sourceDeadlines.find((row) => row.id === deadlineId);
+  /* ── Metric card click ── */
 
-    if (!deadline) {
-      return;
-    }
+  const toggleMetricFilter = (filter: MetricFilter) => {
+    setMetricFilter((current) => (current === filter ? null : filter));
+  };
+
+  /* ── SlidePanel open/close ── */
+
+  const openUpdatePanel = useCallback((deadlineId: string) => {
+    const deadline = (optimisticDeadlines ?? complianceQuery.data?.deadlines ?? []).find(
+      (row) => row.id === deadlineId
+    );
+
+    if (!deadline) return;
 
     setSelectedDeadlineId(deadline.id);
     setFormState({
@@ -204,27 +283,22 @@ export function ComplianceClient() {
       proofDocumentId: deadline.proofDocumentId,
       notes: deadline.notes
     });
-  };
+  }, [optimisticDeadlines, complianceQuery.data?.deadlines]);
 
-  const closeUpdateDialog = () => {
-    if (isSaving) {
-      return;
-    }
-
+  const closeUpdatePanel = useCallback(() => {
+    if (isSaving) return;
     setSelectedDeadlineId(null);
     setFormState(null);
-  };
+  }, [isSaving]);
+
+  /* ── Submit deadline update ── */
 
   const submitUpdate = async () => {
-    if (!selectedDeadline || !formState) {
-      return;
-    }
+    if (!selectedDeadline || !formState) return;
 
     const previousDeadlines = sourceDeadlines;
     const optimistic = previousDeadlines.map((row) => {
-      if (row.id !== selectedDeadline.id) {
-        return row;
-      }
+      if (row.id !== selectedDeadline.id) return row;
 
       const urgency = complianceUrgency({
         status: formState.status,
@@ -237,11 +311,11 @@ export function ComplianceClient() {
         urgency,
         assignedTo: formState.assignedTo,
         assignedToName: formState.assignedTo
-          ? complianceQuery.data?.assignees.find((assignee) => assignee.id === formState.assignedTo)?.fullName ?? row.assignedToName
+          ? complianceQuery.data?.assignees.find((a) => a.id === formState.assignedTo)?.fullName ?? row.assignedToName
           : null,
         proofDocumentId: formState.proofDocumentId,
         proofDocumentTitle: formState.proofDocumentId
-          ? complianceQuery.data?.proofDocuments.find((proof) => proof.id === formState.proofDocumentId)?.title ?? row.proofDocumentTitle
+          ? complianceQuery.data?.proofDocuments.find((p) => p.id === formState.proofDocumentId)?.title ?? row.proofDocumentTitle
           : null,
         completedAt: formState.status === "completed" ? row.completedAt ?? new Date().toISOString() : null,
         notes: formState.notes
@@ -276,12 +350,44 @@ export function ComplianceClient() {
         )
       );
       showToast("success", "Compliance deadline updated.");
-      closeUpdateDialog();
+      closeUpdatePanel();
       complianceQuery.refresh();
     } finally {
       setIsSaving(false);
     }
   };
+
+  /* ── Generate deadlines ── */
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+
+    try {
+      const response = await fetch("/api/v1/compliance/generate-deadlines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ year: generateYear })
+      });
+
+      const json = await response.json();
+
+      if (!response.ok || json.error) {
+        showToast("error", json.error?.message ?? "Unable to generate deadlines.");
+        return;
+      }
+
+      const { created, skipped } = json.data ?? { created: 0, skipped: 0 };
+      showToast("success", `Generated ${created} deadline(s). ${skipped} already existed.`);
+      setShowGenerateModal(false);
+      complianceQuery.refresh();
+    } catch {
+      showToast("error", "Unable to generate deadlines.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  /* ── Render ── */
 
   return (
     <>
@@ -290,6 +396,13 @@ export function ComplianceClient() {
         description="Track statutory deadlines, completion status, and proof across countries."
         actions={
           <div className="page-header-actions">
+            <button
+              type="button"
+              className="button button-accent"
+              onClick={() => setShowGenerateModal(true)}
+            >
+              Generate {new Date().getFullYear()} deadlines
+            </button>
             <button
               type="button"
               className={viewMode === "table" ? "button button-accent" : "button button-subtle"}
@@ -308,6 +421,7 @@ export function ComplianceClient() {
         }
       />
 
+      {/* ── Date range toolbar ── */}
       <section className="compliance-toolbar" aria-label="Compliance filters">
         <label className="form-field" htmlFor="compliance-start-date">
           <span className="form-label">Start date</span>
@@ -343,75 +457,130 @@ export function ComplianceClient() {
       {complianceQuery.isLoading ? complianceSkeleton() : null}
 
       {!complianceQuery.isLoading && complianceQuery.errorMessage ? (
-        <section className="settings-layout">
-          <EmptyState
-            title="Compliance data unavailable"
-            description={complianceQuery.errorMessage}
-            ctaLabel="Retry"
-            ctaHref="/compliance"
-          />
-          <button type="button" className="button button-accent" onClick={complianceQuery.refresh}>
-            Retry now
-          </button>
-        </section>
+        <ErrorState
+          title="Compliance data unavailable"
+          message={complianceQuery.errorMessage}
+          onRetry={complianceQuery.refresh}
+        />
       ) : null}
 
       {!complianceQuery.isLoading && !complianceQuery.errorMessage ? (
         <section className="settings-layout">
-          <section className="compliance-metric-grid" aria-label="Compliance urgency summary">
-            <article className="metric-card">
-              <p className="metric-label">Overdue</p>
-              <p className="metric-value numeric">{summary.overdueCount}</p>
-              <p className="metric-hint">Past due and not completed</p>
-            </article>
-            <article className="metric-card">
-              <p className="metric-label">Due in 7 Days</p>
-              <p className="metric-value numeric">{summary.dueSoonCount}</p>
-              <p className="metric-hint">Immediate deadlines needing attention</p>
-            </article>
-            <article className="metric-card">
-              <p className="metric-label">Upcoming</p>
-              <p className="metric-value numeric">{summary.upcomingCount}</p>
-              <p className="metric-hint">Future deadlines in selected range</p>
-            </article>
-            <article className="metric-card">
-              <p className="metric-label">Completed</p>
-              <p className="metric-value numeric">{summary.completedCount}</p>
-              <p className="metric-hint">Marked as completed</p>
+
+          {/* ── Summary metric cards — clickable ── */}
+          <section className="compliance-metric-grid" aria-label="Compliance summary">
+            <button
+              type="button"
+              className={`metric-card compliance-metric-clickable${metricFilter === "overdue" ? " compliance-metric-active" : ""}`}
+              style={{ borderColor: "var(--status-error-border)" }}
+              onClick={() => toggleMetricFilter("overdue")}
+            >
+              <p className="metric-label" style={{ color: "var(--status-error-text)" }}>Overdue</p>
+              <p className="metric-value numeric" style={{ color: "var(--status-error-text)" }}>
+                {summary.overdueCount}
+              </p>
+            </button>
+            <button
+              type="button"
+              className={`metric-card compliance-metric-clickable${metricFilter === "this_month" ? " compliance-metric-active" : ""}`}
+              style={{ borderColor: "var(--status-warning-border)" }}
+              onClick={() => toggleMetricFilter("this_month")}
+            >
+              <p className="metric-label" style={{ color: "var(--status-warning-text)" }}>Due this month</p>
+              <p className="metric-value numeric" style={{ color: "var(--status-warning-text)" }}>
+                {summary.dueThisMonthCount}
+              </p>
+            </button>
+            <button
+              type="button"
+              className={`metric-card compliance-metric-clickable${metricFilter === "next_30" ? " compliance-metric-active" : ""}`}
+              style={{ borderColor: "var(--status-info-border)" }}
+              onClick={() => toggleMetricFilter("next_30")}
+            >
+              <p className="metric-label" style={{ color: "var(--status-info-text)" }}>Due next 30 days</p>
+              <p className="metric-value numeric" style={{ color: "var(--status-info-text)" }}>
+                {summary.dueNext30Count}
+              </p>
+            </button>
+            <article
+              className="metric-card"
+              style={{ borderColor: "var(--status-success-border)" }}
+            >
+              <p className="metric-label" style={{ color: "var(--status-success-text)" }}>On track</p>
+              <p className="metric-value numeric" style={{ color: "var(--status-success-text)" }}>
+                {summary.onTrackPct}%
+              </p>
             </article>
           </section>
 
-          <article className="settings-card compliance-next-card">
-            <h2 className="section-title">Next Deadline</h2>
-            {summary.nextDeadline ? (
-              <p className="settings-card-description">
-                <strong>{summary.nextDeadline.requirement}</strong>{" "}
-                ({countryFlagFromCode(summary.nextDeadline.countryCode)} {countryNameFromCode(summary.nextDeadline.countryCode)})
-                {" "}is due{" "}
-                <span className={`numeric ${dueDateToneClass(summary.nextDeadline.urgency)}`} title={formatDateTimeTooltip(summary.nextDeadline.dueDate)}>
-                  {formatRelativeTime(summary.nextDeadline.dueDate)}
-                </span>
-                .
-              </p>
-            ) : (
-              <p className="settings-card-description">No active upcoming deadlines in this range.</p>
-            )}
-          </article>
+          {/* ── Country filter tabs ── */}
+          {countryTabs.length > 1 ? (
+            <section className="page-tabs" aria-label="Filter by country">
+              <button
+                type="button"
+                className={countryFilter === "all" ? "page-tab page-tab-active" : "page-tab"}
+                onClick={() => setCountryFilter("all")}
+              >
+                All
+              </button>
+              {countryTabs.map((tab) => (
+                <button
+                  key={tab.code}
+                  type="button"
+                  className={countryFilter === tab.code ? "page-tab page-tab-active" : "page-tab"}
+                  onClick={() => setCountryFilter(tab.code)}
+                >
+                  {tab.flag} {tab.code}
+                  {tab.overdue > 0 ? (
+                    <span className="compliance-country-tab-badge">{tab.overdue}</span>
+                  ) : null}
+                </button>
+              ))}
+            </section>
+          ) : null}
+
+          {/* ── Active filter indicator ── */}
+          {metricFilter || countryFilter !== "all" ? (
+            <div className="compliance-active-filters">
+              <span className="settings-card-description">
+                Showing {sortedDeadlines.length} of {sourceDeadlines.length} deadlines
+                {countryFilter !== "all" ? ` in ${countryNameFromCode(countryFilter)}` : ""}
+                {metricFilter === "overdue" ? " (overdue)" : ""}
+                {metricFilter === "this_month" ? " (due this month)" : ""}
+                {metricFilter === "next_30" ? " (due next 30 days)" : ""}
+              </span>
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={() => { setMetricFilter(null); setCountryFilter("all"); }}
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : null}
 
           {sortedDeadlines.length === 0 ? (
             <EmptyState
               title="No compliance deadlines"
-              description="No compliance deadlines exist in the selected date range."
-              ctaLabel="Open dashboard"
-              ctaHref="/dashboard"
+              description={
+                metricFilter || countryFilter !== "all"
+                  ? "No deadlines match the current filters."
+                  : "No compliance deadlines exist in the selected date range."
+              }
+              ctaLabel="Clear filters"
+              ctaHref="/compliance"
             />
           ) : null}
 
+          {/* ── Table view ── */}
           {sortedDeadlines.length > 0 && viewMode === "table" ? (
             <section className="data-table-container" aria-label="Compliance deadlines table">
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th>Requirement</th>
+                    <th>Authority</th>
+                    <th>Country</th>
                     <th>
                       <button
                         type="button"
@@ -421,28 +590,25 @@ export function ComplianceClient() {
                         }
                       >
                         Due Date
-                        <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                        <span className="numeric">{sortDirection === "asc" ? " ↑" : " ↓"}</span>
                       </button>
                     </th>
-                    <th>Country</th>
-                    <th>Requirement</th>
-                    <th>Authority</th>
-                    <th>Cadence</th>
-                    <th>Assigned To</th>
                     <th>Status</th>
+                    <th>Assigned To</th>
                     <th>Proof</th>
-                    <th className="table-action-column">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedDeadlines.map((deadline) => (
-                    <tr key={deadline.id} className="data-table-row">
+                    <tr
+                      key={deadline.id}
+                      className="data-table-row compliance-table-row-clickable"
+                      onClick={() => openUpdatePanel(deadline.id)}
+                    >
                       <td>
-                        <p className={`numeric ${dueDateToneClass(deadline.urgency)}`} title={formatDateTimeTooltip(deadline.dueDate)}>
-                          {formatRelativeTime(deadline.dueDate)}
-                        </p>
-                        <p className="settings-card-description">{deadline.dueDate}</p>
+                        <p>{deadline.requirement}</p>
                       </td>
+                      <td>{deadline.authority}</td>
                       <td>
                         <p className="country-chip">
                           <span>{countryFlagFromCode(deadline.countryCode)}</span>
@@ -450,36 +616,25 @@ export function ComplianceClient() {
                         </p>
                       </td>
                       <td>
-                        <p>{deadline.requirement}</p>
-                        <p className="settings-card-description">{deadline.description ?? "--"}</p>
+                        <p className={`numeric ${dueDateToneClass(deadline.urgency)}`} title={formatDateTimeTooltip(deadline.dueDate)}>
+                          {formatRelativeTime(deadline.dueDate)}
+                        </p>
+                        <p className="settings-card-description">{deadline.dueDate}</p>
                       </td>
-                      <td>{deadline.authority}</td>
-                      <td>{labelForComplianceCadence(deadline.cadence)}</td>
-                      <td>{deadline.assignedToName ?? "--"}</td>
                       <td>
                         <StatusBadge tone={toneForComplianceStatus(deadline.status)}>
                           {labelForComplianceStatus(deadline.status)}
                         </StatusBadge>
                       </td>
+                      <td>{deadline.assignedToName ?? <span className="settings-card-description">Unassigned</span>}</td>
                       <td>
                         {deadline.proofDocumentId ? (
-                          <Link className="table-row-action" href={`/documents`}>
-                            {deadline.proofDocumentTitle ?? "Attached"}
+                          <Link className="table-row-action" href="/documents" onClick={(e) => e.stopPropagation()}>
+                            View
                           </Link>
                         ) : (
-                          <span className="settings-card-description">None</span>
+                          <span className="settings-card-description">—</span>
                         )}
-                      </td>
-                      <td className="table-row-action-cell">
-                        <div className="compliance-row-actions">
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => openUpdateDialog(deadline.id)}
-                          >
-                            Update
-                          </button>
-                        </div>
                       </td>
                     </tr>
                   ))}
@@ -488,6 +643,7 @@ export function ComplianceClient() {
             </section>
           ) : null}
 
+          {/* ── Calendar view ── */}
           {sortedDeadlines.length > 0 && viewMode === "calendar" ? (
             <section className="compliance-calendar" aria-label="Compliance calendar view">
               {calendarGroups.map(([dueDate, rows]) => (
@@ -518,7 +674,7 @@ export function ComplianceClient() {
                           <button
                             type="button"
                             className="table-row-action"
-                            onClick={() => openUpdateDialog(deadline.id)}
+                            onClick={() => openUpdatePanel(deadline.id)}
                           >
                             Update
                           </button>
@@ -533,26 +689,20 @@ export function ComplianceClient() {
         </section>
       ) : null}
 
-      {selectedDeadline && formState ? (
-        <section className="compliance-update-dialog" aria-label="Update compliance deadline">
-          <button
-            type="button"
-            className="compliance-update-backdrop"
-            aria-label="Close update dialog"
-            onClick={closeUpdateDialog}
-          />
-          <article className="compliance-update-panel">
-            <header className="compliance-update-header">
-              <div>
-                <h2 className="section-title">Update Deadline</h2>
-                <p className="settings-card-description">
-                  {selectedDeadline.requirement} • {selectedDeadline.dueDate}
-                </p>
-              </div>
-              <button type="button" className="button button-subtle" onClick={closeUpdateDialog}>
-                Close
-              </button>
-            </header>
+      {/* ── SlidePanel for updating a deadline ── */}
+      <SlidePanel
+        isOpen={!!selectedDeadline && !!formState}
+        title={selectedDeadline?.requirement ?? "Update Deadline"}
+        description={selectedDeadline ? `${selectedDeadline.authority} • Due ${selectedDeadline.dueDate}` : undefined}
+        onClose={closeUpdatePanel}
+      >
+        {selectedDeadline && formState ? (
+          <div className="slide-panel-form">
+            {selectedDeadline.description ? (
+              <p className="settings-card-description" style={{ marginBottom: "var(--space-4)" }}>
+                {selectedDeadline.description}
+              </p>
+            ) : null}
 
             <label className="form-field" htmlFor="compliance-status">
               <span className="form-label">Status</span>
@@ -562,12 +712,7 @@ export function ComplianceClient() {
                 value={formState.status}
                 onChange={(event) =>
                   setFormState((current) =>
-                    current
-                      ? {
-                          ...current,
-                          status: event.currentTarget.value as ComplianceStatus
-                        }
-                      : current
+                    current ? { ...current, status: event.currentTarget.value as ComplianceStatus } : current
                   )
                 }
               >
@@ -586,12 +731,7 @@ export function ComplianceClient() {
                 value={formState.assignedTo ?? ""}
                 onChange={(event) =>
                   setFormState((current) =>
-                    current
-                      ? {
-                          ...current,
-                          assignedTo: event.currentTarget.value || null
-                        }
-                      : current
+                    current ? { ...current, assignedTo: event.currentTarget.value || null } : current
                   )
                 }
               >
@@ -612,12 +752,7 @@ export function ComplianceClient() {
                 value={formState.proofDocumentId ?? ""}
                 onChange={(event) =>
                   setFormState((current) =>
-                    current
-                      ? {
-                          ...current,
-                          proofDocumentId: event.currentTarget.value || null
-                        }
-                      : current
+                    current ? { ...current, proofDocumentId: event.currentTarget.value || null } : current
                   )
                 }
               >
@@ -643,29 +778,87 @@ export function ComplianceClient() {
                 value={formState.notes ?? ""}
                 onChange={(event) =>
                   setFormState((current) =>
-                    current
-                      ? {
-                          ...current,
-                          notes: event.currentTarget.value || null
-                        }
-                      : current
+                    current ? { ...current, notes: event.currentTarget.value || null } : current
                   )
                 }
               />
             </label>
 
             <footer className="settings-actions">
-              <button type="button" className="button button-subtle" onClick={closeUpdateDialog}>
+              <button type="button" className="button button-subtle" onClick={closeUpdatePanel}>
                 Cancel
               </button>
-              <button type="button" className="button button-accent" disabled={isSaving} onClick={() => void submitUpdate()}>
-                {isSaving ? "Saving..." : "Save update"}
+              <button
+                type="button"
+                className="button button-accent"
+                disabled={isSaving}
+                onClick={() => void submitUpdate()}
+              >
+                {isSaving ? "Saving..." : "Save changes"}
+              </button>
+            </footer>
+          </div>
+        ) : null}
+      </SlidePanel>
+
+      {/* ── Generate deadlines confirmation modal ── */}
+      {showGenerateModal ? (
+        <section className="compliance-update-dialog" aria-label="Generate deadlines confirmation">
+          <button
+            type="button"
+            className="compliance-update-backdrop"
+            aria-label="Close modal"
+            onClick={() => setShowGenerateModal(false)}
+          />
+          <article className="compliance-update-panel">
+            <header className="compliance-update-header">
+              <div>
+                <h2 className="section-title">Generate Compliance Deadlines</h2>
+                <p className="settings-card-description">
+                  This will create deadline records for all compliance items for the selected year.
+                  Existing deadlines will not be duplicated.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={() => setShowGenerateModal(false)}
+              >
+                Close
+              </button>
+            </header>
+
+            <label className="form-field" htmlFor="generate-year">
+              <span className="form-label">Year</span>
+              <input
+                id="generate-year"
+                type="number"
+                className="form-input numeric"
+                min={2020}
+                max={2100}
+                value={generateYear}
+                onChange={(event) => setGenerateYear(parseInt(event.currentTarget.value, 10) || new Date().getFullYear())}
+              />
+            </label>
+
+            <footer className="settings-actions">
+              <button type="button" className="button button-subtle" onClick={() => setShowGenerateModal(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                disabled={isGenerating}
+                onClick={() => void handleGenerate()}
+              >
+                {isGenerating ? "Generating..." : `Generate ${generateYear} deadlines`}
               </button>
             </footer>
           </article>
         </section>
       ) : null}
 
+      {/* ── Toasts ── */}
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite" aria-label="Compliance toasts">
           {toasts.map((toast) => (

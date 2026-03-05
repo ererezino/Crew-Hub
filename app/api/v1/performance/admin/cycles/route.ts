@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { createBulkNotifications } from "../../../../../../lib/notifications/service";
+import { sendReviewCycleStartedEmail } from "../../../../../../lib/notifications/email";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type { CreateReviewCycleData, CreateReviewCyclePayload } from "../../../../../../types/performance";
 import {
@@ -63,7 +65,9 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!canManagePerformance(session.profile.roles)) {
+  const profile = session.profile;
+
+  if (!canManagePerformance(profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
@@ -110,7 +114,7 @@ export async function POST(request: Request) {
     const { data: rawInsertedCycle, error: insertError } = await supabase
       .from("review_cycles")
       .insert({
-        org_id: session.profile.org_id,
+        org_id: profile.org_id,
         name: payload.name,
         type: payload.type,
         status: payload.status,
@@ -118,7 +122,7 @@ export async function POST(request: Request) {
         end_date: payload.endDate,
         self_review_deadline: payload.selfReviewDeadline,
         manager_review_deadline: payload.managerReviewDeadline,
-        created_by: session.profile.id
+        created_by: profile.id
       })
       .select(
         "id, org_id, name, type, status, start_date, end_date, self_review_deadline, manager_review_deadline, created_by, created_at, updated_at"
@@ -149,7 +153,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const mappedCycle = mapCycleRow(parsedCycle.data, session.profile.full_name);
+    const mappedCycle = mapCycleRow(parsedCycle.data, profile.full_name);
 
     if (!mappedCycle) {
       return jsonResponse<null>(500, {
@@ -160,6 +164,52 @@ export async function POST(request: Request) {
         },
         meta: buildMeta()
       });
+    }
+
+    if (mappedCycle.status === "active") {
+      const { data: assignmentRows, error: assignmentError } = await supabase
+        .from("review_assignments")
+        .select("employee_id")
+        .eq("org_id", profile.org_id)
+        .eq("cycle_id", mappedCycle.id)
+        .is("deleted_at", null);
+
+      if (assignmentError) {
+        console.error("Unable to load review assignment recipients.", {
+          cycleId: mappedCycle.id,
+          message: assignmentError.message
+        });
+      } else {
+        const employeeIds = [...new Set(
+          (assignmentRows ?? [])
+            .map((row) => row.employee_id)
+            .filter((value): value is string => typeof value === "string")
+        )];
+
+        const deadlineText = payload.selfReviewDeadline
+          ? ` Self-review due ${payload.selfReviewDeadline}.`
+          : "";
+
+        await createBulkNotifications({
+          orgId: profile.org_id,
+          userIds: employeeIds,
+          type: "review_cycle_started",
+          title: "Review cycle started",
+          body: `Your ${payload.name} review has started.${deadlineText}`,
+          link: "/performance"
+        });
+
+        void Promise.all(
+          employeeIds.map((employeeId) =>
+            sendReviewCycleStartedEmail({
+              orgId: profile.org_id,
+              userId: employeeId,
+              cycleName: payload.name,
+              selfReviewDeadline: payload.selfReviewDeadline ?? null
+            })
+          )
+        );
+      }
     }
 
     const responseData: CreateReviewCycleData = {

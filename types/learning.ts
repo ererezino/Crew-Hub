@@ -143,10 +143,46 @@ export type LearningAssignmentsBulkMutationResponseData = {
   assignments: LearningAssignmentRecord[];
 };
 
+export type LearningQuizResult = {
+  score: number;
+  passed: boolean;
+  totalQuestions: number;
+  correctCount: number;
+  passingScore: number | null;
+  allowRetake: boolean;
+};
+
+export type LearningModuleProgressResponseData = {
+  assignment: LearningAssignmentRecord;
+  quizResult: LearningQuizResult | null;
+};
+
+export type LearningModuleDefinition = {
+  id: string;
+  title: string;
+  type: "video" | "document" | "link" | "quiz";
+  contentUrl: string | null;
+  durationMinutes: number | null;
+  questions: LearningQuizQuestion[];
+};
+
+export type LearningQuizQuestion = {
+  id: string;
+  text: string;
+  options: string[];
+};
+
+export type LearningModuleStatus = {
+  status: "locked" | "in_progress" | "completed";
+  startedAt?: string;
+  completedAt?: string;
+};
+
 export type LearningCoursesResponse = ApiResponse<LearningCoursesResponseData>;
 export type LearningMyAssignmentsResponse = ApiResponse<LearningMyAssignmentsResponseData>;
 export type LearningCourseMutationResponse = ApiResponse<LearningCourseMutationResponseData>;
 export type LearningAssignmentMutationResponse = ApiResponse<LearningAssignmentMutationResponseData>;
+export type LearningModuleProgressResponse = ApiResponse<LearningModuleProgressResponseData>;
 export type LearningAssignmentsBulkMutationResponse = ApiResponse<LearningAssignmentsBulkMutationResponseData>;
 export type LearningReportsResponse = ApiResponse<LearningReportsResponseData>;
 export type LearningCertificateResponse = ApiResponse<LearningCertificateResponseData>;

@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../components/shared/error-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
+import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
+import { formatDate as formatDateLib } from "../../../../lib/datetime";
 import type {
   PersonRecord,
   PeopleListResponse,
   PeopleUpdateResponse,
   PrivacySettings
 } from "../../../../types/people";
+import type { ApiResponse } from "../../../../types/auth";
 
 /* ── Types ── */
 
@@ -58,15 +62,7 @@ function resolvePrivacy(settings: PrivacySettings | null | undefined): Required<
 
 function formatDate(dateString: string | null): string {
   if (!dateString) return "--";
-  try {
-    return new Date(dateString).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    });
-  } catch {
-    return dateString;
-  }
+  return formatDateLib(dateString);
 }
 
 /* ── Component ── */
@@ -89,6 +85,14 @@ export function PeopleOverviewClient({
   );
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Offboarding state
+  const [isOffboardModalOpen, setIsOffboardModalOpen] = useState(false);
+  const [offboardLastDay, setOffboardLastDay] = useState("");
+  const [offboardReason, setOffboardReason] = useState("");
+  const [offboardConfirmName, setOffboardConfirmName] = useState("");
+  const [isSubmittingOffboard, setIsSubmittingOffboard] = useState(false);
+  const [offboardError, setOffboardError] = useState<string | null>(null);
 
   // Fetch person data
   useEffect(() => {
@@ -209,6 +213,48 @@ export function PeopleOverviewClient({
     []
   );
 
+  // Offboarding handler
+  const handleOffboard = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (!person) return;
+
+      setIsSubmittingOffboard(true);
+      setOffboardError(null);
+
+      try {
+        const response = await fetch(`/api/v1/people/${person.id}/offboard`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            lastWorkingDay: offboardLastDay,
+            reason: offboardReason,
+            confirmName: offboardConfirmName
+          })
+        });
+
+        const payload = (await response.json()) as ApiResponse<{ profileId: string; instanceId: string | null; status: string }>;
+
+        if (!response.ok || !payload.data) {
+          setOffboardError(payload.error?.message ?? "Unable to initiate offboarding.");
+          return;
+        }
+
+        setIsOffboardModalOpen(false);
+        refresh();
+      } catch (error) {
+        setOffboardError(error instanceof Error ? error.message : "Unable to initiate offboarding.");
+      } finally {
+        setIsSubmittingOffboard(false);
+      }
+    },
+    [person, offboardLastDay, offboardReason, offboardConfirmName, refresh]
+  );
+
+  const offboardNameMatches = person
+    ? offboardConfirmName === person.fullName
+    : false;
+
   /* ── Loading & Error States ── */
 
   if (isLoading) {
@@ -225,11 +271,10 @@ export function PeopleOverviewClient({
 
   if (errorMessage || !person) {
     return (
-      <EmptyState
+      <ErrorState
         title="Profile unavailable"
-        description={errorMessage ?? "Could not load profile data."}
-        ctaLabel="Retry"
-        ctaHref="#"
+        message={errorMessage ?? "Could not load profile data."}
+        onRetry={refresh}
       />
     );
   }
@@ -398,6 +443,132 @@ export function PeopleOverviewClient({
           </div>
         ) : null}
       </div>
+
+      {/* Offboarding Banner */}
+      {person.status === "offboarding" ? (
+        <div className="offboarding-banner">
+          <div className="offboarding-banner-content">
+            <StatusBadge tone="warning">Offboarding</StatusBadge>
+            <p className="offboarding-banner-text">
+              This employee is being offboarded.{person.noticePeriodEndDate
+                ? ` Last working day: ${formatDate(person.noticePeriodEndDate)}.`
+                : ""}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Danger Zone — Admin only, non-self, non-offboarding */}
+      {isAdmin && !isSelf && person.status !== "offboarding" ? (
+        <div className="danger-zone">
+          <h3 className="danger-zone-title">Danger zone</h3>
+          <div className="danger-zone-content">
+            <div className="danger-zone-description">
+              <p className="danger-zone-label">Initiate offboarding</p>
+              <p className="settings-card-description">
+                Begin the offboarding process for this employee. This will change their status, create offboarding tasks, and notify relevant parties.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="button button-danger"
+              onClick={() => {
+                setOffboardLastDay("");
+                setOffboardReason("");
+                setOffboardConfirmName("");
+                setOffboardError(null);
+                setIsOffboardModalOpen(true);
+              }}
+            >
+              Initiate offboarding
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Offboarding Confirmation Modal */}
+      {isOffboardModalOpen && person ? (
+        <div className="modal-overlay" onClick={() => setIsOffboardModalOpen(false)}>
+          <div
+            className="modal-dialog modal-dialog-danger"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="modal-title">Initiate offboarding for {person.fullName}</h2>
+            <form onSubmit={handleOffboard} noValidate>
+              {offboardError ? (
+                <div className="form-error-banner">{offboardError}</div>
+              ) : null}
+
+              <label className="form-field" htmlFor="offboard-last-day">
+                <span className="form-label">Last working day</span>
+                <input
+                  id="offboard-last-day"
+                  type="date"
+                  className="form-input"
+                  required
+                  value={offboardLastDay}
+                  onChange={(e) => setOffboardLastDay(e.currentTarget.value)}
+                  disabled={isSubmittingOffboard}
+                />
+              </label>
+
+              <label className="form-field" htmlFor="offboard-reason">
+                <span className="form-label">Reason for departure</span>
+                <select
+                  id="offboard-reason"
+                  className="form-input"
+                  required
+                  value={offboardReason}
+                  onChange={(e) => setOffboardReason(e.currentTarget.value)}
+                  disabled={isSubmittingOffboard}
+                >
+                  <option value="">Select a reason</option>
+                  <option value="resignation">Resignation</option>
+                  <option value="redundancy">Redundancy</option>
+                  <option value="performance">Performance</option>
+                  <option value="contract_end">Contract end</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+
+              <label className="form-field" htmlFor="offboard-confirm-name">
+                <span className="form-label">To confirm, type {person.fullName} below</span>
+                <input
+                  id="offboard-confirm-name"
+                  className="form-input"
+                  placeholder={person.fullName}
+                  value={offboardConfirmName}
+                  onChange={(e) => setOffboardConfirmName(e.currentTarget.value)}
+                  disabled={isSubmittingOffboard}
+                />
+              </label>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => setIsOffboardModalOpen(false)}
+                  disabled={isSubmittingOffboard}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button button-danger"
+                  disabled={
+                    isSubmittingOffboard ||
+                    !offboardNameMatches ||
+                    !offboardLastDay ||
+                    !offboardReason
+                  }
+                >
+                  {isSubmittingOffboard ? "Processing..." : "Begin offboarding"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {/* Edit Profile Slide Panel */}
       <SlidePanel

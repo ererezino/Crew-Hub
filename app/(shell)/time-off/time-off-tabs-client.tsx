@@ -91,7 +91,7 @@ export function TimeOffTabsClient({ requestedTab, userRoles }: TimeOffTabsClient
           transition={{ duration: 0.18, ease: "easeOut" }}
         >
           {activeTab === "my-requests" ? <TimeOffClient embedded /> : null}
-          {activeTab === "calendar" ? <TimeOffCalendarClient embedded /> : null}
+          {activeTab === "calendar" ? <TimeOffCalendarClient embedded userRoles={userRoles} /> : null}
         </motion.section>
       </AnimatePresence>
     </>

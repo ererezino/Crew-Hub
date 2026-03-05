@@ -4,27 +4,32 @@ import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
+import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
-import { useTimeOffSummary } from "../../../hooks/use-time-off";
+import { useAfkLogs, useTimeOffSummary } from "../../../hooks/use-time-off";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatDays, formatDateRangeHuman, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatLeaveStatus } from "../../../lib/format-labels";
 import {
   calculateWorkingDays,
   enumerateIsoDatesInRange,
   formatLeaveTypeLabel,
+  getBirthdayLeaveOptions,
   getCurrentMonthKey,
   isoDateToUtcDate,
   isIsoDate,
   monthToDateRange
 } from "../../../lib/time-off";
+import { formatSingleDateHuman } from "../../../lib/datetime";
 import type {
   LeaveBalance,
   LeaveRequestRecord,
   LeaveRequestStatus,
   TimeOffRequestMutationResponse
 } from "../../../types/time-off";
+import { AUTO_GRANTED_LEAVE_TYPES, UNLIMITED_LEAVE_TYPES } from "../../../types/time-off";
 
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -243,10 +248,10 @@ function TimeOffSkeleton() {
           <div key={`timeoff-balance-skeleton-${index}`} className="timeoff-balance-skeleton-card" />
         ))}
       </div>
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`timeoff-row-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`timeoff-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
       <div className="timeoff-calendar-skeleton" />
@@ -265,6 +270,14 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancellingRequestId, setIsCancellingRequestId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isAfkPanelOpen, setIsAfkPanelOpen] = useState(false);
+  const [afkDate, setAfkDate] = useState("");
+  const [afkStartTime, setAfkStartTime] = useState("");
+  const [afkEndTime, setAfkEndTime] = useState("");
+  const [afkNotes, setAfkNotes] = useState("");
+  const [isAfkSubmitting, setIsAfkSubmitting] = useState(false);
+
+  const afkQuery = useAfkLogs();
 
   const summaryQuery = useTimeOffSummary({
     month: activeMonth,
@@ -274,10 +287,16 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   const availableLeaveTypes = useMemo(() => {
     const policyTypes = summaryQuery.data?.policies.map((policy) => policy.leaveType) ?? [];
     const balanceTypes = summaryQuery.data?.balances.map((balance) => balance.leaveType) ?? [];
-    return [...new Set([...policyTypes, ...balanceTypes])].sort((leftValue, rightValue) =>
-      leftValue.localeCompare(rightValue)
-    );
+    return [...new Set([...policyTypes, ...balanceTypes])]
+      .filter((leaveType) => !AUTO_GRANTED_LEAVE_TYPES.has(leaveType))
+      .sort((leftValue, rightValue) => leftValue.localeCompare(rightValue));
   }, [summaryQuery.data?.balances, summaryQuery.data?.policies]);
+
+  const isSelectedTypeUnlimited = useMemo(() => {
+    if (!formValues.leaveType) return false;
+    const policy = summaryQuery.data?.policies.find((p) => p.leaveType === formValues.leaveType);
+    return policy?.isUnlimited || UNLIMITED_LEAVE_TYPES.has(formValues.leaveType);
+  }, [formValues.leaveType, summaryQuery.data?.policies]);
 
   const selectedLeaveBalance = useMemo(
     () =>
@@ -300,6 +319,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   }, [formValues.endDate, formValues.startDate, holidayDateKeys]);
 
   const balanceWarning = useMemo(() => {
+    if (isSelectedTypeUnlimited) return null;
     if (!selectedLeaveBalance || calculatedWorkingDays <= 0) {
       return null;
     }
@@ -309,7 +329,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     }
 
     return `Requested days (${calculatedWorkingDays}) exceed available balance (${selectedLeaveBalance.availableDays}).`;
-  }, [calculatedWorkingDays, selectedLeaveBalance]);
+  }, [calculatedWorkingDays, isSelectedTypeUnlimited, selectedLeaveBalance]);
 
   const sortedRequests = useMemo(() => {
     const requests = summaryQuery.data?.requests ?? [];
@@ -376,6 +396,119 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     window.setTimeout(() => {
       dismissToast(toastId);
     }, 4000);
+  };
+
+  const birthdayChoiceInfo = useMemo(() => {
+    const profile = summaryQuery.data?.profile;
+    if (!profile?.dateOfBirth) return null;
+
+    const currentYear = new Date().getUTCFullYear();
+    const options = getBirthdayLeaveOptions(profile.dateOfBirth, currentYear, holidayDateKeys);
+
+    if (!options.needsChoice) return null;
+
+    const existingBirthdayRequest = (summaryQuery.data?.requests ?? []).find(
+      (r) => r.leaveType === "birthday_leave" && r.startDate.startsWith(String(currentYear))
+    );
+
+    if (existingBirthdayRequest) return null;
+
+    return options;
+  }, [summaryQuery.data?.profile, summaryQuery.data?.requests, holidayDateKeys]);
+
+  const [isBirthdayChoosing, setIsBirthdayChoosing] = useState(false);
+
+  const handleBirthdayChoice = async (chosenDate: string) => {
+    setIsBirthdayChoosing(true);
+
+    try {
+      const response = await fetch("/api/v1/time-off/birthday-choice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chosenDate })
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        showToast("error", payload.error?.message ?? "Unable to select birthday leave date.");
+        return;
+      }
+
+      summaryQuery.refresh();
+      showToast("success", "Birthday leave date selected!");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to select birthday leave date.");
+    } finally {
+      setIsBirthdayChoosing(false);
+    }
+  };
+
+  const afkDurationMinutes = useMemo(() => {
+    if (!afkStartTime || !afkEndTime) return 0;
+    const [sh, sm] = afkStartTime.split(":").map(Number);
+    const [eh, em] = afkEndTime.split(":").map(Number);
+    const start = (sh ?? 0) * 60 + (sm ?? 0);
+    const end = (eh ?? 0) * 60 + (em ?? 0);
+    return end > start ? end - start : 0;
+  }, [afkStartTime, afkEndTime]);
+
+  const openAfkPanel = () => {
+    setAfkDate(new Date().toISOString().slice(0, 10));
+    setAfkStartTime("");
+    setAfkEndTime("");
+    setAfkNotes("");
+    setIsAfkPanelOpen(true);
+  };
+
+  const closeAfkPanel = () => {
+    setIsAfkPanelOpen(false);
+    setAfkDate("");
+    setAfkStartTime("");
+    setAfkEndTime("");
+    setAfkNotes("");
+  };
+
+  const handleSubmitAfk = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!afkDate || !afkStartTime || !afkEndTime) {
+      showToast("error", "Date, start time, and end time are required.");
+      return;
+    }
+
+    setIsAfkSubmitting(true);
+
+    try {
+      const response = await fetch("/api/v1/time-off/afk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: afkDate,
+          startTime: afkStartTime,
+          endTime: afkEndTime,
+          notes: afkNotes.trim()
+        })
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        showToast("error", payload.error?.message ?? "Unable to log AFK entry.");
+        return;
+      }
+
+      closeAfkPanel();
+      afkQuery.refresh();
+      summaryQuery.refresh();
+      showToast("success", afkDurationMinutes > 120
+        ? "AFK logged and auto-reclassified as a personal day request."
+        : "AFK entry logged.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to log AFK entry.");
+    } finally {
+      setIsAfkSubmitting(false);
+    }
   };
 
   const openRequestPanel = () => {
@@ -537,11 +670,10 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             description="Track leave balances, submit requests, and monitor your monthly calendar."
           />
         ) : null}
-        <EmptyState
+        <ErrorState
           title="Time Off data is unavailable"
-          description={summaryQuery.errorMessage ?? "Unable to load time off summary."}
-          ctaLabel="Retry"
-          ctaHref="/time-off"
+          message={summaryQuery.errorMessage ?? "Unable to load time off summary."}
+          onRetry={summaryQuery.refresh}
         />
       </>
     );
@@ -557,7 +689,34 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       ) : null}
 
       <section className="timeoff-balance-grid" aria-label="Leave balances">
-        {summaryQuery.data.balances.length === 0 ? (
+        {/* Unlimited leave type cards (e.g. sick leave) */}
+        {(summaryQuery.data.policies ?? [])
+          .filter((p) => p.isUnlimited)
+          .map((policy) => {
+            const usedRequests = (summaryQuery.data?.requests ?? []).filter(
+              (r) => r.leaveType === policy.leaveType && (r.status === "approved" || r.status === "pending")
+            );
+            const usedDays = usedRequests.reduce((sum, r) => sum + r.totalDays, 0);
+
+            return (
+              <article key={policy.id} className="timeoff-balance-card">
+                <header className="timeoff-balance-card-header">
+                  <h2 className="section-title">{formatLeaveTypeLabel(policy.leaveType)}</h2>
+                  <StatusBadge tone="processing">Unlimited</StatusBadge>
+                </header>
+                <div className="timeoff-balance-metric numeric">Unlimited</div>
+                <p className="settings-card-description">
+                  {usedDays > 0 ? `${formatDays(usedDays)} days used this year` : "No days used this year"}
+                </p>
+                <p className="settings-card-description">
+                  Doctor&apos;s note required after 2 consecutive working days.
+                </p>
+              </article>
+            );
+          })}
+
+        {/* Standard balance cards */}
+        {summaryQuery.data.balances.length === 0 && summaryQuery.data.policies.filter((p) => p.isUnlimited).length === 0 ? (
           <EmptyState
             title="No leave balances available"
             description="Leave balances appear here once policies and allocations are configured."
@@ -565,42 +724,86 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             ctaHref="/dashboard"
           />
         ) : (
-          summaryQuery.data.balances.map((balance) => (
-            <article key={balance.id} className="timeoff-balance-card">
-              <header className="timeoff-balance-card-header">
-                <h2 className="section-title">{formatLeaveTypeLabel(balance.leaveType)}</h2>
-                <StatusBadge tone={toneForBalance(balance)}>
-                  {balance.availableDays > 0 ? "Available" : "Depleted"}
-                </StatusBadge>
-              </header>
-              <div className="timeoff-balance-metric numeric">
-                {balance.availableDays.toFixed(1)} days
-              </div>
-              <p className="settings-card-description">
-                {balance.year} balance including carried days
-              </p>
-              <dl className="timeoff-balance-breakdown">
-                <div>
-                  <dt>Total</dt>
-                  <dd className="numeric">{balance.totalDays.toFixed(1)}</dd>
+          summaryQuery.data.balances.map((balance) => {
+            const scheduledDays = balance.pendingDays;
+            const available = balance.totalDays - balance.usedDays - scheduledDays + balance.carriedDays;
+
+            return (
+              <article key={balance.id} className="timeoff-balance-card">
+                <header className="timeoff-balance-card-header">
+                  <h2 className="section-title">{formatLeaveTypeLabel(balance.leaveType)}</h2>
+                  <StatusBadge tone={toneForBalance(balance)}>
+                    {available > 0 ? "Available" : "Depleted"}
+                  </StatusBadge>
+                </header>
+                <div className="timeoff-balance-metric numeric">
+                  {formatDays(available)} days
                 </div>
-                <div>
-                  <dt>Used</dt>
-                  <dd className="numeric">{balance.usedDays.toFixed(1)}</dd>
-                </div>
-                <div>
-                  <dt>Pending</dt>
-                  <dd className="numeric">{balance.pendingDays.toFixed(1)}</dd>
-                </div>
-                <div>
-                  <dt>Carried</dt>
-                  <dd className="numeric">{balance.carriedDays.toFixed(1)}</dd>
-                </div>
-              </dl>
-            </article>
-          ))
+                <p className="settings-card-description">
+                  {balance.year} balance including carried days
+                </p>
+                <dl className="timeoff-balance-breakdown">
+                  <div>
+                    <dt>Total</dt>
+                    <dd className="numeric">{formatDays(balance.totalDays)}</dd>
+                  </div>
+                  <div>
+                    <dt>Used</dt>
+                    <dd className="numeric">{formatDays(balance.usedDays)}</dd>
+                  </div>
+                  {scheduledDays > 0 ? (
+                    <div>
+                      <dt>Scheduled</dt>
+                      <dd className="numeric">{formatDays(scheduledDays)}</dd>
+                    </div>
+                  ) : null}
+                  {balance.carriedDays > 0 ? (
+                    <div>
+                      <dt>Carried</dt>
+                      <dd className="numeric">{formatDays(balance.carriedDays)}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </article>
+            );
+          })
         )}
       </section>
+
+      {/* Birthday choice banner */}
+      {birthdayChoiceInfo ? (
+        <section className="settings-card" aria-label="Birthday leave selection">
+          <header className="timeoff-section-header">
+            <h2 className="section-title">Birthday Leave</h2>
+            <StatusBadge tone="pending">Action required</StatusBadge>
+          </header>
+          <p className="settings-card-description">
+            Your birthday falls on a non-working day this year ({formatSingleDateHuman(birthdayChoiceInfo.birthdayDate)}). Choose a day for your birthday leave:
+          </p>
+          <div className="timeoff-row-actions" style={{ marginTop: "var(--spacing-sm)" }}>
+            {birthdayChoiceInfo.options.map((dateOption) => (
+              <button
+                key={dateOption}
+                type="button"
+                className="button"
+                disabled={isBirthdayChoosing}
+                onClick={() => handleBirthdayChoice(dateOption)}
+              >
+                {formatSingleDateHuman(dateOption)}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* Probation notice */}
+      {summaryQuery.data.profile.status === "onboarding" ? (
+        <section className="settings-card" aria-label="Probation notice">
+          <p className="settings-card-description">
+            During probation, only unpaid personal days are available for leave requests.
+          </p>
+        </section>
+      ) : null}
 
       <section className="settings-card" aria-label="My leave requests">
         <header className="timeoff-section-header">
@@ -608,6 +811,9 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           <div className="documents-row-actions" style={{ opacity: 1, transform: "none", pointerEvents: "auto" }}>
             <button type="button" className="button button-accent" onClick={openRequestPanel}>
               Request Time Off
+            </button>
+            <button type="button" className="button" onClick={openAfkPanel}>
+              Log AFK
             </button>
             <button
               type="button"
@@ -653,20 +859,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                         dateTime={requestRecord.startDate}
                         title={formatDateTimeTooltip(requestRecord.startDate)}
                       >
-                        {requestRecord.startDate}
-                      </time>
-                      {" - "}
-                      <time
-                        dateTime={requestRecord.endDate}
-                        title={formatDateTimeTooltip(requestRecord.endDate)}
-                      >
-                        {requestRecord.endDate}
+                        {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
                       </time>
                     </td>
-                    <td className="numeric">{requestRecord.totalDays.toFixed(1)}</td>
+                    <td className="numeric">{formatDays(requestRecord.totalDays)}</td>
                     <td>
                       <StatusBadge tone={toneForRequestStatus(requestRecord.status)}>
-                        {requestRecord.status}
+                        {formatLeaveStatus(requestRecord.status)}
                       </StatusBadge>
                     </td>
                     <td>{requestRecord.approverName ?? "--"}</td>
@@ -735,38 +934,112 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             const statuses = requestStatusByDate.get(cell.dateKey) ?? [];
             const hasApproved = statuses.includes("approved");
             const hasPending = statuses.includes("pending");
+            const isHoliday = holidays.length > 0;
 
             const className = [
               "timeoff-calendar-day",
               cell.isCurrentMonth ? "timeoff-calendar-day-current" : "timeoff-calendar-day-muted",
               hasApproved ? "timeoff-calendar-day-approved" : "",
-              hasPending ? "timeoff-calendar-day-pending" : ""
+              hasPending ? "timeoff-calendar-day-pending" : "",
+              isHoliday ? "timeoff-calendar-day-holiday" : ""
             ]
               .filter(Boolean)
               .join(" ");
 
             return (
-              <article key={cell.dateKey} className={className}>
+              <article key={cell.dateKey} className={className} title={isHoliday ? holidays.join(", ") : undefined}>
                 <p className="numeric">{cell.dayNumber}</p>
-                {holidays.length > 0 ? (
-                  <p className="timeoff-calendar-note" title={holidays.join(", ")}>
-                    Holiday
-                  </p>
-                ) : null}
-                {statuses.length > 0 ? (
-                  <p className="timeoff-calendar-note">
-                    {hasApproved ? "Approved" : hasPending ? "Pending" : "Request"}
-                  </p>
-                ) : null}
+                <span className="timeoff-calendar-dots">
+                  {hasApproved ? <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" /> : null}
+                  {hasPending ? <span className="timeoff-calendar-badge timeoff-calendar-badge-pending" /> : null}
+                  {isHoliday ? <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" /> : null}
+                </span>
               </article>
             );
           })}
+        </div>
+
+        <div className="timeoff-calendar-legend">
+          <div className="timeoff-calendar-legend-item">
+            <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" />
+            <span>Leave</span>
+          </div>
+          <div className="timeoff-calendar-legend-item">
+            <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" />
+            <span>Public holiday</span>
+          </div>
+          <div className="timeoff-calendar-legend-item">
+            <span className="timeoff-calendar-badge timeoff-calendar-badge-pending" />
+            <span>Pending</span>
+          </div>
         </div>
 
         <div className="timeoff-country-summary">
           <span>{countryFlagFromCode(summaryQuery.data.profile.countryCode)}</span>
           <span>{countryNameFromCode(summaryQuery.data.profile.countryCode)}</span>
         </div>
+      </section>
+
+      <section className="settings-card" aria-label="AFK log">
+        <header className="timeoff-section-header">
+          <h2 className="section-title">AFK Log</h2>
+          {afkQuery.data ? (
+            <p className="settings-card-description">
+              {afkQuery.data.weeklyCount} of {afkQuery.data.weeklyLimit} entries this week
+            </p>
+          ) : null}
+        </header>
+
+        {afkQuery.isLoading ? (
+          <div className="table-skeleton">
+            <div className="table-skeleton-header" />
+            {Array.from({ length: 2 }, (_, index) => (
+              <div key={`afk-skeleton-${index}`} className="table-skeleton-row" />
+            ))}
+          </div>
+        ) : afkQuery.data && afkQuery.data.logs.length > 0 ? (
+          <div className="data-table-container">
+            <table className="data-table" aria-label="AFK log entries">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {afkQuery.data.logs.map((log) => (
+                  <tr key={log.id} className="data-table-row">
+                    <td>{formatSingleDateHuman(log.date)}</td>
+                    <td className="numeric">{log.startTime} – {log.endTime}</td>
+                    <td className="numeric">
+                      {log.durationMinutes >= 60
+                        ? `${Math.floor(log.durationMinutes / 60)}h ${log.durationMinutes % 60}m`
+                        : `${log.durationMinutes}m`}
+                    </td>
+                    <td>
+                      {log.reclassifiedAs ? (
+                        <StatusBadge tone="warning">Reclassified</StatusBadge>
+                      ) : (
+                        <StatusBadge tone="success">Logged</StatusBadge>
+                      )}
+                    </td>
+                    <td>{log.notes || "--"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState
+            title="No AFK entries this week"
+            description="Log short absences during working hours here."
+            ctaLabel="Log AFK"
+            ctaHref="/time-off"
+          />
+        )}
       </section>
 
       <SlidePanel
@@ -838,15 +1111,22 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
           <section className="timeoff-request-summary">
             <p>
-              Working days: <span className="numeric">{calculatedWorkingDays.toFixed(1)}</span>
+              Working days: <span className="numeric">{formatDays(calculatedWorkingDays)}</span>
             </p>
-            {selectedLeaveBalance ? (
+            {isSelectedTypeUnlimited ? (
+              <p className="settings-card-description">This leave type has unlimited balance.</p>
+            ) : selectedLeaveBalance ? (
               <p>
                 Available balance:{" "}
-                <span className="numeric">{selectedLeaveBalance.availableDays.toFixed(1)}</span>
+                <span className="numeric">{formatDays(selectedLeaveBalance.availableDays)}</span>
               </p>
             ) : null}
             {balanceWarning ? <p className="form-field-error">{balanceWarning}</p> : null}
+            {formValues.leaveType === "sick_leave" && calculatedWorkingDays > 2 ? (
+              <p className="settings-card-description">
+                A doctor&apos;s note may be required for sick leave exceeding 2 consecutive working days.
+              </p>
+            ) : null}
           </section>
 
           {submitError ? <p className="form-submit-error">{submitError}</p> : null}
@@ -857,6 +1137,94 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Submit request"}
+            </button>
+          </div>
+        </form>
+      </SlidePanel>
+
+      <SlidePanel
+        isOpen={isAfkPanelOpen}
+        title="Log AFK"
+        description="Record a short absence during working hours. Maximum 2 entries per week."
+        onClose={closeAfkPanel}
+      >
+        <form className="slide-panel-form-wrapper" onSubmit={handleSubmitAfk} noValidate>
+          <label className="form-field" htmlFor="afk-date">
+            <span className="form-label">Date</span>
+            <input
+              id="afk-date"
+              type="date"
+              className="form-input"
+              value={afkDate}
+              onChange={(event) => setAfkDate(event.currentTarget.value)}
+            />
+          </label>
+
+          <div className="timeoff-form-grid">
+            <label className="form-field" htmlFor="afk-start-time">
+              <span className="form-label">Start time</span>
+              <input
+                id="afk-start-time"
+                type="time"
+                className="form-input"
+                value={afkStartTime}
+                onChange={(event) => setAfkStartTime(event.currentTarget.value)}
+              />
+            </label>
+
+            <label className="form-field" htmlFor="afk-end-time">
+              <span className="form-label">End time</span>
+              <input
+                id="afk-end-time"
+                type="time"
+                className="form-input"
+                value={afkEndTime}
+                onChange={(event) => setAfkEndTime(event.currentTarget.value)}
+              />
+            </label>
+          </div>
+
+          <label className="form-field" htmlFor="afk-notes">
+            <span className="form-label">Notes (optional)</span>
+            <textarea
+              id="afk-notes"
+              rows={3}
+              className="form-input"
+              value={afkNotes}
+              onChange={(event) => setAfkNotes(event.currentTarget.value)}
+              maxLength={500}
+            />
+          </label>
+
+          <section className="timeoff-request-summary">
+            {afkDurationMinutes > 0 ? (
+              <p>
+                Duration:{" "}
+                <span className="numeric">
+                  {afkDurationMinutes >= 60
+                    ? `${Math.floor(afkDurationMinutes / 60)}h ${afkDurationMinutes % 60}m`
+                    : `${afkDurationMinutes}m`}
+                </span>
+              </p>
+            ) : null}
+            {afkDurationMinutes > 120 ? (
+              <p className="form-field-error">
+                AFK over 2 hours will be automatically reclassified as a personal day request.
+              </p>
+            ) : null}
+            {afkQuery.data ? (
+              <p className="settings-card-description">
+                {afkQuery.data.weeklyCount} of {afkQuery.data.weeklyLimit} AFK entries used this week.
+              </p>
+            ) : null}
+          </section>
+
+          <div className="slide-panel-actions">
+            <button type="button" className="button" onClick={closeAfkPanel}>
+              Cancel
+            </button>
+            <button type="submit" className="button button-accent" disabled={isAfkSubmitting}>
+              {isAfkSubmitting ? "Logging..." : "Log AFK"}
             </button>
           </div>
         </form>

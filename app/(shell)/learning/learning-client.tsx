@@ -8,6 +8,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useLearningCourses, useLearningMyAssignments } from "../../../hooks/use-learning";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { toSentenceCase } from "../../../lib/format-labels";
 import type {
   LearningAssignmentRecord,
   LearningAssignmentStatus
@@ -40,10 +41,10 @@ function learningSkeleton() {
           <div key={`learning-metric-skeleton-${index}`} className="timeoff-balance-skeleton-card" />
         ))}
       </div>
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`learning-row-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`learning-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -101,7 +102,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
       {isLoading ? learningSkeleton() : null}
 
       {!isLoading && errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Learning data is unavailable"
             description={errorMessage}
@@ -146,7 +147,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
             </article>
           </article>
 
-          <article className="compensation-summary-card">
+          <article className="metric-card">
             <div>
               <h2 className="section-title">Completion overview</h2>
               <p className="settings-card-description">
@@ -223,7 +224,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
                         <td className="numeric">{assignment.progressPct}%</td>
                         <td>
                           <StatusBadge tone={toneForAssignmentStatus(assignment.status)}>
-                            {assignment.status.replace("_", " ")}
+                            {toSentenceCase(assignment.status)}
                           </StatusBadge>
                         </td>
                         <td className="table-row-action-cell">
@@ -282,7 +283,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
                         <td>{course.title}</td>
                         <td>{course.category ?? "General"}</td>
                         <td>
-                          <StatusBadge tone="info">{course.contentType.replace("_", " ")}</StatusBadge>
+                          <StatusBadge tone="info">{toSentenceCase(course.contentType)}</StatusBadge>
                         </td>
                         <td className="numeric">
                           {course.durationMinutes === null ? "--" : `${course.durationMinutes}m`}

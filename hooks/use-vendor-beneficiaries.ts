@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
   VendorBeneficiariesListResponse,
   VendorBeneficiary
@@ -25,17 +26,17 @@ export function useVendorBeneficiaries(): UseVendorBeneficiariesState {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    const abortController = new AbortController();
 
     async function fetchVendors() {
       setIsLoading(true);
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/v1/vendor-beneficiaries");
+        const response = await fetchWithRetry("/api/v1/vendor-beneficiaries", abortController.signal);
         const json: VendorBeneficiariesListResponse = await response.json();
 
-        if (cancelled) return;
+        if (abortController.signal.aborted) return;
 
         if (json.error) {
           setErrorMessage(json.error.message);
@@ -44,12 +45,12 @@ export function useVendorBeneficiaries(): UseVendorBeneficiariesState {
           setVendors(json.data.vendors);
         }
       } catch {
-        if (!cancelled) {
+        if (!abortController.signal.aborted) {
           setErrorMessage("Failed to load saved vendors.");
           setVendors([]);
         }
       } finally {
-        if (!cancelled) {
+        if (!abortController.signal.aborted) {
           setIsLoading(false);
         }
       }
@@ -58,7 +59,7 @@ export function useVendorBeneficiaries(): UseVendorBeneficiariesState {
     fetchVendors();
 
     return () => {
-      cancelled = true;
+      abortController.abort();
     };
   }, [refreshKey]);
 

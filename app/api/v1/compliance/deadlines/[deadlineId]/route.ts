@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { logAudit } from "../../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import {
   canManageCompliance,
@@ -373,6 +374,27 @@ export async function PATCH(
       meta: buildMeta()
     });
   }
+
+  // ── Audit log ──
+  void logAudit({
+    action: "updated",
+    tableName: "compliance_deadlines",
+    recordId: deadlineId,
+    oldValue: {
+      status: parsedDeadline.data.status,
+      assigned_to: parsedDeadline.data.assigned_to,
+      proof_document_id: parsedDeadline.data.proof_document_id,
+      notes: parsedDeadline.data.notes,
+      completed_at: parsedDeadline.data.completed_at
+    },
+    newValue: {
+      status: parsedUpdatedDeadline.data.status,
+      assigned_to: parsedUpdatedDeadline.data.assigned_to,
+      proof_document_id: parsedUpdatedDeadline.data.proof_document_id,
+      notes: parsedUpdatedDeadline.data.notes,
+      completed_at: parsedUpdatedDeadline.data.completed_at
+    }
+  });
 
   const [assigneeResult, proofDocumentResult] = await Promise.all([
     parsedUpdatedDeadline.data.assigned_to

@@ -30,10 +30,10 @@ const defaultTemplateForm: TemplateFormState = {
 
 function templatesSkeleton() {
   return (
-    <div className="timeoff-table-skeleton" aria-hidden="true">
-      <div className="timeoff-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 6 }, (_, index) => (
-        <div key={`template-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+        <div key={`template-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -115,7 +115,7 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
       {templatesQuery.isLoading ? templatesSkeleton() : null}
 
       {!templatesQuery.isLoading && templatesQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Template data is unavailable"
             description={templatesQuery.errorMessage}

@@ -1,28 +1,25 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
-import {
-  DASHBOARD_WIDGET_KEYS,
-  defaultWidgetVisibilityForRoles,
-  getDefaultVisibleRolesForWidget,
-  isSuperAdmin,
-  isWidgetVisibleForUser,
-  sanitizeRoles
-} from "../../../../lib/access-control";
+import { getDashboardPersona, type DashboardPersona } from "../../../../lib/dashboard-persona";
 import { normalizeUserRoles, type UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../types/auth";
 import type {
-  DashboardBreakdownRow,
-  DashboardHeroMetric,
-  DashboardPrimaryChart,
+  DashboardAnnouncement,
+  DashboardAuditLogEntry,
+  DashboardExpenseItem,
+  DashboardGreeting,
+  DashboardHolidayItem,
+  DashboardLeaveBalanceItem,
+  DashboardPendingApprovals,
   DashboardResponseData,
-  DashboardSecondaryPanel,
-  DashboardSparklinePoint,
-  TeamMemberSpotlight
+  DashboardShiftItem,
+  DashboardTeamOnLeaveItem
 } from "../../../../types/dashboard";
+
+/* ── Helpers ── */
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -37,40 +34,6 @@ function toDateString(value: Date): string {
   const month = String(value.getUTCMonth() + 1).padStart(2, "0");
   const day = String(value.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function toNumber(value: unknown): number {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  return 0;
-}
-
-function toStringValue(value: unknown, fallback: string): string {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : fallback;
-  }
-
-  return fallback;
 }
 
 function getFirstName(fullName: string): string {
@@ -95,317 +58,754 @@ function getTimeOfDay(): "morning" | "afternoon" | "evening" {
   return "evening";
 }
 
-function getInitials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-}
-
-function toTeamMember(row: Record<string, unknown>): TeamMemberSpotlight {
-  const fullName = toStringValue(row.full_name, "Team Member");
+function buildGreeting(fullName: string, roles: readonly UserRole[]): DashboardGreeting {
   return {
-    id: toStringValue(row.id, ""),
+    firstName: getFirstName(fullName),
     fullName,
-    title: typeof row.title === "string" && row.title.trim() ? row.title.trim() : null,
-    department: typeof row.department === "string" && row.department.trim() ? row.department.trim() : null,
-    avatarUrl: typeof row.avatar_url === "string" && row.avatar_url.trim() ? row.avatar_url.trim() : null,
-    initials: getInitials(fullName)
+    roleBadge: getRoleBadge(roles),
+    timeOfDay: getTimeOfDay()
   };
 }
 
-const widgetConfigRowSchema = z.object({
-  widget_key: z.enum(DASHBOARD_WIDGET_KEYS),
-  visible_to_roles: z.array(z.string())
-});
-
-function extractSparkline(
-  trendArray: unknown[],
-  monthKey: string,
-  valueKey: string,
-  limit = 6
-): DashboardSparklinePoint[] {
-  const rows = trendArray.slice(-limit).map((rowValue) => {
-    const row = asRecord(rowValue);
-    return {
-      month: toStringValue(row[monthKey], "--"),
-      value: toNumber(row[valueKey])
-    };
-  });
-
-  return rows;
-}
-
-function buildHeroMetrics(
-  roles: readonly UserRole[],
-  people: Record<string, unknown>,
-  timeOff: Record<string, unknown>,
-  payroll: Record<string, unknown>,
-  expenses: Record<string, unknown>,
-  prevPeople: Record<string, unknown>,
-  prevTimeOff: Record<string, unknown>,
-  prevPayroll: Record<string, unknown>,
-  prevExpenses: Record<string, unknown>
-): DashboardHeroMetric[] {
-  const pMetrics = asRecord(people.metrics);
-  const tMetrics = asRecord(timeOff.metrics);
-  const prMetrics = asRecord(payroll.metrics);
-  const eMetrics = asRecord(expenses.metrics);
-
-  const ppMetrics = asRecord(prevPeople.metrics);
-  const ptMetrics = asRecord(prevTimeOff.metrics);
-  const pprMetrics = asRecord(prevPayroll.metrics);
-  const peMetrics = asRecord(prevExpenses.metrics);
-
-  const peopleTrend = asArray(people.trend);
-  const timeOffTrend = asArray(timeOff.trend);
-  const payrollTrend = asArray(payroll.trend);
-  const expensesTrend = asArray(expenses.trend);
-
-  if (hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN")) {
-    return [
-      {
-        key: "headcount",
-        label: "Active Headcount",
-        value: Math.trunc(toNumber(pMetrics.activeHeadcount)),
-        previousValue: Math.trunc(toNumber(ppMetrics.activeHeadcount)),
-        format: "number",
-        sparkline: extractSparkline(peopleTrend, "month", "headcount")
-      },
-      {
-        key: "new-hires",
-        label: "New Hires",
-        value: Math.trunc(toNumber(pMetrics.newHires)),
-        previousValue: Math.trunc(toNumber(ppMetrics.newHires)),
-        format: "number",
-        sparkline: extractSparkline(peopleTrend, "month", "hires")
-      },
-      {
-        key: "time-off-utilization",
-        label: "Time Off Utilization",
-        value: toNumber(tMetrics.utilizationRate),
-        previousValue: toNumber(ptMetrics.utilizationRate),
-        format: "percentage",
-        sparkline: extractSparkline(timeOffTrend, "month", "approvedDays")
-      },
-      {
-        key: "currently-out",
-        label: "Currently Out",
-        value: Math.trunc(toNumber(tMetrics.currentlyOutCount)),
-        previousValue: Math.trunc(toNumber(ptMetrics.currentlyOutCount)),
-        format: "number",
-        sparkline: extractSparkline(timeOffTrend, "month", "requestedDays")
-      }
-    ];
-  }
-
-  if (hasRole(roles, "FINANCE_ADMIN")) {
-    return [
-      {
-        key: "payroll-net",
-        label: "Total Payroll Net",
-        value: Math.trunc(toNumber(prMetrics.totalNet)),
-        previousValue: Math.trunc(toNumber(pprMetrics.totalNet)),
-        format: "currency",
-        currency: "USD",
-        sparkline: extractSparkline(payrollTrend, "month", "totalNet")
-      },
-      {
-        key: "pending-expenses",
-        label: "Pending Expenses",
-        value: Math.trunc(toNumber(eMetrics.pendingAmount)),
-        previousValue: Math.trunc(toNumber(peMetrics.pendingAmount)),
-        format: "currency",
-        currency: "USD",
-        sparkline: extractSparkline(expensesTrend, "month", "totalAmount")
-      },
-      {
-        key: "expense-count",
-        label: "Expense Count",
-        value: Math.trunc(toNumber(eMetrics.expenseCount)),
-        previousValue: Math.trunc(toNumber(peMetrics.expenseCount)),
-        format: "number",
-        sparkline: extractSparkline(expensesTrend, "month", "expenseCount")
-      },
-      {
-        key: "payroll-runs",
-        label: "Payroll Runs",
-        value: Math.trunc(toNumber(prMetrics.runCount)),
-        previousValue: Math.trunc(toNumber(pprMetrics.runCount)),
-        format: "number",
-        sparkline: extractSparkline(payrollTrend, "month", "totalGross")
-      }
-    ];
-  }
-
-  if (hasRole(roles, "MANAGER")) {
-    return [
-      {
-        key: "headcount",
-        label: "Headcount",
-        value: Math.trunc(toNumber(pMetrics.activeHeadcount)),
-        previousValue: Math.trunc(toNumber(ppMetrics.activeHeadcount)),
-        format: "number",
-        sparkline: extractSparkline(peopleTrend, "month", "headcount")
-      },
-      {
-        key: "new-hires",
-        label: "New Hires",
-        value: Math.trunc(toNumber(pMetrics.newHires)),
-        previousValue: Math.trunc(toNumber(ppMetrics.newHires)),
-        format: "number",
-        sparkline: extractSparkline(peopleTrend, "month", "hires")
-      },
-      {
-        key: "currently-out",
-        label: "Currently Out",
-        value: Math.trunc(toNumber(tMetrics.currentlyOutCount)),
-        previousValue: Math.trunc(toNumber(ptMetrics.currentlyOutCount)),
-        format: "number",
-        sparkline: extractSparkline(timeOffTrend, "month", "requestedDays")
-      },
-      {
-        key: "pending-expenses",
-        label: "Pending Expenses",
-        value: Math.trunc(toNumber(eMetrics.pendingAmount)),
-        previousValue: Math.trunc(toNumber(peMetrics.pendingAmount)),
-        format: "currency",
-        currency: "USD",
-        sparkline: extractSparkline(expensesTrend, "month", "totalAmount")
-      }
-    ];
-  }
-
-  // Employee fallback
-  return [
-    {
-      key: "headcount",
-      label: "Company Headcount",
-      value: Math.trunc(toNumber(pMetrics.activeHeadcount)),
-      previousValue: Math.trunc(toNumber(ppMetrics.activeHeadcount)),
-      format: "number",
-      sparkline: extractSparkline(peopleTrend, "month", "headcount")
-    },
-    {
-      key: "currently-out",
-      label: "Currently Out",
-      value: Math.trunc(toNumber(tMetrics.currentlyOutCount)),
-      previousValue: Math.trunc(toNumber(ptMetrics.currentlyOutCount)),
-      format: "number",
-      sparkline: extractSparkline(timeOffTrend, "month", "requestedDays")
-    },
-    {
-      key: "pending-expenses",
-      label: "Pending Expenses",
-      value: Math.trunc(toNumber(eMetrics.expenseCount)),
-      previousValue: Math.trunc(toNumber(peMetrics.expenseCount)),
-      format: "number",
-      sparkline: extractSparkline(expensesTrend, "month", "expenseCount")
-    },
-    {
-      key: "time-off-utilization",
-      label: "PTO Utilization",
-      value: toNumber(tMetrics.utilizationRate),
-      previousValue: toNumber(ptMetrics.utilizationRate),
-      format: "percentage",
-      sparkline: extractSparkline(timeOffTrend, "month", "approvedDays")
-    }
-  ];
-}
-
-function buildPrimaryChart(
-  roles: readonly UserRole[],
-  people: Record<string, unknown>,
-  payroll: Record<string, unknown>
-): DashboardPrimaryChart {
-  if (hasRole(roles, "FINANCE_ADMIN") && !hasRole(roles, "HR_ADMIN") && !hasRole(roles, "SUPER_ADMIN")) {
-    const trend = asArray(payroll.trend).map((rowValue) => {
-      const row = asRecord(rowValue);
-      return {
-        label: toStringValue(row.month, "--"),
-        value: Math.trunc(toNumber(row.totalNet)),
-        secondaryValue: Math.trunc(toNumber(row.totalGross))
-      };
-    });
-
-    return {
-      title: "Payroll Trend",
-      type: "area",
-      dataKey: "value",
-      secondaryDataKey: "secondaryValue",
-      valueFormat: "currency",
-      currency: "USD",
-      data: trend
-    };
-  }
-
-  // Default: headcount trend
-  const trend = asArray(people.trend).map((rowValue) => {
-    const row = asRecord(rowValue);
-    return {
-      label: toStringValue(row.month, "--"),
-      value: Math.trunc(toNumber(row.headcount)),
-      secondaryValue: Math.trunc(toNumber(row.hires))
-    };
-  });
-
+function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeting): DashboardResponseData {
   return {
-    title: "Headcount Trend",
-    type: "area",
-    dataKey: "value",
-    secondaryDataKey: "secondaryValue",
-    valueFormat: "number",
-    data: trend
+    persona,
+    greeting,
+    announcements: [],
+    teamOnLeaveToday: [],
+    upcomingHolidays: [],
+    org: null,
+    managerInfo: null,
+    onboardingProgress: null,
+    leaveBalance: null,
+    hasTimePolicy: false,
+    recentExpenses: [],
+    upcomingShifts: [],
+    pendingApprovals: null,
+    headcount: null,
+    onboardingStatus: null,
+    complianceDeadlines: null,
+    activeReviewCycles: null,
+    headcountTrend: null,
+    expiringDocuments: null,
+    payroll: null,
+    pendingExpenseApprovals: null,
+    expensePipeline: null,
+    headcountByCountry: null,
+    headcountByDept: null,
+    recentAuditLog: null,
+    complianceHealth: null
   };
 }
 
-function buildSecondaryPanels(
-  people: Record<string, unknown>,
-  expenses: Record<string, unknown>
-): DashboardSecondaryPanel[] {
-  const deptRows = asArray(people.byDepartment);
-  const totalDeptCount = deptRows.reduce((sum: number, rowValue) => {
-    return sum + Math.trunc(toNumber(asRecord(rowValue).count));
-  }, 0);
+type SupabaseClient = ReturnType<typeof createSupabaseServiceRoleClient>;
 
-  const departmentBreakdown: DashboardBreakdownRow[] = deptRows.slice(0, 6).map((rowValue) => {
-    const row = asRecord(rowValue);
-    const count = Math.trunc(toNumber(row.count));
-    return {
-      label: toStringValue(row.label, "Unknown"),
-      value: count,
-      percentage: totalDeptCount > 0 ? Math.round((count / totalDeptCount) * 100) : 0
-    };
-  });
+/* ── Data fetching functions ── */
 
-  const catRows = asArray(expenses.byCategory);
-  const totalExpAmount = catRows.reduce((sum: number, rowValue) => {
-    return sum + Math.trunc(toNumber(asRecord(rowValue).totalAmount));
-  }, 0);
+async function fetchAnnouncements(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<DashboardAnnouncement[]> {
+  try {
+    const { data, error } = await supabase
+      .from("announcements")
+      .select("id, title, body, is_pinned, created_at")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .order("is_pinned", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(3);
 
-  const expenseBreakdown: DashboardBreakdownRow[] = catRows.slice(0, 6).map((rowValue) => {
-    const row = asRecord(rowValue);
-    const amount = Math.trunc(toNumber(row.totalAmount));
-    return {
-      label: toStringValue(row.key, "Other"),
-      value: amount,
-      percentage: totalExpAmount > 0 ? Math.round((amount / totalExpAmount) * 100) : 0
-    };
-  });
+    if (error || !data) return [];
 
-  return [
-    {
-      title: "Headcount by Department",
-      type: "breakdown",
-      rows: departmentBreakdown
-    },
-    {
-      title: "Expenses by Category",
-      type: "breakdown",
-      rows: expenseBreakdown
-    }
-  ];
+    return data.map((row) => ({
+      id: row.id,
+      title: row.title ?? "",
+      body: row.body ?? "",
+      createdAt: row.created_at,
+      isPinned: row.is_pinned ?? false
+    }));
+  } catch {
+    return [];
+  }
 }
+
+async function fetchTeamOnLeaveToday(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<DashboardTeamOnLeaveItem[]> {
+  try {
+    const today = toDateString(new Date());
+
+    const { data, error } = await supabase
+      .from("leave_requests")
+      .select("employee_id, leave_type")
+      .eq("org_id", orgId)
+      .eq("status", "approved")
+      .lte("start_date", today)
+      .gte("end_date", today)
+      .is("deleted_at", null)
+      .limit(20);
+
+    if (error || !data || data.length === 0) return [];
+
+    const employeeIds = [...new Set(data.map((row) => row.employee_id))];
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", employeeIds);
+
+    const nameMap = new Map(
+      (profiles ?? []).map((p) => [p.id, p.full_name])
+    );
+
+    return data.map((row) => ({
+      id: row.employee_id,
+      name: nameMap.get(row.employee_id) ?? "Team Member",
+      leaveType: row.leave_type ?? "Leave"
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchUpcomingHolidays(
+  supabase: SupabaseClient,
+  orgId: string,
+  countryCode: string | null
+): Promise<DashboardHolidayItem[]> {
+  try {
+    const today = toDateString(new Date());
+
+    let query = supabase
+      .from("holiday_calendars")
+      .select("name, date, country_code")
+      .eq("org_id", orgId)
+      .gte("date", today)
+      .is("deleted_at", null)
+      .order("date", { ascending: true })
+      .limit(3);
+
+    if (countryCode) {
+      query = query.eq("country_code", countryCode);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) return [];
+
+    return data.map((row) => ({
+      name: row.name ?? "Holiday",
+      date: row.date,
+      countryCode: row.country_code ?? ""
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchLeaveBalance(
+  supabase: SupabaseClient,
+  orgId: string,
+  employeeId: string
+): Promise<{ byType: DashboardLeaveBalanceItem[]; totalAvailable: number } | null> {
+  try {
+    const currentYear = new Date().getFullYear();
+
+    const { data, error } = await supabase
+      .from("leave_balances")
+      .select("leave_type, total_days, used_days, pending_days, carried_days")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("year", currentYear)
+      .is("deleted_at", null);
+
+    if (error || !data) return null;
+
+    const byType: DashboardLeaveBalanceItem[] = data
+      .filter((row) => (row.total_days ?? 0) + (row.carried_days ?? 0) > 0)
+      .map((row) => {
+        const allocated = (row.total_days ?? 0) + (row.carried_days ?? 0);
+        const used = (row.used_days ?? 0) + (row.pending_days ?? 0);
+        return {
+          leaveType: row.leave_type ?? "Leave",
+          available: Math.max(0, allocated - used),
+          allocated
+        };
+      });
+
+    const totalAvailable = byType.reduce((sum, item) => sum + item.available, 0);
+
+    return { byType, totalAvailable };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchUpcomingShifts(
+  supabase: SupabaseClient,
+  orgId: string,
+  employeeId: string
+): Promise<DashboardShiftItem[]> {
+  try {
+    const today = toDateString(new Date());
+
+    const { data, error } = await supabase
+      .from("shifts")
+      .select("id, shift_date, start_time, end_time")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .gte("shift_date", today)
+      .neq("status", "cancelled")
+      .is("deleted_at", null)
+      .order("shift_date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .limit(3);
+
+    if (error || !data) return [];
+
+    return data.map((row) => ({
+      id: row.id,
+      date: row.shift_date,
+      startTime: row.start_time ?? "",
+      endTime: row.end_time ?? ""
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchRecentExpenses(
+  supabase: SupabaseClient,
+  orgId: string,
+  employeeId: string
+): Promise<DashboardExpenseItem[]> {
+  try {
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("id, description, amount, currency, status, created_at")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(3);
+
+    if (error || !data) return [];
+
+    return data.map((row) => ({
+      id: row.id,
+      description: row.description ?? "Expense",
+      amount: typeof row.amount === "number" ? row.amount : 0,
+      currency: row.currency ?? "USD",
+      status: row.status ?? "pending",
+      createdAt: row.created_at
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchPendingApprovals(
+  supabase: SupabaseClient,
+  orgId: string,
+  _userId: string
+): Promise<DashboardPendingApprovals> {
+  try {
+    const [leaveResult, expenseResult, timesheetResult] = await Promise.all([
+      supabase
+        .from("leave_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "pending")
+        .is("deleted_at", null),
+      supabase
+        .from("expenses")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "pending")
+        .is("deleted_at", null),
+      supabase
+        .from("timesheets")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "submitted")
+        .is("deleted_at", null)
+    ]);
+
+    const leave = leaveResult.count ?? 0;
+    const expenses = expenseResult.count ?? 0;
+    const timesheets = timesheetResult.count ?? 0;
+
+    return {
+      leave,
+      expenses,
+      timesheets,
+      total: leave + expenses + timesheets
+    };
+  } catch {
+    return { leave: 0, expenses: 0, timesheets: 0, total: 0 };
+  }
+}
+
+async function fetchHeadcount(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{ total: number; delta30d: number }> {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = toDateString(thirtyDaysAgo);
+
+    const [totalResult, newHiresResult] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "active")
+        .is("deleted_at", null),
+      supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("status", "active")
+        .gte("start_date", thirtyDaysAgoStr)
+        .is("deleted_at", null)
+    ]);
+
+    return {
+      total: totalResult.count ?? 0,
+      delta30d: newHiresResult.count ?? 0
+    };
+  } catch {
+    return { total: 0, delta30d: 0 };
+  }
+}
+
+async function fetchOnboardingStatus(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{ active: number; overdue: number }> {
+  try {
+    const { data, error } = await supabase
+      .from("onboarding_instances")
+      .select("id, status, started_at")
+      .eq("org_id", orgId)
+      .eq("status", "active")
+      .eq("type", "onboarding")
+      .is("deleted_at", null);
+
+    if (error || !data) return { active: 0, overdue: 0 };
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const active = data.length;
+    const overdue = data.filter((row) => {
+      const started = new Date(row.started_at);
+      return started < thirtyDaysAgo;
+    }).length;
+
+    return { active, overdue };
+  } catch {
+    return { active: 0, overdue: 0 };
+  }
+}
+
+async function fetchComplianceDeadlines(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{
+  thisMonth: number;
+  overdue: number;
+  nextDeadline: { name: string; date: string } | null;
+}> {
+  try {
+    const now = new Date();
+    const today = toDateString(now);
+    const monthEnd = toDateString(
+      new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)
+    );
+
+    const [overdueResult, thisMonthResult, nextResult] = await Promise.all([
+      supabase
+        .from("compliance_deadlines")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .neq("status", "completed")
+        .lt("due_date", today)
+        .is("deleted_at", null),
+      supabase
+        .from("compliance_deadlines")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .neq("status", "completed")
+        .gte("due_date", today)
+        .lte("due_date", monthEnd)
+        .is("deleted_at", null),
+      supabase
+        .from("compliance_deadlines")
+        .select("id, due_date")
+        .eq("org_id", orgId)
+        .neq("status", "completed")
+        .gte("due_date", today)
+        .is("deleted_at", null)
+        .order("due_date", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+    ]);
+
+    const nextDeadline = nextResult.data
+      ? { name: "Upcoming deadline", date: nextResult.data.due_date }
+      : null;
+
+    return {
+      thisMonth: thisMonthResult.count ?? 0,
+      overdue: overdueResult.count ?? 0,
+      nextDeadline
+    };
+  } catch {
+    return { thisMonth: 0, overdue: 0, nextDeadline: null };
+  }
+}
+
+async function fetchActiveReviewCycles(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from("review_cycles")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .in("status", ["active", "in_review"])
+      .is("deleted_at", null);
+
+    return error ? 0 : (count ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchPayrollStatus(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{
+  lastRunStatus: string | null;
+  lastRunDate: string | null;
+  nextPayDate: string | null;
+}> {
+  try {
+    const { data, error } = await supabase
+      .from("payroll_runs")
+      .select("id, status, pay_period_end, created_at")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(2);
+
+    if (error || !data || data.length === 0) {
+      return { lastRunStatus: null, lastRunDate: null, nextPayDate: null };
+    }
+
+    const lastRun = data[0];
+
+    return {
+      lastRunStatus: lastRun.status ?? null,
+      lastRunDate: lastRun.pay_period_end ?? lastRun.created_at ?? null,
+      nextPayDate: null
+    };
+  } catch {
+    return { lastRunStatus: null, lastRunDate: null, nextPayDate: null };
+  }
+}
+
+async function fetchPendingExpenseApprovals(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{ financeStage: number; totalAmount: number }> {
+  try {
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("amount")
+      .eq("org_id", orgId)
+      .eq("status", "manager_approved")
+      .is("deleted_at", null);
+
+    if (error || !data) return { financeStage: 0, totalAmount: 0 };
+
+    const totalAmount = data.reduce((sum, row) => {
+      return sum + (typeof row.amount === "number" ? row.amount : 0);
+    }, 0);
+
+    return { financeStage: data.length, totalAmount: Math.trunc(totalAmount) };
+  } catch {
+    return { financeStage: 0, totalAmount: 0 };
+  }
+}
+
+async function fetchExpensePipeline(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{
+  submitted: number;
+  pendingManager: number;
+  pendingFinance: number;
+  reimbursed: number;
+}> {
+  try {
+    const [pendingResult, financeResult, reimbursedResult] =
+      await Promise.all([
+        supabase
+          .from("expenses")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("status", "pending")
+          .is("deleted_at", null),
+        supabase
+          .from("expenses")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("status", "manager_approved")
+          .is("deleted_at", null),
+        supabase
+          .from("expenses")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("status", "reimbursed")
+          .is("deleted_at", null)
+      ]);
+
+    const pendingManager = pendingResult.count ?? 0;
+    const pendingFinance = financeResult.count ?? 0;
+    const reimbursed = reimbursedResult.count ?? 0;
+
+    return {
+      submitted: pendingManager + pendingFinance,
+      pendingManager,
+      pendingFinance,
+      reimbursed
+    };
+  } catch {
+    return { submitted: 0, pendingManager: 0, pendingFinance: 0, reimbursed: 0 };
+  }
+}
+
+async function fetchRecentAuditLog(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<DashboardAuditLogEntry[]> {
+  try {
+    const { data: entries, error } = await supabase
+      .from("audit_log")
+      .select("id, actor_user_id, action, table_name, created_at")
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (error || !entries || entries.length === 0) return [];
+
+    const actorIds = [
+      ...new Set(
+        entries
+          .map((e) => e.actor_user_id)
+          .filter((id): id is string => typeof id === "string")
+      )
+    ];
+
+    const { data: actors } = actorIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", actorIds)
+      : { data: [] };
+
+    const actorMap = new Map(
+      (actors ?? []).map((a) => [a.id, a.full_name])
+    );
+
+    return entries.map((entry) => ({
+      id: entry.id,
+      actorName: actorMap.get(entry.actor_user_id) ?? "System",
+      action: entry.action ?? "",
+      tableName: entry.table_name ?? "",
+      timestamp: entry.created_at
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function checkTimePolicy(
+  supabase: SupabaseClient,
+  orgId: string,
+  employmentType: string | null,
+  department: string | null
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from("time_policies")
+      .select("id, applies_to_departments, applies_to_types, is_active")
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .is("deleted_at", null);
+
+    if (error || !data || data.length === 0) return false;
+
+    return data.some((policy) => {
+      const depts = Array.isArray(policy.applies_to_departments)
+        ? policy.applies_to_departments
+        : null;
+      const types = Array.isArray(policy.applies_to_types)
+        ? policy.applies_to_types
+        : null;
+
+      const deptMatch = !depts || depts.length === 0 || (department && depts.includes(department));
+      const typeMatch = !types || types.length === 0 || (employmentType && types.includes(employmentType));
+
+      return deptMatch && typeMatch;
+    });
+  } catch {
+    return false;
+  }
+}
+
+async function fetchHeadcountByCountry(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{ countryCode: string; count: number }[]> {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("country_code")
+      .eq("org_id", orgId)
+      .eq("status", "active")
+      .is("deleted_at", null);
+
+    if (error || !data) return [];
+
+    const counts = new Map<string, number>();
+    for (const row of data) {
+      const cc = row.country_code ?? "Unknown";
+      counts.set(cc, (counts.get(cc) ?? 0) + 1);
+    }
+
+    return [...counts.entries()]
+      .map(([countryCode, count]) => ({ countryCode, count }))
+      .sort((a, b) => b.count - a.count);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchHeadcountByDept(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{ department: string; count: number }[]> {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("department")
+      .eq("org_id", orgId)
+      .eq("status", "active")
+      .is("deleted_at", null);
+
+    if (error || !data) return [];
+
+    const counts = new Map<string, number>();
+    for (const row of data) {
+      const dept = row.department ?? "Unassigned";
+      counts.set(dept, (counts.get(dept) ?? 0) + 1);
+    }
+
+    return [...counts.entries()]
+      .map(([department, count]) => ({ department, count }))
+      .sort((a, b) => b.count - a.count);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchExpiringDocuments(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{ count: number; items: { id: string; title: string; expiryDate: string }[] }> {
+  try {
+    const now = new Date();
+    const today = toDateString(now);
+    const thirtyDaysLater = new Date(now);
+    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+    const thirtyDaysLaterStr = toDateString(thirtyDaysLater);
+
+    const { data, error, count } = await supabase
+      .from("documents")
+      .select("id, title, expiry_date", { count: "exact" })
+      .eq("org_id", orgId)
+      .gte("expiry_date", today)
+      .lte("expiry_date", thirtyDaysLaterStr)
+      .is("deleted_at", null)
+      .order("expiry_date", { ascending: true })
+      .limit(5);
+
+    if (error) return { count: 0, items: [] };
+
+    return {
+      count: count ?? (data?.length ?? 0),
+      items: (data ?? []).map((doc) => ({
+        id: doc.id,
+        title: doc.title ?? "Document",
+        expiryDate: doc.expiry_date ?? ""
+      }))
+    };
+  } catch {
+    return { count: 0, items: [] };
+  }
+}
+
+async function fetchComplianceHealth(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{ completed: number; inProgress: number; overdue: number }> {
+  try {
+    const now = new Date();
+    const today = toDateString(now);
+    const monthStart = toDateString(
+      new Date(now.getUTCFullYear(), now.getUTCMonth(), 1)
+    );
+    const monthEnd = toDateString(
+      new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)
+    );
+
+    const { data, error } = await supabase
+      .from("compliance_deadlines")
+      .select("id, status, due_date")
+      .eq("org_id", orgId)
+      .gte("due_date", monthStart)
+      .lte("due_date", monthEnd)
+      .is("deleted_at", null);
+
+    if (error || !data) return { completed: 0, inProgress: 0, overdue: 0 };
+
+    let completed = 0;
+    let inProgress = 0;
+    let overdue = 0;
+
+    for (const row of data) {
+      if (row.status === "completed") {
+        completed++;
+      } else if (row.due_date < today) {
+        overdue++;
+      } else {
+        inProgress++;
+      }
+    }
+
+    return { completed, inProgress, overdue };
+  } catch {
+    return { completed: 0, inProgress: 0, overdue: 0 };
+  }
+}
+
+/* ── Main handler ── */
 
 export async function GET() {
   try {
@@ -421,269 +821,233 @@ export async function GET() {
 
     const profile = session.profile;
     const roles = normalizeUserRoles(profile.roles);
-
-    // Build date ranges
-    const today = new Date();
-    const endDate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-    const startDate = new Date(endDate);
-    startDate.setUTCDate(startDate.getUTCDate() - 179); // 6 months for sparklines
-
-    const prevEndDate = new Date(startDate);
-    prevEndDate.setUTCDate(prevEndDate.getUTCDate() - 1);
-    const prevStartDate = new Date(prevEndDate);
-    prevStartDate.setUTCDate(prevStartDate.getUTCDate() - 29); // previous 30 days
-
     const supabase = createSupabaseServiceRoleClient();
 
-    const currentPayload = {
-      p_org_id: profile.org_id,
-      p_start_date: toDateString(startDate),
-      p_end_date: toDateString(endDate)
-    };
+    /* ── Step 1: Determine persona ── */
 
-    const prevPayload = {
-      p_org_id: profile.org_id,
-      p_start_date: toDateString(prevStartDate),
-      p_end_date: toDateString(prevEndDate)
-    };
-
-    // Fetch current + previous period data in parallel
-    const [
-      peopleResult,
-      timeOffResult,
-      payrollResult,
-      expensesResult,
-      prevPeopleResult,
-      prevTimeOffResult,
-      prevPayrollResult,
-      prevExpensesResult,
-      expenseWidgetResult,
-      complianceResult,
-      widgetConfigResult,
-      teamSpotlightResult,
-      newHiresResult,
-      totalTeamCountResult
-    ] = await Promise.all([
-      supabase.rpc("analytics_people", currentPayload),
-      supabase.rpc("analytics_time_off", currentPayload),
-      supabase.rpc("analytics_payroll", currentPayload),
-      supabase.rpc("analytics_expenses", currentPayload),
-      supabase.rpc("analytics_people", prevPayload),
-      supabase.rpc("analytics_time_off", prevPayload),
-      supabase.rpc("analytics_payroll", prevPayload),
-      supabase.rpc("analytics_expenses", prevPayload),
-      // Employee expense widget
+    const [profileExtrasResult, onboardingResult] = await Promise.all([
       supabase
-        .from("expenses")
-        .select("amount")
-        .eq("org_id", profile.org_id)
+        .from("profiles")
+        .select("start_date, employment_type")
+        .eq("id", profile.id)
+        .single(),
+      supabase
+        .from("onboarding_instances")
+        .select("id, status, started_at")
         .eq("employee_id", profile.id)
-        .eq("status", "pending")
-        .is("deleted_at", null),
-      // Compliance widget
-      supabase
-        .from("compliance_deadlines")
-        .select("id")
-        .eq("org_id", profile.org_id)
-        .is("deleted_at", null)
-        .neq("status", "completed")
-        .lt("due_date", toDateString(endDate)),
-      supabase
-        .from("dashboard_widget_config")
-        .select("widget_key, visible_to_roles")
-        .eq("org_id", profile.org_id),
-      // Team spotlight — random selection of active team members
-      supabase
-        .from("profiles")
-        .select("id, full_name, title, department, avatar_url")
-        .eq("org_id", profile.org_id)
+        .eq("type", "onboarding")
         .eq("status", "active")
         .is("deleted_at", null)
-        .limit(20),
-      // New hires — most recently started
-      supabase
-        .from("profiles")
-        .select("id, full_name, title, department, avatar_url, start_date")
-        .eq("org_id", profile.org_id)
-        .eq("status", "active")
-        .is("deleted_at", null)
-        .not("start_date", "is", null)
-        .order("start_date", { ascending: false })
-        .limit(5),
-      // Total team count
-      supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", profile.org_id)
-        .eq("status", "active")
-        .is("deleted_at", null)
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
     ]);
 
-    const rpcError =
-      peopleResult.error ??
-      timeOffResult.error ??
-      payrollResult.error ??
-      expensesResult.error ??
-      prevPeopleResult.error ??
-      prevTimeOffResult.error ??
-      prevPayrollResult.error ??
-      prevExpensesResult.error ??
-      expenseWidgetResult.error;
+    const startDate = profileExtrasResult.data?.start_date ?? null;
+    const employmentType = profileExtrasResult.data?.employment_type ?? null;
+    const activeOnboarding = onboardingResult.data;
 
-    // These tables may not exist yet — gracefully ignore
-    if (complianceResult.error) {
-      complianceResult.data = [] as never;
-    }
-    if (widgetConfigResult.error) {
-      widgetConfigResult.data = [] as never;
-    }
+    const persona = getDashboardPersona(
+      { roles, startDate },
+      activeOnboarding ? { status: activeOnboarding.status } : null
+    );
 
-    // Team data — gracefully handle errors
-    const teamSpotlightRows = teamSpotlightResult.error ? [] : (teamSpotlightResult.data ?? []);
-    const newHireRows = newHiresResult.error ? [] : (newHiresResult.data ?? []);
-    const totalTeamCount = totalTeamCountResult.error ? 0 : (totalTeamCountResult.count ?? 0);
+    const greeting = buildGreeting(profile.full_name, roles);
+    const response = buildEmptyResponse(persona, greeting);
 
-    // Shuffle team spotlight and take 8 random members
-    const shuffledTeam = [...teamSpotlightRows].sort(() => Math.random() - 0.5);
-    const teamSpotlight: TeamMemberSpotlight[] = shuffledTeam
-      .slice(0, 8)
-      .map((row) => toTeamMember(asRecord(row)));
+    /* ── Step 2: Fetch universal data (all personas) ── */
 
-    const newHires: TeamMemberSpotlight[] = newHireRows
-      .map((row) => toTeamMember(asRecord(row)));
+    const [announcements, teamOnLeaveToday, upcomingHolidays] =
+      await Promise.all([
+        fetchAnnouncements(supabase, profile.org_id),
+        fetchTeamOnLeaveToday(supabase, profile.org_id),
+        fetchUpcomingHolidays(supabase, profile.org_id, profile.country_code)
+      ]);
 
-    const isAdmin =
-      hasRole(roles, "SUPER_ADMIN") ||
-      hasRole(roles, "HR_ADMIN") ||
-      hasRole(roles, "FINANCE_ADMIN");
+    response.announcements = announcements;
+    response.teamOnLeaveToday = teamOnLeaveToday;
+    response.upcomingHolidays = upcomingHolidays;
 
-    if (rpcError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: { code: "DASHBOARD_FETCH_FAILED", message: rpcError.message },
-        meta: buildMeta()
-      });
-    }
+    /* ── Step 3: Fetch persona-specific data ── */
 
-    const people = asRecord(peopleResult.data);
-    const timeOff = asRecord(timeOffResult.data);
-    const payroll = asRecord(payrollResult.data);
-    const expenses = asRecord(expensesResult.data);
-    const prevPeople = asRecord(prevPeopleResult.data);
-    const prevTimeOff = asRecord(prevTimeOffResult.data);
-    const prevPayroll = asRecord(prevPayrollResult.data);
-    const prevExpenses = asRecord(prevExpensesResult.data);
+    switch (persona) {
+      case "new_hire": {
+        const orgName = session.org?.name ?? "your company";
 
-    // Expense widget
-    const expenseRows = expenseWidgetResult.data ?? [];
-    const employeePendingCount = expenseRows.length;
-    const employeePendingAmount = expenseRows.reduce((sum: number, row) => {
-      const amount = typeof row.amount === "number" ? row.amount : 0;
-      return sum + Math.trunc(amount);
-    }, 0);
+        response.org = {
+          name: orgName,
+          description: `Welcome to ${orgName}! Check your onboarding checklist to get started.`
+        };
 
-    // Compliance widget
-    const overdueCount = (complianceResult.data ?? []).length;
-    const showCompliance =
-      hasRole(roles, "HR_ADMIN") ||
-      hasRole(roles, "FINANCE_ADMIN") ||
-      hasRole(roles, "SUPER_ADMIN");
+        if (profile.manager_id) {
+          const { data: manager } = await supabase
+            .from("profiles")
+            .select("full_name, title, avatar_url")
+            .eq("id", profile.manager_id)
+            .single();
 
-    const parsedWidgetRows = z.array(widgetConfigRowSchema).safeParse(widgetConfigResult.data ?? []);
-
-    if (!parsedWidgetRows.success) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "DASHBOARD_WIDGET_CONFIG_PARSE_FAILED",
-          message: "Dashboard widget configuration is not in the expected shape."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    const visibleWidgetKeySet = (() => {
-      if (isSuperAdmin(roles)) {
-        return new Set(DASHBOARD_WIDGET_KEYS);
-      }
-
-      if (parsedWidgetRows.data.length === 0) {
-        return new Set(defaultWidgetVisibilityForRoles(roles));
-      }
-
-      const rowByKey = new Map(
-        parsedWidgetRows.data.map((row) => [row.widget_key, row] as const)
-      );
-      const visibleKeys = DASHBOARD_WIDGET_KEYS.filter((widgetKey) => {
-        const row = rowByKey.get(widgetKey);
-        const visibleToRoles = row
-          ? sanitizeRoles(row.visible_to_roles)
-          : getDefaultVisibleRolesForWidget(widgetKey);
-
-        return isWidgetVisibleForUser({
-          userRoles: roles,
-          visibleToRoles
-        });
-      });
-
-      return new Set(visibleKeys);
-    })();
-
-    const responseData: DashboardResponseData = {
-      greeting: {
-        firstName: getFirstName(profile.full_name),
-        fullName: profile.full_name,
-        roleBadge: getRoleBadge(roles),
-        timeOfDay: getTimeOfDay()
-      },
-      heroMetrics: visibleWidgetKeySet.has("hero_metrics")
-        ? buildHeroMetrics(
-            roles,
-            people,
-            timeOff,
-            payroll,
-            expenses,
-            prevPeople,
-            prevTimeOff,
-            prevPayroll,
-            prevExpenses
-          )
-        : [],
-      primaryChart: visibleWidgetKeySet.has("primary_chart")
-        ? buildPrimaryChart(roles, people, payroll)
-        : {
-            title: "",
-            type: "area",
-            dataKey: "value",
-            data: []
-          },
-      secondaryPanels: visibleWidgetKeySet.has("secondary_panels")
-        ? buildSecondaryPanels(people, expenses)
-        : [],
-      expenseWidget: visibleWidgetKeySet.has("expense_widget")
-        ? {
-            pendingCount: employeePendingCount,
-            pendingAmount: employeePendingAmount,
-            managerPendingCount: 0
+          if (manager) {
+            response.managerInfo = {
+              name: manager.full_name ?? "Your Manager",
+              title: manager.title ?? null,
+              avatarUrl: manager.avatar_url ?? null
+            };
           }
-        : {
-            pendingCount: 0,
-            pendingAmount: 0,
-            managerPendingCount: 0
-          },
-      complianceWidget: visibleWidgetKeySet.has("compliance_widget") && showCompliance
-        ? { overdueCount, nextDeadline: null }
-        : null,
-      /* Home page data */
-      teamSpotlight,
-      newHires,
-      totalTeamCount,
-      companyDescription: "Accrue is a cross-border payment product that helps businesses and individuals send & receive money across Africa and the US.",
-      isAdmin
-    };
+        }
+
+        if (activeOnboarding) {
+          const { data: tasks } = await supabase
+            .from("onboarding_tasks")
+            .select("id, status")
+            .eq("instance_id", activeOnboarding.id)
+            .is("deleted_at", null);
+
+          const taskList = tasks ?? [];
+          response.onboardingProgress = {
+            tasksTotal: taskList.length,
+            tasksCompleted: taskList.filter((t) => t.status === "completed").length,
+            instanceId: activeOnboarding.id
+          };
+        }
+
+        break;
+      }
+
+      case "employee": {
+        const [leaveBalance, upcomingShifts, recentExpenses, hasPolicy] =
+          await Promise.all([
+            fetchLeaveBalance(supabase, profile.org_id, profile.id),
+            fetchUpcomingShifts(supabase, profile.org_id, profile.id),
+            fetchRecentExpenses(supabase, profile.org_id, profile.id),
+            checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+          ]);
+
+        response.leaveBalance = leaveBalance;
+        response.upcomingShifts = upcomingShifts;
+        response.recentExpenses = recentExpenses;
+        response.hasTimePolicy = hasPolicy;
+        break;
+      }
+
+      case "manager": {
+        const [
+          pendingApprovals,
+          leaveBalance,
+          upcomingShifts,
+          recentExpenses,
+          hasPolicy
+        ] = await Promise.all([
+          fetchPendingApprovals(supabase, profile.org_id, profile.id),
+          fetchLeaveBalance(supabase, profile.org_id, profile.id),
+          fetchUpcomingShifts(supabase, profile.org_id, profile.id),
+          fetchRecentExpenses(supabase, profile.org_id, profile.id),
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+        ]);
+
+        response.pendingApprovals = pendingApprovals;
+        response.leaveBalance = leaveBalance;
+        response.upcomingShifts = upcomingShifts;
+        response.recentExpenses = recentExpenses;
+        response.hasTimePolicy = hasPolicy;
+        break;
+      }
+
+      case "hr_admin": {
+        const [
+          headcount,
+          onboardingStatus,
+          complianceDeadlines,
+          activeReviewCycles,
+          expiringDocuments,
+          leaveBalance,
+          hasPolicy
+        ] = await Promise.all([
+          fetchHeadcount(supabase, profile.org_id),
+          fetchOnboardingStatus(supabase, profile.org_id),
+          fetchComplianceDeadlines(supabase, profile.org_id),
+          fetchActiveReviewCycles(supabase, profile.org_id),
+          fetchExpiringDocuments(supabase, profile.org_id),
+          fetchLeaveBalance(supabase, profile.org_id, profile.id),
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+        ]);
+
+        response.headcount = headcount;
+        response.onboardingStatus = onboardingStatus;
+        response.complianceDeadlines = complianceDeadlines;
+        response.activeReviewCycles = activeReviewCycles;
+        response.expiringDocuments = expiringDocuments;
+        response.leaveBalance = leaveBalance;
+        response.hasTimePolicy = hasPolicy;
+        break;
+      }
+
+      case "finance_admin": {
+        const [
+          payroll,
+          pendingExpenseApprovals,
+          expensePipeline,
+          leaveBalance,
+          hasPolicy
+        ] = await Promise.all([
+          fetchPayrollStatus(supabase, profile.org_id),
+          fetchPendingExpenseApprovals(supabase, profile.org_id),
+          fetchExpensePipeline(supabase, profile.org_id),
+          fetchLeaveBalance(supabase, profile.org_id, profile.id),
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+        ]);
+
+        response.payroll = payroll;
+        response.pendingExpenseApprovals = pendingExpenseApprovals;
+        response.expensePipeline = expensePipeline;
+        response.leaveBalance = leaveBalance;
+        response.hasTimePolicy = hasPolicy;
+        break;
+      }
+
+      case "super_admin": {
+        const [
+          headcount,
+          headcountByCountry,
+          headcountByDept,
+          pendingApprovals,
+          payroll,
+          complianceDeadlines,
+          complianceHealth,
+          recentAuditLog,
+          expiringDocuments,
+          leaveBalance,
+          hasPolicy
+        ] = await Promise.all([
+          fetchHeadcount(supabase, profile.org_id),
+          fetchHeadcountByCountry(supabase, profile.org_id),
+          fetchHeadcountByDept(supabase, profile.org_id),
+          fetchPendingApprovals(supabase, profile.org_id, profile.id),
+          fetchPayrollStatus(supabase, profile.org_id),
+          fetchComplianceDeadlines(supabase, profile.org_id),
+          fetchComplianceHealth(supabase, profile.org_id),
+          fetchRecentAuditLog(supabase, profile.org_id),
+          fetchExpiringDocuments(supabase, profile.org_id),
+          fetchLeaveBalance(supabase, profile.org_id, profile.id),
+          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+        ]);
+
+        response.headcount = headcount;
+        response.headcountByCountry = headcountByCountry;
+        response.headcountByDept = headcountByDept;
+        response.pendingApprovals = pendingApprovals;
+        response.payroll = payroll;
+        response.complianceDeadlines = complianceDeadlines;
+        response.complianceHealth = complianceHealth;
+        response.recentAuditLog = recentAuditLog;
+        response.expiringDocuments = expiringDocuments;
+        response.leaveBalance = leaveBalance;
+        response.hasTimePolicy = hasPolicy;
+        break;
+      }
+    }
 
     return jsonResponse<DashboardResponseData>(200, {
-      data: responseData,
+      data: response,
       error: null,
       meta: buildMeta()
     });
@@ -692,7 +1056,8 @@ export async function GET() {
       data: null,
       error: {
         code: "INTERNAL_ERROR",
-        message: error instanceof Error ? error.message : "Unexpected dashboard error."
+        message:
+          error instanceof Error ? error.message : "Unexpected dashboard error."
       },
       meta: buildMeta()
     });

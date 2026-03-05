@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
+import { ErrorState } from "../../../components/shared/error-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useNotifications } from "../../../hooks/use-notifications";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../lib/datetime";
+import { toSentenceCase } from "../../../lib/format-labels";
 
 type NotificationFilter = "all" | "unread";
 type SortDirection = "desc" | "asc";
@@ -47,17 +49,11 @@ export function NotificationsClient() {
 
   if (notificationsQuery.errorMessage) {
     return (
-      <section className="settings-layout">
-        <EmptyState
-          title="Notifications unavailable"
-          description={notificationsQuery.errorMessage}
-          ctaLabel="Retry"
-          ctaHref="/notifications"
-        />
-        <button type="button" className="button button-accent" onClick={notificationsQuery.refresh}>
-          Retry now
-        </button>
-      </section>
+      <ErrorState
+        title="Notifications unavailable"
+        message={notificationsQuery.errorMessage}
+        onRetry={notificationsQuery.refresh}
+      />
     );
   }
 
@@ -139,14 +135,14 @@ export function NotificationsClient() {
                     <p className="numeric" title={formatDateTimeTooltip(notification.createdAt)}>
                       {formatRelativeTime(notification.createdAt)}
                     </p>
-                    <p className="settings-card-description">{notification.createdAt}</p>
+                    <p className="settings-card-description">{formatSingleDateHuman(notification.createdAt)}</p>
                   </td>
                   <td>
                     <p>{notification.title}</p>
                     <p className="settings-card-description">{notification.body}</p>
                   </td>
                   <td>
-                    <code>{notification.type}</code>
+                    <code>{toSentenceCase(notification.type)}</code>
                   </td>
                   <td>
                     <StatusBadge tone={notification.isRead ? "success" : "pending"}>

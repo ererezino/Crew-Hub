@@ -4,11 +4,12 @@ import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
+import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { usePayrollRunsDashboard } from "../../../hooks/use-payroll-runs";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatDate, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import {
   getCurrencyTotal,
   labelForPayrollRunStatus,
@@ -32,10 +33,10 @@ function runsTableSkeleton() {
           <div key={`payroll-metric-skeleton-${index}`} className="payroll-metric-skeleton-card" />
         ))}
       </div>
-      <div className="payroll-table-skeleton">
-        <div className="payroll-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`payroll-table-row-skeleton-${index}`} className="payroll-table-skeleton-row" />
+          <div key={`payroll-table-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -50,7 +51,7 @@ function formatPeriodLabel(start: string, end: string): string {
     return `${start} to ${end}`;
   }
 
-  return `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+  return `${formatDate(startDate)} – ${formatDate(endDate)}`;
 }
 
 export function PayrollDashboardClient({
@@ -82,21 +83,11 @@ export function PayrollDashboardClient({
       {runsQuery.isLoading ? runsTableSkeleton() : null}
 
       {!runsQuery.isLoading && runsQuery.errorMessage ? (
-        <section className="payroll-dashboard-error">
-          <EmptyState
-            title="Payroll runs are unavailable"
-            description={runsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
-          />
-          <button
-            type="button"
-            className="button button-accent"
-            onClick={() => runsQuery.refresh()}
-          >
-            Retry
-          </button>
-        </section>
+        <ErrorState
+          title="Payroll runs are unavailable"
+          message={runsQuery.errorMessage}
+          onRetry={() => runsQuery.refresh()}
+        />
       ) : null}
 
       {!runsQuery.isLoading && !runsQuery.errorMessage && runsQuery.data ? (
@@ -193,7 +184,7 @@ export function PayrollDashboardClient({
                         <p className="settings-card-description">
                           Pay date{" "}
                           <time dateTime={run.payDate} title={formatDateTimeTooltip(run.payDate)}>
-                            {new Date(`${run.payDate}T00:00:00.000Z`).toLocaleDateString()}
+                            {formatDate(run.payDate)}
                           </time>
                         </p>
                       </td>

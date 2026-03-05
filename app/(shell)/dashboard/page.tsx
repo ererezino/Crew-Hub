@@ -24,5 +24,5 @@ export default async function DashboardPage() {
     );
   }
 
-  return <DashboardClient profileStatus={session.profile.status} />;
+  return <DashboardClient />;
 }

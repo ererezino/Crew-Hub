@@ -4,7 +4,7 @@ export default function SettingsLoading() {
       <div className="settings-skeleton settings-skeleton-tabs" />
       <div className="settings-skeleton settings-skeleton-form" />
       <div className="settings-skeleton settings-skeleton-form" />
-      <div className="settings-skeleton settings-skeleton-table" />
+      <div className="settings-skeleton table-skeleton" />
     </div>
   );
 }

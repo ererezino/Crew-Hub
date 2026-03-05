@@ -443,7 +443,7 @@ export function AnnouncementsClient({
       ) : null}
 
       {!isLoading && !errorMessage && announcements.length === 0 ? (
-        <section className="announcements-empty-state">
+        <section className="error-state">
           <EmptyState
             title="No announcements yet"
             description="Announcements will appear here once updates are published for your team."

@@ -7,10 +7,17 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useTimeAttendanceOverview } from "../../../hooks/use-time-attendance";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import {
+  formatDateTimeTooltip,
+  formatInTimezone,
+  formatRelativeTime,
+  formatTimeInTimezone
+} from "../../../lib/datetime";
 import { formatHoursFromMinutes, formatTimeEntryMethod } from "../../../lib/time-attendance";
 
 type SortDirection = "asc" | "desc";
+
+const FALLBACK_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 function overviewSkeleton() {
   return (
@@ -20,10 +27,10 @@ function overviewSkeleton() {
           <div key={`time-attendance-metric-skeleton-${index}`} className="timeoff-balance-skeleton-card" />
         ))}
       </div>
-      <div className="timeoff-table-skeleton">
-        <div className="timeoff-table-skeleton-header" />
+      <div className="table-skeleton">
+        <div className="table-skeleton-header" />
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={`time-attendance-row-skeleton-${index}`} className="timeoff-table-skeleton-row" />
+          <div key={`time-attendance-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
     </section>
@@ -57,7 +64,7 @@ export function TimeAttendanceClient() {
       {overviewQuery.isLoading ? overviewSkeleton() : null}
 
       {!overviewQuery.isLoading && overviewQuery.errorMessage ? (
-        <section className="compensation-error-state">
+        <section className="error-state">
           <EmptyState
             title="Attendance data is unavailable"
             description={overviewQuery.errorMessage}
@@ -114,7 +121,7 @@ export function TimeAttendanceClient() {
             </article>
           </article>
 
-          <article className="compensation-summary-card">
+          <article className="metric-card">
             <div>
               <h2 className="section-title">Current shift</h2>
               <p className="settings-card-description">
@@ -140,8 +147,8 @@ export function TimeAttendanceClient() {
                 <StatusBadge tone="processing">In progress</StatusBadge>
               </header>
               <div className="documents-cell-copy">
-                <span className="numeric" title={formatDateTimeTooltip(activeEntry.clockIn)}>
-                  {activeEntry.clockIn}
+                <span className="numeric" title={formatInTimezone(activeEntry.clockIn, overviewQuery.data.profile.timezone ?? FALLBACK_TIMEZONE)}>
+                  {formatInTimezone(activeEntry.clockIn, overviewQuery.data.profile.timezone ?? FALLBACK_TIMEZONE)}
                 </span>
                 <span className="settings-card-description country-chip">
                   <span>{countryFlagFromCode(overviewQuery.data.profile.countryCode)}</span>
@@ -196,17 +203,20 @@ export function TimeAttendanceClient() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedEntries.map((entry) => (
+                    {sortedEntries.map((entry) => {
+                      const tz = entry.employeeTimezone ?? overviewQuery.data?.profile.timezone ?? FALLBACK_TIMEZONE;
+
+                      return (
                       <tr key={entry.id} className="data-table-row">
                         <td>
-                          <span title={formatDateTimeTooltip(entry.clockIn)}>
-                            {formatRelativeTime(entry.clockIn)}
+                          <span title={formatInTimezone(entry.clockIn, tz)}>
+                            {formatTimeInTimezone(entry.clockIn, tz)}
                           </span>
                         </td>
                         <td>
                           {entry.clockOut ? (
-                            <span title={formatDateTimeTooltip(entry.clockOut)}>
-                              {formatRelativeTime(entry.clockOut)}
+                            <span title={formatInTimezone(entry.clockOut, tz)}>
+                              {formatTimeInTimezone(entry.clockOut, tz)}
                             </span>
                           ) : (
                             "--"
@@ -228,7 +238,8 @@ export function TimeAttendanceClient() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

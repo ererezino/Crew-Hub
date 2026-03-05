@@ -4,28 +4,34 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { toSentenceCase } from "../../../../lib/format-labels";
 import {
   labelForReviewAssignmentStatus,
   labelForReviewCycleStatus,
   toneForReviewAssignmentStatus,
   toneForReviewCycleStatus
 } from "../../../../lib/performance/reviews";
-import { usePerformanceAdmin } from "../../../../hooks/use-performance";
+import { useCalibration, usePerformanceAdmin } from "../../../../hooks/use-performance";
 import type {
   AssignReviewApiResponse,
   AssignReviewPayload,
+  CalibrationRow,
   CreateReviewCycleApiResponse,
   CreateReviewCyclePayload,
   CreateReviewTemplateApiResponse,
   CreateReviewTemplatePayload,
-  ReviewSectionDefinition
+  ReviewSectionDefinition,
+  ShareReviewResponse
 } from "../../../../types/performance";
 
+type AdminTab = "admin" | "calibration";
 type SortDirection = "asc" | "desc";
+type CalibrationSortKey = "employee" | "department" | "selfScore" | "managerScore" | "variance";
 type ToastVariant = "success" | "error" | "info";
 type ToastMessage = {
   id: string;
@@ -111,7 +117,7 @@ function adminSkeleton() {
       <div className="performance-skeleton-header" />
       <div className="performance-skeleton-card" />
       <div className="performance-skeleton-card" />
-      <div className="performance-skeleton-table" />
+      <div className="table-skeleton" />
     </section>
   );
 }
@@ -165,9 +171,279 @@ function standardTemplateSections(): ReviewSectionDefinition[] {
   ];
 }
 
+function varianceTone(variance: number | null): string {
+  if (variance === null) return "";
+  const abs = Math.abs(variance);
+  if (abs > 1) return "calibration-variance-high";
+  if (abs <= 0.5) return "calibration-variance-low";
+  return "calibration-variance-mid";
+}
+
+function sharingStatusLabel(status: "unshared" | "shared" | "acknowledged"): string {
+  switch (status) {
+    case "unshared":
+      return "Not shared";
+    case "shared":
+      return "Shared";
+    case "acknowledged":
+      return "Acknowledged";
+  }
+}
+
+function sharingStatusTone(status: "unshared" | "shared" | "acknowledged"): "draft" | "pending" | "success" {
+  switch (status) {
+    case "unshared":
+      return "draft";
+    case "shared":
+      return "pending";
+    case "acknowledged":
+      return "success";
+  }
+}
+
+// ── Calibration Tab Component ──
+
+function CalibrationTab({ showToast }: { showToast: (variant: ToastVariant, message: string) => void }) {
+  const [cycleIdFilter, setCycleIdFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [countryFilter, setCountryFilter] = useState("all");
+  const [sortKey, setSortKey] = useState<CalibrationSortKey>("employee");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  const calibrationQuery = useCalibration({
+    cycleId: cycleIdFilter || undefined,
+    department: departmentFilter,
+    country: countryFilter
+  });
+
+  const rows = calibrationQuery.data?.rows ?? [];
+  const summary = calibrationQuery.data?.summary ?? null;
+  const cycle = calibrationQuery.data?.cycle ?? null;
+
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      if (row.department) set.add(row.department);
+    }
+    return [...set].sort();
+  }, [rows]);
+
+  const countries = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of rows) {
+      if (row.countryCode) set.add(row.countryCode);
+    }
+    return [...set].sort();
+  }, [rows]);
+
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      let cmp = 0;
+
+      switch (sortKey) {
+        case "employee":
+          cmp = a.employeeName.localeCompare(b.employeeName);
+          break;
+        case "department":
+          cmp = (a.department ?? "").localeCompare(b.department ?? "");
+          break;
+        case "selfScore":
+          cmp = (a.selfScore ?? -1) - (b.selfScore ?? -1);
+          break;
+        case "managerScore":
+          cmp = (a.managerScore ?? -1) - (b.managerScore ?? -1);
+          break;
+        case "variance":
+          cmp = (a.variance ?? 0) - (b.variance ?? 0);
+          break;
+      }
+
+      return sortDirection === "asc" ? cmp : cmp * -1;
+    });
+  }, [rows, sortKey, sortDirection]);
+
+  const toggleSort = (key: CalibrationSortKey) => {
+    if (sortKey === key) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortArrow = (key: CalibrationSortKey) => {
+    if (sortKey !== key) return "";
+    return sortDirection === "asc" ? " \u2191" : " \u2193";
+  };
+
+  return (
+    <article className="settings-card">
+      <h2 className="section-title">Calibration</h2>
+      <p className="settings-card-description">
+        Compare self-review and manager scores across the organisation. Read-only view for HR and admin.
+      </p>
+
+      {calibrationQuery.isLoading ? (
+        <div className="performance-skeleton-card" aria-hidden="true" />
+      ) : calibrationQuery.errorMessage ? (
+        <ErrorState
+          title="Calibration unavailable"
+          message={calibrationQuery.errorMessage}
+          onRetry={calibrationQuery.refresh}
+        />
+      ) : !cycle ? (
+        <EmptyState
+          title="No cycle found"
+          description="Create a review cycle to see calibration data."
+          ctaLabel="Back to admin"
+          ctaHref="/performance/admin"
+        />
+      ) : (
+        <>
+          <div className="calibration-filters">
+            <div className="calibration-cycle-info">
+              <StatusBadge tone={toneForReviewCycleStatus(cycle.status)}>
+                {cycle.name} ({labelForReviewCycleStatus(cycle.status)})
+              </StatusBadge>
+            </div>
+
+            <select
+              className="form-input"
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.currentTarget.value)}
+              aria-label="Filter by department"
+            >
+              <option value="all">All departments</option>
+              {departments.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+
+            <select
+              className="form-input"
+              value={countryFilter}
+              onChange={(e) => setCountryFilter(e.currentTarget.value)}
+              aria-label="Filter by country"
+            >
+              <option value="all">All countries</option>
+              {countries.map((c) => (
+                <option key={c} value={c}>{countryNameFromCode(c)}</option>
+              ))}
+            </select>
+          </div>
+
+          {summary ? (
+            <div className="calibration-summary">
+              <p>
+                Cycle completion:{" "}
+                <span className="numeric">
+                  {summary.completedAssignments} of {summary.totalAssignments} (
+                  {summary.completionPct}%)
+                </span>
+              </p>
+              <p>
+                Average self score:{" "}
+                <span className="numeric">
+                  {summary.avgSelfScore !== null ? summary.avgSelfScore.toFixed(1) : "N/A"}
+                </span>
+              </p>
+              <p>
+                Average manager score:{" "}
+                <span className="numeric">
+                  {summary.avgManagerScore !== null ? summary.avgManagerScore.toFixed(1) : "N/A"}
+                </span>
+              </p>
+            </div>
+          ) : null}
+
+          <section className="data-table-container" aria-label="Calibration data">
+            {sortedRows.length === 0 ? (
+              <EmptyState
+                title="No calibration data"
+                description="No completed assignments match the selected filters."
+                ctaLabel="Clear filters"
+                ctaHref="/performance/admin"
+              />
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>
+                      <button type="button" className="table-sort-trigger" onClick={() => toggleSort("employee")}>
+                        Employee{sortArrow("employee")}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="table-sort-trigger" onClick={() => toggleSort("department")}>
+                        Department{sortArrow("department")}
+                      </button>
+                    </th>
+                    <th>Country</th>
+                    <th>Review Type</th>
+                    <th>
+                      <button type="button" className="table-sort-trigger" onClick={() => toggleSort("selfScore")}>
+                        Self Score{sortArrow("selfScore")}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="table-sort-trigger" onClick={() => toggleSort("managerScore")}>
+                        Manager Score{sortArrow("managerScore")}
+                      </button>
+                    </th>
+                    <th>
+                      <button type="button" className="table-sort-trigger" onClick={() => toggleSort("variance")}>
+                        Variance{sortArrow("variance")}
+                      </button>
+                    </th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedRows.map((row: CalibrationRow) => (
+                    <tr key={row.assignmentId} className="data-table-row">
+                      <td>{row.employeeName}</td>
+                      <td>{row.department ?? "--"}</td>
+                      <td>
+                        <p className="country-chip">
+                          <span>{countryFlagFromCode(row.countryCode)}</span>
+                          <span>{countryNameFromCode(row.countryCode)}</span>
+                        </p>
+                      </td>
+                      <td>{toSentenceCase(row.reviewType)}</td>
+                      <td className="numeric">
+                        {row.selfScore !== null ? row.selfScore.toFixed(1) : "N/A"}
+                      </td>
+                      <td className="numeric">
+                        {row.managerScore !== null ? row.managerScore.toFixed(1) : "N/A"}
+                      </td>
+                      <td className={`numeric ${varianceTone(row.variance)}`}>
+                        {row.variance !== null
+                          ? `${row.variance > 0 ? "+" : ""}${row.variance.toFixed(1)}`
+                          : "N/A"}
+                      </td>
+                      <td>
+                        <StatusBadge tone={sharingStatusTone(row.status)}>
+                          {sharingStatusLabel(row.status)}
+                        </StatusBadge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </>
+      )}
+    </article>
+  );
+}
+
+// ── Main Admin Component ──
+
 export function AdminPerformanceClient() {
   const adminQuery = usePerformanceAdmin();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [activeTab, setActiveTab] = useState<AdminTab>("admin");
 
   const [cycleForm, setCycleForm] = useState<CycleFormValues>(defaultCycleFormValues);
   const [cycleFormValidation, setCycleFormValidation] = useState<
@@ -176,6 +452,7 @@ export function AdminPerformanceClient() {
   const [isCreatingCycle, setIsCreatingCycle] = useState(false);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isSharingReview, setIsSharingReview] = useState(false);
 
   const [selectedCycleId, setSelectedCycleId] = useState<string>("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
@@ -203,6 +480,31 @@ export function AdminPerformanceClient() {
     window.setTimeout(() => {
       dismissToast(toastId);
     }, 4000);
+  };
+
+  const shareReview = async (assignmentId: string) => {
+    setIsSharingReview(true);
+
+    try {
+      const response = await fetch(`/api/v1/performance/assignments/${assignmentId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const body = (await response.json()) as ShareReviewResponse;
+
+      if (!response.ok || !body.data) {
+        showToast("error", body.error?.message ?? "Unable to share review.");
+        return;
+      }
+
+      showToast("success", "Review shared with employee.");
+      adminQuery.refresh();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to share review.");
+    } finally {
+      setIsSharingReview(false);
+    }
   };
 
   const createCycle = async () => {
@@ -356,363 +658,414 @@ export function AdminPerformanceClient() {
         }
       />
 
-      {adminQuery.isLoading ? adminSkeleton() : null}
+      {/* ── Tab Navigation ── */}
+      <section className="page-tabs" aria-label="Admin sections">
+        <button
+          type="button"
+          className={activeTab === "admin" ? "page-tab page-tab-active" : "page-tab"}
+          onClick={() => setActiveTab("admin")}
+        >
+          Admin
+        </button>
+        <button
+          type="button"
+          className={activeTab === "calibration" ? "page-tab page-tab-active" : "page-tab"}
+          onClick={() => setActiveTab("calibration")}
+        >
+          Calibration
+        </button>
+      </section>
 
-      {!adminQuery.isLoading && adminQuery.errorMessage ? (
+      {activeTab === "calibration" ? (
         <section className="settings-layout">
-          <EmptyState
-            title="Performance admin unavailable"
-            description={adminQuery.errorMessage}
-            ctaLabel="Retry"
-            ctaHref="/performance/admin"
-          />
-          <button type="button" className="button button-accent" onClick={adminQuery.refresh}>
-            Retry now
-          </button>
+          <CalibrationTab showToast={showToast} />
         </section>
       ) : null}
 
-      {!adminQuery.isLoading && !adminQuery.errorMessage && adminQuery.data ? (
-        <section className="settings-layout">
-          <section className="performance-admin-metrics">
-            <article className="metric-card">
-              <p className="metric-label">Total Assignments</p>
-              <p className="metric-value numeric">{adminQuery.data.metrics.totalAssignments}</p>
-              <p className="metric-hint">Across all cycles</p>
-            </article>
-            <article className="metric-card">
-              <p className="metric-label">Completed</p>
-              <p className="metric-value numeric">{adminQuery.data.metrics.completedAssignments}</p>
-              <p className="metric-hint">Submitted by employee + manager</p>
-            </article>
-            <article className="metric-card">
-              <p className="metric-label">Pending Self</p>
-              <p className="metric-value numeric">{adminQuery.data.metrics.pendingSelfAssignments}</p>
-              <p className="metric-hint">Awaiting self review</p>
-            </article>
-            <article className="metric-card">
-              <p className="metric-label">Pending Manager</p>
-              <p className="metric-value numeric">{adminQuery.data.metrics.pendingManagerAssignments}</p>
-              <p className="metric-hint">Awaiting manager review</p>
-            </article>
-          </section>
+      {activeTab === "admin" ? (
+        <>
+          {adminQuery.isLoading ? adminSkeleton() : null}
 
-          <article className="settings-card">
-            <h2 className="section-title">Create Cycle</h2>
-            <p className="settings-card-description">
-              Set cycle dates and deadlines for the next review period.
-            </p>
-            <div className="performance-admin-form-grid">
-              <label className="form-field" htmlFor="cycle-name">
-                <span className="form-label">Cycle name</span>
-                <input
-                  id="cycle-name"
-                  className={cycleFormValidation.name ? "form-input form-input-error" : "form-input"}
-                  value={cycleForm.name}
-                  onChange={(event) => {
-                    const nextValue = event.currentTarget.value;
-                    setCycleForm((current) => ({ ...current, name: nextValue }));
-                    setCycleFormValidation((current) => ({
-                      ...current,
-                      name: nextValue.trim() ? undefined : "Cycle name is required."
-                    }));
-                  }}
-                />
-                {cycleFormValidation.name ? (
-                  <p className="form-field-error">{cycleFormValidation.name}</p>
-                ) : null}
-              </label>
+          {!adminQuery.isLoading && adminQuery.errorMessage ? (
+            <ErrorState
+              title="Performance admin unavailable"
+              message={adminQuery.errorMessage}
+              onRetry={adminQuery.refresh}
+            />
+          ) : null}
 
-              <label className="form-field" htmlFor="cycle-type">
-                <span className="form-label">Cycle type</span>
-                <select
-                  id="cycle-type"
-                  className="form-input"
-                  value={cycleForm.type}
-                  onChange={(event) =>
-                    setCycleForm((current) => ({
-                      ...current,
-                      type: event.currentTarget.value as CycleFormValues["type"]
-                    }))
-                  }
-                >
-                  <option value="quarterly">Quarterly</option>
-                  <option value="annual">Annual</option>
-                  <option value="probation">Probation</option>
-                </select>
-              </label>
+          {!adminQuery.isLoading && !adminQuery.errorMessage && adminQuery.data ? (
+            <section className="settings-layout">
+              <section className="performance-admin-metrics">
+                <article className="metric-card">
+                  <p className="metric-label">Total Assignments</p>
+                  <p className="metric-value numeric">{adminQuery.data.metrics.totalAssignments}</p>
+                  <p className="metric-hint">Across all cycles</p>
+                </article>
+                <article className="metric-card">
+                  <p className="metric-label">Completed</p>
+                  <p className="metric-value numeric">{adminQuery.data.metrics.completedAssignments}</p>
+                  <p className="metric-hint">Submitted by employee + manager</p>
+                </article>
+                <article className="metric-card">
+                  <p className="metric-label">Pending Self</p>
+                  <p className="metric-value numeric">{adminQuery.data.metrics.pendingSelfAssignments}</p>
+                  <p className="metric-hint">Awaiting self review</p>
+                </article>
+                <article className="metric-card">
+                  <p className="metric-label">Pending Manager</p>
+                  <p className="metric-value numeric">{adminQuery.data.metrics.pendingManagerAssignments}</p>
+                  <p className="metric-hint">Awaiting manager review</p>
+                </article>
+              </section>
 
-              <label className="form-field" htmlFor="cycle-status">
-                <span className="form-label">Initial status</span>
-                <select
-                  id="cycle-status"
-                  className="form-input"
-                  value={cycleForm.status}
-                  onChange={(event) =>
-                    setCycleForm((current) => ({
-                      ...current,
-                      status: event.currentTarget.value as CycleFormValues["status"]
-                    }))
-                  }
-                >
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="in_review">In Review</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </label>
+              <article className="settings-card">
+                <h2 className="section-title">Create Cycle</h2>
+                <p className="settings-card-description">
+                  Set cycle dates and deadlines for the next review period.
+                </p>
+                <div className="performance-admin-form-grid">
+                  <label className="form-field" htmlFor="cycle-name">
+                    <span className="form-label">Cycle name</span>
+                    <input
+                      id="cycle-name"
+                      className={cycleFormValidation.name ? "form-input form-input-error" : "form-input"}
+                      value={cycleForm.name}
+                      onChange={(event) => {
+                        const nextValue = event.currentTarget.value;
+                        setCycleForm((current) => ({ ...current, name: nextValue }));
+                        setCycleFormValidation((current) => ({
+                          ...current,
+                          name: nextValue.trim() ? undefined : "Cycle name is required."
+                        }));
+                      }}
+                    />
+                    {cycleFormValidation.name ? (
+                      <p className="form-field-error">{cycleFormValidation.name}</p>
+                    ) : null}
+                  </label>
 
-              <label className="form-field" htmlFor="cycle-start-date">
-                <span className="form-label">Start date</span>
-                <input
-                  id="cycle-start-date"
-                  type="date"
-                  className={
-                    cycleFormValidation.startDate ? "form-input form-input-error" : "form-input"
-                  }
-                  value={cycleForm.startDate}
-                  onChange={(event) =>
-                    setCycleForm((current) => ({ ...current, startDate: event.currentTarget.value }))
-                  }
-                />
-                {cycleFormValidation.startDate ? (
-                  <p className="form-field-error">{cycleFormValidation.startDate}</p>
-                ) : null}
-              </label>
+                  <label className="form-field" htmlFor="cycle-type">
+                    <span className="form-label">Cycle type</span>
+                    <select
+                      id="cycle-type"
+                      className="form-input"
+                      value={cycleForm.type}
+                      onChange={(event) =>
+                        setCycleForm((current) => ({
+                          ...current,
+                          type: event.currentTarget.value as CycleFormValues["type"]
+                        }))
+                      }
+                    >
+                      <option value="quarterly">Quarterly</option>
+                      <option value="annual">Annual</option>
+                      <option value="probation">Probation</option>
+                    </select>
+                  </label>
 
-              <label className="form-field" htmlFor="cycle-end-date">
-                <span className="form-label">End date</span>
-                <input
-                  id="cycle-end-date"
-                  type="date"
-                  className={cycleFormValidation.endDate ? "form-input form-input-error" : "form-input"}
-                  value={cycleForm.endDate}
-                  onChange={(event) =>
-                    setCycleForm((current) => ({ ...current, endDate: event.currentTarget.value }))
-                  }
-                />
-                {cycleFormValidation.endDate ? (
-                  <p className="form-field-error">{cycleFormValidation.endDate}</p>
-                ) : null}
-              </label>
+                  <label className="form-field" htmlFor="cycle-status">
+                    <span className="form-label">Initial status</span>
+                    <select
+                      id="cycle-status"
+                      className="form-input"
+                      value={cycleForm.status}
+                      onChange={(event) =>
+                        setCycleForm((current) => ({
+                          ...current,
+                          status: event.currentTarget.value as CycleFormValues["status"]
+                        }))
+                      }
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="active">Active</option>
+                      <option value="in_review">In Review</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </label>
 
-              <label className="form-field" htmlFor="cycle-self-deadline">
-                <span className="form-label">Self review deadline</span>
-                <input
-                  id="cycle-self-deadline"
-                  type="date"
-                  className={
-                    cycleFormValidation.selfReviewDeadline
-                      ? "form-input form-input-error"
-                      : "form-input"
-                  }
-                  value={cycleForm.selfReviewDeadline}
-                  onChange={(event) =>
-                    setCycleForm((current) => ({
-                      ...current,
-                      selfReviewDeadline: event.currentTarget.value
-                    }))
-                  }
-                />
-                {cycleFormValidation.selfReviewDeadline ? (
-                  <p className="form-field-error">{cycleFormValidation.selfReviewDeadline}</p>
-                ) : null}
-              </label>
+                  <label className="form-field" htmlFor="cycle-start-date">
+                    <span className="form-label">Start date</span>
+                    <input
+                      id="cycle-start-date"
+                      type="date"
+                      className={
+                        cycleFormValidation.startDate ? "form-input form-input-error" : "form-input"
+                      }
+                      value={cycleForm.startDate}
+                      onChange={(event) =>
+                        setCycleForm((current) => ({ ...current, startDate: event.currentTarget.value }))
+                      }
+                    />
+                    {cycleFormValidation.startDate ? (
+                      <p className="form-field-error">{cycleFormValidation.startDate}</p>
+                    ) : null}
+                  </label>
 
-              <label className="form-field" htmlFor="cycle-manager-deadline">
-                <span className="form-label">Manager review deadline</span>
-                <input
-                  id="cycle-manager-deadline"
-                  type="date"
-                  className={
-                    cycleFormValidation.managerReviewDeadline
-                      ? "form-input form-input-error"
-                      : "form-input"
-                  }
-                  value={cycleForm.managerReviewDeadline}
-                  onChange={(event) =>
-                    setCycleForm((current) => ({
-                      ...current,
-                      managerReviewDeadline: event.currentTarget.value
-                    }))
-                  }
-                />
-                {cycleFormValidation.managerReviewDeadline ? (
-                  <p className="form-field-error">{cycleFormValidation.managerReviewDeadline}</p>
-                ) : null}
-              </label>
-            </div>
+                  <label className="form-field" htmlFor="cycle-end-date">
+                    <span className="form-label">End date</span>
+                    <input
+                      id="cycle-end-date"
+                      type="date"
+                      className={cycleFormValidation.endDate ? "form-input form-input-error" : "form-input"}
+                      value={cycleForm.endDate}
+                      onChange={(event) =>
+                        setCycleForm((current) => ({ ...current, endDate: event.currentTarget.value }))
+                      }
+                    />
+                    {cycleFormValidation.endDate ? (
+                      <p className="form-field-error">{cycleFormValidation.endDate}</p>
+                    ) : null}
+                  </label>
 
-            <div className="settings-actions">
-              <button
-                type="button"
-                className="button button-accent"
-                disabled={isCreatingCycle}
-                onClick={() => {
-                  void createCycle();
-                }}
-              >
-                {isCreatingCycle ? "Creating..." : "Create cycle"}
-              </button>
-            </div>
-          </article>
+                  <label className="form-field" htmlFor="cycle-self-deadline">
+                    <span className="form-label">Self review deadline</span>
+                    <input
+                      id="cycle-self-deadline"
+                      type="date"
+                      className={
+                        cycleFormValidation.selfReviewDeadline
+                          ? "form-input form-input-error"
+                          : "form-input"
+                      }
+                      value={cycleForm.selfReviewDeadline}
+                      onChange={(event) =>
+                        setCycleForm((current) => ({
+                          ...current,
+                          selfReviewDeadline: event.currentTarget.value
+                        }))
+                      }
+                    />
+                    {cycleFormValidation.selfReviewDeadline ? (
+                      <p className="form-field-error">{cycleFormValidation.selfReviewDeadline}</p>
+                    ) : null}
+                  </label>
 
-          <article className="settings-card">
-            <h2 className="section-title">Templates & Assignment</h2>
-            <p className="settings-card-description">
-              Create a standard template, then assign the selected cycle to active employees.
-            </p>
+                  <label className="form-field" htmlFor="cycle-manager-deadline">
+                    <span className="form-label">Manager review deadline</span>
+                    <input
+                      id="cycle-manager-deadline"
+                      type="date"
+                      className={
+                        cycleFormValidation.managerReviewDeadline
+                          ? "form-input form-input-error"
+                          : "form-input"
+                      }
+                      value={cycleForm.managerReviewDeadline}
+                      onChange={(event) =>
+                        setCycleForm((current) => ({
+                          ...current,
+                          managerReviewDeadline: event.currentTarget.value
+                        }))
+                      }
+                    />
+                    {cycleFormValidation.managerReviewDeadline ? (
+                      <p className="form-field-error">{cycleFormValidation.managerReviewDeadline}</p>
+                    ) : null}
+                  </label>
+                </div>
 
-            <div className="performance-template-grid">
-              <button
-                type="button"
-                className="button button-subtle"
-                disabled={isCreatingTemplate}
-                onClick={() => {
-                  void createStandardTemplate();
-                }}
-              >
-                {isCreatingTemplate ? "Creating template..." : "Create standard template"}
-              </button>
+                <div className="settings-actions">
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    disabled={isCreatingCycle}
+                    onClick={() => {
+                      void createCycle();
+                    }}
+                  >
+                    {isCreatingCycle ? "Creating..." : "Create cycle"}
+                  </button>
+                </div>
+              </article>
 
-              <label className="form-field" htmlFor="assign-cycle">
-                <span className="form-label">Cycle</span>
-                <select
-                  id="assign-cycle"
-                  className="form-input"
-                  value={selectedCycleId}
-                  onChange={(event) => setSelectedCycleId(event.currentTarget.value)}
-                >
-                  <option value="">Select cycle</option>
-                  {adminQuery.data.cycles.map((cycle) => (
-                    <option key={cycle.id} value={cycle.id}>
-                      {cycle.name} ({cycle.type})
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <article className="settings-card">
+                <h2 className="section-title">Templates & Assignment</h2>
+                <p className="settings-card-description">
+                  Create a standard template, then assign the selected cycle to active employees.
+                </p>
 
-              <label className="form-field" htmlFor="assign-template">
-                <span className="form-label">Template</span>
-                <select
-                  id="assign-template"
-                  className="form-input"
-                  value={selectedTemplateId}
-                  onChange={(event) => setSelectedTemplateId(event.currentTarget.value)}
-                >
-                  <option value="">Select template</option>
-                  {adminQuery.data.templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="performance-template-grid">
+                  <button
+                    type="button"
+                    className="button button-subtle"
+                    disabled={isCreatingTemplate}
+                    onClick={() => {
+                      void createStandardTemplate();
+                    }}
+                  >
+                    {isCreatingTemplate ? "Creating template..." : "Create standard template"}
+                  </button>
 
-              <label className="form-field" htmlFor="assign-due-date">
-                <span className="form-label">Due date (optional)</span>
-                <input
-                  id="assign-due-date"
-                  type="date"
-                  className="form-input"
-                  value={assignmentDueAt}
-                  onChange={(event) => setAssignmentDueAt(event.currentTarget.value)}
-                />
-              </label>
+                  <label className="form-field" htmlFor="assign-cycle">
+                    <span className="form-label">Cycle</span>
+                    <select
+                      id="assign-cycle"
+                      className="form-input"
+                      value={selectedCycleId}
+                      onChange={(event) => setSelectedCycleId(event.currentTarget.value)}
+                    >
+                      <option value="">Select cycle</option>
+                      {adminQuery.data.cycles.map((cycle) => (
+                        <option key={cycle.id} value={cycle.id}>
+                          {cycle.name} ({toSentenceCase(cycle.type)})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-              <button
-                type="button"
-                className="button button-accent"
-                disabled={isAssigning}
-                onClick={() => {
-                  void assignCycle();
-                }}
-              >
-                {isAssigning ? "Assigning..." : "Assign to active employees"}
-              </button>
-            </div>
-          </article>
+                  <label className="form-field" htmlFor="assign-template">
+                    <span className="form-label">Template</span>
+                    <select
+                      id="assign-template"
+                      className="form-input"
+                      value={selectedTemplateId}
+                      onChange={(event) => setSelectedTemplateId(event.currentTarget.value)}
+                    >
+                      <option value="">Select template</option>
+                      {adminQuery.data.templates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-          <article className="settings-card">
-            <h2 className="section-title">Assignment Tracker</h2>
-            <section className="data-table-container" aria-label="Performance assignment tracker">
-              {sortedAssignments.length === 0 ? (
-                <EmptyState
-                  title="No assignments yet"
-                  description="Create a cycle and assign reviews to start tracking progress."
-                  ctaLabel="Back to performance"
-                  ctaHref="/performance"
-                />
-              ) : (
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>
-                        <button
-                          type="button"
-                          className="table-sort-trigger"
-                          onClick={() =>
-                            setAssignmentSortDirection((current) =>
-                              current === "asc" ? "desc" : "asc"
-                            )
-                          }
-                        >
-                          Employee
-                          <span className="numeric">{assignmentSortDirection === "asc" ? "↑" : "↓"}</span>
-                        </button>
-                      </th>
-                      <th>Cycle</th>
-                      <th>Reviewer</th>
-                      <th>Country</th>
-                      <th>Status</th>
-                      <th>Updated</th>
-                      <th className="table-action-column">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedAssignments.map((assignment) => (
-                      <tr key={assignment.id} className="data-table-row">
-                        <td>{assignment.employeeName}</td>
-                        <td>
-                          <p>{assignment.cycleName}</p>
-                          <p className="settings-card-description">
-                            <StatusBadge tone={toneForReviewCycleStatus(assignment.cycleStatus)}>
-                              {labelForReviewCycleStatus(assignment.cycleStatus)}
-                            </StatusBadge>
-                          </p>
-                        </td>
-                        <td>{assignment.reviewerName}</td>
-                        <td>
-                          <p className="country-chip">
-                            <span>{countryFlagFromCode(assignment.employeeCountryCode)}</span>
-                            <span>{countryNameFromCode(assignment.employeeCountryCode)}</span>
-                          </p>
-                        </td>
-                        <td>
-                          <StatusBadge tone={toneForReviewAssignmentStatus(assignment.status)}>
-                            {labelForReviewAssignmentStatus(assignment.status)}
-                          </StatusBadge>
-                        </td>
-                        <td title={formatDateTimeTooltip(assignment.updatedAt)}>
-                          {formatRelativeTime(assignment.updatedAt)}
-                        </td>
-                        <td className="table-row-action-cell">
-                          <button
-                            type="button"
-                            className="table-row-action"
-                            onClick={() => showToast("info", `Assignment ${assignment.id.slice(0, 8)}`)}
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                  <label className="form-field" htmlFor="assign-due-date">
+                    <span className="form-label">Due date (optional)</span>
+                    <input
+                      id="assign-due-date"
+                      type="date"
+                      className="form-input"
+                      value={assignmentDueAt}
+                      onChange={(event) => setAssignmentDueAt(event.currentTarget.value)}
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    disabled={isAssigning}
+                    onClick={() => {
+                      void assignCycle();
+                    }}
+                  >
+                    {isAssigning ? "Assigning..." : "Assign to active employees"}
+                  </button>
+                </div>
+              </article>
+
+              <article className="settings-card">
+                <h2 className="section-title">Assignment Tracker</h2>
+                <section className="data-table-container" aria-label="Performance assignment tracker">
+                  {sortedAssignments.length === 0 ? (
+                    <EmptyState
+                      title="No assignments yet"
+                      description="Create a cycle and assign reviews to start tracking progress."
+                      ctaLabel="Back to performance"
+                      ctaHref="/performance"
+                    />
+                  ) : (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>
+                            <button
+                              type="button"
+                              className="table-sort-trigger"
+                              onClick={() =>
+                                setAssignmentSortDirection((current) =>
+                                  current === "asc" ? "desc" : "asc"
+                                )
+                              }
+                            >
+                              Employee
+                              <span className="numeric">{assignmentSortDirection === "asc" ? "\u2191" : "\u2193"}</span>
+                            </button>
+                          </th>
+                          <th>Cycle</th>
+                          <th>Reviewer</th>
+                          <th>Country</th>
+                          <th>Status</th>
+                          <th>Sharing</th>
+                          <th>Updated</th>
+                          <th className="table-action-column">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedAssignments.map((assignment) => {
+                          const sharingStatus = assignment.acknowledgedAt
+                            ? "acknowledged"
+                            : assignment.sharedAt
+                              ? "shared"
+                              : "unshared";
+
+                          return (
+                            <tr key={assignment.id} className="data-table-row">
+                              <td>{assignment.employeeName}</td>
+                              <td>
+                                <p>{assignment.cycleName}</p>
+                                <p className="settings-card-description">
+                                  <StatusBadge tone={toneForReviewCycleStatus(assignment.cycleStatus)}>
+                                    {labelForReviewCycleStatus(assignment.cycleStatus)}
+                                  </StatusBadge>
+                                </p>
+                              </td>
+                              <td>{assignment.reviewerName}</td>
+                              <td>
+                                <p className="country-chip">
+                                  <span>{countryFlagFromCode(assignment.employeeCountryCode)}</span>
+                                  <span>{countryNameFromCode(assignment.employeeCountryCode)}</span>
+                                </p>
+                              </td>
+                              <td>
+                                <StatusBadge tone={toneForReviewAssignmentStatus(assignment.status)}>
+                                  {labelForReviewAssignmentStatus(assignment.status)}
+                                </StatusBadge>
+                              </td>
+                              <td>
+                                {assignment.status === "completed" ? (
+                                  sharingStatus === "acknowledged" ? (
+                                    <StatusBadge tone="success">Acknowledged</StatusBadge>
+                                  ) : sharingStatus === "shared" ? (
+                                    <StatusBadge tone="pending">Awaiting acknowledgment</StatusBadge>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="button button-accent button-sm"
+                                      disabled={isSharingReview}
+                                      onClick={() => { void shareReview(assignment.id); }}
+                                    >
+                                      {isSharingReview ? "Sharing..." : "Share with employee"}
+                                    </button>
+                                  )
+                                ) : (
+                                  <span className="settings-card-description">--</span>
+                                )}
+                              </td>
+                              <td title={formatDateTimeTooltip(assignment.updatedAt)}>
+                                {formatRelativeTime(assignment.updatedAt)}
+                              </td>
+                              <td className="table-row-action-cell">
+                                <button
+                                  type="button"
+                                  className="table-row-action"
+                                  onClick={() => showToast("info", `Assignment ${assignment.id.slice(0, 8)}`)}
+                                >
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </section>
+              </article>
             </section>
-          </article>
-        </section>
+          ) : null}
+        </>
       ) : null}
 
       {toasts.length > 0 ? (

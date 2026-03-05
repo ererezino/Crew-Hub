@@ -1,5 +1,21 @@
 import type { ApiResponse } from "./auth";
 
+export const LEAVE_TYPES = [
+  "annual_leave",
+  "sick_leave",
+  "personal_day",
+  "birthday_leave",
+  "unpaid_personal_day"
+] as const;
+
+export type LeaveType = (typeof LEAVE_TYPES)[number];
+
+/** Leave types where balance tracking is skipped entirely (unlimited). */
+export const UNLIMITED_LEAVE_TYPES: ReadonlySet<string> = new Set(["sick_leave"]);
+
+/** Leave types that should NOT appear in the employee request form (auto-granted). */
+export const AUTO_GRANTED_LEAVE_TYPES: ReadonlySet<string> = new Set(["birthday_leave"]);
+
 export const LEAVE_REQUEST_STATUSES = [
   "pending",
   "approved",
@@ -25,6 +41,7 @@ export type LeavePolicy = {
   defaultDaysPerYear: number;
   accrualType: LeaveAccrualType;
   carryOver: boolean;
+  isUnlimited: boolean;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +76,7 @@ export type LeaveRequestRecord = {
   approverId: string | null;
   approverName: string | null;
   rejectionReason: string | null;
+  requiresDocumentation?: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -76,6 +94,8 @@ export type TimeOffSummaryProfile = {
   fullName: string;
   department: string | null;
   countryCode: string | null;
+  dateOfBirth: string | null;
+  status: string | null;
 };
 
 export type TimeOffSummaryResponseData = {
@@ -115,3 +135,31 @@ export type TimeOffCalendarResponseData = {
 };
 
 export type TimeOffCalendarResponse = ApiResponse<TimeOffCalendarResponseData>;
+
+export type AfkLogRecord = {
+  id: string;
+  employeeId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  reclassifiedAs: string | null;
+  leaveRequestId: string | null;
+  notes: string;
+  createdAt: string;
+};
+
+export type AfkLogsResponseData = {
+  logs: AfkLogRecord[];
+  weeklyCount: number;
+  weeklyLimit: number;
+};
+
+export type AfkLogsResponse = ApiResponse<AfkLogsResponseData>;
+
+export type BirthdayChoiceResponseData = {
+  requestId: string;
+  chosenDate: string;
+};
+
+export type BirthdayChoiceResponse = ApiResponse<BirthdayChoiceResponseData>;

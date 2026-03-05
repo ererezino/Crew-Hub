@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState, useEffect } from "react";
 
 import { DocumentUploadPanel } from "../../../components/shared/document-upload-panel";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
+import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDocuments } from "../../../hooks/use-documents";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
@@ -20,6 +21,8 @@ import {
   type DocumentRecord,
   type DocumentSignedUrlResponse
 } from "../../../types/documents";
+import type { CreateSignatureRequestResponse } from "../../../types/esignatures";
+import type { PeopleListResponse } from "../../../types/people";
 
 type DocumentsClientProps = {
   currentUserId: string;
@@ -126,10 +129,10 @@ function sortByExpiry(
 
 function DocumentsTableSkeleton() {
   return (
-    <div className="documents-table-skeleton" aria-hidden="true">
-      <div className="documents-table-skeleton-header" />
+    <div className="table-skeleton" aria-hidden="true">
+      <div className="table-skeleton-header" />
       {Array.from({ length: 7 }, (_, index) => (
-        <div key={`documents-row-skeleton-${index}`} className="documents-table-skeleton-row" />
+        <div key={`documents-row-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </div>
   );
@@ -152,6 +155,43 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   const [versionTarget, setVersionTarget] = useState<DocumentRecord | null>(null);
   const [isOpeningFileById, setIsOpeningFileById] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Signature request panel state
+  const [sigReqTarget, setSigReqTarget] = useState<DocumentRecord | null>(null);
+  const [sigReqTitle, setSigReqTitle] = useState("");
+  const [sigReqMessage, setSigReqMessage] = useState("");
+  const [sigReqSignerIds, setSigReqSignerIds] = useState<string[]>([]);
+  const [isSubmittingSigReq, setIsSubmittingSigReq] = useState(false);
+  const [sigReqError, setSigReqError] = useState<string | null>(null);
+
+  type SignerOption = { id: string; fullName: string; department: string | null; title: string | null };
+  const [signerOptions, setSignerOptions] = useState<SignerOption[]>([]);
+  const [isSignerOptionsLoading, setIsSignerOptionsLoading] = useState(false);
+
+  // Load signer options when request panel opens
+  useEffect(() => {
+    if (!sigReqTarget || !canManageDocuments) return;
+    const ac = new AbortController();
+    setIsSignerOptionsLoading(true);
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/people?scope=all&limit=250", { signal: ac.signal });
+        const payload = (await res.json()) as PeopleListResponse;
+        if (res.ok && payload.data) {
+          setSignerOptions(
+            payload.data.people
+              .filter((p) => p.id !== currentUserId && p.status === "active")
+              .sort((a, b) => a.fullName.localeCompare(b.fullName))
+              .map((p) => ({ id: p.id, fullName: p.fullName, department: p.department, title: p.title }))
+          );
+        }
+      } catch { /* ignore abort */ }
+      finally { if (!ac.signal.aborted) setIsSignerOptionsLoading(false); }
+    })();
+
+    return () => { ac.abort(); };
+  }, [sigReqTarget, canManageDocuments, currentUserId]);
 
   const filteredDocuments = useMemo(() => {
     const nextDocuments = documents.filter((document) => {
@@ -271,12 +311,12 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         }
       />
 
-      <section className="documents-tabs" aria-label="Document filters">
+      <section className="page-tabs" aria-label="Document filters">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={activeTab === tab.id ? "documents-tab documents-tab-active" : "documents-tab"}
+            className={activeTab === tab.id ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
@@ -296,18 +336,15 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
       ) : null}
 
       {!isLoading && !errorMessage && filteredDocuments.length === 0 ? (
-        <section className="documents-empty-state">
+        <section className="error-state">
           <EmptyState
             title="No documents match this filter"
             description="Upload a document or select a different tab to view more records."
-            ctaLabel="Go to dashboard"
-            ctaHref="/dashboard"
+            ctaLabel={canManageDocuments ? "Upload document" : "Go to dashboard"}
+            {...(canManageDocuments
+              ? { onCtaClick: openCreatePanel }
+              : { ctaHref: "/dashboard" })}
           />
-          {canManageDocuments ? (
-            <button type="button" className="button button-accent" onClick={openCreatePanel}>
-              Upload document
-            </button>
-          ) : null}
         </section>
       ) : null}
 
@@ -398,6 +435,21 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                             New version
                           </button>
                         ) : null}
+                        {canManageDocuments ? (
+                          <button
+                            type="button"
+                            className="table-row-action"
+                            onClick={() => {
+                              setSigReqTarget(document);
+                              setSigReqTitle(document.title);
+                              setSigReqMessage("");
+                              setSigReqSignerIds([]);
+                              setSigReqError(null);
+                            }}
+                          >
+                            Request signature
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -424,6 +476,133 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
           allowPolicyDocuments={canManageDocuments}
           existingDocument={versionTarget}
         />
+      ) : null}
+
+      {/* Request Signature Panel */}
+      {sigReqTarget && canManageDocuments ? (
+        <SlidePanel
+          isOpen={Boolean(sigReqTarget)}
+          title="Request Signature"
+          description="Choose signers for this document. They will receive in-app and email notifications."
+          onClose={() => setSigReqTarget(null)}
+        >
+          <form
+            className="slide-panel-form-wrapper"
+            onSubmit={async (event: FormEvent<HTMLFormElement>) => {
+              event.preventDefault();
+              if (!sigReqTarget) return;
+              if (!sigReqTitle.trim()) { setSigReqError("Title is required."); return; }
+              if (sigReqSignerIds.length === 0) { setSigReqError("Select at least one signer."); return; }
+
+              setIsSubmittingSigReq(true);
+              setSigReqError(null);
+
+              try {
+                const res = await fetch("/api/v1/signatures", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    documentId: sigReqTarget.id,
+                    title: sigReqTitle.trim(),
+                    message: sigReqMessage.trim(),
+                    signerUserIds: sigReqSignerIds
+                  })
+                });
+
+                const payload = (await res.json()) as CreateSignatureRequestResponse;
+
+                if (!res.ok || !payload.data) {
+                  setSigReqError(payload.error?.message ?? "Unable to create signature request.");
+                  return;
+                }
+
+                showToast("success", "Signature request sent.");
+                setSigReqTarget(null);
+              } catch (error) {
+                setSigReqError(error instanceof Error ? error.message : "Unable to create signature request.");
+              } finally {
+                setIsSubmittingSigReq(false);
+              }
+            }}
+            noValidate
+          >
+            {sigReqError ? (
+              <div className="form-error-banner">{sigReqError}</div>
+            ) : null}
+
+            <label className="form-field" htmlFor="sig-req-title">
+              <span className="form-label">Request title</span>
+              <input
+                id="sig-req-title"
+                className="form-input"
+                value={sigReqTitle}
+                onChange={(e) => setSigReqTitle(e.currentTarget.value)}
+                disabled={isSubmittingSigReq}
+              />
+            </label>
+
+            <label className="form-field" htmlFor="sig-req-message">
+              <span className="form-label">Message (optional)</span>
+              <textarea
+                id="sig-req-message"
+                className="form-input"
+                rows={3}
+                value={sigReqMessage}
+                onChange={(e) => setSigReqMessage(e.currentTarget.value)}
+                disabled={isSubmittingSigReq}
+              />
+            </label>
+
+            <fieldset className="signature-signer-picker">
+              <legend className="form-label">Signers</legend>
+              {isSignerOptionsLoading ? (
+                <p className="settings-card-description">Loading signer options...</p>
+              ) : signerOptions.length === 0 ? (
+                <p className="settings-card-description">No active signers available.</p>
+              ) : (
+                <div className="signature-signer-options">
+                  {signerOptions.map((option) => (
+                    <label key={option.id} className="settings-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={sigReqSignerIds.includes(option.id)}
+                        onChange={() => {
+                          setSigReqSignerIds((prev) =>
+                            prev.includes(option.id)
+                              ? prev.filter((id) => id !== option.id)
+                              : [...prev, option.id]
+                          );
+                        }}
+                        disabled={isSubmittingSigReq}
+                      />
+                      <span>
+                        {option.fullName}
+                        <span className="signature-signer-option-meta">
+                          {option.title || "Team member"}
+                          {option.department ? ` - ${option.department}` : ""}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+
+            <div className="slide-panel-actions">
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => setSigReqTarget(null)}
+                disabled={isSubmittingSigReq}
+              >
+                Cancel
+              </button>
+              <button type="submit" className="button button-accent" disabled={isSubmittingSigReq}>
+                {isSubmittingSigReq ? "Sending..." : "Send request"}
+              </button>
+            </div>
+          </form>
+        </SlidePanel>
       ) : null}
 
       {toasts.length > 0 ? (

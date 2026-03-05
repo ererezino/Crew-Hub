@@ -12,12 +12,14 @@ import {
 import { z } from "zod";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
+import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../../components/ui/currency-display";
 import { usePayrollRunDetail } from "../../../../../hooks/use-payroll-runs";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../../lib/countries";
-import { formatDateTimeTooltip } from "../../../../../lib/datetime";
+import { formatDate, formatDateTimeTooltip } from "../../../../../lib/datetime";
+import { toSentenceCase } from "../../../../../lib/format-labels";
 import {
   getCurrencyTotal,
   labelForPayrollRunStatus,
@@ -93,9 +95,9 @@ function itemTableSkeleton() {
     <section className="payroll-run-skeleton" aria-hidden="true">
       <div className="payroll-run-skeleton-timeline" />
       <div className="payroll-run-skeleton-metrics" />
-      <div className="payroll-run-skeleton-table-header" />
+      <div className="table-skeleton-header" />
       {Array.from({ length: 8 }, (_, index) => (
-        <div key={`payroll-run-row-skeleton-${index}`} className="payroll-run-skeleton-table-row" />
+        <div key={`payroll-run-row-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </section>
   );
@@ -704,21 +706,11 @@ export function PayrollRunDetailClient({
       {runQuery.isLoading ? itemTableSkeleton() : null}
 
       {!runQuery.isLoading && runQuery.errorMessage ? (
-        <section className="payroll-dashboard-error">
-          <EmptyState
-            title="Payroll run is unavailable"
-            description={runQuery.errorMessage}
-            ctaLabel="Back to payroll"
-            ctaHref="/payroll"
-          />
-          <button
-            type="button"
-            className="button button-accent"
-            onClick={() => runQuery.refresh()}
-          >
-            Retry
-          </button>
-        </section>
+        <ErrorState
+          title="Payroll run is unavailable"
+          message={runQuery.errorMessage}
+          onRetry={() => runQuery.refresh()}
+        />
       ) : null}
 
       {!runQuery.isLoading && !runQuery.errorMessage && runQuery.data ? (
@@ -749,7 +741,7 @@ export function PayrollRunDetailClient({
                   dateTime={runQuery.data.run.payDate}
                   title={formatDateTimeTooltip(runQuery.data.run.payDate)}
                 >
-                  {new Date(`${runQuery.data.run.payDate}T00:00:00.000Z`).toLocaleDateString()}
+                  {formatDate(runQuery.data.run.payDate)}
                 </time>
               </p>
             </article>
@@ -1162,7 +1154,7 @@ export function PayrollRunDetailClient({
                                       item.adjustments.map((adjustment) => (
                                         <li key={adjustment.id}>
                                           <span>
-                                            {adjustment.label} ({adjustment.type})
+                                            {adjustment.label} ({toSentenceCase(adjustment.type)})
                                           </span>
                                           <CurrencyDisplay
                                             amount={adjustment.amount}

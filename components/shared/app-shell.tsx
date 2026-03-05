@@ -24,6 +24,7 @@ import {
   type UserRole
 } from "../../lib/navigation";
 import type { MeAccessConfigResponse } from "../../types/access-control";
+import { AppErrorBoundary } from "./app-error-boundary";
 import { CommandPalette } from "./command-palette";
 import { NavIcon } from "./nav-icon";
 import { NotificationCenter } from "./notification-center";
@@ -894,7 +895,9 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
           </div>
         </header>
 
-        <main className="page-content">{children}</main>
+        <main className="page-content">
+          <AppErrorBoundary>{children}</AppErrorBoundary>
+        </main>
       </div>
 
       {isMobileSidebarOpen ? (
