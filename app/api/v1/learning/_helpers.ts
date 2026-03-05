@@ -37,6 +37,49 @@ export function canViewTeamLearning(roles: readonly UserRole[]): boolean {
   );
 }
 
+const QUIZ_SENSITIVE_FIELD_NAMES = new Set([
+  "correct_answer",
+  "is_correct",
+  "answer_key",
+  "correctAnswer",
+  "isCorrect",
+  "answerKey"
+]);
+
+function sanitizeLearningValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeLearningValue(item));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const record = value as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = {};
+
+  for (const [key, currentValue] of Object.entries(record)) {
+    if (QUIZ_SENSITIVE_FIELD_NAMES.has(key)) {
+      continue;
+    }
+
+    sanitized[key] = sanitizeLearningValue(currentValue);
+  }
+
+  return sanitized;
+}
+
+export function sanitizeLearningModulesForViewer(
+  modules: unknown[],
+  roles: readonly UserRole[]
+): unknown[] {
+  if (canManageLearning(roles)) {
+    return modules;
+  }
+
+  return modules.map((module) => sanitizeLearningValue(module));
+}
+
 export function parseInteger(value: number | string | null | undefined): number {
   if (typeof value === "number") {
     return Number.isFinite(value) ? Math.trunc(value) : 0;

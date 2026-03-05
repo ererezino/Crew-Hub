@@ -18,7 +18,8 @@ import {
   canManageLearning,
   courseRowSchema,
   jsonResponse,
-  mapCourseRow
+  mapCourseRow,
+  sanitizeLearningModulesForViewer
 } from "../_helpers";
 
 const querySchema = z.object({
@@ -87,7 +88,8 @@ export async function GET(request: Request) {
 
   const query = parsedQuery.data;
   const supabase = await createSupabaseServerClient();
-  const canManage = canManageLearning(session.profile.roles);
+  const viewerRoles = session.profile.roles;
+  const canManage = canManageLearning(viewerRoles);
 
   let coursesQuery = supabase
     .from("courses")
@@ -175,12 +177,14 @@ export async function GET(request: Request) {
 
   const courses = parsedCourses.data.map((row) => {
     const counts = countByCourseId.get(row.id) ?? { total: 0, completed: 0 };
-
-    return mapCourseRow({
+    const course = mapCourseRow({
       ...row,
       assignment_count: counts.total,
       completion_count: counts.completed
     });
+
+    course.modules = sanitizeLearningModulesForViewer(course.modules, viewerRoles);
+    return course;
   });
 
   return jsonResponse<LearningCoursesResponseData>(200, {
