@@ -73,7 +73,7 @@ function SentimentHeatmap({ heatmap }: { heatmap: SurveyHeatmapData }) {
         <div>
           <h2 className="section-title">Sentiment heatmap</h2>
           <p className="settings-card-description">
-            Average score by department and question. Cells with insufficient responses show "—".
+            Average score by department and question. Cells with insufficient responses show &quot;—&quot;.
           </p>
         </div>
       </header>

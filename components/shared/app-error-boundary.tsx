@@ -1,6 +1,7 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
+import Link from "next/link";
 import { Component, type ReactNode } from "react";
 
 type Props = {
@@ -62,9 +63,9 @@ export class AppErrorBoundary extends Component<Props, State> {
             >
               Reload page
             </button>
-            <a href="/dashboard" className="button button-accent">
+            <Link href="/dashboard" className="button button-accent">
               Return to dashboard
-            </a>
+            </Link>
           </div>
         </div>
       </div>

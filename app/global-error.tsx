@@ -1,6 +1,7 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
+import Link from "next/link";
 import { useEffect } from "react";
 
 export default function GlobalError({
@@ -48,7 +49,7 @@ export default function GlobalError({
             >
               Try again
             </button>
-            <a
+            <Link
               href="/dashboard"
               style={{
                 padding: "0.5rem 1rem",
@@ -60,7 +61,7 @@ export default function GlobalError({
               }}
             >
               Return to dashboard
-            </a>
+            </Link>
           </div>
         </div>
       </body>

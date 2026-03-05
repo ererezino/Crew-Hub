@@ -32,8 +32,6 @@ type ParsedModule = LearningModuleDefinition;
 type QuizState = {
   currentIndex: number;
   answers: Record<string, number>;
-  submitted: boolean;
-  result: LearningQuizResult | null;
 };
 
 // ── Helpers ──
@@ -163,33 +161,29 @@ function QuizModule({
   onSubmit,
   isSubmitting,
   quizResult,
-  allowRetake
+  allowRetake,
+  onRetry
 }: {
   questions: LearningQuizQuestion[];
   onSubmit: (answers: Record<string, number>) => void;
   isSubmitting: boolean;
   quizResult: LearningQuizResult | null;
   allowRetake: boolean;
+  onRetry: () => void;
 }) {
   const [quiz, setQuiz] = useState<QuizState>({
     currentIndex: 0,
-    answers: {},
-    submitted: false,
-    result: quizResult
+    answers: {}
   });
-
-  useEffect(() => {
-    if (quizResult) {
-      setQuiz((prev) => ({ ...prev, submitted: true, result: quizResult }));
-    }
-  }, [quizResult]);
+  const resolvedQuizResult = quizResult;
+  const isQuizSubmitted = resolvedQuizResult !== null;
 
   const currentQuestion = questions[quiz.currentIndex];
   const isLastQuestion = quiz.currentIndex === questions.length - 1;
   const hasAnswered = currentQuestion ? quiz.answers[currentQuestion.id] !== undefined : false;
 
   function handleSelectOption(questionId: string, optionIndex: number) {
-    if (quiz.submitted) return;
+    if (isQuizSubmitted) return;
 
     setQuiz((prev) => ({
       ...prev,
@@ -210,36 +204,35 @@ function QuizModule({
   }
 
   function handleRetry() {
+    onRetry();
     setQuiz({
       currentIndex: 0,
-      answers: {},
-      submitted: false,
-      result: null
+      answers: {}
     });
   }
 
   // Show result card after submission
-  if (quiz.submitted && quiz.result) {
+  if (isQuizSubmitted && resolvedQuizResult) {
     return (
       <div className="module-quiz-result">
         <h3 className="section-title">Quiz Result</h3>
         <p className="module-quiz-score">
-          You scored <strong className="numeric">{quiz.result.score}%</strong>.
-          {quiz.result.passingScore !== null
-            ? ` Pass mark is ${quiz.result.passingScore}%.`
+          You scored <strong className="numeric">{resolvedQuizResult.score}%</strong>.
+          {resolvedQuizResult.passingScore !== null
+            ? ` Pass mark is ${resolvedQuizResult.passingScore}%.`
             : ""}
         </p>
 
-        {quiz.result.passed ? (
+        {resolvedQuizResult.passed ? (
           <StatusBadge tone="success">Passed</StatusBadge>
         ) : (
           <StatusBadge tone="error">Failed</StatusBadge>
         )}
 
         <div className="module-quiz-result-actions">
-          {quiz.result.passed ? (
+          {resolvedQuizResult.passed ? (
             <p className="settings-card-description">Module completed. Continue to the next module.</p>
-          ) : quiz.result.allowRetake ? (
+          ) : resolvedQuizResult.allowRetake ? (
             <button type="button" className="button" onClick={handleRetry}>
               Try again
             </button>
@@ -667,6 +660,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
             isSubmitting={isModuleSubmitting}
             quizResult={quizResult}
             allowRetake={course?.allowRetake ?? false}
+            onRetry={() => setQuizResult(null)}
           />
         );
 
@@ -674,7 +668,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
         return (
           <div className="module-content-block">
             <p className="settings-card-description">
-              Module type "{mod.type}" is not yet supported.
+              Module type &quot;{mod.type}&quot; is not yet supported.
             </p>
             <button
               type="button"
