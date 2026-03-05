@@ -160,6 +160,10 @@ export default async function PeopleProfilePage({
             hasRole(session.profile.roles, "FINANCE_ADMIN") ||
             hasRole(session.profile.roles, "SUPER_ADMIN")
           }
+          canInitiateOffboarding={
+            hasRole(session.profile.roles, "HR_ADMIN") ||
+            hasRole(session.profile.roles, "SUPER_ADMIN")
+          }
         />
       ) : null}
 
