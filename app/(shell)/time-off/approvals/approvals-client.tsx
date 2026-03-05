@@ -231,8 +231,71 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
         />
       ) : null}
 
+      {/* Mobile approval cards */}
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && requests.length > 0 ? (
-        <div className="data-table-container">
+        <div className="mobile-approval-cards">
+          {requests.map((requestRecord) => (
+            <article key={`mobile-${requestRecord.id}`} className="mobile-approval-card">
+              <div className="mobile-approval-card-header">
+                <div>
+                  <p className="mobile-approval-card-name">{requestRecord.employeeName}</p>
+                  <p className="mobile-approval-card-detail">
+                    {requestRecord.employeeDepartment ?? "No department"}
+                    {requestRecord.employeeCountryCode ? ` - ${countryFlagFromCode(requestRecord.employeeCountryCode)}` : ""}
+                  </p>
+                </div>
+                <StatusBadge tone={toneForStatus(requestRecord.status)}>
+                  {formatLeaveStatus(requestRecord.status)}
+                </StatusBadge>
+              </div>
+              <div className="mobile-approval-card-body">
+                <div className="mobile-approval-card-row">
+                  <span className="mobile-approval-card-label">Type</span>
+                  <span>{formatLeaveTypeLabel(requestRecord.leaveType)}</span>
+                </div>
+                <div className="mobile-approval-card-row">
+                  <span className="mobile-approval-card-label">Dates</span>
+                  <span>{formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}</span>
+                </div>
+                <div className="mobile-approval-card-row">
+                  <span className="mobile-approval-card-label">Days</span>
+                  <span className="numeric">{formatDays(requestRecord.totalDays)}</span>
+                </div>
+                {requestRecord.reason ? (
+                  <div className="mobile-approval-card-reason">
+                    <span className="mobile-approval-card-label">Reason</span>
+                    <p>{requestRecord.reason}</p>
+                  </div>
+                ) : null}
+              </div>
+              {requestRecord.status === "pending" ? (
+                <div className="mobile-approval-card-actions">
+                  <button
+                    type="button"
+                    className="button button-approve"
+                    onClick={() => handleApprove(requestRecord)}
+                    disabled={isMutatingRequestId === requestRecord.id}
+                  >
+                    {isMutatingRequestId === requestRecord.id ? "Approving..." : "Approve"}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-reject"
+                    onClick={() => openRejectPanel(requestRecord)}
+                    disabled={isMutatingRequestId === requestRecord.id}
+                  >
+                    Reject
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Desktop approval table */}
+      {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && requests.length > 0 ? (
+        <div className="data-table-container approval-desktop-table">
           <table className="data-table" aria-label="Time off approvals table">
             <thead>
               <tr>

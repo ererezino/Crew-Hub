@@ -33,7 +33,8 @@ import {
 
 const listQuerySchema = z.object({
   scope: z.enum(["all", "reports", "me"]).default("all"),
-  limit: z.coerce.number().int().min(1).max(250).default(250)
+  limit: z.coerce.number().int().min(1).max(250).default(250),
+  search: z.string().trim().max(100).optional()
 });
 
 const createPersonSchema = z.object({
@@ -289,6 +290,10 @@ export async function GET(request: Request) {
 
   if (scope === "reports") {
     peopleQuery = peopleQuery.in("id", reportsUserIds.length > 0 ? reportsUserIds : [profile.id]);
+  }
+
+  if (query.search) {
+    peopleQuery = peopleQuery.ilike("full_name", `%${query.search}%`);
   }
 
   const { data: rawPeople, error: peopleError } = await peopleQuery;
