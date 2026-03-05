@@ -15,7 +15,7 @@ import {
   labelForComplianceStatus,
   toneForComplianceStatus
 } from "../../../lib/compliance";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatDate, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { useCompliance, updateComplianceDeadline } from "../../../hooks/use-compliance";
 import type {
   ComplianceDeadlineRecord,
@@ -619,7 +619,7 @@ export function ComplianceClient() {
                         <p className={`numeric ${dueDateToneClass(deadline.urgency)}`} title={formatDateTimeTooltip(deadline.dueDate)}>
                           {formatRelativeTime(deadline.dueDate)}
                         </p>
-                        <p className="settings-card-description">{deadline.dueDate}</p>
+                        <p className="settings-card-description">{formatDate(deadline.dueDate)}</p>
                       </td>
                       <td>
                         <StatusBadge tone={toneForComplianceStatus(deadline.status)}>
@@ -649,7 +649,7 @@ export function ComplianceClient() {
               {calendarGroups.map(([dueDate, rows]) => (
                 <article key={dueDate} className="settings-card">
                   <header className="compliance-calendar-header">
-                    <h3 className="section-title">{dueDate}</h3>
+                    <h3 className="section-title">{formatDate(dueDate)}</h3>
                     <p className="settings-card-description" title={formatDateTimeTooltip(dueDate)}>
                       {formatRelativeTime(dueDate)}
                     </p>
@@ -693,7 +693,7 @@ export function ComplianceClient() {
       <SlidePanel
         isOpen={!!selectedDeadline && !!formState}
         title={selectedDeadline?.requirement ?? "Update Deadline"}
-        description={selectedDeadline ? `${selectedDeadline.authority} • Due ${selectedDeadline.dueDate}` : undefined}
+        description={selectedDeadline ? `${selectedDeadline.authority} • Due ${formatDate(selectedDeadline.dueDate)}` : undefined}
         onClose={closeUpdatePanel}
       >
         {selectedDeadline && formState ? (
