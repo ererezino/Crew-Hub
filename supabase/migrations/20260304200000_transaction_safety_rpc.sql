@@ -190,6 +190,7 @@ DECLARE
   v_total_gross NUMERIC := 0;
   v_total_net NUMERIC := 0;
   v_total_deductions NUMERIC := 0;
+  v_item_deductions NUMERIC := 0;
   v_total_net_by_currency JSONB := '{}'::JSONB;
   v_item RECORD;
   v_currency TEXT;
@@ -223,9 +224,9 @@ BEGIN
     -- Sum deductions from JSONB if present
     IF v_item.deductions IS NOT NULL AND jsonb_typeof(v_item.deductions) = 'object' THEN
       SELECT COALESCE(SUM((value)::NUMERIC), 0)
-      INTO v_total_deductions
+      INTO v_item_deductions
       FROM jsonb_each_text(v_item.deductions);
-      -- Note: accumulate total across items
+      v_total_deductions := v_total_deductions + v_item_deductions;
     END IF;
 
     -- Build net totals by currency
