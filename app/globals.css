@@ -1947,6 +1947,72 @@ html.dark .topbar {
   margin: var(--space-1) 0 0;
 }
 
+.balance-calc-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--text-sm);
+  color: var(--text-accent);
+  cursor: pointer;
+}
+
+.balance-calc-toggle:hover {
+  text-decoration: underline;
+}
+
+.balance-calc-toggle-icon {
+  font-size: var(--text-xs);
+}
+
+.balance-calc-detail {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.balance-calc-table {
+  width: 100%;
+  font-size: var(--text-sm);
+  border-collapse: collapse;
+}
+
+.balance-calc-table td,
+.balance-calc-table th {
+  padding: var(--space-1) 0;
+  text-align: left;
+}
+
+.balance-calc-table th {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.balance-calc-result {
+  font-weight: 600;
+  border-top: 1px solid var(--border-default);
+}
+
+.balance-calc-note {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.balance-history {
+  margin-top: var(--space-3);
+}
+
+.balance-history-heading {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+}
+
 .timeoff-section-header {
   display: flex;
   align-items: center;
@@ -2066,6 +2132,32 @@ html.dark .topbar {
 .timeoff-calendar-badge-holiday {
   background: #fb923c;
   box-shadow: 0 0 4px rgba(251, 146, 60, 0.5);
+}
+
+.timeoff-calendar-badge-afk {
+  background: #fbbf24;
+  box-shadow: 0 0 4px rgba(251, 191, 36, 0.5);
+}
+
+.timeoff-calendar-day-afk {
+  border-left: 2px solid #fbbf24;
+}
+
+.timeoff-calendar-entry-afk {
+  border-left: 3px solid #fbbf24;
+}
+
+.timeoff-panel-afk-heading {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.timeoff-entry-badges {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
 }
 
 .timeoff-calendar-dots {

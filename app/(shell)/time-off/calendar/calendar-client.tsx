@@ -20,7 +20,7 @@ import {
   isoDateToUtcDate,
   monthToDateRange
 } from "../../../../lib/time-off";
-import type { LeaveRequestRecord } from "../../../../types/time-off";
+import type { CalendarAfkEntry, LeaveRequestRecord } from "../../../../types/time-off";
 
 type CalendarCell = {
   dateKey: string;
@@ -220,6 +220,29 @@ export function TimeOffCalendarClient({
     return map;
   }, [activeMonth, calendarQuery.data?.requests]);
 
+  const afkCountByDate = useMemo(() => {
+    const map = new Map<string, number>();
+
+    for (const entry of calendarQuery.data?.afkEntries ?? []) {
+      const current = map.get(entry.date) ?? 0;
+      map.set(entry.date, current + 1);
+    }
+
+    return map;
+  }, [calendarQuery.data?.afkEntries]);
+
+  const afkByDate = useMemo(() => {
+    const map = new Map<string, CalendarAfkEntry[]>();
+
+    for (const entry of calendarQuery.data?.afkEntries ?? []) {
+      const existing = map.get(entry.date) ?? [];
+      existing.push(entry);
+      map.set(entry.date, existing);
+    }
+
+    return map;
+  }, [calendarQuery.data?.afkEntries]);
+
   const closePanel = useCallback(() => setSelectedDay(null), []);
 
   if (calendarQuery.isLoading) {
@@ -333,18 +356,21 @@ export function TimeOffCalendarClient({
           {calendarCells.map((cell) => {
             const holidayNames = holidayNamesByDate.get(cell.dateKey) ?? [];
             const requestCount = requestCountByDate.get(cell.dateKey) ?? 0;
+            const afkCount = afkCountByDate.get(cell.dateKey) ?? 0;
             const isHoliday = holidayNames.length > 0;
             const hasLeave = requestCount > 0;
+            const hasAfk = afkCount > 0;
             const className = [
               "timeoff-calendar-day",
               cell.isCurrentMonth ? "timeoff-calendar-day-current" : "timeoff-calendar-day-muted",
               hasLeave ? "timeoff-calendar-day-approved" : "",
+              hasAfk ? "timeoff-calendar-day-afk" : "",
               isHoliday ? "timeoff-calendar-day-holiday" : ""
             ]
               .filter(Boolean)
               .join(" ");
 
-            const isClickable = canViewDayDetails && (hasLeave || isHoliday) && cell.isCurrentMonth;
+            const isClickable = canViewDayDetails && (hasLeave || isHoliday || hasAfk) && cell.isCurrentMonth;
 
             return (
               <article
@@ -368,10 +394,11 @@ export function TimeOffCalendarClient({
                 <p className="numeric">{cell.dayNumber}</p>
                 <span className="timeoff-calendar-dots">
                   {hasLeave ? <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" /> : null}
+                  {hasAfk ? <span className="timeoff-calendar-badge timeoff-calendar-badge-afk" title="AFK" /> : null}
                   {isHoliday ? <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" /> : null}
                 </span>
-                {requestCount > 1 ? (
-                  <p className="timeoff-calendar-note numeric">{requestCount}</p>
+                {requestCount + afkCount > 1 ? (
+                  <p className="timeoff-calendar-note numeric">{requestCount + afkCount}</p>
                 ) : null}
               </article>
             );
@@ -381,6 +408,10 @@ export function TimeOffCalendarClient({
             <div className="timeoff-calendar-legend-item">
               <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" />
               <span>Leave</span>
+            </div>
+            <div className="timeoff-calendar-legend-item">
+              <span className="timeoff-calendar-badge timeoff-calendar-badge-afk" />
+              <span>AFK</span>
             </div>
             <div className="timeoff-calendar-legend-item">
               <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" />
@@ -393,12 +424,19 @@ export function TimeOffCalendarClient({
       <section className="settings-card" aria-label="Monthly leave entries">
         <header className="timeoff-section-header">
           <h2 className="section-title">Entries This Month</h2>
-          <StatusBadge tone="processing">
-            {calendarQuery.data.requests.length} {calendarQuery.data.requests.length === 1 ? "request" : "requests"}
-          </StatusBadge>
+          <div className="timeoff-entry-badges">
+            <StatusBadge tone="processing">
+              {calendarQuery.data.requests.length} {calendarQuery.data.requests.length === 1 ? "request" : "requests"}
+            </StatusBadge>
+            {(calendarQuery.data.afkEntries ?? []).length > 0 ? (
+              <StatusBadge tone="warning">
+                {calendarQuery.data.afkEntries.length} AFK
+              </StatusBadge>
+            ) : null}
+          </div>
         </header>
 
-        {calendarQuery.data.requests.length === 0 ? (
+        {calendarQuery.data.requests.length === 0 && (calendarQuery.data.afkEntries ?? []).length === 0 ? (
           <EmptyState
             title="No leave entries for this month"
             description="Adjust month or filters to view more calendar entries."
@@ -430,6 +468,32 @@ export function TimeOffCalendarClient({
                       {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
                     </time>
                   </p>
+                </div>
+              </li>
+            ))}
+            {(calendarQuery.data.afkEntries ?? []).map((afk) => (
+              <li key={afk.id} className="timeoff-calendar-entry-card timeoff-calendar-entry-afk">
+                <div>
+                  <p className="timeoff-calendar-entry-title">{afk.employeeName}</p>
+                  <p className="settings-card-description">
+                    AFK {afk.startTime} - {afk.endTime}
+                    {afk.notes ? ` - ${afk.notes}` : ""}
+                  </p>
+                </div>
+                <div className="timeoff-calendar-entry-meta">
+                  <StatusBadge tone={afk.reclassifiedAs ? "warning" : "info"}>
+                    {afk.reclassifiedAs ? "Reclassified" : "AFK"}
+                  </StatusBadge>
+                  <p className="settings-card-description numeric">
+                    {afk.durationMinutes >= 60
+                      ? `${Math.floor(afk.durationMinutes / 60)}h ${afk.durationMinutes % 60}m`
+                      : `${afk.durationMinutes}m`}
+                  </p>
+                  {!afk.leaveRequestId ? (
+                    <a href={`/time-off?convert_afk=${afk.id}&date=${afk.date}`} className="table-row-action">
+                      Convert to leave
+                    </a>
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -485,9 +549,33 @@ export function TimeOffCalendarClient({
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="settings-card-description">No leave requests on this day.</p>
-          )}
+          ) : null}
+
+          {(afkByDate.get(selectedDay) ?? []).length > 0 ? (
+            <>
+              <p className="timeoff-panel-afk-heading">AFK entries</p>
+              <ul className="timeoff-calendar-entry-list">
+                {(afkByDate.get(selectedDay) ?? []).map((afk) => (
+                  <li key={afk.id} className="timeoff-calendar-entry-card timeoff-calendar-entry-afk">
+                    <div>
+                      <p className="timeoff-calendar-entry-title">{afk.employeeName}</p>
+                      <p className="settings-card-description">
+                        {afk.startTime} - {afk.endTime}
+                        {afk.notes ? ` - ${afk.notes}` : ""}
+                      </p>
+                    </div>
+                    <div className="timeoff-calendar-entry-meta">
+                      <StatusBadge tone="info">AFK</StatusBadge>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+
+          {(requestsByDate.get(selectedDay) ?? []).length === 0 && (afkByDate.get(selectedDay) ?? []).length === 0 ? (
+            <p className="settings-card-description">No leave requests or AFK entries on this day.</p>
+          ) : null}
         </SlidePanel>
       ) : null}
     </>

@@ -113,6 +113,13 @@ export type DashboardTeamOnLeaveItem = {
   leaveType: string;
 };
 
+export type DashboardAfkTodayItem = {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+};
+
 export type DashboardAuditLogEntry = {
   id: string;
   actorName: string;
@@ -134,6 +141,7 @@ export type DashboardResponseData = {
   /* ── Universal widgets (all roles) ── */
   announcements: DashboardAnnouncement[];
   teamOnLeaveToday: DashboardTeamOnLeaveItem[];
+  afkToday: DashboardAfkTodayItem[];
   upcomingHolidays: DashboardHolidayItem[];
 
   /* ── new_hire greeting card ── */

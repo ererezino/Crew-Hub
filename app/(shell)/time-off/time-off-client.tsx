@@ -24,6 +24,7 @@ import {
 } from "../../../lib/time-off";
 import { formatSingleDateHuman } from "../../../lib/datetime";
 import type {
+  BalanceHistoryYear,
   LeaveBalance,
   LeaveRequestRecord,
   LeaveRequestStatus,
@@ -270,6 +271,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCancellingRequestId, setIsCancellingRequestId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [expandedBalanceTypes, setExpandedBalanceTypes] = useState<Set<string>>(new Set());
   const [isAfkPanelOpen, setIsAfkPanelOpen] = useState(false);
   const [afkDate, setAfkDate] = useState("");
   const [afkStartTime, setAfkStartTime] = useState("");
@@ -727,6 +729,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           summaryQuery.data.balances.map((balance) => {
             const scheduledDays = balance.pendingDays;
             const available = balance.totalDays - balance.usedDays - scheduledDays + balance.carriedDays;
+            const isExpanded = expandedBalanceTypes.has(balance.leaveType);
+            const policy = (summaryQuery.data?.policies ?? []).find(
+              (p) => p.leaveType === balance.leaveType
+            );
+            const history = (summaryQuery.data?.balanceHistory ?? []).filter(
+              (h: BalanceHistoryYear) => h.leaveType === balance.leaveType
+            );
 
             return (
               <article key={balance.id} className="timeoff-balance-card">
@@ -764,6 +773,92 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                     </div>
                   ) : null}
                 </dl>
+
+                <button
+                  type="button"
+                  className="balance-calc-toggle"
+                  onClick={() => {
+                    setExpandedBalanceTypes((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(balance.leaveType)) {
+                        next.delete(balance.leaveType);
+                      } else {
+                        next.add(balance.leaveType);
+                      }
+                      return next;
+                    });
+                  }}
+                  aria-expanded={isExpanded}
+                >
+                  {isExpanded ? "Hide calculation" : "How this was calculated"}
+                  <span className="balance-calc-toggle-icon">{isExpanded ? "\u25B2" : "\u25BC"}</span>
+                </button>
+
+                {isExpanded ? (
+                  <div className="balance-calc-detail">
+                    <table className="balance-calc-table" aria-label="Balance calculation breakdown">
+                      <tbody>
+                        <tr>
+                          <td>Annual entitlement</td>
+                          <td className="numeric">{formatDays(policy?.defaultDaysPerYear ?? balance.totalDays)} days</td>
+                        </tr>
+                        {balance.carriedDays > 0 ? (
+                          <tr>
+                            <td>Carry-over from {balance.year - 1}</td>
+                            <td className="numeric">+{formatDays(balance.carriedDays)} days</td>
+                          </tr>
+                        ) : null}
+                        <tr>
+                          <td>Used this year</td>
+                          <td className="numeric">-{formatDays(balance.usedDays)} days</td>
+                        </tr>
+                        {scheduledDays > 0 ? (
+                          <tr>
+                            <td>Pending / scheduled</td>
+                            <td className="numeric">-{formatDays(scheduledDays)} days</td>
+                          </tr>
+                        ) : null}
+                        <tr className="balance-calc-result">
+                          <td>Available</td>
+                          <td className="numeric">{formatDays(available)} days</td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    {policy ? (
+                      <p className="balance-calc-note">
+                        Accrual: {policy.accrualType.replace(/_/g, " ")}
+                        {policy.carryOver ? " (carry-over enabled)" : " (no carry-over)"}
+                      </p>
+                    ) : null}
+
+                    {history.length > 0 ? (
+                      <div className="balance-history">
+                        <p className="balance-history-heading">Previous years</p>
+                        <table className="balance-calc-table" aria-label="Balance history">
+                          <thead>
+                            <tr>
+                              <th>Year</th>
+                              <th className="numeric">Entitled</th>
+                              <th className="numeric">Used</th>
+                              <th className="numeric">Carried</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {history.map((h: BalanceHistoryYear) => (
+                              <tr key={h.year}>
+                                <td className="numeric">{h.year}</td>
+                                <td className="numeric">{formatDays(h.totalDays)}</td>
+                                <td className="numeric">{formatDays(h.usedDays)}</td>
+                                <td className="numeric">{formatDays(h.carriedDays)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </article>
             );
           })

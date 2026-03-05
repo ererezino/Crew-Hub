@@ -13,6 +13,7 @@ import {
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
+  type CalendarAfkEntry,
   type HolidayCalendarDay,
   type LeaveRequestRecord,
   type TimeOffCalendarResponseData
@@ -334,12 +335,49 @@ export async function GET(request: Request) {
     }));
   }
 
+  let afkEntries: CalendarAfkEntry[] = [];
+
+  if (filteredProfileIds.length > 0) {
+    try {
+      const { data: rawAfk } = await supabase
+        .from("afk_logs")
+        .select("id, employee_id, date, start_time, end_time, duration_minutes, notes, reclassified_as, leave_request_id")
+        .eq("org_id", session.profile.org_id)
+        .is("deleted_at", null)
+        .in("employee_id", filteredProfileIds)
+        .gte("date", monthRange.startDate)
+        .lte("date", monthRange.endDate)
+        .order("date", { ascending: true });
+
+      if (rawAfk && rawAfk.length > 0) {
+        afkEntries = rawAfk.map((row) => {
+          const employee = profileById.get(row.employee_id);
+          return {
+            id: row.id,
+            employeeId: row.employee_id,
+            employeeName: employee?.full_name ?? "Unknown user",
+            date: row.date,
+            startTime: row.start_time ?? "",
+            endTime: row.end_time ?? "",
+            durationMinutes: typeof row.duration_minutes === "number" ? row.duration_minutes : 0,
+            notes: row.notes ?? "",
+            reclassifiedAs: row.reclassified_as ?? null,
+            leaveRequestId: row.leave_request_id ?? null
+          };
+        });
+      }
+    } catch {
+      // AFK table may not exist yet; gracefully continue without AFK data
+    }
+  }
+
   const responseData: TimeOffCalendarResponseData = {
     month,
     monthStart: monthRange.startDate,
     monthEnd: monthRange.endDate,
     requests,
     holidays,
+    afkEntries,
     filters
   };
 

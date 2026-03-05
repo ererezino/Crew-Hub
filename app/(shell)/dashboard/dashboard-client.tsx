@@ -12,6 +12,7 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDashboard } from "../../../hooks/use-dashboard";
 import { formatDate, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
+import { formatLeaveTypeLabel } from "../../../lib/time-off";
 import type { DashboardResponseData } from "../../../types/dashboard";
 
 import {
@@ -495,16 +496,25 @@ function AnnouncementsWidget({ data }: { data: DashboardResponseData }) {
 }
 
 function TeamOnLeaveWidget({ data }: { data: DashboardResponseData }) {
+  const hasLeave = data.teamOnLeaveToday.length > 0;
+  const hasAfk = (data.afkToday ?? []).length > 0;
+
   return (
-    <WidgetCard title="Team on leave today" icon={<Palmtree size={14} />}>
-      {data.teamOnLeaveToday.length === 0 ? (
-        <p className="settings-card-description">No one is on leave today.</p>
+    <WidgetCard title="Team out today" icon={<Palmtree size={14} />}>
+      {!hasLeave && !hasAfk ? (
+        <p className="settings-card-description">No one is on leave or AFK today.</p>
       ) : (
         <ul className="dashboard-widget-list">
           {data.teamOnLeaveToday.map((person) => (
-            <li key={person.id} className="dashboard-widget-list-item">
+            <li key={`leave-${person.id}`} className="dashboard-widget-list-item">
               <span>{person.name}</span>
-              <StatusBadge tone="info">{person.leaveType}</StatusBadge>
+              <StatusBadge tone="info">{formatLeaveTypeLabel(person.leaveType)}</StatusBadge>
+            </li>
+          ))}
+          {(data.afkToday ?? []).map((person) => (
+            <li key={`afk-${person.id}`} className="dashboard-widget-list-item">
+              <span>{person.name}</span>
+              <StatusBadge tone="warning">AFK {person.startTime} - {person.endTime}</StatusBadge>
             </li>
           ))}
         </ul>

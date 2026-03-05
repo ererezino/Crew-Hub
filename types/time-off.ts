@@ -98,10 +98,19 @@ export type TimeOffSummaryProfile = {
   status: string | null;
 };
 
+export type BalanceHistoryYear = {
+  year: number;
+  leaveType: string;
+  totalDays: number;
+  usedDays: number;
+  carriedDays: number;
+};
+
 export type TimeOffSummaryResponseData = {
   profile: TimeOffSummaryProfile;
   policies: LeavePolicy[];
   balances: LeaveBalance[];
+  balanceHistory: BalanceHistoryYear[];
   requests: LeaveRequestRecord[];
   holidays: HolidayCalendarDay[];
 };
@@ -125,12 +134,26 @@ export type TimeOffCalendarFilterOptions = {
   departments: string[];
 };
 
+export type CalendarAfkEntry = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  notes: string;
+  reclassifiedAs: string | null;
+  leaveRequestId: string | null;
+};
+
 export type TimeOffCalendarResponseData = {
   month: string;
   monthStart: string;
   monthEnd: string;
   requests: LeaveRequestRecord[];
   holidays: HolidayCalendarDay[];
+  afkEntries: CalendarAfkEntry[];
   filters: TimeOffCalendarFilterOptions;
 };
 

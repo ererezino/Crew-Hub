@@ -8,6 +8,7 @@ import type { ApiResponse } from "../../../../../types/auth";
 import {
   LEAVE_ACCRUAL_TYPES,
   LEAVE_REQUEST_STATUSES,
+  type BalanceHistoryYear,
   type HolidayCalendarDay,
   type LeaveBalance,
   type LeavePolicy,
@@ -411,6 +412,37 @@ export async function GET(request: Request) {
     year: row.year
   }));
 
+  // Fetch balance history for the prior 2 years
+  let balanceHistory: BalanceHistoryYear[] = [];
+
+  try {
+    const priorYears = [year - 1, year - 2].filter((y) => y >= 2020);
+
+    if (priorYears.length > 0) {
+      const { data: historyRows } = await supabase
+        .from("leave_balances")
+        .select("leave_type, year, total_days, used_days, carried_days")
+        .eq("org_id", session.profile.org_id)
+        .eq("employee_id", session.profile.id)
+        .in("year", priorYears)
+        .is("deleted_at", null)
+        .order("year", { ascending: false })
+        .order("leave_type", { ascending: true });
+
+      if (historyRows && historyRows.length > 0) {
+        balanceHistory = historyRows.map((row) => ({
+          year: typeof row.year === "number" ? row.year : Number(row.year),
+          leaveType: row.leave_type ?? "",
+          totalDays: parseNumeric(row.total_days),
+          usedDays: parseNumeric(row.used_days),
+          carriedDays: parseNumeric(row.carried_days)
+        }));
+      }
+    }
+  } catch {
+    // Balance history is optional; continue without it
+  }
+
   const responseData: TimeOffSummaryResponseData = {
     profile: {
       id: employeeProfile.id,
@@ -422,6 +454,7 @@ export async function GET(request: Request) {
     },
     policies,
     balances,
+    balanceHistory,
     requests,
     holidays
   };

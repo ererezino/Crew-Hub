@@ -7,6 +7,7 @@ import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../types/auth";
 import type {
+  DashboardAfkTodayItem,
   DashboardAnnouncement,
   DashboardAuditLogEntry,
   DashboardExpenseItem,
@@ -73,6 +74,7 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     greeting,
     announcements: [],
     teamOnLeaveToday: [],
+    afkToday: [],
     upcomingHolidays: [],
     org: null,
     managerInfo: null,
@@ -164,6 +166,47 @@ async function fetchTeamOnLeaveToday(
       id: row.employee_id,
       name: nameMap.get(row.employee_id) ?? "Team Member",
       leaveType: row.leave_type ?? "Leave"
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchAfkToday(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<DashboardAfkTodayItem[]> {
+  try {
+    const today = toDateString(new Date());
+
+    const { data, error } = await supabase
+      .from("afk_logs")
+      .select("id, employee_id, start_time, end_time")
+      .eq("org_id", orgId)
+      .eq("date", today)
+      .is("deleted_at", null)
+      .limit(20);
+
+    if (error || !data || data.length === 0) return [];
+
+    const employeeIds = [...new Set(
+      data.map((row) => row.employee_id).filter((v): v is string => typeof v === "string")
+    )];
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", employeeIds);
+
+    const nameMap = new Map(
+      (profiles ?? []).map((p) => [p.id, p.full_name])
+    );
+
+    return data.map((row) => ({
+      id: row.employee_id,
+      name: nameMap.get(row.employee_id) ?? "Team Member",
+      startTime: row.start_time ?? "",
+      endTime: row.end_time ?? ""
     }));
   } catch {
     return [];
@@ -857,15 +900,17 @@ export async function GET() {
 
     /* ── Step 2: Fetch universal data (all personas) ── */
 
-    const [announcements, teamOnLeaveToday, upcomingHolidays] =
+    const [announcements, teamOnLeaveToday, afkToday, upcomingHolidays] =
       await Promise.all([
         fetchAnnouncements(supabase, profile.org_id),
         fetchTeamOnLeaveToday(supabase, profile.org_id),
+        fetchAfkToday(supabase, profile.org_id),
         fetchUpcomingHolidays(supabase, profile.org_id, profile.country_code)
       ]);
 
     response.announcements = announcements;
     response.teamOnLeaveToday = teamOnLeaveToday;
+    response.afkToday = afkToday;
     response.upcomingHolidays = upcomingHolidays;
 
     /* ── Step 3: Fetch persona-specific data ── */
