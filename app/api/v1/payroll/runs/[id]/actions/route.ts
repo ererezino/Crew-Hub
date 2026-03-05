@@ -511,6 +511,30 @@ export async function POST(
         parsedUpdated.data.pay_period_end
       );
 
+      // Notify admins that payroll was approved (separate from employee payslip notification)
+      const { data: adminRows } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("org_id", profile.org_id)
+        .or("roles.cs.{FINANCE_ADMIN},roles.cs.{SUPER_ADMIN}")
+        .is("deleted_at", null);
+
+      if (adminRows && adminRows.length > 0) {
+        const adminIds = adminRows
+          .map((row) => row.id)
+          .filter((value): value is string => typeof value === "string");
+
+        void createBulkNotifications({
+          orgId: profile.org_id,
+          userIds: adminIds,
+          type: "payroll_approved",
+          title: "Payroll run processed",
+          body: `Payroll run for ${payPeriodLabel} has been processed.`,
+          link: `/payroll/runs/${runId}`
+        });
+      }
+
+      // Notify all employees that their payslip is ready
       const { data: payrollItemRows, error: payrollItemsError } = await supabase
         .from("payroll_items")
         .select("employee_id")
@@ -533,7 +557,7 @@ export async function POST(
           userIds: employeeIds,
           type: "payslip_ready",
           title: "Payslip ready",
-          body: `Your payslip for ${payPeriodLabel} is ready.`,
+          body: `Your payment statement for ${payPeriodLabel} is now available.`,
           link: "/me/pay?tab=payslips"
         });
 
