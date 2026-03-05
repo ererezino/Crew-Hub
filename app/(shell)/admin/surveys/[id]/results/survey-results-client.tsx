@@ -234,7 +234,7 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
         title={survey?.title?.length ? `${survey.title} Results` : "Survey Results"}
         description="Review response coverage, question trends, and export data for analysis."
         actions={
-          <div className="documents-row-actions" style={{ opacity: 1, transform: "none", pointerEvents: "auto" }}>
+          <>
             <Link href="/admin/surveys" className="button">
               Back to admin
             </Link>
@@ -246,7 +246,7 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
                 Export CSV
               </a>
             ) : null}
-          </div>
+          </>
         }
       />
 

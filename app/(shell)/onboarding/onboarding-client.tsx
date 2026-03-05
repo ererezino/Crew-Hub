@@ -552,7 +552,7 @@ export function OnboardingClient({
         description="Launch onboarding plans, monitor progress, and resolve blockers before deadlines slip."
         actions={
           canManageOnboarding ? (
-            <div className="onboarding-header-actions">
+            <>
               <button
                 type="button"
                 className="button"
@@ -567,7 +567,7 @@ export function OnboardingClient({
               >
                 Start onboarding
               </button>
-            </div>
+            </>
           ) : null
         }
       />

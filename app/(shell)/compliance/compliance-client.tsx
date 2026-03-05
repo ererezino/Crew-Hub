@@ -396,7 +396,7 @@ export function ComplianceClient() {
         title="Compliance"
         description="Track statutory deadlines, completion status, and proof across countries."
         actions={
-          <div className="page-header-actions">
+          <>
             <button
               type="button"
               className="button button-accent"
@@ -418,7 +418,7 @@ export function ComplianceClient() {
             >
               Calendar
             </button>
-          </div>
+          </>
         }
       />
 

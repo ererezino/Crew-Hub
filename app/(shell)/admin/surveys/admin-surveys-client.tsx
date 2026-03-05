@@ -109,14 +109,14 @@ export function AdminSurveysClient() {
         title="Survey Admin"
         description="Create, launch, and review survey response coverage across the organization."
         actions={
-          <div className="documents-row-actions" style={{ opacity: 1, transform: "none", pointerEvents: "auto" }}>
+          <>
             <Link href="/admin/surveys/new" className="button button-accent">
               New survey
             </Link>
             <Link href="/surveys" className="button">
               Employee view
             </Link>
-          </div>
+          </>
         }
       />
 

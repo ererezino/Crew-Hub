@@ -514,7 +514,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         title="My Documents"
         description="Access your personal documents, upload required records, and track expiry reminders."
         actions={
-          <div className="page-header-actions-row">
+          <>
             {showTravelView ? (
               <button
                 type="button"
@@ -527,7 +527,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
               <>
                 <button
                   type="button"
-                  className="button button-secondary"
+                  className="button"
                   onClick={openTravelPanel}
                 >
                   Request Travel Letter
@@ -541,7 +541,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                 </button>
               </>
             )}
-          </div>
+          </>
         }
       />
 
