@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { ProgressRing } from "../../../../components/shared/progress-ring";
 import { StatusBadge } from "../../../../components/shared/status-badge";
-import { useOnboardingInstanceDetail, useOnboardingInstances } from "../../../../hooks/use-onboarding";
+import {
+  updateOnboardingTaskStatus,
+  useOnboardingInstanceDetail,
+  useOnboardingInstances
+} from "../../../../hooks/use-onboarding";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { toSentenceCase } from "../../../../lib/format-labels";
 import type { OnboardingTask } from "../../../../types/onboarding";
@@ -49,6 +53,7 @@ export function MyOnboardingClient() {
     });
 
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const resolvedSelectedInstanceId = useMemo(() => {
     if (instances.length === 0) {
       return null;
@@ -65,8 +70,22 @@ export function MyOnboardingClient() {
   const {
     detail,
     isLoading: isDetailLoading,
-    errorMessage: detailError
+    errorMessage: detailError,
+    refresh: refreshDetail
   } = useOnboardingInstanceDetail(resolvedSelectedInstanceId);
+
+  const handleTaskAction = useCallback(
+    async (taskId: string, newStatus: "completed" | "in_progress") => {
+      setUpdatingTaskId(taskId);
+      const result = await updateOnboardingTaskStatus(taskId, newStatus);
+      setUpdatingTaskId(null);
+
+      if (result.success) {
+        refreshDetail();
+      }
+    },
+    [refreshDetail]
+  );
 
   const selectedInstance = useMemo(
     () => instances.find((instance) => instance.id === resolvedSelectedInstanceId) ?? null,
@@ -182,43 +201,86 @@ export function MyOnboardingClient() {
             />
           ) : (
             <section className="my-onboarding-task-list">
-              {detail.tasks.map((task) => (
-                <article key={task.id} className="my-onboarding-task-card">
-                  <header className="my-onboarding-task-card-header">
-                    <h2 className="section-title">{task.title}</h2>
-                    <div className="my-onboarding-task-badges">
-                      {task.taskType === "e_signature" && task.status === "completed" ? (
-                        <StatusBadge tone="success">Signed</StatusBadge>
-                      ) : (
-                        <StatusBadge tone={toneForTaskStatus(task.status)}>{toSentenceCase(task.status)}</StatusBadge>
-                      )}
+              {detail.tasks.map((task) => {
+                const isUpdating = updatingTaskId === task.id;
+
+                return (
+                  <article key={task.id} className="my-onboarding-task-card">
+                    <header className="my-onboarding-task-card-header">
+                      <h2 className="section-title">{task.title}</h2>
+                      <div className="my-onboarding-task-badges">
+                        {task.taskType === "e_signature" && task.status === "completed" ? (
+                          <StatusBadge tone="success">Signed</StatusBadge>
+                        ) : (
+                          <StatusBadge tone={toneForTaskStatus(task.status)}>{toSentenceCase(task.status)}</StatusBadge>
+                        )}
+                      </div>
+                    </header>
+                    {task.description ? (
+                      <p className="settings-card-description">{task.description}</p>
+                    ) : null}
+                    <div className="my-onboarding-task-meta">
+                      <span className="settings-card-description">
+                        {toSentenceCase(task.category)}
+                      </span>
+                      {task.dueDate ? (
+                        <span className="settings-card-description">
+                          Due{" "}
+                          <time dateTime={task.dueDate} title={formatDateTimeTooltip(task.dueDate)}>
+                            {formatRelativeTime(task.dueDate)}
+                          </time>
+                        </span>
+                      ) : null}
+                      {task.completedByName ? (
+                        <span className="settings-card-description">
+                          Completed by {task.completedByName}
+                        </span>
+                      ) : null}
                     </div>
-                  </header>
-                  <p className="settings-card-description">
-                    {task.description ?? "No description"}
-                  </p>
-                  <p className="settings-card-description">Category: {toSentenceCase(task.category)}</p>
-                  <p className="settings-card-description">Assigned: {task.assignedToName}</p>
-                  <p className="settings-card-description">
-                    Due:{" "}
-                    {task.dueDate ? (
-                      <time dateTime={task.dueDate} title={formatDateTimeTooltip(task.dueDate)}>
-                        {formatRelativeTime(task.dueDate)}
-                      </time>
-                    ) : (
-                      "--"
-                    )}
-                  </p>
-                  {task.taskType === "e_signature" && task.status !== "completed" ? (
-                    <Link href="/signatures" className="button button-accent button-sm">
-                      Sign now
-                    </Link>
-                  ) : null}
-                  <p className="settings-card-description">
-                    Completed by: {task.completedByName ?? "--"}
-                  </p>
-                </article>
-              ))}
+
+                    <div className="my-onboarding-task-actions">
+                      {task.taskType === "e_signature" && task.status !== "completed" ? (
+                        <Link href="/signatures" className="button button-accent button-sm">
+                          Sign now
+                        </Link>
+                      ) : null}
+
+                      {task.taskType === "link" && task.status !== "completed" ? (
+                        <a
+                          href={task.documentId ?? "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="button button-sm"
+                        >
+                          Open link
+                        </a>
+                      ) : null}
+
+                      {task.status !== "completed" && task.taskType !== "e_signature" ? (
+                        <button
+                          type="button"
+                          className="button button-accent button-sm"
+                          disabled={isUpdating}
+                          onClick={() => handleTaskAction(task.id, "completed")}
+                        >
+                          {isUpdating ? "Saving..." : "Mark done"}
+                        </button>
+                      ) : null}
+
+                      {task.status === "completed" && task.taskType === "manual" ? (
+                        <button
+                          type="button"
+                          className="button button-sm"
+                          disabled={isUpdating}
+                          onClick={() => handleTaskAction(task.id, "in_progress")}
+                        >
+                          {isUpdating ? "Saving..." : "Undo"}
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
             </section>
           )}
 

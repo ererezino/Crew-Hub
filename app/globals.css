@@ -1872,6 +1872,18 @@ html.dark .topbar {
   gap: var(--space-3);
 }
 
+.my-onboarding-task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+.my-onboarding-task-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
 .my-onboarding-footer {
   margin-top: var(--space-4);
 }

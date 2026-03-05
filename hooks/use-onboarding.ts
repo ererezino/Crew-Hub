@@ -9,6 +9,7 @@ import type {
   OnboardingInstanceSummary,
   OnboardingInstanceStatus,
   OnboardingInstancesResponse,
+  OnboardingTaskStatus,
   OnboardingTemplate,
   OnboardingTemplatesResponse,
   OnboardingType
@@ -287,4 +288,36 @@ export function useOnboardingInstanceDetail(
     errorMessage,
     refresh
   };
+}
+
+export async function updateOnboardingTaskStatus(
+  taskId: string,
+  status: OnboardingTaskStatus,
+  notes?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const body: Record<string, string> = { status };
+    if (notes !== undefined) {
+      body.notes = notes;
+    }
+
+    const response = await fetch(`/api/v1/onboarding/tasks/${taskId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok || payload.error) {
+      return { success: false, error: payload.error?.message ?? "Unable to update task." };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unable to update task."
+    };
+  }
 }
