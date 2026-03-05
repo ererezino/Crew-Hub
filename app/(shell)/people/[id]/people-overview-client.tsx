@@ -22,6 +22,7 @@ type PeopleOverviewClientProps = {
   employeeId: string;
   isSelf: boolean;
   isAdmin: boolean;
+  canOffboard: boolean;
 };
 
 type EditFormValues = {
@@ -70,7 +71,8 @@ function formatDate(dateString: string | null): string {
 export function PeopleOverviewClient({
   employeeId,
   isSelf,
-  isAdmin
+  isAdmin,
+  canOffboard
 }: PeopleOverviewClientProps) {
   const [person, setPerson] = useState<PersonRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -459,7 +461,7 @@ export function PeopleOverviewClient({
       ) : null}
 
       {/* Danger Zone — Admin only, non-self, non-offboarding */}
-      {isAdmin && !isSelf && person.status !== "offboarding" ? (
+      {canOffboard && !isSelf && person.status !== "offboarding" ? (
         <div className="danger-zone">
           <h3 className="danger-zone-title">Danger zone</h3>
           <div className="danger-zone-content">
