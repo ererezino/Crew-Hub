@@ -308,28 +308,58 @@ async function fetchRecentExpenses(
 async function fetchPendingApprovals(
   supabase: SupabaseClient,
   orgId: string,
-  _userId: string
+  userId: string,
+  scopeToDirectReports: boolean
 ): Promise<DashboardPendingApprovals> {
   try {
+    let directReportIds: string[] | null = null;
+
+    if (scopeToDirectReports) {
+      const { data: reportRows } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("org_id", orgId)
+        .eq("manager_id", userId)
+        .is("deleted_at", null);
+
+      directReportIds = (reportRows ?? []).map((row) => row.id as string);
+
+      if (directReportIds.length === 0) {
+        return { leave: 0, expenses: 0, timesheets: 0, total: 0 };
+      }
+    }
+
+    let leaveQuery = supabase
+      .from("leave_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "pending")
+      .is("deleted_at", null);
+
+    let expenseQuery = supabase
+      .from("expenses")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "pending")
+      .is("deleted_at", null);
+
+    let timesheetQuery = supabase
+      .from("timesheets")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "submitted")
+      .is("deleted_at", null);
+
+    if (directReportIds) {
+      leaveQuery = leaveQuery.in("employee_id", directReportIds);
+      expenseQuery = expenseQuery.in("employee_id", directReportIds);
+      timesheetQuery = timesheetQuery.in("employee_id", directReportIds);
+    }
+
     const [leaveResult, expenseResult, timesheetResult] = await Promise.all([
-      supabase
-        .from("leave_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("status", "pending")
-        .is("deleted_at", null),
-      supabase
-        .from("expenses")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("status", "pending")
-        .is("deleted_at", null),
-      supabase
-        .from("timesheets")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("status", "submitted")
-        .is("deleted_at", null)
+      leaveQuery,
+      expenseQuery,
+      timesheetQuery
     ]);
 
     const leave = leaveResult.count ?? 0;
@@ -937,7 +967,7 @@ export async function GET() {
           recentExpenses,
           hasPolicy
         ] = await Promise.all([
-          fetchPendingApprovals(supabase, profile.org_id, profile.id),
+          fetchPendingApprovals(supabase, profile.org_id, profile.id, true),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
           fetchUpcomingShifts(supabase, profile.org_id, profile.id),
           fetchRecentExpenses(supabase, profile.org_id, profile.id),
@@ -1021,7 +1051,7 @@ export async function GET() {
           fetchHeadcount(supabase, profile.org_id),
           fetchHeadcountByCountry(supabase, profile.org_id),
           fetchHeadcountByDept(supabase, profile.org_id),
-          fetchPendingApprovals(supabase, profile.org_id, profile.id),
+          fetchPendingApprovals(supabase, profile.org_id, profile.id, false),
           fetchPayrollStatus(supabase, profile.org_id),
           fetchComplianceDeadlines(supabase, profile.org_id),
           fetchComplianceHealth(supabase, profile.org_id),
