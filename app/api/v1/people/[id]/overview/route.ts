@@ -50,7 +50,7 @@ type Employee360Data = {
 /* ---- Helpers ---- */
 
 const paramsSchema = z.object({
-  employeeId: z.string().uuid("Employee id must be a valid UUID.")
+  id: z.string().uuid("Employee id must be a valid UUID.")
 });
 
 function buildMeta() {
@@ -399,7 +399,7 @@ async function queryDocuments(
 
 export async function GET(
   _request: Request,
-  context: { params: Promise<{ employeeId: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   const session = await getAuthenticatedSession();
 
@@ -427,7 +427,7 @@ export async function GET(
     });
   }
 
-  const employeeId = parsedParams.data.employeeId;
+  const employeeId = parsedParams.data.id;
 
   // Authorization: must be HR_ADMIN, SUPER_ADMIN, MANAGER, or the employee themselves
   const isSelf = employeeId === session.profile.id;
