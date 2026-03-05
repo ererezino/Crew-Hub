@@ -5821,6 +5821,219 @@ html.dark .topbar {
   height: 3.8rem;
 }
 
+/* ── PROD-14: Actionable notification cards ── */
+
+.notification-row-unread {
+  background: var(--bg-warm);
+}
+
+.notification-date-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.notification-unread-dot {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.notifications-row-actions-visible {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.notification-action-button {
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-3);
+  white-space: nowrap;
+}
+
+/* ── PROD-18: Org setup checklist ── */
+
+.org-setup-checklist {
+  margin-bottom: var(--space-4);
+}
+
+.org-checklist-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.org-checklist-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.org-checklist-icon {
+  width: 1.25rem;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+}
+
+.org-checklist-done {
+  color: var(--color-success);
+}
+
+.org-checklist-done .org-checklist-icon {
+  color: var(--color-success);
+}
+
+.org-checklist-pending {
+  color: var(--text-muted);
+}
+
+.org-checklist-nav a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.org-checklist-nav a:hover {
+  text-decoration: underline;
+}
+
+/* ── PROD-22: Contextual help hints ── */
+
+.contextual-hint {
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-card);
+  background: var(--bg-warm);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.contextual-hint-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.contextual-hint-heading {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.contextual-hint-dismiss {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-1);
+  line-height: 1;
+}
+
+.contextual-hint-dismiss:hover {
+  color: var(--text-primary);
+}
+
+.contextual-hint-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-2) 0 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.contextual-hint-item {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  padding-left: var(--space-3);
+  position: relative;
+}
+
+.contextual-hint-item::before {
+  content: "\2022";
+  position: absolute;
+  left: 0;
+  color: var(--color-accent);
+}
+
+/* ── PROD-23: Workflow simplification ── */
+
+.expenses-vendor-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) 0;
+  width: 100%;
+  text-align: left;
+}
+
+.expenses-vendor-toggle:hover {
+  opacity: 0.8;
+}
+
+.expenses-vendor-toggle-icon {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  width: 1rem;
+  text-align: center;
+}
+
+.expenses-vendor-toggle .section-title {
+  margin: 0;
+}
+
+.expenses-vendor-preview {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.expense-submit-summary {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.expense-submit-summary-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--space-2);
+}
+
+.expense-submit-summary-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.expense-submit-summary-list dt {
+  color: var(--text-muted);
+}
+
+.expense-submit-summary-list dd {
+  color: var(--text-primary);
+  margin: 0;
+}
+
 .command-overlay {
   position: fixed;
   inset: 0;

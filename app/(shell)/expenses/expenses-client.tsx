@@ -505,6 +505,7 @@ export function ExpensesClient({
   const [isMutatingExpenseId, setIsMutatingExpenseId] = useState<string | null>(null);
   const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [vendorSectionOpen, setVendorSectionOpen] = useState(false);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -557,6 +558,7 @@ export function ExpensesClient({
     setSubmitError(null);
     setUploadProgress(0);
     setIsDraggingReceipt(false);
+    setVendorSectionOpen(false);
   };
 
   const handleFormFieldChange =
@@ -1325,8 +1327,21 @@ export function ExpensesClient({
 
           {formValues.expenseType === "work_expense" ? (
             <div className="expenses-vendor-fields">
-              <h4 className="section-title" style={{ marginBottom: "0.5rem" }}>Vendor Details</h4>
+              <button
+                type="button"
+                className="expenses-vendor-toggle"
+                onClick={() => setVendorSectionOpen((prev) => !prev)}
+                aria-expanded={vendorSectionOpen}
+              >
+                <span className="expenses-vendor-toggle-icon">{vendorSectionOpen ? "\u25BC" : "\u25B6"}</span>
+                <span className="section-title">Vendor details</span>
+                {!vendorSectionOpen && formValues.vendorName.trim() ? (
+                  <span className="expenses-vendor-preview">{formValues.vendorName}</span>
+                ) : null}
+              </button>
 
+              {vendorSectionOpen ? (
+                <>
               {vendorBeneficiaries.vendors.length > 0 ? (
                 <label className="form-field">
                   <span className="form-label">Select saved vendor</span>
@@ -1416,6 +1431,8 @@ export function ExpensesClient({
                 />
                 <span>Save this vendor for future expenses</span>
               </label>
+                </>
+              ) : null}
             </div>
           ) : null}
 
@@ -1477,6 +1494,28 @@ export function ExpensesClient({
             />
             {formErrors.receipt ? <p className="form-field-error">{formErrors.receipt}</p> : null}
           </div>
+
+          {!isSubmitting && formValues.amount.trim() && formValues.category ? (
+            <aside className="expense-submit-summary" aria-label="Submission summary">
+              <p className="expense-submit-summary-title">Summary</p>
+              <dl className="expense-submit-summary-list">
+                <dt>Type</dt>
+                <dd>{formValues.expenseType === "work_expense" ? "Work expense" : "Personal reimbursement"}</dd>
+                <dt>Category</dt>
+                <dd>{getExpenseCategoryLabel(formValues.category as ExpenseCategory)}</dd>
+                <dt>Amount</dt>
+                <dd className="numeric">{formValues.currency} {formValues.amount}</dd>
+                {formValues.vendorName.trim() ? (
+                  <>
+                    <dt>Vendor</dt>
+                    <dd>{formValues.vendorName}</dd>
+                  </>
+                ) : null}
+                <dt>Receipt</dt>
+                <dd>{receiptFile ? receiptFile.name : "Not attached"}</dd>
+              </dl>
+            </aside>
+          ) : null}
 
           {isSubmitting ? (
             <div className="expenses-upload-progress" aria-live="polite">

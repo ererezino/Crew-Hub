@@ -9,9 +9,68 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { useNotifications } from "../../../hooks/use-notifications";
 import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
+import type { NotificationType } from "../../../types/notifications";
 
 type NotificationFilter = "all" | "unread";
 type SortDirection = "desc" | "asc";
+
+const NOTIFICATION_ACTION_LABELS: Partial<Record<NotificationType, string>> = {
+  leave_submitted: "Review request",
+  leave_status: "View leave",
+  expense_submitted: "Review expense",
+  expense_status: "View expense",
+  onboarding_task: "Open task",
+  payslip_ready: "View payslip",
+  signature_requested: "Sign document",
+  signature_signed: "View signature",
+  signature_completed: "View document",
+  shift_swap_requested: "Review swap",
+  shift_swap_accepted: "View schedule",
+  shift_swap_rejected: "View schedule",
+  course_assigned: "Start course",
+  review_cycle_started: "Begin review",
+  review_reminder: "Continue review",
+  compliance_deadline: "View compliance",
+  document_expiry_warning: "View document",
+  announcement: "Read more",
+  welcome: "Get started",
+  survey_launched: "Take survey"
+};
+
+const NOTIFICATION_FALLBACK_LINKS: Partial<Record<NotificationType, string>> = {
+  leave_submitted: "/time-off",
+  leave_status: "/time-off",
+  expense_submitted: "/expenses/approvals",
+  expense_status: "/expenses",
+  onboarding_task: "/me/onboarding",
+  payslip_ready: "/payroll",
+  signature_requested: "/documents",
+  signature_signed: "/documents",
+  signature_completed: "/documents",
+  shift_swap_requested: "/scheduling",
+  shift_swap_accepted: "/scheduling",
+  shift_swap_rejected: "/scheduling",
+  course_assigned: "/learning",
+  review_cycle_started: "/reviews",
+  review_reminder: "/reviews",
+  compliance_deadline: "/documents",
+  document_expiry_warning: "/documents",
+  announcement: "/dashboard",
+  welcome: "/dashboard",
+  survey_launched: "/dashboard"
+};
+
+function getNotificationAction(type: string, link: string | null): { label: string; href: string } | null {
+  const knownType = type as NotificationType;
+  const label = NOTIFICATION_ACTION_LABELS[knownType] ?? "Open";
+  const href = link ?? NOTIFICATION_FALLBACK_LINKS[knownType] ?? null;
+
+  if (!href) {
+    return null;
+  }
+
+  return { label, href };
+}
 
 function notificationsSkeleton() {
   return (
@@ -129,46 +188,72 @@ export function NotificationsClient() {
               </tr>
             </thead>
             <tbody>
-              {sortedNotifications.map((notification) => (
-                <tr key={notification.id} className="data-table-row">
-                  <td>
-                    <p className="numeric" title={formatDateTimeTooltip(notification.createdAt)}>
-                      {formatRelativeTime(notification.createdAt)}
-                    </p>
-                    <p className="settings-card-description">{formatSingleDateHuman(notification.createdAt)}</p>
-                  </td>
-                  <td>
-                    <p>{notification.title}</p>
-                    <p className="settings-card-description">{notification.body}</p>
-                  </td>
-                  <td>
-                    <code>{toSentenceCase(notification.type)}</code>
-                  </td>
-                  <td>
-                    <StatusBadge tone={notification.isRead ? "success" : "pending"}>
-                      {notification.isRead ? "Read" : "Unread"}
-                    </StatusBadge>
-                  </td>
-                  <td className="table-row-action-cell">
-                    <div className="notifications-row-actions">
-                      {notification.link ? (
-                        <Link className="table-row-action" href={notification.link}>
-                          Open
-                        </Link>
-                      ) : null}
-                      {!notification.isRead ? (
-                        <button
-                          type="button"
-                          className="table-row-action"
-                          onClick={() => void notificationsQuery.markRead(notification.id)}
-                        >
-                          Mark read
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {sortedNotifications.map((notification) => {
+                const action = getNotificationAction(notification.type, notification.link);
+
+                return (
+                  <tr
+                    key={notification.id}
+                    className={
+                      notification.isRead
+                        ? "data-table-row"
+                        : "data-table-row notification-row-unread"
+                    }
+                  >
+                    <td>
+                      <div className="notification-date-cell">
+                        {!notification.isRead ? (
+                          <span className="notification-unread-dot" aria-label="Unread" />
+                        ) : null}
+                        <div>
+                          <p className="numeric" title={formatDateTimeTooltip(notification.createdAt)}>
+                            {formatRelativeTime(notification.createdAt)}
+                          </p>
+                          <p className="settings-card-description">{formatSingleDateHuman(notification.createdAt)}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <p>{notification.title}</p>
+                      <p className="settings-card-description">{notification.body}</p>
+                    </td>
+                    <td>
+                      <code>{toSentenceCase(notification.type)}</code>
+                    </td>
+                    <td>
+                      <StatusBadge tone={notification.isRead ? "success" : "pending"}>
+                        {notification.isRead ? "Read" : "Unread"}
+                      </StatusBadge>
+                    </td>
+                    <td className="table-row-action-cell">
+                      <div className="notifications-row-actions-visible">
+                        {action ? (
+                          <Link
+                            className="button button-accent notification-action-button"
+                            href={action.href}
+                            onClick={() => {
+                              if (!notification.isRead) {
+                                void notificationsQuery.markRead(notification.id);
+                              }
+                            }}
+                          >
+                            {action.label}
+                          </Link>
+                        ) : null}
+                        {!notification.isRead ? (
+                          <button
+                            type="button"
+                            className="table-row-action"
+                            onClick={() => void notificationsQuery.markRead(notification.id)}
+                          >
+                            Mark read
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </section>

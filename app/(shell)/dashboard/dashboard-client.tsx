@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skeleton";
 import { WidgetErrorBoundary } from "../../../components/dashboard/widget-error-boundary";
+import { ContextualHint } from "../../../components/shared/contextual-hint";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDashboard } from "../../../hooks/use-dashboard";
@@ -863,6 +864,62 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
 }
 
 /* ══════════════════════════════════════════════
+   ROLE-SPECIFIC HINTS
+   ══════════════════════════════════════════════ */
+
+function getPersonaHints(persona: string): { heading: string; tips: string[] } {
+  switch (persona) {
+    case "new_hire":
+      return {
+        heading: "Getting started",
+        tips: [
+          "Complete your onboarding tasks under Me > Onboarding.",
+          "Set up your profile photo and phone in Settings.",
+          "Check the team calendar for upcoming holidays."
+        ]
+      };
+    case "manager":
+      return {
+        heading: "Manager quick tips",
+        tips: [
+          "Review pending leave and expense approvals in the widgets below.",
+          "Check team coverage before approving overlapping time-off requests.",
+          "Use the People page to view your direct reports."
+        ]
+      };
+    case "hr_admin":
+      return {
+        heading: "HR admin quick tips",
+        tips: [
+          "Monitor stuck onboarding instances from the Onboarding page.",
+          "Review expiring documents to maintain compliance.",
+          "Configure time-off policies under Settings > Time Policies."
+        ]
+      };
+    case "finance_admin":
+      return {
+        heading: "Finance quick tips",
+        tips: [
+          "Process expense disbursements from Expenses > Approvals.",
+          "Review the payroll status widget for pending runs.",
+          "Track the expense pipeline for outstanding claims."
+        ]
+      };
+    case "super_admin":
+      return {
+        heading: "Admin quick tips",
+        tips: [
+          "Complete the org setup checklist in Settings > Organization.",
+          "Review the audit log for recent changes.",
+          "Check compliance health for any overdue items."
+        ]
+      };
+    default:
+      return { heading: "", tips: [] };
+  }
+}
+
+/* ══════════════════════════════════════════════
    MAIN CONTENT
    ══════════════════════════════════════════════ */
 
@@ -889,10 +946,12 @@ function DashboardContent() {
   }
 
   const data = dashboardQuery.data;
+  const hints = getPersonaHints(data.persona);
 
   return (
     <div className="home-page">
       <GreetingCard data={data} />
+      <ContextualHint heading={hints.heading} tips={hints.tips} />
       <WidgetGrid data={data} />
     </div>
   );

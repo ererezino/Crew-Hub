@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
@@ -491,11 +492,41 @@ export function SettingsClient({
 
         {activeTab === "organization" ? (
           canManageOrganization ? (
-            <section className="settings-card" aria-label="Organization settings">
-              <h2 className="section-title">Organization</h2>
-              <p className="settings-card-description">
-                Manage organization branding for Crew Hub.
-              </p>
+            <>
+              <section className="settings-card org-setup-checklist" aria-label="Setup checklist">
+                <h2 className="section-title">Setup checklist</h2>
+                <p className="settings-card-description">
+                  Complete these steps to finish setting up your organization.
+                </p>
+                <ul className="org-checklist-list">
+                  <li className={organizationValues.name.trim() ? "org-checklist-done" : "org-checklist-pending"}>
+                    <span className="org-checklist-icon">{organizationValues.name.trim() ? "\u2713" : "\u25CB"}</span>
+                    <span>Set organization name</span>
+                  </li>
+                  <li className={organizationValues.logoUrl.trim() ? "org-checklist-done" : "org-checklist-pending"}>
+                    <span className="org-checklist-icon">{organizationValues.logoUrl.trim() ? "\u2713" : "\u25CB"}</span>
+                    <span>Add company logo</span>
+                  </li>
+                  <li className="org-checklist-nav">
+                    <span className="org-checklist-icon">{"\u2192"}</span>
+                    <Link href="/settings?tab=time-policies">Configure time-off policies</Link>
+                  </li>
+                  <li className="org-checklist-nav">
+                    <span className="org-checklist-icon">{"\u2192"}</span>
+                    <Link href="/onboarding">Set up onboarding templates</Link>
+                  </li>
+                  <li className="org-checklist-nav">
+                    <span className="org-checklist-icon">{"\u2192"}</span>
+                    <Link href="/people">Invite team members</Link>
+                  </li>
+                </ul>
+              </section>
+
+              <section className="settings-card" aria-label="Organization settings">
+                <h2 className="section-title">Organization</h2>
+                <p className="settings-card-description">
+                  Manage organization branding for Crew Hub.
+                </p>
 
               <form className="settings-form" onSubmit={handleOrganizationSubmit} noValidate>
                 <label className="form-field" htmlFor="organization-name">
@@ -559,6 +590,7 @@ export function SettingsClient({
                 ) : null}
               </form>
             </section>
+            </>
           ) : (
             <EmptyState
               title="Organization settings are restricted"
