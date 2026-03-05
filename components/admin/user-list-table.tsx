@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { getRoleLabel } from "../../lib/access-control";
 import { StatusBadge } from "../shared/status-badge";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
 import { formatProfileStatus } from "../../lib/format-labels";
@@ -13,15 +14,6 @@ type UserListTableProps = {
   people: PersonRecord[];
   onEdit: (person: PersonRecord) => void;
   onDeactivate: (person: PersonRecord) => void;
-};
-
-const roleLabels: Record<AppRole, string> = {
-  EMPLOYEE: "Employee",
-  TEAM_LEAD: "Team Lead",
-  MANAGER: "Manager",
-  HR_ADMIN: "HR Admin",
-  FINANCE_ADMIN: "Finance Admin",
-  SUPER_ADMIN: "Super Admin"
 };
 
 function toneForProfileStatus(status: PersonRecord["status"]) {
@@ -119,7 +111,7 @@ export function UserListTable({
             <option value="all">All roles</option>
             {USER_ROLES.map((role) => (
               <option key={role} value={role}>
-                {roleLabels[role]}
+                {getRoleLabel(role)}
               </option>
             ))}
           </select>
@@ -154,7 +146,7 @@ export function UserListTable({
                     <div className="people-role-badges">
                       {person.roles.map((role) => (
                         <StatusBadge key={`${person.id}-${role}`} tone="info">
-                          {roleLabels[role]}
+                          {getRoleLabel(role)}
                         </StatusBadge>
                       ))}
                     </div>

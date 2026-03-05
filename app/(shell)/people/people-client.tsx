@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { z } from "zod";
 
+import { getRoleLabel } from "../../../lib/access-control";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
@@ -86,15 +87,6 @@ const createPersonSchema = z.object({
     .length(3, "Currency must be a 3-letter code."),
   status: z.enum(PROFILE_STATUSES)
 });
-
-const roleLabels: Record<AppRole, string> = {
-  EMPLOYEE: "Employee",
-  TEAM_LEAD: "Team Lead",
-  MANAGER: "Manager",
-  HR_ADMIN: "HR Admin",
-  FINANCE_ADMIN: "Finance Admin",
-  SUPER_ADMIN: "Super Admin"
-};
 
 const initialCreatePersonFormValues: CreatePersonFormValues = {
   email: "",
@@ -441,7 +433,7 @@ export function PeopleClient({
                         {person.roles.length > 0 ? (
                           person.roles.map((role) => (
                             <StatusBadge key={`${person.id}-${role}`} tone="info">
-                              {roleLabels[role]}
+                              {getRoleLabel(role)}
                             </StatusBadge>
                           ))
                         ) : (
@@ -568,7 +560,7 @@ export function PeopleClient({
                     checked={createValues.roles.includes(role)}
                     onChange={() => handleRoleToggle(role)}
                   />
-                  <span>{roleLabels[role]}</span>
+                  <span>{getRoleLabel(role)}</span>
                 </label>
               ))}
             </div>

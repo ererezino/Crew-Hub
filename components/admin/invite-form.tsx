@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { getRoleLabel } from "../../lib/access-control";
 import { DEPARTMENTS } from "../../lib/departments";
 import { USER_ROLES } from "../../lib/navigation";
 import {
@@ -51,15 +52,6 @@ type InviteFormProps = {
 };
 
 type Step = 1 | 2 | 3 | 4;
-
-const roleLabels: Record<AppRole, string> = {
-  EMPLOYEE: "Employee",
-  TEAM_LEAD: "Team Lead",
-  MANAGER: "Manager",
-  HR_ADMIN: "HR Admin",
-  FINANCE_ADMIN: "Finance Admin",
-  SUPER_ADMIN: "Super Admin"
-};
 
 const initialValues: InviteFormValues = {
   email: "",
@@ -160,7 +152,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
 
   const roleSelection = useMemo(() => normalizeRoles(values.roles), [values.roles]);
 
-  const roleSummary = roleSelection.map((role) => roleLabels[role]).join(", ");
+  const roleSummary = roleSelection.map((role) => getRoleLabel(role)).join(", ");
   const managerName =
     values.managerId.trim().length > 0
       ? people.find((person) => person.id === values.managerId)?.fullName ?? "Unknown manager"
@@ -492,7 +484,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
                     disabled={role === "EMPLOYEE"}
                     onChange={(event) => toggleRole(role, event.currentTarget.checked)}
                   />
-                  <span>{roleLabels[role]}</span>
+                  <span>{getRoleLabel(role)}</span>
                 </label>
               ))}
             </div>

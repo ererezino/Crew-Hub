@@ -12,6 +12,7 @@ import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { usePeople } from "../../../../hooks/use-people";
 import {
   getNavigationDefinitions,
+  getRoleLabel,
   isNavItemVisibleForUser
 } from "../../../../lib/access-control";
 import {
@@ -47,15 +48,6 @@ type EditValues = {
   managerId: string;
   status: ProfileStatus;
   selectedAccessKeys: string[];
-};
-
-const roleLabels: Record<AppRole, string> = {
-  EMPLOYEE: "Employee",
-  TEAM_LEAD: "Team Lead",
-  MANAGER: "Manager",
-  HR_ADMIN: "HR Admin",
-  FINANCE_ADMIN: "Finance Admin",
-  SUPER_ADMIN: "Super Admin"
 };
 
 function copyToClipboard(value: string) {
@@ -466,7 +458,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
                       disabled={role === "EMPLOYEE" || role === "SUPER_ADMIN" && editValues.id === currentUserId}
                       onChange={(event) => toggleEditRole(role, event.currentTarget.checked)}
                     />
-                    <span>{roleLabels[role]}</span>
+                    <span>{getRoleLabel(role)}</span>
                   </label>
                 ))}
               </div>
