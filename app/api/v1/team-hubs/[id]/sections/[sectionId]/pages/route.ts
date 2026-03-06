@@ -15,7 +15,7 @@ import {
 } from "../../../../../../../../types/team-hub";
 
 const paramsSchema = z.object({
-  hubId: z.string().uuid(),
+  id: z.string().uuid(),
   sectionId: z.string().uuid()
 });
 
@@ -80,7 +80,7 @@ function mapPageRow(row: z.infer<typeof pageRowSchema>): TeamHubPage {
 }
 
 type RouteContext = {
-  params: Promise<{ hubId: string; sectionId: string }>;
+  params: Promise<{ id: string; sectionId: string }>;
 };
 
 export async function GET(_request: Request, context: RouteContext) {
@@ -110,7 +110,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { data: hub } = await supabase
     .from("team_hubs")
     .select("id")
-    .eq("id", parsedParams.data.hubId)
+    .eq("id", parsedParams.data.id)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -127,7 +127,7 @@ export async function GET(_request: Request, context: RouteContext) {
     .from("team_hub_sections")
     .select("id")
     .eq("id", parsedParams.data.sectionId)
-    .eq("hub_id", parsedParams.data.hubId)
+    .eq("hub_id", parsedParams.data.id)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -236,7 +236,7 @@ export async function POST(request: Request, context: RouteContext) {
   const { data: hubRow } = await supabase
     .from("team_hubs")
     .select("id, department")
-    .eq("id", parsedParams.data.hubId)
+    .eq("id", parsedParams.data.id)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -260,7 +260,7 @@ export async function POST(request: Request, context: RouteContext) {
     .from("team_hub_sections")
     .select("id")
     .eq("id", parsedParams.data.sectionId)
-    .eq("hub_id", parsedParams.data.hubId)
+    .eq("hub_id", parsedParams.data.id)
     .is("deleted_at", null)
     .maybeSingle();
 
