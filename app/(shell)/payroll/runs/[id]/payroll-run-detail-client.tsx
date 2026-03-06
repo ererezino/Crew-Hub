@@ -140,6 +140,22 @@ function paymentStatusTone(
   }
 }
 
+function signedAmountPrefix(amount: number | null): string {
+  if (amount === null || amount === 0) {
+    return "";
+  }
+
+  return amount > 0 ? "+" : "-";
+}
+
+function absoluteAmount(amount: number | null): number {
+  if (amount === null) {
+    return 0;
+  }
+
+  return Math.abs(amount);
+}
+
 function summarizeStatusStep(
   runStatus: PayrollRunStatus
 ): {
@@ -1003,6 +1019,16 @@ export function PayrollRunDetailClient({
                         </td>
                         <td>
                           <CurrencyDisplay amount={item.netAmount} currency={item.payCurrency} />
+                          {item.netVarianceAmount !== null ? (
+                            <p className="payroll-net-variance-inline">
+                              {signedAmountPrefix(item.netVarianceAmount)}
+                              <CurrencyDisplay
+                                amount={absoluteAmount(item.netVarianceAmount)}
+                                currency={item.payCurrency}
+                              />
+                              {" vs previous"}
+                            </p>
+                          ) : null}
                         </td>
                         <td>
                           {item.withholdingApplied ? (
@@ -1153,6 +1179,43 @@ export function PayrollRunDetailClient({
                                     Net pay:{" "}
                                     <CurrencyDisplay amount={item.netAmount} currency={item.payCurrency} />
                                   </p>
+                                  {item.previousNetAmount !== null ? (
+                                    <>
+                                      <p className="settings-card-description">
+                                        Previous period{" "}
+                                        {item.previousPayPeriodEnd
+                                          ? `(${formatDate(item.previousPayPeriodEnd)})`
+                                          : ""}{" "}
+                                        net:{" "}
+                                        <CurrencyDisplay
+                                          amount={item.previousNetAmount}
+                                          currency={item.payCurrency}
+                                        />
+                                      </p>
+                                      <p className="payroll-variance-line">
+                                        <span className="numeric">Net change:</span>{" "}
+                                        <span
+                                          className={`numeric ${
+                                            (item.netVarianceAmount ?? 0) > 0
+                                              ? "payroll-variance-up"
+                                              : (item.netVarianceAmount ?? 0) < 0
+                                                ? "payroll-variance-down"
+                                                : "payroll-variance-flat"
+                                          }`}
+                                        >
+                                          {signedAmountPrefix(item.netVarianceAmount)}
+                                          <CurrencyDisplay
+                                            amount={absoluteAmount(item.netVarianceAmount)}
+                                            currency={item.payCurrency}
+                                          />
+                                        </span>
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <p className="settings-card-description">
+                                      No previous payroll period found for comparison.
+                                    </p>
+                                  )}
                                 </article>
 
                                 <article className="settings-card">

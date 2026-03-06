@@ -2844,7 +2844,7 @@ html.dark .topbar {
 .payslip-card-meta {
   display: grid;
   gap: var(--space-2);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .payslip-card-meta div {
@@ -2867,6 +2867,19 @@ html.dark .topbar {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.payslip-variance-copy {
+  margin: calc(var(--space-1) * -1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.payslip-variance-value {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .payslip-viewer-card {
@@ -5123,6 +5136,12 @@ html.dark .topbar {
   gap: var(--space-2);
 }
 
+.payroll-net-variance-inline {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
 .payment-status-pulse {
   width: 0.6rem;
   height: 0.6rem;
@@ -5275,6 +5294,26 @@ html.dark .topbar {
 .payroll-deduction-section {
   display: grid;
   gap: var(--space-1);
+}
+
+.payroll-variance-line {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.payroll-variance-up {
+  color: var(--status-success-text);
+}
+
+.payroll-variance-down {
+  color: var(--status-error-text);
+}
+
+.payroll-variance-flat {
+  color: var(--text-secondary);
 }
 
 .payroll-run-skeleton {

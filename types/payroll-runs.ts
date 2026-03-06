@@ -121,6 +121,12 @@ export type PayrollRunItem = {
   notes: string | null;
   flagged: boolean;
   flagReason: string | null;
+  previousRunId: string | null;
+  previousPayPeriodEnd: string | null;
+  previousGrossAmount: number | null;
+  previousNetAmount: number | null;
+  grossVarianceAmount: number | null;
+  netVarianceAmount: number | null;
   deductionTotal: number;
   adjustmentTotal: number;
   createdAt: string;
