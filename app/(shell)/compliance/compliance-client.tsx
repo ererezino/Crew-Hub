@@ -15,6 +15,7 @@ import {
   labelForComplianceStatus,
   toneForComplianceStatus
 } from "../../../lib/compliance";
+import { getLocalComplianceGuidance } from "../../../lib/compliance/local-guidance";
 import {
   formatDateTimeTooltip,
   formatRelativeTime,
@@ -227,6 +228,14 @@ export function ComplianceClient() {
         overdue: counts.overdue
       }));
   }, [sourceDeadlines]);
+
+  const localGuidance = useMemo(() => {
+    if (countryFilter === "all") {
+      return [];
+    }
+
+    return getLocalComplianceGuidance(countryFilter);
+  }, [countryFilter]);
 
   // Filtered deadlines (country + metric)
   const filteredDeadlines = useMemo(() => {
@@ -611,6 +620,42 @@ export function ComplianceClient() {
               ))}
             </section>
           ) : null}
+
+          <section className="settings-card compliance-local-guidance" aria-label="Local authority guidance">
+            <header className="compliance-local-guidance-header">
+              <h2 className="section-title">Local authority guidance</h2>
+              <p className="settings-card-description">
+                {countryFilter === "all"
+                  ? "Select a country tab to view local filing guidance and official authority links."
+                  : `Reference links for ${countryNameFromCode(countryFilter)} filing obligations.`}
+              </p>
+            </header>
+
+            {countryFilter === "all" ? null : localGuidance.length > 0 ? (
+              <ul className="compliance-local-guidance-list">
+                {localGuidance.map((entry) => (
+                  <li key={`${entry.countryCode}-${entry.authority}`} className="compliance-local-guidance-item">
+                    <div>
+                      <p className="form-label">{entry.authority}</p>
+                      <p className="settings-card-description">{entry.local_guidance}</p>
+                    </div>
+                    <a
+                      className="table-row-action"
+                      href={entry.authority_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Authority site
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="settings-card-description">
+                No local authority guidance is configured for this country yet.
+              </p>
+            )}
+          </section>
 
           {/* ── Active filter indicator ── */}
           {metricFilter || countryFilter !== "all" ? (
