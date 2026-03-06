@@ -3002,6 +3002,17 @@ html.dark .topbar {
   justify-items: flex-start;
 }
 
+.expenses-approvals-filter-bar {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .expenses-metric-grid,
 .expenses-metric-skeleton-grid {
   margin-bottom: var(--space-4);
@@ -6384,6 +6395,10 @@ html.dark .topbar {
 
   .expenses-metric-grid,
   .expenses-metric-skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .expenses-approvals-filter-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
