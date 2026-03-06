@@ -12,6 +12,7 @@ import { StatusBadge } from "../../../../components/shared/status-badge";
 import { VestingBar } from "../../../../components/shared/vesting-bar";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useAdminCompensation } from "../../../../hooks/use-compensation";
+import { useConfirmAction } from "../../../../hooks/use-confirm-action";
 import {
   formatDateTimeTooltip,
   formatRelativeTime,
@@ -421,6 +422,7 @@ export function AdminCompensationClient({
   const [isUpdatingEquityApprovalId, setIsUpdatingEquityApprovalId] = useState<string | null>(
     null
   );
+  const { confirm, confirmDialog } = useConfirmAction();
 
   const compensationQuery = useAdminCompensation({ employeeId: selectedEmployeeId });
 
@@ -686,9 +688,12 @@ export function AdminCompensationClient({
   };
 
   const handleAllowanceDelete = async (allowanceId: string) => {
-    const confirmed = window.confirm(
-      "Delete this allowance? This action is recorded in the audit log."
-    );
+    const confirmed = await confirm({
+      title: "Delete allowance?",
+      description: "This removes the allowance record and logs the action in the audit trail.",
+      confirmLabel: "Delete allowance",
+      tone: "danger"
+    });
 
     if (!confirmed) {
       return;
@@ -1973,6 +1978,8 @@ export function AdminCompensationClient({
           </div>
         </form>
       </SlidePanel>
+
+      {confirmDialog}
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite" aria-label="Compensation toasts">

@@ -16,6 +16,7 @@ import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../../components/ui/currency-display";
+import { useConfirmAction } from "../../../../../hooks/use-confirm-action";
 import { usePayrollRunDetail } from "../../../../../hooks/use-payroll-runs";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../../lib/countries";
 import { formatDate, formatDateTimeTooltip } from "../../../../../lib/datetime";
@@ -259,6 +260,7 @@ export function PayrollRunDetailClient({
   const [rejectReasonError, setRejectReasonError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const paymentPollingIntervalRef = useRef<number | null>(null);
+  const { confirm, confirmDialog } = useConfirmAction();
 
   const sortedItems = useMemo(() => {
     const rows = runQuery.data?.items ?? [];
@@ -656,9 +658,13 @@ export function PayrollRunDetailClient({
   };
 
   const cancelRun = async () => {
-    const confirmed = window.confirm(
-      "Cancel this payroll run? This action is intended for runs that should no longer proceed."
-    );
+    const confirmed = await confirm({
+      title: "Cancel payroll run?",
+      description:
+        "This run will move to cancelled status and cannot continue through approvals or payments.",
+      confirmLabel: "Cancel run",
+      tone: "danger"
+    });
 
     if (!confirmed) {
       return;
@@ -1452,6 +1458,8 @@ export function PayrollRunDetailClient({
           </article>
         </section>
       ) : null}
+
+      {confirmDialog}
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite" aria-label="Payroll toasts">

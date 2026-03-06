@@ -5939,6 +5939,15 @@ html.dark .topbar {
   border-radius: var(--radius-default);
   border: 1px solid var(--border-default);
   padding: var(--space-2) var(--space-2);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.notification-item-content {
+  flex: 1;
+  min-width: 0;
   display: grid;
   gap: var(--space-1);
 }
@@ -5959,6 +5968,14 @@ html.dark .topbar {
 .notification-link {
   display: grid;
   gap: var(--space-1);
+}
+
+.notification-dropdown-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
 }
 
 .notification-source-label {

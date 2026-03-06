@@ -1,24 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
+import { NotificationActionButton } from "../../../components/shared/notification-action-button";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useNotifications } from "../../../hooks/use-notifications";
 import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
-import type { NotificationAction } from "../../../types/notifications";
 
 type NotificationFilter = "all" | "unread";
 type SortDirection = "desc" | "asc";
-
-type ActionState = {
-  status: "idle" | "loading" | "awaiting_reason" | "success" | "error";
-  message?: string;
-};
 
 function notificationsSkeleton() {
   return (
@@ -28,123 +22,6 @@ function notificationsSkeleton() {
       <div className="notifications-skeleton-row" />
       <div className="notifications-skeleton-row" />
     </section>
-  );
-}
-
-function NotificationActionButton({
-  action,
-  onRefresh
-}: {
-  action: NotificationAction;
-  notificationId: string;
-  onRefresh: () => void;
-}) {
-  const router = useRouter();
-  const [state, setState] = useState<ActionState>({ status: "idle" });
-  const [reason, setReason] = useState("");
-
-  const variantClass =
-    action.variant === "primary"
-      ? "notification-action-primary"
-      : action.variant === "destructive"
-        ? "notification-action-destructive"
-        : "notification-action-outline";
-
-  const handleApiAction = useCallback(
-    async (extraBody?: Record<string, unknown>) => {
-      if (!action.api_endpoint || !action.api_method) {
-        return;
-      }
-
-      setState({ status: "loading" });
-
-      try {
-        const body = { ...action.api_body, ...extraBody };
-        const response = await fetch(action.api_endpoint, {
-          method: action.api_method,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        });
-
-        if (response.ok) {
-          setState({ status: "success", message: `${action.label} done` });
-          onRefresh();
-        } else {
-          const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
-          const errorMessage = payload?.error?.message ?? "Action failed";
-          setState({ status: "error", message: errorMessage });
-        }
-      } catch {
-        setState({ status: "error", message: "Network error" });
-      }
-    },
-    [action, onRefresh]
-  );
-
-  const handleClick = useCallback(() => {
-    if (action.action_type === "navigate" && action.navigate_url) {
-      router.push(action.navigate_url);
-      return;
-    }
-
-    if (action.action_type === "api") {
-      if (action.requires_reason && state.status !== "awaiting_reason") {
-        setState({ status: "awaiting_reason" });
-        return;
-      }
-
-      if (action.requires_reason && state.status === "awaiting_reason") {
-        if (!reason.trim()) {
-          return;
-        }
-        void handleApiAction({ rejectionReason: reason.trim() });
-        return;
-      }
-
-      void handleApiAction();
-    }
-  }, [action, state.status, reason, handleApiAction, router]);
-
-  if (state.status === "success" || state.status === "error") {
-    return (
-      <span
-        className={`notification-action-status ${state.status === "success" ? "notification-action-status-success" : "notification-action-status-error"}`}
-      >
-        {state.message}
-      </span>
-    );
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        className={`notification-action-btn ${variantClass}`}
-        disabled={state.status === "loading"}
-        onClick={handleClick}
-        aria-label={action.label}
-      >
-        {state.status === "loading" ? (
-          <span className="notification-action-spinner" aria-hidden="true" />
-        ) : null}
-        {state.status === "awaiting_reason" ? "Confirm" : action.label}
-      </button>
-      {state.status === "awaiting_reason" ? (
-        <input
-          type="text"
-          className="notification-decline-reason"
-          placeholder="Reason for declining..."
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && reason.trim()) {
-              void handleApiAction({ rejectionReason: reason.trim() });
-            }
-          }}
-          autoFocus
-        />
-      ) : null}
-    </>
   );
 }
 
@@ -270,8 +147,7 @@ export function NotificationsClient() {
                           <NotificationActionButton
                             key={`${notification.id}-${action.label}`}
                             action={action}
-                            notificationId={notification.id}
-                            onRefresh={notificationsQuery.refresh}
+                            onComplete={notificationsQuery.refresh}
                           />
                         ))}
                       </div>

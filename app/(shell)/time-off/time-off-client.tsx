@@ -10,6 +10,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { TeamAvailabilityPanel } from "../../../components/time-off/team-availability-panel";
+import { useConfirmAction } from "../../../hooks/use-confirm-action";
 import { useAfkLogs, useTimeOffSummary } from "../../../hooks/use-time-off";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import {
@@ -304,6 +305,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   const [afkEndTime, setAfkEndTime] = useState("");
   const [afkNotes, setAfkNotes] = useState("");
   const [isAfkSubmitting, setIsAfkSubmitting] = useState(false);
+  const { confirm, confirmDialog } = useConfirmAction();
 
   const afkQuery = useAfkLogs();
 
@@ -637,7 +639,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   };
 
   const handleCancelRequest = async (requestRecord: LeaveRequestRecord) => {
-    const shouldCancel = window.confirm("Cancel this leave request?");
+    const shouldCancel = await confirm({
+      title: "Cancel leave request?",
+      description:
+        "This request will move to cancelled status and no longer be considered for approval.",
+      confirmLabel: "Cancel request",
+      tone: "danger"
+    });
 
     if (!shouldCancel) {
       return;
@@ -1285,6 +1293,8 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           </div>
         </form>
       </SlidePanel>
+
+      {confirmDialog}
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite">

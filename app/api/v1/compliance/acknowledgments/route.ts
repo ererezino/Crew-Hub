@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { canManageCompliance } from "../../../../../lib/compliance";
+import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import type { PolicyAckStatus } from "../../../../../types/compliance";
@@ -156,6 +157,35 @@ export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
   const orgId = session.profile.org_id;
 
+  const { data: policyRowData, error: policyError } = await supabase
+    .from("compliance_policies")
+    .select("id, name")
+    .eq("id", policy_id)
+    .eq("org_id", orgId)
+    .eq("status", "published")
+    .is("deleted_at", null)
+    .maybeSingle();
+  const policyRow = policyRowData as { id: string; name: string } | null;
+
+  if (policyError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "FETCH_FAILED", message: "Unable to load policy details." },
+      meta: buildMeta(),
+    });
+  }
+
+  if (!policyRow) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: {
+        code: "NOT_FOUND",
+        message: "Published policy not found for this organization."
+      },
+      meta: buildMeta(),
+    });
+  }
+
   // Get all active employees in the org
   const { data: employees } = await supabase
     .from("profiles")
@@ -191,6 +221,24 @@ export async function POST(request: Request) {
       meta: buildMeta(),
     });
   }
+
+  await createBulkNotifications({
+    orgId,
+    userIds: employees.map((employee: { id: string }) => employee.id),
+    type: "compliance_policy_acknowledgment",
+    title: "Policy acknowledgment requested",
+    body: `Please review and acknowledge ${policyRow.name}.`,
+    link: "/compliance",
+    actions: [
+      {
+        label: "Acknowledge now",
+        variant: "primary",
+        action_type: "api",
+        api_endpoint: `/api/v1/compliance/acknowledgments/${policy_id}/acknowledge`,
+        api_method: "POST"
+      }
+    ]
+  });
 
   return jsonResponse<{ created: number }>(200, {
     data: { created: records.length },
