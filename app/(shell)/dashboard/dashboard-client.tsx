@@ -43,8 +43,8 @@ import {
 /* ── Animation ── */
 
 const fadeIn = {
-  initial: { opacity: 0, y: 12 },
-  animate: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 120, damping: 18 } }
+  initial: { y: 8 },
+  animate: { y: 0, transition: { type: "spring" as const, stiffness: 120, damping: 18 } }
 };
 
 /* ── Greeting helpers ── */
