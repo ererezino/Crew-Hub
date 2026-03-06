@@ -492,6 +492,16 @@ export function ExpenseApprovalsClient({
       return;
     }
 
+    const confirmed = window.confirm(
+      rejectMode === "manager"
+        ? `Reject ${rejectTarget.employeeName}'s expense?`
+        : `Finance reject ${rejectTarget.employeeName}'s expense?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     setIsRejecting(true);
     setIsMutatingId(rejectTarget.id);
 

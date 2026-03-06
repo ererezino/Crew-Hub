@@ -77,6 +77,16 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
       return;
     }
 
+    if (action === "reject") {
+      const confirmed = window.confirm(
+        "Reject this timesheet? The employee will be notified with your reason."
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
     setActiveActionTimesheetId(timesheetId);
 
     try {

@@ -219,6 +219,14 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
   };
 
   const handleDeactivate = async (person: PersonRecord) => {
+    const confirmed = window.confirm(
+      `Deactivate ${person.fullName}? They will lose active access until reactivated.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     const response = await fetch(`/api/v1/people/${person.id}`, {
       method: "PUT",
       headers: {
