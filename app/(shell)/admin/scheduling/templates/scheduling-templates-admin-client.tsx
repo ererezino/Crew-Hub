@@ -122,7 +122,7 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
           />
           <button
             type="button"
-            className="button button-accent"
+            className="button"
             onClick={() => templatesQuery.refresh()}
           >
             Retry
@@ -141,77 +141,83 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                 </p>
               </div>
             </header>
-            <form className="settings-form-grid" onSubmit={handleCreateTemplate}>
-              <label className="settings-field">
-                <span className="settings-field-label">Template name</span>
+            <form className="settings-form" onSubmit={handleCreateTemplate}>
+              <div>
+                <label className="form-label" htmlFor="template-name">Template name</label>
                 <input
-                  className="settings-input"
+                  id="template-name"
+                  className="form-input"
                   value={templateForm.name}
                   onChange={(event) =>
                     setTemplateForm((currentValue) => ({ ...currentValue, name: event.target.value }))
                   }
                   placeholder="Operations Early Shift"
                 />
-              </label>
-              <label className="settings-field">
-                <span className="settings-field-label">Department</span>
+              </div>
+              <div>
+                <label className="form-label" htmlFor="template-department">Department</label>
                 <input
-                  className="settings-input"
+                  id="template-department"
+                  className="form-input"
                   value={templateForm.department}
                   onChange={(event) =>
                     setTemplateForm((currentValue) => ({ ...currentValue, department: event.target.value }))
                   }
                   placeholder="Operations"
                 />
-              </label>
-              <label className="settings-field">
-                <span className="settings-field-label">Start time</span>
+              </div>
+              <div>
+                <label className="form-label" htmlFor="template-start">Start time</label>
                 <input
+                  id="template-start"
                   type="time"
-                  className="settings-input"
+                  className="form-input"
                   value={templateForm.startTime}
                   onChange={(event) =>
                     setTemplateForm((currentValue) => ({ ...currentValue, startTime: event.target.value }))
                   }
                 />
-              </label>
-              <label className="settings-field">
-                <span className="settings-field-label">End time</span>
+              </div>
+              <div>
+                <label className="form-label" htmlFor="template-end">End time</label>
                 <input
+                  id="template-end"
                   type="time"
-                  className="settings-input"
+                  className="form-input"
                   value={templateForm.endTime}
                   onChange={(event) =>
                     setTemplateForm((currentValue) => ({ ...currentValue, endTime: event.target.value }))
                   }
                 />
-              </label>
-              <label className="settings-field">
-                <span className="settings-field-label">Break (minutes)</span>
+              </div>
+              <div>
+                <label className="form-label" htmlFor="template-break">Break (minutes)</label>
                 <input
+                  id="template-break"
                   type="number"
                   min={0}
                   max={240}
-                  className="settings-input numeric"
+                  className="form-input numeric"
                   value={templateForm.breakMinutes}
                   onChange={(event) =>
                     setTemplateForm((currentValue) => ({ ...currentValue, breakMinutes: event.target.value }))
                   }
                 />
-              </label>
-              <label className="settings-field">
-                <span className="settings-field-label">Color</span>
+              </div>
+              <div>
+                <label className="form-label" htmlFor="template-color">Color</label>
                 <input
-                  className="settings-input"
+                  id="template-color"
+                  className="form-input"
                   value={templateForm.color}
                   onChange={(event) =>
                     setTemplateForm((currentValue) => ({ ...currentValue, color: event.target.value }))
                   }
                 />
-              </label>
+              </div>
               {formError ? <p className="form-field-error">{formError}</p> : null}
               <div className="settings-actions">
-                <button type="submit" className="button button-accent" disabled={isSubmitting}>
+                <button type="submit" className="button button-primary" disabled={isSubmitting}>
                   {isSubmitting ? "Creating..." : "Create template"}
                 </button>
               </div>

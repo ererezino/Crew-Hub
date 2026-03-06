@@ -90,7 +90,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
           />
           <button
             type="button"
-            className="button button-accent"
+            className="button"
             onClick={() => openShiftsQuery.refresh()}
           >
             Retry

@@ -199,7 +199,7 @@ export function SchedulingSwapsClient({
           />
           <button
             type="button"
-            className="button button-accent"
+            className="button"
             onClick={() => swapsQuery.refresh()}
           >
             Retry
@@ -218,11 +218,12 @@ export function SchedulingSwapsClient({
                 </p>
               </div>
             </header>
-            <form className="settings-form-grid" onSubmit={handleCreateSwapRequest}>
-              <label className="settings-field">
-                <span className="settings-field-label">My shift</span>
+            <form className="settings-form" onSubmit={handleCreateSwapRequest}>
+              <div>
+                <label className="form-label" htmlFor="swap-shift-select">My shift</label>
                 <select
-                  className="settings-input"
+                  id="swap-shift-select"
+                  className="form-input"
                   value={requestForm.shiftId}
                   onChange={(event) =>
                     setRequestForm((currentValue) => ({
@@ -238,11 +239,12 @@ export function SchedulingSwapsClient({
                     </option>
                   ))}
                 </select>
-              </label>
-              <label className="settings-field">
-                <span className="settings-field-label">Reason</span>
+              </div>
+              <div>
+                <label className="form-label" htmlFor="swap-reason">Reason</label>
                 <textarea
-                  className="settings-input"
+                  id="swap-reason"
+                  className="form-input"
                   value={requestForm.reason}
                   onChange={(event) =>
                     setRequestForm((currentValue) => ({
@@ -253,10 +255,10 @@ export function SchedulingSwapsClient({
                   rows={3}
                   placeholder="Need coverage for a client meeting."
                 />
-              </label>
+              </div>
               {requestError ? <p className="form-field-error">{requestError}</p> : null}
               <div className="settings-actions">
-                <button type="submit" className="button button-accent" disabled={isSubmittingRequest}>
+                <button type="submit" className="button button-primary" disabled={isSubmittingRequest}>
                   {isSubmittingRequest ? "Submitting..." : "Request swap"}
                 </button>
               </div>

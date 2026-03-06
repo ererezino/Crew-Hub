@@ -98,7 +98,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
           />
           <button
             type="button"
-            className="button button-accent"
+            className="button"
             onClick={() => {
               shiftsQuery.refresh();
               openShiftsQuery.refresh();
