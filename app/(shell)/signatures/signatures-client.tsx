@@ -543,7 +543,7 @@ export function SignaturesClient({
     <>
       <PageHeader
         title="Signatures"
-        description="Request, sign, and track documents securely with a clear signer timeline."
+        description="Request, sign, and track documents with signer timelines."
         actions={
           canManageSignatures ? (
             <button

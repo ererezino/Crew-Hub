@@ -659,7 +659,7 @@ export function PeopleClient({
     <>
       <PageHeader
         title="People"
-        description="Find people quickly, review role and status, and open full employee profiles."
+        description="Find people, review roles, and open full profiles."
         actions={
           canManagePeople ? (
             <>

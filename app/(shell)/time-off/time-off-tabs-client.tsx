@@ -72,7 +72,7 @@ export function TimeOffTabsClient({ requestedTab, userRoles }: TimeOffTabsClient
     <>
       <PageHeader
         title="Time Off"
-        description="Check your leave balance, request time off, and track approvals in one place."
+        description="Request time off, check balances, and track approval status."
       />
 
       <PageTabs

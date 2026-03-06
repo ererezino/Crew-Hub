@@ -430,7 +430,7 @@ export function AnnouncementsClient({
     <>
       <PageHeader
         title="Announcements"
-        description="Broadcast company updates, read notices, and track read state across Crew Hub."
+        description="Company updates and news since your last visit."
         actions={
           canManageAnnouncements ? (
             <button type="button" className="button button-accent" onClick={openCreatePanel}>

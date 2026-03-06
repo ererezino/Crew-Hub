@@ -84,7 +84,7 @@ export function ComplianceEmployeeClient({ userId }: { userId: string }) {
     <>
       <PageHeader
         title="Compliance"
-        description="Your compliance documents and deadlines."
+        description="Statutory filings with due dates, proof, and country tracking."
       />
 
       {isLoading ? (

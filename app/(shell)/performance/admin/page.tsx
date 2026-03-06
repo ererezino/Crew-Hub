@@ -12,7 +12,7 @@ export default async function PerformanceAdminPage() {
       <>
         <PageHeader
           title="Performance Admin"
-          description="Run review cycles end-to-end, monitor completion, and identify calibration risks early."
+          description="Run review cycles, track completion, and calibrate fairly."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -33,7 +33,7 @@ export default async function PerformanceAdminPage() {
       <>
         <PageHeader
           title="Performance Admin"
-          description="Run review cycles end-to-end, monitor completion, and identify calibration risks early."
+          description="Run review cycles, track completion, and calibrate fairly."
         />
         <EmptyState
           title="Access denied"

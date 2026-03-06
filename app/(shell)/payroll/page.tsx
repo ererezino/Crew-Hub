@@ -27,7 +27,7 @@ export default async function PayrollPage() {
       <>
         <PageHeader
           title="Payroll"
-          description="Run payroll safely with staged approvals, item-level checks, and clear payout status."
+          description="Run payroll with staged approvals and clear payout status."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -44,7 +44,7 @@ export default async function PayrollPage() {
       <>
         <PageHeader
           title="Payroll"
-          description="Run payroll safely with staged approvals, item-level checks, and clear payout status."
+          description="Run payroll with staged approvals and clear payout status."
         />
         <EmptyState
           title="Access denied"

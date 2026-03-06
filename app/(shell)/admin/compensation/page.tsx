@@ -39,7 +39,7 @@ export default async function AdminCompensationPage({
       <>
         <PageHeader
           title="Compensation Admin"
-          description="Manage salary, allowances, and equity records."
+          description="Manage salary, allowances, and equity for team members."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -56,7 +56,7 @@ export default async function AdminCompensationPage({
       <>
         <PageHeader
           title="Compensation Admin"
-          description="Manage salary, allowances, and equity records."
+          description="Manage salary, allowances, and equity for team members."
         />
         <EmptyState
           title="Access denied"

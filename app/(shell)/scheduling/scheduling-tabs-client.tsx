@@ -119,7 +119,7 @@ export function SchedulingTabsClient({
     <>
       <PageHeader
         title="Schedule"
-        description="Shifts, swaps, and team schedule management."
+        description="Build, publish, and manage team shift schedules."
       />
 
       <PageTabs

@@ -477,7 +477,7 @@ export function ComplianceClient() {
     <>
       <PageHeader
         title="Compliance"
-        description="Track statutory deadlines, completion status, and proof across countries."
+        description="Statutory filings with due dates, proof, and country tracking."
         actions={
           <>
             <button

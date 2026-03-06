@@ -77,7 +77,7 @@ export function PayClient({ requestedTab, userRoles }: PayClientProps) {
     <>
       <PageHeader
         title="Pay"
-        description="Review payslips, payment details, and compensation in one place."
+        description="Pay statements, payout setup, and compensation in one view."
       />
 
       <PageTabs

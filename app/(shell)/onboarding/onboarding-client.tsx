@@ -633,7 +633,7 @@ export function OnboardingClient({
     <>
       <PageHeader
         title="Onboarding"
-        description="Launch onboarding plans, monitor progress, and resolve blockers before deadlines slip."
+        description="Launch onboarding plans, track progress, and resolve blockers."
         actions={
           canManageOnboarding ? (
             <>

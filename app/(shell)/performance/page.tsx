@@ -12,7 +12,7 @@ export default async function PerformancePage() {
       <>
         <PageHeader
           title="Performance"
-          description="Complete your reviews, track goals, and keep performance conversations moving."
+          description="Run review cycles, track completion, and calibrate fairly."
         />
         <EmptyState
           title="Profile is unavailable"

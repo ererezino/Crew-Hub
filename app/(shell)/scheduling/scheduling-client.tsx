@@ -83,7 +83,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
       {!embedded ? (
         <PageHeader
           title="Schedule"
-          description="See your shift schedule, claim open shifts, and manage swap requests."
+          description="Build, publish, and manage team shift schedules."
         />
       ) : null}
 

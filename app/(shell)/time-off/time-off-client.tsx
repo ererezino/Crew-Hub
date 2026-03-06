@@ -691,7 +691,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         {!embedded ? (
           <PageHeader
             title="Time Off"
-            description="Check your leave balance, request time off, and track approvals in one place."
+            description="Request time off, check balances, and track approval status."
           />
         ) : null}
         <TimeOffSkeleton />
@@ -705,7 +705,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         {!embedded ? (
           <PageHeader
             title="Time Off"
-            description="Check your leave balance, request time off, and track approvals in one place."
+            description="Request time off, check balances, and track approval status."
           />
         ) : null}
         <ErrorState
@@ -722,7 +722,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       {!embedded ? (
         <PageHeader
           title="Time Off"
-          description="Check your leave balance, request time off, and track approvals in one place."
+          description="Request time off, check balances, and track approval status."
         />
       ) : null}
 

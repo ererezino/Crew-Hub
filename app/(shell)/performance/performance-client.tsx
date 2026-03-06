@@ -1183,7 +1183,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
     <>
       <PageHeader
         title="Performance"
-        description="Track active review cycles, complete self reviews, and submit manager feedback."
+        description="Run review cycles, track completion, and calibrate fairly."
         actions={
           canManagePerformance ? (
             <Link className="button button-subtle" href="/performance/admin">

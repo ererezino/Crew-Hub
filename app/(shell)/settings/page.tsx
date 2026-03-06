@@ -39,7 +39,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       <>
         <PageHeader
           title="Settings"
-          description="Update your profile and workspace preferences, with admin controls available by role."
+          description="Profile, workspace preferences, and admin controls."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -67,7 +67,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     <>
       <PageHeader
         title="Settings"
-        description="Update your profile and workspace preferences, with admin controls available by role."
+        description="Profile, workspace preferences, and admin controls."
       />
 
       <SettingsClient

@@ -21,7 +21,7 @@ export default async function AnalyticsPage() {
       <>
         <PageHeader
           title="Analytics"
-          description="Track workforce and operations trends with filters and exports for decision-making."
+          description="Workforce and operations trends with filters and exports."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -40,7 +40,7 @@ export default async function AnalyticsPage() {
       <>
         <PageHeader
           title="Analytics"
-          description="Track workforce and operations trends with filters and exports for decision-making."
+          description="Workforce and operations trends with filters and exports."
         />
         <EmptyState
           title="Access denied"

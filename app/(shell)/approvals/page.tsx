@@ -27,7 +27,7 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
       <>
         <PageHeader
           title="Approvals"
-          description="Review team requests from one consolidated queue."
+          description="Review and act on pending team requests."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -61,7 +61,7 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
       <>
         <PageHeader
           title="Approvals"
-          description="Review team requests from one consolidated queue."
+          description="Review and act on pending team requests."
         />
         <EmptyState
           title="Approvals are restricted"

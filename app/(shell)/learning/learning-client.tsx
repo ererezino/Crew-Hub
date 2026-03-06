@@ -96,7 +96,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
       {!embedded ? (
         <PageHeader
           title="Learning"
-          description="Complete assigned learning, access certificates, and respond to learning surveys."
+          description="Courses, certificates, and surveys assigned to you."
         />
       ) : null}
 

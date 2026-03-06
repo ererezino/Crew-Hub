@@ -373,7 +373,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
     <>
       <PageHeader
         title="Documents"
-        description="Access your personal documents, upload required records, and track expiry reminders."
+        description="Your documents, required records, and expiry reminders."
         actions={
           canManageDocuments ? (
             <button type="button" className="button button-accent" onClick={openCreatePanel}>

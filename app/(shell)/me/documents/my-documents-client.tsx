@@ -522,7 +522,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
     <>
       <PageHeader
         title="My Documents"
-        description="Access your personal documents, upload required records, and track expiry reminders."
+        description="Your documents, required records, and expiry reminders."
         actions={
           <>
             {showTravelView ? (

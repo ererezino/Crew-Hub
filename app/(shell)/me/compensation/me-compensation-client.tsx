@@ -62,7 +62,7 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
     <>
       <PageHeader
         title="Compensation"
-        description="Understand your compensation clearly, including current pay, allowances, and vesting progress."
+        description="Manage salary, allowances, and equity for team members."
       />
       {content}
     </>

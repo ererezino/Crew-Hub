@@ -84,7 +84,7 @@ export function PayrollDashboardClient({
     <>
       <PageHeader
         title="Payroll"
-        description="Run payroll safely with staged approvals, item-level checks, and clear payout status."
+        description="Run payroll with staged approvals and clear payout status."
         actions={headerActions}
       />
 

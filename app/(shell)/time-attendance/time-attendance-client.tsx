@@ -58,7 +58,7 @@ export function TimeAttendanceClient() {
     <>
       <PageHeader
         title="Hours"
-        description="Log your work hours and review attendance records for this week."
+        description="Log work hours, track clock-ins, and review weekly attendance."
       />
 
       {overviewQuery.isLoading ? overviewSkeleton() : null}

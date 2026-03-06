@@ -834,7 +834,7 @@ export function ExpensesClient({
     <>
       <PageHeader
         title="Expenses"
-        description="Submit work expenses for reimbursement and track each claim through manager review and finance disbursement."
+        description="Submit expenses, upload receipts, and track reimbursement."
         actions={
           <>
             {canViewReports ? (

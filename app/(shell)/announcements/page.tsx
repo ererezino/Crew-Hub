@@ -12,7 +12,7 @@ export default async function AnnouncementsPage() {
       <>
         <PageHeader
           title="Announcements"
-          description="Stay up to date on company updates and see what's new since your last visit."
+          description="Company updates and news since your last visit."
         />
         <EmptyState
           title="Profile is unavailable"

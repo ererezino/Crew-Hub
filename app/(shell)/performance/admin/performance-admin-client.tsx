@@ -657,7 +657,7 @@ export function AdminPerformanceClient() {
     <>
       <PageHeader
         title="Performance Admin"
-        description="Create review cycles, assign templates, and track completion progress."
+        description="Run review cycles, track completion, and calibrate fairly."
         actions={
           <Link className="button button-subtle" href="/performance">
             Back to performance

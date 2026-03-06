@@ -839,7 +839,7 @@ export function AdminCompensationClient({
     <>
       <PageHeader
         title="Compensation Admin"
-        description="Manage salary, allowances, and equity grants for crew members."
+        description="Manage salary, allowances, and equity for team members."
       />
 
       <section className="compensation-admin-employee-card" aria-label="Employee selector">
