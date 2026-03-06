@@ -20,7 +20,7 @@ import {
   isoDateToUtcDate,
   monthToDateRange
 } from "../../../../lib/time-off";
-import type { LeaveRequestRecord } from "../../../../types/time-off";
+import type { AfkCalendarRecord, LeaveRequestRecord } from "../../../../types/time-off";
 
 type CalendarCell = {
   dateKey: string;
@@ -192,6 +192,17 @@ export function TimeOffCalendarClient({
     return map;
   }, [activeMonth, calendarQuery.data?.requests]);
 
+  const afkCountByDate = useMemo(() => {
+    const map = new Map<string, number>();
+
+    for (const afkLog of calendarQuery.data?.afkLogs ?? []) {
+      const currentCount = map.get(afkLog.date) ?? 0;
+      map.set(afkLog.date, currentCount + 1);
+    }
+
+    return map;
+  }, [calendarQuery.data?.afkLogs]);
+
   const requestsByDate = useMemo(() => {
     const map = new Map<string, LeaveRequestRecord[]>();
     const monthRange = monthToDateRange(activeMonth);
@@ -219,6 +230,18 @@ export function TimeOffCalendarClient({
 
     return map;
   }, [activeMonth, calendarQuery.data?.requests]);
+
+  const afkByDate = useMemo(() => {
+    const map = new Map<string, AfkCalendarRecord[]>();
+
+    for (const afkLog of calendarQuery.data?.afkLogs ?? []) {
+      const existing = map.get(afkLog.date) ?? [];
+      existing.push(afkLog);
+      map.set(afkLog.date, existing);
+    }
+
+    return map;
+  }, [calendarQuery.data?.afkLogs]);
 
   const closePanel = useCallback(() => setSelectedDay(null), []);
 
@@ -252,6 +275,8 @@ export function TimeOffCalendarClient({
       </>
     );
   }
+
+  const monthlyEntryCount = calendarQuery.data.requests.length + calendarQuery.data.afkLogs.length;
 
   return (
     <>
@@ -333,18 +358,22 @@ export function TimeOffCalendarClient({
           {calendarCells.map((cell) => {
             const holidayNames = holidayNamesByDate.get(cell.dateKey) ?? [];
             const requestCount = requestCountByDate.get(cell.dateKey) ?? 0;
+            const afkCount = afkCountByDate.get(cell.dateKey) ?? 0;
             const isHoliday = holidayNames.length > 0;
             const hasLeave = requestCount > 0;
+            const hasAfk = afkCount > 0;
+            const entryCount = requestCount + afkCount;
             const className = [
               "timeoff-calendar-day",
               cell.isCurrentMonth ? "timeoff-calendar-day-current" : "timeoff-calendar-day-muted",
               hasLeave ? "timeoff-calendar-day-approved" : "",
+              hasAfk ? "timeoff-calendar-day-afk" : "",
               isHoliday ? "timeoff-calendar-day-holiday" : ""
             ]
               .filter(Boolean)
               .join(" ");
 
-            const isClickable = canViewDayDetails && (hasLeave || isHoliday) && cell.isCurrentMonth;
+            const isClickable = canViewDayDetails && (hasLeave || hasAfk || isHoliday) && cell.isCurrentMonth;
 
             return (
               <article
@@ -368,10 +397,11 @@ export function TimeOffCalendarClient({
                 <p className="numeric">{cell.dayNumber}</p>
                 <span className="timeoff-calendar-dots">
                   {hasLeave ? <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" /> : null}
+                  {hasAfk ? <span className="timeoff-calendar-badge timeoff-calendar-badge-afk" /> : null}
                   {isHoliday ? <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" /> : null}
                 </span>
-                {requestCount > 1 ? (
-                  <p className="timeoff-calendar-note numeric">{requestCount}</p>
+                {entryCount > 1 ? (
+                  <p className="timeoff-calendar-note numeric">{entryCount}</p>
                 ) : null}
               </article>
             );
@@ -383,6 +413,10 @@ export function TimeOffCalendarClient({
               <span>Leave</span>
             </div>
             <div className="timeoff-calendar-legend-item">
+              <span className="timeoff-calendar-badge timeoff-calendar-badge-afk" />
+              <span>AFK</span>
+            </div>
+            <div className="timeoff-calendar-legend-item">
               <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" />
               <span>Public holiday</span>
             </div>
@@ -390,50 +424,81 @@ export function TimeOffCalendarClient({
         </div>
       </section>
 
-      <section className="settings-card" aria-label="Monthly leave entries">
+      <section className="settings-card" aria-label="Monthly leave and AFK entries">
         <header className="timeoff-section-header">
           <h2 className="section-title">Entries This Month</h2>
           <StatusBadge tone="processing">
-            {calendarQuery.data.requests.length} {calendarQuery.data.requests.length === 1 ? "request" : "requests"}
+            {monthlyEntryCount} {monthlyEntryCount === 1 ? "entry" : "entries"}
           </StatusBadge>
         </header>
 
-        {calendarQuery.data.requests.length === 0 ? (
+        {monthlyEntryCount === 0 ? (
           <EmptyState
-            title="No leave entries for this month"
-            description="Adjust month or filters to view more calendar entries."
+            title="No leave or AFK entries for this month"
+            description="Adjust month or filters to view more calendar activity."
             ctaLabel="Open Time Off"
             ctaHref="/time-off"
           />
         ) : (
-          <ul className="timeoff-calendar-entry-list">
-            {calendarQuery.data.requests.map((requestRecord) => (
-              <li key={requestRecord.id} className="timeoff-calendar-entry-card">
-                <div>
-                  <p className="timeoff-calendar-entry-title">{requestRecord.employeeName}</p>
-                  <p className="settings-card-description">
-                    {requestRecord.employeeDepartment ?? "No department"} •{" "}
-                    {countryFlagFromCode(requestRecord.employeeCountryCode)}{" "}
-                    {countryNameFromCode(requestRecord.employeeCountryCode)}
-                  </p>
-                </div>
-                <div className="timeoff-calendar-entry-meta">
-                  <StatusBadge tone={requestRecord.status === "approved" ? "success" : "pending"}>
-                    {formatLeaveStatus(requestRecord.status)}
-                  </StatusBadge>
-                  <p className="settings-card-description">{formatLeaveTypeLabel(requestRecord.leaveType)}</p>
-                  <p className="settings-card-description">
-                    <time
-                      dateTime={requestRecord.startDate}
-                      title={formatDateTimeTooltip(requestRecord.startDate)}
-                    >
-                      {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
-                    </time>
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <>
+            {calendarQuery.data.requests.length > 0 ? (
+              <ul className="timeoff-calendar-entry-list">
+                {calendarQuery.data.requests.map((requestRecord) => (
+                  <li key={requestRecord.id} className="timeoff-calendar-entry-card">
+                    <div>
+                      <p className="timeoff-calendar-entry-title">{requestRecord.employeeName}</p>
+                      <p className="settings-card-description">
+                        {requestRecord.employeeDepartment ?? "No department"} •{" "}
+                        {countryFlagFromCode(requestRecord.employeeCountryCode)}{" "}
+                        {countryNameFromCode(requestRecord.employeeCountryCode)}
+                      </p>
+                    </div>
+                    <div className="timeoff-calendar-entry-meta">
+                      <StatusBadge tone={requestRecord.status === "approved" ? "success" : "pending"}>
+                        {formatLeaveStatus(requestRecord.status)}
+                      </StatusBadge>
+                      <p className="settings-card-description">{formatLeaveTypeLabel(requestRecord.leaveType)}</p>
+                      <p className="settings-card-description">
+                        <time
+                          dateTime={requestRecord.startDate}
+                          title={formatDateTimeTooltip(requestRecord.startDate)}
+                        >
+                          {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
+                        </time>
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {calendarQuery.data.afkLogs.length > 0 ? (
+              <ul className="timeoff-calendar-entry-list">
+                {calendarQuery.data.afkLogs.map((afkLog) => (
+                  <li key={afkLog.id} className="timeoff-calendar-entry-card">
+                    <div>
+                      <p className="timeoff-calendar-entry-title">{afkLog.employeeName}</p>
+                      <p className="settings-card-description">
+                        {afkLog.employeeDepartment ?? "No department"} •{" "}
+                        {countryFlagFromCode(afkLog.employeeCountryCode)}{" "}
+                        {countryNameFromCode(afkLog.employeeCountryCode)}
+                      </p>
+                    </div>
+                    <div className="timeoff-calendar-entry-meta">
+                      <StatusBadge tone="info">AFK</StatusBadge>
+                      <p className="settings-card-description">
+                        <time dateTime={afkLog.date} title={formatDateTimeTooltip(afkLog.date)}>
+                          {formatDateRangeHuman(afkLog.date, afkLog.date)}
+                        </time>{" "}
+                        · {afkLog.startTime}-{afkLog.endTime}
+                      </p>
+                      <p className="settings-card-description numeric">{afkLog.durationMinutes} min</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
         )}
       </section>
 
@@ -446,7 +511,7 @@ export function TimeOffCalendarClient({
             day: "numeric",
             timeZone: "UTC"
           })}
-          description="Who's off this day"
+          description="Who's away or AFK this day"
           onClose={closePanel}
         >
           {(holidayNamesByDate.get(selectedDay) ?? []).length > 0 ? (
@@ -485,9 +550,38 @@ export function TimeOffCalendarClient({
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="settings-card-description">No leave requests on this day.</p>
-          )}
+          ) : null}
+
+          {(afkByDate.get(selectedDay) ?? []).length > 0 ? (
+            <ul className="timeoff-calendar-entry-list">
+              {(afkByDate.get(selectedDay) ?? []).map((afkLog) => (
+                <li key={afkLog.id} className="timeoff-calendar-entry-card">
+                  <div>
+                    <p className="timeoff-calendar-entry-title">{afkLog.employeeName}</p>
+                    <p className="settings-card-description">
+                      {afkLog.employeeDepartment ?? "No department"} •{" "}
+                      {countryFlagFromCode(afkLog.employeeCountryCode)}{" "}
+                      {countryNameFromCode(afkLog.employeeCountryCode)}
+                    </p>
+                  </div>
+                  <div className="timeoff-calendar-entry-meta">
+                    <StatusBadge tone="info">AFK</StatusBadge>
+                    <p className="settings-card-description">
+                      <time dateTime={afkLog.date} title={formatDateTimeTooltip(afkLog.date)}>
+                        {formatDateRangeHuman(afkLog.date, afkLog.date)}
+                      </time>{" "}
+                      · {afkLog.startTime}-{afkLog.endTime}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {(requestsByDate.get(selectedDay) ?? []).length === 0 &&
+          (afkByDate.get(selectedDay) ?? []).length === 0 ? (
+            <p className="settings-card-description">No leave or AFK entries on this day.</p>
+          ) : null}
         </SlidePanel>
       ) : null}
     </>

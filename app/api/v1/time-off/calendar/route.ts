@@ -13,6 +13,7 @@ import {
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
+  type AfkCalendarRecord,
   type HolidayCalendarDay,
   type LeaveRequestRecord,
   type TimeOffCalendarResponseData
@@ -52,6 +53,17 @@ const holidayRowSchema = z.object({
   date: z.string(),
   name: z.string(),
   year: z.number()
+});
+
+const afkLogRowSchema = z.object({
+  id: z.string().uuid(),
+  employee_id: z.string().uuid(),
+  date: z.string(),
+  start_time: z.string(),
+  end_time: z.string(),
+  duration_minutes: z.union([z.number(), z.string()]),
+  notes: z.string().nullable(),
+  created_at: z.string()
 });
 
 function buildMeta() {
@@ -217,6 +229,7 @@ export async function GET(request: Request) {
   const profileById = new Map(filteredProfiles.map((profile) => [profile.id, profile]));
 
   let requests: LeaveRequestRecord[] = [];
+  let afkLogs: AfkCalendarRecord[] = [];
 
   if (filteredProfileIds.length > 0) {
     const { data: rawRequests, error: requestsError } = await supabase
@@ -276,6 +289,60 @@ export async function GET(request: Request) {
         rejectionReason: row.rejection_reason,
         createdAt: row.created_at,
         updatedAt: row.updated_at
+      };
+    });
+
+    const { data: rawAfkLogs, error: afkLogsError } = await supabase
+      .from("afk_logs")
+      .select("id, employee_id, date, start_time, end_time, duration_minutes, notes, created_at")
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .is("reclassified_as", null)
+      .in("employee_id", filteredProfileIds)
+      .gte("date", monthRange.startDate)
+      .lte("date", monthRange.endDate)
+      .order("date", { ascending: true })
+      .order("start_time", { ascending: true });
+
+    if (afkLogsError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "AFK_LOGS_FETCH_FAILED",
+          message: "Unable to load AFK logs for calendar view."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedAfkLogs = z.array(afkLogRowSchema).safeParse(rawAfkLogs ?? []);
+
+    if (!parsedAfkLogs.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "AFK_LOGS_PARSE_FAILED",
+          message: "AFK log data is not in the expected shape."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    afkLogs = parsedAfkLogs.data.map((row) => {
+      const employee = profileById.get(row.employee_id);
+
+      return {
+        id: row.id,
+        employeeId: row.employee_id,
+        employeeName: employee?.full_name ?? "Unknown user",
+        employeeDepartment: employee?.department ?? null,
+        employeeCountryCode: employee?.country_code ?? null,
+        date: row.date,
+        startTime: row.start_time,
+        endTime: row.end_time,
+        durationMinutes: parseNumeric(row.duration_minutes),
+        notes: row.notes ?? "",
+        createdAt: row.created_at
       };
     });
   }
@@ -339,6 +406,7 @@ export async function GET(request: Request) {
     monthStart: monthRange.startDate,
     monthEnd: monthRange.endDate,
     requests,
+    afkLogs,
     holidays,
     filters
   };
