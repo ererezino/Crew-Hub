@@ -234,15 +234,15 @@ function PaymentStatementDocument(props: PaymentStatementPdfInput) {
             </View>
             <View style={styles.metaItem}>
               <Text style={styles.metaLabel}>Department</Text>
-              <Text style={styles.metaValue}>{props.department ?? "—"}</Text>
+              <Text style={styles.metaValue}>{props.department ?? "-"}</Text>
             </View>
             <View style={styles.metaItem}>
               <Text style={styles.metaLabel}>Title</Text>
-              <Text style={styles.metaValue}>{props.title ?? "—"}</Text>
+              <Text style={styles.metaValue}>{props.title ?? "-"}</Text>
             </View>
             <View style={styles.metaItem}>
               <Text style={styles.metaLabel}>Country</Text>
-              <Text style={styles.metaValue}>{props.country ?? "—"}</Text>
+              <Text style={styles.metaValue}>{props.country ?? "-"}</Text>
             </View>
           </View>
         </View>
@@ -299,7 +299,7 @@ function PaymentStatementDocument(props: PaymentStatementPdfInput) {
           ) : (
             <View style={styles.tableRow}>
               <Text style={{ ...styles.tableRowLabel, fontStyle: "italic" }}>
-                None — taxes not withheld
+                None. Taxes not withheld
               </Text>
               <Text style={styles.tableRowValue}>
                 {formatAmount(0, props.currency)}

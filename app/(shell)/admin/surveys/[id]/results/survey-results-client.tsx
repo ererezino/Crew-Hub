@@ -73,7 +73,7 @@ function SentimentHeatmap({ heatmap }: { heatmap: SurveyHeatmapData }) {
         <div>
           <h2 className="section-title">Sentiment heatmap</h2>
           <p className="settings-card-description">
-            Average score by department and question. Cells with insufficient responses show &quot;—&quot;.
+            Average score by department and question. Cells with insufficient responses show &quot;-&quot;.
           </p>
         </div>
       </header>
@@ -106,7 +106,7 @@ function SentimentHeatmap({ heatmap }: { heatmap: SurveyHeatmapData }) {
                       className={heatmapCellClass(score, isProtected)}
                       title={isProtected ? `${count} responses (below threshold)` : `${count} responses`}
                     >
-                      {isProtected || score === null ? "—" : score.toFixed(1)}
+                      {isProtected || score === null ? "-" : score.toFixed(1)}
                     </td>
                   );
                 })}
@@ -163,7 +163,7 @@ function TrendChart({ trend }: { trend: SurveyTrendData }) {
         <div>
           <h2 className="section-title">Score trend</h2>
           <p className="survey-trend-summary">
-            {trend.instanceCount} survey instances — average score trending{" "}
+            {trend.instanceCount} survey instances, average score trending{" "}
             <strong>{trendArrow(trend.trendDirection)}</strong>
           </p>
         </div>

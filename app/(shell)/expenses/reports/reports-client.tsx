@@ -113,7 +113,7 @@ function EmployeeTable({ rows }: { rows: EnhancedEmployeeBucket[] }) {
           {rows.map((row) => (
             <tr key={row.key}>
               <td>{row.label}</td>
-              <td>{row.department ?? "—"}</td>
+              <td>{row.department ?? "-"}</td>
               <td className="numeric">{row.count}</td>
               <td className="numeric">
                 <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
@@ -121,7 +121,7 @@ function EmployeeTable({ rows }: { rows: EnhancedEmployeeBucket[] }) {
               <td className="numeric">
                 {row.avgProcessingHours !== null
                   ? `${(row.avgProcessingHours / 24).toFixed(1)}d`
-                  : "—"}
+                  : "-"}
               </td>
               <td>
                 <span className="expenses-status-pills">
@@ -166,7 +166,7 @@ function CategoryTable({ rows }: { rows: EnhancedCategoryBucket[] }) {
                 <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
               </td>
               <td className="numeric">{row.pctOfTotal}%</td>
-              <td>{row.mostCommonVendor ?? "—"}</td>
+              <td>{row.mostCommonVendor ?? "-"}</td>
             </tr>
           ))}
         </tbody>
@@ -201,7 +201,7 @@ function DepartmentTable({ rows }: { rows: EnhancedDepartmentBucket[] }) {
                 <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
               </td>
               <td className="numeric">{row.uniqueEmployees}</td>
-              <td>{row.topCategory ? getExpenseCategoryLabel(row.topCategory as never) : "—"}</td>
+              <td>{row.topCategory ? getExpenseCategoryLabel(row.topCategory as never) : "-"}</td>
             </tr>
           ))}
         </tbody>
@@ -227,7 +227,7 @@ export function ExpenseReportsClient() {
       if (row.department) depts.add(row.department);
     }
     for (const row of reportsQuery.data.byDepartment) {
-      if (row.label && row.label !== "No department") depts.add(row.label);
+      if (row.label && row.label !== "") depts.add(row.label);
     }
     return [...depts].sort();
   }, [reportsQuery.data]);
@@ -399,7 +399,7 @@ export function ExpenseReportsClient() {
               <p className="metric-label">Avg Manager Approval</p>
               <p className="metric-value numeric">
                 {reportsQuery.data.timings.avgSubmissionToManagerApprovalHours === null
-                  ? "—"
+                  ? "-"
                   : `${reportsQuery.data.timings.avgSubmissionToManagerApprovalHours.toFixed(1)}h`}
               </p>
               <p className="metric-hint">From submission to manager approval</p>
@@ -408,7 +408,7 @@ export function ExpenseReportsClient() {
               <p className="metric-label">Avg Disbursement</p>
               <p className="metric-value numeric">
                 {reportsQuery.data.timings.avgManagerApprovalToDisbursementHours === null
-                  ? "—"
+                  ? "-"
                   : `${reportsQuery.data.timings.avgManagerApprovalToDisbursementHours.toFixed(1)}h`}
               </p>
               <p className="metric-hint">From manager approval to reimbursement</p>

@@ -288,7 +288,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                     <div className="documents-cell-copy">
                       <p className="documents-cell-title">{requestRecord.employeeName}</p>
                       <p className="documents-cell-description">
-                        {requestRecord.employeeDepartment ?? "No department"}
+                        {requestRecord.employeeDepartment ?? ""}
                       </p>
                     </div>
                   </td>
@@ -371,7 +371,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
             <article className="settings-card">
               <h3 className="section-title">{contextTarget.employeeName}</h3>
               <p className="settings-card-description">
-                {contextTarget.employeeDepartment ?? "No department"}
+                {contextTarget.employeeDepartment ?? ""}
               </p>
               <p className="settings-card-description">
                 <span className="country-chip">

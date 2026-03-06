@@ -448,7 +448,7 @@ export function TimeOffCalendarClient({
                     <div>
                       <p className="timeoff-calendar-entry-title">{requestRecord.employeeName}</p>
                       <p className="settings-card-description">
-                        {requestRecord.employeeDepartment ?? "No department"} •{" "}
+                        {requestRecord.employeeDepartment ?? ""} •{" "}
                         {countryFlagFromCode(requestRecord.employeeCountryCode)}{" "}
                         {countryNameFromCode(requestRecord.employeeCountryCode)}
                       </p>
@@ -479,7 +479,7 @@ export function TimeOffCalendarClient({
                     <div>
                       <p className="timeoff-calendar-entry-title">{afkLog.employeeName}</p>
                       <p className="settings-card-description">
-                        {afkLog.employeeDepartment ?? "No department"} •{" "}
+                        {afkLog.employeeDepartment ?? ""} •{" "}
                         {countryFlagFromCode(afkLog.employeeCountryCode)}{" "}
                         {countryNameFromCode(afkLog.employeeCountryCode)}
                       </p>
@@ -532,7 +532,7 @@ export function TimeOffCalendarClient({
                   <div>
                     <p className="timeoff-calendar-entry-title">{req.employeeName}</p>
                     <p className="settings-card-description">
-                      {req.employeeDepartment ?? "No department"} •{" "}
+                      {req.employeeDepartment ?? ""} •{" "}
                       {countryFlagFromCode(req.employeeCountryCode)}{" "}
                       {countryNameFromCode(req.employeeCountryCode)}
                     </p>
@@ -559,7 +559,7 @@ export function TimeOffCalendarClient({
                   <div>
                     <p className="timeoff-calendar-entry-title">{afkLog.employeeName}</p>
                     <p className="settings-card-description">
-                      {afkLog.employeeDepartment ?? "No department"} •{" "}
+                      {afkLog.employeeDepartment ?? ""} •{" "}
                       {countryFlagFromCode(afkLog.employeeCountryCode)}{" "}
                       {countryNameFromCode(afkLog.employeeCountryCode)}
                     </p>

@@ -23,6 +23,10 @@ import {
   CreditCard,
   Lock,
   Settings,
+  PenTool,
+  BookOpen,
+  Building,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,6 +53,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   CreditCard,
   Lock,
   Settings,
+  PenTool,
+  BookOpen,
+  Building,
+  ScrollText,
 };
 
 type NavIconProps = {

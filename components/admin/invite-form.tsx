@@ -521,7 +521,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
               <option value="">No manager</option>
               {managerOptions.map((person) => (
                 <option key={person.id} value={person.id}>
-                  {person.fullName} ({person.department ?? "No department"})
+                  {person.fullName} ({person.department ?? ""})
                 </option>
               ))}
             </select>

@@ -533,7 +533,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               </article>
               <article className="metric-card">
                 <p className="metric-label">Most common type</p>
-                <p className="metric-value">{data.timeOff.metrics.mostCommonType ? leaveTypeLabel(data.timeOff.metrics.mostCommonType) : "—"}</p>
+                <p className="metric-value">{data.timeOff.metrics.mostCommonType ? leaveTypeLabel(data.timeOff.metrics.mostCommonType) : "-"}</p>
                 <p className="metric-hint">By total days taken</p>
               </article>
               <article className="metric-card">
@@ -591,7 +591,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
                             {row.fullName}
                           </a>
                         </td>
-                        <td>{row.department ?? "—"}</td>
+                        <td>{row.department ?? "-"}</td>
                         <td className="numeric">{formatDays(row.totalDays)}</td>
                         <td>{leaveTypeLabel(row.mainType)}</td>
                       </tr>

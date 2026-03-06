@@ -905,7 +905,7 @@ export function AdminCompensationClient({
             <div>
               <h2 className="section-title">{selectedEmployee.fullName}</h2>
               <p className="settings-card-description">
-                {selectedEmployee.title ?? "No title"} • {selectedEmployee.department ?? "No department"}
+                {selectedEmployee.title ?? "No title"} • {selectedEmployee.department ?? ""}
               </p>
             </div>
             <div className="compensation-summary-meta">

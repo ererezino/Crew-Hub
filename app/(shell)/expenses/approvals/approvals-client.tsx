@@ -817,7 +817,7 @@ export function ExpenseApprovalsClient({
                         <div className="documents-cell-copy">
                           <p className="documents-cell-title">{expense.employeeName}</p>
                           <p className="documents-cell-description">
-                            {expense.employeeDepartment ?? "No department"}
+                            {expense.employeeDepartment ?? ""}
                           </p>
                         </div>
                       </td>

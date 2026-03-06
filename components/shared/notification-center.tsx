@@ -319,7 +319,7 @@ export function NotificationCenter() {
                 </ul>
               ) : (
                 <p className="notification-footer">
-                  All caught up — no new notifications.
+                  All caught up. No new notifications.
                 </p>
               )}
             </>

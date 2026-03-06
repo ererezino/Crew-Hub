@@ -135,7 +135,7 @@ export function CompensationOverview({
           <div>
             <h2 className="section-title">{snapshot.employee.fullName}</h2>
             <p className="settings-card-description">
-              {snapshot.employee.title ?? "No title"} • {snapshot.employee.department ?? "No department"}
+              {snapshot.employee.title ?? "No title"} • {snapshot.employee.department ?? ""}
             </p>
           </div>
           <div className="compensation-summary-meta">

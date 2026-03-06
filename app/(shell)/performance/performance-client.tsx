@@ -546,7 +546,7 @@ function GoalsTab({
               id="goal-description"
               className="form-input"
               rows={3}
-              placeholder="Optional — describe what success looks like."
+              placeholder="Optional. Describe what success looks like."
               value={goalForm.description}
               onChange={(event) =>
                 setGoalForm((current) => ({ ...current, description: event.currentTarget.value }))
@@ -1430,7 +1430,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                         {selfAssignmentAcknowledged ? (
                           <StatusBadge tone="success">Acknowledged</StatusBadge>
                         ) : (
-                          <StatusBadge tone="pending">Shared — pending acknowledgment</StatusBadge>
+                          <StatusBadge tone="pending">Shared, pending acknowledgment</StatusBadge>
                         )}
 
                         {selfAssignment.managerResponse ? (

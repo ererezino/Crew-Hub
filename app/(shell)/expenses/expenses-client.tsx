@@ -1001,7 +1001,7 @@ export function ExpensesClient({
                               <div className="documents-cell-copy">
                                 <p className="documents-cell-title">{expense.employeeName}</p>
                                 <p className="documents-cell-description">
-                                  {expense.employeeDepartment ?? "No department"}
+                                  {expense.employeeDepartment ?? ""}
                                 </p>
                               </div>
                             </td>
@@ -1419,10 +1419,10 @@ export function ExpensesClient({
                     }}
                     disabled={isSubmitting}
                   >
-                    <option value="">— Choose a saved vendor —</option>
+                    <option value="">Choose a saved vendor</option>
                     {vendorBeneficiaries.vendors.map((vendor) => (
                       <option key={vendor.id} value={vendor.id}>
-                        {vendor.vendorName} — {vendor.bankAccountNumber}
+                        {vendor.vendorName} - {vendor.bankAccountNumber}
                       </option>
                     ))}
                   </select>

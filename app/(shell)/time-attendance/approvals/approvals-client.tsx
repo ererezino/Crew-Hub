@@ -213,7 +213,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                       <div className="documents-cell-copy">
                         <p className="documents-cell-title">{timesheet.employeeName}</p>
                         <p className="documents-cell-description">
-                          {timesheet.employeeDepartment ?? "No department"}
+                          {timesheet.employeeDepartment ?? ""}
                         </p>
                       </div>
                     </td>

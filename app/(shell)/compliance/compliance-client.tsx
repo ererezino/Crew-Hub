@@ -754,7 +754,7 @@ export function ComplianceClient() {
                             View
                           </Link>
                         ) : (
-                          <span className="settings-card-description">—</span>
+                          <span className="settings-card-description">-</span>
                         )}
                       </td>
                     </tr>

@@ -811,7 +811,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
                             {status.status === "completed"
                               ? "✓"
                               : status.status === "locked"
-                                ? "—"
+                                ? "-"
                                 : String(index + 1)}
                           </span>
                           <span className="module-sidebar-label">

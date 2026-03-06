@@ -372,7 +372,7 @@ function SuperAdminGreeting({ data }: { data: DashboardResponseData }) {
               {toSentenceCase(payroll.lastRunStatus)}
             </StatusBadge>
           ) : (
-            <p className="metric-value">—</p>
+            <p className="metric-value">-</p>
           )}
         </article>
         <article className="metric-card">
