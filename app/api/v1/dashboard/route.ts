@@ -25,6 +25,7 @@ import type {
   DashboardGreeting,
   DashboardHolidayItem,
   DashboardLeaveBalanceItem,
+  DashboardManagerOnboardingItem,
   DashboardPendingApprovals,
   DashboardResponseData,
   DashboardShiftItem,
@@ -95,6 +96,7 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     upcomingShifts: [],
     pendingApprovals: null,
     pendingApprovalItems: null,
+    managerOnboarding: null,
     headcount: null,
     onboardingStatus: null,
     complianceDeadlines: null,
@@ -198,6 +200,7 @@ function applyWidgetVisibility(
     response.teamOnLeaveToday = [];
     response.upcomingHolidays = [];
     response.pendingApprovalItems = null;
+    response.managerOnboarding = null;
     response.headcountByCountry = null;
     response.headcountByDept = null;
     response.recentAuditLog = null;
@@ -551,6 +554,142 @@ async function fetchPendingApprovalItems(
     // Sort by date descending (most recent first), limit to 6 items max
     items.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : 0));
     return items.slice(0, 6);
+  } catch {
+    return [];
+  }
+}
+
+type ManagerProfileRow = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
+type ManagerOnboardingInstanceRow = {
+  id: string;
+  employee_id: string;
+  started_at: string;
+};
+
+type ManagerOnboardingTaskRow = {
+  instance_id: string;
+  status: string;
+  assigned_to: string | null;
+  due_date: string | null;
+};
+
+async function fetchManagerOnboarding(
+  supabase: SupabaseClient,
+  orgId: string,
+  managerUserId: string
+): Promise<DashboardManagerOnboardingItem[]> {
+  try {
+    const { data: rawReports, error: reportsError } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .eq("org_id", orgId)
+      .eq("manager_id", managerUserId)
+      .is("deleted_at", null);
+
+    if (reportsError || !rawReports || rawReports.length === 0) {
+      return [];
+    }
+
+    const reports = rawReports as ManagerProfileRow[];
+    const reportIds = reports
+      .map((row) => row.id)
+      .filter((value): value is string => typeof value === "string");
+
+    if (reportIds.length === 0) {
+      return [];
+    }
+
+    const { data: rawInstances, error: instancesError } = await supabase
+      .from("onboarding_instances")
+      .select("id, employee_id, started_at")
+      .eq("org_id", orgId)
+      .eq("status", "active")
+      .eq("type", "onboarding")
+      .is("deleted_at", null)
+      .in("employee_id", reportIds);
+
+    if (instancesError || !rawInstances || rawInstances.length === 0) {
+      return [];
+    }
+
+    const instances = rawInstances as ManagerOnboardingInstanceRow[];
+    const instanceIds = instances
+      .map((row) => row.id)
+      .filter((value): value is string => typeof value === "string");
+
+    const { data: rawTasks, error: tasksError } = await supabase
+      .from("onboarding_tasks")
+      .select("instance_id, status, assigned_to, due_date")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("instance_id", instanceIds);
+
+    if (tasksError) {
+      return [];
+    }
+
+    const tasks = (rawTasks ?? []) as ManagerOnboardingTaskRow[];
+    const tasksByInstanceId = new Map<string, ManagerOnboardingTaskRow[]>();
+
+    for (const task of tasks) {
+      const instanceTasks = tasksByInstanceId.get(task.instance_id) ?? [];
+      instanceTasks.push(task);
+      tasksByInstanceId.set(task.instance_id, instanceTasks);
+    }
+
+    const reportById = new Map(reports.map((row) => [row.id, row]));
+    const today = toDateString(new Date());
+
+    const items: DashboardManagerOnboardingItem[] = instances
+      .map((instance) => {
+        const employee = reportById.get(instance.employee_id);
+
+        if (!employee) {
+          return null;
+        }
+
+        const instanceTasks = tasksByInstanceId.get(instance.id) ?? [];
+        const tasksTotal = instanceTasks.length;
+        const tasksCompleted = instanceTasks.filter((task) => task.status === "completed").length;
+        const overdueManagerTaskCount = instanceTasks.filter(
+          (task) =>
+            task.assigned_to === managerUserId &&
+            task.status !== "completed" &&
+            typeof task.due_date === "string" &&
+            task.due_date < today
+        ).length;
+
+        const startedAtTimestamp = Date.parse(instance.started_at);
+        const daysSinceStart = Number.isNaN(startedAtTimestamp)
+          ? 0
+          : Math.max(0, Math.floor((Date.now() - startedAtTimestamp) / (24 * 60 * 60 * 1000)));
+
+        return {
+          employeeId: instance.employee_id,
+          employeeName: employee.full_name ?? "Team member",
+          employeeAvatarUrl: employee.avatar_url ?? null,
+          instanceId: instance.id,
+          tasksTotal,
+          tasksCompleted,
+          daysSinceStart,
+          overdueManagerTaskCount
+        };
+      })
+      .filter((value): value is DashboardManagerOnboardingItem => value !== null)
+      .sort((left, right) => {
+        if (left.overdueManagerTaskCount !== right.overdueManagerTaskCount) {
+          return right.overdueManagerTaskCount - left.overdueManagerTaskCount;
+        }
+
+        return right.daysSinceStart - left.daysSinceStart;
+      });
+
+    return items;
   } catch {
     return [];
   }
@@ -1147,6 +1286,7 @@ export async function GET() {
         const [
           pendingApprovals,
           pendingApprovalItems,
+          managerOnboarding,
           leaveBalance,
           upcomingShifts,
           recentExpenses,
@@ -1154,6 +1294,7 @@ export async function GET() {
         ] = await Promise.all([
           fetchPendingApprovals(supabase, profile.org_id, profile.id),
           fetchPendingApprovalItems(supabase, profile.org_id, profile.id),
+          fetchManagerOnboarding(supabase, profile.org_id, profile.id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
           fetchUpcomingShifts(supabase, profile.org_id, profile.id),
           fetchRecentExpenses(supabase, profile.org_id, profile.id),
@@ -1162,6 +1303,7 @@ export async function GET() {
 
         response.pendingApprovals = pendingApprovals;
         response.pendingApprovalItems = pendingApprovalItems;
+        response.managerOnboarding = managerOnboarding;
         response.leaveBalance = leaveBalance;
         response.upcomingShifts = upcomingShifts;
         response.recentExpenses = recentExpenses;

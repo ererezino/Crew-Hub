@@ -28,15 +28,21 @@ export async function POST(
 
   const { policyId } = await params;
   const supabase = await createSupabaseServerClient();
+  const acknowledgedAt = new Date().toISOString();
 
   const { error } = await supabase
     .from("policy_acknowledgments")
-    .update({
-      acknowledged_at: new Date().toISOString(),
-    })
-    .eq("policy_id", policyId)
-    .eq("employee_id", session.profile.id)
-    .is("acknowledged_at", null);
+    .upsert(
+      {
+        org_id: session.profile.org_id,
+        policy_id: policyId,
+        employee_id: session.profile.id,
+        acknowledged_at: acknowledgedAt
+      },
+      {
+        onConflict: "policy_id,employee_id"
+      }
+    );
 
   if (error) {
     return jsonResponse<null>(500, {
@@ -46,8 +52,51 @@ export async function POST(
     });
   }
 
-  return jsonResponse<{ acknowledged: boolean }>(200, {
-    data: { acknowledged: true },
+  return jsonResponse<{ acknowledged: boolean; acknowledgedAt: string }>(200, {
+    data: { acknowledged: true, acknowledgedAt },
+    error: null,
+    meta: buildMeta(),
+  });
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ policyId: string }> }
+) {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: { code: "UNAUTHORIZED", message: "You must be logged in." },
+      meta: buildMeta(),
+    });
+  }
+
+  const { policyId } = await params;
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("policy_acknowledgments")
+    .select("acknowledged_at")
+    .eq("org_id", session.profile.org_id)
+    .eq("policy_id", policyId)
+    .eq("employee_id", session.profile.id)
+    .maybeSingle();
+
+  if (error) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "FETCH_FAILED", message: error.message },
+      meta: buildMeta(),
+    });
+  }
+
+  const acknowledgedAt =
+    data && typeof data.acknowledged_at === "string" ? data.acknowledged_at : null;
+
+  return jsonResponse<{ acknowledged: boolean; acknowledgedAt: string | null }>(200, {
+    data: { acknowledged: acknowledgedAt !== null, acknowledgedAt },
     error: null,
     meta: buildMeta(),
   });

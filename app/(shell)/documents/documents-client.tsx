@@ -54,6 +54,16 @@ type ToastMessage = {
   message: string;
 };
 
+type PolicyAcknowledgeResponse = {
+  data: {
+    acknowledged: boolean;
+    acknowledgedAt: string | null;
+  } | null;
+  error?: {
+    message?: string;
+  } | null;
+};
+
 const tabs: Array<{ id: DocumentsTab; label: string }> = [
   { id: "all", label: "All Documents" },
   { id: "policy", label: "Policies" },
@@ -159,6 +169,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
 
   // Policy detail panel state
   const [policyDetail, setPolicyDetail] = useState<DocumentRecord | null>(null);
+  const [acknowledgingPolicyId, setAcknowledgingPolicyId] = useState<string | null>(null);
 
   // Signature request panel state
   const [sigReqTarget, setSigReqTarget] = useState<DocumentRecord | null>(null);
@@ -298,6 +309,61 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         delete nextState[documentId];
         return nextState;
       });
+    }
+  };
+
+  const handleAcknowledgePolicy = async (document: DocumentRecord) => {
+    if (!document.isPolicy || !document.requiresAcknowledgment) {
+      return;
+    }
+
+    setAcknowledgingPolicyId(document.id);
+
+    try {
+      const response = await fetch(
+        `/api/v1/compliance/acknowledgments/${document.id}/acknowledge`,
+        {
+          method: "POST"
+        }
+      );
+
+      const payload = (await response.json()) as PolicyAcknowledgeResponse;
+
+      if (!response.ok || !payload.data?.acknowledged) {
+        showToast("error", payload.error?.message ?? "Unable to acknowledge policy.");
+        return;
+      }
+
+      const acknowledgedAt = payload.data.acknowledgedAt ?? new Date().toISOString();
+
+      setDocuments((currentDocuments) =>
+        currentDocuments.map((currentDocument) =>
+          currentDocument.id === document.id
+            ? {
+                ...currentDocument,
+                acknowledgedAt
+              }
+            : currentDocument
+        )
+      );
+
+      setPolicyDetail((currentPolicy) =>
+        currentPolicy && currentPolicy.id === document.id
+          ? {
+              ...currentPolicy,
+              acknowledgedAt
+            }
+          : currentPolicy
+      );
+
+      showToast("success", "Policy acknowledged.");
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to acknowledge policy."
+      );
+    } finally {
+      setAcknowledgingPolicyId(null);
     }
   };
 
@@ -652,6 +718,47 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
               <section className="policy-detail-body">
                 <h3 className="section-title">Description</h3>
                 <p className="policy-detail-text">{policyDetail.description}</p>
+              </section>
+            ) : null}
+            {policyDetail.isPolicy && policyDetail.requiresAcknowledgment ? (
+              <section className="settings-card" aria-label="Policy acknowledgment">
+                <div className="documents-row-actions" style={{ justifyContent: "space-between" }}>
+                  <StatusBadge tone={policyDetail.acknowledgedAt ? "success" : "pending"}>
+                    {policyDetail.acknowledgedAt
+                      ? "Acknowledged"
+                      : "Acknowledgment required"}
+                  </StatusBadge>
+                  {!policyDetail.acknowledgedAt ? (
+                    <button
+                      type="button"
+                      className="button button-accent"
+                      onClick={() => {
+                        void handleAcknowledgePolicy(policyDetail);
+                      }}
+                      disabled={acknowledgingPolicyId === policyDetail.id}
+                    >
+                      {acknowledgingPolicyId === policyDetail.id
+                        ? "Saving..."
+                        : "I have read and understood this policy"}
+                    </button>
+                  ) : null}
+                </div>
+                <p className="settings-card-description">
+                  {policyDetail.acknowledgedAt ? (
+                    <>
+                      Acknowledged on{" "}
+                      <time
+                        dateTime={policyDetail.acknowledgedAt}
+                        title={formatDateTimeTooltip(policyDetail.acknowledgedAt)}
+                      >
+                        {formatRelativeTime(policyDetail.acknowledgedAt)}
+                      </time>
+                      .
+                    </>
+                  ) : (
+                    "This policy requires your acknowledgment."
+                  )}
+                </p>
               </section>
             ) : null}
             <div className="slide-panel-actions">

@@ -8,7 +8,7 @@ import { useCallback, useState } from "react";
 import { DecisionCard } from "../../../components/dashboard/decision-card";
 import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skeleton";
 import { HealthAlerts } from "../../../components/dashboard/health-alerts";
-import { OnboardingBanner } from "../../../components/dashboard/onboarding-banner";
+import { ManagerOnboardingWidget, OnboardingBanner } from "../../../components/dashboard/onboarding-banner";
 import { SetupChecklist } from "../../../components/dashboard/setup-checklist";
 import { WidgetErrorBoundary } from "../../../components/dashboard/widget-error-boundary";
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -975,6 +975,10 @@ function DashboardContent() {
     data.healthAlerts.length > 0;
   const onboardingProgress = data.onboardingProgress;
   const shouldShowOnboardingBanner = data.persona === "new_hire" && onboardingProgress;
+  const shouldShowManagerOnboarding =
+    data.persona === "manager" &&
+    Array.isArray(data.managerOnboarding) &&
+    data.managerOnboarding.length > 0;
   const onboardingProgressPercent =
     onboardingProgress && onboardingProgress.tasksTotal > 0
       ? Math.round((onboardingProgress.tasksCompleted / onboardingProgress.tasksTotal) * 100)
@@ -991,6 +995,9 @@ function DashboardContent() {
         />
       ) : null}
       <GreetingCard data={data} />
+      {shouldShowManagerOnboarding ? (
+        <ManagerOnboardingWidget reports={data.managerOnboarding!} />
+      ) : null}
       {showHealthAlerts ? <HealthAlerts alerts={data.healthAlerts!} /> : null}
       <WidgetGrid data={data} />
     </div>

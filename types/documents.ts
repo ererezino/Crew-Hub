@@ -37,6 +37,10 @@ export type DocumentRecord = {
   createdAt: string;
   updatedAt: string;
   latestVersion: number;
+  isPolicy?: boolean;
+  requiresAcknowledgment?: boolean;
+  policyVersion?: string | null;
+  acknowledgedAt?: string | null;
 };
 
 export type DocumentsResponseData = {
