@@ -718,7 +718,7 @@ export function PayrollRunDetailClient({
               {canProcessPayments ? (
                 <button
                   type="button"
-                  className="button button-accent"
+                  className="button button-primary"
                   onClick={processPayments}
                   disabled={
                     isProcessingPayments ||
@@ -865,7 +865,7 @@ export function PayrollRunDetailClient({
               {canSubmitForApproval ? (
                 <button
                   type="button"
-                  className="button button-accent"
+                  className="button"
                   disabled={activeRunAction !== null || isCalculating}
                   onClick={() => {
                     void performRunAction("submit");
@@ -878,7 +878,7 @@ export function PayrollRunDetailClient({
               {canApproveFirst ? (
                 <button
                   type="button"
-                  className="button button-accent"
+                  className="button button-primary"
                   disabled={activeRunAction !== null}
                   onClick={() => {
                     void performRunAction("approve_first");
@@ -891,7 +891,7 @@ export function PayrollRunDetailClient({
               {canApproveFinal ? (
                 <button
                   type="button"
-                  className="button button-accent"
+                  className="button button-primary"
                   disabled={activeRunAction !== null}
                   onClick={() => {
                     void performRunAction("approve_final");
@@ -1348,7 +1348,7 @@ export function PayrollRunDetailClient({
                                         <div className="settings-actions">
                                           <button
                                             type="submit"
-                                            className="button button-accent"
+                                            className="button"
                                             disabled={isSubmittingAdjustment}
                                           >
                                             {isSubmittingAdjustment ? "Saving..." : "Apply adjustment"}
@@ -1369,7 +1369,7 @@ export function PayrollRunDetailClient({
                                     ) : (
                                       <button
                                         type="button"
-                                        className="button button-accent"
+                                        className="button"
                                         onClick={() => openAdjustmentPanel(item)}
                                       >
                                         Add adjustment
@@ -1439,7 +1439,7 @@ export function PayrollRunDetailClient({
               <div className="settings-actions">
                 <button
                   type="submit"
-                  className="button button-accent"
+                  className="button button-danger"
                   disabled={activeRunAction === "reject"}
                 >
                   {activeRunAction === "reject" ? "Rejecting..." : "Confirm reject"}

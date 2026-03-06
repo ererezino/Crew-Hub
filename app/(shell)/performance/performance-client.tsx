@@ -470,7 +470,7 @@ function GoalsTab({
                       <span className="numeric">{progressValue}%</span>
                       <button
                         type="button"
-                        className="button button-accent button-sm"
+                        className="button button-primary button-sm"
                         disabled={isSavingProgress}
                         onClick={() => { void saveProgress(goal.id); }}
                       >
@@ -1474,7 +1474,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                             </p>
                             <button
                               type="button"
-                              className="button button-accent"
+                              className="button button-primary"
                               disabled={isAcknowledging}
                               onClick={() => {
                                 void acknowledgeReview(selfAssignment.id);
@@ -1563,7 +1563,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                                     ) : (
                                       <button
                                         type="button"
-                                        className="button button-accent button-sm"
+                                        className="button button-primary button-sm"
                                         disabled={isSharingReview}
                                         onClick={() => { void shareReview(assignment.id); }}
                                       >
