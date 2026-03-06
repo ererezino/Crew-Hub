@@ -2118,6 +2118,11 @@ html.dark .topbar {
   background: color-mix(in srgb, var(--status-pending-bg) 40%, var(--bg-canvas));
 }
 
+.timeoff-calendar-day-afk {
+  border-color: var(--status-info-border);
+  background: color-mix(in srgb, var(--status-info-bg) 40%, var(--bg-canvas));
+}
+
 .timeoff-calendar-note {
   font-size: var(--text-xs);
   color: var(--text-secondary);
@@ -2143,6 +2148,11 @@ html.dark .topbar {
 .timeoff-calendar-badge-pending {
   background: #fbbf24;
   box-shadow: 0 0 4px rgba(251, 191, 36, 0.5);
+}
+
+.timeoff-calendar-badge-afk {
+  background: var(--status-info-text);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--status-info-text) 40%, transparent);
 }
 
 .timeoff-calendar-badge-default {

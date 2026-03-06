@@ -125,11 +125,26 @@ export type TimeOffCalendarFilterOptions = {
   departments: string[];
 };
 
+export type AfkCalendarRecord = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeDepartment: string | null;
+  employeeCountryCode: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  notes: string;
+  createdAt: string;
+};
+
 export type TimeOffCalendarResponseData = {
   month: string;
   monthStart: string;
   monthEnd: string;
   requests: LeaveRequestRecord[];
+  afkLogs: AfkCalendarRecord[];
   holidays: HolidayCalendarDay[];
   filters: TimeOffCalendarFilterOptions;
 };
