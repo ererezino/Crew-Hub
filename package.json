@@ -32,6 +32,7 @@
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
+    "puppeteer": "^24.38.0",
     "tsx": "^4.21.0",
     "typescript": "latest",
     "vitest": "^4.0.18"
