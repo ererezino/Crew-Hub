@@ -17,7 +17,7 @@ import { StatusBadge } from "../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useExpenseApprovals } from "../../../../hooks/use-expenses";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../../lib/datetime";
 import {
   currentMonthKey,
   formatMonthLabel,
@@ -25,7 +25,9 @@ import {
   getExpenseStatusLabel,
   toneForExpenseStatus
 } from "../../../../lib/expenses";
+import { EXPENSE_CATEGORIES } from "../../../../types/expenses";
 import type {
+  ExpenseCategory,
   ExpenseApprovalStage,
   ExpenseBulkApproveResponse,
   ExpenseReceiptSignedUrlResponse,
@@ -124,6 +126,10 @@ export function ExpenseApprovalsClient({
   }, [canFinanceApprove, canManagerApprove]);
   const [month, setMonth] = useState(currentMonthKey());
   const [stage, setStage] = useState<ExpenseApprovalStage>(availableStages[0] ?? "manager");
+  const [employeeFilter, setEmployeeFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | "all">("all");
+  const [fromDateFilter, setFromDateFilter] = useState("");
+  const [toDateFilter, setToDateFilter] = useState("");
   const approvalsQuery = useExpenseApprovals({ month, stage });
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -161,6 +167,38 @@ export function ExpenseApprovalsClient({
     });
   }, [approvalsQuery.data?.expenses, sortDirection]);
 
+  const filteredExpenses = useMemo(() => {
+    const normalizedEmployeeFilter = employeeFilter.trim().toLowerCase();
+
+    return expenses.filter((expense) => {
+      if (categoryFilter !== "all" && expense.category !== categoryFilter) {
+        return false;
+      }
+
+      if (fromDateFilter && expense.expenseDate < fromDateFilter) {
+        return false;
+      }
+
+      if (toDateFilter && expense.expenseDate > toDateFilter) {
+        return false;
+      }
+
+      if (!normalizedEmployeeFilter) {
+        return true;
+      }
+
+      const searchableText = [
+        expense.employeeName,
+        expense.employeeDepartment ?? "",
+        getExpenseCategoryLabel(expense.category)
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedEmployeeFilter);
+    });
+  }, [categoryFilter, employeeFilter, expenses, fromDateFilter, toDateFilter]);
+
   useEffect(() => {
     if (!availableStages.includes(stage) && availableStages[0]) {
       setStage(availableStages[0]);
@@ -169,9 +207,11 @@ export function ExpenseApprovalsClient({
 
   useEffect(() => {
     setSelectedIds([]);
-  }, [month, stage]);
+  }, [month, stage, employeeFilter, categoryFilter, fromDateFilter, toDateFilter]);
 
-  const allSelected = expenses.length > 0 && expenses.every((expense) => selectedIds.includes(expense.id));
+  const allSelected =
+    filteredExpenses.length > 0 &&
+    filteredExpenses.every((expense) => selectedIds.includes(expense.id));
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -200,7 +240,7 @@ export function ExpenseApprovalsClient({
       return;
     }
 
-    setSelectedIds(expenses.map((expense) => expense.id));
+    setSelectedIds(filteredExpenses.map((expense) => expense.id));
   };
 
   const handleSingleManagerApprove = async (expense: ExpenseRecord) => {
@@ -531,6 +571,18 @@ export function ExpenseApprovalsClient({
     stage === "manager"
       ? "Expenses from your direct reports awaiting manager approval."
       : "Manager-approved expenses ready for finance disbursement.";
+  const hasActiveFilters =
+    employeeFilter.trim().length > 0 ||
+    categoryFilter !== "all" ||
+    fromDateFilter.length > 0 ||
+    toDateFilter.length > 0;
+
+  const clearFilters = () => {
+    setEmployeeFilter("");
+    setCategoryFilter("all");
+    setFromDateFilter("");
+    setToDateFilter("");
+  };
 
   return (
     <>
@@ -577,18 +629,76 @@ export function ExpenseApprovalsClient({
       ) : null}
 
       <section className="expenses-toolbar" aria-label="Approvals filters">
+        <div className="expenses-toolbar-copy">
+          <label className="form-field">
+            <span className="form-label">Month</span>
+            <input
+              className="form-input numeric"
+              type="month"
+              value={month}
+              onChange={(event) => setMonth(event.currentTarget.value)}
+            />
+          </label>
+          <p className="settings-card-description">
+            {stageTitle}: {formatMonthLabel(month)}.
+          </p>
+        </div>
+        <div className="expenses-toolbar-actions">
+          <p className="settings-card-description">
+            Filter by employee, category, and date range to prioritize reimbursements faster.
+          </p>
+          <button type="button" className="button" onClick={clearFilters} disabled={!hasActiveFilters}>
+            Clear filters
+          </button>
+        </div>
+      </section>
+
+      <section className="expenses-approvals-filter-bar" aria-label="Approval queue filters">
         <label className="form-field">
-          <span className="form-label">Month</span>
+          <span className="form-label">Employee</span>
           <input
-            className="form-input numeric"
-            type="month"
-            value={month}
-            onChange={(event) => setMonth(event.currentTarget.value)}
+            type="search"
+            className="form-input"
+            value={employeeFilter}
+            onChange={(event) => setEmployeeFilter(event.currentTarget.value)}
+            placeholder="Search by employee or department"
           />
         </label>
-        <p className="settings-card-description">
-          {stageTitle}: {formatMonthLabel(month)}.
-        </p>
+        <label className="form-field">
+          <span className="form-label">Category</span>
+          <select
+            className="form-input"
+            value={categoryFilter}
+            onChange={(event) =>
+              setCategoryFilter(event.currentTarget.value as ExpenseCategory | "all")
+            }
+          >
+            <option value="all">All categories</option>
+            {EXPENSE_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {getExpenseCategoryLabel(category)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="form-field">
+          <span className="form-label">From Date</span>
+          <input
+            type="date"
+            className="form-input numeric"
+            value={fromDateFilter}
+            onChange={(event) => setFromDateFilter(event.currentTarget.value)}
+          />
+        </label>
+        <label className="form-field">
+          <span className="form-label">To Date</span>
+          <input
+            type="date"
+            className="form-input numeric"
+            value={toDateFilter}
+            onChange={(event) => setToDateFilter(event.currentTarget.value)}
+          />
+        </label>
       </section>
 
       {approvalsQuery.isLoading ? <ApprovalSkeleton /> : null}
@@ -624,10 +734,20 @@ export function ExpenseApprovalsClient({
             </article>
           </section>
 
-          {expenses.length === 0 ? (
+          {filteredExpenses.length === 0 ? (
             <EmptyState
-              title={stage === "manager" ? "No expenses pending manager approval" : "No expenses pending disbursement"}
-              description="All current expense submissions have been processed for this stage."
+              title={
+                hasActiveFilters
+                  ? "No expenses match current filters"
+                  : stage === "manager"
+                    ? "No expenses pending manager approval"
+                    : "No expenses pending disbursement"
+              }
+              description={
+                hasActiveFilters
+                  ? "Try clearing one or more filters to view more expense requests."
+                  : "All current expense submissions have been processed for this stage."
+              }
               ctaLabel="Open expenses"
               ctaHref="/expenses"
             />
@@ -669,7 +789,7 @@ export function ExpenseApprovalsClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {expenses.map((expense) => (
+                  {filteredExpenses.map((expense) => (
                     <tr key={expense.id} className="data-table-row">
                       <td>
                         <label className="expenses-checkbox">
@@ -707,7 +827,7 @@ export function ExpenseApprovalsClient({
                           dateTime={expense.expenseDate}
                           title={formatDateTimeTooltip(expense.expenseDate)}
                         >
-                          {expense.expenseDate}
+                          {formatSingleDateHuman(expense.expenseDate)}
                         </time>
                       </td>
                       <td>
