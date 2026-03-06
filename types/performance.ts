@@ -15,12 +15,14 @@ export const REVIEW_ASSIGNMENT_STATUSES = [
 ] as const;
 export const REVIEW_RESPONSE_TYPES = ["self", "manager"] as const;
 export const REVIEW_QUESTION_TYPES = ["rating", "text"] as const;
+export const REVIEW_ACTION_ITEM_STATUSES = ["pending", "in_progress", "completed"] as const;
 
 export type ReviewCycleType = (typeof REVIEW_CYCLE_TYPES)[number];
 export type ReviewCycleStatus = (typeof REVIEW_CYCLE_STATUSES)[number];
 export type ReviewAssignmentStatus = (typeof REVIEW_ASSIGNMENT_STATUSES)[number];
 export type ReviewResponseType = (typeof REVIEW_RESPONSE_TYPES)[number];
 export type ReviewQuestionType = (typeof REVIEW_QUESTION_TYPES)[number];
+export type ReviewActionItemStatus = (typeof REVIEW_ACTION_ITEM_STATUSES)[number];
 
 export const GOAL_STATUSES = ["active", "completed", "cancelled"] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];
@@ -105,6 +107,18 @@ export type ReviewAssignmentSummary = {
   updatedAt: string;
   selfResponse: ReviewResponseRecord | null;
   managerResponse: ReviewResponseRecord | null;
+};
+
+export type ReviewActionItem = {
+  id: string;
+  assignmentId: string;
+  description: string;
+  dueDate: string | null;
+  assignedTo: string | null;
+  assignedToName: string | null;
+  status: ReviewActionItemStatus;
+  completedAt: string | null;
+  createdAt: string;
 };
 
 export type PerformanceOverviewResponseData = {
@@ -243,6 +257,24 @@ export type AcknowledgeReviewResponseData = {
   assignment: ReviewAssignmentSummary;
 };
 
+export type ReviewActionItemsResponseData = {
+  actionItems: ReviewActionItem[];
+};
+
+export type ReviewActionItemMutationResponseData = {
+  actionItem: ReviewActionItem;
+};
+
+export type CreateReviewActionItemPayload = {
+  description: string;
+  dueDate?: string | null;
+  assignedTo?: string | null;
+};
+
+export type UpdateReviewActionItemPayload = {
+  status: ReviewActionItemStatus;
+};
+
 // ── Calibration ──
 
 export type CalibrationRow = {
@@ -280,4 +312,6 @@ export type GoalsListResponse = ApiResponse<GoalsListResponseData>;
 export type GoalMutationResponse = ApiResponse<GoalMutationResponseData>;
 export type ShareReviewResponse = ApiResponse<ShareReviewResponseData>;
 export type AcknowledgeReviewResponse = ApiResponse<AcknowledgeReviewResponseData>;
+export type ReviewActionItemsResponse = ApiResponse<ReviewActionItemsResponseData>;
+export type ReviewActionItemMutationResponse = ApiResponse<ReviewActionItemMutationResponseData>;
 export type CalibrationResponse = ApiResponse<CalibrationResponseData>;

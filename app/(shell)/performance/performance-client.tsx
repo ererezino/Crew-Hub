@@ -26,6 +26,9 @@ import type {
   AcknowledgeReviewResponse,
   GoalMutationResponse,
   GoalRecord,
+  ReviewActionItem,
+  ReviewActionItemMutationResponse,
+  ReviewActionItemsResponse,
   ReviewAnswerValue,
   ReviewAnswers,
   ReviewAssignmentSummary,
@@ -163,6 +166,34 @@ function toneForGoalStatus(status: string): "pending" | "success" | "error" | "d
       return "error";
     default:
       return "draft";
+  }
+}
+
+function labelForActionItemStatus(status: ReviewActionItem["status"]): string {
+  switch (status) {
+    case "pending":
+      return "Pending";
+    case "in_progress":
+      return "In Progress";
+    case "completed":
+      return "Completed";
+    default:
+      return "Pending";
+  }
+}
+
+function toneForActionItemStatus(
+  status: ReviewActionItem["status"]
+): "pending" | "processing" | "success" {
+  switch (status) {
+    case "pending":
+      return "pending";
+    case "in_progress":
+      return "processing";
+    case "completed":
+      return "success";
+    default:
+      return "pending";
   }
 }
 
@@ -568,6 +599,277 @@ function GoalsTab({
         </div>
       </SlidePanel>
     </>
+  );
+}
+
+function ReviewActionItemsSection({
+  assignment,
+  allowCreate,
+  showToast
+}: {
+  assignment: ReviewAssignmentSummary;
+  allowCreate: boolean;
+  showToast: (variant: ToastVariant, message: string) => void;
+}) {
+  const [actionItems, setActionItems] = useState<ReviewActionItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdatingId, setIsUpdatingId] = useState<string | null>(null);
+  const [newDescription, setNewDescription] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
+  const [newAssignedTo, setNewAssignedTo] = useState(assignment.employeeId);
+
+  const loadActionItems = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/v1/performance/assignments/${assignment.id}/action-items`, {
+        method: "GET"
+      });
+
+      const body = (await response.json()) as ReviewActionItemsResponse;
+
+      if (!response.ok || !body.data) {
+        setErrorMessage(body.error?.message ?? "Unable to load post-review action items.");
+        return;
+      }
+
+      setActionItems(body.data.actionItems);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Unable to load post-review action items.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [assignment.id]);
+
+  useEffect(() => {
+    setNewAssignedTo(assignment.employeeId);
+  }, [assignment.employeeId]);
+
+  useEffect(() => {
+    void loadActionItems();
+  }, [loadActionItems]);
+
+  const openActionCount = useMemo(
+    () => actionItems.filter((item) => item.status !== "completed").length,
+    [actionItems]
+  );
+
+  const createActionItem = async () => {
+    if (!newDescription.trim()) {
+      showToast("error", "Action item description is required.");
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      const response = await fetch(`/api/v1/performance/assignments/${assignment.id}/action-items`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          description: newDescription.trim(),
+          dueDate: newDueDate || null,
+          assignedTo: newAssignedTo || null
+        })
+      });
+
+      const body = (await response.json()) as ReviewActionItemMutationResponse;
+
+      if (!response.ok || !body.data) {
+        showToast("error", body.error?.message ?? "Unable to add action item.");
+        return;
+      }
+
+      const createdActionItem = body.data.actionItem;
+      setActionItems((currentItems) => [...currentItems, createdActionItem]);
+      setNewDescription("");
+      setNewDueDate("");
+      setNewAssignedTo(assignment.employeeId);
+      showToast("success", "Post-review action item added.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to add action item.");
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const updateActionItemStatus = async (
+    actionItem: ReviewActionItem,
+    nextStatus: ReviewActionItem["status"]
+  ) => {
+    setIsUpdatingId(actionItem.id);
+
+    try {
+      const response = await fetch(`/api/v1/performance/action-items/${actionItem.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          status: nextStatus
+        })
+      });
+
+      const body = (await response.json()) as ReviewActionItemMutationResponse;
+
+      if (!response.ok || !body.data) {
+        showToast("error", body.error?.message ?? "Unable to update action item.");
+        return;
+      }
+
+      const updatedActionItem = body.data.actionItem;
+      setActionItems((currentItems) =>
+        currentItems.map((item) => (item.id === actionItem.id ? updatedActionItem : item))
+      );
+      showToast("info", `Action item marked ${labelForActionItemStatus(nextStatus).toLowerCase()}.`);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to update action item.");
+    } finally {
+      setIsUpdatingId(null);
+    }
+  };
+
+  return (
+    <section className="performance-action-items-section">
+      <div className="performance-action-items-header">
+        <h4 className="section-title">Post-Review Actions</h4>
+        <StatusBadge tone={openActionCount === 0 ? "success" : "pending"}>
+          {openActionCount} open
+        </StatusBadge>
+      </div>
+
+      {allowCreate ? (
+        <div className="performance-action-items-form">
+          <label className="form-field">
+            <span className="form-label">Action item</span>
+            <textarea
+              className="form-input"
+              rows={3}
+              value={newDescription}
+              onChange={(event) => setNewDescription(event.currentTarget.value)}
+              placeholder="Define a concrete next step from this review conversation."
+              maxLength={2000}
+            />
+          </label>
+          <div className="performance-action-items-controls">
+            <label className="form-field">
+              <span className="form-label">Due date</span>
+              <input
+                className="form-input numeric"
+                type="date"
+                value={newDueDate}
+                onChange={(event) => setNewDueDate(event.currentTarget.value)}
+              />
+            </label>
+            <label className="form-field">
+              <span className="form-label">Assign to</span>
+              <select
+                className="form-input"
+                value={newAssignedTo}
+                onChange={(event) => setNewAssignedTo(event.currentTarget.value)}
+              >
+                <option value={assignment.employeeId}>{assignment.employeeName}</option>
+                <option value={assignment.reviewerId}>{assignment.reviewerName}</option>
+              </select>
+            </label>
+          </div>
+          <button
+            type="button"
+            className="button button-accent"
+            disabled={isCreating}
+            onClick={() => {
+              void createActionItem();
+            }}
+          >
+            {isCreating ? "Adding..." : "Add action item"}
+          </button>
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="performance-skeleton-card" aria-hidden="true" />
+      ) : errorMessage ? (
+        <ErrorState
+          title="Action items unavailable"
+          message={errorMessage}
+          onRetry={() => {
+            void loadActionItems();
+          }}
+        />
+      ) : actionItems.length === 0 ? (
+        <EmptyState
+          title="No action items yet"
+          description="Action items from review conversations will appear here."
+          ctaLabel="Open dashboard"
+          ctaHref="/dashboard"
+        />
+      ) : (
+        <ul className="performance-action-items-list">
+          {actionItems.map((actionItem) => (
+            <li key={actionItem.id} className="performance-action-item-card">
+              <div className="performance-action-item-copy">
+                <p className="form-label">{actionItem.description}</p>
+                <p className="settings-card-description">
+                  Assigned to: {actionItem.assignedToName ?? "Unassigned"}
+                </p>
+                {actionItem.dueDate ? (
+                  <p className="settings-card-description" title={formatDateTimeTooltip(actionItem.dueDate)}>
+                    Due: {formatRelativeTime(actionItem.dueDate)}
+                  </p>
+                ) : null}
+              </div>
+              <div className="performance-action-item-meta">
+                <StatusBadge tone={toneForActionItemStatus(actionItem.status)}>
+                  {labelForActionItemStatus(actionItem.status)}
+                </StatusBadge>
+                <div className="performance-action-item-actions">
+                  {actionItem.status !== "in_progress" ? (
+                    <button
+                      type="button"
+                      className="table-row-action"
+                      disabled={isUpdatingId === actionItem.id}
+                      onClick={() => {
+                        void updateActionItemStatus(actionItem, "in_progress");
+                      }}
+                    >
+                      Start
+                    </button>
+                  ) : null}
+                  {actionItem.status !== "completed" ? (
+                    <button
+                      type="button"
+                      className="table-row-action"
+                      disabled={isUpdatingId === actionItem.id}
+                      onClick={() => {
+                        void updateActionItemStatus(actionItem, "completed");
+                      }}
+                    >
+                      Complete
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="table-row-action"
+                      disabled={isUpdatingId === actionItem.id}
+                      onClick={() => {
+                        void updateActionItemStatus(actionItem, "pending");
+                      }}
+                    >
+                      Reopen
+                    </button>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -1183,6 +1485,12 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                             </button>
                           </div>
                         ) : null}
+
+                        <ReviewActionItemsSection
+                          assignment={selfAssignment}
+                          allowCreate={false}
+                          showToast={showToast}
+                        />
                       </section>
                     ) : selfAssignment.status === "completed" || selfAssignment.status === "in_review" ? (
                       !selfAssignmentShared ? (
@@ -1431,6 +1739,12 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                               {isSubmittingManager ? "Submitting..." : "Submit manager review"}
                             </button>
                           </div>
+
+                          <ReviewActionItemsSection
+                            assignment={selectedManagerAssignment}
+                            allowCreate
+                            showToast={showToast}
+                          />
                         </article>
                       </section>
                     ) : null}

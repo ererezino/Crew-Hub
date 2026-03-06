@@ -4252,6 +4252,75 @@ html.dark .topbar {
   align-items: flex-start;
 }
 
+.performance-action-items-section {
+  margin-top: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.performance-action-items-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.performance-action-items-form {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.performance-action-items-controls {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.performance-action-items-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.performance-action-item-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  padding: var(--space-3);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.performance-action-item-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.performance-action-item-meta {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: end;
+}
+
+.performance-action-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 /* ── Phase 6C: Calibration ── */
 
 .calibration-filters {
@@ -6358,6 +6427,18 @@ html.dark .topbar {
   .performance-cycle-meta,
   .performance-template-grid {
     grid-template-columns: 1fr;
+  }
+
+  .performance-action-items-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .performance-action-item-card {
+    flex-direction: column;
+  }
+
+  .performance-action-item-meta {
+    justify-items: start;
   }
 
   .performance-admin-metrics,
