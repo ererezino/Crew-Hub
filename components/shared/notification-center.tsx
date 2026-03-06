@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnouncements } from "../../hooks/use-announcements";
 import { useNotifications } from "../../hooks/use-notifications";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
+import type { NotificationAction } from "../../types/notifications";
+import { NotificationActionButton } from "./notification-action-button";
 
 const POLL_INTERVAL_MS = 60_000;
 const PREVIEW_LIMIT = 8;
@@ -19,6 +21,7 @@ type FeedItem = {
   link: string;
   createdAt: string;
   isRead: boolean;
+  actions: NotificationAction[];
 };
 
 function loadDismissed(): Set<string> {
@@ -88,7 +91,8 @@ export function NotificationCenter() {
         body: n.body,
         link: n.link ?? "/notifications",
         createdAt: n.createdAt,
-        isRead: n.isRead
+        isRead: n.isRead,
+        actions: n.actions ?? []
       });
     }
 
@@ -104,7 +108,8 @@ export function NotificationCenter() {
           a.body.length > 120 ? `${a.body.slice(0, 120)}…` : a.body,
         link: "/announcements",
         createdAt: a.createdAt,
-        isRead: a.isRead
+        isRead: a.isRead,
+        actions: []
       });
     }
 
@@ -264,28 +269,44 @@ export function NotificationCenter() {
                       key={`${item.source}-${item.id}`}
                       className="notification-item notification-item-unread"
                     >
-                      <Link
-                        href={item.link}
-                        className="notification-link"
-                        onClick={() => {
-                          void handleDismiss(item);
-                          setIsOpen(false);
-                        }}
-                      >
-                        {item.source === "announcement" ? (
-                          <span className="notification-source-label">
-                            Announcement
-                          </span>
-                        ) : null}
-                        <p className="notification-title">{item.title}</p>
-                        <p className="notification-detail">{item.body}</p>
-                        <p
-                          className="notification-time numeric"
-                          title={formatDateTimeTooltip(item.createdAt)}
+                      <div className="notification-item-content">
+                        <Link
+                          href={item.link}
+                          className="notification-link"
+                          onClick={() => {
+                            void handleDismiss(item);
+                            setIsOpen(false);
+                          }}
                         >
-                          {formatRelativeTime(item.createdAt)}
-                        </p>
-                      </Link>
+                          {item.source === "announcement" ? (
+                            <span className="notification-source-label">
+                              Announcement
+                            </span>
+                          ) : null}
+                          <p className="notification-title">{item.title}</p>
+                          <p className="notification-detail">{item.body}</p>
+                          <p
+                            className="notification-time numeric"
+                            title={formatDateTimeTooltip(item.createdAt)}
+                          >
+                            {formatRelativeTime(item.createdAt)}
+                          </p>
+                        </Link>
+                        {item.source === "notification" && item.actions.length > 0 ? (
+                          <div className="notification-dropdown-inline-actions">
+                            {item.actions.map((action) => (
+                              <NotificationActionButton
+                                key={`${item.id}-${action.label}`}
+                                action={action}
+                                onComplete={() => {
+                                  void handleDismiss(item);
+                                  notifications.refresh();
+                                }}
+                              />
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                       <button
                         type="button"
                         className="table-row-action"
