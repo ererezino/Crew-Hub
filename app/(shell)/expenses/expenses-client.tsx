@@ -13,6 +13,7 @@ import {
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
+import { ContextualHelp } from "../../../components/shared/contextual-help";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
@@ -156,6 +157,24 @@ const categoryOptions: ExpenseCategory[] = [
 ];
 
 const uploadAcceptValue = ALLOWED_RECEIPT_EXTENSIONS.map((extension) => `.${extension}`).join(",");
+
+const EXPENSE_CONTEXTUAL_HELP = [
+  {
+    title: "Receipt checklist",
+    description: "Upload PDF, PNG, or JPG receipts under 10MB so approvals do not stall."
+  },
+  {
+    title: "Approval flow",
+    description:
+      "Crew Hub routes each submission through manager approval before finance disbursement."
+  },
+  {
+    title: "Policy reference",
+    description: "Review reimbursement rules and category guidance before submitting.",
+    ctaLabel: "Open policy",
+    ctaHref: "/documents"
+  }
+] as const;
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -826,6 +845,13 @@ export function ExpensesClient({
             </button>
           </>
         }
+      />
+
+      <ContextualHelp
+        title="Need help before submitting?"
+        description="Quick reminders to keep expense reviews fast and predictable."
+        items={EXPENSE_CONTEXTUAL_HELP}
+        ariaLabel="Expenses contextual help"
       />
 
       <section className="expenses-toolbar" aria-label="Expenses filters">
