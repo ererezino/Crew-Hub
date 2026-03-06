@@ -108,6 +108,17 @@ export type DashboardPendingApprovals = {
   total: number;
 };
 
+export type DashboardManagerOnboardingItem = {
+  employeeId: string;
+  employeeName: string;
+  employeeAvatarUrl: string | null;
+  instanceId: string;
+  tasksTotal: number;
+  tasksCompleted: number;
+  daysSinceStart: number;
+  overdueManagerTaskCount: number;
+};
+
 export type DashboardApprovalItem = {
   id: string;
   type: "leave" | "expense" | "signature";
@@ -171,6 +182,7 @@ export type DashboardResponseData = {
   /* ── manager greeting card & decision cards ── */
   pendingApprovals: DashboardPendingApprovals | null;
   pendingApprovalItems: DashboardApprovalItem[] | null;
+  managerOnboarding: DashboardManagerOnboardingItem[] | null;
 
   /* ── hr_admin greeting card & widgets ── */
   headcount: { total: number; delta30d: number } | null;

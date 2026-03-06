@@ -29,7 +29,10 @@ const documentRowSchema = z.object({
   country_code: z.string().nullable(),
   created_by: z.string().uuid(),
   created_at: z.string(),
-  updated_at: z.string()
+  updated_at: z.string(),
+  is_policy: z.boolean().optional().nullable(),
+  requires_acknowledgment: z.boolean().optional().nullable(),
+  policy_version: z.string().optional().nullable()
 });
 
 const profileRowSchema = z.object({
@@ -40,6 +43,11 @@ const profileRowSchema = z.object({
 const versionRowSchema = z.object({
   document_id: z.string().uuid(),
   version: z.union([z.number(), z.string()])
+});
+
+const policyAcknowledgmentRowSchema = z.object({
+  policy_id: z.string().uuid(),
+  acknowledged_at: z.string().nullable()
 });
 
 function buildMeta() {
@@ -93,7 +101,7 @@ export async function GET(request: Request) {
   let documentsQuery = supabase
     .from("documents")
     .select(
-      "id, owner_user_id, category, title, description, file_path, file_name, mime_type, size_bytes, expiry_date, country_code, created_by, created_at, updated_at"
+      "id, owner_user_id, category, title, description, file_path, file_name, mime_type, size_bytes, expiry_date, country_code, created_by, created_at, updated_at, is_policy, requires_acknowledgment, policy_version"
     )
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -238,6 +246,50 @@ export async function GET(request: Request) {
     latestVersionByDocumentId = nextMap;
   }
 
+  let policyAcknowledgmentByPolicyId = new Map<string, string | null>();
+  const policyDocumentIds = rows
+    .filter((row) => row.is_policy === true && row.requires_acknowledgment === true)
+    .map((row) => row.id);
+
+  if (policyDocumentIds.length > 0) {
+    const { data: rawPolicyAcknowledgments, error: policyAcknowledgmentsError } = await supabase
+      .from("policy_acknowledgments")
+      .select("policy_id, acknowledged_at")
+      .eq("org_id", session.profile.org_id)
+      .eq("employee_id", session.profile.id)
+      .in("policy_id", policyDocumentIds);
+
+    if (policyAcknowledgmentsError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "POLICY_ACKNOWLEDGMENTS_FETCH_FAILED",
+          message: "Unable to resolve policy acknowledgment status."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedPolicyAcknowledgments = z
+      .array(policyAcknowledgmentRowSchema)
+      .safeParse(rawPolicyAcknowledgments ?? []);
+
+    if (!parsedPolicyAcknowledgments.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "POLICY_ACKNOWLEDGMENTS_PARSE_FAILED",
+          message: "Policy acknowledgment metadata is not in the expected shape."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    policyAcknowledgmentByPolicyId = new Map(
+      parsedPolicyAcknowledgments.data.map((row) => [row.policy_id, row.acknowledged_at])
+    );
+  }
+
   const documents: DocumentRecord[] = rows.map((row) => ({
     id: row.id,
     ownerUserId: row.owner_user_id,
@@ -257,7 +309,11 @@ export async function GET(request: Request) {
     createdByName: profileNameById.get(row.created_by) ?? "Unknown user",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    latestVersion: latestVersionByDocumentId.get(row.id) ?? 1
+    latestVersion: latestVersionByDocumentId.get(row.id) ?? 1,
+    isPolicy: row.is_policy ?? row.category === "policy",
+    requiresAcknowledgment: row.requires_acknowledgment ?? false,
+    policyVersion: row.policy_version ?? null,
+    acknowledgedAt: policyAcknowledgmentByPolicyId.get(row.id) ?? null
   }));
 
   const responseData: DocumentsResponseData = {
