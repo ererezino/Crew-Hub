@@ -561,54 +561,58 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
               <p className="settings-card-description">Set week boundaries before assigning shifts.</p>
             </div>
           </header>
-          <form className="settings-form-grid" onSubmit={handleCreateSchedule}>
-            <label className="settings-field">
-              <span className="settings-field-label">Schedule name</span>
+          <form className="settings-form" onSubmit={handleCreateSchedule}>
+            <div>
+              <label className="form-label" htmlFor="schedule-name">Schedule name</label>
               <input
-                className="settings-input"
+                id="schedule-name"
+                className="form-input"
                 value={scheduleForm.name}
                 onChange={(event) =>
                   setScheduleForm((currentValue) => ({ ...currentValue, name: event.target.value }))
                 }
                 placeholder="Engineering Week 10"
               />
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Department</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="schedule-department">Department</label>
               <input
-                className="settings-input"
+                id="schedule-department"
+                className="form-input"
                 value={scheduleForm.department}
                 onChange={(event) =>
                   setScheduleForm((currentValue) => ({ ...currentValue, department: event.target.value }))
                 }
                 placeholder="Engineering"
               />
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Week start</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="schedule-week-start">Week start</label>
               <input
+                id="schedule-week-start"
                 type="date"
-                className="settings-input"
+                className="form-input"
                 value={scheduleForm.weekStart}
                 onChange={(event) =>
                   setScheduleForm((currentValue) => ({ ...currentValue, weekStart: event.target.value }))
                 }
               />
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Week end (optional)</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="schedule-week-end">Week end (optional)</label>
               <input
+                id="schedule-week-end"
                 type="date"
-                className="settings-input"
+                className="form-input"
                 value={scheduleForm.weekEnd}
                 onChange={(event) =>
                   setScheduleForm((currentValue) => ({ ...currentValue, weekEnd: event.target.value }))
                 }
               />
-            </label>
+            </div>
             {scheduleFormError ? <p className="form-field-error">{scheduleFormError}</p> : null}
             <div className="settings-actions">
-              <button type="submit" className="button button-accent" disabled={isSubmittingSchedule}>
+              <button type="submit" className="button button-primary" disabled={isSubmittingSchedule}>
                 {isSubmittingSchedule ? "Creating..." : "Create schedule"}
               </button>
             </div>
@@ -622,11 +626,12 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
               <p className="settings-card-description">Assign a team member or leave employee blank for open shifts.</p>
             </div>
           </header>
-          <form className="settings-form-grid" onSubmit={handleCreateShift}>
-            <label className="settings-field">
-              <span className="settings-field-label">Schedule</span>
+          <form className="settings-form" onSubmit={handleCreateShift}>
+            <div>
+              <label className="form-label" htmlFor="shift-schedule">Schedule</label>
               <select
-                className="settings-input"
+                id="shift-schedule"
+                className="form-input"
                 value={shiftForm.scheduleId}
                 onChange={(event) =>
                   setShiftForm((currentValue) => ({ ...currentValue, scheduleId: event.target.value }))
@@ -639,11 +644,12 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Template</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="shift-template">Template</label>
               <select
-                className="settings-input"
+                id="shift-template"
+                className="form-input"
                 value={shiftForm.templateId}
                 onChange={(event) =>
                   setShiftForm((currentValue) => ({ ...currentValue, templateId: event.target.value }))
@@ -656,11 +662,12 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Employee</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="shift-employee">Employee</label>
               <select
-                className="settings-input"
+                id="shift-employee"
+                className="form-input"
                 value={shiftForm.employeeId}
                 onChange={(event) =>
                   setShiftForm((currentValue) => ({ ...currentValue, employeeId: event.target.value }))
@@ -673,67 +680,72 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Shift date</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="shift-date">Shift date</label>
               <input
+                id="shift-date"
                 type="date"
-                className="settings-input"
+                className="form-input"
                 value={shiftForm.shiftDate}
                 onChange={(event) =>
                   setShiftForm((currentValue) => ({ ...currentValue, shiftDate: event.target.value }))
                 }
               />
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Start</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="shift-start">Start</label>
               <input
+                id="shift-start"
                 type="time"
-                className="settings-input"
+                className="form-input"
                 value={shiftForm.startTime}
                 onChange={(event) =>
                   setShiftForm((currentValue) => ({ ...currentValue, startTime: event.target.value }))
                 }
               />
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">End</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="shift-end">End</label>
               <input
+                id="shift-end"
                 type="time"
-                className="settings-input"
+                className="form-input"
                 value={shiftForm.endTime}
                 onChange={(event) =>
                   setShiftForm((currentValue) => ({ ...currentValue, endTime: event.target.value }))
                 }
               />
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Break minutes</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="shift-break">Break minutes</label>
               <input
+                id="shift-break"
                 type="number"
                 min={0}
                 max={240}
-                className="settings-input numeric"
+                className="form-input numeric"
                 value={shiftForm.breakMinutes}
                 onChange={(event) =>
                   setShiftForm((currentValue) => ({ ...currentValue, breakMinutes: event.target.value }))
                 }
               />
-            </label>
-            <label className="settings-field">
-              <span className="settings-field-label">Notes (optional)</span>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="shift-notes">Notes (optional)</label>
               <input
-                className="settings-input"
+                id="shift-notes"
+                className="form-input"
                 value={shiftForm.notes}
                 onChange={(event) =>
                   setShiftForm((currentValue) => ({ ...currentValue, notes: event.target.value }))
                 }
                 placeholder="Coverage for product launch"
               />
-            </label>
+            </div>
             {shiftFormError ? <p className="form-field-error">{shiftFormError}</p> : null}
             <div className="settings-actions">
-              <button type="submit" className="button button-accent" disabled={isSubmittingShift}>
+              <button type="submit" className="button button-primary" disabled={isSubmittingShift}>
                 {isSubmittingShift ? "Creating..." : "Create shift"}
               </button>
             </div>
@@ -825,14 +837,14 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                               </button>
                               <button
                                 type="button"
-                                className="button button-accent"
+                                className="button"
                                 style={{ fontSize: "var(--font-size-sm)", padding: "var(--space-1) var(--space-3)" }}
                                 onClick={() => handleAutoGenerate(schedule.id)}
                                 disabled={isAutoGenerating && autoGenScheduleId === schedule.id}
                               >
                                 {isAutoGenerating && autoGenScheduleId === schedule.id
                                   ? "Generating..."
-                                  : "Auto-Generate"}
+                                  : "Auto-generate"}
                               </button>
                             </>
                           ) : (
@@ -861,7 +873,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
               <div style={{ display: "flex", gap: "var(--space-2)" }}>
                 <button
                   type="button"
-                  className="button button-accent"
+                  className="button button-primary"
                   onClick={handleApplyAutoGen}
                   disabled={isApplyingAutoGen}
                 >
@@ -978,7 +990,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                               {dateStr}
                             </span>
                             <input
-                              className="settings-input"
+                              className="form-input"
                               style={{
                                 fontSize: "var(--font-size-sm)",
                                 opacity: isSaving ? 0.6 : 1
