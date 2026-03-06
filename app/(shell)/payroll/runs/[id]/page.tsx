@@ -52,8 +52,6 @@ export default async function PayrollRunDetailPage({ params }: PayrollRunDetailP
         <EmptyState
           title="Access denied"
           description="Only HR Admin, Finance Admin, and Super Admin can view payroll runs."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

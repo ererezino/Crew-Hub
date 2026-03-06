@@ -806,8 +806,6 @@ function ReviewActionItemsSection({
         <EmptyState
           title="No action items yet"
           description="Action items from review conversations will appear here."
-          ctaLabel="Open dashboard"
-          ctaHref="/dashboard"
         />
       ) : (
         <ul className="performance-action-items-list">
@@ -1292,8 +1290,9 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                     icon={<Star size={32} />}
                     title="No active review"
                     description="There is no active review cycle right now. You will be notified when one starts."
-                    ctaLabel={canManagePerformance ? "Open admin" : "Back to dashboard"}
-                    ctaHref={canManagePerformance ? "/performance/admin" : "/dashboard"}
+                    {...(canManagePerformance
+                      ? { ctaLabel: "Open admin", ctaHref: "/performance/admin" }
+                      : {})}
                   />
                 )}
               </article>
@@ -1315,8 +1314,6 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                   <EmptyState
                     title="No self review assigned"
                     description="You do not have an active self review assignment right now."
-                    ctaLabel="Back to dashboard"
-                    ctaHref="/dashboard"
                   />
                 ) : (
                   <>
@@ -1512,8 +1509,6 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                   <EmptyState
                     title="No manager reviews assigned"
                     description="You currently have no direct report reviews assigned in active cycles."
-                    ctaLabel="Back to dashboard"
-                    ctaHref="/dashboard"
                   />
                 ) : (
                   <>
@@ -1762,8 +1757,6 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                     <EmptyState
                       title="No completed reviews yet"
                       description="Completed review cycles will appear here."
-                      ctaLabel="Back to dashboard"
-                      ctaHref="/dashboard"
                     />
                   ) : (
                     <table className="data-table">

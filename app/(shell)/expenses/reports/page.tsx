@@ -27,8 +27,6 @@ export default async function ExpenseReportsPage() {
         <EmptyState
           title="Profile is unavailable"
           description="No profile is linked to this account yet."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

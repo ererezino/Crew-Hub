@@ -73,8 +73,6 @@ export function AdminPaymentDetailsClient() {
           <EmptyState
             title="Payment details are unavailable"
             description={paymentDetailsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -92,8 +90,6 @@ export function AdminPaymentDetailsClient() {
         <EmptyState
           title="No employee records found"
           description="Seed employee data or complete onboarding profiles to populate payment details."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       ) : null}
 

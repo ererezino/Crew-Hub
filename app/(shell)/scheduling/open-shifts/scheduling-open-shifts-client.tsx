@@ -87,8 +87,6 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
           <EmptyState
             title="Open shifts are unavailable"
             description={openShiftsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"

@@ -119,8 +119,6 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
           <EmptyState
             title="Template data is unavailable"
             description={templatesQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"

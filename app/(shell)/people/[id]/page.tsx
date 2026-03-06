@@ -63,8 +63,6 @@ export default async function PeopleProfilePage({
         <EmptyState
           title="Profile is unavailable"
           description="No profile is linked to this account yet."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );
@@ -103,8 +101,6 @@ export default async function PeopleProfilePage({
         <EmptyState
           title="Access denied"
           description="You do not have permission to view this crew profile."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

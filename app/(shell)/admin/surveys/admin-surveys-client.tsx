@@ -127,8 +127,6 @@ export function AdminSurveysClient() {
           <EmptyState
             title="Survey admin is unavailable"
             description={errorMessage ?? adminQuery.errorMessage ?? "Unable to load survey admin."}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"

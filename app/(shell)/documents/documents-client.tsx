@@ -413,10 +413,9 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
             icon={<FileText size={32} />}
             title="No documents here"
             description="Upload a document or select a different tab to view more records."
-            ctaLabel={canManageDocuments ? "Upload document" : "Go to dashboard"}
             {...(canManageDocuments
-              ? { onCtaClick: openCreatePanel }
-              : { ctaHref: "/dashboard" })}
+              ? { ctaLabel: "Upload document", onCtaClick: openCreatePanel }
+              : {})}
           />
         </section>
       ) : null}

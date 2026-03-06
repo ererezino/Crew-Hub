@@ -74,8 +74,6 @@ export function SurveysClient({
           <EmptyState
             title="Surveys are unavailable"
             description={pendingQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -93,8 +91,6 @@ export function SurveysClient({
             icon={<MessageSquare size={32} />}
             title="No surveys pending"
             description="You are caught up. New surveys will appear here when launched."
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
         ) : (
           <section className="announcements-grid" aria-label="Pending surveys list">

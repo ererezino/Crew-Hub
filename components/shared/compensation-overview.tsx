@@ -197,8 +197,6 @@ export function CompensationOverview({
           <EmptyState
             title="No salary record yet"
             description="Compensation administrators can add the first salary record."
-            ctaLabel="Open dashboard"
-            ctaHref="/dashboard"
           />
         )}
 
@@ -284,8 +282,6 @@ export function CompensationOverview({
           <EmptyState
             title="No allowances configured"
             description="Allowances will appear here once they are added for this employee."
-            ctaLabel="Open dashboard"
-            ctaHref="/dashboard"
           />
         ) : (
           <>
@@ -380,8 +376,6 @@ export function CompensationOverview({
           <EmptyState
             title="No equity grants yet"
             description="Equity grants and vesting progress will appear here when issued."
-            ctaLabel="Open dashboard"
-            ctaHref="/dashboard"
           />
         ) : (
           <div className="compensation-equity-grid">
@@ -453,8 +447,6 @@ export function CompensationOverview({
           <EmptyState
             title="No compensation timeline events"
             description="Timeline events will appear after compensation changes are recorded."
-            ctaLabel="Open dashboard"
-            ctaHref="/dashboard"
           />
         ) : (
           <ol className="compensation-timeline">

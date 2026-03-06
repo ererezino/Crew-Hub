@@ -590,8 +590,6 @@ export function SignaturesClient({
                 ? "Create your first signature request to collect acknowledgements digitally."
                 : "You do not have pending signature requests right now."
             }
-            ctaLabel="Go to dashboard"
-            ctaHref="/dashboard"
           />
           {canManageSignatures ? (
             <button

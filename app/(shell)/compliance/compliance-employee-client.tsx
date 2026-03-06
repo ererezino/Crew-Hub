@@ -107,8 +107,6 @@ export function ComplianceEmployeeClient({ userId }: { userId: string }) {
         <EmptyState
           title="Your compliance documents are up to date"
           description="No compliance documents require your attention."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       ) : null}
 

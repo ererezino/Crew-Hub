@@ -162,8 +162,6 @@ export function LearningAdminClient() {
           <EmptyState
             title="Learning admin data is unavailable"
             description={errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"

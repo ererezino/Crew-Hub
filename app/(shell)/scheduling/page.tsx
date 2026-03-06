@@ -28,8 +28,6 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
       <EmptyState
         title="Profile is unavailable"
         description="No profile is linked to this account yet."
-        ctaLabel="Back to dashboard"
-        ctaHref="/dashboard"
       />
     );
   }
@@ -47,8 +45,6 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
         <EmptyState
           title="Scheduling is for Customer Success"
           description="Scheduling is available for Customer Success team members. If you believe you should have access, contact your manager."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

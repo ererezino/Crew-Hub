@@ -431,8 +431,6 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
         <EmptyState
           title="No analytics data for this range"
           description="Try a wider date range or seed data to populate analytics charts."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       ) : (
         <section className="settings-layout">

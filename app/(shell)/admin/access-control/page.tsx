@@ -11,8 +11,6 @@ export default async function AccessControlPage() {
       <EmptyState
         title="Profile is unavailable"
         description="No profile is linked to this account yet."
-        ctaLabel="Back to dashboard"
-        ctaHref="/dashboard"
       />
     );
   }
@@ -22,8 +20,6 @@ export default async function AccessControlPage() {
       <EmptyState
         title="Access control is restricted"
         description="Only Super Admin can update navigation and dashboard visibility rules."
-        ctaLabel="Open dashboard"
-        ctaHref="/dashboard"
       />
     );
   }

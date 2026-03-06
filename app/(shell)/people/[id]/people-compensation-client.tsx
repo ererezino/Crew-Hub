@@ -44,8 +44,6 @@ export function PeopleCompensationClient({
           <EmptyState
             title="Compensation data is unavailable"
             description={errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"

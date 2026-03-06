@@ -44,8 +44,6 @@ export default async function AdminCompensationPage({
         <EmptyState
           title="Profile is unavailable"
           description="No profile is linked to this account yet."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );
@@ -61,8 +59,6 @@ export default async function AdminCompensationPage({
         <EmptyState
           title="Access denied"
           description="Only HR Admin, Finance Admin, and Super Admin can manage compensation."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

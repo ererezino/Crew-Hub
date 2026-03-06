@@ -26,8 +26,6 @@ export default async function CompensationBandsPage() {
         <EmptyState
           title="Profile is unavailable"
           description="No profile is linked to this account yet."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );
@@ -43,8 +41,6 @@ export default async function CompensationBandsPage() {
         <EmptyState
           title="Access denied"
           description="Only HR Admin, Finance Admin, and Super Admin can manage compensation bands."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

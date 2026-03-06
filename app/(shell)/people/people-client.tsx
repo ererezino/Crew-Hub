@@ -699,8 +699,9 @@ export function PeopleClient({
             icon={<Users size={32} />}
             title="No employees found"
             description="Add your first team member to start using people workflows."
-            ctaLabel={canManagePeople ? "Add person" : "Go to dashboard"}
-            ctaHref={canManagePeople ? "/people" : "/dashboard"}
+            {...(canManagePeople
+              ? { ctaLabel: "Add person", onCtaClick: () => setIsCreateOpen(true) }
+              : {})}
           />
           {canManagePeople ? (
             <button

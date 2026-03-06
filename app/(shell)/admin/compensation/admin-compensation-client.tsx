@@ -876,8 +876,6 @@ export function AdminCompensationClient({
           <EmptyState
             title="Compensation admin data is unavailable"
             description={compensationQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -896,8 +894,6 @@ export function AdminCompensationClient({
         <EmptyState
           title="No employees found"
           description="Seed or create profile data before managing compensation records."
-          ctaLabel="Go to dashboard"
-          ctaHref="/dashboard"
         />
       ) : null}
 
@@ -982,8 +978,6 @@ export function AdminCompensationClient({
               <EmptyState
                 title="No salary records"
                 description="Create the first salary record for this employee."
-                ctaLabel="Back to dashboard"
-                ctaHref="/dashboard"
               />
             )}
 
@@ -1103,8 +1097,6 @@ export function AdminCompensationClient({
               <EmptyState
                 title="No allowances"
                 description="Create allowances for this employee to track recurring compensation."
-                ctaLabel="Back to dashboard"
-                ctaHref="/dashboard"
               />
             ) : (
               <div className="data-table-container">
@@ -1208,8 +1200,6 @@ export function AdminCompensationClient({
               <EmptyState
                 title="No equity grants"
                 description="Create equity grants to track vesting schedules for this employee."
-                ctaLabel="Back to dashboard"
-                ctaHref="/dashboard"
               />
             ) : (
               <div className="data-table-container">

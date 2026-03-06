@@ -1,0 +1,2634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crew Hub: Brand Identity Guidelines</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+
+/* ================================================================
+   CREW HUB: BRAND IDENTITY GUIDELINES
+   Internal Brand of Accrue
+
+   DESIGN QUESTION:
+   What does it feel like to be taken care of by the same people
+   building something for hundreds of thousands of users?
+
+   ANSWER: Warmth turned inward. The same cream. The same orange.
+   But quieter, steadier, more structural. The crew, seen.
+   ================================================================
+
+   CONFIRMED ACCRUE BRAND DNA (Source: Accrue_Brand_Guideline.pdf)
+   ----------------------------------------------------------------
+   Cream   #FFFAF3   Primary canvas
+   Orange  #FD8B05   Brand accent
+   Black   #000000   Precision
+   Gray 1  #495057   Supporting text
+   Gray 2  #727272   Tertiary
+   White   #FFFFFF   Clean space
+   Type    Circular Std (Book / Medium / Bold / Black)
+
+   CREW HUB EXTENSIONS
+   ----------------------------------------------------------------
+   Navy    #1A2B3C   Navigation, authority, depth
+   Sage    #2D6A4F   Approval, success, growth states
+   Dust    #F0EBE1   Subtle surface variation
+   Border  #E8DFD0   All rule lines, dividers, card edges
+   ================================================================ */
+
+:root {
+  --cream:      #FFFAF3;
+  --orange:     #FD8B05;
+  --black:      #000000;
+  --gray1:      #495057;
+  --gray2:      #727272;
+  --white:      #FFFFFF;
+  --navy:       #1A2B3C;
+  --sage:       #2D6A4F;
+  --dust:       #F0EBE1;
+  --border:     #E8DFD0;
+  --red:        #C0392B;
+  --amber:      #D97706;
+  --orange-tint:#FFF3DC;
+  --sage-tint:  #E8F4EE;
+  --navy-tint:  #EBF0F5;
+  --red-tint:   #FDECEA;
+  --amber-tint: #FEF6E4;
+
+  --serif:  'Playfair Display', Georgia, serif;
+  --sans:   'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --max: 1280px;
+  --pad: clamp(32px, 6vw, 96px);
+  --gap: clamp(16px, 3vw, 32px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  background: var(--cream);
+  color: var(--black);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  line-height: 1;
+}
+
+/* ── SCROLL REVEAL ─────────────────────────────────────────── */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1),
+              transform 0.8s cubic-bezier(0.16,1,0.3,1);
+}
+[data-reveal].in { opacity: 1; transform: none; }
+[data-reveal][data-delay="1"] { transition-delay: 0.1s; }
+[data-reveal][data-delay="2"] { transition-delay: 0.2s; }
+[data-reveal][data-delay="3"] { transition-delay: 0.3s; }
+[data-reveal][data-delay="4"] { transition-delay: 0.4s; }
+[data-reveal][data-delay="5"] { transition-delay: 0.5s; }
+[data-reveal][data-delay="6"] { transition-delay: 0.6s; }
+
+/* ── FIXED NAV ─────────────────────────────────────────────── */
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 200;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--pad);
+  background: rgba(255,250,243,0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-id {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  text-decoration: none;
+}
+.nav-id .word-accrue {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--black);
+}
+.nav-id .word-sep { color: var(--border); font-weight: 300; font-size: 16px; }
+.nav-id .word-hub {
+  font-family: var(--sans);
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--gray1);
+}
+.nav-links {
+  display: flex;
+  gap: 36px;
+  list-style: none;
+}
+.nav-links a {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gray2);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--orange); }
+.nav-version {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--white);
+  background: var(--black);
+  padding: 5px 12px;
+  border-radius: 100px;
+}
+
+/* ── COVER ─────────────────────────────────────────────────── */
+.cover {
+  min-height: 100vh;
+  padding-top: 60px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative grain overlay */
+.cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+/* Orange arc in top right */
+.cover-arc {
+  position: absolute;
+  top: -240px; right: -240px;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  border: 120px solid var(--orange);
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+.cover-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  align-items: end;
+  gap: 80px;
+  padding: clamp(80px, 14vh, 160px) var(--pad) 80px;
+  max-width: var(--max);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.cover-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.cover-eyebrow-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--orange);
+}
+.cover-eyebrow-text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gray2);
+}
+
+.cover-headline {
+  font-family: var(--serif);
+  font-size: clamp(72px, 10.5vw, 152px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.035em;
+  color: var(--black);
+  margin-bottom: 40px;
+}
+.cover-headline .italic {
+  font-style: italic;
+  color: var(--orange);
+}
+
+.cover-question {
+  font-size: clamp(15px, 1.6vw, 18px);
+  font-weight: 300;
+  line-height: 1.65;
+  color: var(--gray1);
+  max-width: 480px;
+  margin-bottom: 48px;
+  border-left: 2px solid var(--orange);
+  padding-left: 20px;
+}
+
+.cover-meta-row {
+  display: flex;
+  gap: 40px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
+}
+.meta-item label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gray2);
+  margin-bottom: 6px;
+}
+.meta-item span {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--black);
+}
+
+.cover-toc { padding-bottom: 20px; }
+.toc-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gray2);
+  margin-bottom: 20px;
+}
+.toc-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  transition: border-color 0.2s;
+}
+.toc-link:hover { border-color: var(--orange); }
+.toc-link:hover .toc-n { color: var(--orange); }
+.toc-link:hover .toc-arrow { opacity: 1; transform: translateX(0); }
+.toc-left { display: flex; align-items: baseline; gap: 14px; }
+.toc-n {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray2);
+  width: 20px;
+  transition: color 0.2s;
+  letter-spacing: 0.05em;
+}
+.toc-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--black);
+}
+.toc-arrow {
+  font-size: 12px;
+  color: var(--orange);
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.cover-footer {
+  background: var(--black);
+  padding: 20px var(--pad);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cover-footer-text {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.03em;
+}
+.cover-footer-text strong { color: var(--orange); font-weight: 600; }
+.cover-footer-mark {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cover-footer-mark svg { fill: var(--black); }
+
+/* ── CHAPTER STRUCTURE ─────────────────────────────────────── */
+.chapter {
+  padding: clamp(80px, 10vw, 140px) var(--pad);
+  max-width: var(--max);
+  margin: 0 auto;
+}
+
+.ch-opener {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 48px;
+  align-items: start;
+  padding-bottom: 64px;
+  margin-bottom: 80px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ch-n {
+  font-family: var(--serif);
+  font-size: 120px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--dust);
+  letter-spacing: -0.05em;
+  margin-top: -8px;
+  user-select: none;
+}
+
+.ch-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ch-label::after {
+  content: '';
+  width: 32px; height: 1px;
+  background: var(--orange);
+  opacity: 0.5;
+}
+
+.ch-title {
+  font-family: var(--serif);
+  font-size: clamp(40px, 5.5vw, 72px);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  color: var(--black);
+  margin-bottom: 20px;
+}
+.ch-title em { font-style: italic; color: var(--orange); }
+
+.ch-intro {
+  font-size: 17px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--gray1);
+  max-width: 600px;
+}
+
+/* ── SECTION DIVIDER ───────────────────────────────────────── */
+.full-strip {
+  background: var(--black);
+  padding: 0 var(--pad);
+  overflow: hidden;
+}
+.strip-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 60px 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+.strip-question {
+  font-family: var(--serif);
+  font-size: clamp(28px, 3.5vw, 48px);
+  font-weight: 400;
+  font-style: italic;
+  line-height: 1.2;
+  color: var(--white);
+}
+.strip-question span { color: var(--orange); font-style: normal; font-weight: 700; }
+.strip-answer {
+  font-size: 15px;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.55);
+  font-weight: 300;
+}
+
+/* ── CH 1: FOUNDATION ──────────────────────────────────────── */
+.foundation-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+  margin-bottom: 48px;
+}
+.f-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 40px 36px;
+  position: relative;
+  overflow: hidden;
+}
+.f-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--orange);
+}
+.f-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 16px;
+}
+.f-card h3 {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--black);
+  margin-bottom: 14px;
+  line-height: 1.2;
+}
+.f-card p {
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--gray1);
+  font-weight: 300;
+}
+
+.personality-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  margin-top: 48px;
+}
+.p-card {
+  background: var(--black);
+  border-radius: 16px;
+  padding: 36px 32px;
+  position: relative;
+  overflow: hidden;
+}
+.p-card::after {
+  content: '';
+  position: absolute;
+  bottom: -40px; right: -40px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: var(--orange);
+  opacity: 0.08;
+}
+.p-trait {
+  display: block;
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--orange);
+  margin-bottom: 12px;
+  line-height: 1;
+}
+.p-not {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.p-not::before {
+  content: 'not';
+  color: var(--orange);
+  opacity: 0.5;
+}
+.p-desc {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.55);
+  font-weight: 300;
+}
+
+.positioning-compare {
+  margin-top: 48px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.pc-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background: var(--dust);
+  padding: 16px 32px;
+  gap: 32px;
+}
+.pc-header span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gray2);
+}
+.pc-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 20px 32px;
+  gap: 32px;
+  border-top: 1px solid var(--border);
+  align-items: start;
+}
+.pc-row:nth-child(even) { background: rgba(255,255,255,0.5); }
+.pc-dimension {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--black);
+}
+.pc-accrue {
+  font-size: 14px;
+  color: var(--gray1);
+  line-height: 1.5;
+  font-weight: 300;
+}
+.pc-crew {
+  font-size: 14px;
+  color: var(--black);
+  font-weight: 500;
+  line-height: 1.5;
+}
+.pc-crew strong { color: var(--orange); font-weight: 600; }
+
+/* ── CH 2: COLOUR ──────────────────────────────────────────── */
+.colour-intro-block {
+  background: var(--black);
+  border-radius: 20px;
+  padding: 56px;
+  margin-bottom: 48px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+.cib-text h3 {
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 16px;
+  line-height: 1.2;
+}
+.cib-text p {
+  font-size: 15px;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.5);
+  font-weight: 300;
+}
+.cib-palette {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.mini-swatch {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px;
+}
+.mini-swatch span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ms-light span { color: var(--black); }
+.ms-dark span { color: rgba(255,255,255,0.7); }
+
+.swatches-row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.swatch-block {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.swatch-body {
+  aspect-ratio: 4/5;
+  display: flex;
+  align-items: flex-end;
+  padding: 14px;
+  position: relative;
+}
+.swatch-body::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 40%;
+  background: linear-gradient(to top, rgba(0,0,0,0.15), transparent);
+  border-radius: 0;
+}
+.swatch-hex {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  position: relative;
+  z-index: 1;
+}
+.swatch-light .swatch-hex { color: rgba(0,0,0,0.5); }
+.swatch-dark .swatch-hex { color: rgba(255,255,255,0.7); }
+.swatch-info {
+  background: var(--white);
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+.swatch-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--black);
+  margin-bottom: 3px;
+}
+.swatch-role {
+  font-size: 11px;
+  color: var(--gray2);
+  line-height: 1.4;
+}
+.swatch-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 100px;
+  margin-top: 6px;
+}
+.tag-core { background: var(--orange-tint); color: var(--orange); }
+.tag-ext { background: var(--navy-tint); color: var(--navy); }
+
+.colour-rules {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 48px;
+}
+.rule-card {
+  border-radius: 12px;
+  padding: 28px;
+  border: 1px solid var(--border);
+}
+.rule-card.do { border-color: var(--sage); background: var(--sage-tint); }
+.rule-card.dont { border-color: #E5B8B8; background: var(--red-tint); }
+.rule-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.rule-card.do .rule-tag { color: var(--sage); }
+.rule-card.dont .rule-tag { color: var(--red); }
+.rule-card ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rule-card li {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--gray1);
+  font-weight: 400;
+  padding-left: 20px;
+  position: relative;
+}
+.rule-card.do li::before {
+  content: '✓';
+  position: absolute; left: 0;
+  color: var(--sage); font-weight: 700; font-size: 13px;
+}
+.rule-card.dont li::before {
+  content: '×';
+  position: absolute; left: 0;
+  color: var(--red); font-weight: 700; font-size: 15px;
+  line-height: 1.3;
+}
+
+.status-system {
+  margin-top: 48px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.status-header {
+  background: var(--dust);
+  padding: 18px 28px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gray2);
+}
+.status-row {
+  display: flex;
+  align-items: center;
+  padding: 16px 28px;
+  gap: 20px;
+  border-top: 1px solid var(--border);
+}
+.status-chip {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 4px 12px;
+  border-radius: 100px;
+  min-width: 100px;
+  text-align: center;
+}
+.status-meaning {
+  font-size: 14px;
+  color: var(--gray1);
+  flex: 1;
+  font-weight: 300;
+}
+.status-usage {
+  font-size: 12px;
+  color: var(--gray2);
+  font-style: italic;
+}
+
+/* ── CH 3: TYPOGRAPHY ──────────────────────────────────────── */
+.type-specimen-large {
+  background: var(--black);
+  border-radius: 20px;
+  padding: 64px 56px;
+  margin-bottom: 48px;
+  overflow: hidden;
+  position: relative;
+}
+.type-specimen-large::before {
+  content: 'Aa';
+  position: absolute;
+  right: -40px; top: -40px;
+  font-family: var(--serif);
+  font-size: 320px;
+  font-weight: 900;
+  color: rgba(255,255,255,0.03);
+  line-height: 1;
+  pointer-events: none;
+  letter-spacing: -0.05em;
+}
+.specimen-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 28px;
+}
+.specimen-name {
+  font-family: var(--serif);
+  font-size: clamp(48px, 6vw, 88px);
+  font-weight: 900;
+  color: var(--white);
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  margin-bottom: 8px;
+}
+.specimen-sub {
+  font-size: 15px;
+  color: rgba(255,255,255,0.35);
+  font-weight: 300;
+  margin-bottom: 48px;
+  letter-spacing: 0.02em;
+}
+.specimen-weights {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.specimen-w {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.specimen-w .sample {
+  font-family: var(--serif);
+  font-size: 24px;
+  color: var(--white);
+  line-height: 1;
+}
+.specimen-w .wlabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+}
+.specimen-w .w1 { font-weight: 400; }
+.specimen-w .w2 { font-weight: 700; }
+.specimen-w .w3 { font-weight: 900; }
+.specimen-w .w4 { font-weight: 400; font-style: italic; }
+.specimen-w .w5 { font-weight: 700; font-style: italic; }
+
+.type-scale {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 32px;
+}
+.ts-header {
+  display: grid;
+  grid-template-columns: 80px 1fr 120px 140px;
+  gap: 24px;
+  padding: 14px 28px;
+  background: var(--dust);
+}
+.ts-header span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gray2);
+}
+.ts-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 120px 140px;
+  gap: 24px;
+  padding: 20px 28px;
+  border-top: 1px solid var(--border);
+  align-items: center;
+}
+.ts-row:nth-child(even) { background: rgba(255,255,255,0.6); }
+.ts-role {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orange);
+}
+.ts-spec {
+  font-size: 12px;
+  color: var(--gray2);
+  font-family: 'Courier New', monospace;
+  line-height: 1.5;
+}
+.ts-usage {
+  font-size: 12px;
+  color: var(--gray1);
+  line-height: 1.5;
+}
+
+.ts-display { font-family: var(--serif); font-size: 40px; font-weight: 900; letter-spacing: -0.03em; line-height: 1; color: var(--black); }
+.ts-h1     { font-family: var(--serif); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: var(--black); }
+.ts-h2     { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.15; color: var(--black); }
+.ts-h3     { font-family: var(--sans); font-size: 17px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; color: var(--black); }
+.ts-body   { font-family: var(--sans); font-size: 15px; font-weight: 400; line-height: 1.65; color: var(--black); }
+.ts-small  { font-family: var(--sans); font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--gray1); }
+.ts-label  { font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gray2); }
+
+/* ── CH 4: VOICE ───────────────────────────────────────────── */
+.voice-principles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 48px;
+}
+.vp-card {
+  background: var(--white);
+  padding: 40px 36px;
+}
+.vp-card:first-child { border-radius: 14px 0 0 0; }
+.vp-card:nth-child(2) { border-radius: 0 14px 0 0; }
+.vp-card:nth-child(3) { border-radius: 0 0 0 14px; }
+.vp-card:last-child { border-radius: 0 0 14px 0; }
+.vp-num {
+  font-family: var(--serif);
+  font-size: 56px;
+  font-weight: 900;
+  color: var(--dust);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  margin-bottom: 8px;
+}
+.vp-principle {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 6px;
+  line-height: 1.2;
+}
+.vp-not {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--orange);
+  margin-bottom: 16px;
+}
+.vp-desc {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--gray1);
+  font-weight: 300;
+}
+
+.word-swap {
+  margin-top: 48px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.ws-header {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr 180px;
+  gap: 0;
+  padding: 16px 28px;
+  background: var(--dust);
+  align-items: center;
+}
+.ws-header span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gray2);
+}
+.ws-row {
+  display: grid;
+  grid-template-columns: 1fr 40px 1fr 180px;
+  gap: 0;
+  padding: 16px 28px;
+  border-top: 1px solid var(--border);
+  align-items: center;
+}
+.ws-row:nth-child(even) { background: rgba(255,255,255,0.5); }
+.ws-avoid {
+  font-size: 14px;
+  color: var(--red);
+  text-decoration: line-through;
+  text-decoration-color: rgba(192,57,43,0.4);
+  font-weight: 400;
+}
+.ws-arrow { font-size: 16px; color: var(--border); text-align: center; }
+.ws-use {
+  font-size: 14px;
+  color: var(--black);
+  font-weight: 600;
+}
+.ws-why {
+  font-size: 12px;
+  color: var(--gray2);
+  font-style: italic;
+  line-height: 1.45;
+}
+
+.micro-copy {
+  margin-top: 48px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}
+.mc-block {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.mc-type {
+  padding: 14px 20px;
+  background: var(--dust);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gray2);
+  border-bottom: 1px solid var(--border);
+}
+.mc-example {
+  padding: 20px;
+}
+.mc-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.mc-label.avoid { color: var(--red); }
+.mc-label.use { color: var(--sage); }
+.mc-text {
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.mc-text.avoid-bg { background: var(--red-tint); color: var(--red); }
+.mc-text.use-bg { background: var(--sage-tint); color: var(--sage); font-weight: 500; }
+
+/* ── CH 5: LOGO ────────────────────────────────────────────── */
+.logo-showcase {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+  margin-bottom: 48px;
+}
+.logo-field {
+  border-radius: 16px;
+  aspect-ratio: 16/9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.logo-field .field-label {
+  position: absolute;
+  bottom: 16px; left: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gray2);
+}
+.logo-text-lockup {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  line-height: 1;
+}
+.logo-accrue {
+  font-family: var(--sans);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--black);
+}
+.logo-sep {
+  height: 1em;
+  width: 1px;
+  background: var(--border);
+  margin: 0 10px;
+  align-self: center;
+}
+.logo-sub {
+  font-family: var(--sans);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--gray2);
+}
+.logo-field.on-cream { background: var(--cream); }
+.logo-field.on-white { background: var(--white); }
+.logo-field.on-black { background: var(--black); border-color: #222; }
+.logo-field.on-black .logo-accrue { color: var(--white); }
+.logo-field.on-black .logo-sub { color: rgba(255,255,255,0.5); }
+.logo-field.on-black .logo-sep { background: #444; }
+.logo-field.on-black .field-label { color: rgba(255,255,255,0.4); }
+.logo-field.on-orange { background: var(--orange); border-color: var(--orange); }
+.logo-field.on-orange .logo-accrue { color: var(--white); }
+.logo-field.on-orange .logo-sub { color: rgba(255,255,255,0.6); }
+.logo-field.on-orange .logo-sep { background: rgba(255,255,255,0.3); }
+.logo-field.on-orange .field-label { color: rgba(255,255,255,0.6); }
+
+.clearspace-demo {
+  margin: 48px 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 48px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+.cs-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.cs-lockup {
+  padding: 24px;
+  border: 1.5px dashed var(--orange);
+  border-radius: 4px;
+  position: relative;
+}
+.cs-outer {
+  position: absolute;
+  inset: -16px;
+  border: 1px dashed rgba(253,139,5,0.25);
+  border-radius: 4px;
+}
+.cs-text {
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--black);
+  letter-spacing: -0.02em;
+}
+.cs-label-top, .cs-label-bottom {
+  position: absolute;
+  left: 50%; transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orange);
+  white-space: nowrap;
+}
+.cs-label-top { top: -28px; }
+.cs-label-bottom { bottom: -28px; }
+.cs-info h4 {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 12px;
+}
+.cs-info p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--gray1);
+  font-weight: 300;
+  margin-bottom: 20px;
+}
+.cs-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--gray1);
+  margin-bottom: 8px;
+}
+.cs-rule::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--orange);
+  flex-shrink: 0;
+}
+
+/* ── CH 6: COMPONENTS ──────────────────────────────────────── */
+.component-section {
+  margin-bottom: 56px;
+}
+.comp-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Buttons */
+.buttons-showcase {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+.btn-primary { background: var(--black); color: var(--white); }
+.btn-primary:hover { background: var(--navy); }
+.btn-cta { background: var(--orange); color: var(--white); }
+.btn-cta:hover { background: #E07D04; }
+.btn-ghost {
+  background: transparent;
+  color: var(--black);
+  border: 1.5px solid var(--border);
+}
+.btn-ghost:hover { border-color: var(--black); }
+.btn-danger { background: var(--red-tint); color: var(--red); border: 1.5px solid #E5B8B8; }
+.btn-disabled { background: var(--dust); color: var(--gray2); cursor: not-allowed; }
+.btn-sm { padding: 8px 16px; font-size: 12px; border-radius: 6px; }
+.btn-icon { padding: 10px; border-radius: 8px; background: var(--dust); color: var(--black); border: 1.5px solid var(--border); }
+
+.btn-spec-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+.btn-spec-table td, .btn-spec-table th {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.btn-spec-table th {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gray2);
+  background: var(--dust);
+}
+.btn-spec-table td:first-child { font-weight: 600; }
+
+/* Cards */
+.cards-showcase {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  margin-bottom: 20px;
+}
+.demo-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+.demo-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 8px;
+}
+.demo-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--black);
+  margin-bottom: 8px;
+}
+.demo-card-body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gray1);
+  font-weight: 300;
+  margin-bottom: 20px;
+}
+.demo-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.demo-card-meta { font-size: 12px; color: var(--gray2); }
+.demo-card-stat {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--serif);
+  color: var(--black);
+  letter-spacing: -0.03em;
+}
+
+/* Forms */
+.form-showcase {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.field-group { display: flex; flex-direction: column; gap: 6px; }
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--black);
+  letter-spacing: -0.01em;
+}
+.field-label .required { color: var(--orange); margin-left: 2px; }
+.field-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--black);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field-input:focus { border-color: var(--orange); }
+.field-input.error-state { border-color: var(--red); }
+.field-input.success-state { border-color: var(--sage); }
+.field-hint { font-size: 12px; color: var(--gray2); }
+.field-error { font-size: 12px; color: var(--red); }
+.field-success { font-size: 12px; color: var(--sage); }
+
+/* ── CH 7: DO / DON'T ──────────────────────────────────────── */
+.dds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+.dd-panel {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.dd-header {
+  padding: 16px 24px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.dd-do .dd-header { background: var(--sage-tint); color: var(--sage); border-bottom: 1px solid #C8E6D4; }
+.dd-dont .dd-header { background: var(--red-tint); color: var(--red); border-bottom: 1px solid #F5C6C1; }
+.dd-body { padding: 24px; }
+.dd-example {
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  font-weight: 400;
+}
+.dd-do .dd-example { background: var(--sage-tint); color: var(--black); }
+.dd-dont .dd-example { background: var(--red-tint); color: var(--red); text-decoration: line-through; text-decoration-color: rgba(192,57,43,0.3); }
+.dd-rationale {
+  font-size: 12px;
+  color: var(--gray2);
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* ── CLOSING ───────────────────────────────────────────────── */
+.closing {
+  background: var(--black);
+  padding: clamp(80px, 10vw, 140px) var(--pad);
+  position: relative;
+  overflow: hidden;
+}
+.closing::before {
+  content: '';
+  position: absolute;
+  top: -200px; right: -200px;
+  width: 500px; height: 500px;
+  border-radius: 50%;
+  background: var(--orange);
+  opacity: 0.05;
+}
+.closing::after {
+  content: '';
+  position: absolute;
+  bottom: -100px; left: -100px;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: var(--orange);
+  opacity: 0.04;
+}
+.closing-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+.closing-small {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 32px;
+}
+.closing-headline {
+  font-family: var(--serif);
+  font-size: clamp(48px, 7vw, 100px);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  color: var(--white);
+  margin-bottom: 48px;
+}
+.closing-headline em { color: var(--orange); font-style: italic; }
+.closing-body {
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1.75;
+  color: rgba(255,255,255,0.55);
+  max-width: 640px;
+  margin-bottom: 64px;
+}
+.closing-body strong { color: var(--white); font-weight: 500; }
+.closing-rule {
+  width: 64px; height: 1px;
+  background: var(--orange);
+  margin-bottom: 32px;
+}
+.closing-credits {
+  display: flex;
+  gap: 64px;
+  flex-wrap: wrap;
+}
+.credit-item label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 6px;
+}
+.credit-item span {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--white);
+}
+
+/* ── AGENT GUIDE ───────────────────────────────────────────── */
+.agent-section {
+  background: var(--navy);
+  padding: clamp(64px, 8vw, 100px) var(--pad);
+}
+.agent-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+}
+.agent-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 24px;
+}
+.agent-headline {
+  font-family: var(--serif);
+  font-size: clamp(32px, 4vw, 52px);
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: -0.025em;
+  margin-bottom: 16px;
+  line-height: 1.1;
+}
+.agent-subhead {
+  font-size: 16px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.5);
+  max-width: 560px;
+  line-height: 1.65;
+  margin-bottom: 48px;
+}
+.agent-rules {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 48px;
+}
+.agent-rule {
+  background: var(--navy);
+  padding: 28px 32px;
+}
+.agent-rule h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--orange);
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+.agent-rule p {
+  font-size: 14px;
+  line-height: 1.65;
+  color: rgba(255,255,255,0.55);
+  font-weight: 300;
+}
+.agent-rule code {
+  display: inline-block;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+  color: rgba(255,255,255,0.7);
+  margin-top: 6px;
+}
+.agent-checklist {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 32px;
+}
+.agent-checklist h4 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 20px;
+}
+.check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255,255,255,0.6);
+  font-weight: 300;
+}
+.check-item:last-child { border-bottom: none; }
+.check-item::before {
+  content: '';
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── RESPONSIVE ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  :root { --pad: 24px; --gap: 16px; }
+  .cover-main { grid-template-columns: 1fr; }
+  .cover-toc { display: none; }
+  .ch-opener { grid-template-columns: 1fr; }
+  .ch-n { font-size: 72px; }
+  .foundation-cards { grid-template-columns: 1fr; }
+  .personality-grid { grid-template-columns: 1fr; }
+  .swatches-row { grid-template-columns: repeat(3, 1fr); }
+  .colour-rules { grid-template-columns: 1fr; }
+  .type-specimen-large { padding: 36px 28px; }
+  .voice-principles { grid-template-columns: 1fr; }
+  .micro-copy { grid-template-columns: 1fr; }
+  .logo-showcase { grid-template-columns: 1fr; }
+  .cards-showcase { grid-template-columns: 1fr; }
+  .form-showcase { grid-template-columns: 1fr; }
+  .dds { grid-template-columns: 1fr; }
+  .agent-rules { grid-template-columns: 1fr; }
+  .strip-inner { grid-template-columns: 1fr; gap: 32px; }
+  .colour-intro-block { grid-template-columns: 1fr; }
+  .cib-palette { grid-template-columns: repeat(6, 1fr); }
+  .nav-links { display: none; }
+  .positioning-compare { overflow-x: auto; }
+  .ts-header, .ts-row { grid-template-columns: 60px 1fr 100px; }
+  .ts-header span:last-child, .ts-row .ts-usage { display: none; }
+}
+
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-id">
+    <span class="word-accrue">Accrue</span>
+    <span class="word-sep">/</span>
+    <span class="word-hub">Crew Hub</span>
+  </div>
+  <ul class="nav-links">
+    <li><a href="#foundation">Foundation</a></li>
+    <li><a href="#colour">Colour</a></li>
+    <li><a href="#typography">Type</a></li>
+    <li><a href="#voice">Voice</a></li>
+    <li><a href="#logo">Logo</a></li>
+    <li><a href="#components">Components</a></li>
+  </ul>
+  <span class="nav-version">v1.0</span>
+</nav>
+
+
+<!-- COVER -->
+<section class="cover">
+  <div class="cover-arc"></div>
+
+  <div class="cover-main">
+    <div class="cover-left">
+      <div class="cover-eyebrow" data-reveal>
+        <div class="cover-eyebrow-dot"></div>
+        <span class="cover-eyebrow-text">Accrue Internal Brand System</span>
+      </div>
+
+      <h1 class="cover-headline" data-reveal data-delay="1">
+        Crew<br>
+        <span class="italic">Hub.</span>
+      </h1>
+
+      <p class="cover-question" data-reveal data-delay="2">
+        The design question: what does it feel like to be taken care of by the same people building something for hundreds of thousands of users? This is that answer.
+      </p>
+
+      <div class="cover-meta-row" data-reveal data-delay="3">
+        <div class="meta-item">
+          <label>Document</label>
+          <span>Brand Guidelines</span>
+        </div>
+        <div class="meta-item">
+          <label>Version</label>
+          <span>1.0</span>
+        </div>
+        <div class="meta-item">
+          <label>Parent Brand</label>
+          <span>Accrue</span>
+        </div>
+        <div class="meta-item">
+          <label>Scope</label>
+          <span>Internal Platform</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cover-toc" data-reveal data-delay="3">
+      <div class="toc-label">Contents</div>
+      <a href="#foundation" class="toc-link">
+        <div class="toc-left"><span class="toc-n">01</span><span class="toc-name">Brand Foundation</span></div>
+        <span class="toc-arrow">&#8599;</span>
+      </a>
+      <a href="#colour" class="toc-link">
+        <div class="toc-left"><span class="toc-n">02</span><span class="toc-name">Colour</span></div>
+        <span class="toc-arrow">&#8599;</span>
+      </a>
+      <a href="#typography" class="toc-link">
+        <div class="toc-left"><span class="toc-n">03</span><span class="toc-name">Typography</span></div>
+        <span class="toc-arrow">&#8599;</span>
+      </a>
+      <a href="#voice" class="toc-link">
+        <div class="toc-left"><span class="toc-n">04</span><span class="toc-name">Voice &amp; Tone</span></div>
+        <span class="toc-arrow">&#8599;</span>
+      </a>
+      <a href="#logo" class="toc-link">
+        <div class="toc-left"><span class="toc-n">05</span><span class="toc-name">Logo &amp; Identity</span></div>
+        <span class="toc-arrow">&#8599;</span>
+      </a>
+      <a href="#components" class="toc-link">
+        <div class="toc-left"><span class="toc-n">06</span><span class="toc-name">Components</span></div>
+        <span class="toc-arrow">&#8599;</span>
+      </a>
+      <a href="#rules" class="toc-link">
+        <div class="toc-left"><span class="toc-n">07</span><span class="toc-name">Do's &amp; Don'ts</span></div>
+        <span class="toc-arrow">&#8599;</span>
+      </a>
+      <a href="#agents" class="toc-link">
+        <div class="toc-left"><span class="toc-n">08</span><span class="toc-name">Agent Guide</span></div>
+        <span class="toc-arrow">&#8599;</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="cover-footer">
+    <span class="cover-footer-text">Internal use only. <strong>Accrue Technologies Inc.</strong> All markets.</span>
+    <div class="cover-footer-mark">
+      <svg width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4"/></svg>
+    </div>
+  </div>
+</section>
+
+
+<!-- INTERSTITIAL STRIP -->
+<div class="full-strip">
+  <div class="strip-inner">
+    <p class="strip-question" data-reveal>
+      "Warmth turned <span>inward.</span> The same cream. The same orange. But quieter, steadier, more structural."
+    </p>
+    <p class="strip-answer" data-reveal data-delay="2">
+      Accrue was built to serve hundreds of thousands of users across Africa. Crew Hub is built to serve the people who build for them. Both deserve the same quality of attention, the same care, the same brand discipline. This is not a secondary system. It is the same system, held closer.
+    </p>
+  </div>
+</div>
+
+
+<!-- CHAPTER 1: BRAND FOUNDATION -->
+<section id="foundation">
+  <div class="chapter">
+    <div class="ch-opener">
+      <div class="ch-n" data-reveal>01</div>
+      <div data-reveal data-delay="1">
+        <div class="ch-label">Brand Foundation</div>
+        <h2 class="ch-title">The <em>crew</em><br>at the center.</h2>
+        <p class="ch-intro">Crew Hub is Accrue's internal operating layer. Every design decision here starts from one belief: the people building Accrue deserve the same quality of experience as the people using it. Same family. Different room.</p>
+      </div>
+    </div>
+
+    <div class="foundation-cards">
+      <div class="f-card" data-reveal>
+        <div class="f-card-label">Purpose</div>
+        <h3>Give the crew what they give users.</h3>
+        <p>Accrue gives users clarity, warmth, and control over their money. Crew Hub gives the team building Accrue the same clarity, warmth, and control over how they work. The internal experience should match the ambition of the external product.</p>
+      </div>
+      <div class="f-card" data-reveal data-delay="1">
+        <div class="f-card-label">Positioning</div>
+        <h3>The internal layer of a distributed team.</h3>
+        <p>Crew Hub is where HR, ops, and team coordination live for a cross-border team spanning Lagos, Accra, and beyond. It is not an afterthought. It is infrastructure with a face, and that face should feel as considered as the product it supports.</p>
+      </div>
+    </div>
+
+    <div class="personality-grid">
+      <div class="p-card" data-reveal>
+        <span class="p-trait">Direct</span>
+        <div class="p-not">blunt</div>
+        <p class="p-desc">We say what we mean without softening it into confusion. But directness is paired with respect. Information lands clearly because it was shaped with care, not because it was sharpened as a weapon.</p>
+      </div>
+      <div class="p-card" data-reveal data-delay="1">
+        <span class="p-trait">Warm</span>
+        <div class="p-not">casual</div>
+        <p class="p-desc">This is a people platform. The tone carries genuine regard for whoever is reading it, whether they are requesting leave or reviewing a policy. Warmth is not decoration. It is function.</p>
+      </div>
+      <div class="p-card" data-reveal data-delay="2">
+        <span class="p-trait">Steady</span>
+        <div class="p-not">rigid</div>
+        <p class="p-desc">The crew depends on Crew Hub to be reliable. Consistency in language and visual behaviour builds the kind of trust that lets the team move fast without second-guessing the tools beneath them.</p>
+      </div>
+    </div>
+
+    <div class="positioning-compare" data-reveal style="margin-top: 48px;">
+      <div class="pc-header">
+        <span>Dimension</span>
+        <span>Accrue (Product)</span>
+        <span>Crew Hub (Internal)</span>
+      </div>
+      <div class="pc-row">
+        <div class="pc-dimension">Audience</div>
+        <div class="pc-accrue">350,000+ users across Africa</div>
+        <div class="pc-crew"><strong>The team</strong> building Accrue</div>
+      </div>
+      <div class="pc-row">
+        <div class="pc-dimension">Energy</div>
+        <div class="pc-accrue">Energetic, forward, aspirational</div>
+        <div class="pc-crew"><strong>Grounded</strong>, structured, reliable</div>
+      </div>
+      <div class="pc-row">
+        <div class="pc-dimension">Orange use</div>
+        <div class="pc-accrue">Bold, expressive, frequent</div>
+        <div class="pc-crew">Precise, singular, <strong>earned</strong></div>
+      </div>
+      <div class="pc-row">
+        <div class="pc-dimension">Language</div>
+        <div class="pc-accrue">Marketing, aspiration, growth</div>
+        <div class="pc-crew"><strong>Operational</strong>, human, crew-first</div>
+      </div>
+      <div class="pc-row">
+        <div class="pc-dimension">Relationship</div>
+        <div class="pc-accrue">Brand to user</div>
+        <div class="pc-crew"><strong>Team to team</strong>, people to people</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CHAPTER 2: COLOUR -->
+<section id="colour" style="background: var(--cream);">
+  <div class="chapter">
+    <div class="ch-opener">
+      <div class="ch-n" data-reveal>02</div>
+      <div data-reveal data-delay="1">
+        <div class="ch-label">Colour</div>
+        <h2 class="ch-title">Inherited.<br><em>Precise.</em></h2>
+        <p class="ch-intro">Every Crew Hub colour traces directly back to Accrue's confirmed brand DNA. Nothing invented. Two colours extended, carefully, to serve operational states that do not exist in the consumer product.</p>
+      </div>
+    </div>
+
+    <div class="colour-intro-block" data-reveal>
+      <div class="cib-text">
+        <h3>The palette is an argument, not a decoration.</h3>
+        <p>Cream is warmth at rest. Orange is precision in action. Black is where important things live. The two extensions, Navy and Sage, exist only because internal tools need states (authority, approval) that consumer apps handle differently. Every colour earns its place or does not appear.</p>
+      </div>
+      <div class="cib-palette">
+        <div class="mini-swatch ms-light" style="background:#FFFAF3; border: 1px solid #E8DFD0;"><span>Cream</span></div>
+        <div class="mini-swatch ms-dark" style="background:#FD8B05;"><span>Orange</span></div>
+        <div class="mini-swatch ms-dark" style="background:#000000;"><span>Black</span></div>
+        <div class="mini-swatch ms-dark" style="background:#495057;"><span>Gray 1</span></div>
+        <div class="mini-swatch ms-light" style="background:#E8DFD0; border: 1px solid #D8CFC5;"><span>Border</span></div>
+        <div class="mini-swatch ms-dark" style="background:#1A2B3C;"><span>Navy</span></div>
+      </div>
+    </div>
+
+    <div class="swatches-row" data-reveal>
+      <!-- Cream -->
+      <div class="swatch-block">
+        <div class="swatch-body swatch-light" style="background:#FFFAF3; border: 1px solid #E8DFD0;">
+          <span class="swatch-hex">#FFFAF3</span>
+        </div>
+        <div class="swatch-info">
+          <div class="swatch-name">Cream</div>
+          <div class="swatch-role">Primary canvas. Every screen.</div>
+          <span class="swatch-tag tag-core">Core</span>
+        </div>
+      </div>
+      <!-- Orange -->
+      <div class="swatch-block">
+        <div class="swatch-body swatch-dark" style="background:#FD8B05;">
+          <span class="swatch-hex">#FD8B05</span>
+        </div>
+        <div class="swatch-info">
+          <div class="swatch-name">Orange</div>
+          <div class="swatch-role">Brand accent. One CTA per screen.</div>
+          <span class="swatch-tag tag-core">Core</span>
+        </div>
+      </div>
+      <!-- Black -->
+      <div class="swatch-block">
+        <div class="swatch-body swatch-dark" style="background:#000000;">
+          <span class="swatch-hex">#000000</span>
+        </div>
+        <div class="swatch-info">
+          <div class="swatch-name">Black</div>
+          <div class="swatch-role">Headlines, primary actions.</div>
+          <span class="swatch-tag tag-core">Core</span>
+        </div>
+      </div>
+      <!-- Gray 1 -->
+      <div class="swatch-block">
+        <div class="swatch-body swatch-dark" style="background:#495057;">
+          <span class="swatch-hex">#495057</span>
+        </div>
+        <div class="swatch-info">
+          <div class="swatch-name">Gray 1</div>
+          <div class="swatch-role">Body text, secondary labels.</div>
+          <span class="swatch-tag tag-core">Core</span>
+        </div>
+      </div>
+      <!-- Navy -->
+      <div class="swatch-block">
+        <div class="swatch-body swatch-dark" style="background:#1A2B3C;">
+          <span class="swatch-hex">#1A2B3C</span>
+        </div>
+        <div class="swatch-info">
+          <div class="swatch-name">Navy</div>
+          <div class="swatch-role">Navigation, admin states.</div>
+          <span class="swatch-tag tag-ext">Extended</span>
+        </div>
+      </div>
+      <!-- Sage -->
+      <div class="swatch-block">
+        <div class="swatch-body swatch-dark" style="background:#2D6A4F;">
+          <span class="swatch-hex">#2D6A4F</span>
+        </div>
+        <div class="swatch-info">
+          <div class="swatch-name">Sage</div>
+          <div class="swatch-role">Approval, success states.</div>
+          <span class="swatch-tag tag-ext">Extended</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-system" data-reveal style="margin-top: 48px;">
+      <div class="status-header">Status Colour System</div>
+      <div class="status-row">
+        <span class="status-chip" style="background:#E8F4EE; color:#2D6A4F;">Approved</span>
+        <span class="status-meaning">Request processed, action completed, document signed</span>
+        <span class="status-usage">Sage #2D6A4F on Sage tint</span>
+      </div>
+      <div class="status-row">
+        <span class="status-chip" style="background:#FEF6E4; color:#D97706;">Pending</span>
+        <span class="status-meaning">Awaiting review, in progress, under consideration</span>
+        <span class="status-usage">Amber #D97706 on Amber tint</span>
+      </div>
+      <div class="status-row">
+        <span class="status-chip" style="background:#FDECEA; color:#C0392B;">Declined</span>
+        <span class="status-meaning">Not approved, error occurred, action failed</span>
+        <span class="status-usage">Red #C0392B on Red tint</span>
+      </div>
+      <div class="status-row">
+        <span class="status-chip" style="background:#EBF0F5; color:#1A2B3C;">Draft</span>
+        <span class="status-meaning">Not yet submitted, being prepared, unpublished</span>
+        <span class="status-usage">Navy #1A2B3C on Navy tint</span>
+      </div>
+      <div class="status-row">
+        <span class="status-chip" style="background:#F0EBE1; color:#727272;">Archived</span>
+        <span class="status-meaning">No longer active, historical record</span>
+        <span class="status-usage">Gray 2 #727272 on Dust</span>
+      </div>
+    </div>
+
+    <div class="colour-rules" data-reveal>
+      <div class="rule-card do">
+        <div class="rule-tag">Do</div>
+        <ul>
+          <li>Use Cream as the default canvas on every screen</li>
+          <li>Use Orange for one primary CTA per page or module</li>
+          <li>Pair status colours only with their designated tint background</li>
+          <li>Use Black for headlines, Navy only in navigation contexts</li>
+          <li>Let white space breathe around orange elements</li>
+        </ul>
+      </div>
+      <div class="rule-card dont">
+        <div class="rule-tag">Don't</div>
+        <ul>
+          <li>Use Orange on Black backgrounds or as a text colour for body copy</li>
+          <li>Apply more than one primary orange CTA per screen section</li>
+          <li>Mix status colours outside their designated system</li>
+          <li>Use Navy or Sage as general brand colours outside their functional role</li>
+          <li>Replace Cream with white as the default canvas</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CHAPTER 3: TYPOGRAPHY -->
+<section id="typography">
+  <div class="chapter">
+    <div class="ch-opener">
+      <div class="ch-n" data-reveal>03</div>
+      <div data-reveal data-delay="1">
+        <div class="ch-label">Typography</div>
+        <h2 class="ch-title">Type that<br><em>does work.</em></h2>
+        <p class="ch-intro">The typeface system pairs a serif for editorial moments with a geometric sans for operational clarity. Every size in the scale has a specific job. Nothing is decorative. Everything communicates.</p>
+      </div>
+    </div>
+
+    <div class="type-specimen-large" data-reveal>
+      <div class="specimen-label">Display Serif / Playfair Display</div>
+      <div class="specimen-name">For moments<br>that matter.</div>
+      <div class="specimen-sub">Headlines, chapter openers, brand statements, key numbers</div>
+      <div class="specimen-weights">
+        <div class="specimen-w">
+          <span class="sample w1">Crew Hub</span>
+          <span class="wlabel">Regular 400</span>
+        </div>
+        <div class="specimen-w">
+          <span class="sample w2">Crew Hub</span>
+          <span class="wlabel">Bold 700</span>
+        </div>
+        <div class="specimen-w">
+          <span class="sample w3">Crew Hub</span>
+          <span class="wlabel">Black 900</span>
+        </div>
+        <div class="specimen-w">
+          <span class="sample w4">Crew Hub</span>
+          <span class="wlabel">Italic 400</span>
+        </div>
+        <div class="specimen-w">
+          <span class="sample w5">Crew Hub</span>
+          <span class="wlabel">Italic 700</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="type-scale" data-reveal>
+      <div class="ts-header">
+        <span>Role</span>
+        <span>Sample</span>
+        <span>Spec</span>
+        <span>Usage</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-role">Display</span>
+        <span class="ts-display">Crew Hub</span>
+        <span class="ts-spec">Serif 40px/900<br>ls -0.035em</span>
+        <span class="ts-usage">Cover, chapter titles, key data</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-role">H1</span>
+        <span class="ts-h1">Crew Hub</span>
+        <span class="ts-spec">Serif 28px/700<br>ls -0.02em</span>
+        <span class="ts-usage">Page titles, section headers</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-role">H2</span>
+        <span class="ts-h2">Crew Hub</span>
+        <span class="ts-spec">Serif 22px/700<br>ls -0.015em</span>
+        <span class="ts-usage">Card headings, subsections</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-role">H3</span>
+        <span class="ts-h3">Section heading</span>
+        <span class="ts-spec">Sans 17px/600<br>ls -0.01em</span>
+        <span class="ts-usage">Module titles, grouped items</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-role">Body</span>
+        <span class="ts-body">Standard body text for reading</span>
+        <span class="ts-spec">Sans 15px/400<br>lh 1.65</span>
+        <span class="ts-usage">Descriptions, policy text, messages</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-role">Small</span>
+        <span class="ts-small">Supporting detail, timestamps, metadata</span>
+        <span class="ts-spec">Sans 13px/400<br>lh 1.5</span>
+        <span class="ts-usage">Dates, captions, table metadata</span>
+      </div>
+      <div class="ts-row">
+        <span class="ts-role">Label</span>
+        <span class="ts-label">Category Label</span>
+        <span class="ts-spec">Sans 11px/700<br>CAPS ls 0.12em</span>
+        <span class="ts-usage">Eyebrows, tags, column headers</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:32px;" data-reveal>
+      <div style="background:var(--white); border:1px solid var(--border); border-radius:12px; padding:28px;">
+        <div class="ts-label" style="margin-bottom:16px;">Fallback Stack</div>
+        <code style="font-size:13px; line-height:2; color:var(--gray1); font-family:'Courier New',monospace; display:block;">
+          font-family:<br>
+          &nbsp;&nbsp;'DM Sans',<br>
+          &nbsp;&nbsp;-apple-system,<br>
+          &nbsp;&nbsp;BlinkMacSystemFont,<br>
+          &nbsp;&nbsp;'Segoe UI',<br>
+          &nbsp;&nbsp;sans-serif;
+        </code>
+      </div>
+      <div style="background:var(--white); border:1px solid var(--border); border-radius:12px; padding:28px;">
+        <div class="ts-label" style="margin-bottom:16px;">Type Rules</div>
+        <ul style="list-style:none; display:flex; flex-direction:column; gap:12px;">
+          <li style="font-size:14px; color:var(--gray1); line-height:1.55; padding-left:18px; position:relative;"><span style="position:absolute;left:0;color:var(--orange);font-weight:700;">1.</span>Never set body copy below 13px</li>
+          <li style="font-size:14px; color:var(--gray1); line-height:1.55; padding-left:18px; position:relative;"><span style="position:absolute;left:0;color:var(--orange);font-weight:700;">2.</span>Headlines use serif; UI elements use sans</li>
+          <li style="font-size:14px; color:var(--gray1); line-height:1.55; padding-left:18px; position:relative;"><span style="position:absolute;left:0;color:var(--orange);font-weight:700;">3.</span>Body line height is always 1.6 or above</li>
+          <li style="font-size:14px; color:var(--gray1); line-height:1.55; padding-left:18px; position:relative;"><span style="position:absolute;left:0;color:var(--orange);font-weight:700;">4.</span>Labels are always uppercase and tracked</li>
+          <li style="font-size:14px; color:var(--gray1); line-height:1.55; padding-left:18px; position:relative;"><span style="position:absolute;left:0;color:var(--orange);font-weight:700;">5.</span>Italic serif is reserved for key brand moments</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CHAPTER 4: VOICE -->
+<section id="voice" style="background:var(--dust);">
+  <div class="chapter">
+    <div class="ch-opener">
+      <div class="ch-n" data-reveal>04</div>
+      <div data-reveal data-delay="1">
+        <div class="ch-label">Voice &amp; Tone</div>
+        <h2 class="ch-title">Words that<br><em>sound like us.</em></h2>
+        <p class="ch-intro">Voice is the character. Tone is how the character shows up depending on context. Crew Hub has one voice, four principles, and infinite tonal range between warm and direct depending on what the moment calls for.</p>
+      </div>
+    </div>
+
+    <div class="voice-principles" data-reveal>
+      <div class="vp-card">
+        <div class="vp-num">1</div>
+        <div class="vp-principle">Direct</div>
+        <div class="vp-not">not blunt</div>
+        <p class="vp-desc">Say what you mean in the fewest precise words. No corporate hedging. No softening into vagueness. But directness here is shaped with enough care that it lands as help, not a command.</p>
+      </div>
+      <div class="vp-card">
+        <div class="vp-num">2</div>
+        <div class="vp-principle">Warm</div>
+        <div class="vp-not">not casual</div>
+        <p class="vp-desc">There are people behind every request in this system. The voice carries genuine regard for them, whether they are requesting leave or reviewing payroll. Warmth is not decoration here. It is infrastructure.</p>
+      </div>
+      <div class="vp-card">
+        <div class="vp-num">3</div>
+        <div class="vp-principle">Clear</div>
+        <div class="vp-not">not simple</div>
+        <p class="vp-desc">Clear language treats the reader as intelligent. It does not dumb down. It strips away complexity that exists for the writer's benefit rather than the reader's. The crew is smart. Write accordingly.</p>
+      </div>
+      <div class="vp-card">
+        <div class="vp-num">4</div>
+        <div class="vp-principle">Crew-first</div>
+        <div class="vp-not">not system-first</div>
+        <p class="vp-desc">The language always centres the person using the tool, not the tool itself. "Your request has been submitted" not "The system has logged your input." The crew is the subject. Everything else is supporting cast.</p>
+      </div>
+    </div>
+
+    <div class="word-swap" data-reveal style="margin-top: 48px;">
+      <div class="ws-header">
+        <span>Avoid</span>
+        <span></span>
+        <span>Use instead</span>
+        <span>Why it matters</span>
+      </div>
+      <div class="ws-row">
+        <div class="ws-avoid">staff / employees / personnel</div>
+        <div class="ws-arrow">&#8594;</div>
+        <div class="ws-use">crew</div>
+        <div class="ws-why">Reflects Accrue's language, builds belonging</div>
+      </div>
+      <div class="ws-row">
+        <div class="ws-avoid">HR / human resources</div>
+        <div class="ws-arrow">&#8594;</div>
+        <div class="ws-use">people ops</div>
+        <div class="ws-why">Less institutional, more intentional</div>
+      </div>
+      <div class="ws-row">
+        <div class="ws-avoid">submit a ticket / raise a request</div>
+        <div class="ws-arrow">&#8594;</div>
+        <div class="ws-use">send a request</div>
+        <div class="ws-why">Sounds like talking to a person, not a system</div>
+      </div>
+      <div class="ws-row">
+        <div class="ws-avoid">please be advised that</div>
+        <div class="ws-arrow">&#8594;</div>
+        <div class="ws-use">[say the thing directly]</div>
+        <div class="ws-why">Corporate throat-clearing. Cut it.</div>
+      </div>
+      <div class="ws-row">
+        <div class="ws-avoid">utilize / leverage / synergize</div>
+        <div class="ws-arrow">&#8594;</div>
+        <div class="ws-use">use / work with / combine</div>
+        <div class="ws-why">Plain language respects the reader's time</div>
+      </div>
+      <div class="ws-row">
+        <div class="ws-avoid">action item / deliverable</div>
+        <div class="ws-arrow">&#8594;</div>
+        <div class="ws-use">task / what you need to do</div>
+        <div class="ws-why">We are people, not project trackers</div>
+      </div>
+      <div class="ws-row">
+        <div class="ws-avoid">circle back / touch base</div>
+        <div class="ws-arrow">&#8594;</div>
+        <div class="ws-use">follow up / check in</div>
+        <div class="ws-why">Jargon creates distance. We close it.</div>
+      </div>
+    </div>
+
+    <div class="micro-copy" data-reveal style="margin-top: 48px;">
+      <div class="mc-block">
+        <div class="mc-type">Error Messages</div>
+        <div class="mc-example">
+          <div class="mc-label avoid">Don't</div>
+          <div class="mc-text avoid-bg">Error: Process failed. Code 500. Contact administrator.</div>
+          <div class="mc-label use">Do</div>
+          <div class="mc-text use-bg">Something went wrong on our end. Try again in a moment. If it keeps happening, reach out to ops.</div>
+        </div>
+      </div>
+      <div class="mc-block">
+        <div class="mc-type">Empty States</div>
+        <div class="mc-example">
+          <div class="mc-label avoid">Don't</div>
+          <div class="mc-text avoid-bg">No data found.</div>
+          <div class="mc-label use">Do</div>
+          <div class="mc-text use-bg">Nothing here yet. Once requests come in, they will show up here.</div>
+        </div>
+      </div>
+      <div class="mc-block">
+        <div class="mc-type">Confirmation Messages</div>
+        <div class="mc-example">
+          <div class="mc-label avoid">Don't</div>
+          <div class="mc-text avoid-bg">Record updated successfully.</div>
+          <div class="mc-label use">Do</div>
+          <div class="mc-text use-bg">Done. Changes saved. The crew member will be notified.</div>
+        </div>
+      </div>
+      <div class="mc-block">
+        <div class="mc-type">Onboarding</div>
+        <div class="mc-example">
+          <div class="mc-label avoid">Don't</div>
+          <div class="mc-text avoid-bg">Please complete your profile to access all features of the platform.</div>
+          <div class="mc-label use">Do</div>
+          <div class="mc-text use-bg">Good to have you. Finish setting up your profile and you are ready to go.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CHAPTER 5: LOGO -->
+<section id="logo">
+  <div class="chapter">
+    <div class="ch-opener">
+      <div class="ch-n" data-reveal>05</div>
+      <div data-reveal data-delay="1">
+        <div class="ch-label">Logo &amp; Identity</div>
+        <h2 class="ch-title">One mark.<br><em>Extended.</em></h2>
+        <p class="ch-intro">Crew Hub does not have its own logo. It inherits the Accrue wordmark and extends it with a sub-brand label. This is intentional. The crew knows they are working inside Accrue. The identity reflects that truth instead of pretending otherwise.</p>
+      </div>
+    </div>
+
+    <div class="logo-showcase" data-reveal>
+      <div class="logo-field on-cream">
+        <div class="logo-text-lockup">
+          <span class="logo-accrue" style="font-size:28px;">Accrue</span>
+          <div class="logo-sep"></div>
+          <span class="logo-sub" style="font-size:18px;">Crew Hub</span>
+        </div>
+        <span class="field-label">On Cream (Primary)</span>
+      </div>
+      <div class="logo-field on-white">
+        <div class="logo-text-lockup">
+          <span class="logo-accrue" style="font-size:28px;">Accrue</span>
+          <div class="logo-sep"></div>
+          <span class="logo-sub" style="font-size:18px;">Crew Hub</span>
+        </div>
+        <span class="field-label">On White</span>
+      </div>
+      <div class="logo-field on-black">
+        <div class="logo-text-lockup">
+          <span class="logo-accrue" style="font-size:28px;">Accrue</span>
+          <div class="logo-sep"></div>
+          <span class="logo-sub" style="font-size:18px;">Crew Hub</span>
+        </div>
+        <span class="field-label">On Black</span>
+      </div>
+      <div class="logo-field on-orange">
+        <div class="logo-text-lockup">
+          <span class="logo-accrue" style="font-size:28px;">Accrue</span>
+          <div class="logo-sep"></div>
+          <span class="logo-sub" style="font-size:18px;">Crew Hub</span>
+        </div>
+        <span class="field-label">On Orange (limited use)</span>
+      </div>
+    </div>
+
+    <div class="clearspace-demo" data-reveal>
+      <div class="cs-visual">
+        <div style="position:relative; padding: 48px;">
+          <div class="cs-outer"></div>
+          <div class="cs-lockup">
+            <div class="cs-label-top">Clearspace = cap-height of "A"</div>
+            <div class="cs-text">Accrue <span style="color:var(--gray2); font-weight:400; font-size:18px;">Crew Hub</span></div>
+            <div class="cs-label-bottom">Same clearspace on all sides</div>
+          </div>
+        </div>
+      </div>
+      <div class="cs-info">
+        <h4>Clearspace &amp; Sizing</h4>
+        <p>The minimum clearspace around the Crew Hub lockup is the cap-height of the "A" in Accrue on all four sides. Never crowd the mark with competing elements.</p>
+        <div class="cs-rule">Minimum digital size: 120px wide</div>
+        <div class="cs-rule">Minimum print size: 32mm wide</div>
+        <div class="cs-rule">Never place on low-contrast backgrounds</div>
+        <div class="cs-rule">Never stretch, skew, or outline the wordmark</div>
+        <div class="cs-rule">Never remove "Crew Hub" and use Accrue alone in this context</div>
+      </div>
+    </div>
+
+    <div data-reveal style="background:var(--black); border-radius:16px; padding:36px; margin-top:24px;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--orange); margin-bottom:20px;">Logo Misuse</div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:20px; text-align:center;">
+          <div style="font-size:22px; color:var(--orange); font-weight:700; margin-bottom:8px; font-family:var(--serif); text-decoration:line-through; text-decoration-color:var(--red);">Crew Hub</div>
+          <div style="font-size:11px; color:rgba(255,255,255,0.4); line-height:1.5;">No standalone Crew Hub logo without the Accrue wordmark</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:20px; text-align:center;">
+          <div style="font-size:22px; color:#8B5CF6; font-weight:700; margin-bottom:8px; text-decoration:line-through; text-decoration-color:var(--red);">Accrue</div>
+          <div style="font-size:11px; color:rgba(255,255,255,0.4); line-height:1.5;">Never recolour the wordmark to non-brand colours</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:20px; text-align:center;">
+          <div style="font-size:22px; color:var(--white); font-weight:700; margin-bottom:8px; transform:scaleX(1.4); display:inline-block; text-decoration:line-through; text-decoration-color:var(--red);">Accrue</div>
+          <div style="font-size:11px; color:rgba(255,255,255,0.4); line-height:1.5;">Never stretch or distort the letterforms</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CHAPTER 6: COMPONENTS -->
+<section id="components" style="background:var(--cream);">
+  <div class="chapter">
+    <div class="ch-opener">
+      <div class="ch-n" data-reveal>06</div>
+      <div data-reveal data-delay="1">
+        <div class="ch-label">UI Components</div>
+        <h2 class="ch-title">The building<br><em>blocks.</em></h2>
+        <p class="ch-intro">These are the recurring interface elements. Consistent use of these patterns is what makes Crew Hub feel like one coherent system, not a collection of screens built by different people on different days.</p>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="component-section" data-reveal>
+      <div class="comp-label">Buttons</div>
+      <div class="buttons-showcase">
+        <button class="btn btn-primary">Approve Request</button>
+        <button class="btn btn-cta">Send Offer</button>
+        <button class="btn btn-ghost">View Details</button>
+        <button class="btn btn-danger">Decline</button>
+        <button class="btn btn-disabled" disabled>Unavailable</button>
+        <button class="btn btn-primary btn-sm">Save</button>
+        <button class="btn btn-ghost btn-sm">Cancel</button>
+      </div>
+      <table class="btn-spec-table">
+        <tr><th>Button</th><th>Background</th><th>Text</th><th>Use for</th></tr>
+        <tr><td>Primary</td><td>#000000 Black</td><td>#FFFFFF White</td><td>Main action per section (approve, save, submit)</td></tr>
+        <tr><td>CTA</td><td>#FD8B05 Orange</td><td>#FFFFFF White</td><td>One per page. The most important action.</td></tr>
+        <tr><td>Ghost</td><td>Transparent</td><td>#000000 Black</td><td>Secondary actions that should not compete</td></tr>
+        <tr><td>Danger</td><td>Red tint</td><td>#C0392B Red</td><td>Destructive or irreversible actions only</td></tr>
+        <tr><td>Disabled</td><td>#F0EBE1 Dust</td><td>#727272 Gray 2</td><td>Unavailable until conditions are met</td></tr>
+      </table>
+    </div>
+
+    <!-- Cards -->
+    <div class="component-section" data-reveal>
+      <div class="comp-label">Cards</div>
+      <div class="cards-showcase">
+        <div class="demo-card">
+          <div class="demo-card-label">Leave Request</div>
+          <div class="demo-card-title">Annual Leave</div>
+          <div class="demo-card-body">15 days requested. 10 days remaining in balance. Covering 14 July through 28 July.</div>
+          <div class="demo-card-footer">
+            <span class="status-chip" style="background:#FEF6E4; color:#D97706; font-size:11px; padding:3px 10px; border-radius:100px; font-weight:600;">Pending</span>
+            <button class="btn btn-primary btn-sm">Review</button>
+          </div>
+        </div>
+        <div class="demo-card">
+          <div class="demo-card-label">Team Overview</div>
+          <div class="demo-card-title">Active Crew</div>
+          <div class="demo-card-body">Distributed across Nigeria, Ghana, Kenya, South Africa, and Canada.</div>
+          <div class="demo-card-footer">
+            <span class="demo-card-meta">As of today</span>
+            <span class="demo-card-stat">24</span>
+          </div>
+        </div>
+        <div class="demo-card">
+          <div class="demo-card-label">Document</div>
+          <div class="demo-card-title">Employment Contract</div>
+          <div class="demo-card-body">Signed and countersigned. Effective date 1 March 2026. Three-year term.</div>
+          <div class="demo-card-footer">
+            <span class="status-chip" style="background:#E8F4EE; color:#2D6A4F; font-size:11px; padding:3px 10px; border-radius:100px; font-weight:600;">Approved</span>
+            <button class="btn btn-ghost btn-sm">Open</button>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--white); border:1px solid var(--border); border-radius:10px; padding:20px; display:grid; grid-template-columns:repeat(4,1fr); gap:16px;">
+        <div><div class="ts-label" style="margin-bottom:6px;">Background</div><div style="font-size:13px; color:var(--gray1);">#FFFFFF White</div></div>
+        <div><div class="ts-label" style="margin-bottom:6px;">Border</div><div style="font-size:13px; color:var(--gray1);">#E8DFD0 1px solid</div></div>
+        <div><div class="ts-label" style="margin-bottom:6px;">Radius</div><div style="font-size:13px; color:var(--gray1);">12px</div></div>
+        <div><div class="ts-label" style="margin-bottom:6px;">Padding</div><div style="font-size:13px; color:var(--gray1);">24px</div></div>
+      </div>
+    </div>
+
+    <!-- Forms -->
+    <div class="component-section" data-reveal>
+      <div class="comp-label">Form Fields</div>
+      <div class="form-showcase">
+        <div class="field-group">
+          <label class="field-label">Full name <span class="required">*</span></label>
+          <input class="field-input" type="text" placeholder="Ada Okoye" />
+          <span class="field-hint">As it appears on your official documents</span>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Department</label>
+          <input class="field-input" type="text" placeholder="Engineering" />
+          <span class="field-hint">Select or type your team</span>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Start date <span class="required">*</span></label>
+          <input class="field-input error-state" type="text" value="33 February 2026" />
+          <span class="field-error">That date does not exist. Check and try again.</span>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Email address <span class="required">*</span></label>
+          <input class="field-input success-state" type="text" value="ada@useaccrue.com" />
+          <span class="field-success">Looks good.</span>
+        </div>
+      </div>
+      <div style="background:var(--white); border:1px solid var(--border); border-radius:10px; padding:20px; display:grid; grid-template-columns:repeat(4,1fr); gap:16px;">
+        <div><div class="ts-label" style="margin-bottom:6px;">Focus border</div><div style="font-size:13px; color:var(--gray1);">#FD8B05 Orange</div></div>
+        <div><div class="ts-label" style="margin-bottom:6px;">Error border</div><div style="font-size:13px; color:var(--gray1);">#C0392B Red</div></div>
+        <div><div class="ts-label" style="margin-bottom:6px;">Success border</div><div style="font-size:13px; color:var(--gray1);">#2D6A4F Sage</div></div>
+        <div><div class="ts-label" style="margin-bottom:6px;">Required mark</div><div style="font-size:13px; color:var(--gray1);">* in Orange</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CHAPTER 7: DO / DON'T -->
+<section id="rules" style="background:var(--white);">
+  <div class="chapter">
+    <div class="ch-opener">
+      <div class="ch-n" data-reveal>07</div>
+      <div data-reveal data-delay="1">
+        <div class="ch-label">Do's &amp; Don'ts</div>
+        <h2 class="ch-title">The rules,<br><em>shown.</em></h2>
+        <p class="ch-intro">Every rule here exists because someone will eventually face the situation. These are not restrictions. They are the places where thinking has already been done so the team does not have to do it again.</p>
+      </div>
+    </div>
+
+    <div style="font-size:13px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--gray2); margin-bottom:20px;" data-reveal>Colour Usage</div>
+    <div class="dds" data-reveal>
+      <div class="dd-panel dd-do">
+        <div class="dd-header">Do</div>
+        <div class="dd-body">
+          <div class="dd-example">Use Orange for the primary CTA and let it stand alone.</div>
+          <div class="dd-rationale">Orange earns its power through scarcity. One anchor per screen creates hierarchy. Multiple oranges create noise.</div>
+        </div>
+      </div>
+      <div class="dd-panel dd-dont">
+        <div class="dd-header">Don't</div>
+        <div class="dd-body">
+          <div class="dd-example">Use orange for buttons, headings, borders, AND highlights on the same screen.</div>
+          <div class="dd-rationale">When everything shouts, nothing is heard. Orange used carelessly becomes background noise.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:13px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--gray2); margin-bottom:20px; margin-top:40px;" data-reveal>Typography</div>
+    <div class="dds" data-reveal>
+      <div class="dd-panel dd-do">
+        <div class="dd-header">Do</div>
+        <div class="dd-body">
+          <div class="dd-example">Use serif for page titles and key moments. Use sans for UI elements and body text.</div>
+          <div class="dd-rationale">The contrast between the two typefaces creates visual hierarchy. Each has its domain. Respect it.</div>
+        </div>
+      </div>
+      <div class="dd-panel dd-dont">
+        <div class="dd-header">Don't</div>
+        <div class="dd-body">
+          <div class="dd-example">Mix both typefaces within the same UI component, or use serif for form labels.</div>
+          <div class="dd-rationale">Typeface mixing within a single element creates visual noise and signals disorder, not creativity.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:13px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--gray2); margin-bottom:20px; margin-top:40px;" data-reveal>Voice</div>
+    <div class="dds" data-reveal>
+      <div class="dd-panel dd-do">
+        <div class="dd-header">Do</div>
+        <div class="dd-body">
+          <div class="dd-example">Your leave request has been approved. 10 days will be added back to your balance.</div>
+          <div class="dd-rationale">Crew-first. Clear. Tells the person what happened AND what it means for them. That is useful communication.</div>
+        </div>
+      </div>
+      <div class="dd-panel dd-dont">
+        <div class="dd-header">Don't</div>
+        <div class="dd-body">
+          <div class="dd-example">The leave management system has successfully processed your leave application request and updated your records accordingly.</div>
+          <div class="dd-rationale">System-first. Passive. The tool is talking about itself. Cut the preamble. Say the thing.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:13px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--gray2); margin-bottom:20px; margin-top:40px;" data-reveal>Layout</div>
+    <div class="dds" data-reveal>
+      <div class="dd-panel dd-do">
+        <div class="dd-header">Do</div>
+        <div class="dd-body">
+          <div class="dd-example">Use white space deliberately. Let cards breathe on the Cream canvas. Groups of related items should cluster; unrelated items should have room between them.</div>
+          <div class="dd-rationale">Generous spacing communicates that content is organised and that the team behind the tool cares about clarity.</div>
+        </div>
+      </div>
+      <div class="dd-panel dd-dont">
+        <div class="dd-header">Don't</div>
+        <div class="dd-body">
+          <div class="dd-example">Pack every available pixel with content. Add more cards to a dashboard just because there is space. Fill silence with noise.</div>
+          <div class="dd-rationale">A crowded layout communicates urgency and disorder. Crew Hub should feel calm and in control at all times.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- AGENT SECTION -->
+<section id="agents" class="agent-section">
+  <div class="agent-inner">
+    <div class="agent-label" data-reveal>For AI Agents</div>
+    <h2 class="agent-headline" data-reveal data-delay="1">This guide is your brief.</h2>
+    <p class="agent-subhead" data-reveal data-delay="2">Any AI agent working on Crew Hub interfaces, copy, communications, or documentation must follow this guide. This section is the canonical reference for agents. Internalize it. Apply it. Every output that carries the Crew Hub name should be indistinguishable from something built by a designer who has lived in this system.</p>
+
+    <div class="agent-rules" data-reveal data-delay="3">
+      <div class="agent-rule">
+        <h4>Colour</h4>
+        <p>Default canvas is <code>#FFFAF3</code> Cream. Orange <code>#FD8B05</code> appears once per screen as the primary CTA, never more. Status colours are restricted to their chip contexts. Do not introduce colours outside this system.</p>
+      </div>
+      <div class="agent-rule">
+        <h4>Typography</h4>
+        <p>Headlines and openers use Playfair Display. All UI, labels, body, and buttons use DM Sans. Body text minimum is 13px. Labels are always uppercase, tracked. Never mix typefaces within a single element.</p>
+      </div>
+      <div class="agent-rule">
+        <h4>Voice</h4>
+        <p>Crew-first language always. Use "crew" not "staff". Use "send a request" not "submit a ticket". Cut corporate hedging. No em dashes. Sentences are shorter than you think they need to be. Say the thing.</p>
+      </div>
+      <div class="agent-rule">
+        <h4>Components</h4>
+        <p>Buttons: Primary is Black, CTA is Orange (one per screen). Cards: White on Cream, 1px <code>#E8DFD0</code> border, 12px radius. Form focus: Orange border. Required fields: asterisk in Orange.</p>
+      </div>
+      <div class="agent-rule">
+        <h4>Spacing</h4>
+        <p>Never crowd elements. Cards have 24px internal padding. Groups of related items sit 16px apart. Unrelated sections have at least 48px between them. White space is not wasted space. It is how Crew Hub breathes.</p>
+      </div>
+      <div class="agent-rule">
+        <h4>Extension colours</h4>
+        <p>Navy <code>#1A2B3C</code> is for navigation and admin states only. Sage <code>#2D6A4F</code> is for approval and success states only. Neither appears as a general brand colour. Do not expand their usage without explicit instruction.</p>
+      </div>
+    </div>
+
+    <div class="agent-checklist" data-reveal>
+      <h4>Pre-output Checklist for Agents</h4>
+      <div class="check-item">Canvas is Cream (#FFFAF3). White surfaces sit on it. Not the other way around.</div>
+      <div class="check-item">Orange appears once as the primary CTA. Not twice. Not as a text colour in body copy.</div>
+      <div class="check-item">Serif typeface is used for headlines only, not UI labels, buttons, or body text.</div>
+      <div class="check-item">Language is crew-first. The person is the subject, not the system.</div>
+      <div class="check-item">No em dashes appear anywhere in the output.</div>
+      <div class="check-item">No corporate jargon: no "leverage", no "synergize", no "please be advised".</div>
+      <div class="check-item">Status colours are only used within chip components, paired with their designated tint background.</div>
+      <div class="check-item">Every button is labelled with a verb that tells the person what will happen when they click it.</div>
+      <div class="check-item">Spacing is generous. If it feels crowded, remove something rather than shrinking it.</div>
+      <div class="check-item">The Accrue wordmark is never used without the Crew Hub sub-label in this context.</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CLOSING -->
+<div class="closing">
+  <div class="closing-inner">
+    <div class="closing-small" data-reveal>Closing</div>
+    <h2 class="closing-headline" data-reveal data-delay="1">
+      The crew<br>
+      <em>notices.</em>
+    </h2>
+    <p class="closing-body" data-reveal data-delay="2">
+      Every time this brand is applied consistently, it earns trust. Every shortcut taken, every colour introduced without reason, every button labelled with a vague word instead of a clear verb, <strong>costs trust.</strong> The people using Crew Hub are the same people building the product that hundreds of thousands of Africans depend on. They deserve tools that reflect that seriousness. This guide exists so no one has to guess what serious looks like.
+    </p>
+    <div class="closing-rule" data-reveal data-delay="3"></div>
+    <div class="closing-credits" data-reveal data-delay="4">
+      <div class="credit-item">
+        <label>Parent Brand</label>
+        <span>Accrue</span>
+      </div>
+      <div class="credit-item">
+        <label>Internal Platform</label>
+        <span>Crew Hub</span>
+      </div>
+      <div class="credit-item">
+        <label>Version</label>
+        <span>1.0</span>
+      </div>
+      <div class="credit-item">
+        <label>Status</label>
+        <span>Active</span>
+      </div>
+      <div class="credit-item">
+        <label>Reference</label>
+        <span>Accrue_Brand_Guideline.pdf</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// ── SCROLL REVEAL ───────────────────────────────────────────────
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el));
+
+// ── NAV ACTIVE STATE ─────────────────────────────────────────────
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav-links a');
+
+const sectionObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(a => {
+        a.style.color = a.getAttribute('href') === '#' + e.target.id
+          ? 'var(--orange)' : '';
+      });
+    }
+  });
+}, { threshold: 0.4 });
+
+sections.forEach(s => sectionObserver.observe(s));
+
+// ── SMOOTH FORM DEMO ─────────────────────────────────────────────
+document.querySelectorAll('.field-input').forEach(input => {
+  input.addEventListener('focus', () => {
+    if (!input.classList.contains('error-state') && !input.classList.contains('success-state')) {
+      input.style.borderColor = 'var(--orange)';
+    }
+  });
+  input.addEventListener('blur', () => {
+    if (!input.classList.contains('error-state') && !input.classList.contains('success-state')) {
+      input.style.borderColor = 'var(--border)';
+    }
+  });
+});
+</script>
+
+</body>
+</html>

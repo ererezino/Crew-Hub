@@ -101,8 +101,6 @@ export function NotificationsClient() {
         <EmptyState
           title="No notifications yet"
           description="New activity from workflows and approvals will appear here."
-          ctaLabel="Open dashboard"
-          ctaHref="/dashboard"
         />
       ) : null}
 

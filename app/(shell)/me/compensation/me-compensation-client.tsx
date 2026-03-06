@@ -22,8 +22,6 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
           <EmptyState
             title="Compensation is unavailable"
             description={compensationQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -41,8 +39,6 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
         <EmptyState
           title="No compensation profile found"
           description="Compensation details will appear here after records are configured."
-          ctaLabel="Go to dashboard"
-          ctaHref="/dashboard"
         />
       ) : null}
 

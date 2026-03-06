@@ -539,8 +539,6 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
         <EmptyState
           title="Scheduling management is unavailable"
           description={schedulesQuery.errorMessage ?? shiftsQuery.errorMessage ?? "Unable to load scheduling management data."}
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </section>
     );

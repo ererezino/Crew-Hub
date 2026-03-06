@@ -159,8 +159,7 @@ export default function LoginPage() {
     <main className="standalone-page auth-page">
       <section className="standalone-card auth-card" aria-label="Crew Hub login form">
         <header className="auth-card-header">
-          <h1 className="page-title">Crew Hub</h1>
-          <p className="page-description">Sign in to continue to your workspace.</p>
+          <h1 className="page-title text-h1">Crew Hub</h1>
         </header>
 
         <form className="auth-form" noValidate onSubmit={handleSubmit}>
@@ -214,7 +213,7 @@ export default function LoginPage() {
             </p>
           ) : null}
 
-          <button type="submit" className="button button-accent auth-submit" disabled={isSubmitting}>
+          <button type="submit" className="button button-cta auth-submit" disabled={isSubmitting}>
             {isSubmitting ? "Signing in..." : "Sign in"}
           </button>
         </form>

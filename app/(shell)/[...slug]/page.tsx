@@ -27,8 +27,6 @@ export default async function PlaceholderPage({ params }: PlaceholderPageProps) 
       <EmptyState
         title="Coming soon"
         description={`The ${routeName.toLowerCase()} module is under development. Check back later.`}
-        ctaLabel="Go to dashboard"
-        ctaHref="/dashboard"
       />
     </>
   );

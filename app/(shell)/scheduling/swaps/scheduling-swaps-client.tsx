@@ -196,8 +196,6 @@ export function SchedulingSwapsClient({
           <EmptyState
             title="Shift swaps are unavailable"
             description={swapsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"

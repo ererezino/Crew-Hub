@@ -106,8 +106,6 @@ export function TeamHubClient({ isAdmin }: TeamHubClientProps) {
         <EmptyState
           title="No team hubs available"
           description="You don't have access to any team hubs yet. Contact your administrator for access."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

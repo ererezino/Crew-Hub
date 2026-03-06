@@ -404,8 +404,6 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
           <EmptyState
             title="Payment details are unavailable"
             description={paymentDetailsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -465,8 +463,6 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
             <EmptyState
               title="No payment details on file"
               description="Add your payout destination below. Changes are held for 48 hours before activation."
-              ctaLabel="Go to dashboard"
-              ctaHref="/dashboard"
             />
           )}
 

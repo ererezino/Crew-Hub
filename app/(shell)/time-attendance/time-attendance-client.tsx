@@ -67,8 +67,6 @@ export function TimeAttendanceClient() {
           <EmptyState
             title="Attendance data is unavailable"
             description={overviewQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -171,8 +169,6 @@ export function TimeAttendanceClient() {
               <EmptyState
                 title="No time entries yet"
                 description="Clock-ins will appear here after attendance tracking starts."
-                ctaLabel="Back to dashboard"
-                ctaHref="/dashboard"
               />
             ) : (
               <div className="data-table-container">

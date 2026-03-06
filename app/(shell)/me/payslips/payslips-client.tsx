@@ -250,8 +250,6 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
           <EmptyState
             title="Payments are unavailable"
             description={payslipsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -305,8 +303,6 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
         <EmptyState
           title="No payment statements yet."
           description="Payment statements will appear here once payroll statements are generated."
-          ctaLabel="Open dashboard"
-          ctaHref="/dashboard"
         />
       ) : null}
 

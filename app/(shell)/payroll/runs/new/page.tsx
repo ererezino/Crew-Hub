@@ -47,8 +47,6 @@ export default async function PayrollRunCreatePage() {
         <EmptyState
           title="Access denied"
           description="Only HR Admin, Finance Admin, and Super Admin can view payroll modules."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

@@ -585,8 +585,6 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
               icon={<FileText size={32} />}
               title="No documents here"
               description="Try another filter or upload a document to populate this list."
-              ctaLabel="Go to dashboard"
-              ctaHref="/dashboard"
             />
           ) : null}
 
@@ -745,8 +743,6 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
             <EmptyState
               title="No travel letter requests"
               description="Request a travel support letter for your next trip. Letters are signed by a co-founder."
-              ctaLabel="Go to dashboard"
-              ctaHref="/dashboard"
             />
           ) : null}
 

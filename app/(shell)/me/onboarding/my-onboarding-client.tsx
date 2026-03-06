@@ -96,8 +96,6 @@ export function MyOnboardingClient() {
         <EmptyState
           title="No onboarding instance assigned"
           description="Your onboarding checklist appears here once your manager or HR assigns it."
-          ctaLabel="Open dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );
@@ -177,8 +175,6 @@ export function MyOnboardingClient() {
             <EmptyState
               title="No tasks assigned yet"
               description="Tasks assigned to this onboarding instance will appear here."
-              ctaLabel="Open dashboard"
-              ctaHref="/dashboard"
             />
           ) : (
             <section className="my-onboarding-task-list">

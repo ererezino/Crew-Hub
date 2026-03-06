@@ -765,8 +765,6 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           <EmptyState
             title="No leave balances available"
             description="Leave balances appear here once policies and allocations are configured."
-            ctaLabel="Open dashboard"
-            ctaHref="/dashboard"
           />
         ) : (
           summaryQuery.data.balances.map((balance) => {

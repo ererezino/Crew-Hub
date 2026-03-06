@@ -457,8 +457,6 @@ export function AnnouncementsClient({
             icon={<Megaphone size={32} />}
             title="No announcements yet"
             description="Announcements will appear here once updates are published for your team."
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           {canManageAnnouncements ? (
             <button type="button" className="button button-accent" onClick={openCreatePanel}>

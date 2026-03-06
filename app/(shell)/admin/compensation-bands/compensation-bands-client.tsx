@@ -620,8 +620,6 @@ export function CompensationBandsClient() {
           <EmptyState
             title="Compensation bands are unavailable"
             description={bandsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button type="button" className="button button-accent" onClick={() => bandsQuery.refresh()}>
             Retry
@@ -753,8 +751,6 @@ export function CompensationBandsClient() {
                 <EmptyState
                   title="No compensation bands"
                   description="Create your first compensation band to begin benchmarking and pay equity reviews."
-                  ctaLabel="Back to dashboard"
-                  ctaHref="/dashboard"
                 />
                 <button type="button" className="button button-accent" onClick={handleOpenCreateBand}>
                   Create band
@@ -872,8 +868,6 @@ export function CompensationBandsClient() {
                 <EmptyState
                   title="No benchmark data"
                   description="Add external benchmark records to compare your bands with market pay data."
-                  ctaLabel="Back to dashboard"
-                  ctaHref="/dashboard"
                 />
                 <button
                   type="button"
@@ -969,8 +963,6 @@ export function CompensationBandsClient() {
                 <EmptyState
                   title="No assignments"
                   description="Assign employees to bands to enable compa-ratio and out-of-band alerts."
-                  ctaLabel="Back to dashboard"
-                  ctaHref="/dashboard"
                 />
                 <button
                   type="button"

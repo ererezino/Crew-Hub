@@ -107,8 +107,6 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
           <EmptyState
             title="Learning data is unavailable"
             description={errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"

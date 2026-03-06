@@ -140,7 +140,6 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
           <EmptyState
             title="Approvals are unavailable"
             description={approvalsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
             ctaHref={embedded ? "/approvals?tab=timesheets" : "/dashboard"}
           />
           <button

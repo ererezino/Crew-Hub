@@ -692,10 +692,9 @@ export function OnboardingClient({
               <EmptyState
                 title={`No ${activeTab} onboarding instances`}
                 description="When onboarding records are created, they will appear in this table."
-                ctaLabel={canManageOnboarding ? "Start onboarding" : "Open dashboard"}
                 {...(canManageOnboarding
-                  ? { onCtaClick: () => setIsStartPanelOpen(true) }
-                  : { ctaHref: "/dashboard" })}
+                  ? { ctaLabel: "Start onboarding", onCtaClick: () => setIsStartPanelOpen(true) }
+                  : {})}
               />
             </section>
           ) : null}
@@ -917,8 +916,9 @@ export function OnboardingClient({
               <EmptyState
                 title="No onboarding templates"
                 description="Template records will appear here once created."
-                ctaLabel={canManageOnboarding ? "Create template" : "Open dashboard"}
-                ctaHref={canManageOnboarding ? "/onboarding" : "/dashboard"}
+                {...(canManageOnboarding
+                  ? { ctaLabel: "Create template", ctaHref: "/onboarding" }
+                  : {})}
               />
               {canManageOnboarding ? (
                 <button

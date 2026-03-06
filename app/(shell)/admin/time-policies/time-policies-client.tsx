@@ -51,8 +51,6 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
           <EmptyState
             title="Time policies are unavailable"
             description={policiesQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -68,8 +66,6 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
         <EmptyState
           title="No policies configured"
           description="Create an attendance policy to enforce breaks and overtime rules."
-          ctaLabel="Open Hours"
-          ctaHref="/time-attendance"
         />
       ) : null}
 

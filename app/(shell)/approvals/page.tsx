@@ -32,8 +32,6 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
         <EmptyState
           title="Profile is unavailable"
           description="No profile is linked to this account yet."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );
@@ -66,8 +64,6 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
         <EmptyState
           title="Approvals are restricted"
           description="Only team leads, managers, and admins can process approvals."
-          ctaLabel="Open dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );

@@ -24,8 +24,6 @@ export default async function SectionPage({ params }: SectionPageProps) {
         <EmptyState
           title="Profile is unavailable"
           description="No profile is linked to this account yet."
-          ctaLabel="Back to dashboard"
-          ctaHref="/dashboard"
         />
       </>
     );
