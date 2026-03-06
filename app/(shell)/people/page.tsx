@@ -15,7 +15,7 @@ function resolveScope(roles: readonly UserRole[]): PeopleScope {
     return "all";
   }
 
-  if (hasRole(roles, "MANAGER")) {
+  if (hasRole(roles, "MANAGER") || hasRole(roles, "TEAM_LEAD")) {
     return "reports";
   }
 

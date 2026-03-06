@@ -32,6 +32,7 @@ import type {
   TravelSupportRequest,
   TravelSupportUpdateResponse
 } from "../../../../types/travel-support";
+import { humanizeError } from "@/lib/errors";
 
 type MyDocumentsClientProps = {
   currentUserId: string;
@@ -219,7 +220,8 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   };
 
-  const showToast = (variant: ToastVariant, message: string) => {
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
 
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);

@@ -16,6 +16,7 @@ import {
   todayIsoDate
 } from "../../../../lib/datetime";
 import { type CompensationBandLocationType } from "../../../../types/compensation-bands";
+import { humanizeError } from "@/lib/errors";
 
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -360,7 +361,8 @@ export function CompensationBandsClient() {
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const showToast = (variant: ToastVariant, message: string) => {
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
 
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);

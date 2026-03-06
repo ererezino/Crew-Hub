@@ -22,6 +22,7 @@ import {
   type PeopleCreateResponse,
   type ProfileStatus
 } from "../../../types/people";
+import { humanizeError } from "@/lib/errors";
 
 type PeopleScope = "all" | "reports" | "me";
 type SortDirection = "asc" | "desc";
@@ -324,7 +325,7 @@ export function PeopleClient({
       if (!response.ok || !payload.data?.person) {
         setCreateErrors((currentErrors) => ({
           ...currentErrors,
-          form: payload.error?.message ?? "Unable to create person."
+          form: humanizeError(payload.error?.message ?? "Unable to create person.")
         }));
         return;
       }

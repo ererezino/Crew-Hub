@@ -133,7 +133,7 @@ function canViewAllPeople(userRoles: readonly UserRole[]): boolean {
 }
 
 function canViewReports(userRoles: readonly UserRole[]): boolean {
-  return hasRole(userRoles, "MANAGER") || canViewAllPeople(userRoles);
+  return hasRole(userRoles, "MANAGER") || hasRole(userRoles, "TEAM_LEAD") || canViewAllPeople(userRoles);
 }
 
 function normalizeRoles(values: readonly string[]): AppRole[] {
@@ -246,31 +246,58 @@ export async function GET(request: Request) {
 
   let reportsUserIds: string[] = [];
 
-  if (scope === "reports" && hasRole(profile.roles, "MANAGER")) {
-    const { data: reportRows, error: reportError } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("org_id", profile.org_id)
-      .is("deleted_at", null)
-      .eq("manager_id", profile.id);
+  if (scope === "reports") {
+    if (hasRole(profile.roles, "MANAGER")) {
+      const { data: reportRows, error: reportError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("org_id", profile.org_id)
+        .is("deleted_at", null)
+        .eq("manager_id", profile.id);
 
-    if (reportError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "REPORTS_FETCH_FAILED",
-          message: "Unable to load manager reports."
-        },
-        meta: buildMeta()
-      });
+      if (reportError) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "REPORTS_FETCH_FAILED",
+            message: "Unable to load manager reports."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      reportsUserIds = [
+        profile.id,
+        ...(reportRows ?? [])
+          .map((row) => row.id)
+          .filter((value): value is string => typeof value === "string")
+      ];
+    } else if (hasRole(profile.roles, "TEAM_LEAD") && profile.department) {
+      const { data: deptRows, error: deptError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("org_id", profile.org_id)
+        .is("deleted_at", null)
+        .ilike("department", profile.department);
+
+      if (deptError) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "REPORTS_FETCH_FAILED",
+            message: "Unable to load department members."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      reportsUserIds = [
+        profile.id,
+        ...(deptRows ?? [])
+          .map((row) => row.id)
+          .filter((value): value is string => typeof value === "string")
+      ];
     }
-
-    reportsUserIds = [
-      profile.id,
-      ...(reportRows ?? [])
-        .map((row) => row.id)
-        .filter((value): value is string => typeof value === "string")
-    ];
   }
 
   let peopleQuery = supabase

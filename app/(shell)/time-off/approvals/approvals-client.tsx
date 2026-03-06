@@ -15,6 +15,7 @@ import { formatDays, formatDateRangeHuman, formatDateTimeTooltip, formatRelative
 import { formatLeaveStatus } from "../../../../lib/format-labels";
 import { formatLeaveTypeLabel } from "../../../../lib/time-off";
 import type { LeaveRequestRecord, TimeOffRequestMutationResponse } from "../../../../types/time-off";
+import { humanizeError } from "@/lib/errors";
 
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -97,7 +98,8 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   };
 
-  const showToast = (variant: ToastVariant, message: string) => {
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
 

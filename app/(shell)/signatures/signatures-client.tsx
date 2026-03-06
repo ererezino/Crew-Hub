@@ -27,6 +27,7 @@ import type {
 import type { DocumentSignedUrlResponse } from "../../../types/documents";
 import type { PeopleListResponse } from "../../../types/people";
 import { PenSquare } from "lucide-react";
+import { humanizeError } from "@/lib/errors";
 
 type SignaturesClientProps = {
   currentUserId: string;
@@ -259,7 +260,8 @@ export function SignaturesClient({
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   };
 
-  const showToast = (variant: ToastVariant, message: string) => {
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
 

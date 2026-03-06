@@ -21,6 +21,7 @@ import type {
   AnnouncementMutationResponse,
   AnnouncementReadResponse
 } from "../../../types/announcements";
+import { humanizeError } from "@/lib/errors";
 
 type AnnouncementsClientProps = {
   canManageAnnouncements: boolean;
@@ -265,7 +266,8 @@ export function AnnouncementsClient({
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   };
 
-  const showToast = (variant: ToastVariant, message: string) => {
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
 
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);

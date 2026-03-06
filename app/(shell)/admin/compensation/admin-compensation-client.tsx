@@ -36,6 +36,7 @@ import {
   type CompensationMutationResponse,
   type EquityGrantRecord
 } from "../../../../types/compensation";
+import { humanizeError } from "@/lib/errors";
 
 type ToastVariant = "success" | "error" | "info";
 type SortDirection = "asc" | "desc";
@@ -510,7 +511,8 @@ export function AdminCompensationClient({
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   };
 
-  const showToast = (variant: ToastVariant, message: string) => {
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
 
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);

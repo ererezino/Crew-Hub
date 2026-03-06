@@ -34,6 +34,7 @@ import type {
   ExpenseRecord,
   UpdateExpenseResponse
 } from "../../../../types/expenses";
+import { humanizeError } from "@/lib/errors";
 
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -217,7 +218,8 @@ export function ExpenseApprovalsClient({
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
   };
 
-  const showToast = (variant: ToastVariant, message: string) => {
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
     setToasts((current) => [...current, { id: toastId, variant, message }]);
 

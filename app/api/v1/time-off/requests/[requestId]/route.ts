@@ -8,6 +8,7 @@ import { createNotification } from "../../../../../../lib/notifications/service"
 import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
 import { formatLeaveTypeLabel, parseNumeric } from "../../../../../../lib/time-off";
+import { humanizeError } from "../../../../../../lib/errors";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
@@ -366,6 +367,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     nextApproverId = isOverrideUser && !isEmployeeOwner ? session.profile.id : existingRequest.approver_id;
     nextRejectionReason = null;
   } else if (parsedBody.data.action === "approve" || parsedBody.data.action === "reject") {
+    if (isEmployeeOwner) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "You cannot approve your own leave request. It must be approved by your manager or HR."
+        },
+        meta: buildMeta()
+      });
+    }
+
     if (!(isOverrideUser || (isApproverUser && isManagerOfEmployee))) {
       return jsonResponse<null>(403, {
         data: null,
@@ -416,7 +428,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         data: null,
         error: {
           code: "REQUEST_UPDATE_FAILED",
-          message: `Unable to ${parsedBody.data.action} leave request: ${rpcError.message}`
+          message: humanizeError(rpcError.message)
         },
         meta: buildMeta()
       });

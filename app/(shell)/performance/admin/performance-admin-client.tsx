@@ -33,6 +33,7 @@ import type {
   ReviewSectionDefinition,
   ShareReviewResponse
 } from "../../../../types/performance";
+import { humanizeError } from "@/lib/errors";
 
 type AdminTab = "admin" | "calibration";
 type SortDirection = "asc" | "desc";
@@ -478,7 +479,8 @@ export function AdminPerformanceClient() {
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   };
 
-  const showToast = (variant: ToastVariant, message: string) => {
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
 

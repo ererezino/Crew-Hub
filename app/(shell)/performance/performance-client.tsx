@@ -36,6 +36,7 @@ import type {
   SaveReviewResponsePayload,
   ShareReviewResponse
 } from "../../../types/performance";
+import { humanizeError } from "@/lib/errors";
 
 type OverviewTab = "reviews" | "goals";
 type SortDirection = "asc" | "desc";
@@ -925,7 +926,8 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   }, []);
 
-  const showToast = useCallback((variant: ToastVariant, message: string) => {
+  const showToast = useCallback((variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
 
