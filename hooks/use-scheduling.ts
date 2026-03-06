@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
@@ -68,6 +68,16 @@ function useDataFetch<TPayload, TData>({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const extractorRef = useRef(extractor);
+  const emptyDataRef = useRef(emptyData);
+
+  useEffect(() => {
+    extractorRef.current = extractor;
+  }, [extractor]);
+
+  useEffect(() => {
+    emptyDataRef.current = emptyData;
+  }, [emptyData]);
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -79,10 +89,10 @@ function useDataFetch<TPayload, TData>({
       try {
         const response = await fetchWithRetry(endpoint, abortController.signal);
         const payload = (await response.json()) as TPayload;
-        const extracted = extractor(payload);
+        const extracted = extractorRef.current(payload);
 
         if (!response.ok || !extracted) {
-          setData(emptyData);
+          setData(emptyDataRef.current);
           setErrorMessage("Unable to load scheduling data.");
           return;
         }
@@ -93,7 +103,7 @@ function useDataFetch<TPayload, TData>({
           return;
         }
 
-        setData(emptyData);
+        setData(emptyDataRef.current);
         setErrorMessage(error instanceof Error ? error.message : "Unable to load scheduling data.");
       } finally {
         if (!abortController.signal.aborted) {
@@ -107,7 +117,7 @@ function useDataFetch<TPayload, TData>({
     return () => {
       abortController.abort();
     };
-  }, [emptyData, endpoint, extractor, reloadToken]);
+  }, [endpoint, reloadToken]);
 
   const refresh = useCallback(() => {
     setReloadToken((currentValue) => currentValue + 1);

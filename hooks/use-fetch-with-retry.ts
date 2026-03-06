@@ -2,6 +2,19 @@
 
 const RETRY_DELAY_MS = 2000;
 const MAX_RETRY_COUNT = 1;
+const REQUEST_TIMEOUT_MS = 15000;
+
+function isRetriableError(error: unknown): boolean {
+  if (error instanceof TypeError) {
+    return true;
+  }
+
+  if (error instanceof Error && error.message.startsWith("Request timed out")) {
+    return true;
+  }
+
+  return false;
+}
 
 /**
  * Fetch with automatic retry on network failures.
@@ -18,15 +31,34 @@ export async function fetchWithRetry(
   signal: AbortSignal,
   retryCount = 0
 ): Promise<Response> {
+  const requestAbortController = new AbortController();
+  let timedOut = false;
+
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    requestAbortController.abort();
+  }, REQUEST_TIMEOUT_MS);
+
+  const onAbort = () => {
+    requestAbortController.abort();
+  };
+
+  signal.addEventListener("abort", onAbort, { once: true });
+
   try {
-    return await fetch(endpoint, { method: "GET", signal });
+    return await fetch(endpoint, { method: "GET", signal: requestAbortController.signal });
   } catch (error) {
     if (signal.aborted) {
       throw error;
     }
 
+    const normalizedError =
+      timedOut && error instanceof DOMException && error.name === "AbortError"
+        ? new Error(`Request timed out after ${Math.floor(REQUEST_TIMEOUT_MS / 1000)}s.`)
+        : error;
+
     // Only retry on network errors (TypeError from fetch), not other failures
-    if (error instanceof TypeError && retryCount < MAX_RETRY_COUNT) {
+    if (isRetriableError(normalizedError) && retryCount < MAX_RETRY_COUNT) {
       await new Promise<void>((resolve) => {
         const timeoutId = setTimeout(resolve, RETRY_DELAY_MS);
 
@@ -46,6 +78,9 @@ export async function fetchWithRetry(
       return fetchWithRetry(endpoint, signal, retryCount + 1);
     }
 
-    throw error;
+    throw normalizedError;
+  } finally {
+    clearTimeout(timeoutId);
+    signal.removeEventListener("abort", onAbort);
   }
 }

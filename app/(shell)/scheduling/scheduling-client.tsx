@@ -63,6 +63,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
   });
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [currentTime] = useState(() => Date.now());
+  const isInitialLoading = shiftsQuery.isLoading && shiftsQuery.data === null;
 
   const sortedShifts = useMemo(() => {
     const rows = shiftsQuery.data?.shifts ?? [];
@@ -87,15 +88,13 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
         />
       ) : null}
 
-      {(shiftsQuery.isLoading || openShiftsQuery.isLoading || swapsQuery.isLoading) ? schedulingSkeleton() : null}
+      {isInitialLoading ? schedulingSkeleton() : null}
 
       {!shiftsQuery.isLoading && shiftsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Scheduling data is unavailable"
             description={shiftsQuery.errorMessage}
-            ctaLabel="Back to dashboard"
-            ctaHref="/dashboard"
           />
           <button
             type="button"
@@ -108,7 +107,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!shiftsQuery.isLoading && !shiftsQuery.errorMessage ? (
