@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
+import { createBulkNotifications } from "../../../../../../lib/notifications/service";
 import {
   processMockPayment,
   resolvePaymentProvider
@@ -581,6 +582,30 @@ export async function POST(
       orgId: session.profile.org_id,
       payrollRunId: parsedPayrollItem.data.payroll_run_id
     });
+
+    if (runStatus === "completed") {
+      const { data: payrollRowsForRun } = await supabase
+        .from("payroll_items")
+        .select("employee_id")
+        .eq("org_id", session.profile.org_id)
+        .eq("payroll_run_id", parsedPayrollItem.data.payroll_run_id)
+        .is("deleted_at", null);
+
+      const recipientIds = [...new Set((payrollRowsForRun ?? [])
+        .map((row) => row.employee_id)
+        .filter((value): value is string => typeof value === "string"))];
+
+      if (recipientIds.length > 0) {
+        await createBulkNotifications({
+          orgId: session.profile.org_id,
+          userIds: recipientIds,
+          type: "payroll_completed",
+          title: "Payroll completed",
+          body: "Your payroll payment has been processed and marked complete.",
+          link: "/me/pay?tab=payslips"
+        });
+      }
+    }
 
     await logAudit({
       action: "updated",

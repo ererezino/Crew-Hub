@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
+import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import { decideIdempotencyAction } from "../../../../../lib/payments/idempotency";
 import {
   processMockPayment,
@@ -902,6 +903,18 @@ export async function POST(request: Request) {
 
     const completedCount = payments.filter((payment) => payment.status === "completed").length;
     const failedCount = payments.filter((payment) => payment.status === "failed").length;
+
+    if (runStatus === "completed") {
+      const recipientIds = [...new Set(parsedItems.data.map((item) => item.employee_id))];
+      await createBulkNotifications({
+        orgId: session.profile.org_id,
+        userIds: recipientIds,
+        type: "payroll_completed",
+        title: "Payroll completed",
+        body: "Your payroll payment has been processed and marked complete.",
+        link: "/me/pay?tab=payslips"
+      });
+    }
 
     await logAudit({
       action: "created",
