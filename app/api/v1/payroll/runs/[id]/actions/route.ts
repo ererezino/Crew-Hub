@@ -510,31 +510,39 @@ export async function POST(
         parsedUpdated.data.pay_period_end
       );
 
-      const { data: payrollItemRows, error: payrollItemsError } = await supabase
-        .from("payroll_items")
-        .select("employee_id")
+      const { data: adminRows, error: adminRowsError } = await supabase
+        .from("profiles")
+        .select("id, roles")
         .eq("org_id", profile.org_id)
-        .eq("payroll_run_id", runId)
         .is("deleted_at", null);
 
-      if (payrollItemsError) {
-        console.error("Unable to load payroll notification recipients.", {
+      if (adminRowsError) {
+        console.error("Unable to load payroll approval notification recipients.", {
           runId,
-          message: payrollItemsError.message
+          message: adminRowsError.message
         });
       } else {
-        const employeeIds = [...new Set((payrollItemRows ?? [])
-          .map((row) => row.employee_id)
-          .filter((value): value is string => typeof value === "string"))];
+        const adminRecipientIds = [...new Set(
+          (adminRows ?? [])
+            .filter(
+              (row): row is { id: string; roles: string[] } =>
+                typeof row?.id === "string" &&
+                Array.isArray(row?.roles) &&
+                (row.roles.includes("FINANCE_ADMIN") || row.roles.includes("SUPER_ADMIN"))
+            )
+            .map((row) => row.id)
+        )];
 
-        await createBulkNotifications({
-          orgId: profile.org_id,
-          userIds: employeeIds,
-          type: "payroll_approved",
-          title: "Payroll approved",
-          body: `Payroll for ${payPeriodLabel} is approved and payment processing will begin shortly.`,
-          link: "/me/pay?tab=payslips"
-        });
+        if (adminRecipientIds.length > 0) {
+          await createBulkNotifications({
+            orgId: profile.org_id,
+            userIds: adminRecipientIds,
+            type: "payroll_approved",
+            title: "Payroll approved",
+            body: `Payroll for ${payPeriodLabel} has been final-approved and is ready for payment processing.`,
+            link: "/payroll"
+          });
+        }
       }
     }
 

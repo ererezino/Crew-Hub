@@ -910,9 +910,9 @@ export async function POST(request: Request) {
         orgId: session.profile.org_id,
         userIds: recipientIds,
         type: "payroll_completed",
-        title: "Payroll completed",
-        body: "Your payroll payment has been processed and marked complete.",
-        link: "/me/pay?tab=payslips"
+        title: "Payment statement available",
+        body: `Your payment statement for ${payPeriod} is now available.`,
+        link: "/me/pay"
       });
     }
 

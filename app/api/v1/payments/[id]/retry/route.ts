@@ -32,6 +32,7 @@ const payrollItemSchema = z.object({
 
 const payrollRunSchema = z.object({
   id: z.string().uuid(),
+  pay_period_end: z.string(),
   status: z.enum([
     "draft",
     "calculated",
@@ -66,6 +67,10 @@ function parseAmount(value: string | number): number {
   }
 
   return Math.trunc(parsed);
+}
+
+function payPeriodFromDate(payPeriodEnd: string): string {
+  return payPeriodEnd.slice(0, 7);
 }
 
 function isHoldActive(changeEffectiveAt: string): boolean {
@@ -414,7 +419,7 @@ export async function POST(
 
     const { data: runRow, error: actualRunError } = await supabase
       .from("payroll_runs")
-      .select("id, status")
+      .select("id, pay_period_end, status")
       .eq("org_id", session.profile.org_id)
       .eq("id", parsedPayrollItem.data.payroll_run_id)
       .is("deleted_at", null)
@@ -596,13 +601,14 @@ export async function POST(
         .filter((value): value is string => typeof value === "string"))];
 
       if (recipientIds.length > 0) {
+        const payPeriod = payPeriodFromDate(parsedRun.data.pay_period_end);
         await createBulkNotifications({
           orgId: session.profile.org_id,
           userIds: recipientIds,
           type: "payroll_completed",
-          title: "Payroll completed",
-          body: "Your payroll payment has been processed and marked complete.",
-          link: "/me/pay?tab=payslips"
+          title: "Payment statement available",
+          body: `Your payment statement for ${payPeriod} is now available.`,
+          link: "/me/pay"
         });
       }
     }
