@@ -8,6 +8,7 @@ import { useCallback, useState } from "react";
 import { DecisionCard } from "../../../components/dashboard/decision-card";
 import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skeleton";
 import { HealthAlerts } from "../../../components/dashboard/health-alerts";
+import { OnboardingBanner } from "../../../components/dashboard/onboarding-banner";
 import { SetupChecklist } from "../../../components/dashboard/setup-checklist";
 import { WidgetErrorBoundary } from "../../../components/dashboard/widget-error-boundary";
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -92,11 +93,6 @@ function QuickActionsRow({ hasTimePolicy }: { hasTimePolicy: boolean }) {
    ══════════════════════════════════════════════ */
 
 function NewHireGreeting({ data }: { data: DashboardResponseData }) {
-  const progress = data.onboardingProgress;
-  const progressPct = progress && progress.tasksTotal > 0
-    ? Math.round((progress.tasksCompleted / progress.tasksTotal) * 100)
-    : 0;
-
   return (
     <motion.section className="home-welcome-hero" {...fadeIn}>
       <div className="home-welcome-content">
@@ -131,22 +127,6 @@ function NewHireGreeting({ data }: { data: DashboardResponseData }) {
           </div>
         ) : null}
 
-        {progress ? (
-          <div className="dashboard-onboarding-progress">
-            <p className="settings-card-description numeric">
-              Onboarding: {progress.tasksCompleted} of {progress.tasksTotal} tasks complete
-            </p>
-            <div className="onboarding-banner-progress-track" aria-hidden="true">
-              <span
-                className="onboarding-banner-progress-fill"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            <Link href="/me/onboarding" className="button button-accent">
-              View your onboarding checklist
-            </Link>
-          </div>
-        ) : null}
       </div>
     </motion.section>
   );
@@ -993,10 +973,23 @@ function DashboardContent() {
     (data.persona === "super_admin" || data.persona === "hr_admin") &&
     data.healthAlerts &&
     data.healthAlerts.length > 0;
+  const onboardingProgress = data.onboardingProgress;
+  const shouldShowOnboardingBanner = data.persona === "new_hire" && onboardingProgress;
+  const onboardingProgressPercent =
+    onboardingProgress && onboardingProgress.tasksTotal > 0
+      ? Math.round((onboardingProgress.tasksCompleted / onboardingProgress.tasksTotal) * 100)
+      : 0;
 
   return (
     <div className="home-page">
       {data.persona === "super_admin" && <SetupChecklist />}
+      {shouldShowOnboardingBanner ? (
+        <OnboardingBanner
+          progressPercent={onboardingProgressPercent}
+          totalTasks={onboardingProgress.tasksTotal}
+          completedTasks={onboardingProgress.tasksCompleted}
+        />
+      ) : null}
       <GreetingCard data={data} />
       {showHealthAlerts ? <HealthAlerts alerts={data.healthAlerts!} /> : null}
       <WidgetGrid data={data} />
