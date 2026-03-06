@@ -376,7 +376,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     <>
       <PageHeader
         title="Admin Users"
-        description="Invite, configure, and manage employee accounts."
+        description="Invite, configure, and manage crew accounts."
       />
 
       <div className="page-tabs" role="tablist" aria-label="Admin users tabs">

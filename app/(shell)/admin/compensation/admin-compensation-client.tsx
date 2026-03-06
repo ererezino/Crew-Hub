@@ -892,7 +892,7 @@ export function AdminCompensationClient({
       compensationQuery.data &&
       compensationQuery.data.employees.length === 0 ? (
         <EmptyState
-          title="No employees found"
+          title="No crew members found"
           description="Seed or create profile data before managing compensation records."
         />
       ) : null}
@@ -977,7 +977,7 @@ export function AdminCompensationClient({
             ) : (
               <EmptyState
                 title="No salary records"
-                description="Create the first salary record for this employee."
+                description="Create the first salary record for this crew member."
               />
             )}
 
@@ -1096,7 +1096,7 @@ export function AdminCompensationClient({
             {allowances.length === 0 ? (
               <EmptyState
                 title="No allowances"
-                description="Create allowances for this employee to track recurring compensation."
+                description="Create allowances for this crew member to track recurring compensation."
               />
             ) : (
               <div className="data-table-container">
@@ -1199,7 +1199,7 @@ export function AdminCompensationClient({
             {equityGrants.length === 0 ? (
               <EmptyState
                 title="No equity grants"
-                description="Create equity grants to track vesting schedules for this employee."
+                description="Create equity grants to track vesting schedules for this crew member."
               />
             ) : (
               <div className="data-table-container">

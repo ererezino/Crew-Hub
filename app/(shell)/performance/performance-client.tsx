@@ -1627,7 +1627,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                           ) : (
                             <EmptyState
                               title="Self review not submitted"
-                              description="This employee has not submitted their self review yet."
+                              description="This crew member has not submitted their self review yet."
                               ctaLabel="Back to top"
                               ctaHref="/performance"
                             />

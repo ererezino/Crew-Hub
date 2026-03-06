@@ -64,7 +64,7 @@ export function PeopleCompensationClient({
       {!isLoading && !errorMessage && !snapshot ? (
         <EmptyState
           title="No compensation profile found"
-          description="No compensation records were found for this employee."
+          description="No compensation records were found for this crew member."
           ctaLabel="Back to people"
           ctaHref="/people"
         />

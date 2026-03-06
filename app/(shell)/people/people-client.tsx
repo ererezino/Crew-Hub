@@ -697,7 +697,7 @@ export function PeopleClient({
         <>
           <EmptyState
             icon={<Users size={32} />}
-            title="No employees found"
+            title="No crew members found"
             description="Add your first team member to start using people workflows."
             {...(canManagePeople
               ? { ctaLabel: "Add person", onCtaClick: () => setIsCreateOpen(true) }
@@ -1139,7 +1139,7 @@ export function PeopleClient({
       <SlidePanel
         isOpen={isBulkUploadOpen}
         title="Bulk Upload"
-        description="Import multiple employees from a CSV file."
+        description="Import multiple crew members from a CSV file."
         onClose={closeBulkUploadPanel}
       >
         <div className="slide-panel-form-wrapper">
@@ -1264,7 +1264,7 @@ export function PeopleClient({
               <div className="bulk-upload-instructions">
                 <h3 className="form-label">Importing...</h3>
                 <p className="form-hint">
-                  Creating {bulkRows.filter((r) => r.valid).length} employee accounts. This may take a moment.
+                  Creating {bulkRows.filter((r) => r.valid).length} crew accounts. This may take a moment.
                 </p>
               </div>
             </div>

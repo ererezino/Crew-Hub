@@ -128,7 +128,7 @@ export function LearningReportsClient() {
             {sortedCourses.length === 0 ? (
               <EmptyState
                 title="No course activity"
-                description="Assign courses to employees to start seeing report data."
+                description="Assign courses to crew members to start seeing report data."
                 ctaLabel="Open learning admin"
                 ctaHref="/admin/learning"
               />

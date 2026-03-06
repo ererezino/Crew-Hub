@@ -1052,7 +1052,7 @@ export function OnboardingClient({
       <SlidePanel
         isOpen={isStartPanelOpen}
         title="Start Onboarding"
-        description="Assign a template to an employee and create tasks."
+        description="Assign a template to a crew member and create tasks."
         onClose={closeStartPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleStartOnboarding} noValidate>

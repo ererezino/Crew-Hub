@@ -656,7 +656,7 @@ export function CompensationBandsClient() {
             {sortedAlerts.length === 0 ? (
               <EmptyState
                 title="No alerts"
-                description="All employees with assignments are currently within their configured bands."
+                description="All crew members with assignments are currently within their configured bands."
                 ctaLabel="Review bands"
                 ctaHref="/admin/compensation-bands"
               />
@@ -962,7 +962,7 @@ export function CompensationBandsClient() {
               <>
                 <EmptyState
                   title="No assignments"
-                  description="Assign employees to bands to enable compa-ratio and out-of-band alerts."
+                  description="Assign crew members to bands to enable compa-ratio and out-of-band alerts."
                 />
                 <button
                   type="button"
@@ -1436,7 +1436,7 @@ export function CompensationBandsClient() {
       <SlidePanel
         isOpen={isAssignmentPanelOpen}
         title="Assign employee to band"
-        description="Map an employee to a salary band for compa-ratio and alert checks."
+        description="Map an crew member to a salary band for compa-ratio and alert checks."
         onClose={resetAssignmentPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleAssignmentSubmit}>

@@ -30,7 +30,7 @@ export default async function PayrollRunDetailPage({ params }: PayrollRunDetailP
       <>
         <PageHeader
           title="Payroll Run"
-          description="Review payroll run calculations and employee payout details."
+          description="Review payroll run calculations and crew member payout details."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -47,7 +47,7 @@ export default async function PayrollRunDetailPage({ params }: PayrollRunDetailP
       <>
         <PageHeader
           title="Payroll Run"
-          description="Review payroll run calculations and employee payout details."
+          description="Review payroll run calculations and crew member payout details."
         />
         <EmptyState
           title="Access denied"

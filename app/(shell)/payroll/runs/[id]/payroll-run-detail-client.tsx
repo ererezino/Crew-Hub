@@ -967,7 +967,7 @@ export function PayrollRunDetailClient({
           {sortedItems.length === 0 ? (
             <EmptyState
               title="No payroll items yet"
-              description="Run calculation to populate employees in this payroll run."
+              description="Run calculation to populate crew members in this payroll run."
               ctaLabel="Back to payroll"
               ctaHref="/payroll"
             />

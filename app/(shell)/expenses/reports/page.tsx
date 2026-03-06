@@ -22,7 +22,7 @@ export default async function ExpenseReportsPage() {
       <>
         <PageHeader
           title="Expense Reports"
-          description="Monthly analytics by category, employee, and department."
+          description="Monthly analytics by category, crew member, and department."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -37,7 +37,7 @@ export default async function ExpenseReportsPage() {
       <>
         <PageHeader
           title="Expense Reports"
-          description="Monthly analytics by category, employee, and department."
+          description="Monthly analytics by category, crew member, and department."
         />
         <EmptyState
           title="Access denied"

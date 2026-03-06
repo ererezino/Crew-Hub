@@ -63,7 +63,7 @@ export function AdminPaymentDetailsClient() {
     <>
       <PageHeader
         title="Payment Details"
-        description="Review masked employee payment destinations, hold windows, and missing records."
+        description="Review masked crew member payment destinations, hold windows, and missing records."
       />
 
       {paymentDetailsQuery.isLoading ? detailsTableSkeleton() : null}
@@ -89,7 +89,7 @@ export function AdminPaymentDetailsClient() {
       sortedRows.length === 0 ? (
         <EmptyState
           title="No employee records found"
-          description="Seed employee data or complete onboarding profiles to populate payment details."
+          description="Seed crew data or complete onboarding profiles to populate payment details."
         />
       ) : null}
 

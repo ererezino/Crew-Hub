@@ -281,7 +281,7 @@ export function CompensationOverview({
         {sortedAllowances.length === 0 ? (
           <EmptyState
             title="No allowances configured"
-            description="Allowances will appear here once they are added for this employee."
+            description="Allowances will appear here once they are added for this crew member."
           />
         ) : (
           <>

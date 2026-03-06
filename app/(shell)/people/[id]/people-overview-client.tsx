@@ -750,7 +750,7 @@ export function PeopleOverviewClient({
             <div className="danger-zone-description">
               <p className="danger-zone-label">Initiate offboarding</p>
               <p className="settings-card-description">
-                Begin the offboarding process for this employee. This will change their status, create offboarding tasks, and notify relevant parties.
+                Begin the offboarding process for this crew member. This will change their status, create offboarding tasks, and notify relevant parties.
               </p>
             </div>
             <button

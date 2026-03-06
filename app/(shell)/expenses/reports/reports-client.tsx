@@ -248,7 +248,7 @@ export function ExpenseReportsClient() {
     <>
       <PageHeader
         title="Expense Reports"
-        description="Monthly reporting by category, employee, and department with CSV export."
+        description="Monthly reporting by category, crew member, and department with CSV export."
         actions={
           <button type="button" className="button button-accent" onClick={handleCsvExport}>
             Export CSV

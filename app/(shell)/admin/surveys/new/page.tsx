@@ -13,7 +13,7 @@ export default async function NewSurveyPage() {
       <>
         <PageHeader
           title="New Survey"
-          description="Build and launch a new employee survey in Crew Hub."
+          description="Build and launch a new crew survey in Crew Hub."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -32,7 +32,7 @@ export default async function NewSurveyPage() {
       <>
         <PageHeader
           title="New Survey"
-          description="Build and launch a new employee survey in Crew Hub."
+          description="Build and launch a new crew survey in Crew Hub."
         />
         <EmptyState
           title="Survey creation is restricted"
