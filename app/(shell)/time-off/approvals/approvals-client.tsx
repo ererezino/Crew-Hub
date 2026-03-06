@@ -8,6 +8,7 @@ import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
+import { TeamAvailabilityPanel } from "../../../../components/time-off/team-availability-panel";
 import { useTimeOffApprovals } from "../../../../hooks/use-time-off";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDays, formatDateRangeHuman, formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
@@ -75,6 +76,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isMutatingRequestId, setIsMutatingRequestId] = useState<string | null>(null);
+  const [contextTarget, setContextTarget] = useState<LeaveRequestRecord | null>(null);
   const [rejectTarget, setRejectTarget] = useState<LeaveRequestRecord | null>(null);
   const [rejectValues, setRejectValues] = useState<RejectFormValues>({ rejectionReason: "" });
   const [rejectErrors, setRejectErrors] = useState<RejectFormErrors>({});
@@ -126,6 +128,9 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       }
 
       approvalsQuery.refresh();
+      if (contextTarget?.id === requestRecord.id) {
+        setContextTarget(null);
+      }
       showToast("success", "Leave request approved.");
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to approve leave request.");
@@ -144,6 +149,14 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
     setRejectTarget(null);
     setRejectValues({ rejectionReason: "" });
     setRejectErrors({});
+  };
+
+  const openContextPanel = (requestRecord: LeaveRequestRecord) => {
+    setContextTarget(requestRecord);
+  };
+
+  const closeContextPanel = () => {
+    setContextTarget(null);
   };
 
   const handleRejectReasonChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -303,6 +316,14 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       <button
                         type="button"
                         className="table-row-action"
+                        onClick={() => openContextPanel(requestRecord)}
+                        disabled={isMutatingRequestId === requestRecord.id}
+                      >
+                        Review
+                      </button>
+                      <button
+                        type="button"
+                        className="table-row-action"
                         onClick={() => handleApprove(requestRecord)}
                         disabled={isMutatingRequestId === requestRecord.id}
                       >
@@ -324,6 +345,93 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
           </table>
         </div>
       ) : null}
+
+      <SlidePanel
+        isOpen={Boolean(contextTarget)}
+        title="Review Leave Request"
+        description={
+          contextTarget
+            ? `Review full context for ${contextTarget.employeeName} before making an approval decision.`
+            : undefined
+        }
+        onClose={closeContextPanel}
+      >
+        {contextTarget ? (
+          <div className="slide-panel-form-wrapper">
+            <article className="settings-card">
+              <h3 className="section-title">{contextTarget.employeeName}</h3>
+              <p className="settings-card-description">
+                {contextTarget.employeeDepartment ?? "No department"}
+              </p>
+              <p className="settings-card-description">
+                <span className="country-chip">
+                  <span>{countryFlagFromCode(contextTarget.employeeCountryCode)}</span>
+                  <span>{countryNameFromCode(contextTarget.employeeCountryCode)}</span>
+                </span>
+              </p>
+              <p className="settings-card-description">
+                Leave type: {formatLeaveTypeLabel(contextTarget.leaveType)}
+              </p>
+              <p className="settings-card-description">
+                Date range: {formatDateRangeHuman(contextTarget.startDate, contextTarget.endDate)}
+              </p>
+              <p className="settings-card-description">
+                Total days: <span className="numeric">{formatDays(contextTarget.totalDays)}</span>
+              </p>
+              <p className="settings-card-description">
+                Submitted:{" "}
+                <time
+                  dateTime={contextTarget.createdAt}
+                  title={formatDateTimeTooltip(contextTarget.createdAt)}
+                >
+                  {formatRelativeTime(contextTarget.createdAt)}
+                </time>
+              </p>
+              <p className="settings-card-description">Reason: {contextTarget.reason}</p>
+            </article>
+
+            <article className="settings-card">
+              <h3 className="section-title">Team calendar context</h3>
+              <p className="settings-card-description">
+                Review team calendar context before approval to avoid overlapping absences.
+              </p>
+              <TeamAvailabilityPanel
+                startDate={contextTarget.startDate}
+                endDate={contextTarget.endDate}
+              />
+            </article>
+
+            <div className="slide-panel-actions">
+              <button
+                type="button"
+                className="button"
+                onClick={closeContextPanel}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="button"
+                onClick={() => {
+                  closeContextPanel();
+                  openRejectPanel(contextTarget);
+                }}
+                disabled={isMutatingRequestId === contextTarget.id}
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => handleApprove(contextTarget)}
+                disabled={isMutatingRequestId === contextTarget.id}
+              >
+                {isMutatingRequestId === contextTarget.id ? "Saving..." : "Approve"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </SlidePanel>
 
       <SlidePanel
         isOpen={Boolean(rejectTarget)}
