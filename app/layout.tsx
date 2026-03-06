@@ -1,12 +1,22 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans, Playfair_Display } from "next/font/google";
 
 import { ThemeProvider } from "../components/shared/theme-provider";
 import "./globals.css";
 
-const inter = Inter({
+const playfair = Playfair_Display({
   subsets: ["latin"],
-  variable: "--font-inter"
+  weight: ["400", "700", "900"],
+  style: ["normal", "italic"],
+  variable: "--font-serif",
+  display: "swap"
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-sans",
+  display: "swap"
 });
 
 export const metadata: Metadata = {
@@ -44,7 +54,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.variable}>
+      <body className={`${playfair.variable} ${dmSans.variable}`}>
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

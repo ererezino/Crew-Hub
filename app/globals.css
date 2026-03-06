@@ -226,22 +226,23 @@ kbd {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border-radius: var(--radius-default);
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border-default);
-  background: var(--bg-canvas);
+  background: var(--bg-surface);
   color: var(--text-primary);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) 20px;
+  height: 36px;
   font-weight: 500;
-  font-size: var(--text-body);
+  font-size: var(--text-base);
   letter-spacing: 0.01em;
   cursor: pointer;
   transition: all var(--transition-hover);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
 }
 
 .button:hover {
   border-color: var(--text-muted);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 .button:focus-visible {
@@ -249,42 +250,52 @@ kbd {
   outline-offset: 2px;
 }
 
-.button-accent {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #ffffff;
-  box-shadow: var(--shadow-sm);
-}
-
-.button-accent:hover {
-  background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
-  box-shadow: var(--shadow-md);
-}
-
-html.dark .button-accent {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #ffffff;
-}
-
-html.dark .button-accent:hover {
-  background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
-  color: #ffffff;
-}
-
+.button-accent,
+.button-cta,
 .button-orange {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: #ffffff;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
+.button-accent:hover,
+.button-cta:hover,
 .button-orange:hover {
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
-  box-shadow: var(--shadow-md);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.button-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.button-primary:hover {
+  background: #222222;
+  border-color: #222222;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+html.dark .button-accent,
+html.dark .button-cta,
+html.dark .button-orange {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #ffffff;
+}
+
+html.dark .button-accent:hover,
+html.dark .button-cta:hover,
+html.dark .button-orange:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: #ffffff;
 }
 
 .button-subtle {
@@ -325,6 +336,16 @@ html.dark .button-accent:hover {
   background: var(--status-error-text);
   border-color: var(--status-error-text);
   color: #ffffff;
+}
+
+.button:disabled,
+.button[disabled] {
+  background: var(--crew-dust);
+  border-color: var(--crew-dust);
+  color: var(--crew-gray2);
+  pointer-events: none;
+  opacity: 1;
+  box-shadow: none;
 }
 
 .section-title {
@@ -5530,12 +5551,12 @@ html.dark .topbar {
   gap: var(--space-1);
   border: 1px solid transparent;
   border-radius: 999px;
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: 500;
+  padding: var(--space-1) 10px;
+  font-size: 11px;
+  font-weight: 700;
   line-height: 1.25;
-  text-transform: capitalize;
-  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 .status-badge-success {
@@ -5778,31 +5799,37 @@ html.dark .topbar {
 }
 
 .empty-state {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-card);
-  background: var(--bg-canvas);
-  padding: var(--space-8);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
 }
 
 .empty-state-icon {
-  color: var(--text-muted);
-  margin-bottom: var(--space-1);
+  color: var(--crew-gray2);
+  margin-bottom: var(--space-4);
+}
+
+.empty-state-icon svg {
+  width: 48px;
+  height: 48px;
 }
 
 .empty-state-title {
-  font-size: var(--text-md);
+  font-size: 17px;
   line-height: 1.3;
   font-weight: 600;
+  margin-bottom: var(--space-1);
 }
 
 .empty-state-description {
-  color: var(--text-muted);
-  font-size: var(--text-base);
-  line-height: 1.5;
+  color: var(--crew-gray1);
+  font-size: 15px;
+  line-height: 1.65;
+  max-width: 400px;
+  margin-bottom: var(--space-6);
 }
 
 /* ─── Error State ─── */
