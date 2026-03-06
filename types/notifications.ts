@@ -4,6 +4,7 @@ export const NOTIFICATION_TYPES = [
   "leave_submitted",
   "leave_status",
   "payroll_approved",
+  "payroll_completed",
   "expense_submitted",
   "expense_status",
   "onboarding_task",
@@ -22,7 +23,8 @@ export const NOTIFICATION_TYPES = [
   "review_cycle_started",
   "review_reminder",
   "survey_launched",
-  "document_expiry_warning"
+  "document_expiry_warning",
+  "compliance_policy_acknowledgment"
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

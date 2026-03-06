@@ -56,7 +56,11 @@ export function ConfirmDialog({
       }}
     >
       <section
-        className={tone === "danger" ? "modal-dialog modal-dialog-danger" : "modal-dialog"}
+        className={
+          tone === "danger"
+            ? "confirm-dialog modal-dialog modal-dialog-danger"
+            : "confirm-dialog modal-dialog"
+        }
         role="dialog"
         aria-modal="true"
         aria-label={title}

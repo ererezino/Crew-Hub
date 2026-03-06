@@ -1492,7 +1492,7 @@ export function AdminCompensationClient({
                   setSalaryFormErrors(validateSalary(nextValues));
                 }}
               />
-              <span>Approve this salary record now (SUPER_ADMIN only)</span>
+              <span>Approve this salary record now (Super Admin only)</span>
             </label>
           ) : null}
 
@@ -1964,7 +1964,7 @@ export function AdminCompensationClient({
                   setEquityFormErrors(validateEquity(nextValues));
                 }}
               />
-              <span>Approve this equity grant now (SUPER_ADMIN only)</span>
+              <span>Approve this equity grant now (Super Admin only)</span>
             </label>
           ) : null}
 
