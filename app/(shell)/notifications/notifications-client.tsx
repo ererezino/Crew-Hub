@@ -64,14 +64,14 @@ export function NotificationsClient() {
         <div className="page-header-actions">
           <button
             type="button"
-            className={filter === "all" ? "button button-accent" : "button button-subtle"}
+            className={filter === "all" ? "button button-primary" : "button button-subtle"}
             onClick={() => setFilter("all")}
           >
             All
           </button>
           <button
             type="button"
-            className={filter === "unread" ? "button button-accent" : "button button-subtle"}
+            className={filter === "unread" ? "button button-primary" : "button button-subtle"}
             onClick={() => setFilter("unread")}
           >
             Unread

@@ -358,7 +358,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               <button
                 key={key}
                 type="button"
-                className={preset === key ? "button button-accent" : "button button-subtle"}
+                className={preset === key ? "button button-primary" : "button button-subtle"}
                 onClick={() => applyPreset(key)}
               >
                 {label}

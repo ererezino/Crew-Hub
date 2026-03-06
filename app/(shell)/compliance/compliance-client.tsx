@@ -489,14 +489,14 @@ export function ComplianceClient() {
             </button>
             <button
               type="button"
-              className={viewMode === "table" ? "button button-accent" : "button button-subtle"}
+              className={viewMode === "table" ? "button button-primary" : "button button-subtle"}
               onClick={() => setViewMode("table")}
             >
               Table
             </button>
             <button
               type="button"
-              className={viewMode === "calendar" ? "button button-accent" : "button button-subtle"}
+              className={viewMode === "calendar" ? "button button-primary" : "button button-subtle"}
               onClick={() => setViewMode("calendar")}
             >
               Calendar
