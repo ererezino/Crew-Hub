@@ -4,6 +4,7 @@ import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
+import { ContextualHelp } from "../../../components/shared/contextual-help";
 import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
@@ -92,6 +93,25 @@ const ALL_FORM_TOUCHED: RequestFormTouched = {
   endDate: true,
   reason: true
 };
+
+const TIME_OFF_CONTEXTUAL_HELP = [
+  {
+    title: "Working day calculation",
+    description:
+      "Leave days are auto-calculated from working days, excluding weekends and country holidays."
+  },
+  {
+    title: "Approval expectation",
+    description:
+      "Requests are sent to your direct manager first. Add clear reasons to reduce back-and-forth."
+  },
+  {
+    title: "Team coverage",
+    description: "Check team availability before submitting overlapping dates.",
+    ctaLabel: "View availability",
+    ctaHref: "/time-off?tab=calendar"
+  }
+] as const;
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -695,6 +715,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           description="Check your leave balance, request time off, and track approvals in one place."
         />
       ) : null}
+
+      <ContextualHelp
+        title="Plan leave with confidence"
+        description="Use these reminders to avoid request delays and team coverage issues."
+        items={TIME_OFF_CONTEXTUAL_HELP}
+        ariaLabel="Time off contextual help"
+      />
 
       <section className="timeoff-balance-grid" aria-label="Leave balances">
         {/* Unlimited leave type cards (e.g. sick leave) */}
