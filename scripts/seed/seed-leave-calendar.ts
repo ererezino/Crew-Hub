@@ -72,39 +72,6 @@ function groupConsecutiveDates(dates: string[]): { startDate: string; endDate: s
   return blocks;
 }
 
-/* ── Name-to-email mapping (Excel name → profile email) ── */
-
-const NAME_TO_EMAIL: Record<string, string> = {
-  "Clinton Mbah": "clinton@useaccrue.com",
-  "Adesuwa Omoruyi": "adesuwa@useaccrue.com",
-  "Zino Asamaige": "zino@useaccrue.com",
-  "Richard Adaramola": "richard@useaccrue.com",
-  "Temabo Omame": "tema@useaccrue.com",
-  "Alan Olisa": "alan@useaccrue.com",
-  "Esse-oghene Emma Udubrah": "esse@useaccrue.com",
-  "Alex Omenye": "alex@useaccrue.com",
-  "Felix Akinnibi": "felix@useaccrue.com",
-  "Nureni Imam": "nureni@useaccrue.com",
-  "Chantal Kimbi": "kimbi@useaccrue.com",
-  "Flore Keugwa": "flore@useaccrue.com",
-  "Melon Lagoye": "melon@useaccrue.com",
-  "Ifeanyichukwu Obinna Onuoha": "ifeanyi@useaccrue.com",
-  "Victor Sanusi": "victor.s@useaccrue.com",
-  "Gabriel Kofi Owusu": "gabby@useaccrue.com",
-  "Benjamin Essilfie Ofori-Quansah": "essilfie@useaccrue.com",
-  "Dapilah Sydney": "sydney@useaccrue.com",
-  "Shalewa Oseni": "shalewa@useaccrue.com",
-  "Raphaela Rockson": "raphaela@useaccrue.com",
-  "Ailara Motunrayo": "rayo@useaccrue.com",
-  "Antoinette Atolagbe": "antoinette@useaccrue.com",
-  "Favour Nnadi": "favour.n@useaccrue.com",
-  "Stephanie Anene": "stephanie@useaccrue.com",
-  "Oluwaseun Adesoye": "seun@useaccrue.com",
-  "Chiamaka Ufedo Ewa": "chiamaka@useaccrue.com",
-  "Aishat Akintola": "aishat@useaccrue.com",
-  "Tunmise Falade": "tunmise@useaccrue.com",
-};
-
 /* ── Employee leave data (extracted from Excel, weekdays only) ── */
 
 type EmployeeLeave = { email: string; leaveDates: string[] };
@@ -250,7 +217,6 @@ async function main() {
   console.log(`Org ID: ${orgId}`);
 
   // 2. Look up all profile IDs by email
-  const allEmails = [...new Set(EMPLOYEE_LEAVE.map((e) => e.email))];
   const { data: profiles, error: profErr } = await client
     .from("profiles")
     .select("id, email, full_name, country_code")

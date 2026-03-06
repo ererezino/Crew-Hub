@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { AccessChecklist, type AccessChecklistItem } from "../../../../components/admin/access-checklist";
 import { InviteForm } from "../../../../components/admin/invite-form";
 import { UserListTable } from "../../../../components/admin/user-list-table";
-import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";

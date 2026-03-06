@@ -184,7 +184,6 @@ export function SignaturesClient({
   const [isSignerOptionsLoading, setIsSignerOptionsLoading] = useState(false);
   const [signerOptionsError, setSignerOptionsError] = useState<string | null>(null);
   const [isOpeningByRequestId, setIsOpeningByRequestId] = useState<Record<string, boolean>>({});
-  const [isSigningByRequestId, setIsSigningByRequestId] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Signing panel state
@@ -301,7 +300,7 @@ export function SignaturesClient({
 
       return rightValue - leftValue;
     });
-  }, [activeTab, createdSortDirection, signatures.requests]);
+  }, [activeTab, createdSortDirection, currentUserId, signatures.requests]);
 
   const resetCreateForm = () => {
     setCreateValues(INITIAL_FORM_VALUES);

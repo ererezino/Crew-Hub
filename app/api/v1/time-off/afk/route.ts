@@ -5,7 +5,6 @@ import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import { isIsoDate } from "../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
-import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import type { AfkLogRecord, AfkLogsResponseData } from "../../../../../types/time-off";
 

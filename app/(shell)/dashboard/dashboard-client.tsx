@@ -28,13 +28,11 @@ import {
   Sunrise,
   Sun,
   Sunset,
-  Users,
   AlertTriangle,
   ArrowRight,
   Megaphone,
   Palmtree,
   ShieldCheck,
-  BookOpen,
   BarChart3,
   ChevronRight,
   Activity
@@ -106,6 +104,7 @@ function NewHireGreeting({ data }: { data: DashboardResponseData }) {
         {data.managerInfo ? (
           <div className="dashboard-manager-callout">
             {data.managerInfo.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={data.managerInfo.avatarUrl}
                 alt={data.managerInfo.name}

@@ -29,7 +29,6 @@ export default async function TeamHubPage() {
 
   return (
     <TeamHubClient
-      currentUserId={session.profile.id}
       isAdmin={isAdmin}
     />
   );

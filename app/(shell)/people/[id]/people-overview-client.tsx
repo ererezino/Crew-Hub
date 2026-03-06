@@ -423,6 +423,7 @@ export function PeopleOverviewClient({
         <div className="profile-overview-identity">
           <div className="profile-overview-avatar-wrapper">
             {person.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={person.avatarUrl}
                 alt={`${person.fullName} avatar`}

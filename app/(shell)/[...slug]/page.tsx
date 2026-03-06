@@ -18,7 +18,6 @@ export default async function PlaceholderPage({ params }: PlaceholderPageProps) 
   const { slug } = await params;
 
   const routeName = slug.map(formatSegment).join(" / ");
-  const targetPath = `/${slug.join("/")}`;
 
   return (
     <>

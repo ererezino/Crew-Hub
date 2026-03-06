@@ -135,7 +135,12 @@ export function useGoals(query: GoalsQuery = {}): UseFetchResult<GoalsListRespon
   const [reloadToken, setReloadToken] = useState(0);
 
   const endpoint = useMemo(
-    () => buildGoalsUrl(query),
+    () =>
+      buildGoalsUrl({
+        employeeId: query.employeeId,
+        status: query.status,
+        cycleId: query.cycleId
+      }),
     [query.employeeId, query.status, query.cycleId]
   );
 
@@ -205,7 +210,12 @@ export function useCalibration(query: CalibrationQuery = {}): UseFetchResult<Cal
   const [reloadToken, setReloadToken] = useState(0);
 
   const endpoint = useMemo(
-    () => buildCalibrationUrl(query),
+    () =>
+      buildCalibrationUrl({
+        cycleId: query.cycleId,
+        department: query.department,
+        country: query.country
+      }),
     [query.cycleId, query.department, query.country]
   );
 

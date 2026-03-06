@@ -814,14 +814,32 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
         <nav className="sidebar-nav" aria-label="Primary">
           {navigationGroups.map(({ group, key, domId }) => {
             const hasHeading = group.label.length > 0;
+            const isExpanded = expandedGroupKeys.has(key);
+            const defaultExpanded = defaultExpandedGroupKeys.has(key);
 
             return (
               <section key={key} className="sidebar-group">
                 {hasHeading ? (
-                  <h2 className="sidebar-section-label">{group.label}</h2>
+                  <button
+                    type="button"
+                    className="sidebar-section-label"
+                    onClick={() => handleSidebarGroupToggle(key, defaultExpanded)}
+                    aria-expanded={isExpanded}
+                    aria-controls={domId}
+                    style={{
+                      background: "none",
+                      border: 0,
+                      padding: 0,
+                      textAlign: "left",
+                      width: "100%",
+                      cursor: "pointer"
+                    }}
+                  >
+                    {group.label}
+                  </button>
                 ) : null}
 
-                <ul id={domId} className="sidebar-links">
+                <ul id={domId} className="sidebar-links" hidden={!isExpanded}>
                   {group.items.map((item) => {
                     const isActive = isRouteActive(activePathname, item.href);
                     const showApprovalsBadge =

@@ -72,6 +72,8 @@ export function AccrueLetterhead({ address }: { address?: string }) {
 
   return (
     <View style={letterheadStyles.headerContainer}>
+      {/* react-pdf Image does not support alt text props. */}
+      {/* eslint-disable-next-line jsx-a11y/alt-text */}
       <Image src={getLogoDataUri()} style={letterheadStyles.logoImage} />
       <View style={letterheadStyles.companyInfo}>
         {addressLines.map((line, i) => (

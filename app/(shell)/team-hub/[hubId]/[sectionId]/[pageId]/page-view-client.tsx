@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { EmptyState } from "../../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../../../components/shared/slide-panel";
-import { StatusBadge } from "../../../../../../components/shared/status-badge";
 import { formatRelativeTime } from "../../../../../../lib/datetime";
 
 /* ── Types ── */

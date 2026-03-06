@@ -257,9 +257,7 @@ async function createRealTeam(
   for (const member of REAL_MEMBERS) {
     const normalizedEmail = member.email.toLowerCase();
 
-    // Check if auth user already exists (e.g., re-run safety)
-    const { data: existingList } = await client.auth.admin.listUsers({ perPage: 1 });
-    // Use a direct lookup instead
+    // Check if profile already exists (e.g., re-run safety)
     const { data: existingProfile } = await client
       .from("profiles")
       .select("id")

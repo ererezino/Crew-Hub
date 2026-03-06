@@ -18,13 +18,12 @@ type TeamHub = {
 };
 
 type TeamHubClientProps = {
-  currentUserId: string;
   isAdmin: boolean;
 };
 
 /* ── Component ── */
 
-export function TeamHubClient({ currentUserId, isAdmin }: TeamHubClientProps) {
+export function TeamHubClient({ isAdmin }: TeamHubClientProps) {
   const [hubs, setHubs] = useState<TeamHub[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

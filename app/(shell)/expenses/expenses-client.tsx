@@ -528,7 +528,7 @@ export function ExpensesClient({
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [, setUploadProgress] = useState(0);
   const [isOpeningReceiptById, setIsOpeningReceiptById] = useState<Record<string, boolean>>({});
   const [isMutatingExpenseId, setIsMutatingExpenseId] = useState<string | null>(null);
   const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);

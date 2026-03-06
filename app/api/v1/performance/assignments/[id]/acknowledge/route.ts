@@ -5,7 +5,6 @@ import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { sendReviewAcknowledgedEmail } from "../../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
-import type { ApiResponse } from "../../../../../../../types/auth";
 import type { AcknowledgeReviewResponseData } from "../../../../../../../types/performance";
 import {
   assignmentRowSchema,

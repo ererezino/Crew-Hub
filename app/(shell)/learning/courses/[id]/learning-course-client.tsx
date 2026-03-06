@@ -177,6 +177,7 @@ function QuizModule({
   });
   const resolvedQuizResult = quizResult;
   const isQuizSubmitted = resolvedQuizResult !== null;
+  const canRetake = resolvedQuizResult?.allowRetake ?? allowRetake;
 
   const currentQuestion = questions[quiz.currentIndex];
   const isLastQuestion = quiz.currentIndex === questions.length - 1;
@@ -232,7 +233,7 @@ function QuizModule({
         <div className="module-quiz-result-actions">
           {resolvedQuizResult.passed ? (
             <p className="settings-card-description">Module completed. Continue to the next module.</p>
-          ) : resolvedQuizResult.allowRetake ? (
+          ) : canRetake ? (
             <button type="button" className="button" onClick={handleRetry}>
               Try again
             </button>

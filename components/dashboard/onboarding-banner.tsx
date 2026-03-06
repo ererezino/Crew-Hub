@@ -86,6 +86,7 @@ export function ManagerOnboardingWidget({ reports }: ManagerOnboardingWidgetProp
               <div className="documents-row-actions" style={{ justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
                   {report.employeeAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={report.employeeAvatarUrl}
                       alt={report.employeeName}

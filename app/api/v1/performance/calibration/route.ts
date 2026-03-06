@@ -5,7 +5,6 @@ import { normalizeUserRoles } from "../../../../../lib/navigation";
 import { normalizeReviewAnswers, normalizeReviewSections } from "../../../../../lib/performance/reviews";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
-import type { ApiResponse } from "../../../../../types/auth";
 import type {
   CalibrationResponseData,
   CalibrationRow,

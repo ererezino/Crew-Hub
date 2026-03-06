@@ -209,8 +209,8 @@ function sharingStatusTone(status: "unshared" | "shared" | "acknowledged"): "dra
 
 // ── Calibration Tab Component ──
 
-function CalibrationTab({ showToast }: { showToast: (variant: ToastVariant, message: string) => void }) {
-  const [cycleIdFilter, setCycleIdFilter] = useState("");
+function CalibrationTab() {
+  const cycleIdFilter = "";
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
   const [sortKey, setSortKey] = useState<CalibrationSortKey>("employee");
@@ -222,7 +222,7 @@ function CalibrationTab({ showToast }: { showToast: (variant: ToastVariant, mess
     country: countryFilter
   });
 
-  const rows = calibrationQuery.data?.rows ?? [];
+  const rows = useMemo(() => calibrationQuery.data?.rows ?? [], [calibrationQuery.data?.rows]);
   const summary = calibrationQuery.data?.summary ?? null;
   const cycle = calibrationQuery.data?.cycle ?? null;
 
@@ -685,7 +685,7 @@ export function AdminPerformanceClient() {
 
       {activeTab === "calibration" ? (
         <section className="settings-layout">
-          <CalibrationTab showToast={showToast} />
+          <CalibrationTab />
         </section>
       ) : null}
 

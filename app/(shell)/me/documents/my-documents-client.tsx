@@ -82,6 +82,7 @@ const tabs: Array<{ id: MyDocumentsTab; label: string }> = [
   { id: "tax_form", label: "Tax Forms" },
   { id: "travel_letters", label: "Travel Letters" }
 ];
+const ENTITY_COUNTRIES = ["USA", "Nigeria", "Canada", "Ghana", "South Africa"];
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -216,11 +217,11 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
     );
   }, [activeTab, documents]);
 
-  const dismissToast = (toastId: string) => {
+  const dismissToast = useCallback((toastId: string) => {
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
-  };
+  }, []);
 
-  const showToast = (variant: ToastVariant, rawMessage: string) => {
+  const showToast = useCallback((variant: ToastVariant, rawMessage: string) => {
     const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
     const toastId = createToastId();
 
@@ -229,7 +230,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
     window.setTimeout(() => {
       dismissToast(toastId);
     }, 4000);
-  };
+  }, [dismissToast]);
 
   const closeUploadPanel = () => {
     setVersionTarget(null);
@@ -347,7 +348,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         setIsSubmittingTravel(false);
       }
     },
-    [travelForm, refreshTravel]
+    [travelForm, refreshTravel, showToast]
   );
 
   const handleDownloadTravelLetter = useCallback(
@@ -381,7 +382,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         });
       }
     },
-    []
+    [showToast]
   );
 
   // Admin: open approve panel
@@ -448,7 +449,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         setIsApproving(false);
       }
     },
-    [approvalTarget, approvalCountry, approvalAddress, refreshPending, refreshTravel, refreshEntities]
+    [approvalTarget, approvalCountry, approvalAddress, refreshPending, refreshTravel, refreshEntities, showToast]
   );
 
   // Admin: reject
@@ -504,11 +505,9 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         setIsRejecting(false);
       }
     },
-    [rejectionTarget, rejectionReason, refreshPending, refreshTravel]
+    [rejectionTarget, rejectionReason, refreshPending, refreshTravel, showToast]
   );
 
-  // Known entity countries for the select dropdown
-  const ENTITY_COUNTRIES = ["USA", "Nigeria", "Canada", "Ghana", "South Africa"];
   const countryOptions = useMemo(() => {
     const saved = new Set(letterheadEntities.map((e) => e.country));
     const all = new Set([...ENTITY_COUNTRIES, ...saved]);
