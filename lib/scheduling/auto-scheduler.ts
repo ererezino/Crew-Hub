@@ -61,7 +61,7 @@ function timeToMinutes(time: string): number {
 
 /** Duration of a slot in hours. Handles overnight shifts. */
 function slotHours(slot: ShiftSlot): number {
-  let startMin = timeToMinutes(slot.startTime);
+  const startMin = timeToMinutes(slot.startTime);
   let endMin = timeToMinutes(slot.endTime);
 
   if (endMin <= startMin) {

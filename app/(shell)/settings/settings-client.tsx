@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useMemo, useState } from "react";
 
@@ -613,13 +614,13 @@ export function SettingsClient({
               <p className="settings-field-hint">
                 Use this to update your password. You will need to enter your current password.
               </p>
-              <a
+              <Link
                 href="/change-password"
                 className="btn btn-secondary"
                 style={{ display: "inline-block", marginTop: "var(--space-2)" }}
               >
                 Change password
-              </a>
+              </Link>
             </div>
           </div>
         ) : null}

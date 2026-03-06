@@ -115,8 +115,8 @@ export async function GET() {
 
   // Get section and page counts
   const hubIds = parsed.data.map((h) => h.id);
-  let sectionCountMap = new Map<string, number>();
-  let pageCountMap = new Map<string, number>();
+  const sectionCountMap = new Map<string, number>();
+  const pageCountMap = new Map<string, number>();
 
   if (hubIds.length > 0) {
     const { data: sectionRows } = await supabase
