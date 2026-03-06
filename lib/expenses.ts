@@ -30,6 +30,65 @@ const categoryLabelByValue: Record<ExpenseCategory, string> = {
   other: "Other"
 };
 
+type ExpenseCategoryGuidance = {
+  summary: string;
+  documentation: string;
+  policyNote: string;
+};
+
+export const EXPENSE_CATEGORY_GUIDANCE: Record<ExpenseCategory, ExpenseCategoryGuidance> = {
+  travel: {
+    summary: "Work travel costs like flights, intercity buses, and approved ride bookings are reimbursable.",
+    documentation: "Upload tickets, booking confirmations, and travel receipts.",
+    policyNote: "Pre-approval is required before booking travel."
+  },
+  lodging: {
+    summary: "Hotel and short-stay accommodation for approved work travel can be reimbursed.",
+    documentation: "Upload the hotel invoice with dates and guest name.",
+    policyNote: "Pre-approval is required and nightly limits apply per policy."
+  },
+  meals: {
+    summary: "Meals during approved work travel or approved client meetings may be reimbursed.",
+    documentation: "Upload itemized receipts showing date, location, and amount.",
+    policyNote: "Per-diem and category caps apply."
+  },
+  transport: {
+    summary: "Local transport costs for approved work activity are reimbursable.",
+    documentation: "Upload ride receipts or transit tickets with trip date.",
+    policyNote: "Use the most cost-effective option available."
+  },
+  internet: {
+    summary: "Approved internet costs for work continuity can be reimbursed.",
+    documentation: "Upload provider invoices or recharge receipts.",
+    policyNote: "Only work-related usage is eligible."
+  },
+  office_supplies: {
+    summary: "Small office purchases required for work can be reimbursed.",
+    documentation: "Upload store receipts listing purchased items.",
+    policyNote: "Non-work and personal items are not eligible."
+  },
+  software: {
+    summary: "Approved software subscriptions and tools used for work can be reimbursed.",
+    documentation: "Upload invoices or subscription receipts with plan details.",
+    policyNote: "Pre-approval is required before purchase."
+  },
+  wellness: {
+    summary: "Wellness reimbursements are limited to approved wellness benefits and programs.",
+    documentation: "Upload receipts and provider confirmation where applicable.",
+    policyNote: "Claim limits and eligibility rules apply."
+  },
+  marketing: {
+    summary: "Approved campaign, event, and media spend can be reimbursed.",
+    documentation: "Upload campaign invoices, ad receipts, or event bills.",
+    policyNote: "Budget owner approval is required before spend."
+  },
+  other: {
+    summary: "Use this category only when no listed category applies.",
+    documentation: "Upload full proof of payment and add a clear business justification.",
+    policyNote: "Finance may request additional clarification before disbursement."
+  }
+};
+
 export function isExpenseCategory(value: string): value is ExpenseCategory {
   return EXPENSE_CATEGORIES.includes(value as ExpenseCategory);
 }

@@ -30,6 +30,7 @@ import {
 import {
   ALLOWED_RECEIPT_EXTENSIONS,
   currentMonthKey,
+  EXPENSE_CATEGORY_GUIDANCE,
   formatMonthLabel,
   getExpenseCategoryLabel,
   getExpenseStatusLabel,
@@ -517,6 +518,8 @@ export function ExpensesClient({
   const [expenseFormDirty, setExpenseFormDirty] = useState(false);
   useUnsavedGuard(expenseFormDirty);
 
+  const selectedCategoryGuidance = EXPENSE_CATEGORY_GUIDANCE[formValues.category];
+
   const summaryCurrency = useMemo(() => {
     const rows = expensesQuery.data?.expenses ?? [];
     return rows.length > 0 ? rows[0].currency : "USD";
@@ -810,7 +813,7 @@ export function ExpensesClient({
     <>
       <PageHeader
         title="Expenses"
-        description="Submit work expenses, upload receipts, and track where each claim is in the reimbursement flow."
+        description="Submit work expenses for reimbursement and track each claim through manager review and finance disbursement."
         actions={
           <>
             {canViewReports ? (
@@ -826,18 +829,28 @@ export function ExpensesClient({
       />
 
       <section className="expenses-toolbar" aria-label="Expenses filters">
-        <label className="form-field">
-          <span className="form-label">Month</span>
-          <input
-            className="form-input numeric"
-            type="month"
-            value={month}
-            onChange={(event) => setMonth(event.currentTarget.value)}
-          />
-        </label>
-        <p className="settings-card-description">
-          Showing {formatMonthLabel(month)} expenses.
-        </p>
+        <div className="expenses-toolbar-copy">
+          <label className="form-field">
+            <span className="form-label">Month</span>
+            <input
+              className="form-input numeric"
+              type="month"
+              value={month}
+              onChange={(event) => setMonth(event.currentTarget.value)}
+            />
+          </label>
+          <p className="settings-card-description">
+            Showing {formatMonthLabel(month)} expenses.
+          </p>
+        </div>
+        <div className="expenses-toolbar-actions">
+          <p className="settings-card-description">
+            Most claims are reviewed within 3 business days once submitted with a valid receipt.
+          </p>
+          <Link className="button" href="/documents">
+            View Expense Policy
+          </Link>
+        </div>
       </section>
 
       {expensesQuery.isLoading ? <ExpensesSkeleton /> : null}
@@ -1224,7 +1237,7 @@ export function ExpensesClient({
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
                 <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
-              <p>Not all expenses qualify for reimbursement. Reimbursement-eligible expenses must be pre-approved by your manager.</p>
+              <p>Not all expenses qualify for reimbursement. Claims should be pre-approved by your manager before spend.</p>
             </div>
           ) : null}
 
@@ -1251,6 +1264,21 @@ export function ExpensesClient({
             </div>
             {formErrors.category ? <p className="form-field-error">{formErrors.category}</p> : null}
           </div>
+
+          <section className="expenses-guidance-card" aria-label="Category guidance">
+            <header className="expenses-guidance-header">
+              <h3 className="section-title">Category Guidance</h3>
+              <StatusBadge tone="info">{getExpenseCategoryLabel(formValues.category)}</StatusBadge>
+            </header>
+            <p className="settings-card-description">{selectedCategoryGuidance.summary}</p>
+            <p className="settings-card-description">{selectedCategoryGuidance.documentation}</p>
+            <p className="settings-card-description">{selectedCategoryGuidance.policyNote}</p>
+            <div className="expenses-guidance-actions">
+              <Link href="/documents" className="button">
+                View Expense Policy
+              </Link>
+            </div>
+          </section>
 
           {formValues.category === "other" ? (
             <label className="form-field">
