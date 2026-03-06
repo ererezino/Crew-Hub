@@ -24,8 +24,10 @@ import {
   type UserRole
 } from "../../lib/navigation";
 import type { MeAccessConfigResponse } from "../../types/access-control";
+import { useKeyboardShortcuts } from "../../hooks/use-keyboard-shortcuts";
 import { AppErrorBoundary } from "./app-error-boundary";
 import { CommandPalette } from "./command-palette";
+import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { NavIcon } from "./nav-icon";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
@@ -530,6 +532,8 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
   const pathname = usePathname();
   const router = useRouter();
 
+  useKeyboardShortcuts();
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(readSidebarCollapsed);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -964,6 +968,8 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
           onNavigate={handleCommandNavigate}
         />
       ) : null}
+
+      <KeyboardShortcutsModal />
     </div>
   );
 }
