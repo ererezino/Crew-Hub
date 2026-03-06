@@ -604,7 +604,7 @@ export function SettingsClient({
         ) : null}
 
         {activeTab === "security" ? (
-          <div className="settings-section">
+          <article className="settings-card">
             <h3 className="settings-section-title">Security</h3>
             <p className="settings-field-hint" style={{ marginBottom: "var(--space-4)" }}>
               Manage your password and active sessions.
@@ -616,13 +616,13 @@ export function SettingsClient({
               </p>
               <Link
                 href="/change-password"
-                className="btn btn-secondary"
+                className="button"
                 style={{ display: "inline-block", marginTop: "var(--space-2)" }}
               >
                 Change password
               </Link>
             </div>
-          </div>
+          </article>
         ) : null}
 
         {activeTab === "audit" ? (

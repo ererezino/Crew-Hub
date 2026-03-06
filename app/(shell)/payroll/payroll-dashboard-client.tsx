@@ -155,8 +155,8 @@ export function PayrollDashboardClient({
 
           {sortedRuns.length === 0 ? (
             <EmptyState
-              title="No payroll runs yet"
-              description="Create a payroll run to calculate contractor payouts. Net pay equals gross pay while withholding is disabled."
+              title="Nothing here yet"
+              description="Create a payroll run to get started. Net pay equals gross pay while withholding is disabled."
               ctaLabel={canManage ? "Create payroll run" : "Open withholding settings"}
               ctaHref={canManage ? createRunHref : settingsHref}
             />

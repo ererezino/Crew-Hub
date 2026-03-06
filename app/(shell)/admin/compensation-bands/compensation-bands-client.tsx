@@ -621,7 +621,7 @@ export function CompensationBandsClient() {
             title="Compensation bands are unavailable"
             description={bandsQuery.errorMessage}
           />
-          <button type="button" className="button button-accent" onClick={() => bandsQuery.refresh()}>
+          <button type="button" className="button" onClick={() => bandsQuery.refresh()}>
             Retry
           </button>
         </>
@@ -747,15 +747,12 @@ export function CompensationBandsClient() {
             </header>
 
             {sortedBands.length === 0 ? (
-              <>
-                <EmptyState
-                  title="No compensation bands"
-                  description="Create your first compensation band to begin benchmarking and pay equity reviews."
-                />
-                <button type="button" className="button button-accent" onClick={handleOpenCreateBand}>
-                  Create band
-                </button>
-              </>
+              <EmptyState
+                title="No compensation bands"
+                description="Create your first compensation band to begin benchmarking and pay equity reviews."
+                ctaLabel="Create band"
+                onCtaClick={handleOpenCreateBand}
+              />
             ) : (
               <div className="data-table-container">
                 <table className="data-table" aria-label="Compensation bands table">
@@ -871,7 +868,7 @@ export function CompensationBandsClient() {
                 />
                 <button
                   type="button"
-                  className="button button-accent"
+                  className="button"
                   onClick={() => setIsBenchmarkPanelOpen(true)}
                 >
                   Add benchmark
@@ -966,7 +963,7 @@ export function CompensationBandsClient() {
                 />
                 <button
                   type="button"
-                  className="button button-accent"
+                  className="button"
                   onClick={() => setIsAssignmentPanelOpen(true)}
                 >
                   Assign employee

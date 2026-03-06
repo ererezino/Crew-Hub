@@ -39,7 +39,7 @@ import type { AnalyticsCsvSection } from "../../../types/analytics";
 
 const CHART_PALETTE = [
   "var(--color-accent)",
-  "var(--status-info-text)",
+  "var(--crew-navy)",
   "var(--status-warning-text)",
   "var(--status-pending-text)",
   "var(--text-secondary)"
@@ -494,7 +494,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
                     <XAxis type="number" tick={{ fill: "var(--text-secondary)" }} />
                     <YAxis dataKey="label" type="category" tick={{ fill: "var(--text-secondary)" }} width={100} />
                     <Tooltip />
-                    <Bar dataKey="count" fill={CHART_PALETTE[1]} radius={[0, 6, 6, 0]} />
+                    <Bar dataKey="count" fill={CHART_PALETTE[0]} radius={[0, 6, 6, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </article>

@@ -104,6 +104,10 @@
   --shadow-lg: 0 10px 30px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
   --shadow-xl: 0 20px 50px rgba(0,0,0,0.10), 0 8px 20px rgba(0,0,0,0.04);
 
+  /* ─── Skeleton shimmer ─── */
+  --skeleton-base: var(--bg-subtle);
+  --skeleton-highlight: var(--bg-surface);
+
   /* ─── Transitions ─── */
   --transition-hover: 150ms ease-in-out;
   --transition-panel: 200ms ease-out;
@@ -170,6 +174,9 @@ html.dark {
   --color-accent-subtle: #2E3D2A;
   --color-accent-hover: #E57D04;
   --color-accent-muted: #A06B2A;
+
+  --skeleton-base: #1A2A35;
+  --skeleton-highlight: #1E3040;
 
   --dashboard-card-hover-shadow: 0 12px 32px rgba(0,0,0,0.24);
   --dashboard-tooltip-bg: rgba(26, 26, 26, 0.92);
@@ -1149,7 +1156,7 @@ html.dark .topbar {
 .announcement-widget-skeleton-row {
   border-radius: var(--radius-default);
   height: 2.6rem;
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -1264,7 +1271,7 @@ html.dark .topbar {
 .announcements-skeleton-row {
   border-radius: var(--radius-default);
   height: 3.2rem;
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -1585,7 +1592,7 @@ html.dark .topbar {
 .table-skeleton-header {
   height: 2.1rem;
   border-radius: var(--radius-default);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -1593,7 +1600,7 @@ html.dark .topbar {
 .table-skeleton-row {
   height: 2.8rem;
   border-radius: var(--radius-default);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -2041,7 +2048,7 @@ html.dark .topbar {
 .onboarding-details-skeleton-summary,
 .onboarding-details-skeleton-section {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -2325,7 +2332,7 @@ html.dark .topbar {
 .team-availability-skeleton {
   height: 2.25rem;
   border-radius: var(--radius-default);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -2426,7 +2433,7 @@ html.dark .topbar {
 .timeoff-balance-skeleton-card {
   height: 8.4rem;
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -2435,7 +2442,7 @@ html.dark .topbar {
 .timeoff-calendar-skeleton {
   height: 22rem;
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -2698,7 +2705,7 @@ html.dark .topbar {
 .compensation-skeleton-equity-card,
 .compensation-skeleton-timeline {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -2829,7 +2836,7 @@ html.dark .topbar {
 .payment-details-skeleton-card,
 .payment-details-skeleton-form {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -2860,7 +2867,7 @@ html.dark .topbar {
 .payslips-skeleton-metric,
 .payslip-viewer-skeleton {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -3114,7 +3121,7 @@ html.dark .topbar {
 .expenses-metric-skeleton-card,
 .expenses-report-chart-skeleton {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -3897,7 +3904,7 @@ html.dark .topbar {
 .compliance-skeleton-toolbar,
 .compliance-skeleton-card {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -4106,7 +4113,7 @@ html.dark .topbar {
 .performance-skeleton-card,
 .performance-skeleton-form {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -4983,7 +4990,7 @@ html.dark .topbar {
 .analytics-skeleton-card,
 .analytics-skeleton-chart {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -5229,7 +5236,7 @@ html.dark .topbar {
 .payroll-run-skeleton-timeline,
 .payroll-run-skeleton-metrics {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -5776,7 +5783,7 @@ html.dark .topbar {
 
 .settings-skeleton {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -6042,7 +6049,7 @@ html.dark .topbar {
 .notification-item-skeleton {
   height: 4.2rem;
   border-radius: var(--radius-default);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -6364,7 +6371,7 @@ html.dark .topbar {
 .notifications-skeleton-toolbar,
 .notifications-skeleton-row {
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -7594,7 +7601,7 @@ html.dark .chart-tooltip-frosted {
   height: 1.6rem;
   width: 200px;
   border-radius: var(--radius-default);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -7608,7 +7615,7 @@ html.dark .chart-tooltip-frosted {
 .dashboard-v2-hero-skeleton-card {
   height: 130px;
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -7616,7 +7623,7 @@ html.dark .chart-tooltip-frosted {
 .dashboard-v2-chart-skeleton {
   height: 340px;
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }
@@ -7630,7 +7637,7 @@ html.dark .chart-tooltip-frosted {
 .dashboard-v2-panel-skeleton {
   height: 200px;
   border-radius: var(--radius-card);
-  background: linear-gradient(90deg, var(--bg-subtle) 20%, var(--bg-surface) 50%, var(--bg-subtle) 80%);
+  background: linear-gradient(90deg, var(--skeleton-base) 20%, var(--skeleton-highlight) 50%, var(--skeleton-base) 80%);
   background-size: 240% 100%;
   animation: skeleton-wave 1.4s ease-in-out infinite;
 }

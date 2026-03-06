@@ -682,11 +682,11 @@ export function ComplianceClient() {
           {sortedDeadlines.length === 0 ? (
             <EmptyState
               icon={<ShieldCheck size={32} />}
-              title="No deadlines found"
+              title="No compliance deadlines in this date range"
               description={
                 metricFilter || countryFilter !== "all"
                   ? "No deadlines match the current filters."
-                  : "No compliance deadlines exist in the selected date range."
+                  : "Try a wider date range or generate deadlines for the next year."
               }
               ctaLabel="Clear filters"
               ctaHref="/compliance"

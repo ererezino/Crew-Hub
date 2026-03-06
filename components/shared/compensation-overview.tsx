@@ -195,8 +195,8 @@ export function CompensationOverview({
           </article>
         ) : (
           <EmptyState
-            title="No salary record yet"
-            description="Compensation administrators can add the first salary record."
+            title="No salary record added yet"
+            description="Compensation admins can add the first one."
           />
         )}
 
