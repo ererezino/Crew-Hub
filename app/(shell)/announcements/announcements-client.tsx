@@ -452,7 +452,7 @@ export function AnnouncementsClient({
       ) : null}
 
       {!isLoading && !errorMessage && announcements.length === 0 ? (
-        <section className="error-state">
+        <>
           <EmptyState
             icon={<Megaphone size={32} />}
             title="No announcements yet"
@@ -463,7 +463,7 @@ export function AnnouncementsClient({
               Publish first announcement
             </button>
           ) : null}
-        </section>
+        </>
       ) : null}
 
       {!isLoading && !errorMessage && announcements.length > 0 ? (

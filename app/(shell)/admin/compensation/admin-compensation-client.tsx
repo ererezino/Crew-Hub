@@ -872,7 +872,7 @@ export function AdminCompensationClient({
       {compensationQuery.isLoading ? <CompensationSkeleton /> : null}
 
       {!compensationQuery.isLoading && compensationQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Compensation admin data is unavailable"
             description={compensationQuery.errorMessage}
@@ -884,7 +884,7 @@ export function AdminCompensationClient({
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!compensationQuery.isLoading &&

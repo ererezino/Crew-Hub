@@ -192,7 +192,7 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
       {detailQuery.isLoading ? surveyDetailSkeleton() : null}
 
       {!detailQuery.isLoading && detailQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Survey is unavailable"
             description={detailQuery.errorMessage}
@@ -206,7 +206,7 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!detailQuery.isLoading && !detailQuery.errorMessage && missingSurvey ? (

@@ -123,7 +123,7 @@ export function AdminSurveysClient() {
       {adminQuery.isLoading ? adminSurveysSkeleton() : null}
 
       {!adminQuery.isLoading && (adminQuery.errorMessage || errorMessage) ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Survey admin is unavailable"
             description={errorMessage ?? adminQuery.errorMessage ?? "Unable to load survey admin."}
@@ -138,7 +138,7 @@ export function AdminSurveysClient() {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!adminQuery.isLoading && !adminQuery.errorMessage && !errorMessage ? (

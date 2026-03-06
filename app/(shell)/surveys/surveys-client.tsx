@@ -70,7 +70,7 @@ export function SurveysClient({
       {pendingQuery.isLoading ? surveysSkeleton() : null}
 
       {!pendingQuery.isLoading && pendingQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Surveys are unavailable"
             description={pendingQuery.errorMessage}
@@ -82,7 +82,7 @@ export function SurveysClient({
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!pendingQuery.isLoading && !pendingQuery.errorMessage ? (

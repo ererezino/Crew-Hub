@@ -337,7 +337,7 @@ export function ExpenseReportsClient() {
       {reportsQuery.isLoading ? <ReportsSkeleton /> : null}
 
       {!reportsQuery.isLoading && reportsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Expense reports are unavailable"
             description={reportsQuery.errorMessage}
@@ -347,7 +347,7 @@ export function ExpenseReportsClient() {
           <button type="button" className="button button-accent" onClick={() => reportsQuery.refresh()}>
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!reportsQuery.isLoading && !reportsQuery.errorMessage && reportsQuery.data ? (

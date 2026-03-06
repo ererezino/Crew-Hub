@@ -69,7 +69,7 @@ export function AdminPaymentDetailsClient() {
       {paymentDetailsQuery.isLoading ? detailsTableSkeleton() : null}
 
       {!paymentDetailsQuery.isLoading && paymentDetailsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Payment details are unavailable"
             description={paymentDetailsQuery.errorMessage}
@@ -81,7 +81,7 @@ export function AdminPaymentDetailsClient() {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!paymentDetailsQuery.isLoading &&

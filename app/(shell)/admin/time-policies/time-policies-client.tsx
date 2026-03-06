@@ -47,7 +47,7 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
       {policiesQuery.isLoading ? policiesSkeleton() : null}
 
       {!policiesQuery.isLoading && policiesQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Time policies are unavailable"
             description={policiesQuery.errorMessage}
@@ -59,7 +59,7 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!policiesQuery.isLoading && !policiesQuery.errorMessage && sortedPolicies.length === 0 ? (

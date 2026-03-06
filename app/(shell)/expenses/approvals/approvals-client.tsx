@@ -716,7 +716,7 @@ export function ExpenseApprovalsClient({
       {approvalsQuery.isLoading ? <ApprovalSkeleton /> : null}
 
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Expense approvals are unavailable"
             description={approvalsQuery.errorMessage}
@@ -726,7 +726,7 @@ export function ExpenseApprovalsClient({
           <button type="button" className="button button-accent" onClick={() => approvalsQuery.refresh()}>
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && approvalsQuery.data ? (

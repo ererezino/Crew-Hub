@@ -103,7 +103,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
       {isLoading ? learningSkeleton() : null}
 
       {!isLoading && errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Learning data is unavailable"
             description={errorMessage}
@@ -118,7 +118,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!isLoading && !errorMessage ? (

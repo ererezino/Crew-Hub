@@ -694,7 +694,7 @@ export function PeopleClient({
       ) : null}
 
       {!isLoading && !errorMessage && sortedPeople.length === 0 ? (
-        <section className="error-state">
+        <>
           <EmptyState
             icon={<Users size={32} />}
             title="No employees found"
@@ -712,7 +712,7 @@ export function PeopleClient({
               Add person
             </button>
           ) : null}
-        </section>
+        </>
       ) : null}
 
       {!isLoading && !errorMessage && sortedPeople.length > 0 ? (

@@ -408,7 +408,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
       ) : null}
 
       {!isLoading && !errorMessage && filteredDocuments.length === 0 ? (
-        <section className="error-state">
+        <>
           <EmptyState
             icon={<FileText size={32} />}
             title="No documents here"
@@ -417,7 +417,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
               ? { ctaLabel: "Upload document", onCtaClick: openCreatePanel }
               : {})}
           />
-        </section>
+        </>
       ) : null}
 
       {!isLoading && !errorMessage && filteredDocuments.length > 0 ? (

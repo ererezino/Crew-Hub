@@ -192,7 +192,7 @@ export function SchedulingSwapsClient({
       {(swapsQuery.isLoading || shiftsQuery.isLoading) ? swapsSkeleton() : null}
 
       {!swapsQuery.isLoading && swapsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Shift swaps are unavailable"
             description={swapsQuery.errorMessage}
@@ -204,7 +204,7 @@ export function SchedulingSwapsClient({
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!swapsQuery.isLoading && !swapsQuery.errorMessage ? (

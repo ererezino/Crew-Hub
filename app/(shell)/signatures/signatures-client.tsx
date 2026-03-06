@@ -581,7 +581,7 @@ export function SignaturesClient({
       ) : null}
 
       {!signatures.isLoading && !signatures.errorMessage && visibleRequests.length === 0 ? (
-        <section className="error-state">
+        <>
           <EmptyState
             icon={<PenSquare size={32} />}
             title="No signatures pending"
@@ -600,7 +600,7 @@ export function SignaturesClient({
               New signature request
             </button>
           ) : null}
-        </section>
+        </>
       ) : null}
 
       {!signatures.isLoading && !signatures.errorMessage && visibleRequests.length > 0 ? (

@@ -63,7 +63,7 @@ export function TimeAttendanceClient() {
       {overviewQuery.isLoading ? overviewSkeleton() : null}
 
       {!overviewQuery.isLoading && overviewQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Attendance data is unavailable"
             description={overviewQuery.errorMessage}
@@ -75,7 +75,7 @@ export function TimeAttendanceClient() {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!overviewQuery.isLoading && !overviewQuery.errorMessage && overviewQuery.data ? (

@@ -83,7 +83,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
       {openShiftsQuery.isLoading ? openShiftsSkeleton() : null}
 
       {!openShiftsQuery.isLoading && openShiftsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Open shifts are unavailable"
             description={openShiftsQuery.errorMessage}
@@ -95,7 +95,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!openShiftsQuery.isLoading && !openShiftsQuery.errorMessage && sortedShifts.length === 0 ? (

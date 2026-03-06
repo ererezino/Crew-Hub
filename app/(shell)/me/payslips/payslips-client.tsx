@@ -246,7 +246,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
       {payslipsQuery.isLoading ? metricsSkeleton() : null}
 
       {!payslipsQuery.isLoading && payslipsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Payments are unavailable"
             description={payslipsQuery.errorMessage}
@@ -258,7 +258,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!payslipsQuery.isLoading && !payslipsQuery.errorMessage ? (

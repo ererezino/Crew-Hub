@@ -115,7 +115,7 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
       {templatesQuery.isLoading ? templatesSkeleton() : null}
 
       {!templatesQuery.isLoading && templatesQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Template data is unavailable"
             description={templatesQuery.errorMessage}
@@ -127,7 +127,7 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!templatesQuery.isLoading && !templatesQuery.errorMessage ? (

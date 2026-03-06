@@ -695,14 +695,14 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
       {isLoading ? learningCourseSkeleton() : null}
 
       {!isLoading && errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Course data is unavailable"
             description={errorMessage}
             ctaLabel="Back to learning"
             ctaHref="/learning"
           />
-        </section>
+        </>
       ) : null}
 
       {!isLoading && !errorMessage && course ? (

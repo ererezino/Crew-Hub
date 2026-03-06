@@ -535,12 +535,12 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
 
   if (schedulesQuery.errorMessage || shiftsQuery.errorMessage) {
     return (
-      <section className="error-state">
+      <>
         <EmptyState
           title="Scheduling management is unavailable"
           description={schedulesQuery.errorMessage ?? shiftsQuery.errorMessage ?? "Unable to load scheduling management data."}
         />
-      </section>
+      </>
     );
   }
 

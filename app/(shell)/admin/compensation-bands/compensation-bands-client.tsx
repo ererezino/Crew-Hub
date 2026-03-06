@@ -616,7 +616,7 @@ export function CompensationBandsClient() {
       {bandsQuery.isLoading ? bandTableSkeleton() : null}
 
       {!bandsQuery.isLoading && bandsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Compensation bands are unavailable"
             description={bandsQuery.errorMessage}
@@ -624,7 +624,7 @@ export function CompensationBandsClient() {
           <button type="button" className="button button-accent" onClick={() => bandsQuery.refresh()}>
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!bandsQuery.isLoading && !bandsQuery.errorMessage && bandsQuery.data ? (
@@ -747,7 +747,7 @@ export function CompensationBandsClient() {
             </header>
 
             {sortedBands.length === 0 ? (
-              <section className="error-state">
+              <>
                 <EmptyState
                   title="No compensation bands"
                   description="Create your first compensation band to begin benchmarking and pay equity reviews."
@@ -755,7 +755,7 @@ export function CompensationBandsClient() {
                 <button type="button" className="button button-accent" onClick={handleOpenCreateBand}>
                   Create band
                 </button>
-              </section>
+              </>
             ) : (
               <div className="data-table-container">
                 <table className="data-table" aria-label="Compensation bands table">
@@ -864,7 +864,7 @@ export function CompensationBandsClient() {
             </header>
 
             {sortedBenchmarks.length === 0 ? (
-              <section className="error-state">
+              <>
                 <EmptyState
                   title="No benchmark data"
                   description="Add external benchmark records to compare your bands with market pay data."
@@ -876,7 +876,7 @@ export function CompensationBandsClient() {
                 >
                   Add benchmark
                 </button>
-              </section>
+              </>
             ) : (
               <div className="data-table-container">
                 <table className="data-table" aria-label="Benchmark data table">
@@ -959,7 +959,7 @@ export function CompensationBandsClient() {
             </header>
 
             {sortedAssignments.length === 0 ? (
-              <section className="error-state">
+              <>
                 <EmptyState
                   title="No assignments"
                   description="Assign employees to bands to enable compa-ratio and out-of-band alerts."
@@ -971,7 +971,7 @@ export function CompensationBandsClient() {
                 >
                   Assign employee
                 </button>
-              </section>
+              </>
             ) : (
               <div className="data-table-container">
                 <table className="data-table" aria-label="Band assignments table">

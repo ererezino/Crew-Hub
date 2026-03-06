@@ -688,7 +688,7 @@ export function OnboardingClient({
           {!activeInstancesQueryForTab.isLoading &&
           !activeInstancesQueryForTab.errorMessage &&
           instancesForTab.length === 0 ? (
-            <section className="error-state">
+            <>
               <EmptyState
                 title={`No ${activeTab} onboarding instances`}
                 description="When onboarding records are created, they will appear in this table."
@@ -696,7 +696,7 @@ export function OnboardingClient({
                   ? { ctaLabel: "Start onboarding", onCtaClick: () => setIsStartPanelOpen(true) }
                   : {})}
               />
-            </section>
+            </>
           ) : null}
 
           {!activeInstancesQueryForTab.isLoading &&
@@ -800,14 +800,14 @@ export function OnboardingClient({
           {!atRiskQuery.isLoading &&
           !atRiskQuery.errorMessage &&
           atRiskQuery.instances.length === 0 ? (
-            <section className="error-state">
+            <>
               <EmptyState
                 title="No at-risk onboarding instances"
                 description="All active onboarding plans are progressing on schedule."
                 ctaLabel="View active"
                 onCtaClick={() => setActiveTab("active")}
               />
-            </section>
+            </>
           ) : null}
 
           {!atRiskQuery.isLoading &&
@@ -912,7 +912,7 @@ export function OnboardingClient({
           {!templatesQuery.isLoading &&
           !templatesQuery.errorMessage &&
           templatesQuery.templates.length === 0 ? (
-            <section className="error-state">
+            <>
               <EmptyState
                 title="No onboarding templates"
                 description="Template records will appear here once created."
@@ -929,7 +929,7 @@ export function OnboardingClient({
                   Create template
                 </button>
               ) : null}
-            </section>
+            </>
           ) : null}
 
           {!templatesQuery.isLoading &&

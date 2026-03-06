@@ -884,7 +884,7 @@ export function ExpensesClient({
       {expensesQuery.isLoading ? <ExpensesSkeleton /> : null}
 
       {!expensesQuery.isLoading && expensesQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Expenses are unavailable"
             description={expensesQuery.errorMessage}
@@ -894,7 +894,7 @@ export function ExpensesClient({
           <button type="button" className="button button-accent" onClick={() => expensesQuery.refresh()}>
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!expensesQuery.isLoading && !expensesQuery.errorMessage && expensesQuery.data ? (

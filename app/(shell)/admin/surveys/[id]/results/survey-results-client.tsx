@@ -253,7 +253,7 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
       {resultsQuery.isLoading ? surveyResultsSkeleton() : null}
 
       {!resultsQuery.isLoading && resultsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Survey results are unavailable"
             description={resultsQuery.errorMessage}
@@ -267,7 +267,7 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!resultsQuery.isLoading && !resultsQuery.errorMessage && !survey?.id ? (

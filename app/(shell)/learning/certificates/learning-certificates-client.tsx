@@ -81,7 +81,7 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
       {assignmentsQuery.isLoading ? certificatesSkeleton() : null}
 
       {!assignmentsQuery.isLoading && assignmentsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Certificate data is unavailable"
             description={assignmentsQuery.errorMessage}
@@ -91,7 +91,7 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
           <button type="button" className="button button-accent" onClick={() => assignmentsQuery.refresh()}>
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!assignmentsQuery.isLoading && !assignmentsQuery.errorMessage ? (

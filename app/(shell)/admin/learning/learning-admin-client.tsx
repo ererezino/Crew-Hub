@@ -158,7 +158,7 @@ export function LearningAdminClient() {
       {isLoading ? learningAdminSkeleton() : null}
 
       {!isLoading && errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Learning admin data is unavailable"
             description={errorMessage}
@@ -173,7 +173,7 @@ export function LearningAdminClient() {
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!isLoading && !errorMessage ? (

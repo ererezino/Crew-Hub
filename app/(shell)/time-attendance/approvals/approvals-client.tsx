@@ -136,7 +136,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
       {approvalsQuery.isLoading ? approvalsSkeleton() : null}
 
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
-        <section className="error-state">
+        <>
           <EmptyState
             title="Approvals are unavailable"
             description={approvalsQuery.errorMessage}
@@ -149,7 +149,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
           >
             Retry
           </button>
-        </section>
+        </>
       ) : null}
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && sortedTimesheets.length === 0 ? (
