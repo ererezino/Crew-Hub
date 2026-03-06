@@ -136,6 +136,17 @@ export function SchedulingSwapsClient({
   }
 
   async function handleSwapAction(swapId: string, action: SwapAction) {
+    if (action === "cancel" || action === "reject") {
+      const actionLabel = action === "cancel" ? "cancel" : "reject";
+      const confirmed = window.confirm(
+        `Are you sure you want to ${actionLabel} this swap request?`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
     setIsUpdatingSwapId(swapId);
     setFeedbackMessage(null);
 

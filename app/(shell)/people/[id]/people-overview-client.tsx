@@ -222,6 +222,14 @@ export function PeopleOverviewClient({
       event.preventDefault();
       if (!person) return;
 
+      const confirmed = window.confirm(
+        `Begin offboarding for ${person.fullName}? This will move the employee to offboarding and create related tasks.`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
       setIsSubmittingOffboard(true);
       setOffboardError(null);
 
