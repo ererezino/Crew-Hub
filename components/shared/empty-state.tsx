@@ -24,11 +24,11 @@ export function EmptyState({
       <h2 className="empty-state-title">{title}</h2>
       <p className="empty-state-description">{description}</p>
       {ctaLabel && onCtaClick ? (
-        <button type="button" className="button button-accent" onClick={onCtaClick}>
+        <button type="button" className="button" onClick={onCtaClick}>
           {ctaLabel}
         </button>
       ) : ctaLabel && ctaHref ? (
-        <Link className="button button-accent" href={ctaHref}>
+        <Link className="button" href={ctaHref}>
           {ctaLabel}
         </Link>
       ) : null}

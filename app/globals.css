@@ -250,28 +250,28 @@ kbd {
 }
 
 .button-accent {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #ffffff;
   box-shadow: var(--shadow-sm);
 }
 
 .button-accent:hover {
-  background: #333333;
-  border-color: #333333;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
   box-shadow: var(--shadow-md);
 }
 
 html.dark .button-accent {
-  background: #F5F5F5;
-  border-color: #F5F5F5;
-  color: #111111;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #ffffff;
 }
 
 html.dark .button-accent:hover {
-  background: #E0E0E0;
-  border-color: #E0E0E0;
-  color: #111111;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: #ffffff;
 }
 
 .button-orange {
@@ -3872,7 +3872,12 @@ html.dark .topbar {
   cursor: pointer;
   transition: box-shadow var(--transition-hover), transform var(--transition-hover);
   text-align: left;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-subtle);
+  border-left-width: 4px;
+}
+
+.compliance-metric-grid .metric-card {
+  border-left-width: 4px;
 }
 
 .compliance-metric-clickable:hover {
@@ -5754,9 +5759,9 @@ html.dark .topbar {
 
 .metric-label {
   color: var(--text-muted);
-  font-size: var(--text-body);
+  font-size: var(--text-xs);
   font-weight: 500;
-
+  text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
