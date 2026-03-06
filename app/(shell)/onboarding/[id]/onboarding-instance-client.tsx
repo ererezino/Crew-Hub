@@ -173,6 +173,21 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
                       <p className="settings-card-description">
                         Completed by: {task.completedByName ?? "--"}
                       </p>
+                      {task.completionGuidance ? (
+                        <p className="settings-card-description">
+                          Completion guidance: {task.completionGuidance}
+                        </p>
+                      ) : null}
+                      {task.actionUrl ? (
+                        <a
+                          href={task.actionUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="button button-sm"
+                        >
+                          {task.actionLabel ?? "Open task action"}
+                        </a>
+                      ) : null}
                       <p className="settings-card-description">{task.notes ?? "No notes"}</p>
                     </div>
                   </li>

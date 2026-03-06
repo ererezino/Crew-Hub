@@ -23,7 +23,21 @@ const templateTaskInputSchema = z.object({
   title: z.string().trim().min(1, "Task title is required.").max(200, "Task title is too long."),
   description: z.string().trim().max(1000, "Task description is too long.").optional(),
   category: z.string().trim().min(1, "Task category is required.").max(50, "Task category is too long."),
-  dueOffsetDays: z.number().int().min(-365).max(365).nullable().optional()
+  dueOffsetDays: z.number().int().min(-365).max(365).nullable().optional(),
+  actionUrl: z
+    .string()
+    .trim()
+    .url("Action URL must be a valid URL.")
+    .max(500, "Action URL is too long.")
+    .nullable()
+    .optional(),
+  actionLabel: z.string().trim().max(120, "Action label is too long.").nullable().optional(),
+  completionGuidance: z
+    .string()
+    .trim()
+    .max(1000, "Completion guidance is too long.")
+    .nullable()
+    .optional()
 });
 
 const createTemplateSchema = z.object({
@@ -55,7 +69,13 @@ const templateTaskSchema = z.object({
   description: z.string().default(""),
   category: z.string(),
   dueOffsetDays: z.number().int().nullable().optional(),
-  due_offset_days: z.number().int().nullable().optional()
+  due_offset_days: z.number().int().nullable().optional(),
+  actionUrl: z.string().nullable().optional(),
+  action_url: z.string().nullable().optional(),
+  actionLabel: z.string().nullable().optional(),
+  action_label: z.string().nullable().optional(),
+  completionGuidance: z.string().nullable().optional(),
+  completion_guidance: z.string().nullable().optional()
 });
 
 function buildMeta() {
@@ -93,7 +113,11 @@ function normalizeTemplateTasks(value: unknown): OnboardingTemplateTask[] {
       dueOffsetDays:
         parsedTask.data.dueOffsetDays ??
         parsedTask.data.due_offset_days ??
-        null
+        null,
+      actionUrl: parsedTask.data.actionUrl ?? parsedTask.data.action_url ?? null,
+      actionLabel: parsedTask.data.actionLabel ?? parsedTask.data.action_label ?? null,
+      completionGuidance:
+        parsedTask.data.completionGuidance ?? parsedTask.data.completion_guidance ?? null
     });
   }
 
@@ -264,7 +288,10 @@ export async function POST(request: Request) {
     title: task.title.trim(),
     description: task.description?.trim() ?? "",
     category: task.category.trim(),
-    dueOffsetDays: task.dueOffsetDays ?? null
+    dueOffsetDays: task.dueOffsetDays ?? null,
+    actionUrl: task.actionUrl?.trim() || null,
+    actionLabel: task.actionLabel?.trim() || null,
+    completionGuidance: task.completionGuidance?.trim() || null
   }));
 
   const { data: insertedTemplate, error: insertError } = await supabase

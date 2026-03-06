@@ -209,6 +209,21 @@ export function MyOnboardingClient() {
                       "--"
                     )}
                   </p>
+                  {task.completionGuidance ? (
+                    <p className="settings-card-description">
+                      Completion guidance: {task.completionGuidance}
+                    </p>
+                  ) : null}
+                  {task.actionUrl && task.taskType !== "e_signature" ? (
+                    <a
+                      href={task.actionUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="button button-sm"
+                    >
+                      {task.actionLabel ?? "Open task action"}
+                    </a>
+                  ) : null}
                   {task.taskType === "e_signature" && task.status !== "completed" ? (
                     <Link href="/signatures" className="button button-accent button-sm">
                       Sign now
