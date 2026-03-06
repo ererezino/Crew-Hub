@@ -2991,6 +2991,17 @@ html.dark .topbar {
   flex-wrap: wrap;
 }
 
+.expenses-toolbar-copy {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.expenses-toolbar-actions {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: flex-start;
+}
+
 .expenses-metric-grid,
 .expenses-metric-skeleton-grid {
   margin-bottom: var(--space-4);
@@ -3194,6 +3205,28 @@ html.dark .topbar {
 .expenses-category-option-active {
   border-color: var(--color-accent);
   background: var(--color-accent-subtle);
+}
+
+.expenses-guidance-card {
+  border: 1px solid var(--status-info-border);
+  border-radius: var(--radius-default);
+  background: color-mix(in srgb, var(--status-info-bg) 60%, var(--bg-canvas));
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.expenses-guidance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.expenses-guidance-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .expenses-form-grid {
