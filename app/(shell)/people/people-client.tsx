@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -9,7 +9,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { usePeople } from "../../../hooks/use-people";
-import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
+import { countryFlagFromCode, countryNameFromCode, getCountryDefaults } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { formatEmploymentType, formatProfileStatus } from "../../../lib/format-labels";
 import { USER_ROLES } from "../../../lib/navigation";
@@ -56,6 +56,7 @@ type CreatePersonFormValues = {
   employmentType: EmploymentType;
   primaryCurrency: string;
   status: ProfileStatus;
+  isNewHire: boolean;
 };
 
 type CreatePersonFormErrors = Partial<Record<keyof CreatePersonFormValues, string>> & {
@@ -86,7 +87,8 @@ const createPersonSchema = z.object({
     .string()
     .trim()
     .length(3, "Currency must be a 3-letter code."),
-  status: z.enum(PROFILE_STATUSES)
+  status: z.enum(PROFILE_STATUSES),
+  isNewHire: z.boolean()
 });
 
 const roleLabels: Record<AppRole, string> = {
@@ -112,7 +114,8 @@ const initialCreatePersonFormValues: CreatePersonFormValues = {
   managerId: "",
   employmentType: "contractor",
   primaryCurrency: "USD",
-  status: "active"
+  status: "active",
+  isNewHire: true
 };
 
 function createToastId() {
@@ -160,7 +163,8 @@ function mapSchemaErrors(values: CreatePersonFormValues): CreatePersonFormErrors
     managerId: values.managerId.trim().length > 0 ? values.managerId.trim() : null,
     employmentType: values.employmentType,
     primaryCurrency: values.primaryCurrency,
-    status: values.status
+    status: values.status,
+    isNewHire: values.isNewHire
   });
 
   if (parsed.success) {
@@ -189,6 +193,165 @@ function mapSchemaErrors(values: CreatePersonFormValues): CreatePersonFormErrors
 
 function hasValidationErrors(errors: CreatePersonFormErrors): boolean {
   return Object.values(errors).some((value) => Boolean(value));
+}
+
+type BulkStep = "template" | "preview" | "importing" | "done";
+
+type BulkParsedRow = {
+  data: Record<string, string>;
+  errors: string[];
+  valid: boolean;
+};
+
+type BulkResult = {
+  email: string;
+  status: string;
+  error?: string;
+};
+
+const CSV_TEMPLATE_HEADERS = [
+  "full_name",
+  "email",
+  "country_code",
+  "department",
+  "job_title",
+  "employment_type",
+  "start_date",
+  "manager_email",
+  "roles"
+] as const;
+
+function parseCSVLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ",") {
+        fields.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+  }
+
+  fields.push(current.trim());
+  return fields;
+}
+
+function parseCSV(text: string): { headers: string[]; rows: Record<string, string>[] } {
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .filter((line) => line.trim().length > 0);
+
+  if (lines.length === 0) {
+    return { headers: [], rows: [] };
+  }
+
+  const headers = parseCSVLine(lines[0]).map((header) => header.toLowerCase().trim());
+  const rows: Record<string, string>[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCSVLine(lines[i]);
+    const row: Record<string, string> = {};
+
+    for (let j = 0; j < headers.length; j++) {
+      row[headers[j]] = values[j] ?? "";
+    }
+
+    rows.push(row);
+  }
+
+  return { headers, rows };
+}
+
+function validateBulkRow(row: Record<string, string>): { errors: string[]; valid: boolean } {
+  const errors: string[] = [];
+
+  const email = row.email?.trim() ?? "";
+  const fullName = row.full_name?.trim() ?? "";
+
+  if (!fullName) {
+    errors.push("Full name is required.");
+  }
+
+  if (!email) {
+    errors.push("Email is required.");
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.push("Email is not valid.");
+  }
+
+  const countryCode = row.country_code?.trim() ?? "";
+  if (countryCode && !/^[a-zA-Z]{2}$/.test(countryCode)) {
+    errors.push("Country code must be 2 letters.");
+  }
+
+  const startDate = row.start_date?.trim() ?? "";
+  if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+    errors.push("Start date must be YYYY-MM-DD.");
+  }
+
+  const employmentType = row.employment_type?.trim().toLowerCase() ?? "";
+  if (employmentType && !["contractor", "full_time", "part_time"].includes(employmentType)) {
+    errors.push("Employment type must be contractor, full_time, or part_time.");
+  }
+
+  const managerEmail = row.manager_email?.trim() ?? "";
+  if (managerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(managerEmail)) {
+    errors.push("Manager email is not valid.");
+  }
+
+  return { errors, valid: errors.length === 0 };
+}
+
+function downloadCSVTemplate() {
+  const csvContent = CSV_TEMPLATE_HEADERS.join(",") + "\nJane Doe,jane@example.com,US,Engineering,Software Engineer,full_time,2024-01-15,manager@example.com,EMPLOYEE";
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "crew-hub-people-template.csv";
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function mapCSVRowToEmployee(row: Record<string, string>) {
+  const rolesRaw = row.roles?.trim() ?? "";
+  const roles = rolesRaw
+    .split(/[,;|]/)
+    .map((r) => r.trim().toUpperCase())
+    .filter((r) => USER_ROLES.includes(r as AppRole));
+
+  return {
+    email: row.email?.trim() ?? "",
+    fullName: row.full_name?.trim() ?? "",
+    countryCode: row.country_code?.trim() || undefined,
+    department: row.department?.trim() || undefined,
+    title: row.job_title?.trim() || undefined,
+    startDate: row.start_date?.trim() || undefined,
+    managerEmail: row.manager_email?.trim() || undefined,
+    roles: roles.length > 0 ? roles : undefined,
+    employmentType: row.employment_type?.trim().toLowerCase() || undefined
+  };
 }
 
 function PeopleTableSkeleton() {
@@ -221,6 +384,15 @@ export function PeopleClient({
   const [createErrors, setCreateErrors] = useState<CreatePersonFormErrors>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // Bulk upload state
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [bulkStep, setBulkStep] = useState<BulkStep>("template");
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkRows, setBulkRows] = useState<BulkParsedRow[]>([]);
+  const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const bulkFileInputRef = useRef<HTMLInputElement>(null);
+
   const sortedPeople = useMemo(
     () =>
       [...people].sort((leftPerson, rightPerson) => {
@@ -245,6 +417,136 @@ export function PeopleClient({
       setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
     }, 4000);
   };
+
+  const closeBulkUploadPanel = useCallback(() => {
+    if (bulkStep === "importing") {
+      return;
+    }
+
+    setIsBulkUploadOpen(false);
+    setBulkStep("template");
+    setBulkFile(null);
+    setBulkRows([]);
+    setBulkResults([]);
+    setBulkError(null);
+
+    if (bulkFileInputRef.current) {
+      bulkFileInputRef.current.value = "";
+    }
+  }, [bulkStep]);
+
+  const handleBulkFileChange = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      setBulkError(null);
+      const file = event.target.files?.[0];
+
+      if (!file) {
+        return;
+      }
+
+      if (!file.name.endsWith(".csv")) {
+        setBulkError("Please upload a .csv file.");
+        return;
+      }
+
+      setBulkFile(file);
+
+      try {
+        const text = await file.text();
+        const { headers, rows } = parseCSV(text);
+
+        if (rows.length === 0) {
+          setBulkError("The CSV file is empty or has no data rows.");
+          return;
+        }
+
+        if (!headers.includes("email") || !headers.includes("full_name")) {
+          setBulkError("The CSV must include 'email' and 'full_name' columns.");
+          return;
+        }
+
+        // Check for duplicate emails within the file
+        const emailCounts = new Map<string, number>();
+        for (const row of rows) {
+          const email = (row.email ?? "").trim().toLowerCase();
+          if (email) {
+            emailCounts.set(email, (emailCounts.get(email) ?? 0) + 1);
+          }
+        }
+
+        const parsedRows: BulkParsedRow[] = rows.map((row) => {
+          const validation = validateBulkRow(row);
+          const email = (row.email ?? "").trim().toLowerCase();
+          const duplicateCount = emailCounts.get(email) ?? 0;
+
+          if (duplicateCount > 1) {
+            validation.errors.push("Duplicate email within this file.");
+            validation.valid = false;
+          }
+
+          return {
+            data: row,
+            errors: validation.errors,
+            valid: validation.valid
+          };
+        });
+
+        setBulkRows(parsedRows);
+        setBulkStep("preview");
+      } catch {
+        setBulkError("Failed to read the CSV file.");
+      }
+    },
+    []
+  );
+
+  const handleBulkImport = useCallback(async () => {
+    const validRows = bulkRows.filter((row) => row.valid);
+
+    if (validRows.length === 0) {
+      setBulkError("No valid rows to import.");
+      return;
+    }
+
+    setBulkStep("importing");
+    setBulkError(null);
+
+    try {
+      const employees = validRows.map((row) => mapCSVRowToEmployee(row.data));
+
+      const response = await fetch("/api/v1/people/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employees, confirm: true })
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok && !payload.data?.results) {
+        setBulkError(humanizeError(payload.error?.message ?? "Bulk import failed."));
+        setBulkStep("preview");
+        return;
+      }
+
+      setBulkResults(payload.data.results ?? []);
+      setBulkStep("done");
+
+      const created = payload.data.created ?? 0;
+      const failed = payload.data.failed ?? 0;
+
+      if (created > 0) {
+        addToast("success", `${created} employee${created === 1 ? "" : "s"} imported successfully.`);
+        refresh();
+      }
+
+      if (failed > 0) {
+        addToast("error", `${failed} employee${failed === 1 ? "" : "s"} failed to import.`);
+      }
+    } catch (error) {
+      setBulkError(error instanceof Error ? error.message : "Bulk import failed.");
+      setBulkStep("preview");
+    }
+  }, [bulkRows, refresh]);
 
   const closeCreatePanel = () => {
     if (isCreating) {
@@ -316,7 +618,8 @@ export function PeopleClient({
           managerId: createValues.managerId.trim() || undefined,
           employmentType: createValues.employmentType,
           primaryCurrency: createValues.primaryCurrency.trim().toUpperCase(),
-          status: createValues.status
+          status: createValues.status,
+          isNewEmployee: createValues.isNewHire
         })
       });
 
@@ -359,13 +662,22 @@ export function PeopleClient({
         description="Find people quickly, review role and status, and open full employee profiles."
         actions={
           canManagePeople ? (
-            <button
-              type="button"
-              className="button button-accent"
-              onClick={() => setIsCreateOpen(true)}
-            >
-              Add person
-            </button>
+            <>
+              <button
+                type="button"
+                className="button"
+                onClick={() => setIsBulkUploadOpen(true)}
+              >
+                Bulk Upload
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => setIsCreateOpen(true)}
+              >
+                Add person
+              </button>
+            </>
           ) : null
         }
       />
@@ -505,6 +817,33 @@ export function PeopleClient({
         onClose={closeCreatePanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleCreatePerson} noValidate>
+          <div className="form-field">
+            <span className="form-label">Employee type</span>
+            <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
+              <button
+                type="button"
+                className={createValues.isNewHire ? "button button-accent" : "button"}
+                style={{ flex: 1, height: 36 }}
+                onClick={() => updateCreateValues({ ...createValues, isNewHire: true })}
+              >
+                New hire
+              </button>
+              <button
+                type="button"
+                className={!createValues.isNewHire ? "button button-accent" : "button"}
+                style={{ flex: 1, height: 36 }}
+                onClick={() => updateCreateValues({ ...createValues, isNewHire: false })}
+              >
+                Existing employee
+              </button>
+            </div>
+            <p className="form-field-hint">
+              {createValues.isNewHire
+                ? "New hires get an onboarding checklist and welcome email."
+                : "Existing employees get a profile only."}
+            </p>
+          </div>
+
           <label className="form-field" htmlFor="person-email">
             <span className="form-label">Email</span>
             <input
@@ -619,12 +958,15 @@ export function PeopleClient({
               maxLength={2}
               className={createErrors.countryCode ? "form-input form-input-error" : "form-input"}
               value={createValues.countryCode}
-              onChange={(event) =>
+              onChange={(event) => {
+                const code = event.currentTarget.value.toUpperCase();
+                const defaults = code.length === 2 ? getCountryDefaults(code) : null;
                 updateCreateValues({
                   ...createValues,
-                  countryCode: event.currentTarget.value.toUpperCase()
-                })
-              }
+                  countryCode: code,
+                  ...(defaults ? { primaryCurrency: defaults.currency, timezone: defaults.timezone } : {})
+                });
+              }}
             />
             {createErrors.countryCode ? (
               <p className="form-field-error">{createErrors.countryCode}</p>
@@ -791,6 +1133,194 @@ export function PeopleClient({
             </button>
           </div>
         </form>
+      </SlidePanel>
+
+      <SlidePanel
+        isOpen={isBulkUploadOpen}
+        title="Bulk Upload"
+        description="Import multiple employees from a CSV file."
+        onClose={closeBulkUploadPanel}
+      >
+        <div className="slide-panel-form-wrapper">
+          {bulkStep === "template" ? (
+            <div className="bulk-upload-step">
+              <div className="bulk-upload-instructions">
+                <h3 className="form-label">Step 1: Download the CSV template</h3>
+                <p className="form-hint">
+                  Download the template, fill in your employee data, then upload the completed CSV.
+                  Required columns: <strong>full_name</strong> and <strong>email</strong>.
+                  Optional columns: country_code, department, job_title, employment_type, start_date, manager_email, roles.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={downloadCSVTemplate}
+              >
+                Download CSV Template
+              </button>
+              <div className="bulk-upload-divider" />
+              <div className="bulk-upload-instructions">
+                <h3 className="form-label">Step 2: Upload your completed CSV</h3>
+                <p className="form-hint">
+                  Select the CSV file with your employee data. The file will be validated before import.
+                </p>
+              </div>
+              <label className="form-field" htmlFor="bulk-csv-file">
+                <span className="form-label">CSV file</span>
+                <input
+                  ref={bulkFileInputRef}
+                  id="bulk-csv-file"
+                  type="file"
+                  accept=".csv"
+                  className="form-input"
+                  onChange={handleBulkFileChange}
+                />
+              </label>
+              {bulkError ? <p className="form-submit-error">{bulkError}</p> : null}
+            </div>
+          ) : null}
+
+          {bulkStep === "preview" ? (
+            <div className="bulk-upload-step">
+              <div className="bulk-upload-instructions">
+                <h3 className="form-label">Preview</h3>
+                <p className="form-hint">
+                  {bulkFile?.name ?? "CSV"} - {bulkRows.length} row{bulkRows.length === 1 ? "" : "s"} found.{" "}
+                  <strong>{bulkRows.filter((r) => r.valid).length}</strong> valid,{" "}
+                  <strong>{bulkRows.filter((r) => !r.valid).length}</strong> with errors.
+                </p>
+              </div>
+              <div className="data-table-container">
+                <table className="data-table" aria-label="Bulk upload preview">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Department</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkRows.map((row, index) => (
+                      <tr
+                        key={`bulk-row-${index}`}
+                        className={`data-table-row ${row.valid ? "bulk-row-valid" : "bulk-row-error"}`}
+                      >
+                        <td>{index + 1}</td>
+                        <td>{row.data.full_name || "--"}</td>
+                        <td>{row.data.email || "--"}</td>
+                        <td>{row.data.department || "--"}</td>
+                        <td>
+                          {row.valid ? (
+                            <StatusBadge tone="success">Valid</StatusBadge>
+                          ) : (
+                            <span>
+                              <StatusBadge tone="warning">Error</StatusBadge>
+                              <span className="bulk-row-error-text">
+                                {row.errors.join("; ")}
+                              </span>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {bulkError ? <p className="form-submit-error">{bulkError}</p> : null}
+              <div className="slide-panel-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => {
+                    setBulkStep("template");
+                    setBulkRows([]);
+                    setBulkFile(null);
+                    setBulkError(null);
+                    if (bulkFileInputRef.current) {
+                      bulkFileInputRef.current.value = "";
+                    }
+                  }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  className="button button-accent"
+                  disabled={bulkRows.filter((r) => r.valid).length === 0}
+                  onClick={handleBulkImport}
+                >
+                  Import {bulkRows.filter((r) => r.valid).length} employee{bulkRows.filter((r) => r.valid).length === 1 ? "" : "s"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {bulkStep === "importing" ? (
+            <div className="bulk-upload-step">
+              <div className="bulk-upload-instructions">
+                <h3 className="form-label">Importing...</h3>
+                <p className="form-hint">
+                  Creating {bulkRows.filter((r) => r.valid).length} employee accounts. This may take a moment.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {bulkStep === "done" ? (
+            <div className="bulk-upload-step">
+              <div className="bulk-upload-instructions">
+                <h3 className="form-label">Import Complete</h3>
+                <p className="form-hint">
+                  {bulkResults.filter((r) => r.status === "created").length} employee{bulkResults.filter((r) => r.status === "created").length === 1 ? "" : "s"} created successfully.
+                  {bulkResults.filter((r) => r.status === "error").length > 0
+                    ? ` ${bulkResults.filter((r) => r.status === "error").length} failed.`
+                    : ""}
+                </p>
+              </div>
+              {bulkResults.length > 0 ? (
+                <div className="data-table-container">
+                  <table className="data-table" aria-label="Bulk import results">
+                    <thead>
+                      <tr>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkResults.map((result, index) => (
+                        <tr
+                          key={`bulk-result-${index}`}
+                          className={`data-table-row ${result.status === "created" ? "bulk-row-valid" : "bulk-row-error"}`}
+                        >
+                          <td>{result.email}</td>
+                          <td>
+                            <StatusBadge tone={result.status === "created" ? "success" : "warning"}>
+                              {result.status === "created" ? "Created" : "Failed"}
+                            </StatusBadge>
+                          </td>
+                          <td>{result.error ?? "--"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              <div className="slide-panel-actions">
+                <button
+                  type="button"
+                  className="button button-accent"
+                  onClick={closeBulkUploadPanel}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </SlidePanel>
 
       {toasts.length > 0 ? (

@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { EmptyState } from "../../../../components/shared/empty-state";
 import { Employee360 } from "../../../../components/people/employee-360";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
@@ -27,6 +26,13 @@ type PeopleOverviewClientProps = {
 };
 
 type EditFormValues = {
+  fullName: string;
+  phone: string;
+  timezone: string;
+  pronouns: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  emergencyContactRelationship: string;
   bio: string;
   favoriteMusic: string;
   favoriteBooks: string;
@@ -34,6 +40,13 @@ type EditFormValues = {
 };
 
 const INITIAL_EDIT_VALUES: EditFormValues = {
+  fullName: "",
+  phone: "",
+  timezone: "",
+  pronouns: "",
+  emergencyContactName: "",
+  emergencyContactPhone: "",
+  emergencyContactRelationship: "",
   bio: "",
   favoriteMusic: "",
   favoriteBooks: "",
@@ -67,6 +80,29 @@ function formatDate(dateString: string | null): string {
   return formatDateLib(dateString);
 }
 
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function formatEmploymentType(type: string): string {
+  return type
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getBrowserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return "";
+  }
+}
+
 /* ── Component ── */
 
 export function PeopleOverviewClient({
@@ -79,6 +115,11 @@ export function PeopleOverviewClient({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+
+  // Avatar upload state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   // Edit panel state
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -150,10 +191,91 @@ export function PeopleOverviewClient({
     setReloadToken((v) => v + 1);
   }, []);
 
+  // Avatar upload handler
+  const handleAvatarUpload = useCallback(
+    async (file: File) => {
+      if (!person) return;
+
+      setIsUploadingAvatar(true);
+      setAvatarError(null);
+
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const response = await fetch("/api/v1/me/avatar", {
+          method: "POST",
+          body: formData
+        });
+
+        const payload = (await response.json()) as ApiResponse<{ avatarUrl: string }>;
+
+        if (!response.ok || !payload.data) {
+          setAvatarError(payload.error?.message ?? "Unable to upload avatar.");
+          return;
+        }
+
+        setPerson((prev) =>
+          prev ? { ...prev, avatarUrl: payload.data!.avatarUrl } : prev
+        );
+      } catch (error) {
+        setAvatarError(error instanceof Error ? error.message : "Unable to upload avatar.");
+      } finally {
+        setIsUploadingAvatar(false);
+      }
+    },
+    [person]
+  );
+
+  const handleFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.currentTarget.files?.[0];
+      if (file) {
+        void handleAvatarUpload(file);
+      }
+      // Reset the input so the same file can be re-selected
+      event.currentTarget.value = "";
+    },
+    [handleAvatarUpload]
+  );
+
+  const handleRemoveAvatar = useCallback(async () => {
+    if (!person) return;
+
+    setIsUploadingAvatar(true);
+    setAvatarError(null);
+
+    try {
+      const response = await fetch("/api/v1/me/avatar", {
+        method: "DELETE"
+      });
+
+      const payload = (await response.json()) as ApiResponse<{ avatarUrl: null }>;
+
+      if (!response.ok || !payload.data) {
+        setAvatarError(payload.error?.message ?? "Unable to remove avatar.");
+        return;
+      }
+
+      setPerson((prev) => (prev ? { ...prev, avatarUrl: null } : prev));
+    } catch (error) {
+      setAvatarError(error instanceof Error ? error.message : "Unable to remove avatar.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }, [person]);
+
   // Open edit panel
   const openEdit = useCallback(() => {
     if (!person) return;
     setEditValues({
+      fullName: person.fullName ?? "",
+      phone: person.phone ?? "",
+      timezone: person.timezone ?? getBrowserTimezone(),
+      pronouns: person.pronouns ?? "",
+      emergencyContactName: person.emergencyContactName ?? "",
+      emergencyContactPhone: person.emergencyContactPhone ?? "",
+      emergencyContactRelationship: person.emergencyContactRelationship ?? "",
       bio: person.bio ?? "",
       favoriteMusic: person.favoriteMusic ?? "",
       favoriteBooks: person.favoriteBooks ?? "",
@@ -182,6 +304,13 @@ export function PeopleOverviewClient({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            fullName: editValues.fullName.trim() || person.fullName,
+            phone: editValues.phone.trim() || null,
+            timezone: editValues.timezone.trim() || null,
+            pronouns: editValues.pronouns.trim() || null,
+            emergencyContactName: editValues.emergencyContactName.trim() || null,
+            emergencyContactPhone: editValues.emergencyContactPhone.trim() || null,
+            emergencyContactRelationship: editValues.emergencyContactRelationship.trim() || null,
             bio: editValues.bio.trim() || null,
             favoriteMusic: editValues.favoriteMusic.trim() || null,
             favoriteBooks: editValues.favoriteBooks.trim() || null,
@@ -206,14 +335,6 @@ export function PeopleOverviewClient({
       }
     },
     [person, editValues, privacyValues]
-  );
-
-  // Toggle privacy setting
-  const togglePrivacy = useCallback(
-    (key: keyof PrivacySettings) => {
-      setPrivacyValues((prev) => ({ ...prev, [key]: !prev[key] }));
-    },
-    []
   );
 
   // Offboarding handler
@@ -297,30 +418,92 @@ export function PeopleOverviewClient({
 
   return (
     <section className="profile-overview-section" aria-label="Profile overview">
-      {/* Header with name and edit button */}
+      {/* Header with name, avatar, and edit button */}
       <div className="profile-overview-header">
         <div className="profile-overview-identity">
-          <div className="profile-overview-avatar">
-            {person.fullName
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .toUpperCase()
-              .slice(0, 2)}
+          <div className="profile-overview-avatar-wrapper">
+            {person.avatarUrl ? (
+              <img
+                src={person.avatarUrl}
+                alt={`${person.fullName} avatar`}
+                className="profile-overview-avatar profile-overview-avatar-img"
+              />
+            ) : (
+              <div className="profile-overview-avatar">
+                {getInitials(person.fullName)}
+              </div>
+            )}
+            {isSelf ? (
+              <button
+                type="button"
+                className="profile-avatar-overlay"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                aria-label="Change profile photo"
+              >
+                {isUploadingAvatar ? (
+                  <span className="profile-avatar-overlay-text">...</span>
+                ) : (
+                  <svg
+                    className="profile-avatar-overlay-icon"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                )}
+              </button>
+            ) : null}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFileChange}
+              style={{ display: "none" }}
+              aria-hidden="true"
+            />
           </div>
           <div>
-            <h2 className="profile-overview-name">{person.fullName}</h2>
+            <h2 className="profile-overview-name">
+              {person.fullName}
+              {person.pronouns ? (
+                <span className="profile-overview-pronouns">({person.pronouns})</span>
+              ) : null}
+            </h2>
             {person.title ? (
               <p className="profile-overview-title">{person.title}</p>
             ) : null}
           </div>
         </div>
-        {isSelf ? (
-          <button type="button" className="button button-secondary" onClick={openEdit}>
-            Edit Profile
-          </button>
-        ) : null}
+        <div className="profile-overview-header-actions">
+          {isSelf && person.avatarUrl ? (
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={handleRemoveAvatar}
+              disabled={isUploadingAvatar}
+            >
+              Remove Photo
+            </button>
+          ) : null}
+          {isSelf ? (
+            <button type="button" className="button button-secondary" onClick={openEdit}>
+              Edit Profile
+            </button>
+          ) : null}
+        </div>
       </div>
+
+      {avatarError ? (
+        <div className="form-error-banner">{avatarError}</div>
+      ) : null}
 
       {/* Details Grid */}
       <div className="profile-overview-grid">
@@ -368,6 +551,13 @@ export function PeopleOverviewClient({
               </>
             ) : null}
 
+            {person.pronouns ? (
+              <>
+                <dt>Pronouns</dt>
+                <dd>{person.pronouns}</dd>
+              </>
+            ) : null}
+
             <dt>Joined</dt>
             <dd>{formatDate(person.startDate || person.createdAt)}</dd>
 
@@ -410,6 +600,85 @@ export function PeopleOverviewClient({
             </dl>
           </div>
         ) : null}
+
+        {/* Emergency Contact (self/admin only) */}
+        {canSeeAll ? (
+          <div className="profile-overview-card">
+            <h3 className="profile-overview-card-title">Emergency Contact</h3>
+            {person.emergencyContactName ? (
+              <dl className="profile-overview-dl">
+                <dt>Name</dt>
+                <dd>{person.emergencyContactName}</dd>
+
+                {person.emergencyContactRelationship ? (
+                  <>
+                    <dt>Relationship</dt>
+                    <dd>{person.emergencyContactRelationship}</dd>
+                  </>
+                ) : null}
+
+                {person.emergencyContactPhone ? (
+                  <>
+                    <dt>Phone</dt>
+                    <dd>{person.emergencyContactPhone}</dd>
+                  </>
+                ) : null}
+              </dl>
+            ) : (
+              <p className="profile-overview-empty">
+                {isSelf ? "Add an emergency contact for your safety." : "No emergency contact on file."}
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {/* Work Information (read-only) */}
+        <div className="profile-overview-card">
+          <h3 className="profile-overview-card-title">Work Information</h3>
+          <dl className="profile-overview-dl profile-overview-dl-readonly">
+            <dt>Email</dt>
+            <dd>{person.email}</dd>
+
+            <dt>Department</dt>
+            <dd>{person.department ?? "--"}</dd>
+
+            <dt>Job Title</dt>
+            <dd>{person.title ?? "--"}</dd>
+
+            {person.countryCode ? (
+              <>
+                <dt>Country</dt>
+                <dd>
+                  <span className="country-chip">
+                    <span>{countryFlagFromCode(person.countryCode)}</span>
+                    <span>{countryNameFromCode(person.countryCode)}</span>
+                  </span>
+                </dd>
+              </>
+            ) : (
+              <>
+                <dt>Country</dt>
+                <dd>--</dd>
+              </>
+            )}
+
+            <dt>Employment Type</dt>
+            <dd>{formatEmploymentType(person.employmentType)}</dd>
+
+            {person.managerName ? (
+              <>
+                <dt>Manager</dt>
+                <dd>{person.managerName}</dd>
+              </>
+            ) : null}
+
+            <dt>Roles</dt>
+            <dd>{person.roles.join(", ")}</dd>
+
+            <dt>Start Date</dt>
+            <dd>{formatDate(person.startDate)}</dd>
+          </dl>
+        </div>
 
         {/* Privacy Settings (self only) */}
         {isSelf ? (
@@ -472,7 +741,7 @@ export function PeopleOverviewClient({
         </div>
       ) : null}
 
-      {/* Danger Zone — HR Admin/Super Admin only, non-self, non-offboarding */}
+      {/* Danger Zone -- HR Admin/Super Admin only, non-self, non-offboarding */}
       {canInitiateOffboarding && !isSelf && person.status !== "offboarding" ? (
         <div className="danger-zone">
           <h3 className="danger-zone-title">Danger zone</h3>
@@ -588,13 +857,70 @@ export function PeopleOverviewClient({
       <SlidePanel
         isOpen={isEditOpen}
         title="Edit Profile"
-        description="Update your bio and interests."
+        description="Update your personal information, bio, and interests."
         onClose={closeEdit}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSave} noValidate>
           {saveError ? (
             <div className="form-error-banner">{saveError}</div>
           ) : null}
+
+          <label className="form-field" htmlFor="profile-fullname">
+            <span className="form-label">Display Name</span>
+            <input
+              id="profile-fullname"
+              className="form-input"
+              maxLength={200}
+              placeholder="Your full name"
+              value={editValues.fullName}
+              onChange={(e) =>
+                setEditValues((prev) => ({ ...prev, fullName: e.currentTarget.value }))
+              }
+            />
+          </label>
+
+          <label className="form-field" htmlFor="profile-pronouns">
+            <span className="form-label">Pronouns</span>
+            <input
+              id="profile-pronouns"
+              className="form-input"
+              maxLength={50}
+              placeholder="e.g. he/him, she/her, they/them"
+              value={editValues.pronouns}
+              onChange={(e) =>
+                setEditValues((prev) => ({ ...prev, pronouns: e.currentTarget.value }))
+              }
+            />
+          </label>
+
+          <label className="form-field" htmlFor="profile-phone">
+            <span className="form-label">Phone Number</span>
+            <input
+              id="profile-phone"
+              className="form-input"
+              type="tel"
+              maxLength={30}
+              placeholder="e.g. +1 555-0100"
+              value={editValues.phone}
+              onChange={(e) =>
+                setEditValues((prev) => ({ ...prev, phone: e.currentTarget.value }))
+              }
+            />
+          </label>
+
+          <label className="form-field" htmlFor="profile-timezone">
+            <span className="form-label">Timezone</span>
+            <input
+              id="profile-timezone"
+              className="form-input"
+              maxLength={50}
+              placeholder="e.g. Africa/Lagos"
+              value={editValues.timezone}
+              onChange={(e) =>
+                setEditValues((prev) => ({ ...prev, timezone: e.currentTarget.value }))
+              }
+            />
+          </label>
 
           <label className="form-field" htmlFor="profile-bio">
             <span className="form-label">Bio</span>
@@ -612,56 +938,116 @@ export function PeopleOverviewClient({
             <span className="form-field-hint">{editValues.bio.length}/500</span>
           </label>
 
-          <label className="form-field" htmlFor="profile-music">
-            <span className="form-label">Favorite Music</span>
-            <input
-              id="profile-music"
-              className="form-input"
-              maxLength={200}
-              placeholder="e.g. Jazz, Afrobeats, Classical"
-              value={editValues.favoriteMusic}
-              onChange={(e) =>
-                setEditValues((prev) => ({
-                  ...prev,
-                  favoriteMusic: e.currentTarget.value
-                }))
-              }
-            />
-          </label>
+          <fieldset className="form-fieldset">
+            <legend className="form-fieldset-legend">Emergency Contact</legend>
 
-          <label className="form-field" htmlFor="profile-books">
-            <span className="form-label">Favorite Books</span>
-            <input
-              id="profile-books"
-              className="form-input"
-              maxLength={200}
-              placeholder="e.g. Atomic Habits, Deep Work"
-              value={editValues.favoriteBooks}
-              onChange={(e) =>
-                setEditValues((prev) => ({
-                  ...prev,
-                  favoriteBooks: e.currentTarget.value
-                }))
-              }
-            />
-          </label>
+            <label className="form-field" htmlFor="profile-ec-name">
+              <span className="form-label">Name</span>
+              <input
+                id="profile-ec-name"
+                className="form-input"
+                maxLength={200}
+                placeholder="Emergency contact name"
+                value={editValues.emergencyContactName}
+                onChange={(e) =>
+                  setEditValues((prev) => ({
+                    ...prev,
+                    emergencyContactName: e.currentTarget.value
+                  }))
+                }
+              />
+            </label>
 
-          <label className="form-field" htmlFor="profile-sports">
-            <span className="form-label">Favorite Sports</span>
-            <input
-              id="profile-sports"
-              className="form-input"
-              maxLength={200}
-              placeholder="e.g. Football, Basketball, Swimming"
-              value={editValues.favoriteSports}
-              onChange={(e) =>
-                setEditValues((prev) => ({
-                  ...prev,
-                  favoriteSports: e.currentTarget.value
-                }))
-              }
-            />
-          </label>
+            <label className="form-field" htmlFor="profile-ec-phone">
+              <span className="form-label">Phone</span>
+              <input
+                id="profile-ec-phone"
+                className="form-input"
+                type="tel"
+                maxLength={30}
+                placeholder="Emergency contact phone"
+                value={editValues.emergencyContactPhone}
+                onChange={(e) =>
+                  setEditValues((prev) => ({
+                    ...prev,
+                    emergencyContactPhone: e.currentTarget.value
+                  }))
+                }
+              />
+            </label>
+
+            <label className="form-field" htmlFor="profile-ec-relationship">
+              <span className="form-label">Relationship</span>
+              <input
+                id="profile-ec-relationship"
+                className="form-input"
+                maxLength={100}
+                placeholder="e.g. Spouse, Parent, Sibling"
+                value={editValues.emergencyContactRelationship}
+                onChange={(e) =>
+                  setEditValues((prev) => ({
+                    ...prev,
+                    emergencyContactRelationship: e.currentTarget.value
+                  }))
+                }
+              />
+            </label>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend className="form-fieldset-legend">Interests</legend>
+
+            <label className="form-field" htmlFor="profile-music">
+              <span className="form-label">Favorite Music</span>
+              <input
+                id="profile-music"
+                className="form-input"
+                maxLength={200}
+                placeholder="e.g. Jazz, Afrobeats, Classical"
+                value={editValues.favoriteMusic}
+                onChange={(e) =>
+                  setEditValues((prev) => ({
+                    ...prev,
+                    favoriteMusic: e.currentTarget.value
+                  }))
+                }
+              />
+            </label>
+
+            <label className="form-field" htmlFor="profile-books">
+              <span className="form-label">Favorite Books</span>
+              <input
+                id="profile-books"
+                className="form-input"
+                maxLength={200}
+                placeholder="e.g. Atomic Habits, Deep Work"
+                value={editValues.favoriteBooks}
+                onChange={(e) =>
+                  setEditValues((prev) => ({
+                    ...prev,
+                    favoriteBooks: e.currentTarget.value
+                  }))
+                }
+              />
+            </label>
+
+            <label className="form-field" htmlFor="profile-sports">
+              <span className="form-label">Favorite Sports</span>
+              <input
+                id="profile-sports"
+                className="form-input"
+                maxLength={200}
+                placeholder="e.g. Football, Basketball, Swimming"
+                value={editValues.favoriteSports}
+                onChange={(e) =>
+                  setEditValues((prev) => ({
+                    ...prev,
+                    favoriteSports: e.currentTarget.value
+                  }))
+                }
+              />
+            </label>
+          </fieldset>
 
           <div className="slide-panel-actions">
             <button type="button" className="button button-ghost" onClick={closeEdit}>

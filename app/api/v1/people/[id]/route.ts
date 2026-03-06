@@ -83,6 +83,11 @@ const profileRowSchema = z.object({
   favorite_music: z.string().nullable().default(null),
   favorite_books: z.string().nullable().default(null),
   favorite_sports: z.string().nullable().default(null),
+  avatar_url: z.string().nullable().default(null),
+  emergency_contact_name: z.string().nullable().default(null),
+  emergency_contact_phone: z.string().nullable().default(null),
+  emergency_contact_relationship: z.string().nullable().default(null),
+  pronouns: z.string().nullable().default(null),
   privacy_settings: z.unknown().default({}),
   created_at: z.string(),
   updated_at: z.string()
@@ -125,10 +130,15 @@ function mapPersonRow(
     primaryCurrency: row.primary_currency,
     status: row.status,
     noticePeriodEndDate: row.notice_period_end_date ?? null,
+    avatarUrl: row.avatar_url ?? null,
     bio: row.bio ?? null,
     favoriteMusic: row.favorite_music ?? null,
     favoriteBooks: row.favorite_books ?? null,
     favoriteSports: row.favorite_sports ?? null,
+    emergencyContactName: row.emergency_contact_name ?? null,
+    emergencyContactPhone: row.emergency_contact_phone ?? null,
+    emergencyContactRelationship: row.emergency_contact_relationship ?? null,
+    pronouns: row.pronouns ?? null,
     privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../../types/people").PrivacySettings,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -240,7 +250,7 @@ export async function PUT(
   const { data: existingProfile, error: existingProfileError } = await serviceRoleClient
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, created_at, updated_at"
     )
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
@@ -448,7 +458,7 @@ export async function PUT(
       .eq("id", personId)
       .eq("org_id", session.profile.org_id)
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, created_at, updated_at"
       )
       .single();
 
@@ -654,6 +664,14 @@ export async function PUT(
 }
 
 const selfUpdateSchema = z.object({
+  fullName: z.string().trim().min(1, "Name is required.").max(200, "Name is too long.").optional(),
+  phone: z.string().trim().max(30, "Phone is too long.").nullable().optional(),
+  timezone: z.string().trim().max(50, "Timezone is too long.").nullable().optional(),
+  pronouns: z.string().trim().max(50, "Pronouns must be 50 characters or fewer.").nullable().optional(),
+  emergencyContactName: z.string().trim().max(200, "Emergency contact name is too long.").nullable().optional(),
+  emergencyContactPhone: z.string().trim().max(30, "Emergency contact phone is too long.").nullable().optional(),
+  emergencyContactRelationship: z.string().trim().max(100, "Emergency contact relationship is too long.").nullable().optional(),
+  avatarUrl: z.string().url("Avatar URL must be a valid URL.").nullable().optional(),
   bio: z.string().trim().max(500, "Bio must be 500 characters or fewer.").nullable().optional(),
   favoriteMusic: z.string().trim().max(200, "Favorite music must be 200 characters or fewer.").nullable().optional(),
   favoriteBooks: z.string().trim().max(200, "Favorite books must be 200 characters or fewer.").nullable().optional(),
@@ -745,6 +763,38 @@ export async function PATCH(
 
   const updateValues: Record<string, unknown> = {};
 
+  if (payload.fullName !== undefined) {
+    updateValues.full_name = payload.fullName.trim();
+  }
+
+  if (payload.phone !== undefined) {
+    updateValues.phone = payload.phone?.trim() || null;
+  }
+
+  if (payload.timezone !== undefined) {
+    updateValues.timezone = payload.timezone?.trim() || null;
+  }
+
+  if (payload.pronouns !== undefined) {
+    updateValues.pronouns = payload.pronouns?.trim() || null;
+  }
+
+  if (payload.emergencyContactName !== undefined) {
+    updateValues.emergency_contact_name = payload.emergencyContactName?.trim() || null;
+  }
+
+  if (payload.emergencyContactPhone !== undefined) {
+    updateValues.emergency_contact_phone = payload.emergencyContactPhone?.trim() || null;
+  }
+
+  if (payload.emergencyContactRelationship !== undefined) {
+    updateValues.emergency_contact_relationship = payload.emergencyContactRelationship?.trim() || null;
+  }
+
+  if (payload.avatarUrl !== undefined) {
+    updateValues.avatar_url = payload.avatarUrl;
+  }
+
   if (payload.bio !== undefined) {
     updateValues.bio = payload.bio?.trim() || null;
   }
@@ -782,7 +832,7 @@ export async function PATCH(
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, bio, favorite_music, favorite_books, favorite_sports, privacy_settings, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, created_at, updated_at"
     )
     .single();
 

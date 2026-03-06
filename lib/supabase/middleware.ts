@@ -120,6 +120,7 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
   const isLoginRoute = pathname === "/login";
+  const isChangePasswordRoute = pathname === "/change-password";
 
   if (!user && !isLoginRoute && !isApiRoute) {
     const redirectUrl = new URL("/login", request.url);
@@ -135,6 +136,32 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
     return applySecurityHeaders(
       NextResponse.redirect(new URL("/dashboard", request.url))
     );
+  }
+
+  // Password change enforcement: redirect authenticated users who still
+  // need to change their temporary password.  Only check on non-API,
+  // non-login, non-change-password routes to minimise performance impact.
+  if (user && !isApiRoute && !isLoginRoute) {
+    const { data: profileRow } = await supabase
+      .from("profiles")
+      .select("password_change_required")
+      .eq("id", user.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    const mustChangePassword = profileRow?.password_change_required === true;
+
+    if (mustChangePassword && !isChangePasswordRoute) {
+      return applySecurityHeaders(
+        NextResponse.redirect(new URL("/change-password", request.url))
+      );
+    }
+
+    if (!mustChangePassword && isChangePasswordRoute) {
+      return applySecurityHeaders(
+        NextResponse.redirect(new URL("/dashboard", request.url))
+      );
+    }
   }
 
   return applySecurityHeaders(response);

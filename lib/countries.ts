@@ -6,6 +6,23 @@ const countryNameByCode: Record<string, string> = {
   CA: "Canada"
 };
 
+const countryDefaults: Record<string, { currency: string; timezone: string }> = {
+  NG: { currency: "NGN", timezone: "Africa/Lagos" },
+  GH: { currency: "GHS", timezone: "Africa/Accra" },
+  KE: { currency: "KES", timezone: "Africa/Nairobi" },
+  ZA: { currency: "ZAR", timezone: "Africa/Johannesburg" },
+  CA: { currency: "CAD", timezone: "America/Toronto" }
+};
+
+export function getCountryDefaults(countryCode: string): { currency: string; timezone: string } | null {
+  const normalized = countryCode.trim().toUpperCase();
+  return countryDefaults[normalized] ?? null;
+}
+
+export function getCountryCodes(): string[] {
+  return Object.keys(countryNameByCode);
+}
+
 function toCountryCode(value: string): string | null {
   const normalized = value.trim().toUpperCase();
 
