@@ -39,7 +39,7 @@ CREATE POLICY "goals_select" ON performance_goals
         SELECT 1 FROM profiles p3
         WHERE p3.id = auth.uid()
           AND p3.deleted_at IS NULL
-          AND p3.roles::jsonb ?| ARRAY['HR_ADMIN', 'SUPER_ADMIN']
+          AND p3.roles && ARRAY['HR_ADMIN', 'SUPER_ADMIN']::text[]
       )
     )
   );
@@ -57,7 +57,7 @@ CREATE POLICY "goals_insert" ON performance_goals
         SELECT 1 FROM profiles p3
         WHERE p3.id = auth.uid()
           AND p3.deleted_at IS NULL
-          AND p3.roles::jsonb ?| ARRAY['HR_ADMIN', 'SUPER_ADMIN']
+          AND p3.roles && ARRAY['HR_ADMIN', 'SUPER_ADMIN']::text[]
       )
     )
   );
@@ -76,7 +76,7 @@ CREATE POLICY "goals_update" ON performance_goals
         SELECT 1 FROM profiles p3
         WHERE p3.id = auth.uid()
           AND p3.deleted_at IS NULL
-          AND p3.roles::jsonb ?| ARRAY['HR_ADMIN', 'SUPER_ADMIN']
+          AND p3.roles && ARRAY['HR_ADMIN', 'SUPER_ADMIN']::text[]
       )
     )
   );

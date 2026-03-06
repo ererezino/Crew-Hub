@@ -92,7 +92,7 @@ CREATE POLICY "team_hubs_select" ON team_hubs
           SELECT 1 FROM profiles p
           WHERE p.id = auth.uid()
             AND p.deleted_at IS NULL
-            AND (p.roles @> '["HR_ADMIN"]'::jsonb OR p.roles @> '["SUPER_ADMIN"]'::jsonb)
+            AND (p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[])
         )
       )
     )
@@ -108,10 +108,9 @@ CREATE POLICY "team_hubs_insert" ON team_hubs
       WHERE p.id = auth.uid()
         AND p.deleted_at IS NULL
         AND (
-          p.roles @> '["HR_ADMIN"]'::jsonb
-          OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+          p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
           OR (
-            (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+            p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
             AND (
               team_hubs.department IS NULL
               OR p.department = team_hubs.department
@@ -132,10 +131,9 @@ CREATE POLICY "team_hubs_update" ON team_hubs
       WHERE p.id = auth.uid()
         AND p.deleted_at IS NULL
         AND (
-          p.roles @> '["HR_ADMIN"]'::jsonb
-          OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+          p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
           OR (
-            (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+            p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
             AND (
               team_hubs.department IS NULL
               OR p.department = team_hubs.department
@@ -158,10 +156,9 @@ CREATE POLICY "team_hubs_delete" ON team_hubs
       WHERE p.id = auth.uid()
         AND p.deleted_at IS NULL
         AND (
-          p.roles @> '["HR_ADMIN"]'::jsonb
-          OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+          p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
           OR (
-            (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+            p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
             AND (
               team_hubs.department IS NULL
               OR p.department = team_hubs.department
@@ -187,7 +184,7 @@ CREATE POLICY "team_hub_sections_select" ON team_hub_sections
           (h.visibility = 'org_wide' AND h.org_id = (SELECT p.org_id FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL))
           OR (h.visibility = 'department' AND h.org_id = (SELECT p.org_id FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL) AND h.department = (SELECT p.department FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL))
           OR (h.visibility = 'private' AND h.created_by = auth.uid())
-          OR (h.org_id = (SELECT p.org_id FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL) AND EXISTS (SELECT 1 FROM profiles p2 WHERE p2.id = auth.uid() AND p2.deleted_at IS NULL AND (p2.roles @> '["HR_ADMIN"]'::jsonb OR p2.roles @> '["SUPER_ADMIN"]'::jsonb)))
+          OR (h.org_id = (SELECT p.org_id FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL) AND EXISTS (SELECT 1 FROM profiles p2 WHERE p2.id = auth.uid() AND p2.deleted_at IS NULL AND (p2.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[])))
         )
     )
   );
@@ -205,10 +202,9 @@ CREATE POLICY "team_hub_sections_insert" ON team_hub_sections
           WHERE p.id = auth.uid()
             AND p.deleted_at IS NULL
             AND (
-              p.roles @> '["HR_ADMIN"]'::jsonb
-              OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+              p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
               OR (
-                (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+                p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
                 AND (h.department IS NULL OR p.department = h.department)
               )
             )
@@ -230,10 +226,9 @@ CREATE POLICY "team_hub_sections_update" ON team_hub_sections
           WHERE p.id = auth.uid()
             AND p.deleted_at IS NULL
             AND (
-              p.roles @> '["HR_ADMIN"]'::jsonb
-              OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+              p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
               OR (
-                (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+                p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
                 AND (h.department IS NULL OR p.department = h.department)
               )
             )
@@ -254,10 +249,9 @@ CREATE POLICY "team_hub_sections_delete" ON team_hub_sections
           WHERE p.id = auth.uid()
             AND p.deleted_at IS NULL
             AND (
-              p.roles @> '["HR_ADMIN"]'::jsonb
-              OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+              p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
               OR (
-                (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+                p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
                 AND (h.department IS NULL OR p.department = h.department)
               )
             )
@@ -283,7 +277,7 @@ CREATE POLICY "team_hub_pages_select" ON team_hub_pages
           (h.visibility = 'org_wide' AND h.org_id = (SELECT p.org_id FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL))
           OR (h.visibility = 'department' AND h.org_id = (SELECT p.org_id FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL) AND h.department = (SELECT p.department FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL))
           OR (h.visibility = 'private' AND h.created_by = auth.uid())
-          OR (h.org_id = (SELECT p.org_id FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL) AND EXISTS (SELECT 1 FROM profiles p2 WHERE p2.id = auth.uid() AND p2.deleted_at IS NULL AND (p2.roles @> '["HR_ADMIN"]'::jsonb OR p2.roles @> '["SUPER_ADMIN"]'::jsonb)))
+          OR (h.org_id = (SELECT p.org_id FROM profiles p WHERE p.id = auth.uid() AND p.deleted_at IS NULL) AND EXISTS (SELECT 1 FROM profiles p2 WHERE p2.id = auth.uid() AND p2.deleted_at IS NULL AND (p2.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[])))
         )
     )
   );
@@ -303,10 +297,9 @@ CREATE POLICY "team_hub_pages_insert" ON team_hub_pages
           WHERE p.id = auth.uid()
             AND p.deleted_at IS NULL
             AND (
-              p.roles @> '["HR_ADMIN"]'::jsonb
-              OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+              p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
               OR (
-                (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+                p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
                 AND (h.department IS NULL OR p.department = h.department)
               )
             )
@@ -330,10 +323,9 @@ CREATE POLICY "team_hub_pages_update" ON team_hub_pages
           WHERE p.id = auth.uid()
             AND p.deleted_at IS NULL
             AND (
-              p.roles @> '["HR_ADMIN"]'::jsonb
-              OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+              p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
               OR (
-                (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+                p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
                 AND (h.department IS NULL OR p.department = h.department)
               )
             )
@@ -356,10 +348,9 @@ CREATE POLICY "team_hub_pages_delete" ON team_hub_pages
           WHERE p.id = auth.uid()
             AND p.deleted_at IS NULL
             AND (
-              p.roles @> '["HR_ADMIN"]'::jsonb
-              OR p.roles @> '["SUPER_ADMIN"]'::jsonb
+              p.roles && ARRAY['HR_ADMIN','SUPER_ADMIN']::text[]
               OR (
-                (p.roles @> '["TEAM_LEAD"]'::jsonb OR p.roles @> '["MANAGER"]'::jsonb)
+                p.roles && ARRAY['TEAM_LEAD','MANAGER']::text[]
                 AND (h.department IS NULL OR p.department = h.department)
               )
             )

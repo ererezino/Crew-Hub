@@ -81,4 +81,4 @@ CREATE POLICY afk_logs_insert_admin ON afk_logs
 CREATE TRIGGER set_afk_logs_updated_at
   BEFORE UPDATE ON afk_logs
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION public.set_updated_at();
