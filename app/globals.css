@@ -1,57 +1,73 @@
 :root {
   color-scheme: light;
 
-  /* ─── Brand palette ─── */
-  --color-primary: #1A1A1A;
-  --color-accent: #F7941D;
-  --color-accent-hover: #E8850F;
-  --color-accent-subtle: #FFF4E6;
-  --color-accent-dark: #D97B06;
-  --color-accent-yellow: #F7941D;
+  /* ─── Brand palette (Crew Hub Brand Guidelines) ─── */
+  --color-primary: #000000;
+  --color-accent: #FD8B05;
+  --color-accent-hover: #E57D04;
+  --color-accent-subtle: #FFF3DC;
+  --color-accent-dark: #D97706;
+  --color-accent-yellow: #FD8B05;
   --color-accent-muted: #FBBF68;
-  --color-secondary: #1E3A5F;
-  --color-accent-secondary: #1E3A5F;
+  --color-secondary: #1A2B3C;
+  --color-accent-secondary: #1A2B3C;
+
+  /* ─── Crew Hub extended palette ─── */
+  --crew-navy: #1A2B3C;
+  --crew-sage: #2D6A4F;
+  --crew-dust: #F0EBE1;
+  --crew-orange: #FD8B05;
+  --crew-gray1: #495057;
+  --crew-gray2: #727272;
+  --crew-warm-border: #E8DFD0;
+  --crew-pending: #D97706;
+  --crew-danger: #C0392B;
+  --crew-orange-tint: #FFF3DC;
+  --crew-sage-tint: #E8F4EE;
+  --crew-navy-tint: #EBF0F5;
+  --crew-red-tint: #FDECEA;
+  --crew-amber-tint: #FEF6E4;
 
   /* ─── Surfaces ─── */
-  --bg-canvas: #FFFFFF;
-  --bg-surface: #FAFAF8;
-  --bg-subtle: #F5F3F0;
-  --bg-warm: #FFF8F0;
+  --bg-canvas: #FFFAF3;
+  --bg-surface: #FFFFFF;
+  --bg-subtle: #FFFAF3;
+  --bg-warm: #FFF3DC;
 
   /* ─── Text ─── */
-  --text-primary: #1A1A1A;
-  --text-secondary: #525252;
-  --text-muted: #737373;
+  --text-primary: #000000;
+  --text-secondary: #495057;
+  --text-muted: #727272;
   --text-soft: #A3A3A3;
   --text-inverse-primary: #FAFAFA;
   --text-inverse-secondary: #A3A3A3;
 
   /* ─── Borders ─── */
-  --border-default: #E5E5E5;
-  --border-subtle: #F0F0F0;
+  --border-default: #E8DFD0;
+  --border-subtle: #F0EBE1;
 
   /* ─── Status colors ─── */
-  --status-success-bg: #ECFDF5;
-  --status-success-text: #059669;
-  --status-success-border: #A7F3D0;
-  --status-warning-bg: #FFFBEB;
+  --status-success-bg: #E8F4EE;
+  --status-success-text: #2D6A4F;
+  --status-success-border: #A7D7C0;
+  --status-warning-bg: #FEF6E4;
   --status-warning-text: #D97706;
   --status-warning-border: #FDE68A;
-  --status-error-bg: #FEF2F2;
-  --status-error-text: #DC2626;
-  --status-error-border: #FECACA;
-  --status-info-bg: #EFF6FF;
-  --status-info-text: #2563EB;
-  --status-info-border: #BFDBFE;
-  --status-pending-bg: #FFF7ED;
-  --status-pending-text: #C2410C;
+  --status-error-bg: #FDECEA;
+  --status-error-text: #C0392B;
+  --status-error-border: #F5B7B1;
+  --status-info-bg: #EBF0F5;
+  --status-info-text: #1A2B3C;
+  --status-info-border: #B0C4D8;
+  --status-pending-bg: #FEF6E4;
+  --status-pending-text: #D97706;
   --status-pending-border: #FED7AA;
-  --status-draft-bg: #F5F3F0;
-  --status-draft-text: #5C5C5C;
-  --status-draft-border: #E5E5E5;
-  --status-processing-bg: #EFF6FF;
-  --status-processing-text: #0369A1;
-  --status-processing-border: #BAE6FD;
+  --status-draft-bg: #F0EBE1;
+  --status-draft-text: #495057;
+  --status-draft-border: #E8DFD0;
+  --status-processing-bg: #EBF0F5;
+  --status-processing-text: #1A2B3C;
+  --status-processing-border: #B0C4D8;
 
   /* ─── Type scale ─── */
   --text-xs: 11px;
@@ -108,20 +124,20 @@
 html.dark {
   color-scheme: dark;
 
-  --bg-canvas: #111111;
-  --bg-surface: #1A1A1A;
-  --bg-subtle: #222222;
-  --bg-warm: #1C1710;
+  --bg-canvas: #1A2B3C;
+  --bg-surface: #223648;
+  --bg-subtle: #1A2B3C;
+  --bg-warm: #1E3040;
 
   --text-primary: #F5F5F5;
-  --text-secondary: #A3A3A3;
-  --text-muted: #8A8A8A;
-  --text-soft: #525252;
+  --text-secondary: #B0C4D8;
+  --text-muted: #8A9BB0;
+  --text-soft: #566A80;
   --text-inverse-primary: #F5F5F5;
-  --text-inverse-secondary: #A3A3A3;
+  --text-inverse-secondary: #B0C4D8;
 
-  --border-default: #2E2E2E;
-  --border-subtle: #232323;
+  --border-default: #2E4358;
+  --border-subtle: #253A4E;
 
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.20);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.24), 0 1px 2px rgba(0,0,0,0.16);
@@ -151,8 +167,8 @@ html.dark {
   --status-processing-text: #7DD3FC;
   --status-processing-border: #1E3A5F;
 
-  --color-accent-subtle: #2A1F0A;
-  --color-accent-hover: #D97B06;
+  --color-accent-subtle: #2E3D2A;
+  --color-accent-hover: #E57D04;
   --color-accent-muted: #A06B2A;
 
   --dashboard-card-hover-shadow: 0 12px 32px rgba(0,0,0,0.24);
@@ -174,10 +190,20 @@ body {
   margin: 0;
   background: var(--bg-subtle);
   color: var(--text-primary);
-  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: var(--text-base);
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ─── Brand typography classes ─── */
+.text-display { font-family: var(--font-serif), Georgia, serif; font-size: 40px; font-weight: 900; letter-spacing: -0.035em; line-height: 1.1; }
+.text-h1 { font-family: var(--font-serif), Georgia, serif; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.text-h2 { font-family: var(--font-serif), Georgia, serif; font-size: 22px; font-weight: 700; letter-spacing: -0.015em; line-height: 1.3; }
+.text-h3 { font-family: var(--font-sans), sans-serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.text-body { font-family: var(--font-sans), sans-serif; font-size: 15px; font-weight: 400; line-height: 1.65; }
+.text-small { font-family: var(--font-sans), sans-serif; font-size: 13px; font-weight: 400; line-height: 1.5; }
+.text-label { font-family: var(--font-sans), sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; }
 
 h1,
 h2,
@@ -365,7 +391,7 @@ html.dark .button-orange:hover {
   inset: 0 auto 0 0;
   z-index: 40;
   width: var(--sidebar-width);
-  background: var(--color-primary);
+  background: var(--crew-navy);
   color: var(--text-inverse-primary);
   border-right: none;
   display: flex;
