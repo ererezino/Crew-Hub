@@ -5,6 +5,7 @@ export const SETTINGS_TABS = [
   "organization",
   "time-policies",
   "notifications",
+  "security",
   "audit"
 ] as const;
 

@@ -326,6 +326,17 @@ async function fetchSidebarApprovalCounts(
   };
 }
 
+type AvailabilityStatus = "available" | "in_meeting" | "on_break" | "focusing" | "afk" | "ooo";
+
+const STATUS_OPTIONS: { value: AvailabilityStatus; label: string; color: string }[] = [
+  { value: "available", label: "Available", color: "#22C55E" },
+  { value: "in_meeting", label: "In a meeting", color: "#EAB308" },
+  { value: "on_break", label: "On a break", color: "#EAB308" },
+  { value: "focusing", label: "Focusing", color: "#F97316" },
+  { value: "afk", label: "AFK", color: "#94A3B8" },
+  { value: "ooo", label: "Out of office", color: "#EF4444" },
+];
+
 type UserMenuProps = {
   profile: { fullName: string; email: string; avatarUrl: string | null } | null;
   initials: string;
@@ -345,18 +356,39 @@ function getRoleBadgeLabel(roles: readonly UserRole[]): string {
 function UserMenu({ profile, initials, roles }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<AvailabilityStatus>("available");
+  const [statusNote, setStatusNote] = useState("");
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const statusRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
+      if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
+        setIsStatusPickerOpen(false);
+      }
     };
 
     window.addEventListener("pointerdown", handlePointerDown);
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, []);
+
+  const handleStatusChange = useCallback(async (status: AvailabilityStatus) => {
+    setCurrentStatus(status);
+    setIsStatusPickerOpen(false);
+    try {
+      await fetch("/api/v1/me/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, note: statusNote })
+      });
+    } catch {
+      // Best effort
+    }
+  }, [statusNote]);
 
   const handleSignOut = useCallback(async () => {
     setIsSigningOut(true);
@@ -371,14 +403,59 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
   const roleBadge = getRoleBadgeLabel(roles);
 
   return (
-    <div className="user-menu" ref={menuRef}>
+    <div className="user-menu" ref={menuRef} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+      <div ref={statusRef} style={{ position: "relative" }}>
+        <button
+          type="button"
+          className="user-menu-trigger"
+          onClick={() => setIsStatusPickerOpen((v) => !v)}
+          aria-label="Change status"
+        >
+          <span className="user-menu-avatar numeric">{initials}</span>
+          <span className={`status-dot status-dot-${currentStatus}`} />
+        </button>
+
+        {isStatusPickerOpen ? (
+          <div className="status-picker">
+            {STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`status-picker-option${currentStatus === opt.value ? " status-picker-option-active" : ""}`}
+                onClick={() => void handleStatusChange(opt.value)}
+              >
+                <span className="status-picker-option-dot" style={{ background: opt.color }} />
+                {opt.label}
+              </button>
+            ))}
+            {(currentStatus === "afk" || currentStatus === "ooo") ? (
+              <input
+                type="text"
+                className="status-note-input"
+                placeholder="Add a note (optional)"
+                value={statusNote}
+                onChange={(e) => setStatusNote(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    void handleStatusChange(currentStatus);
+                  }
+                }}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
       <button
         type="button"
         className="user-menu-trigger"
         onClick={() => setIsOpen((v) => !v)}
         aria-label="User menu"
+        style={{ position: "relative" }}
       >
-        <span className="user-menu-avatar numeric">{initials}</span>
+        <svg viewBox="0 0 24 24" style={{ width: "16px", height: "16px" }} aria-hidden="true">
+          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
       </button>
 
       {isOpen ? (
@@ -732,53 +809,15 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
 
         <nav className="sidebar-nav" aria-label="Primary">
           {navigationGroups.map(({ group, key, domId }) => {
-            const defaultExpanded = defaultExpandedGroupKeys.has(key);
-            const isGroupExpanded = expandedGroupKeys.has(key);
             const hasHeading = group.label.length > 0;
 
             return (
               <section key={key} className="sidebar-group">
                 {hasHeading ? (
-                  <h2 className="sidebar-group-heading">
-                    <button
-                      type="button"
-                      className="sidebar-group-trigger"
-                      onClick={() => handleSidebarGroupToggle(key, defaultExpanded)}
-                      aria-expanded={isGroupExpanded}
-                      aria-controls={domId}
-                    >
-                      <span className="sidebar-group-title">{group.label}</span>
-                      <span
-                        className={
-                          isGroupExpanded
-                            ? "sidebar-group-chevron"
-                            : "sidebar-group-chevron sidebar-group-chevron-collapsed"
-                        }
-                        aria-hidden="true"
-                      >
-                        <svg viewBox="0 0 20 20">
-                          <path
-                            d="M5.5 7.5 10 12l4.5-4.5"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            fill="none"
-                          />
-                        </svg>
-                      </span>
-                    </button>
-                  </h2>
+                  <h2 className="sidebar-section-label">{group.label}</h2>
                 ) : null}
 
-                <ul
-                  id={domId}
-                  className={
-                    isGroupExpanded
-                      ? "sidebar-links"
-                      : "sidebar-links sidebar-links-collapsed"
-                  }
-                >
+                <ul id={domId} className="sidebar-links">
                   {group.items.map((item) => {
                     const isActive = isRouteActive(activePathname, item.href);
                     const showApprovalsBadge =

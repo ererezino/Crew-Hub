@@ -73,7 +73,11 @@ const settingsTabs: PageTab[] = [
   },
   {
     key: "notifications",
-    label: "Notifications"
+    label: "Preferences"
+  },
+  {
+    key: "security",
+    label: "Security"
   },
   {
     key: "organization",
@@ -83,12 +87,12 @@ const settingsTabs: PageTab[] = [
   {
     key: "time-policies",
     label: "Time Policies",
-    requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"]
+    requiredRoles: ["SUPER_ADMIN"]
   },
   {
     key: "audit",
     label: "Audit Log",
-    requiredRoles: ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]
+    requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"]
   }
 ];
 
@@ -598,13 +602,35 @@ export function SettingsClient({
           )
         ) : null}
 
+        {activeTab === "security" ? (
+          <div className="settings-section">
+            <h3 className="settings-section-title">Security</h3>
+            <p className="settings-field-hint" style={{ marginBottom: "var(--space-4)" }}>
+              Manage your password and active sessions.
+            </p>
+            <div className="settings-field-group">
+              <label className="settings-label">Change Password</label>
+              <p className="settings-field-hint">
+                Use this to update your password. You will need to enter your current password.
+              </p>
+              <a
+                href="/change-password"
+                className="btn btn-secondary"
+                style={{ display: "inline-block", marginTop: "var(--space-2)" }}
+              >
+                Change password
+              </a>
+            </div>
+          </div>
+        ) : null}
+
         {activeTab === "audit" ? (
           canViewAudit ? (
             <AuditLogViewer />
           ) : (
             <EmptyState
               title="Audit log is restricted"
-              description="Only HR Admin, Finance Admin, and Super Admin can view audit history."
+              description="Only HR Admin and Super Admin can view audit history."
               ctaLabel="Back to settings"
               ctaHref="/settings"
             />

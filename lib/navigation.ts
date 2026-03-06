@@ -47,200 +47,178 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Home",
         href: "/dashboard",
         icon: "LayoutDashboard",
-        description: "Your home base — updates, links, and insights.",
-        shortcut: "G D"
+        description: "Your personal home in Crew Hub. See what needs attention and jump to your most-used actions.",
+        shortcut: "G H"
       },
       {
         label: "Announcements",
         href: "/announcements",
         icon: "Megaphone",
-        description: "Internal notices and company updates.",
+        description: "Company updates and news since your last visit.",
         shortcut: "G A"
       }
     ]
   },
   {
-    label: "My Stuff",
+    label: "MY WORK",
     items: [
       {
         label: "Time Off",
         href: "/time-off",
         icon: "CalendarOff",
-        description: "Requests, balances, and leave calendar.",
+        description: "Request time off, check balances, and track approval status.",
         shortcut: "G T"
       },
       {
-        label: "Expenses",
-        href: "/expenses",
-        icon: "Receipt",
-        description: "Claims, approvals, and reimbursements.",
-        shortcut: "G E"
-      },
-      {
-        label: "Schedule",
-        href: "/scheduling",
-        icon: "CalendarClock",
-        description: "My shifts, open shifts, and swap requests.",
-        shortcut: "G S"
-      },
-      {
-        label: "Hours",
-        href: "/time-attendance",
-        icon: "Clock",
-        description: "Track clock-ins, worked hours, and weekly attendance totals.",
-        shortcut: "G H"
+        label: "My Pay",
+        href: "/me/pay",
+        icon: "Wallet",
+        description: "Pay statements, payout setup, and compensation in one view.",
+        shortcut: "G Y"
       },
       {
         label: "Documents",
         href: "/documents",
         icon: "FileText",
-        description: "Contracts, policies, and signed files.",
-        shortcut: "G C"
-      },
-      {
-        label: "Pay",
-        href: "/me/pay",
-        icon: "Wallet",
-        description: "Payslips, payment details, and compensation in one place.",
-        shortcut: "G Y"
+        description: "Your documents, required records, and expiry reminders.",
+        shortcut: "G D"
       },
       {
         label: "Learning",
         href: "/learning",
         icon: "GraduationCap",
-        description: "Courses, certificates, and surveys.",
+        description: "Courses, certificates, and surveys assigned to you.",
         shortcut: "G L"
-      },
-      {
-        label: "Reviews",
-        href: "/performance",
-        icon: "Star",
-        description: "Review cycles, goals, and feedback.",
-        shortcut: "G R"
       }
     ]
   },
   {
-    label: "Approvals",
-    description: "Review team requests",
+    label: "TEAM",
     requiredRoles: ["MANAGER", "TEAM_LEAD", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
     items: [
       {
         label: "Approvals",
         href: "/approvals",
         icon: "CheckCircle",
-        description: "Unified approvals for time off, expenses, and timesheets.",
+        description: "Review and act on pending team requests.",
         shortcut: "G V"
-      }
-    ]
-  },
-  {
-    label: "Manage",
-    requiredRoles: ["MANAGER", "TEAM_LEAD", "HR_ADMIN", "SUPER_ADMIN"],
-    items: [
+      },
       {
         label: "People",
         href: "/people",
         icon: "Users",
-        description: "Directory, lifecycle, and people records.",
+        description: "Find people, review roles, and open full profiles.",
         shortcut: "G P"
       },
       {
         label: "Scheduling",
-        href: "/scheduling/manage",
+        href: "/scheduling",
         icon: "Calendar",
-        description: "Create schedules, assign shifts, and publish rotas.",
-        shortcut: "G 2"
+        description: "Build, publish, and manage team shift schedules.",
+        shortcut: "G S"
       },
       {
         label: "Onboarding",
         href: "/onboarding",
         icon: "Rocket",
-        description: "Template-driven onboarding and offboarding workflows.",
+        description: "Launch onboarding plans, track progress, and resolve blockers.",
         shortcut: "G O"
+      },
+      {
+        label: "Team Hub",
+        href: "/team-hub",
+        icon: "BookOpen",
+        description: "Your department's knowledge base: guides, contacts, and resources.",
+        shortcut: "G B"
       }
     ]
   },
   {
-    label: "Finance",
-    description: "Payroll, expenses, and compensation",
+    label: "FINANCE",
     requiredRoles: ["FINANCE_ADMIN", "HR_ADMIN", "SUPER_ADMIN"],
     items: [
       {
         label: "Payroll",
         href: "/payroll",
         icon: "Calculator",
-        description: "Payroll runs, approvals, and disbursement tracking.",
+        description: "Run payroll with staged approvals and clear payout status.",
         shortcut: "F P"
       },
       {
-        label: "Expense Reports",
-        href: "/expenses/reports",
-        icon: "FileBarChart",
-        description: "Monthly expense analytics by category, employee, and department.",
+        label: "Expenses",
+        href: "/expenses",
+        icon: "Receipt",
+        description: "Submit expenses, upload receipts, and track reimbursement.",
         shortcut: "F E"
       },
       {
         label: "Compensation",
         href: "/admin/compensation",
         icon: "Coins",
-        description: "Manage salary, allowances, and equity records.",
+        description: "Manage salary, allowances, and equity for team members.",
         shortcut: "F C"
-      },
-      {
-        label: "Payment Details",
-        href: "/admin/payment-details",
-        icon: "CreditCard",
-        description: "Review employee payout destinations and missing details.",
-        shortcut: "F D"
       }
     ]
   },
   {
-    label: "Insights",
-    requiredRoles: ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+    label: "OPERATIONS",
+    requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"],
     items: [
       {
-        label: "Analytics",
-        href: "/analytics",
-        icon: "BarChart3",
-        description: "Workforce, payroll, and operations trend reporting.",
-        shortcut: "G N"
+        label: "Performance",
+        href: "/performance",
+        icon: "Star",
+        description: "Run review cycles, track completion, and calibrate fairly.",
+        shortcut: "G R"
       },
       {
         label: "Compliance",
         href: "/compliance",
         icon: "ShieldCheck",
-        description: "Regulatory deadlines and filing status monitoring.",
+        description: "Statutory filings with due dates, proof, and country tracking.",
         shortcut: "G M"
+      },
+      {
+        label: "Analytics",
+        href: "/analytics",
+        icon: "BarChart3",
+        description: "Workforce and operations trends with filters and exports.",
+        shortcut: "G N"
+      },
+      {
+        label: "Signatures",
+        href: "/signatures",
+        icon: "PenTool",
+        description: "Request, sign, and track documents with signer timelines.",
+        shortcut: "G I"
       }
     ]
   },
   {
-    label: "Admin",
+    label: "ADMIN",
     adminOnly: true,
-    requiredRoles: ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+    requiredRoles: ["SUPER_ADMIN"],
     items: [
       {
-        label: "Users & Roles",
-        href: "/admin/users",
-        icon: "UserCog",
-        description: "Invite employees, assign roles, and manage account lifecycle.",
-        shortcut: "A U"
+        label: "Organization",
+        href: "/settings?tab=organization",
+        icon: "Building",
+        description: "Company name, logo, countries, and currencies.",
+        shortcut: "A O"
       },
       {
-        label: "Access Control",
+        label: "Roles & Access",
         href: "/admin/access-control",
         icon: "Lock",
-        description: "Control navigation and dashboard visibility by role.",
+        description: "Default role permissions and per-person overrides.",
         shortcut: "A A"
       },
       {
-        label: "Settings",
-        href: "/settings",
-        icon: "Settings",
-        description: "Workspace preferences, organization, and audit logs.",
-        shortcut: "A S"
+        label: "Audit Log",
+        href: "/settings?tab=audit",
+        icon: "ScrollText",
+        description: "Who did what, when, and to which record.",
+        shortcut: "A L"
       }
     ]
   }

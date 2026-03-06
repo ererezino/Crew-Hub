@@ -85,18 +85,21 @@ const INSIGHTS_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "SUPER
 const DEFAULT_NAV_ROLE_OVERRIDES: Readonly<Record<string, readonly UserRole[]>> = {
   "/approvals": APPROVAL_ROLES,
   "/people": MANAGE_GROUP_ROLES,
+  "/scheduling": SCHEDULING_ROLES,
   "/scheduling/manage": SCHEDULING_MANAGE_ROLES,
   "/onboarding": MANAGE_GROUP_ROLES,
+  "/team-hub": ALL_ROLES,
   "/analytics": INSIGHTS_ROLES,
-  "/compliance": INSIGHTS_ROLES,
-  "/admin/users": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+  "/compliance": ["HR_ADMIN", "SUPER_ADMIN"],
   "/admin/compensation": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/payroll": ["FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/admin/payment-details": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+  "/payroll": ["FINANCE_ADMIN", "HR_ADMIN", "SUPER_ADMIN"],
   "/admin/access-control": ["SUPER_ADMIN"],
-  "/scheduling": SCHEDULING_ROLES,
+  "/performance": ["HR_ADMIN", "SUPER_ADMIN"],
+  "/signatures": ["HR_ADMIN", "SUPER_ADMIN"],
+  "/expenses": ALL_ROLES,
   "/time-attendance": SCHEDULING_ROLES,
-  "/expenses/reports": ["MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]
+  "/settings?tab=organization": SUPER_ONLY,
+  "/settings?tab=audit": ["HR_ADMIN", "SUPER_ADMIN"]
 };
 
 const DEFAULT_WIDGET_ROLE_OVERRIDES: Readonly<
