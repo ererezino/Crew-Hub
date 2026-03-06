@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { DeltaBadge } from "../../../../components/dashboard/delta-badge";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
@@ -64,6 +65,22 @@ function metricsSkeleton() {
 
 function statementTypeLabel(statement: PaymentStatementRecord): string {
   return statement.withholdingApplied ? "Payslip" : "Payment statement";
+}
+
+function signedCurrencyPrefix(value: number | null): string {
+  if (value === null || value === 0) {
+    return "";
+  }
+
+  return value > 0 ? "+" : "-";
+}
+
+function absoluteAmount(value: number | null): number {
+  if (value === null) {
+    return 0;
+  }
+
+  return Math.abs(value);
 }
 
 export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
@@ -327,6 +344,14 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                 <CurrencyDisplay amount={statement.netAmount} currency={statement.currency} />
               </div>
 
+              {statement.previousNetAmount !== null ? (
+                <p className="payslip-variance-copy">
+                  Net pay changed from {formatPayPeriod(statement.previousPayPeriod ?? "")}.
+                </p>
+              ) : (
+                <p className="payslip-variance-copy">No previous period available for comparison.</p>
+              )}
+
               <dl className="payslip-card-meta">
                 <div>
                   <dt>Gross</dt>
@@ -355,6 +380,28 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                       </span>
                     ) : (
                       "Not viewed yet"
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Net change</dt>
+                  <dd className="payslip-variance-value">
+                    {statement.previousNetAmount !== null ? (
+                      <>
+                        <DeltaBadge
+                          current={statement.netAmount}
+                          previous={statement.previousNetAmount}
+                        />
+                        <span className="numeric">
+                          {signedCurrencyPrefix(statement.netVarianceAmount)}
+                          <CurrencyDisplay
+                            amount={absoluteAmount(statement.netVarianceAmount)}
+                            currency={statement.currency}
+                          />
+                        </span>
+                      </>
+                    ) : (
+                      <span className="settings-card-description">No baseline</span>
                     )}
                   </dd>
                 </div>

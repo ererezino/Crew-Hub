@@ -72,6 +72,24 @@ function parseDeductionTotal(value: unknown): number {
   return parsed.data.reduce((sum, row) => sum + parseAmount(row.amount), 0);
 }
 
+function computeVariancePercent(currentAmount: number, previousAmount: number): number | null {
+  if (previousAmount === 0) {
+    if (currentAmount === 0) {
+      return 0;
+    }
+
+    return null;
+  }
+
+  const delta = ((currentAmount - previousAmount) / Math.abs(previousAmount)) * 100;
+
+  if (!Number.isFinite(delta)) {
+    return null;
+  }
+
+  return Number.parseFloat(delta.toFixed(2));
+}
+
 function toPayrollItem(
   row: z.infer<typeof payslipRowSchema>
 ): z.infer<typeof payrollItemRowSchema> | null {
@@ -206,7 +224,11 @@ export async function GET(request: Request) {
         netAmount: parseAmount(payrollItem.net_amount),
         currency: payrollItem.currency.toUpperCase(),
         paymentReference: payrollItem.payment_reference,
-        withholdingApplied: payrollItem.withholding_applied
+        withholdingApplied: payrollItem.withholding_applied,
+        previousPayPeriod: null,
+        previousNetAmount: null,
+        netVarianceAmount: null,
+        netVariancePercent: null
       });
     }
 
@@ -223,12 +245,31 @@ export async function GET(request: Request) {
 
     summary.monthsPaid = new Set(statements.map((statement) => statement.payPeriod)).size;
 
+    const statementsWithVariance = statements.map((statement, statementIndex) => {
+      const previousStatement = statements[statementIndex + 1] ?? null;
+      const previousNetAmount = previousStatement?.netAmount ?? null;
+      const netVarianceAmount =
+        previousNetAmount === null ? null : statement.netAmount - previousNetAmount;
+      const netVariancePercent =
+        previousNetAmount === null
+          ? null
+          : computeVariancePercent(statement.netAmount, previousNetAmount);
+
+      return {
+        ...statement,
+        previousPayPeriod: previousStatement?.payPeriod ?? null,
+        previousNetAmount,
+        netVarianceAmount,
+        netVariancePercent
+      };
+    });
+
     const responseData: MePayslipsResponseData = {
       year: selectedYear,
       availableYears:
         availableYears.length > 0 ? availableYears : [selectedYear],
       summary,
-      statements
+      statements: statementsWithVariance
     };
 
     return jsonResponse<MePayslipsResponseData>(200, {

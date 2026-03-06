@@ -14,6 +14,10 @@ export type PaymentStatementRecord = {
   currency: string;
   paymentReference: string | null;
   withholdingApplied: boolean;
+  previousPayPeriod: string | null;
+  previousNetAmount: number | null;
+  netVarianceAmount: number | null;
+  netVariancePercent: number | null;
 };
 
 export type PaymentStatementSummary = {
