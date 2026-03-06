@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -44,6 +44,37 @@ type ShiftFormState = {
   breakMinutes: string;
   notes: string;
 };
+
+type ToastVariant = "success" | "error" | "info";
+
+type ToastMessage = {
+  id: string;
+  message: string;
+  variant: ToastVariant;
+};
+
+type AutoGenerateAssignment = {
+  employeeId: string;
+  employeeName: string;
+  shiftDate: string;
+  startTime: string;
+  endTime: string;
+  breakMinutes: number;
+  templateId?: string;
+};
+
+type DayNote = {
+  noteDate: string;
+  content: string;
+};
+
+function createToastId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `toast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 function toneForShiftStatus(status: ShiftStatus) {
   switch (status) {
@@ -134,6 +165,20 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
   const [scheduleSortDirection, setScheduleSortDirection] = useState<SortDirection>("desc");
   const [shiftSortDirection, setShiftSortDirection] = useState<SortDirection>("asc");
 
+  // Toast state
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Auto-generate state
+  const [autoGenScheduleId, setAutoGenScheduleId] = useState<string | null>(null);
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const [autoGenPreview, setAutoGenPreview] = useState<AutoGenerateAssignment[] | null>(null);
+  const [isApplyingAutoGen, setIsApplyingAutoGen] = useState(false);
+
+  // Day notes state
+  const [dayNotes, setDayNotes] = useState<Record<string, DayNote[]>>({});
+  const [dayNotesLoading, setDayNotesLoading] = useState<Record<string, boolean>>({});
+  const [savingNoteKey, setSavingNoteKey] = useState<string | null>(null);
+
   useEffect(() => {
     const abortController = new AbortController();
 
@@ -204,6 +249,163 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       return shiftSortDirection === "asc" ? leftValue - rightValue : rightValue - leftValue;
     });
   }, [shiftSortDirection, shiftsQuery.data?.shifts]);
+
+  const addToast = useCallback((variant: ToastVariant, message: string) => {
+    const id = createToastId();
+    setToasts((currentToasts) => [...currentToasts, { id, variant, message }]);
+    window.setTimeout(() => {
+      setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== id));
+    }, 4000);
+  }, []);
+
+  // --- Auto-generate handlers ---
+
+  async function handleAutoGenerate(scheduleId: string) {
+    setAutoGenScheduleId(scheduleId);
+    setIsAutoGenerating(true);
+    setAutoGenPreview(null);
+
+    try {
+      const response = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
+        method: "POST"
+      });
+      const payload = (await response.json()) as {
+        data: { assignments: AutoGenerateAssignment[] } | null;
+        error: { message?: string } | null;
+      };
+
+      if (!response.ok || !payload.data) {
+        addToast("error", payload.error?.message ?? "Unable to auto-generate assignments.");
+        setAutoGenScheduleId(null);
+        return;
+      }
+
+      setAutoGenPreview(payload.data.assignments);
+      addToast("info", `Generated ${payload.data.assignments.length} assignment(s). Review and apply.`);
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Auto-generate failed.");
+      setAutoGenScheduleId(null);
+    } finally {
+      setIsAutoGenerating(false);
+    }
+  }
+
+  async function handleApplyAutoGen() {
+    if (!autoGenScheduleId || !autoGenPreview) {
+      return;
+    }
+
+    setIsApplyingAutoGen(true);
+
+    try {
+      const response = await fetch(
+        `/api/v1/scheduling/schedules/${autoGenScheduleId}/auto-generate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true, assignments: autoGenPreview })
+        }
+      );
+      const payload = (await response.json()) as {
+        data: unknown;
+        error: { message?: string } | null;
+      };
+
+      if (!response.ok) {
+        addToast("error", payload.error?.message ?? "Unable to apply assignments.");
+        return;
+      }
+
+      addToast("success", "Auto-generated assignments applied.");
+      setAutoGenPreview(null);
+      setAutoGenScheduleId(null);
+      shiftsQuery.refresh();
+      schedulesQuery.refresh();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Apply failed.");
+    } finally {
+      setIsApplyingAutoGen(false);
+    }
+  }
+
+  function handleDiscardAutoGen() {
+    setAutoGenPreview(null);
+    setAutoGenScheduleId(null);
+    addToast("info", "Auto-generated assignments discarded.");
+  }
+
+  // --- Day notes handlers ---
+
+  const loadDayNotes = useCallback(async (scheduleId: string) => {
+    setDayNotesLoading((current) => ({ ...current, [scheduleId]: true }));
+
+    try {
+      const response = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/notes`);
+      const payload = (await response.json()) as {
+        data: { notes: DayNote[] } | null;
+        error: { message?: string } | null;
+      };
+
+      if (response.ok && payload.data) {
+        setDayNotes((current) => ({ ...current, [scheduleId]: payload.data!.notes }));
+      }
+    } catch {
+      // Silently fail — notes are non-critical
+    } finally {
+      setDayNotesLoading((current) => ({ ...current, [scheduleId]: false }));
+    }
+  }, []);
+
+  async function handleSaveDayNote(scheduleId: string, noteDate: string, content: string) {
+    const noteKey = `${scheduleId}:${noteDate}`;
+    setSavingNoteKey(noteKey);
+
+    try {
+      const response = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteDate, content })
+      });
+      const payload = (await response.json()) as {
+        data: unknown;
+        error: { message?: string } | null;
+      };
+
+      if (!response.ok) {
+        addToast("error", payload.error?.message ?? "Unable to save note.");
+        return;
+      }
+
+      // Update local state
+      setDayNotes((current) => {
+        const existing = current[scheduleId] ?? [];
+        const noteIndex = existing.findIndex((note) => note.noteDate === noteDate);
+
+        if (noteIndex >= 0) {
+          const updated = [...existing];
+          updated[noteIndex] = { noteDate, content };
+          return { ...current, [scheduleId]: updated };
+        }
+
+        return { ...current, [scheduleId]: [...existing, { noteDate, content }] };
+      });
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Unable to save note.");
+    } finally {
+      setSavingNoteKey(null);
+    }
+  }
+
+  // Load day notes when schedules are available
+  useEffect(() => {
+    const schedules = schedulesQuery.data?.schedules ?? [];
+
+    for (const schedule of schedules) {
+      if (!dayNotes[schedule.id] && !dayNotesLoading[schedule.id]) {
+        void loadDayNotes(schedule.id);
+      }
+    }
+  }, [schedulesQuery.data?.schedules, dayNotes, dayNotesLoading, loadDayNotes]);
 
   async function handleCreateSchedule(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -349,7 +551,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       {!embedded ? (
         <PageHeader
           title="Scheduling"
-          description="Build and publish team schedules with templates, assignments, and swap oversight."
+          description="Build, publish, and manage team shift schedules."
         />
       ) : null}
 
@@ -614,14 +816,27 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                       <td className="table-row-action-cell">
                         <div className="timeatt-row-actions">
                           {schedule.status === "draft" ? (
-                            <button
-                              type="button"
-                              className="table-row-action"
-                              onClick={() => handlePublishSchedule(schedule.id)}
-                              disabled={isPublishingScheduleId === schedule.id}
-                            >
-                              {isPublishingScheduleId === schedule.id ? "Publishing..." : "Publish"}
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => handlePublishSchedule(schedule.id)}
+                                disabled={isPublishingScheduleId === schedule.id}
+                              >
+                                {isPublishingScheduleId === schedule.id ? "Publishing..." : "Publish"}
+                              </button>
+                              <button
+                                type="button"
+                                className="button button-accent"
+                                style={{ fontSize: "var(--font-size-sm)", padding: "var(--space-1) var(--space-3)" }}
+                                onClick={() => handleAutoGenerate(schedule.id)}
+                                disabled={isAutoGenerating && autoGenScheduleId === schedule.id}
+                              >
+                                {isAutoGenerating && autoGenScheduleId === schedule.id
+                                  ? "Generating..."
+                                  : "Auto-Generate"}
+                              </button>
+                            </>
                           ) : (
                             <span className="table-row-action">Published</span>
                           )}
@@ -634,6 +849,164 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
             </div>
           )}
         </article>
+
+        {autoGenPreview !== null && autoGenScheduleId ? (
+          <article className="settings-card" aria-label="Auto-generate preview">
+            <header className="announcement-item-header">
+              <div>
+                <h2 className="section-title">Auto-generated assignments preview</h2>
+                <p className="settings-card-description">
+                  {autoGenPreview.length} assignment{autoGenPreview.length === 1 ? "" : "s"} generated.
+                  Review and apply or discard.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                <button
+                  type="button"
+                  className="button button-accent"
+                  onClick={handleApplyAutoGen}
+                  disabled={isApplyingAutoGen}
+                >
+                  {isApplyingAutoGen ? "Applying..." : "Apply"}
+                </button>
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={handleDiscardAutoGen}
+                  disabled={isApplyingAutoGen}
+                >
+                  Discard
+                </button>
+              </div>
+            </header>
+
+            {autoGenPreview.length === 0 ? (
+              <p className="settings-card-description" style={{ padding: "var(--space-4)" }}>
+                No assignments could be generated for this schedule.
+              </p>
+            ) : (
+              <div className="data-table-container">
+                <table className="data-table" aria-label="Auto-generated assignments">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Date</th>
+                      <th>Start</th>
+                      <th>End</th>
+                      <th>Break (min)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {autoGenPreview.map((assignment, index) => (
+                      <tr
+                        key={`autogen-${assignment.employeeId}-${assignment.shiftDate}-${index}`}
+                        className="data-table-row"
+                      >
+                        <td>{assignment.employeeName}</td>
+                        <td className="numeric">{assignment.shiftDate}</td>
+                        <td className="numeric">{assignment.startTime}</td>
+                        <td className="numeric">{assignment.endTime}</td>
+                        <td className="numeric">{assignment.breakMinutes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </article>
+        ) : null}
+
+        {sortedSchedules.length > 0 ? (
+          <article className="settings-card" aria-label="Day notes">
+            <header className="announcement-item-header">
+              <div>
+                <h2 className="section-title">Day notes</h2>
+                <p className="settings-card-description">
+                  Add notes to specific dates in a schedule. Notes save automatically on blur.
+                </p>
+              </div>
+            </header>
+
+            <div style={{ padding: "var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+              {sortedSchedules.map((schedule) => {
+                const start = new Date(`${schedule.weekStart}T00:00:00`);
+                const end = new Date(`${schedule.weekEnd}T00:00:00`);
+                const dates: string[] = [];
+
+                for (
+                  let d = new Date(start);
+                  d <= end;
+                  d.setDate(d.getDate() + 1)
+                ) {
+                  dates.push(d.toISOString().split("T")[0]);
+                }
+
+                const notes = dayNotes[schedule.id] ?? [];
+
+                return (
+                  <div key={`daynotes-${schedule.id}`}>
+                    <h3
+                      className="section-title"
+                      style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--space-2)" }}
+                    >
+                      {schedule.name ?? `${schedule.weekStart} to ${schedule.weekEnd}`}
+                    </h3>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "auto 1fr",
+                        gap: "var(--space-2)",
+                        alignItems: "center"
+                      }}
+                    >
+                      {dates.map((dateStr) => {
+                        const existingNote = notes.find((note) => note.noteDate === dateStr);
+                        const noteKey = `${schedule.id}:${dateStr}`;
+                        const isSaving = savingNoteKey === noteKey;
+
+                        return (
+                          <div
+                            key={`note-row-${schedule.id}-${dateStr}`}
+                            style={{ display: "contents" }}
+                          >
+                            <span
+                              className="numeric"
+                              style={{
+                                fontSize: "var(--font-size-sm)",
+                                color: "var(--color-text-secondary)",
+                                whiteSpace: "nowrap"
+                              }}
+                            >
+                              {dateStr}
+                            </span>
+                            <input
+                              className="settings-input"
+                              style={{
+                                fontSize: "var(--font-size-sm)",
+                                opacity: isSaving ? 0.6 : 1
+                              }}
+                              defaultValue={existingNote?.content ?? ""}
+                              placeholder="Add a note for this day..."
+                              disabled={isSaving}
+                              onBlur={(event) => {
+                                const value = event.target.value.trim();
+                                const previous = existingNote?.content ?? "";
+
+                                if (value !== previous) {
+                                  void handleSaveDayNote(schedule.id, dateStr, value);
+                                }
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+        ) : null}
 
         <article className="compensation-section">
           <header className="announcements-section-header">
@@ -714,6 +1087,37 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
           )}
         </article>
       </section>
+
+      {toasts.length > 0 ? (
+        <section className="toast-region" aria-live="polite">
+          {toasts.map((toast) => (
+            <article
+              key={toast.id}
+              className={`toast-message ${
+                toast.variant === "success"
+                  ? "toast-message-success"
+                  : toast.variant === "error"
+                    ? "toast-message-error"
+                    : "toast-message-info"
+              }`}
+            >
+              <p>{toast.message}</p>
+              <button
+                type="button"
+                className="toast-dismiss"
+                aria-label="Dismiss notification"
+                onClick={() =>
+                  setToasts((currentToasts) =>
+                    currentToasts.filter((entry) => entry.id !== toast.id)
+                  )
+                }
+              >
+                &times;
+              </button>
+            </article>
+          ))}
+        </section>
+      ) : null}
     </>
   );
 }
