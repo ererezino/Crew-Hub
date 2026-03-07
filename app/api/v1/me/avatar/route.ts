@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
+
+const sessionProfileSchema = z.object({
+  id: z.string().uuid("Session profile id is invalid.")
+});
 
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
@@ -37,7 +42,17 @@ export async function POST(request: Request) {
     });
   }
 
-  const userId = session.profile.id;
+  const parsedProfile = sessionProfileSchema.safeParse(session.profile);
+
+  if (!parsedProfile.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "SESSION_INVALID", message: parsedProfile.error.issues[0]?.message ?? "Invalid session profile." },
+      meta: buildMeta()
+    });
+  }
+
+  const userId = parsedProfile.data.id;
 
   let formData: FormData;
 
@@ -158,7 +173,17 @@ export async function DELETE() {
     });
   }
 
-  const userId = session.profile.id;
+  const parsedProfile = sessionProfileSchema.safeParse(session.profile);
+
+  if (!parsedProfile.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "SESSION_INVALID", message: parsedProfile.error.issues[0]?.message ?? "Invalid session profile." },
+      meta: buildMeta()
+    });
+  }
+
+  const userId = parsedProfile.data.id;
   const supabase = createSupabaseServiceRoleClient();
 
   // List and remove all avatar files for this user

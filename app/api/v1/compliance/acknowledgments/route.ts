@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { canManageCompliance } from "../../../../../lib/compliance";
@@ -6,6 +7,10 @@ import { createBulkNotifications } from "../../../../../lib/notifications/servic
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import type { PolicyAckStatus } from "../../../../../types/compliance";
+
+const requestSchema = z.object({
+  policy_id: z.string().uuid("policy_id must be a valid UUID.")
+});
 
 type AckRow = {
   employee_id: string;
@@ -133,9 +138,9 @@ export async function POST(request: Request) {
     });
   }
 
-  let body: { policy_id?: string };
+  let body: unknown;
   try {
-    body = (await request.json()) as { policy_id?: string };
+    body = await request.json();
   } catch {
     return jsonResponse<null>(400, {
       data: null,
@@ -144,15 +149,17 @@ export async function POST(request: Request) {
     });
   }
 
-  const { policy_id } = body;
+  const parsedBody = requestSchema.safeParse(body);
 
-  if (!policy_id) {
+  if (!parsedBody.success) {
     return jsonResponse<null>(400, {
       data: null,
-      error: { code: "VALIDATION_ERROR", message: "policy_id is required." },
+      error: { code: "VALIDATION_ERROR", message: parsedBody.error.issues[0]?.message ?? "policy_id is required." },
       meta: buildMeta(),
     });
   }
+
+  const { policy_id } = parsedBody.data;
 
   const supabase = await createSupabaseServerClient();
   const orgId = session.profile.org_id;

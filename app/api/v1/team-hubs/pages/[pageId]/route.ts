@@ -81,9 +81,10 @@ type RouteContext = {
   params: Promise<{ pageId: string }>;
 };
 
-async function getPageHubDepartment(
+async function getPageHubOwnership(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  pageId: string
+  pageId: string,
+  orgId: string
 ): Promise<{ department: string | null; found: boolean }> {
   const { data: pageRow } = await supabase
     .from("team_hub_pages")
@@ -109,8 +110,9 @@ async function getPageHubDepartment(
 
   const { data: hubRow } = await supabase
     .from("team_hubs")
-    .select("department")
+    .select("department, org_id")
     .eq("id", sectionRow.hub_id as string)
+    .eq("org_id", orgId)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -240,27 +242,27 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   const profile = session.profile;
+
+  // Verify page belongs to user's org (fail-closed: all roles including admin)
+  const supabase = await createSupabaseServerClient();
+  const { department, found } = await getPageHubOwnership(supabase, parsedParams.data.pageId, profile.org_id);
+
+  if (!found) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: { code: "NOT_FOUND", message: "Page not found." },
+      meta: buildMeta()
+    });
+  }
+
+  // Check department-scoped access for non-admins
   const isAdmin = hasAnyRole(profile.roles, ["HR_ADMIN", "SUPER_ADMIN"]);
-
-  if (!isAdmin) {
-    const supabase = await createSupabaseServerClient();
-    const { department, found } = await getPageHubDepartment(supabase, parsedParams.data.pageId);
-
-    if (!found) {
-      return jsonResponse<null>(404, {
-        data: null,
-        error: { code: "NOT_FOUND", message: "Page not found." },
-        meta: buildMeta()
-      });
-    }
-
-    if (department && department !== profile.department) {
-      return jsonResponse<null>(403, {
-        data: null,
-        error: { code: "FORBIDDEN", message: "You can only update pages in your department hub." },
-        meta: buildMeta()
-      });
-    }
+  if (!isAdmin && department && department !== profile.department) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: { code: "FORBIDDEN", message: "You can only update pages in your department hub." },
+      meta: buildMeta()
+    });
   }
 
   const serviceClient = createSupabaseServiceRoleClient();
@@ -339,27 +341,27 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   const profile = session.profile;
+
+  // Verify page belongs to user's org (fail-closed: all roles including admin)
+  const supabase = await createSupabaseServerClient();
+  const { department, found } = await getPageHubOwnership(supabase, parsedParams.data.pageId, profile.org_id);
+
+  if (!found) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: { code: "NOT_FOUND", message: "Page not found." },
+      meta: buildMeta()
+    });
+  }
+
+  // Check department-scoped access for non-admins
   const isAdmin = hasAnyRole(profile.roles, ["HR_ADMIN", "SUPER_ADMIN"]);
-
-  if (!isAdmin) {
-    const supabase = await createSupabaseServerClient();
-    const { department, found } = await getPageHubDepartment(supabase, parsedParams.data.pageId);
-
-    if (!found) {
-      return jsonResponse<null>(404, {
-        data: null,
-        error: { code: "NOT_FOUND", message: "Page not found." },
-        meta: buildMeta()
-      });
-    }
-
-    if (department && department !== profile.department) {
-      return jsonResponse<null>(403, {
-        data: null,
-        error: { code: "FORBIDDEN", message: "You can only delete pages in your department hub." },
-        meta: buildMeta()
-      });
-    }
+  if (!isAdmin && department && department !== profile.department) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: { code: "FORBIDDEN", message: "You can only delete pages in your department hub." },
+      meta: buildMeta()
+    });
   }
 
   const serviceClient = createSupabaseServiceRoleClient();

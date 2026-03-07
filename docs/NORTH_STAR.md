@@ -76,36 +76,42 @@ not equality. Double-approval still requires two different people.
 
 ## Design Tokens (SINGLE SOURCE OF TRUTH)
 
+Source of truth: globals.css CSS custom properties.
+Brand guidelines: docs/brand/crew-hub-brand-guidelines.html
+
 ### Core Palette
-Primary:          #0F172A
-Accent:           #22C55E
-Accent hover:     #16A34A
-Accent subtle:    #F0FDF4
-Accent dark mode: #4ADE80
+Primary:          #000000 (--color-primary)
+Accent (Orange):  #FD8B05 (--color-accent, --crew-orange)
+Accent hover:     #E57D04 (--color-accent-hover)
+Accent subtle:    #FFF3DC (--color-accent-subtle)
+Accent muted:     #FBBF68 (--color-accent-muted)
+Navy:             #1A2B3C (--crew-navy, --color-secondary)
+Cream:            #FFFAF3 (--crew-cream)
 
 ### Backgrounds
-Light: #FFFFFF / #F8FAFC / #F1F5F9
-Dark:  #0F172A / #1E293B / #334155
+Light: #FFFAF3 canvas / #FFFFFF surface / #F5F0EB muted
+Dark:  #1A2B3C canvas / #243447 surface / #0F1C28 deep
 
 ### Text
-Light: #0F172A / #475569 / #94A3B8 / #CBD5E1
-Dark:  #F8FAFC / #94A3B8 / #64748B / #475569
+Light: #000000 primary / #4A5568 secondary / #A0AEC0 muted
+Dark:  #FFFAF3 primary / #CBD5E0 secondary / #718096 muted
 
 ### Borders
-Light: #E2E8F0 (default), #F1F5F9 (subtle)
-Dark:  #334155 (default), #1E293B (subtle)
+Light: #E5DDD3 (default), #F0EAE2 (subtle)
+Dark:  #2D3748 (default), #1A2B3C (subtle)
 
 ### Status Colors (each has bg, text, border)
 Success/Active:    bg #F0FDF4, text #15803D, border #BBF7D0
 Warning:           bg #FFFBEB, text #A16207, border #FDE68A
 Error/Rejected:    bg #FEF2F2, text #B91C1C, border #FECACA
-Info:              bg #EFF6FF, text #1D4ED8, border #BFDBFE
+Info:              bg #EFF6FF, text #1A2B3C, border #BFDBFE
 Pending:           bg #F5F3FF, text #6D28D9, border #DDD6FE
 Draft:             bg #F8FAFC, text #475569, border #E2E8F0
-Processing:        bg #F0F9FF, text #0369A1, border #BAE6FD
+Processing:        bg #F0F9FF, text #1A2B3C, border #BAE6FD
 
-Dark mode status: same hues but lower saturation backgrounds 
-that work on dark surfaces. Define as CSS variables.
+Dark mode status: same hues but lower saturation backgrounds
+that work on dark surfaces. Defined as CSS custom properties
+in globals.css :root[data-theme="dark"].
 
 ### Typography
 Fonts: Geist (body), Geist Mono (numbers/data/code)
@@ -117,7 +123,5 @@ Line heights: 1.25 headings, 1.5 body
 Radius: 6px default, 8px cards, 12px modals
 Transitions: 150ms hover, 200ms panels
 
-Do NOT use #1a1a2e anywhere. Primary is #0F172A.
-Do NOT hardcode colors outside these tokens. Every color in the 
-app must trace back to a token defined here or a CSS variable 
-derived from one.
+Do NOT hardcode colors outside these tokens. Every color in the
+app must trace back to a CSS custom property defined in globals.css.

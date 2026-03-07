@@ -358,13 +358,13 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       });
       const payload = (await response.json()) as PeoplePasswordResetResponse;
 
-      if (!response.ok || !payload.data?.temporaryPassword) {
+      if (!response.ok || !payload.data?.resetInitiated) {
         setEditError(payload.error?.message ?? "Unable to reset password.");
         return;
       }
 
-      setResetPasswordValue(payload.data.temporaryPassword);
-      setEditMessage("Password reset complete. Share the temporary password securely.");
+      setResetPasswordValue(null);
+      setEditMessage("Password setup link sent. The user should complete setup from their email.");
     } catch (error) {
       setEditError(error instanceof Error ? error.message : "Unable to reset password.");
     } finally {
@@ -592,20 +592,6 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
                 {isResettingPassword ? "Resetting..." : "Reset Password"}
               </button>
             </div>
-
-            {resetPasswordValue ? (
-              <div className="admin-users-password-box">
-                <p className="form-label">Temporary password</p>
-                <code className="admin-users-password-value">{resetPasswordValue}</code>
-                <button
-                  type="button"
-                  className="table-row-action"
-                  onClick={() => copyToClipboard(resetPasswordValue)}
-                >
-                  Copy password
-                </button>
-              </div>
-            ) : null}
 
             {editError ? <p className="form-submit-error">{editError}</p> : null}
             {editMessage ? <p className="settings-feedback">{editMessage}</p> : null}

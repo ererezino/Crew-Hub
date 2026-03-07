@@ -83,9 +83,18 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-type AutoGenerateResponseData = {
+type EnrichedAssignment = GeneratedAssignment & {
+  employeeName: string;
+};
+
+type AutoGeneratePreviewResponseData = {
+  assignments: EnrichedAssignment[];
+  warnings?: string[];
+};
+
+type AutoGenerateConfirmResponseData = {
   assignments: GeneratedAssignment[];
-  savedCount?: number;
+  savedCount: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -271,7 +280,7 @@ export async function POST(
       }
     });
 
-    return jsonResponse<AutoGenerateResponseData>(201, {
+    return jsonResponse<AutoGenerateConfirmResponseData>(201, {
       data: {
         assignments,
         savedCount: assignments.length
@@ -465,8 +474,46 @@ export async function POST(
     scheduleType
   });
 
-  return jsonResponse<AutoGenerateResponseData>(200, {
-    data: { assignments },
+  // Build employee name lookup for enriched response
+  const nameMap = new Map<string, string>();
+  for (const emp of employees) {
+    nameMap.set(emp.id, emp.fullName);
+  }
+
+  const enriched: EnrichedAssignment[] = assignments.map((a) => ({
+    ...a,
+    employeeName: nameMap.get(a.employeeId) ?? "Unknown"
+  }));
+
+  // Detect unfilled slots (dates × slots that have no assignment)
+  const warnings: string[] = [];
+  const dates = (() => {
+    const result: string[] = [];
+    const cur = new Date(`${schedule.week_start}T00:00:00Z`);
+    const last = new Date(`${schedule.week_end}T00:00:00Z`);
+    while (cur <= last) {
+      result.push(cur.toISOString().slice(0, 10));
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return result;
+  })();
+
+  for (const date of dates) {
+    for (const slot of typedSlots) {
+      const filled = assignments.some(
+        (a) => a.shiftDate === date && a.slotName === slot.name
+      );
+      if (!filled) {
+        warnings.push(`${date}: no employee available for ${slot.name}`);
+      }
+    }
+  }
+
+  return jsonResponse<AutoGeneratePreviewResponseData>(200, {
+    data: {
+      assignments: enriched,
+      ...(warnings.length > 0 ? { warnings } : {})
+    },
     error: null,
     meta: buildMeta()
   });

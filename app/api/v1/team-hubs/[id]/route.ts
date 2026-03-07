@@ -191,24 +191,32 @@ export async function PUT(request: Request, context: RouteContext) {
   const profile = session.profile;
   const payload = parsedBody.data;
 
-  // Check department-scoped access
-  const isAdmin = hasAnyRole(profile.roles, ["HR_ADMIN", "SUPER_ADMIN"]);
-  if (!isAdmin) {
-    const supabase = await createSupabaseServerClient();
-    const { data: existingHub } = await supabase
-      .from("team_hubs")
-      .select("department")
-      .eq("id", parsedParams.data.id)
-      .is("deleted_at", null)
-      .maybeSingle();
+  // Verify hub exists and belongs to user's org (fail-closed: null = 404)
+  const supabase = await createSupabaseServerClient();
+  const { data: existingHub } = await supabase
+    .from("team_hubs")
+    .select("department")
+    .eq("id", parsedParams.data.id)
+    .eq("org_id", profile.org_id)
+    .is("deleted_at", null)
+    .maybeSingle();
 
-    if (existingHub && existingHub.department && existingHub.department !== profile.department) {
-      return jsonResponse<null>(403, {
-        data: null,
-        error: { code: "FORBIDDEN", message: "You can only update hubs for your own department." },
-        meta: buildMeta()
-      });
-    }
+  if (!existingHub) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: { code: "NOT_FOUND", message: "Team hub not found." },
+      meta: buildMeta()
+    });
+  }
+
+  // Check department-scoped access for non-admins
+  const isAdmin = hasAnyRole(profile.roles, ["HR_ADMIN", "SUPER_ADMIN"]);
+  if (!isAdmin && existingHub.department && existingHub.department !== profile.department) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: { code: "FORBIDDEN", message: "You can only update hubs for your own department." },
+      meta: buildMeta()
+    });
   }
 
   const serviceClient = createSupabaseServiceRoleClient();
@@ -225,6 +233,7 @@ export async function PUT(request: Request, context: RouteContext) {
     .from("team_hubs")
     .update(updateData)
     .eq("id", parsedParams.data.id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .select("id, org_id, department, name, description, cover_image_url, icon, visibility, created_by")
     .single();
@@ -284,24 +293,33 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   const profile = session.profile;
+
+  // Verify hub exists and belongs to user's org (fail-closed: null = 404)
+  const supabase = await createSupabaseServerClient();
+  const { data: existingHub } = await supabase
+    .from("team_hubs")
+    .select("department")
+    .eq("id", parsedParams.data.id)
+    .eq("org_id", profile.org_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!existingHub) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: { code: "NOT_FOUND", message: "Team hub not found." },
+      meta: buildMeta()
+    });
+  }
+
+  // Check department-scoped access for non-admins
   const isAdmin = hasAnyRole(profile.roles, ["HR_ADMIN", "SUPER_ADMIN"]);
-
-  if (!isAdmin) {
-    const supabase = await createSupabaseServerClient();
-    const { data: existingHub } = await supabase
-      .from("team_hubs")
-      .select("department")
-      .eq("id", parsedParams.data.id)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (existingHub && existingHub.department && existingHub.department !== profile.department) {
-      return jsonResponse<null>(403, {
-        data: null,
-        error: { code: "FORBIDDEN", message: "You can only delete hubs for your own department." },
-        meta: buildMeta()
-      });
-    }
+  if (!isAdmin && existingHub.department && existingHub.department !== profile.department) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: { code: "FORBIDDEN", message: "You can only delete hubs for your own department." },
+      meta: buildMeta()
+    });
   }
 
   const serviceClient = createSupabaseServiceRoleClient();
@@ -311,6 +329,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     .from("team_hubs")
     .update({ deleted_at: now, updated_at: now })
     .eq("id", parsedParams.data.id)
+    .eq("org_id", profile.org_id)
     .is("deleted_at", null);
 
   if (deleteError) {

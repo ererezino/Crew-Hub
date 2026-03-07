@@ -9,7 +9,6 @@ import {
   buildAccessOverridesFromSelected,
   resolveDefaultAccessForRoles
 } from "../../lib/auth/default-role-access";
-import { generateStrongPassword } from "../../lib/auth/generate-password";
 import type { AppRole } from "../../types/auth";
 import {
   EMPLOYMENT_TYPES,
@@ -41,7 +40,6 @@ type InviteSuccessState = {
   userId: string;
   fullName: string;
   email: string;
-  temporaryPassword: string;
 };
 
 type InviteFormProps = {
@@ -96,7 +94,6 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
   const [errors, setErrors] = useState<InviteFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAccessKeys, setSelectedAccessKeys] = useState<string[]>([]);
-  const [generatedPassword, setGeneratedPassword] = useState("");
   const [successState, setSuccessState] = useState<InviteSuccessState | null>(null);
 
   const defaultRoleAccess = useMemo(
@@ -107,12 +104,6 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
   useEffect(() => {
     setSelectedAccessKeys(defaultRoleAccess);
   }, [defaultRoleAccess]);
-
-  useEffect(() => {
-    if (step === 4 && generatedPassword.trim().length === 0) {
-      setGeneratedPassword(generateStrongPassword());
-    }
-  }, [generatedPassword, step]);
 
   const managerOptions = useMemo(() => {
     const query = managerSearch.trim().toLowerCase();
@@ -205,7 +196,6 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
   const resetForm = () => {
     setStep(1);
     setValues(initialValues);
-    setGeneratedPassword("");
     setErrors({});
     setSuccessState(null);
     setManagerSearch("");
@@ -248,11 +238,6 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
       return;
     }
 
-    if (!generatedPassword.trim()) {
-      setGeneratedPassword(generateStrongPassword());
-      return;
-    }
-
     setIsSubmitting(true);
     setErrors({});
 
@@ -264,7 +249,6 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
     const payload: PeopleCreatePayload = {
       email: values.email.trim(),
       fullName: values.fullName.trim(),
-      password: generatedPassword,
       phone: values.phone.trim() || undefined,
       isNewEmployee: values.isNewEmployee,
       department: values.department.trim(),
@@ -299,8 +283,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
       setSuccessState({
         userId: responseBody.data.person.id,
         fullName: responseBody.data.person.fullName,
-        email: responseBody.data.person.email,
-        temporaryPassword: responseBody.data.temporaryPassword ?? generatedPassword
+        email: responseBody.data.person.email
       });
     } catch (error) {
       setErrors({
@@ -318,19 +301,8 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
         <p className="settings-card-description">
           {successState.fullName} ({successState.email}) is ready in Crew Hub.
         </p>
-        <div className="admin-users-password-box">
-          <p className="form-label">Temporary password</p>
-          <code className="admin-users-password-value">{successState.temporaryPassword}</code>
-          <button
-            type="button"
-            className="table-row-action"
-            onClick={() => copyToClipboard(successState.temporaryPassword)}
-          >
-            Copy password
-          </button>
-        </div>
         <p className="settings-card-description">
-          Share these credentials securely with the employee. They should change their password on first login.
+          A welcome email and secure account setup link have been sent to the employee.
         </p>
         <div className="settings-actions">
           <button type="button" className="button button-accent" onClick={resetForm}>
@@ -616,28 +588,8 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
             </div>
           </dl>
 
-          <div className="admin-users-password-box">
-            <p className="form-label">Auto-generated temporary password</p>
-            <code className="admin-users-password-value">{generatedPassword}</code>
-            <div className="settings-actions">
-              <button
-                type="button"
-                className="table-row-action"
-                onClick={() => copyToClipboard(generatedPassword)}
-              >
-                Copy
-              </button>
-              <button
-                type="button"
-                className="table-row-action"
-                onClick={() => setGeneratedPassword(generateStrongPassword())}
-              >
-                Regenerate
-              </button>
-            </div>
-          </div>
           <p className="settings-card-description">
-            Share these credentials securely with the employee. They should change their password on first login.
+            A welcome email and secure account setup link will be sent to the employee.
           </p>
         </section>
       ) : null}

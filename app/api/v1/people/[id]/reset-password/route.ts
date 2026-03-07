@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
-import { generateStrongPassword } from "../../../../../../lib/auth/generate-password";
 import { logAudit } from "../../../../../../lib/audit";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
@@ -21,6 +20,12 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
+function resolveAuthRedirectUrl(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.crew-hub.local";
+  const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
+  return `${normalizedAppUrl}/reset-password`;
+}
+
 export async function POST(
   _request: Request,
   context: { params: Promise<{ id: string }> }
@@ -32,7 +37,7 @@ export async function POST(
       data: null,
       error: {
         code: "UNAUTHORIZED",
-        message: "You must be logged in to reset user passwords."
+        message: "You must be logged in to send password setup links."
       },
       meta: buildMeta()
     });
@@ -43,7 +48,7 @@ export async function POST(
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only Super Admin can reset user passwords."
+        message: "Only Super Admin can send password setup links."
       },
       meta: buildMeta()
     });
@@ -64,10 +69,11 @@ export async function POST(
 
   const personId = parsedParams.data.id;
   const serviceRoleClient = createSupabaseServiceRoleClient();
+  const authRedirectUrl = resolveAuthRedirectUrl();
 
   const { data: existingProfile, error: profileError } = await serviceRoleClient
     .from("profiles")
-    .select("id")
+    .select("id, email")
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -84,7 +90,7 @@ export async function POST(
     });
   }
 
-  if (!existingProfile?.id) {
+  if (!existingProfile?.id || typeof existingProfile.email !== "string" || existingProfile.email.length === 0) {
     return jsonResponse<null>(404, {
       data: null,
       error: {
@@ -95,18 +101,19 @@ export async function POST(
     });
   }
 
-  const temporaryPassword = generateStrongPassword();
-
-  const { error: resetError } = await serviceRoleClient.auth.admin.updateUserById(personId, {
-    password: temporaryPassword
-  });
+  const { error: resetError } = await serviceRoleClient.auth.resetPasswordForEmail(
+    existingProfile.email,
+    {
+      redirectTo: authRedirectUrl
+    }
+  );
 
   if (resetError) {
     return jsonResponse<null>(500, {
       data: null,
       error: {
         code: "PASSWORD_RESET_FAILED",
-        message: "Unable to reset password for this user."
+        message: "Unable to send a password setup link for this user."
       },
       meta: buildMeta()
     });
@@ -117,7 +124,7 @@ export async function POST(
     tableName: "profiles",
     recordId: personId,
     newValue: {
-      passwordReset: true,
+      resetLinkInitiated: true,
       resetBy: session.profile.id
     }
   });
@@ -125,7 +132,7 @@ export async function POST(
   return jsonResponse<PeoplePasswordResetResponseData>(200, {
     data: {
       userId: personId,
-      temporaryPassword
+      resetInitiated: true
     },
     error: null,
     meta: buildMeta()

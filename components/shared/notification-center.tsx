@@ -125,7 +125,7 @@ export function NotificationCenter() {
   const isLoading = notifications.isLoading || announcementsLoading;
   const errorMessage = notifications.errorMessage;
 
-  /* Dismiss a single item */
+  /* Dismiss a single item — optimistic with server-failure recovery */
   const handleDismiss = useCallback(
     async (item: FeedItem) => {
       const key = `${item.source}-${item.id}`;
@@ -138,50 +138,85 @@ export function NotificationCenter() {
         return next;
       });
 
-      /* Also mark as read on the server */
-      if (item.source === "notification") {
-        await notifications.markRead(item.id);
-      } else {
-        try {
-          await fetch("/api/v1/announcements/read", {
+      /* Mark as read on the server; revert on failure */
+      try {
+        if (item.source === "notification") {
+          await notifications.markRead(item.id);
+        } else {
+          const response = await fetch("/api/v1/announcements/read", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ announcementId: item.id })
           });
-        } catch {
-          /* silent */
+
+          if (!response.ok) {
+            throw new Error("Server rejected read mark");
+          }
         }
+      } catch {
+        /* Server call failed — revert the optimistic dismissal so the item reappears */
+        setDismissed((current) => {
+          const next = new Set(current);
+          next.delete(key);
+          saveDismissed(next);
+          return next;
+        });
       }
     },
     [notifications]
   );
 
-  /* Dismiss all visible items */
+  /* Dismiss all visible items — optimistic with partial failure recovery */
   const handleDismissAll = useCallback(async () => {
+    const itemKeys = feedItems.map((item) => `${item.source}-${item.id}`);
+
     setDismissed((current) => {
       const next = new Set(current);
-      for (const item of feedItems) {
-        next.add(`${item.source}-${item.id}`);
+      for (const key of itemKeys) {
+        next.add(key);
       }
       saveDismissed(next);
       return next;
     });
 
-    /* Mark notifications as read */
-    await notifications.markAllRead();
+    /* Mark notifications as read — revert all on failure */
+    try {
+      await notifications.markAllRead();
+    } catch {
+      /* If bulk mark-read fails, revert notification dismissals */
+      const notificationKeys = feedItems
+        .filter((i) => i.source === "notification")
+        .map((i) => `notification-${i.id}`);
+      setDismissed((current) => {
+        const next = new Set(current);
+        for (const key of notificationKeys) {
+          next.delete(key);
+        }
+        saveDismissed(next);
+        return next;
+      });
+    }
 
-    /* Mark announcements as read */
+    /* Mark announcements as read — revert individually on failure */
     const announcementItems = feedItems.filter((i) => i.source === "announcement");
     await Promise.all(
       announcementItems.map(async (item) => {
         try {
-          await fetch("/api/v1/announcements/read", {
+          const response = await fetch("/api/v1/announcements/read", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ announcementId: item.id })
           });
+
+          if (!response.ok) throw new Error("Failed");
         } catch {
-          /* silent */
+          const key = `announcement-${item.id}`;
+          setDismissed((current) => {
+            const next = new Set(current);
+            next.delete(key);
+            saveDismissed(next);
+            return next;
+          });
         }
       })
     );

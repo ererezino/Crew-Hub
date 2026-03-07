@@ -5,6 +5,7 @@ import { type ReactNode, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
+import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../components/ui/currency-display";
@@ -86,6 +87,11 @@ export function PayrollDashboardClient({
         title="Payroll"
         description="Run payroll with staged approvals and clear payout status."
         actions={headerActions}
+      />
+
+      <FeatureBanner
+        moduleId="payroll"
+        description="Payroll is in limited pilot. Disbursement is not yet connected to a payment provider."
       />
 
       {runsQuery.isLoading ? runsTableSkeleton() : null}

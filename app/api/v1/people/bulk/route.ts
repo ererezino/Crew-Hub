@@ -397,7 +397,6 @@ export async function POST(request: Request) {
         await sendWelcomeEmail({
           recipientEmail: normalizedEmail,
           recipientName: employee.fullName.trim(),
-          temporaryPassword: generatedPassword,
           loginUrl
         });
       } catch (emailError) {

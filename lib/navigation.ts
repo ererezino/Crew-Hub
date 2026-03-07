@@ -29,6 +29,8 @@ export type NavItem = {
   icon: string;
   description: string;
   shortcut: string;
+  /** Optional link to the feature state system for nav visibility control */
+  moduleId?: import("./feature-state").ModuleId;
 };
 
 export type NavGroup = {
@@ -88,7 +90,8 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/learning",
         icon: "GraduationCap",
         description: "Courses, certificates, and surveys assigned to you.",
-        shortcut: "G L"
+        shortcut: "G L",
+        moduleId: "learning"
       }
     ]
   },
@@ -115,7 +118,8 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/scheduling",
         icon: "Calendar",
         description: "Build, publish, and manage team shift schedules.",
-        shortcut: "G S"
+        shortcut: "G S",
+        moduleId: "scheduling"
       },
       {
         label: "Onboarding",
@@ -129,7 +133,8 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/team-hub",
         icon: "BookOpen",
         description: "Your department's knowledge base: guides, contacts, and resources.",
-        shortcut: "G B"
+        shortcut: "G B",
+        moduleId: "team_hub"
       }
     ]
   },
@@ -142,7 +147,8 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/payroll",
         icon: "Calculator",
         description: "Run payroll with staged approvals and clear payout status.",
-        shortcut: "F P"
+        shortcut: "F P",
+        moduleId: "payroll"
       },
       {
         label: "Expenses",
@@ -169,7 +175,8 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/performance",
         icon: "Star",
         description: "Run review cycles, track completion, and calibrate fairly.",
-        shortcut: "G R"
+        shortcut: "G R",
+        moduleId: "performance"
       },
       {
         label: "Compliance",
@@ -183,14 +190,16 @@ export const NAV_GROUPS: NavGroup[] = [
         href: "/analytics",
         icon: "BarChart3",
         description: "Workforce and operations trends with filters and exports.",
-        shortcut: "G N"
+        shortcut: "G N",
+        moduleId: "analytics"
       },
       {
         label: "Signatures",
         href: "/signatures",
         icon: "PenTool",
         description: "Request, sign, and track documents with signer timelines.",
-        shortcut: "G I"
+        shortcut: "G I",
+        moduleId: "signatures"
       }
     ]
   },

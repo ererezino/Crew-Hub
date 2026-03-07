@@ -123,12 +123,10 @@ async function fetchEmailsByRole({
 export async function sendWelcomeEmail({
   recipientEmail,
   recipientName,
-  temporaryPassword,
   loginUrl
 }: {
   recipientEmail: string;
   recipientName: string;
-  temporaryPassword: string;
   loginUrl?: string;
 }): Promise<void> {
   try {
@@ -141,16 +139,11 @@ export async function sendWelcomeEmail({
       text: [
         `Hello ${recipientName},`,
         "",
-        "Welcome to the team! Your account has been created.",
+        "Welcome to the team! Your Crew Hub account has been created.",
         "",
-        "Here are your login credentials:",
+        `Your login email is: ${recipientEmail}`,
         "",
-        `  Email: ${recipientEmail}`,
-        `  Temporary password: ${temporaryPassword}`,
-        "",
-        `Log in at: ${effectiveLoginUrl}`,
-        "",
-        "Important: Please change your password immediately after your first login.",
+        `To get started, visit ${effectiveLoginUrl} and use "Forgot password" to set your password.`,
         "",
         "If you have any questions, reach out to your manager or HR.",
         "",
