@@ -3,10 +3,7 @@
 import {
   Fragment,
   type FormEvent,
-  useCallback,
-  useEffect,
   useMemo,
-  useRef,
   useState
 } from "react";
 import { z } from "zod";
@@ -27,10 +24,6 @@ import {
   labelForPayrollRunStatus,
   toneForPayrollRunStatus
 } from "../../../../../lib/payroll/runs";
-import type {
-  CreatePaymentBatchResponse,
-  RetryPaymentResponse
-} from "../../../../../types/payments";
 import type { GeneratePayslipsResponse } from "../../../../../types/payslips";
 import type {
   AddPayrollAdjustmentResponse,
@@ -111,35 +104,15 @@ function contractorNote() {
 }
 
 function paymentStatusLabel(status: PayrollRunItem["paymentStatus"]): string {
-  switch (status) {
-    case "paid":
-      return "Paid";
-    case "failed":
-      return "Failed";
-    case "processing":
-      return "Processing";
-    case "cancelled":
-      return "Cancelled";
-    default:
-      return "Pending";
-  }
+  void status;
+  return "Disabled in this release";
 }
 
 function paymentStatusTone(
   status: PayrollRunItem["paymentStatus"]
 ): "success" | "error" | "processing" | "warning" | "draft" {
-  switch (status) {
-    case "paid":
-      return "success";
-    case "failed":
-      return "error";
-    case "processing":
-      return "processing";
-    case "cancelled":
-      return "warning";
-    default:
-      return "draft";
-  }
+  void status;
+  return "draft";
 }
 
 function signedAmountPrefix(amount: number | null): string {
@@ -245,8 +218,6 @@ export function PayrollRunDetailClient({
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isGeneratingStatements, setIsGeneratingStatements] = useState(false);
-  const [isProcessingPayments, setIsProcessingPayments] = useState(false);
-  const [retryingPaymentId, setRetryingPaymentId] = useState<string | null>(null);
   const [activeRunAction, setActiveRunAction] = useState<
     null | "submit" | "approve_first" | "approve_final" | "reject" | "cancel"
   >(null);
@@ -260,7 +231,6 @@ export function PayrollRunDetailClient({
   const [rejectReason, setRejectReason] = useState("");
   const [rejectReasonError, setRejectReasonError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const paymentPollingIntervalRef = useRef<number | null>(null);
   const { confirm, confirmDialog } = useConfirmAction();
 
   const sortedItems = useMemo(() => {
@@ -286,8 +256,6 @@ export function PayrollRunDetailClient({
   const isPendingFinal = run?.status === "pending_final_approval";
   const canCalculateRun = canManage && (run?.status === "draft" || isCalculated);
   const canGenerateStatements = canManage && isApproved;
-  const canProcessPayments =
-    canManage && (run?.status === "approved" || run?.status === "processing");
   const canAdjustItems = canManage && isCalculated;
   const canSubmitForApproval = canManage && isCalculated;
   const canApproveFirst =
@@ -308,33 +276,6 @@ export function PayrollRunDetailClient({
   const canCancelRun =
     canManage &&
     (run ? run.status !== "approved" && run.status !== "cancelled" : false);
-
-  const refreshRunDetail = runQuery.refresh;
-
-  const startPaymentPolling = useCallback(() => {
-    if (paymentPollingIntervalRef.current !== null) {
-      return;
-    }
-
-    paymentPollingIntervalRef.current = window.setInterval(() => {
-      refreshRunDetail();
-    }, 1250);
-  }, [refreshRunDetail]);
-
-  const stopPaymentPolling = useCallback(() => {
-    if (paymentPollingIntervalRef.current === null) {
-      return;
-    }
-
-    window.clearInterval(paymentPollingIntervalRef.current);
-    paymentPollingIntervalRef.current = null;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      stopPaymentPolling();
-    };
-  }, [stopPaymentPolling]);
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -421,104 +362,6 @@ export function PayrollRunDetailClient({
       );
     } finally {
       setIsGeneratingStatements(false);
-    }
-  };
-
-  const processPayments = async () => {
-    setIsProcessingPayments(true);
-    startPaymentPolling();
-
-    try {
-      const response = await fetch("/api/v1/payments/batch", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          payrollRunId: runId
-        })
-      });
-
-      const payload = (await response.json()) as CreatePaymentBatchResponse;
-
-      if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to process payroll payments.");
-        return;
-      }
-
-      const summary = payload.data.summary;
-
-      showToast(
-        summary.failedCount > 0 ? "info" : "success",
-        `Payments processed: ${summary.completedCount} completed, ${summary.failedCount} failed.`
-      );
-
-      if (summary.rejectedCount > 0) {
-        showToast(
-          "info",
-          `${summary.rejectedCount} duplicate payment key${
-            summary.rejectedCount === 1 ? "" : "s"
-          } rejected by idempotency protection.`
-        );
-      }
-
-      if (summary.failedCount > 0) {
-        showToast(
-          "error",
-          "Some payments failed. Use Retry payment on failed employees."
-        );
-      }
-
-      runQuery.refresh();
-    } catch (error) {
-      showToast(
-        "error",
-        error instanceof Error ? error.message : "Unable to process payroll payments."
-      );
-    } finally {
-      setIsProcessingPayments(false);
-      window.setTimeout(() => {
-        stopPaymentPolling();
-      }, 900);
-    }
-  };
-
-  const retryPayment = async (item: PayrollRunItem) => {
-    if (!item.paymentId) {
-      showToast("error", "No payment record is linked for retry.");
-      return;
-    }
-
-    setRetryingPaymentId(item.paymentId);
-    startPaymentPolling();
-
-    try {
-      const response = await fetch(`/api/v1/payments/${item.paymentId}/retry`, {
-        method: "POST"
-      });
-
-      const payload = (await response.json()) as RetryPaymentResponse;
-
-      if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to retry payment.");
-        return;
-      }
-
-      showToast(
-        payload.data.payment.status === "completed" ? "success" : "error",
-        payload.data.payment.status === "completed"
-          ? "Payment retry completed."
-          : "Payment retry failed."
-      );
-
-      runQuery.refresh();
-    } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to retry payment.");
-    } finally {
-      setRetryingPaymentId(null);
-      window.setTimeout(() => {
-        stopPaymentPolling();
-      }, 900);
     }
   };
 
@@ -663,7 +506,7 @@ export function PayrollRunDetailClient({
     const confirmed = await confirm({
       title: "Cancel payroll run?",
       description:
-        "This run will move to cancelled status and cannot continue through approvals or payments.",
+        "This run will move to cancelled status and cannot continue through approvals.",
       confirmLabel: "Cancel run",
       tone: "danger"
     });
@@ -681,7 +524,7 @@ export function PayrollRunDetailClient({
         title="Payroll Run"
         description="Review payroll calculations, approvals, and item-level adjustments."
         actions={
-          canCalculateRun || canGenerateStatements || canProcessPayments ? (
+          canCalculateRun || canGenerateStatements ? (
             <>
               {canCalculateRun ? (
                 <button
@@ -691,7 +534,6 @@ export function PayrollRunDetailClient({
                   disabled={
                     isCalculating ||
                     isGeneratingStatements ||
-                    isProcessingPayments ||
                     activeRunAction !== null
                   }
                 >
@@ -707,27 +549,10 @@ export function PayrollRunDetailClient({
                   disabled={
                     isGeneratingStatements ||
                     isCalculating ||
-                    isProcessingPayments ||
                     activeRunAction !== null
                   }
                 >
                   {isGeneratingStatements ? "Generating..." : "Generate statements"}
-                </button>
-              ) : null}
-
-              {canProcessPayments ? (
-                <button
-                  type="button"
-                  className="button button-primary"
-                  onClick={processPayments}
-                  disabled={
-                    isProcessingPayments ||
-                    isCalculating ||
-                    isGeneratingStatements ||
-                    activeRunAction !== null
-                  }
-                >
-                  {isProcessingPayments ? "Processing..." : "Process payments"}
                 </button>
               ) : null}
             </>
@@ -973,6 +798,9 @@ export function PayrollRunDetailClient({
             />
           ) : (
             <section className="data-table-container" aria-label="Payroll run items">
+              <p className="settings-card-description">
+                Disbursement execution is disabled in this release. These are non-execution payroll records only.
+              </p>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -994,7 +822,7 @@ export function PayrollRunDetailClient({
                     <th>Deductions</th>
                     <th>Net</th>
                     <th>Withholding</th>
-                    <th>Payment</th>
+                    <th>Disbursement</th>
                     <th className="table-action-column">Actions</th>
                   </tr>
                 </thead>
@@ -1047,37 +875,6 @@ export function PayrollRunDetailClient({
                         </td>
                         <td>
                           <span className="payment-status-inline">
-                            {item.paymentStatus === "processing" ? (
-                              <span className="payment-status-pulse" aria-hidden="true" />
-                            ) : item.paymentStatus === "paid" ? (
-                              <svg
-                                className="payment-status-icon payment-status-icon-success"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  d="M5 12.5 9.2 16.7 19 7"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  fill="none"
-                                />
-                              </svg>
-                            ) : item.paymentStatus === "failed" ? (
-                              <svg
-                                className="payment-status-icon payment-status-icon-error"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  d="M7 7l10 10M17 7L7 17"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                />
-                              </svg>
-                            ) : null}
                             <StatusBadge tone={paymentStatusTone(item.paymentStatus)}>
                               {paymentStatusLabel(item.paymentStatus)}
                             </StatusBadge>
@@ -1085,25 +882,6 @@ export function PayrollRunDetailClient({
                         </td>
                         <td className="table-row-action-cell">
                           <div className="payroll-row-actions">
-                            {canManage &&
-                            item.paymentStatus === "failed" &&
-                            item.paymentId ? (
-                              <button
-                                type="button"
-                                className="table-row-action"
-                                disabled={
-                                  isProcessingPayments ||
-                                  retryingPaymentId === item.paymentId
-                                }
-                                onClick={() => {
-                                  void retryPayment(item);
-                                }}
-                              >
-                                {retryingPaymentId === item.paymentId
-                                  ? "Retrying..."
-                                  : "Retry payment"}
-                              </button>
-                            ) : null}
                             <button
                               type="button"
                               className="table-row-action"
@@ -1175,13 +953,13 @@ export function PayrollRunDetailClient({
                                     <p className="settings-card-description">{contractorNote()}</p>
                                   )}
                                   <p>
-                                    Payment status:{" "}
+                                    Disbursement execution:{" "}
                                     <StatusBadge tone={paymentStatusTone(item.paymentStatus)}>
                                       {paymentStatusLabel(item.paymentStatus)}
                                     </StatusBadge>
                                   </p>
                                   <p className="settings-card-description">
-                                    Payment reference: {item.paymentReference ?? "--"}
+                                    No live payout rails are enabled in this release.
                                   </p>
                                   <p>
                                     Net pay:{" "}

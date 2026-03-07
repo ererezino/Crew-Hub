@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
+
+const sessionProfileSchema = z.object({
+  id: z.string().uuid("Session profile id is invalid."),
+  org_id: z.string().uuid("Session organization id is invalid.")
+});
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -48,7 +54,20 @@ export async function GET() {
     });
   }
 
-  const profile = session.profile;
+  const parsedProfile = sessionProfileSchema.safeParse(session.profile);
+
+  if (!parsedProfile.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SESSION_INVALID",
+        message: parsedProfile.error.issues[0]?.message ?? "Invalid session profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const profile = parsedProfile.data;
 
   try {
     const supabase = await createSupabaseServerClient();

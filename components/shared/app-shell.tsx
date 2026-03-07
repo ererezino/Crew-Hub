@@ -15,6 +15,8 @@ import {
 } from "react";
 
 import { defaultNavVisibilityForRoles, isSuperAdmin } from "../../lib/access-control";
+import { getModuleState, isModuleVisibleInNav } from "../../lib/feature-state";
+import { FeatureBadge } from "./feature-badge";
 import { hasAnyRole, hasRole } from "../../lib/roles";
 import {
   NAV_GROUPS,
@@ -601,7 +603,10 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
       .map((group) => ({
         ...group,
         items: group.items.filter(
-          (item) => item.href !== "/settings" && allowedRouteKeys.has(item.href)
+          (item) =>
+            item.href !== "/settings" &&
+            allowedRouteKeys.has(item.href) &&
+            (!item.moduleId || isModuleVisibleInNav(item.moduleId))
         )
       }))
       .filter((group) => group.items.length > 0)
@@ -856,6 +861,9 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                           <span className="sidebar-link-indicator" aria-hidden="true" />
                           <NavIcon name={item.icon} size={18} className="sidebar-link-icon" />
                           <span className="sidebar-link-text">{item.label}</span>
+                          {item.moduleId && getModuleState(item.moduleId) !== "LIVE" ? (
+                            <FeatureBadge moduleId={item.moduleId} />
+                          ) : null}
                           {showApprovalsBadge ? (
                             <span className="sidebar-link-badge numeric" aria-label="Pending approvals">
                               {approvalsCountQuery.data?.total ?? 0}

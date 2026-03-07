@@ -57,10 +57,9 @@ type AutoGenerateAssignment = {
   employeeId: string;
   employeeName: string;
   shiftDate: string;
+  slotName: string;
   startTime: string;
   endTime: string;
-  breakMinutes: number;
-  templateId?: string;
 };
 
 type DayNote = {
@@ -261,16 +260,31 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
   // --- Auto-generate handlers ---
 
   async function handleAutoGenerate(scheduleId: string) {
+    const templates = templatesQuery.data?.templates ?? [];
+
+    if (templates.length === 0) {
+      addToast("error", "Create at least one shift template before auto-generating.");
+      return;
+    }
+
     setAutoGenScheduleId(scheduleId);
     setIsAutoGenerating(true);
     setAutoGenPreview(null);
 
     try {
+      const slots = templates.map((t) => ({
+        name: t.name,
+        startTime: t.startTime,
+        endTime: t.endTime
+      }));
+
       const response = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
-        method: "POST"
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slots, scheduleType: "weekday" })
       });
       const payload = (await response.json()) as {
-        data: { assignments: AutoGenerateAssignment[] } | null;
+        data: { assignments: AutoGenerateAssignment[]; warnings?: string[] } | null;
         error: { message?: string } | null;
       };
 
@@ -281,7 +295,10 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       }
 
       setAutoGenPreview(payload.data.assignments);
-      addToast("info", `Generated ${payload.data.assignments.length} assignment(s). Review and apply.`);
+
+      const warningCount = payload.data.warnings?.length ?? 0;
+      const warningNote = warningCount > 0 ? ` (${warningCount} slot(s) unfilled)` : "";
+      addToast("info", `Generated ${payload.data.assignments.length} assignment(s).${warningNote} Review and apply.`);
     } catch (error) {
       addToast("error", error instanceof Error ? error.message : "Auto-generate failed.");
       setAutoGenScheduleId(null);
@@ -901,9 +918,9 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                     <tr>
                       <th>Employee</th>
                       <th>Date</th>
+                      <th>Slot</th>
                       <th>Start</th>
                       <th>End</th>
-                      <th>Break (min)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -914,9 +931,9 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                       >
                         <td>{assignment.employeeName}</td>
                         <td className="numeric">{assignment.shiftDate}</td>
+                        <td>{assignment.slotName}</td>
                         <td className="numeric">{assignment.startTime}</td>
                         <td className="numeric">{assignment.endTime}</td>
-                        <td className="numeric">{assignment.breakMinutes}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -939,16 +956,16 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
 
             <div style={{ padding: "var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
               {sortedSchedules.map((schedule) => {
-                const start = new Date(`${schedule.weekStart}T00:00:00`);
-                const end = new Date(`${schedule.weekEnd}T00:00:00`);
+                const start = new Date(`${schedule.weekStart}T00:00:00Z`);
+                const end = new Date(`${schedule.weekEnd}T00:00:00Z`);
                 const dates: string[] = [];
 
                 for (
                   let d = new Date(start);
                   d <= end;
-                  d.setDate(d.getDate() + 1)
+                  d.setUTCDate(d.getUTCDate() + 1)
                 ) {
-                  dates.push(d.toISOString().split("T")[0]);
+                  dates.push(d.toISOString().slice(0, 10));
                 }
 
                 const notes = dayNotes[schedule.id] ?? [];

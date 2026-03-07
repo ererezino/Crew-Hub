@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { hasAnyRole, hasRole } from "../../../../lib/roles";
@@ -33,6 +34,9 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
 }
 
 const PER_CATEGORY_LIMIT = 3;
+const searchQuerySchema = z.object({
+  q: z.string().trim().max(200, "Search query is too long.").default("")
+});
 
 export async function GET(request: NextRequest) {
   const session = await getAuthenticatedSession();
@@ -48,9 +52,24 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const q = request.nextUrl.searchParams.get("q");
+  const parsedQuery = searchQuerySchema.safeParse({
+    q: request.nextUrl.searchParams.get("q") ?? ""
+  });
 
-  if (!q || q.trim().length < 2) {
+  if (!parsedQuery.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedQuery.error.issues[0]?.message ?? "Invalid search query."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const q = parsedQuery.data.q;
+
+  if (q.length < 2) {
     return jsonResponse<SearchResponseData>(200, {
       data: { results: [] },
       error: null,
@@ -58,7 +77,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const searchTerm = `%${q.trim()}%`;
+  const searchTerm = `%${q}%`;
   const profile = session.profile;
   const roles: readonly UserRole[] = profile.roles;
   const isAdmin = hasAnyRole(roles, ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]);

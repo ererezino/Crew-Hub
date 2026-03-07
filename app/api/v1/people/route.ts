@@ -6,7 +6,6 @@ import {
   applyUserNavigationAccess,
   resolveEffectiveUserNavSelection
 } from "../../../../lib/auth/navigation-access";
-import { generateStrongPassword } from "../../../../lib/auth/generate-password";
 import { logAudit } from "../../../../lib/audit";
 import {
   getDepartmentsValidationMessage,
@@ -40,12 +39,6 @@ const listQuerySchema = z.object({
 const createPersonSchema = z.object({
   email: z.string().trim().email("Email must be valid."),
   fullName: z.string().trim().min(1, "Name is required").max(200, "Name is too long."),
-  password: z
-    .string()
-    .trim()
-    .min(8, "Password must be at least 8 characters.")
-    .max(72, "Password must be 72 characters or fewer.")
-    .optional(),
   roles: z.array(z.enum(USER_ROLES)).min(1, "Select at least one role."),
   department: z.string().trim().max(100, "Department is too long.").optional(),
   title: z.string().trim().max(200, "Title is too long.").optional(),
@@ -124,6 +117,12 @@ function buildMeta() {
 
 function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
+}
+
+function resolveAuthRedirectUrl(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.crew-hub.local";
+  const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
+  return `${normalizedAppUrl}/reset-password`;
 }
 
 function canManagePeople(userRoles: readonly UserRole[]): boolean {
@@ -458,6 +457,22 @@ export async function POST(request: Request) {
         } satisfies Record<string, unknown>)
       : body;
 
+  if (
+    normalizedBody &&
+    typeof normalizedBody === "object" &&
+    !Array.isArray(normalizedBody) &&
+    "password" in normalizedBody
+  ) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Password field is not supported. Use secure setup links."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const parsedBody = createPersonSchema.safeParse(normalizedBody);
 
   if (!parsedBody.success) {
@@ -550,9 +565,7 @@ export async function POST(request: Request) {
 
   const serviceRoleClient = createSupabaseServiceRoleClient();
   const normalizedEmail = payload.email.trim().toLowerCase();
-  const generatedPassword = payload.password?.trim().length
-    ? payload.password
-    : generateStrongPassword();
+  const authRedirectUrl = resolveAuthRedirectUrl();
 
   const isNewEmployee = payload.isNewEmployee;
   const profileStatus: ProfileStatus = isNewEmployee ? "onboarding" : "active";
@@ -670,14 +683,15 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
-    email: normalizedEmail,
-    password: generatedPassword,
-    email_confirm: true,
-    user_metadata: {
-      full_name: payload.fullName.trim()
+  const { data: authData, error: authError } = await serviceRoleClient.auth.admin.inviteUserByEmail(
+    normalizedEmail,
+    {
+      data: {
+        full_name: payload.fullName.trim()
+      },
+      redirectTo: authRedirectUrl
     }
-  });
+  );
 
   if (authError || !authData.user) {
     const message =
@@ -750,25 +764,10 @@ export async function POST(request: Request) {
     });
   }
 
-  // Flag the new user to change their temporary password on first login
-  await serviceRoleClient
-    .from("profiles")
-    .update({ password_change_required: true })
-    .eq("id", createdUserId)
-    .then(({ error: flagError }) => {
-      if (flagError) {
-        console.error("Failed to set password_change_required flag.", {
-          userId: createdUserId,
-          message: flagError.message
-        });
-      }
-    });
-
-  // Send welcome email with temporary credentials (fire-and-forget)
+  // Send welcome email with login link (fire-and-forget)
   sendWelcomeEmail({
     recipientEmail: normalizedEmail,
-    recipientName: payload.fullName.trim(),
-    temporaryPassword: generatedPassword
+    recipientName: payload.fullName.trim()
   }).catch((error) => {
     console.error("Failed to send welcome email.", {
       userId: createdUserId,
@@ -867,7 +866,7 @@ export async function POST(request: Request) {
     userId: createdUserId,
     type: "welcome",
     title: "Welcome to Crew Hub",
-    body: "Welcome to the team! Please update your profile and change your password.",
+    body: "Welcome to the team! Check your email to finish setting up your account.",
     link: "/settings"
   });
 
@@ -906,8 +905,7 @@ export async function POST(request: Request) {
 
   return jsonResponse<PeopleCreateResponseData>(201, {
     data: {
-      person,
-      temporaryPassword: generatedPassword
+      person
     },
     error: null,
     meta: buildMeta()

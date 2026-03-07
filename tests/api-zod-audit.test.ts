@@ -3,6 +3,12 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+const ZOD_AUDIT_WAIVERS: Record<string, string> = {
+  "payments/[id]/retry/route.ts": "Intentionally disabled payment stub endpoint.",
+  "payments/batch/route.ts": "Intentionally disabled payment stub endpoint.",
+  "payments/webhook/route.ts": "Intentionally disabled payment stub endpoint."
+};
+
 function collectRouteFiles(directory: string): string[] {
   const entries = readdirSync(directory);
   const files: string[] = [];
@@ -33,9 +39,21 @@ describe("API endpoint validation audit", () => {
 
     const missingZodImport = routeFiles.filter((file) => {
       const source = readFileSync(file, "utf8");
-      return !(source.includes('from "zod"') || source.includes("from 'zod'"));
+      if (source.includes('from "zod"') || source.includes("from 'zod'")) {
+        return false;
+      }
+
+      const relativePath = path.relative(apiRoot, file).split(path.sep).join("/");
+      return !(relativePath in ZOD_AUDIT_WAIVERS);
     });
 
     expect(missingZodImport).toEqual([]);
+
+    const invalidWaivers = Object.keys(ZOD_AUDIT_WAIVERS).filter((relativePath) => {
+      const fullPath = path.join(apiRoot, relativePath);
+      return !routeFiles.includes(fullPath);
+    });
+
+    expect(invalidWaivers).toEqual([]);
   });
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import type { UserRole } from "../../../../../lib/navigation";
@@ -9,6 +10,10 @@ import {
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
+
+const sessionProfileSchema = z.object({
+  org_id: z.string().uuid("Session organization id is invalid.")
+});
 
 function buildMeta() {
   return {
@@ -38,6 +43,19 @@ export async function GET() {
     });
   }
 
+  const parsedProfile = sessionProfileSchema.safeParse(session.profile);
+
+  if (!parsedProfile.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SESSION_INVALID",
+        message: parsedProfile.error.issues[0]?.message ?? "Invalid session profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
   if (!canViewAtRisk(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
@@ -52,7 +70,7 @@ export async function GET() {
   const supabase = await createSupabaseServerClient();
 
   try {
-    const instances = await getAtRiskOnboardings(supabase, session.profile.org_id);
+    const instances = await getAtRiskOnboardings(supabase, parsedProfile.data.org_id);
 
     return jsonResponse<AtRiskOnboardingsResponseData>(200, {
       data: { instances },

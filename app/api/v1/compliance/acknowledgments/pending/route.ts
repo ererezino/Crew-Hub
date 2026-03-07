@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../types/auth";
+
+const sessionProfileSchema = z.object({
+  id: z.string().uuid("Session profile id is invalid.")
+});
 
 type AckRow = {
   id: string;
@@ -45,12 +50,22 @@ export async function GET() {
     });
   }
 
+  const parsedProfile = sessionProfileSchema.safeParse(session.profile);
+
+  if (!parsedProfile.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "SESSION_INVALID", message: parsedProfile.error.issues[0]?.message ?? "Invalid session profile." },
+      meta: buildMeta(),
+    });
+  }
+
   const supabase = await createSupabaseServerClient();
 
   const { data: acks } = await supabase
     .from("policy_acknowledgments")
     .select("id, policy_id, created_at")
-    .eq("employee_id", session.profile.id)
+    .eq("employee_id", parsedProfile.data.id)
     .is("acknowledged_at", null);
 
   if (!acks || acks.length === 0) {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { hasRole } from "../../../../../lib/roles";
@@ -6,6 +7,11 @@ import { normalizeUserRoles } from "../../../../../lib/navigation";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+const sessionProfileSchema = z.object({
+  org_id: z.string().uuid("Session organization id is invalid."),
+  roles: z.array(z.string())
+});
 
 /* ── Types ── */
 
@@ -70,7 +76,17 @@ export async function GET() {
       });
     }
 
-    const profile = session.profile;
+    const parsedProfile = sessionProfileSchema.safeParse(session.profile);
+
+    if (!parsedProfile.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "SESSION_INVALID", message: parsedProfile.error.issues[0]?.message ?? "Invalid session profile." },
+        meta: buildMeta()
+      });
+    }
+
+    const profile = parsedProfile.data;
     const roles = normalizeUserRoles(profile.roles);
 
     if (!hasRole(roles, "SUPER_ADMIN")) {

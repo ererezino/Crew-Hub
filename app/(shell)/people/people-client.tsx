@@ -44,7 +44,6 @@ type ToastMessage = {
 type CreatePersonFormValues = {
   email: string;
   fullName: string;
-  password: string;
   roles: AppRole[];
   department: string;
   title: string;
@@ -66,7 +65,6 @@ type CreatePersonFormErrors = Partial<Record<keyof CreatePersonFormValues, strin
 const createPersonSchema = z.object({
   email: z.string().trim().email("Email must be valid."),
   fullName: z.string().trim().min(1, "Name is required.").max(200, "Name is too long."),
-  password: z.string().trim().min(8, "Password must be at least 8 characters.").max(72, "Password is too long."),
   roles: z.array(z.enum(USER_ROLES)).min(1, "Select at least one role."),
   department: z.string().trim().max(100, "Department is too long."),
   title: z.string().trim().max(200, "Title is too long."),
@@ -103,7 +101,6 @@ const roleLabels: Record<AppRole, string> = {
 const initialCreatePersonFormValues: CreatePersonFormValues = {
   email: "",
   fullName: "",
-  password: "",
   roles: ["EMPLOYEE"],
   department: "",
   title: "",
@@ -152,7 +149,6 @@ function mapSchemaErrors(values: CreatePersonFormValues): CreatePersonFormErrors
   const parsed = createPersonSchema.safeParse({
     email: values.email,
     fullName: values.fullName,
-    password: values.password,
     roles: values.roles,
     department: values.department,
     title: values.title,
@@ -176,7 +172,6 @@ function mapSchemaErrors(values: CreatePersonFormValues): CreatePersonFormErrors
   return {
     email: fieldErrors.email?.[0],
     fullName: fieldErrors.fullName?.[0],
-    password: fieldErrors.password?.[0],
     roles: fieldErrors.roles?.[0],
     department: fieldErrors.department?.[0],
     title: fieldErrors.title?.[0],
@@ -607,7 +602,6 @@ export function PeopleClient({
         body: JSON.stringify({
           email: createValues.email.trim(),
           fullName: createValues.fullName.trim(),
-          password: createValues.password,
           roles: createValues.roles,
           department: createValues.department.trim() || undefined,
           title: createValues.title.trim() || undefined,
@@ -814,7 +808,7 @@ export function PeopleClient({
       <SlidePanel
         isOpen={isCreateOpen}
         title="Add Person"
-        description="Create login credentials and a profile record."
+        description="Create a profile and send secure account setup instructions."
         onClose={closeCreatePanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleCreatePerson} noValidate>
@@ -878,26 +872,6 @@ export function PeopleClient({
             />
             {createErrors.fullName ? (
               <p className="form-field-error">{createErrors.fullName}</p>
-            ) : null}
-          </label>
-
-          <label className="form-field" htmlFor="person-password">
-            <span className="form-label">Temporary password</span>
-            <input
-              id="person-password"
-              type="password"
-              autoComplete="new-password"
-              className={createErrors.password ? "form-input form-input-error" : "form-input"}
-              value={createValues.password}
-              onChange={(event) =>
-                updateCreateValues({
-                  ...createValues,
-                  password: event.currentTarget.value
-                })
-              }
-            />
-            {createErrors.password ? (
-              <p className="form-field-error">{createErrors.password}</p>
             ) : null}
           </label>
 

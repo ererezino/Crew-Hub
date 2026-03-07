@@ -70,7 +70,6 @@ export type PeopleListResponse = ApiResponse<PeopleListResponseData>;
 
 export type PeopleCreateResponseData = {
   person: PersonRecord;
-  temporaryPassword?: string;
 };
 
 export type PeopleCreateResponse = ApiResponse<PeopleCreateResponseData>;
@@ -83,7 +82,6 @@ export type PeopleAccessOverrides = {
 export type PeopleCreatePayload = {
   email: string;
   fullName: string;
-  password?: string;
   roles: AppRole[];
   department?: string;
   title?: string;
@@ -130,7 +128,7 @@ export type PeopleUpdateResponse = ApiResponse<PeopleUpdateResponseData>;
 
 export type PeoplePasswordResetResponseData = {
   userId: string;
-  temporaryPassword: string;
+  resetInitiated: boolean;
 };
 
 export type PeoplePasswordResetResponse = ApiResponse<PeoplePasswordResetResponseData>;

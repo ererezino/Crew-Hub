@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../../types/auth";
+
+const policyParamsSchema = z.object({
+  policyId: z.string().uuid("Policy id must be a valid UUID.")
+});
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -26,7 +31,17 @@ export async function POST(
     });
   }
 
-  const { policyId } = await params;
+  const parsedParams = policyParamsSchema.safeParse(await params);
+
+  if (!parsedParams.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: { code: "VALIDATION_ERROR", message: parsedParams.error.issues[0]?.message ?? "Invalid policy id." },
+      meta: buildMeta(),
+    });
+  }
+
+  const { policyId } = parsedParams.data;
   const supabase = await createSupabaseServerClient();
   const acknowledgedAt = new Date().toISOString();
 
@@ -73,7 +88,17 @@ export async function GET(
     });
   }
 
-  const { policyId } = await params;
+  const parsedParams = policyParamsSchema.safeParse(await params);
+
+  if (!parsedParams.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: { code: "VALIDATION_ERROR", message: parsedParams.error.issues[0]?.message ?? "Invalid policy id." },
+      meta: buildMeta(),
+    });
+  }
+
+  const { policyId } = parsedParams.data;
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase

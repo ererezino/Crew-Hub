@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { PageHeader } from "../../../components/shared/page-header";
 import type { UserRole } from "../../../lib/navigation";
@@ -120,6 +121,11 @@ export function SchedulingTabsClient({
       <PageHeader
         title="Schedule"
         description="Build, publish, and manage team shift schedules."
+      />
+
+      <FeatureBanner
+        moduleId="scheduling"
+        description="Scheduling is in limited pilot for Customer Success. Auto-generate requires shift templates to be configured first."
       />
 
       <PageTabs
