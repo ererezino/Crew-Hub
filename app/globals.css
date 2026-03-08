@@ -419,6 +419,7 @@ html.dark .button-orange:hover {
 
 .sidebar-collapsed {
   width: var(--sidebar-collapsed-width);
+  overflow: hidden;
 }
 
 /* ─── Sidebar Header (Logo + Collapse) ─── */
@@ -745,7 +746,8 @@ html.dark .button-orange:hover {
 
 .sidebar-collapsed .sidebar-link-text,
 .sidebar-collapsed .sidebar-shortcut,
-.sidebar-collapsed .sidebar-link-indicator {
+.sidebar-collapsed .sidebar-link-indicator,
+.sidebar-collapsed .sidebar-link .status-badge {
   display: none;
 }
 
@@ -8294,6 +8296,14 @@ html.dark .topbar {
 
   .sidebar-collapsed .sidebar-link-icon {
     opacity: 0.6 !important;
+  }
+
+  .sidebar-collapsed .sidebar-link .status-badge {
+    display: inline-flex !important;
+  }
+
+  .sidebar-collapsed {
+    overflow: visible !important;
   }
 }
 
