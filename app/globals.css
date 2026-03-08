@@ -961,6 +961,14 @@ html.dark .button-orange:hover {
   border: 1.5px solid var(--sidebar-bg, #1a1a2e);
 }
 
+.wio-entry-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  flex: 1;
+}
+
 .wio-name {
   font-size: var(--text-sm);
   color: rgba(255, 255, 255, 0.8);
@@ -968,6 +976,26 @@ html.dark .button-orange:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+.wio-status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.wio-status-afk {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.wio-status-ooo {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
 }
 
 /* Collapsed sidebar: compact indicator */

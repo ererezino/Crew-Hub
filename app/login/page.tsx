@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type ChangeEvent,
@@ -145,20 +144,11 @@ export default function LoginPage() {
       return;
     }
 
+    /* Audit log + mark account_setup_at (handled server-side in the audit route) */
     await fetch("/api/v1/audit/login", {
       method: "POST",
       keepalive: true
     }).catch(() => undefined);
-
-    /* Mark account as set up on first real login (no-op if already set) */
-    const { data: userData } = await supabase.auth.getUser();
-    if (userData?.user?.id) {
-      void supabase
-        .from("profiles")
-        .update({ account_setup_at: new Date().toISOString() })
-        .eq("id", userData.user.id)
-        .is("account_setup_at", null);
-    }
 
     const nextPath = getRedirectTarget();
     router.replace(nextPath);
@@ -228,8 +218,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="auth-footer-link">
-          <Link href="/forgot-password">Forgot password?</Link>
+        <p className="auth-footer-link auth-footer-hint">
+          Forgot password? Contact your admin.
         </p>
       </section>
     </main>

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 
 type LoginAuditResponse = {
@@ -66,6 +67,19 @@ export async function POST(request: Request) {
       userAgent: parsedHeaders.data.userAgent
     }
   });
+
+  /* Mark account as set up on first real login (no-op if already set).
+     Uses the service role client to bypass RLS so the update always succeeds. */
+  try {
+    const serviceRole = createSupabaseServiceRoleClient();
+    await serviceRole
+      .from("profiles")
+      .update({ account_setup_at: new Date().toISOString() })
+      .eq("id", user.id)
+      .is("account_setup_at", null);
+  } catch {
+    // Non-critical — don't fail the login audit if this update fails.
+  }
 
   return jsonResponse<LoginAuditResponse>(200, {
     data: {

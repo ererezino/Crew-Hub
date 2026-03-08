@@ -12,6 +12,11 @@ const PRESENCE_LABELS: Record<PresenceState, string> = {
   offline: "Offline"
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  afk: "AFK",
+  ooo: "OOO"
+};
+
 function PresenceDot({ state }: { state: PresenceState }) {
   return (
     <span
@@ -96,31 +101,50 @@ export function WhoIsOnline({ isSidebarCollapsed }: WhoIsOnlineProps) {
           {activeEntries.length === 0 ? (
             <li className="wio-empty">No one online right now</li>
           ) : (
-            activeEntries.map((entry) => (
-              <li key={entry.id} className="wio-entry">
-                <Link href={`/people/${entry.id}`} className="wio-entry-link">
-                  <span className="wio-avatar">
-                    {entry.avatarUrl ? (
-                      <Image
-                        src={entry.avatarUrl}
-                        alt=""
-                        width={24}
-                        height={24}
-                        className="wio-avatar-image"
-                      />
-                    ) : (
-                      <span className="wio-avatar-fallback">
-                        {getInitials(entry.fullName)}
+            activeEntries.map((entry) => {
+              const statusLabel = STATUS_LABELS[entry.availabilityStatus];
+              const statusTooltip = statusLabel
+                ? entry.statusNote
+                  ? `${statusLabel}: ${entry.statusNote}`
+                  : statusLabel
+                : undefined;
+
+              return (
+                <li key={entry.id} className="wio-entry">
+                  <Link href={`/people/${entry.id}`} className="wio-entry-link">
+                    <span className="wio-avatar">
+                      {entry.avatarUrl ? (
+                        <Image
+                          src={entry.avatarUrl}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="wio-avatar-image"
+                        />
+                      ) : (
+                        <span className="wio-avatar-fallback">
+                          {getInitials(entry.fullName)}
+                        </span>
+                      )}
+                      <PresenceDot state={entry.presence} />
+                    </span>
+                    <span className="wio-entry-info">
+                      <span className="wio-name" title={entry.fullName}>
+                        {entry.fullName}
                       </span>
-                    )}
-                    <PresenceDot state={entry.presence} />
-                  </span>
-                  <span className="wio-name" title={entry.fullName}>
-                    {entry.fullName}
-                  </span>
-                </Link>
-              </li>
-            ))
+                      {statusLabel ? (
+                        <span
+                          className={`wio-status-badge wio-status-${entry.availabilityStatus}`}
+                          title={statusTooltip}
+                        >
+                          {statusLabel}
+                        </span>
+                      ) : null}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })
           )}
         </ul>
       ) : null}

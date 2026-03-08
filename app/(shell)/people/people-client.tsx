@@ -466,6 +466,10 @@ export function PeopleClient({
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkPerson, setInviteLinkPerson] = useState<string>("");
 
+  // Reset password state
+  const [resettingId, setResettingId] = useState<string | null>(null);
+  const [confirmResetPerson, setConfirmResetPerson] = useState<PersonRecord | null>(null);
+
   // Bulk upload state
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [bulkStep, setBulkStep] = useState<BulkStep>("template");
@@ -743,6 +747,34 @@ export function PeopleClient({
       addToast("error", error instanceof Error ? error.message : "Unable to send invite.");
     } finally {
       setInvitingId(null);
+    }
+  }, []);
+
+  /* ── Reset password handler ── */
+
+  const handleResetPassword = useCallback(async (person: PersonRecord) => {
+    setResettingId(person.id);
+
+    try {
+      const response = await fetch(`/api/v1/people/${person.id}/reset-password`, {
+        method: "POST"
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok || !payload.data?.resetInitiated) {
+        setConfirmResetPerson(null);
+        addToast("error", humanizeError(payload.error?.message ?? "Unable to send password reset link."));
+        return;
+      }
+
+      setConfirmResetPerson(null);
+      addToast("success", `Password reset link sent for ${person.fullName}.`);
+    } catch (error) {
+      setConfirmResetPerson(null);
+      addToast("error", error instanceof Error ? error.message : "Unable to send password reset link.");
+    } finally {
+      setResettingId(null);
     }
   }, []);
 
@@ -1045,14 +1077,25 @@ export function PeopleClient({
                         >
                           Edit
                         </button>
-                        <button
-                          type="button"
-                          className="table-row-action"
-                          disabled={invitingId === person.id}
-                          onClick={() => setConfirmInvitePerson(person)}
-                        >
-                          {invitingId === person.id ? "Sending..." : "Invite"}
-                        </button>
+                        {person.inviteStatus === "active" ? (
+                          <button
+                            type="button"
+                            className="table-row-action"
+                            disabled={resettingId === person.id}
+                            onClick={() => setConfirmResetPerson(person)}
+                          >
+                            {resettingId === person.id ? "Sending..." : "Reset Password"}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="table-row-action"
+                            disabled={invitingId === person.id}
+                            onClick={() => setConfirmInvitePerson(person)}
+                          >
+                            {invitingId === person.id ? "Sending..." : "Invite"}
+                          </button>
+                        )}
                       </div>
                     </td>
                   ) : (
@@ -1773,6 +1816,52 @@ export function PeopleClient({
                 </div>
               </>
             )}
+          </section>
+        </div>
+      ) : null}
+
+      {/* ── Reset Password Dialog ── */}
+      {confirmResetPerson !== null ? (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            if (!resettingId) {
+              setConfirmResetPerson(null);
+            }
+          }}
+        >
+          <section
+            className="confirm-dialog modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Reset password"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="modal-title">Reset password</h2>
+            <p className="settings-card-description">
+              Send a password reset link to {confirmResetPerson.fullName} ({confirmResetPerson.email})?
+              They will receive an email with a link to set a new password.
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={() => setConfirmResetPerson(null)}
+                disabled={resettingId !== null}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => {
+                  if (confirmResetPerson) void handleResetPassword(confirmResetPerson);
+                }}
+                disabled={resettingId !== null}
+              >
+                {resettingId ? "Sending..." : "Send Reset Link"}
+              </button>
+            </div>
           </section>
         </div>
       ) : null}

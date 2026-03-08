@@ -19,6 +19,37 @@ const passwordSchema = z
     path: ["confirmPassword"]
   });
 
+type PageState = "loading" | "ready" | "session_error";
+
+/**
+ * Parse the hash fragment that Supabase sends after verifying an invite/recovery link.
+ *
+ * Supabase redirects here as:
+ *   /reset-password#access_token=…&refresh_token=…&type=recovery
+ *
+ * The @supabase/ssr browser client is configured for PKCE flow and does NOT
+ * process hash fragments, so we extract the tokens manually.
+ */
+function extractTokensFromHash(): {
+  accessToken: string;
+  refreshToken: string;
+} | null {
+  if (typeof window === "undefined") return null;
+
+  const hash = window.location.hash;
+  if (!hash || hash.length < 2) return null;
+
+  const params = new URLSearchParams(hash.substring(1));
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+
+  if (accessToken && refreshToken) {
+    return { accessToken, refreshToken };
+  }
+
+  return null;
+}
+
 export default function ResetPasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -27,27 +58,58 @@ export default function ResetPasswordPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFirstTimeSetup, setIsFirstTimeSetup] = useState(false);
+  const [pageState, setPageState] = useState<PageState>("loading");
 
-  /* Detect whether this is first-time account setup or a password reset */
   useEffect(() => {
-    const checkSetupStatus = async () => {
+    const initSession = async () => {
       const supabase = createSupabaseBrowserClient();
-      const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user?.id) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("account_setup_at")
-          .eq("id", userData.user.id)
-          .maybeSingle();
 
-        if (profile && !profile.account_setup_at) {
-          setIsFirstTimeSetup(true);
+      /* ── Step 1: Try to establish a session from the URL ──────────── */
+
+      // Supabase sends tokens in the hash fragment (#access_token=…)
+      const hashTokens = extractTokensFromHash();
+      if (hashTokens) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: hashTokens.accessToken,
+          refresh_token: hashTokens.refreshToken
+        });
+
+        if (sessionError) {
+          setPageState("session_error");
+          return;
         }
+
+        // Clean up the hash from the URL so it's not visible
+        window.history.replaceState(null, "", window.location.pathname);
       }
+
+      /* ── Step 2: Verify we have a valid session ──────────────────── */
+
+      const { data: userData } = await supabase.auth.getUser();
+
+      if (!userData?.user?.id) {
+        // No hash tokens AND no existing session — link is broken/expired
+        setPageState("session_error");
+        return;
+      }
+
+      /* ── Step 3: Check if first-time setup or password reset ─────── */
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("account_setup_at")
+        .eq("id", userData.user.id)
+        .maybeSingle();
+
+      if (profile && !profile.account_setup_at) {
+        setIsFirstTimeSetup(true);
+      }
+
+      setPageState("ready");
     };
 
-    checkSetupStatus().catch(() => {
-      /* If check fails, default to reset wording */
+    initSession().catch(() => {
+      setPageState("session_error");
     });
   }, []);
 
@@ -98,6 +160,40 @@ export default function ResetPasswordPage() {
     }
   };
 
+  /* ── Loading state ──────────────────────────────────────────────── */
+  if (pageState === "loading") {
+    return (
+      <main className="standalone-page auth-page">
+        <section className="standalone-card auth-card" aria-label="Setting up">
+          <header className="auth-card-header">
+            <h1 className="page-title">Crew Hub</h1>
+            <p className="page-description">Verifying your link…</p>
+          </header>
+        </section>
+      </main>
+    );
+  }
+
+  /* ── Error state (expired / invalid link) ───────────────────────── */
+  if (pageState === "session_error") {
+    return (
+      <main className="standalone-page auth-page">
+        <section className="standalone-card auth-card" aria-label="Link expired">
+          <header className="auth-card-header">
+            <h1 className="page-title">Crew Hub</h1>
+            <p className="page-description">
+              This link has expired or is invalid. Please ask your admin to send a new invite.
+            </p>
+          </header>
+          <Link href="/login" className="button button-accent auth-submit">
+            Back to sign in
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  /* ── Ready state: show the password form ────────────────────────── */
   const heading = isFirstTimeSetup ? "Set up your account" : "Reset your password";
   const description = isFirstTimeSetup
     ? "Create a password to get started with Crew Hub."

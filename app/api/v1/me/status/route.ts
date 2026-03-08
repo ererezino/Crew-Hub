@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
-import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import type { ApiResponse } from "../../../../../types/auth";
 
@@ -72,7 +72,7 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceRoleClient();
 
   const { error: updateError } = await supabase
     .from("profiles")
@@ -94,7 +94,7 @@ export async function PATCH(request: Request) {
   }
 
   // Send team notification when changing to AFK or OOO
-  if (parsed.data.status !== "available" && parsed.data.note) {
+  if (parsed.data.status !== "available") {
     const statusLabel = STATUS_LABELS[parsed.data.status];
     const fullName = session.profile.full_name ?? "A crew member";
 
@@ -117,11 +117,12 @@ export async function PATCH(request: Request) {
       notificationTitle = `${fullName} is ${statusLabel} for ${durationLabel}`;
     }
 
-    // Fetch all org members — company-wide notification (including the sender)
+    // Fetch all org members — company-wide notification
     const { data: orgMembers } = await supabase
       .from("profiles")
       .select("id")
-      .eq("org_id", session.profile.org_id);
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null);
 
     if (orgMembers && orgMembers.length > 0) {
       void createBulkNotifications({
@@ -129,7 +130,7 @@ export async function PATCH(request: Request) {
         userIds: orgMembers.map((m) => m.id),
         type: "status_change",
         title: notificationTitle,
-        body: parsed.data.note,
+        body: parsed.data.note || "",
         link: "/people",
         skipIfUnreadDuplicate: false
       });
