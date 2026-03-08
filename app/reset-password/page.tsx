@@ -64,23 +64,40 @@ export default function ResetPasswordPage() {
     const initSession = async () => {
       const supabase = createSupabaseBrowserClient();
 
-      /* ── Step 1: Try to establish a session from the URL ──────────── */
+      /* ── Step 1a: Try PKCE code exchange (?code=…) ───────────────── */
 
-      // Supabase sends tokens in the hash fragment (#access_token=…)
-      const hashTokens = extractTokensFromHash();
-      if (hashTokens) {
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: hashTokens.accessToken,
-          refresh_token: hashTokens.refreshToken
-        });
+      const urlCode = new URLSearchParams(window.location.search).get("code");
+      if (urlCode) {
+        const { error: codeError } = await supabase.auth.exchangeCodeForSession(urlCode);
 
-        if (sessionError) {
+        if (codeError) {
+          console.error("Code exchange failed:", codeError.message);
           setPageState("session_error");
           return;
         }
 
-        // Clean up the hash from the URL so it's not visible
+        // Clean up the code from the URL
         window.history.replaceState(null, "", window.location.pathname);
+      }
+
+      /* ── Step 1b: Try hash fragment tokens (#access_token=…) ─────── */
+
+      if (!urlCode) {
+        const hashTokens = extractTokensFromHash();
+        if (hashTokens) {
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: hashTokens.accessToken,
+            refresh_token: hashTokens.refreshToken
+          });
+
+          if (sessionError) {
+            setPageState("session_error");
+            return;
+          }
+
+          // Clean up the hash from the URL so it's not visible
+          window.history.replaceState(null, "", window.location.pathname);
+        }
       }
 
       /* ── Step 2: Verify we have a valid session ──────────────────── */
@@ -88,7 +105,7 @@ export default function ResetPasswordPage() {
       const { data: userData } = await supabase.auth.getUser();
 
       if (!userData?.user?.id) {
-        // No hash tokens AND no existing session — link is broken/expired
+        // No code, no hash tokens, AND no existing session — link is broken/expired
         setPageState("session_error");
         return;
       }
