@@ -21,34 +21,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "Crew Hub",
-  description: "Crew Hub employee operations platform.",
-  icons: {
-    icon: [
-      {
-        url: "/brand/icon-dark.png",
-        type: "image/png",
-        media: "(prefers-color-scheme: light)"
-      },
-      {
-        url: "/brand/icon-light.png",
-        type: "image/png",
-        media: "(prefers-color-scheme: dark)"
-      }
-    ],
-    shortcut: [
-      {
-        url: "/brand/icon-dark.png",
-        type: "image/png",
-        media: "(prefers-color-scheme: light)"
-      },
-      {
-        url: "/brand/icon-light.png",
-        type: "image/png",
-        media: "(prefers-color-scheme: dark)"
-      }
-    ],
-    apple: "/brand/icon-dark.png"
-  }
+  description: "Crew Hub employee operations platform."
 };
 
 export default function RootLayout({
