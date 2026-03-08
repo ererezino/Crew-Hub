@@ -25,25 +25,29 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/brand/crew-hub-app-logo.svg",
+        url: "/brand/icon-dark.png",
+        type: "image/png",
         media: "(prefers-color-scheme: light)"
       },
       {
-        url: "/brand/crew-hub-site-logo.svg",
+        url: "/brand/icon-light.png",
+        type: "image/png",
         media: "(prefers-color-scheme: dark)"
       }
     ],
     shortcut: [
       {
-        url: "/brand/crew-hub-app-logo.svg",
+        url: "/brand/icon-dark.png",
+        type: "image/png",
         media: "(prefers-color-scheme: light)"
       },
       {
-        url: "/brand/crew-hub-site-logo.svg",
+        url: "/brand/icon-light.png",
+        type: "image/png",
         media: "(prefers-color-scheme: dark)"
       }
     ],
-    apple: "/brand/crew-hub-app-logo.svg"
+    apple: "/brand/icon-dark.png"
   }
 };
 

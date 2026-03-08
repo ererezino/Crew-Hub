@@ -108,6 +108,7 @@ const profileRowSchema = z.object({
   pronouns: z.string().nullable().default(null),
   privacy_settings: z.unknown().default({}),
   account_setup_at: z.string().nullable().default(null),
+  last_seen_at: z.string().nullable().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -176,9 +177,18 @@ function normalizePayrollMode(
   return requestedPayrollMode ?? "employee_local_withholding";
 }
 
+function deriveInviteStatus(
+  accountSetupAt: string | null,
+  lastSeenAt: string | null
+): "not_invited" | "invited" | "active" {
+  if (accountSetupAt || lastSeenAt) return "active";
+  return "invited";
+}
+
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
-  managerNameById: ReadonlyMap<string, string>
+  managerNameById: ReadonlyMap<string, string>,
+  crewTagById?: ReadonlyMap<string, string>
 ): PersonRecord {
   return {
     id: row.id,
@@ -209,7 +219,8 @@ function mapPersonRow(
     emergencyContactRelationship: row.emergency_contact_relationship ?? null,
     pronouns: row.pronouns ?? null,
     privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../types/people").PrivacySettings,
-    inviteStatus: row.account_setup_at ? "active" as const : "not_invited" as const,
+    crewTag: crewTagById?.get(row.id) ?? null,
+    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -318,7 +329,7 @@ export async function GET(request: Request) {
   let peopleQuery = supabase
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
@@ -398,7 +409,31 @@ export async function GET(request: Request) {
     );
   }
 
-  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById));
+  /* Fetch crew tags from payment details for all loaded profiles */
+  const profileIds = parsedPeople.data.map((row) => row.id);
+  let crewTagById = new Map<string, string>();
+
+  if (profileIds.length > 0 && canViewAllPeople(profile.roles)) {
+    const { data: paymentRows } = await supabase
+      .from("employee_payment_details")
+      .select("employee_id, crew_tag")
+      .eq("org_id", profile.org_id)
+      .in("employee_id", profileIds)
+      .not("crew_tag", "is", null);
+
+    if (paymentRows) {
+      crewTagById = new Map(
+        paymentRows
+          .filter(
+            (row): row is { employee_id: string; crew_tag: string } =>
+              typeof row?.employee_id === "string" && typeof row?.crew_tag === "string"
+          )
+          .map((row) => [row.employee_id, row.crew_tag])
+      );
+    }
+  }
+
+  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById));
 
   return jsonResponse<PeopleListResponseData>(200, {
     data: { people },
@@ -737,7 +772,7 @@ export async function POST(request: Request) {
       status: profileStatus
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 

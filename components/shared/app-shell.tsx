@@ -33,6 +33,7 @@ import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { NavIcon } from "./nav-icon";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
+import { UnsavedLeaveDialog } from "./unsaved-leave-dialog";
 import { WhoIsOnline } from "./who-is-online";
 
 const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
@@ -658,7 +659,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                     className="status-note-confirm"
                     onClick={confirmPendingStatus}
                   >
-                    Confirm
+                    Enter
                   </button>
                 </div>
               </div>
@@ -1153,7 +1154,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
         </nav>
 
         {isSuperAdmin(currentUserRoles) ? (
-          <WhoIsOnline isSidebarCollapsed={isSidebarCollapsed} />
+          <WhoIsOnline isSidebarCollapsed={isSidebarCollapsed && !isMobileSidebarOpen} />
         ) : null}
 
         <div className="sidebar-bottom">
@@ -1242,7 +1243,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
               <span>Search</span>
               <kbd>Cmd/Ctrl + K</kbd>
             </button>
-            <NotificationCenter />
+            <NotificationCenter isSuperAdmin={hasRole(currentUserRoles, "SUPER_ADMIN")} />
             <ThemeToggle />
             <UserMenu
               profile={currentUserProfile}
@@ -1277,6 +1278,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
       ) : null}
 
       <KeyboardShortcutsModal />
+      <UnsavedLeaveDialog />
     </div>
   );
 }

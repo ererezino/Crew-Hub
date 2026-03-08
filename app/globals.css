@@ -6301,12 +6301,18 @@ html.dark .topbar {
   background: var(--bg-canvas);
   padding: var(--space-1) var(--space-2);
   cursor: pointer;
-  transition: border-color var(--transition-hover), background-color var(--transition-hover);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  line-height: 1.4;
+  transition: border-color var(--transition-hover), background-color var(--transition-hover), color var(--transition-hover);
 }
 
 .table-row-action:hover {
   border-color: var(--color-accent);
   background: var(--color-accent-subtle);
+  color: var(--color-accent);
 }
 
 .table-row-action-danger {
@@ -6783,6 +6789,10 @@ html.dark .topbar {
   justify-content: space-between;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+}
+
+.notification-delete-all {
+  color: var(--color-error, #dc2626) !important;
 }
 
 .pill {
@@ -8205,15 +8215,83 @@ html.dark .topbar {
     min-width: 0;
   }
 
-  .sidebar-collapsed .sidebar-brand-copy,
-  .sidebar-collapsed .sidebar-group-title,
-  .sidebar-collapsed .sidebar-link-text,
-  .sidebar-collapsed .sidebar-shortcut,
-  .sidebar-collapsed .sidebar-link-badge,
-  .sidebar-collapsed .sidebar-profile-copy {
+  /* On mobile, sidebar-collapsed must look fully expanded */
+  .sidebar-collapsed .sidebar-brand-copy {
+    display: block;
     opacity: 1;
     width: auto;
     pointer-events: auto;
+  }
+
+  .sidebar-collapsed .sidebar-group-title,
+  .sidebar-collapsed .sidebar-link-text,
+  .sidebar-collapsed .sidebar-shortcut {
+    display: inline;
+    opacity: 1;
+    width: auto;
+    pointer-events: auto;
+  }
+
+  .sidebar-collapsed .sidebar-link-indicator {
+    display: block;
+  }
+
+  .sidebar-collapsed .sidebar-link-badge {
+    position: static;
+    opacity: 1;
+    width: auto;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    font-size: var(--text-xs);
+    padding: 0 var(--space-1);
+    pointer-events: auto;
+  }
+
+  .sidebar-collapsed .sidebar-profile-copy {
+    display: grid;
+    opacity: 1;
+    width: auto;
+    pointer-events: auto;
+  }
+
+  .sidebar-collapsed .sidebar-group-trigger {
+    display: flex;
+    pointer-events: auto;
+  }
+
+  .sidebar-collapsed .sidebar-group-chevron {
+    opacity: 1;
+    width: 1rem;
+  }
+
+  .sidebar-collapsed .sidebar-link {
+    justify-content: flex-start;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .sidebar-collapsed .sidebar-header {
+    justify-content: space-between;
+  }
+
+  .sidebar-collapsed .sidebar-brand {
+    gap: var(--space-2);
+  }
+
+  .sidebar-collapsed .sidebar-profile-link {
+    justify-content: flex-start;
+    padding: var(--space-2);
+  }
+
+  .sidebar-collapsed .sidebar-bottom {
+    justify-items: stretch;
+  }
+
+  .sidebar-collapsed .sidebar-section-label {
+    display: flex;
+  }
+
+  .sidebar-collapsed .sidebar-link-icon {
+    opacity: 0.6;
   }
 }
 
@@ -10552,6 +10630,84 @@ html.dark .dashboard-audit-table {
   justify-content: flex-end;
   gap: var(--space-3);
   margin-top: var(--space-5);
+}
+
+/* Unsaved leave dialog */
+.unsaved-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: var(--space-4);
+  animation: fade-in 120ms ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.unsaved-dialog {
+  background: var(--bg-canvas);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 400px;
+  padding: var(--space-6);
+  box-shadow: var(--shadow-lg);
+  border-top: 3px solid var(--color-warning, #f59e0b);
+}
+
+.unsaved-dialog-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.unsaved-dialog-body {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-5) 0;
+  line-height: 1.5;
+}
+
+.unsaved-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.unsaved-dialog-btn {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.unsaved-dialog-stay {
+  background: var(--bg-accent);
+  color: var(--text-on-accent);
+  border: 1px solid var(--bg-accent);
+}
+
+.unsaved-dialog-stay:hover {
+  opacity: 0.9;
+}
+
+.unsaved-dialog-leave {
+  background: transparent;
+  color: var(--color-error, #dc2626);
+  border: 1px solid var(--border-default);
+}
+
+.unsaved-dialog-leave:hover {
+  background: var(--bg-surface);
+  border-color: var(--color-error, #dc2626);
 }
 
 /* Signature canvas */

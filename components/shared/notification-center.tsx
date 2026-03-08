@@ -23,7 +23,11 @@ type FeedItem = {
   actions: NotificationAction[];
 };
 
-export function NotificationCenter() {
+type NotificationCenterProps = {
+  isSuperAdmin?: boolean;
+};
+
+export function NotificationCenter({ isSuperAdmin = false }: NotificationCenterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -243,6 +247,20 @@ export function NotificationCenter() {
             >
               Dismiss all
             </button>
+            {isSuperAdmin ? (
+              <button
+                type="button"
+                className="table-row-action notification-delete-all"
+                onClick={() => {
+                  void notifications.deleteAll().then(() => {
+                    refreshAnnouncements();
+                    window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+                  });
+                }}
+              >
+                Delete all
+              </button>
+            ) : null}
             <Link
               className="table-row-action"
               href="/notifications"

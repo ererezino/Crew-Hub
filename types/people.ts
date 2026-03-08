@@ -58,6 +58,7 @@ export type PersonRecord = {
   emergencyContactRelationship: string | null;
   pronouns: string | null;
   privacySettings: PrivacySettings;
+  crewTag: string | null;
   inviteStatus: "not_invited" | "invited" | "active";
   createdAt: string;
   updatedAt: string;

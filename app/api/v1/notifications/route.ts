@@ -8,7 +8,9 @@ import type {
   NotificationRecord,
   NotificationsResponseData
 } from "../../../../types/notifications";
+import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 
 const querySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -161,6 +163,63 @@ export async function GET(request: Request) {
 
   return jsonResponse<NotificationsResponseData>(200, {
     data: responseData,
+    error: null,
+    meta: buildMeta()
+  });
+}
+
+/**
+ * DELETE /api/v1/notifications
+ *
+ * Super Admin only — soft-deletes ALL notifications for the current user.
+ */
+export async function DELETE() {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be logged in."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!hasRole(session.profile.roles, "SUPER_ADMIN")) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only Super Admin can delete all notifications."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const supabase = createSupabaseServiceRoleClient();
+
+  const { error: deleteError } = await supabase
+    .from("notifications")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("org_id", session.profile.org_id)
+    .eq("user_id", session.profile.id)
+    .is("deleted_at", null);
+
+  if (deleteError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "NOTIFICATIONS_DELETE_FAILED",
+        message: "Unable to delete notifications."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  return jsonResponse<{ deletedAt: string }>(200, {
+    data: { deletedAt: new Date().toISOString() },
     error: null,
     meta: buildMeta()
   });

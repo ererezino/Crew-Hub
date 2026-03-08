@@ -38,6 +38,7 @@ const updatePersonSchema = z.object({
   favoriteMusic: z.string().trim().max(200, "Favorite music must be 200 characters or fewer.").nullable().optional(),
   favoriteBooks: z.string().trim().max(200, "Favorite books must be 200 characters or fewer.").nullable().optional(),
   favoriteSports: z.string().trim().max(200, "Favorite sports must be 200 characters or fewer.").nullable().optional(),
+  crewTag: z.string().trim().max(50, "Crew Tag must be 50 characters or fewer.").nullable().optional(),
   privacySettings: z.object({
     showEmail: z.boolean().optional(),
     showPhone: z.boolean().optional(),
@@ -90,6 +91,7 @@ const profileRowSchema = z.object({
   pronouns: z.string().nullable().default(null),
   privacy_settings: z.unknown().default({}),
   account_setup_at: z.string().nullable().default(null),
+  last_seen_at: z.string().nullable().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -108,9 +110,18 @@ function normalizeRoles(values: readonly string[]): AppRole[] {
   );
 }
 
+function deriveInviteStatus(
+  accountSetupAt: string | null,
+  lastSeenAt: string | null
+): "not_invited" | "invited" | "active" {
+  if (accountSetupAt || lastSeenAt) return "active";
+  return "invited";
+}
+
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
-  managerNameById: ReadonlyMap<string, string>
+  managerNameById: ReadonlyMap<string, string>,
+  crewTag?: string | null
 ): PersonRecord {
   return {
     id: row.id,
@@ -141,7 +152,8 @@ function mapPersonRow(
     emergencyContactRelationship: row.emergency_contact_relationship ?? null,
     pronouns: row.pronouns ?? null,
     privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../../types/people").PrivacySettings,
-    inviteStatus: row.account_setup_at ? "active" as const : "not_invited" as const,
+    crewTag: crewTag ?? null,
+    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at),
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -256,7 +268,7 @@ export async function PUT(
   const { data: existingProfile, error: existingProfileError } = await serviceRoleClient
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
@@ -464,7 +476,7 @@ export async function PUT(
       .eq("id", personId)
       .eq("org_id", session.profile.org_id)
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
       )
       .single();
 
@@ -480,6 +492,35 @@ export async function PUT(
     }
 
     updatedProfileRow = updatedRow;
+  }
+
+  /* Handle crew_tag upsert into employee_payment_details */
+  if (payload.crewTag !== undefined) {
+    const trimmedCrewTag = payload.crewTag?.trim() || null;
+
+    try {
+      if (trimmedCrewTag) {
+        await serviceRoleClient
+          .from("employee_payment_details")
+          .upsert(
+            {
+              org_id: session.profile.org_id,
+              employee_id: personId,
+              crew_tag: trimmedCrewTag,
+              payment_method: "crew_tag"
+            },
+            { onConflict: "org_id,employee_id" }
+          );
+      } else {
+        await serviceRoleClient
+          .from("employee_payment_details")
+          .update({ crew_tag: null })
+          .eq("org_id", session.profile.org_id)
+          .eq("employee_id", personId);
+      }
+    } catch {
+      /* best-effort — crew tag update failure should not block profile save */
+    }
   }
 
   const parsedUpdatedRow = profileRowSchema.safeParse(updatedProfileRow);
@@ -594,7 +635,20 @@ export async function PUT(
     );
   }
 
-  const person = mapPersonRow(parsedUpdatedRow.data, managerNameById);
+  /* Fetch crew tag for this person */
+  const { data: crewTagRow } = await serviceRoleClient
+    .from("employee_payment_details")
+    .select("crew_tag")
+    .eq("org_id", session.profile.org_id)
+    .eq("employee_id", personId)
+    .not("crew_tag", "is", null)
+    .maybeSingle();
+
+  const person = mapPersonRow(
+    parsedUpdatedRow.data,
+    managerNameById,
+    typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null
+  );
 
   let accessConfigChangedKeys: string[] = [];
   let accessSelection = resolveEffectiveUserNavSelection({
@@ -838,7 +892,7 @@ export async function PATCH(
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 
@@ -887,7 +941,20 @@ export async function PATCH(
     );
   }
 
-  const person = mapPersonRow(parsedUpdatedRow.data, managerNameById);
+  /* Fetch crew tag for this person */
+  const { data: selfCrewTagRow } = await serviceRoleClient
+    .from("employee_payment_details")
+    .select("crew_tag")
+    .eq("org_id", session.profile.org_id)
+    .eq("employee_id", personId)
+    .not("crew_tag", "is", null)
+    .maybeSingle();
+
+  const person = mapPersonRow(
+    parsedUpdatedRow.data,
+    managerNameById,
+    typeof selfCrewTagRow?.crew_tag === "string" ? selfCrewTagRow.crew_tag : null
+  );
 
   return jsonResponse<PeopleUpdateResponseData>(200, {
     data: {

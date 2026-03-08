@@ -72,6 +72,7 @@ type EditPersonFormValues = {
   department: string;
   managerId: string;
   title: string;
+  crewTag: string;
 };
 
 type EditPersonFormErrors = {
@@ -79,6 +80,7 @@ type EditPersonFormErrors = {
   department?: string;
   managerId?: string;
   title?: string;
+  crewTag?: string;
   form?: string;
 };
 
@@ -455,7 +457,8 @@ export function PeopleClient({
     roles: ["EMPLOYEE"],
     department: "",
     managerId: "",
-    title: ""
+    title: "",
+    crewTag: ""
   });
   const [editErrors, setEditErrors] = useState<EditPersonFormErrors>({});
   const [isEditSaving, setIsEditSaving] = useState(false);
@@ -642,7 +645,8 @@ export function PeopleClient({
       roles: person.roles.length > 0 ? [...person.roles] : ["EMPLOYEE"],
       department: person.department ?? "",
       managerId: person.managerId ?? "",
-      title: person.title ?? ""
+      title: person.title ?? "",
+      crewTag: person.crewTag ?? ""
     });
     setEditErrors({});
     setIsEditOpen(true);
@@ -687,7 +691,8 @@ export function PeopleClient({
           roles: editValues.roles,
           department: editValues.department.trim() || null,
           managerId: editValues.managerId.trim() || null,
-          title: editValues.title.trim() || null
+          title: editValues.title.trim() || null,
+          crewTag: editValues.crewTag.trim() || null
         })
       });
 
@@ -1203,7 +1208,7 @@ export function PeopleClient({
 
           <label className="form-field" htmlFor="person-department">
             <span className="form-label">Department</span>
-            <input
+            <select
               id="person-department"
               className={createErrors.department ? "form-input form-input-error" : "form-input"}
               value={createValues.department}
@@ -1213,7 +1218,14 @@ export function PeopleClient({
                   department: event.currentTarget.value
                 })
               }
-            />
+            >
+              <option value="">No department</option>
+              {DEPARTMENTS.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
             {createErrors.department ? (
               <p className="form-field-error">{createErrors.department}</p>
             ) : null}
@@ -1690,6 +1702,24 @@ export function PeopleClient({
               </select>
               {editErrors.department ? (
                 <p className="form-field-error">{editErrors.department}</p>
+              ) : null}
+            </label>
+
+            <label className="form-field" htmlFor="edit-person-crew-tag">
+              <span className="form-label">Crew Tag</span>
+              <input
+                id="edit-person-crew-tag"
+                className={editErrors.crewTag ? "form-input form-input-error" : "form-input"}
+                placeholder="e.g. john.doe"
+                maxLength={50}
+                value={editValues.crewTag}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setEditValues((prev) => ({ ...prev, crewTag: val }));
+                }}
+              />
+              {editErrors.crewTag ? (
+                <p className="form-field-error">{editErrors.crewTag}</p>
               ) : null}
             </label>
 
