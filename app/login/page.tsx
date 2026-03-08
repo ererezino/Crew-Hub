@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   type ChangeEvent,
@@ -218,8 +219,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="auth-footer-link auth-footer-hint">
-          Forgot password? Contact your admin.
+        <p className="auth-footer-link">
+          <Link href="/forgot-password">Forgot password?</Link>
         </p>
       </section>
     </main>
