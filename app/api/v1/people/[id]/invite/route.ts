@@ -35,7 +35,7 @@ function resolveAuthRedirectUrl(request: Request): string {
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     requestUrl.origin;
   const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
-  return `${normalizedAppUrl}/reset-password`;
+  return `${normalizedAppUrl}/api/auth/callback?next=/reset-password`;
 }
 
 export async function POST(
@@ -191,6 +191,16 @@ export async function POST(
     }
 
     inviteLink = linkData.properties.action_link;
+
+    /* Also fire the standard Supabase invite email so the user receives
+       a message in their inbox.  generateLink only creates the link —
+       it doesn't send anything. */
+    serviceRoleClient.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName },
+      redirectTo: authRedirectUrl
+    }).catch(() => {
+      /* Swallow — the manual link is the reliable fallback */
+    });
   }
 
   /* Send welcome email (fire-and-forget) */

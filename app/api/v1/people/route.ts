@@ -127,7 +127,7 @@ function resolveAuthRedirectUrl(request: Request): string {
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     requestUrl.origin;
   const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
-  return `${normalizedAppUrl}/reset-password`;
+  return `${normalizedAppUrl}/api/auth/callback?next=/reset-password`;
 }
 
 function canManagePeople(userRoles: readonly UserRole[]): boolean {

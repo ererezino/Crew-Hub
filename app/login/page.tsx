@@ -1,9 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   type ChangeEvent,
   type FormEvent,
+  Suspense,
   useState
 } from "react";
 import { z } from "zod";
@@ -71,8 +72,19 @@ function getRedirectTarget(): string {
   return redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
 }
 
-export default function LoginPage() {
+const INVITE_ERROR_MESSAGES: Record<string, string> = {
+  invite_expired:
+    "This invite link has expired or is invalid. Please ask your admin to send a new one.",
+  auth_error:
+    "We couldn't verify your link. Please ask your admin to resend the invite."
+};
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const urlError = searchParams.get("error");
+  const inviteBanner = urlError ? INVITE_ERROR_MESSAGES[urlError] ?? null : null;
 
   const [values, setValues] = useState<LoginValues>(INITIAL_VALUES);
   const [errors, setErrors] = useState<LoginErrors>({});
@@ -162,6 +174,12 @@ export default function LoginPage() {
           <h1 className="page-title text-h1">Crew Hub</h1>
         </header>
 
+        {inviteBanner ? (
+          <p className="form-submit-error" role="alert" style={{ marginBottom: 16 }}>
+            {inviteBanner}
+          </p>
+        ) : null}
+
         <form className="auth-form" noValidate onSubmit={handleSubmit}>
           <label className="form-field" htmlFor="email">
             <span className="form-label">Email</span>
@@ -223,5 +241,13 @@ export default function LoginPage() {
         </p>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
