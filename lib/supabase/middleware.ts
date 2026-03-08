@@ -121,8 +121,10 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const isLoginRoute = pathname === "/login";
   const isChangePasswordRoute = pathname === "/change-password";
+  const isPublicAuthRoute =
+    pathname === "/forgot-password" || pathname === "/reset-password";
 
-  if (!user && !isLoginRoute && !isApiRoute) {
+  if (!user && !isLoginRoute && !isApiRoute && !isPublicAuthRoute) {
     const redirectUrl = new URL("/login", request.url);
 
     if (pathname !== "/") {

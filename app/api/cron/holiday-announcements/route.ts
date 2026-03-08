@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import { createNotification } from "../../../../lib/notifications/service";
-import { countryNameFromCode } from "../../../../lib/countries";
+import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 
 /**
  * Daily cron endpoint: creates announcements for public holidays.
@@ -117,12 +117,15 @@ export async function GET(request: Request) {
     const creatorId = adminRows?.[0]?.id ?? members[0].id;
 
     for (const holiday of holidays) {
+      const countryLabels = holiday.countryCodes
+        .map((cc) => `${countryNameFromCode(cc)} ${countryFlagFromCode(cc)}`)
+        .join(", ");
       const countryNames = holiday.countryCodes
         .map((cc) => countryNameFromCode(cc))
         .join(", ");
 
-      const title = `Today is ${holiday.name}`;
-      const body = `Team members in ${countryNames} have the day off for ${holiday.name}.`;
+      const title = `Public Holiday (${countryLabels})`;
+      const body = `Today is ${holiday.name}. Team members in ${countryNames} have the day off.`;
 
       // Deduplicate: skip if same announcement already exists today
       const { data: existing } = await supabase
@@ -172,9 +175,9 @@ export async function GET(request: Request) {
             orgId,
             userId: m.id,
             type: "announcement",
-            title: `Happy ${holiday.name}!`,
-            body: "You have the day off today.",
-            link: "/time-off",
+            title: `Happy ${holiday.name}! 🎉`,
+            body: "You have the day off today. Enjoy!",
+            link: "/announcements",
           })
         )
       );
@@ -186,9 +189,9 @@ export async function GET(request: Request) {
             orgId,
             userId: m.id,
             type: "announcement",
-            title: `Today is ${holiday.name}`,
-            body: `Team members in ${countryNames} have the day off.`,
-            link: "/time-off",
+            title: `Public Holiday (${countryLabels})`,
+            body: `Today is ${holiday.name}. Team members in ${countryNames} have the day off.`,
+            link: "/announcements",
           })
         )
       );

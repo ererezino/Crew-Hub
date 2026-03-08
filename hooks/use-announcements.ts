@@ -14,6 +14,7 @@ import type { Announcement, AnnouncementsResponse } from "../types/announcements
 
 type UseAnnouncementsOptions = {
   limit?: number;
+  dismissed?: boolean;
 };
 
 type UseAnnouncementsResult = {
@@ -24,25 +25,28 @@ type UseAnnouncementsResult = {
   setAnnouncements: Dispatch<SetStateAction<Announcement[]>>;
 };
 
-function buildAnnouncementsUrl(limit?: number): string {
-  if (!limit) {
-    return "/api/v1/announcements";
+function buildAnnouncementsUrl(limit?: number, dismissed?: boolean): string {
+  const params = new URLSearchParams();
+
+  if (limit) {
+    params.set("limit", String(limit));
   }
 
-  const params = new URLSearchParams({
-    limit: String(limit)
-  });
+  if (dismissed) {
+    params.set("dismissed", "true");
+  }
 
-  return `/api/v1/announcements?${params.toString()}`;
+  const qs = params.toString();
+  return qs ? `/api/v1/announcements?${qs}` : "/api/v1/announcements";
 }
 
-export function useAnnouncements({ limit }: UseAnnouncementsOptions = {}): UseAnnouncementsResult {
+export function useAnnouncements({ limit, dismissed }: UseAnnouncementsOptions = {}): UseAnnouncementsResult {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
-  const endpoint = useMemo(() => buildAnnouncementsUrl(limit), [limit]);
+  const endpoint = useMemo(() => buildAnnouncementsUrl(limit, dismissed), [limit, dismissed]);
 
   useEffect(() => {
     const abortController = new AbortController();

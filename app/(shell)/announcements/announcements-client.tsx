@@ -7,24 +7,59 @@ import {
   useState
 } from "react";
 import { z } from "zod";
+import Link from "next/link";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useAnnouncements } from "../../../hooks/use-announcements";
+import { useNotifications } from "../../../hooks/use-notifications";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
-import { Megaphone } from "lucide-react";
+import { Archive, Megaphone } from "lucide-react";
 import type {
   Announcement,
+  AnnouncementDismissResponse,
   AnnouncementMutationResponse,
   AnnouncementReadResponse
 } from "../../../types/announcements";
+import type { NotificationRecord } from "../../../types/notifications";
 import { humanizeError } from "@/lib/errors";
+
+const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
+  status_change: "Status Update",
+  leave_submitted: "Leave Request",
+  leave_approved: "Leave Approved",
+  leave_rejected: "Leave Rejected",
+  expense_submitted: "Expense",
+  expense_approved: "Expense Approved",
+  expense_rejected: "Expense Rejected",
+  payroll_approved: "Payroll",
+  timesheet_submitted: "Timesheet",
+  timesheet_approved: "Timesheet Approved",
+  schedule_published: "Schedule",
+  shift_swap_requested: "Shift Swap",
+  shift_swap_accepted: "Shift Swap",
+  shift_swap_rejected: "Shift Swap",
+  course_assigned: "Learning",
+  review_cycle_started: "Performance",
+  review_reminder: "Performance",
+  survey_launched: "Survey",
+  document_expiry_warning: "Document",
+  signature_requested: "Signature",
+  signature_signed: "Signature",
+  signature_completed: "Signature",
+  compliance_policy_acknowledgment: "Compliance"
+};
+
+function getNotificationTypeLabel(type: string): string {
+  return NOTIFICATION_TYPE_LABELS[type] ?? "Notification";
+}
 
 type AnnouncementsClientProps = {
   canManageAnnouncements: boolean;
+  isSuperAdmin: boolean;
   currentUserName: string;
 };
 
@@ -96,15 +131,25 @@ function getValidationErrors(
 function AnnouncementCard({
   announcement,
   canManageAnnouncements,
+  isSuperAdmin,
+  isArchiveView,
+  isDismissing,
   isMarkingRead,
+  onDismiss,
   onMarkRead,
-  onEdit
+  onEdit,
+  onDelete
 }: {
   announcement: Announcement;
   canManageAnnouncements: boolean;
+  isSuperAdmin: boolean;
+  isArchiveView: boolean;
+  isDismissing: boolean;
   isMarkingRead: boolean;
+  onDismiss: (announcementId: string) => void;
   onMarkRead: (announcementId: string) => void;
   onEdit: (announcement: Announcement) => void;
+  onDelete: (announcement: Announcement) => void;
 }) {
   return (
     <li
@@ -166,13 +211,32 @@ function AnnouncementCard({
               {isMarkingRead ? "Marking..." : "Mark read"}
             </button>
           ) : null}
-          {canManageAnnouncements ? (
+          {announcement.isRead && !isArchiveView ? (
+            <button
+              type="button"
+              className="table-row-action"
+              onClick={() => onDismiss(announcement.id)}
+              disabled={isDismissing}
+            >
+              {isDismissing ? "Dismissing..." : "Dismiss"}
+            </button>
+          ) : null}
+          {canManageAnnouncements && !isArchiveView ? (
             <button
               type="button"
               className="table-row-action"
               onClick={() => onEdit(announcement)}
             >
               Edit
+            </button>
+          ) : null}
+          {isSuperAdmin && isArchiveView ? (
+            <button
+              type="button"
+              className="table-row-action table-row-action-danger"
+              onClick={() => onDelete(announcement)}
+            >
+              Delete
             </button>
           ) : null}
         </div>
@@ -198,6 +262,7 @@ function AnnouncementsSkeleton() {
 
 export function AnnouncementsClient({
   canManageAnnouncements,
+  isSuperAdmin,
   currentUserName
 }: AnnouncementsClientProps) {
   const {
@@ -208,6 +273,8 @@ export function AnnouncementsClient({
     setAnnouncements
   } = useAnnouncements();
 
+  const notificationsQuery = useNotifications({ limit: 20 });
+
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState<AnnouncementFormValues>(INITIAL_FORM_VALUES);
@@ -216,19 +283,42 @@ export function AnnouncementsClient({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isMarkingReadById, setIsMarkingReadById] = useState<Record<string, boolean>>({});
+  const [isDismissingById, setIsDismissingById] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [announcementFormDirty, setAnnouncementFormDirty] = useState(false);
   useUnsavedGuard(announcementFormDirty);
 
-  const pinnedAnnouncements = useMemo(
-    () => announcements.filter((announcement) => announcement.isPinned),
-    [announcements]
-  );
+  type UnifiedItem =
+    | { source: "announcement"; data: Announcement }
+    | { source: "notification"; data: NotificationRecord };
 
-  const recentAnnouncements = useMemo(
-    () => announcements.filter((announcement) => !announcement.isPinned),
-    [announcements]
-  );
+  const unifiedFeed = useMemo((): UnifiedItem[] => {
+    const items: UnifiedItem[] = [];
+
+    for (const a of announcements) {
+      items.push({ source: "announcement", data: a });
+    }
+
+    for (const n of notificationsQuery.data?.notifications ?? []) {
+      items.push({ source: "notification", data: n });
+    }
+
+    items.sort((a, b) => {
+      const aPinned = a.source === "announcement" ? a.data.isPinned : false;
+      const bPinned = b.source === "announcement" ? b.data.isPinned : false;
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return new Date(b.data.createdAt).getTime() - new Date(a.data.createdAt).getTime();
+    });
+
+    return items;
+  }, [announcements, notificationsQuery.data?.notifications]);
+
+  const totalUnreadCount = useMemo(() => {
+    const unreadAnnouncements = announcements.filter((a) => !a.isRead).length;
+    const unreadNotifications = notificationsQuery.data?.unreadCount ?? 0;
+    return unreadAnnouncements + unreadNotifications;
+  }, [announcements, notificationsQuery.data?.unreadCount]);
 
   const openCreatePanel = () => {
     setEditingAnnouncementId(null);
@@ -353,6 +443,7 @@ export function AnnouncementsClient({
         )
       );
 
+      window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
       showToast("info", "Announcement marked as read.");
     } catch (error) {
       showToast(
@@ -361,6 +452,48 @@ export function AnnouncementsClient({
       );
     } finally {
       setIsMarkingReadById((currentState) => {
+        const nextState = { ...currentState };
+        delete nextState[announcementId];
+        return nextState;
+      });
+    }
+  };
+
+  const handleDismiss = async (announcementId: string) => {
+    setIsDismissingById((currentState) => ({
+      ...currentState,
+      [announcementId]: true
+    }));
+
+    try {
+      const response = await fetch("/api/v1/announcements/dismiss", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ announcementId })
+      });
+
+      const payload = (await response.json()) as AnnouncementDismissResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? "Unable to dismiss announcement.");
+        return;
+      }
+
+      setAnnouncements((currentAnnouncements) =>
+        currentAnnouncements.filter((a) => a.id !== announcementId)
+      );
+
+      window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+      showToast("info", "Announcement dismissed.");
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to dismiss announcement."
+      );
+    } finally {
+      setIsDismissingById((currentState) => {
         const nextState = { ...currentState };
         delete nextState[announcementId];
         return nextState;
@@ -429,14 +562,20 @@ export function AnnouncementsClient({
   return (
     <>
       <PageHeader
-        title="Announcements"
-        description="Company updates and news since your last visit."
+        title="Notifications"
+        description="Company updates, alerts, and messages since your last visit."
         actions={
-          canManageAnnouncements ? (
-            <button type="button" className="button button-accent" onClick={openCreatePanel}>
-              New announcement
-            </button>
-          ) : null
+          <div className="page-header-actions">
+            <Link className="button" href="/announcements/archive">
+              <Archive size={14} />
+              Archive
+            </Link>
+            {canManageAnnouncements ? (
+              <button type="button" className="button button-accent" onClick={openCreatePanel}>
+                New announcement
+              </button>
+            ) : null}
+          </div>
         }
       />
 
@@ -444,19 +583,19 @@ export function AnnouncementsClient({
 
       {!isLoading && errorMessage ? (
         <EmptyState
-          title="Announcements are unavailable"
+          title="Notifications are unavailable"
           description={errorMessage}
           ctaLabel="Retry"
           ctaHref="/announcements"
         />
       ) : null}
 
-      {!isLoading && !errorMessage && announcements.length === 0 ? (
+      {!isLoading && !errorMessage && unifiedFeed.length === 0 ? (
         <>
           <EmptyState
             icon={<Megaphone size={32} />}
-            title="No announcements yet"
-            description="Announcements will appear here once updates are published for your team."
+            title="No notifications yet"
+            description="Notifications and announcements will appear here."
           />
           {canManageAnnouncements ? (
             <button type="button" className="button button-accent" onClick={openCreatePanel}>
@@ -466,64 +605,115 @@ export function AnnouncementsClient({
         </>
       ) : null}
 
-      {!isLoading && !errorMessage && announcements.length > 0 ? (
+      {!isLoading && !errorMessage && unifiedFeed.length > 0 ? (
         <div className="announcements-grid">
-          <section className="settings-card" aria-label="Pinned announcements">
+          <section className="settings-card" aria-label="All notifications">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">Pinned</h2>
+                <h2 className="section-title">Notifications</h2>
                 <p className="settings-card-description">
-                  High-priority updates stay at the top for everyone.
+                  All updates, newest first. Pinned items stay at the top.
                 </p>
               </div>
-              <StatusBadge tone="info">{pinnedAnnouncements.length} pinned</StatusBadge>
+              {totalUnreadCount > 0 ? (
+                <StatusBadge tone="pending">{totalUnreadCount} unread</StatusBadge>
+              ) : null}
             </header>
 
-            {pinnedAnnouncements.length > 0 ? (
-              <ul className="announcement-list">
-                {pinnedAnnouncements.map((announcement) => (
-                  <AnnouncementCard
-                    key={announcement.id}
-                    announcement={announcement}
-                    canManageAnnouncements={canManageAnnouncements}
-                    isMarkingRead={Boolean(isMarkingReadById[announcement.id])}
-                    onMarkRead={handleMarkRead}
-                    onEdit={openEditPanel}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <p className="announcements-muted">No pinned announcements right now.</p>
-            )}
-          </section>
+            <ul className="announcement-list">
+              {unifiedFeed.map((item) => {
+                if (item.source === "announcement") {
+                  return (
+                    <AnnouncementCard
+                      key={`announcement-${item.data.id}`}
+                      announcement={item.data}
+                      canManageAnnouncements={canManageAnnouncements}
+                      isSuperAdmin={isSuperAdmin}
+                      isArchiveView={false}
+                      isDismissing={Boolean(isDismissingById[item.data.id])}
+                      isMarkingRead={Boolean(isMarkingReadById[item.data.id])}
+                      onDismiss={handleDismiss}
+                      onMarkRead={handleMarkRead}
+                      onEdit={openEditPanel}
+                      onDelete={() => {}}
+                    />
+                  );
+                }
 
-          <section className="settings-card" aria-label="Recent announcements">
-            <header className="announcements-section-header">
-              <div>
-                <h2 className="section-title">Recent</h2>
-                <p className="settings-card-description">
-                  Chronological updates, newest to oldest.
-                </p>
-              </div>
-              <StatusBadge tone="processing">{recentAnnouncements.length} recent</StatusBadge>
-            </header>
-
-            {recentAnnouncements.length > 0 ? (
-              <ul className="announcement-list">
-                {recentAnnouncements.map((announcement) => (
-                  <AnnouncementCard
-                    key={announcement.id}
-                    announcement={announcement}
-                    canManageAnnouncements={canManageAnnouncements}
-                    isMarkingRead={Boolean(isMarkingReadById[announcement.id])}
-                    onMarkRead={handleMarkRead}
-                    onEdit={openEditPanel}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <p className="announcements-muted">No recent non-pinned announcements right now.</p>
-            )}
+                const notification = item.data;
+                return (
+                  <li
+                    key={`notification-${notification.id}`}
+                    className={
+                      notification.isRead
+                        ? "announcement-item"
+                        : "announcement-item announcement-item-unread"
+                    }
+                  >
+                    <article className="announcement-item-card">
+                      <header className="announcement-item-header">
+                        <div>
+                          <div className="notification-type-row">
+                            <span className="notification-type-label">
+                              {getNotificationTypeLabel(notification.type)}
+                            </span>
+                          </div>
+                          <h3 className="announcement-item-title">{notification.title}</h3>
+                          <p className="announcement-item-meta">
+                            <time
+                              dateTime={notification.createdAt}
+                              title={formatDateTimeTooltip(notification.createdAt)}
+                            >
+                              {formatRelativeTime(notification.createdAt)}
+                            </time>
+                          </p>
+                        </div>
+                        <div className="announcement-item-status">
+                          {notification.isRead ? (
+                            <span className="announcement-read-check" title="Read">
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  d="M5 12.5l4.5 4.5L19 7.5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  fill="none"
+                                />
+                              </svg>
+                              Read
+                            </span>
+                          ) : (
+                            <StatusBadge tone="pending">Unread</StatusBadge>
+                          )}
+                        </div>
+                      </header>
+                      <p className="announcement-item-body">{notification.body}</p>
+                      <div className="announcement-row-actions">
+                        {!notification.isRead ? (
+                          <button
+                            type="button"
+                            className="table-row-action"
+                            onClick={() => {
+                              void notificationsQuery.markRead(notification.id).then(() => {
+                                window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+                              });
+                            }}
+                          >
+                            Mark read
+                          </button>
+                        ) : null}
+                        {notification.link ? (
+                          <Link href={notification.link} className="table-row-action">
+                            View
+                          </Link>
+                        ) : null}
+                      </div>
+                    </article>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         </div>
       ) : null}

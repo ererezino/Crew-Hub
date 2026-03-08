@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
+import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
@@ -554,6 +555,11 @@ export function SignaturesClient({
             </button>
           ) : null
         }
+      />
+
+      <FeatureBanner
+        moduleId="signatures"
+        description="Signatures is built but not yet included in the active release. Requests here are preview-only."
       />
 
       <section className="page-tabs" aria-label="Signature request filters">

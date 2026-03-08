@@ -150,6 +150,16 @@ export default function LoginPage() {
       keepalive: true
     }).catch(() => undefined);
 
+    /* Mark account as set up on first real login (no-op if already set) */
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData?.user?.id) {
+      void supabase
+        .from("profiles")
+        .update({ account_setup_at: new Date().toISOString() })
+        .eq("id", userData.user.id)
+        .is("account_setup_at", null);
+    }
+
     const nextPath = getRedirectTarget();
     router.replace(nextPath);
     router.refresh();

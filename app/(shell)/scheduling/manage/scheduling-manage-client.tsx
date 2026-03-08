@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
@@ -13,6 +13,7 @@ import {
 } from "../../../../hooks/use-scheduling";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
+import { DEPARTMENTS } from "../../../../lib/departments";
 import { formatScheduleStatus, formatShiftStatus } from "../../../../lib/format-labels";
 import { formatTimeRangeLabel } from "../../../../lib/scheduling";
 import type { PeopleListResponse } from "../../../../types/people";
@@ -124,7 +125,7 @@ function manageSkeleton() {
 
 const defaultScheduleForm: ScheduleFormState = {
   name: "",
-  department: "",
+  department: "Customer Success",
   weekStart: "",
   weekEnd: ""
 };
@@ -169,9 +170,24 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
 
   // Auto-generate state
   const [autoGenScheduleId, setAutoGenScheduleId] = useState<string | null>(null);
+  const [autoGenScheduleType, setAutoGenScheduleType] = useState<"weekday" | "weekend">("weekday");
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
   const [autoGenPreview, setAutoGenPreview] = useState<AutoGenerateAssignment[] | null>(null);
   const [isApplyingAutoGen, setIsApplyingAutoGen] = useState(false);
+
+  // Crew selection for auto-generate
+  const [autoGenCrewSelection, setAutoGenCrewSelection] = useState<Set<string> | null>(null);
+  const [autoGenTargetScheduleId, setAutoGenTargetScheduleId] = useState<string | null>(null);
+
+  // Confirmation dialog state
+  const [publishConfirmScheduleId, setPublishConfirmScheduleId] = useState<string | null>(null);
+  const [deleteConfirmScheduleId, setDeleteConfirmScheduleId] = useState<string | null>(null);
+  const [cancelConfirmShiftId, setCancelConfirmShiftId] = useState<string | null>(null);
+  const [isCancellingShift, setIsCancellingShift] = useState(false);
+  const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
+
+  // Shift editing state
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
 
   // Day notes state
   const [dayNotes, setDayNotes] = useState<Record<string, DayNote[]>>({});
@@ -194,7 +210,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
 
         if (!response.ok || !payload.data) {
           setPeople([]);
-          setPeopleError(payload.error?.message ?? "Unable to load team members.");
+          setPeopleError(payload.error?.message ?? "Unable to load crew members.");
           return;
         }
 
@@ -212,7 +228,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
         }
 
         setPeople([]);
-        setPeopleError(error instanceof Error ? error.message : "Unable to load team members.");
+        setPeopleError(error instanceof Error ? error.message : "Unable to load crew members.");
       } finally {
         if (!abortController.signal.aborted) {
           setIsLoadingPeople(false);
@@ -259,6 +275,71 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
 
   // --- Auto-generate handlers ---
 
+  function openCrewSelection(scheduleId: string) {
+    const schedule = sortedSchedules.find((s) => s.id === scheduleId);
+    const scheduleDepartment = schedule?.department ?? null;
+
+    const initialSelection = new Set<string>(
+      people
+        .filter((person) =>
+          scheduleDepartment
+            ? person.department?.toLowerCase() === scheduleDepartment.toLowerCase()
+            : true
+        )
+        .map((person) => person.id)
+    );
+
+    setAutoGenTargetScheduleId(scheduleId);
+    setAutoGenCrewSelection(initialSelection);
+  }
+
+  function closeCrewSelection() {
+    setAutoGenCrewSelection(null);
+    setAutoGenTargetScheduleId(null);
+  }
+
+  function toggleCrewMember(personId: string) {
+    setAutoGenCrewSelection((current) => {
+      if (!current) return current;
+      const next = new Set(current);
+      if (next.has(personId)) {
+        next.delete(personId);
+      } else {
+        next.add(personId);
+      }
+      return next;
+    });
+  }
+
+  function toggleDepartment(department: string) {
+    setAutoGenCrewSelection((current) => {
+      if (!current) return current;
+      const deptPeople = people.filter(
+        (person) => person.department?.toLowerCase() === department.toLowerCase()
+      );
+      const allSelected = deptPeople.every((person) => current.has(person.id));
+      const next = new Set(current);
+
+      for (const person of deptPeople) {
+        if (allSelected) {
+          next.delete(person.id);
+        } else {
+          next.add(person.id);
+        }
+      }
+
+      return next;
+    });
+  }
+
+  function selectAllCrew() {
+    setAutoGenCrewSelection(new Set(people.map((person) => person.id)));
+  }
+
+  function deselectAllCrew() {
+    setAutoGenCrewSelection(new Set());
+  }
+
   async function handleAutoGenerate(scheduleId: string) {
     const templates = templatesQuery.data?.templates ?? [];
 
@@ -266,6 +347,12 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       addToast("error", "Create at least one shift template before auto-generating.");
       return;
     }
+
+    const selectedCrewIds = autoGenCrewSelection ? Array.from(autoGenCrewSelection) : undefined;
+
+    // Close crew selection panel
+    setAutoGenCrewSelection(null);
+    setAutoGenTargetScheduleId(null);
 
     setAutoGenScheduleId(scheduleId);
     setIsAutoGenerating(true);
@@ -281,7 +368,11 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       const response = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slots, scheduleType: "weekday" })
+        body: JSON.stringify({
+          slots,
+          scheduleType: autoGenScheduleType,
+          ...(selectedCrewIds && selectedCrewIds.length > 0 ? { employeeIds: selectedCrewIds } : {})
+        })
       });
       const payload = (await response.json()) as {
         data: { assignments: AutoGenerateAssignment[]; warnings?: string[] } | null;
@@ -336,6 +427,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       addToast("success", "Auto-generated assignments applied.");
       setAutoGenPreview(null);
       setAutoGenScheduleId(null);
+      setAutoGenScheduleType("weekday");
       shiftsQuery.refresh();
       schedulesQuery.refresh();
     } catch (error) {
@@ -348,7 +440,103 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
   function handleDiscardAutoGen() {
     setAutoGenPreview(null);
     setAutoGenScheduleId(null);
+    setAutoGenScheduleType("weekday");
     addToast("info", "Auto-generated assignments discarded.");
+  }
+
+  // --- Shift cancel handler ---
+
+  async function handleCancelShift(shiftId: string) {
+    setIsCancellingShift(true);
+
+    try {
+      const response = await fetch(`/api/v1/scheduling/shifts/${shiftId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled" })
+      });
+      const payload = (await response.json()) as {
+        data: unknown;
+        error: { message?: string } | null;
+      };
+
+      if (!response.ok) {
+        addToast("error", payload.error?.message ?? "Unable to cancel shift.");
+        return;
+      }
+
+      addToast("success", "Shift cancelled.");
+      shiftsQuery.refresh();
+      schedulesQuery.refresh();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Unable to cancel shift.");
+    } finally {
+      setIsCancellingShift(false);
+      setCancelConfirmShiftId(null);
+    }
+  }
+
+  // --- Schedule delete handler ---
+
+  async function handleDeleteSchedule(scheduleId: string) {
+    setIsDeletingSchedule(true);
+
+    try {
+      const response = await fetch(`/api/v1/scheduling/schedules/${scheduleId}`, {
+        method: "DELETE"
+      });
+      const payload = (await response.json()) as {
+        data: unknown;
+        error: { message?: string } | null;
+      };
+
+      if (!response.ok) {
+        addToast("error", payload.error?.message ?? "Unable to delete schedule.");
+        return;
+      }
+
+      addToast("success", "Draft schedule deleted.");
+      schedulesQuery.refresh();
+      shiftsQuery.refresh();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Unable to delete schedule.");
+    } finally {
+      setIsDeletingSchedule(false);
+      setDeleteConfirmScheduleId(null);
+    }
+  }
+
+  // --- Shift edit helpers ---
+
+  function startEditingShift(shift: {
+    id: string;
+    scheduleId: string;
+    templateId: string | null;
+    employeeId: string | null;
+    shiftDate: string;
+    startTime: string;
+    endTime: string;
+    breakMinutes: number;
+    notes: string | null;
+  }) {
+    setEditingShiftId(shift.id);
+    setShiftForm({
+      scheduleId: shift.scheduleId,
+      templateId: shift.templateId ?? "",
+      employeeId: shift.employeeId ?? "",
+      shiftDate: shift.shiftDate,
+      startTime: shift.startTime.slice(0, 5),
+      endTime: shift.endTime.slice(0, 5),
+      breakMinutes: String(shift.breakMinutes),
+      notes: shift.notes ?? ""
+    });
+    setShiftFormError(null);
+  }
+
+  function cancelEditingShift() {
+    setEditingShiftId(null);
+    setShiftForm(defaultShiftForm);
+    setShiftFormError(null);
   }
 
   // --- Day notes handlers ---
@@ -469,7 +657,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
     }
   }
 
-  async function handleCreateShift(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmitShift(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setShiftFormError(null);
     setSubmitMessage(null);
@@ -481,22 +669,27 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
 
     setIsSubmittingShift(true);
 
+    const shiftPayload = {
+      scheduleId: shiftForm.scheduleId,
+      templateId: shiftForm.templateId || undefined,
+      employeeId: shiftForm.employeeId || undefined,
+      shiftDate: shiftForm.shiftDate,
+      startTime: shiftForm.startTime,
+      endTime: shiftForm.endTime,
+      breakMinutes: Number.parseInt(shiftForm.breakMinutes || "0", 10),
+      notes: shiftForm.notes || undefined
+    };
+
     try {
-      const response = await fetch("/api/v1/scheduling/shifts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          scheduleId: shiftForm.scheduleId,
-          templateId: shiftForm.templateId || undefined,
-          employeeId: shiftForm.employeeId || undefined,
-          shiftDate: shiftForm.shiftDate,
-          startTime: shiftForm.startTime,
-          endTime: shiftForm.endTime,
-          breakMinutes: Number.parseInt(shiftForm.breakMinutes || "0", 10),
-          notes: shiftForm.notes || undefined
-        })
+      const url = editingShiftId
+        ? `/api/v1/scheduling/shifts/${editingShiftId}`
+        : "/api/v1/scheduling/shifts";
+      const method = editingShiftId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(shiftPayload)
       });
       const payload = (await response.json()) as {
         data: unknown;
@@ -504,16 +697,21 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       };
 
       if (!response.ok) {
-        setShiftFormError(payload.error?.message ?? "Unable to create shift.");
+        setShiftFormError(
+          payload.error?.message ?? (editingShiftId ? "Unable to update shift." : "Unable to create shift.")
+        );
         return;
       }
 
       setShiftForm(defaultShiftForm);
-      setSubmitMessage("Shift created.");
+      setEditingShiftId(null);
+      setSubmitMessage(editingShiftId ? "Shift updated." : "Shift created.");
       shiftsQuery.refresh();
       schedulesQuery.refresh();
     } catch (error) {
-      setShiftFormError(error instanceof Error ? error.message : "Unable to create shift.");
+      setShiftFormError(
+        error instanceof Error ? error.message : (editingShiftId ? "Unable to update shift." : "Unable to create shift.")
+      );
     } finally {
       setIsSubmittingShift(false);
     }
@@ -533,16 +731,17 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
       };
 
       if (!response.ok) {
-        setSubmitMessage(payload.error?.message ?? "Unable to publish schedule.");
+        addToast("error", payload.error?.message ?? "Unable to publish schedule.");
         return;
       }
 
-      setSubmitMessage("Schedule published.");
+      addToast("success", "Schedule published.");
       schedulesQuery.refresh();
     } catch (error) {
-      setSubmitMessage(error instanceof Error ? error.message : "Unable to publish schedule.");
+      addToast("error", error instanceof Error ? error.message : "Unable to publish schedule.");
     } finally {
       setIsPublishingScheduleId(null);
+      setPublishConfirmScheduleId(null);
     }
   }
 
@@ -593,15 +792,19 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
             </div>
             <div>
               <label className="form-label" htmlFor="schedule-department">Department</label>
-              <input
+              <select
                 id="schedule-department"
                 className="form-input"
                 value={scheduleForm.department}
                 onChange={(event) =>
                   setScheduleForm((currentValue) => ({ ...currentValue, department: event.target.value }))
                 }
-                placeholder="Engineering"
-              />
+              >
+                <option value="">All departments</option>
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="form-label" htmlFor="schedule-week-start">Week start</label>
@@ -639,11 +842,20 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
         <article className="settings-card">
           <header className="announcement-item-header">
             <div>
-              <h2 className="section-title">Create shift</h2>
-              <p className="settings-card-description">Assign a team member or leave employee blank for open shifts.</p>
+              <h2 className="section-title">{editingShiftId ? "Edit shift" : "Create shift"}</h2>
+              <p className="settings-card-description">
+                {editingShiftId
+                  ? "Update shift details. Cancel to discard changes."
+                  : "Assign a crew member or leave blank for open shifts."}
+              </p>
             </div>
+            {editingShiftId ? (
+              <button type="button" className="button button-ghost" onClick={cancelEditingShift}>
+                Cancel edit
+              </button>
+            ) : null}
           </header>
-          <form className="settings-form" onSubmit={handleCreateShift}>
+          <form className="settings-form" onSubmit={handleSubmitShift}>
             <div>
               <label className="form-label" htmlFor="shift-schedule">Schedule</label>
               <select
@@ -681,7 +893,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
               </select>
             </div>
             <div>
-              <label className="form-label" htmlFor="shift-employee">Employee</label>
+              <label className="form-label" htmlFor="shift-employee">Crew member</label>
               <select
                 id="shift-employee"
                 className="form-input"
@@ -763,7 +975,9 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
             {shiftFormError ? <p className="form-field-error">{shiftFormError}</p> : null}
             <div className="settings-actions">
               <button type="submit" className="button button-primary" disabled={isSubmittingShift}>
-                {isSubmittingShift ? "Creating..." : "Create shift"}
+                {isSubmittingShift
+                  ? (editingShiftId ? "Saving..." : "Creating...")
+                  : (editingShiftId ? "Save changes" : "Create shift")}
               </button>
             </div>
           </form>
@@ -847,21 +1061,37 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                               <button
                                 type="button"
                                 className="table-row-action"
-                                onClick={() => handlePublishSchedule(schedule.id)}
+                                onClick={() => setPublishConfirmScheduleId(schedule.id)}
                                 disabled={isPublishingScheduleId === schedule.id}
                               >
                                 {isPublishingScheduleId === schedule.id ? "Publishing..." : "Publish"}
                               </button>
+                              <select
+                                className="table-row-action-select"
+                                value={autoGenScheduleType}
+                                onChange={(event) =>
+                                  setAutoGenScheduleType(event.target.value as "weekday" | "weekend")
+                                }
+                              >
+                                <option value="weekday">Weekday</option>
+                                <option value="weekend">Weekend</option>
+                              </select>
                               <button
                                 type="button"
-                                className="button"
-                                style={{ fontSize: "var(--font-size-sm)", padding: "var(--space-1) var(--space-3)" }}
-                                onClick={() => handleAutoGenerate(schedule.id)}
+                                className="table-row-action"
+                                onClick={() => openCrewSelection(schedule.id)}
                                 disabled={isAutoGenerating && autoGenScheduleId === schedule.id}
                               >
                                 {isAutoGenerating && autoGenScheduleId === schedule.id
                                   ? "Generating..."
                                   : "Auto-generate"}
+                              </button>
+                              <button
+                                type="button"
+                                className="table-row-action table-row-action-danger"
+                                onClick={() => setDeleteConfirmScheduleId(schedule.id)}
+                              >
+                                Delete
                               </button>
                             </>
                           ) : (
@@ -876,6 +1106,99 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
             </div>
           )}
         </article>
+
+        {autoGenCrewSelection !== null && autoGenTargetScheduleId ? (
+          <article className="settings-card autogen-crew-panel" aria-label="Select crew for auto-generate">
+            <header className="announcement-item-header">
+              <div>
+                <h2 className="section-title">Select crew for auto-generate</h2>
+                <p className="settings-card-description">
+                  {autoGenCrewSelection.size} of {people.length} crew members selected
+                </p>
+              </div>
+              <div className="autogen-crew-header-actions">
+                <button
+                  type="button"
+                  className="button button-primary"
+                  onClick={() => void handleAutoGenerate(autoGenTargetScheduleId)}
+                  disabled={autoGenCrewSelection.size === 0}
+                >
+                  Generate
+                </button>
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={closeCrewSelection}
+                >
+                  Cancel
+                </button>
+              </div>
+            </header>
+
+            <div className="autogen-dept-chips">
+              <button
+                type="button"
+                className={`autogen-dept-chip${autoGenCrewSelection.size === people.length ? " autogen-dept-chip-active" : ""}`}
+                onClick={selectAllCrew}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={`autogen-dept-chip${autoGenCrewSelection.size === 0 ? " autogen-dept-chip-active" : ""}`}
+                onClick={deselectAllCrew}
+              >
+                None
+              </button>
+              {DEPARTMENTS.map((dept) => {
+                const deptPeople = people.filter(
+                  (person) => person.department?.toLowerCase() === dept.toLowerCase()
+                );
+                if (deptPeople.length === 0) return null;
+                const allSelected = deptPeople.every((person) => autoGenCrewSelection.has(person.id));
+                return (
+                  <button
+                    key={dept}
+                    type="button"
+                    className={`autogen-dept-chip${allSelected ? " autogen-dept-chip-active" : ""}`}
+                    onClick={() => toggleDepartment(dept)}
+                  >
+                    {dept}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="autogen-crew-list">
+              {(() => {
+                const targetSchedule = sortedSchedules.find((s) => s.id === autoGenTargetScheduleId);
+                const scheduleDept = targetSchedule?.department?.toLowerCase() ?? null;
+
+                const sorted = [...people].sort((a, b) => {
+                  const aInDept = scheduleDept && a.department?.toLowerCase() === scheduleDept ? 0 : 1;
+                  const bInDept = scheduleDept && b.department?.toLowerCase() === scheduleDept ? 0 : 1;
+                  if (aInDept !== bInDept) return aInDept - bInDept;
+                  return a.fullName.localeCompare(b.fullName);
+                });
+
+                return sorted.map((person) => (
+                  <label key={person.id} className="autogen-crew-row">
+                    <input
+                      type="checkbox"
+                      checked={autoGenCrewSelection.has(person.id)}
+                      onChange={() => toggleCrewMember(person.id)}
+                    />
+                    <span className="autogen-crew-name">{person.fullName}</span>
+                    <span className="autogen-crew-dept">{person.department ?? "--"}</span>
+                    {person.countryCode ? (
+                      <span className="autogen-crew-flag">{countryFlagFromCode(person.countryCode)}</span>
+                    ) : null}
+                  </label>
+                ));
+              })()}
+            </div>
+          </article>
+        ) : null}
 
         {autoGenPreview !== null && autoGenScheduleId ? (
           <article className="settings-card" aria-label="Auto-generate preview">
@@ -916,7 +1239,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                 <table className="data-table" aria-label="Auto-generated assignments">
                   <thead>
                     <tr>
-                      <th>Employee</th>
+                      <th>Crew member</th>
                       <th>Date</th>
                       <th>Slot</th>
                       <th>Start</th>
@@ -1101,9 +1424,48 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
                       </td>
                       <td className="table-row-action-cell">
                         <div className="timeatt-row-actions">
-                          <Link href="/scheduling?tab=swaps" className="table-row-action">
-                            View swaps
-                          </Link>
+                          {shift.status === "scheduled" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() =>
+                                  startEditingShift({
+                                    id: shift.id,
+                                    scheduleId: shift.scheduleId,
+                                    templateId: shift.templateId,
+                                    employeeId: shift.employeeId,
+                                    shiftDate: shift.shiftDate,
+                                    startTime: shift.startTime,
+                                    endTime: shift.endTime,
+                                    breakMinutes: shift.breakMinutes,
+                                    notes: shift.notes
+                                  })
+                                }
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                style={{ color: "var(--color-danger)" }}
+                                onClick={() => setCancelConfirmShiftId(shift.id)}
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : shift.status === "swap_requested" ? (
+                            <button
+                              type="button"
+                              className="table-row-action"
+                              style={{ color: "var(--color-danger)" }}
+                              onClick={() => setCancelConfirmShiftId(shift.id)}
+                            >
+                              Cancel
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-muted)" }}>--</span>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1114,6 +1476,51 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
           )}
         </article>
       </section>
+
+      <ConfirmDialog
+        isOpen={publishConfirmScheduleId !== null}
+        title="Publish schedule?"
+        description="This will notify all assigned crew members. Draft shifts become final."
+        confirmLabel="Publish"
+        tone="default"
+        isConfirming={isPublishingScheduleId !== null}
+        onConfirm={() => {
+          if (publishConfirmScheduleId) {
+            void handlePublishSchedule(publishConfirmScheduleId);
+          }
+        }}
+        onCancel={() => setPublishConfirmScheduleId(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteConfirmScheduleId !== null}
+        title="Delete draft schedule?"
+        description="All shifts in this schedule will also be deleted. This cannot be undone."
+        confirmLabel="Delete"
+        tone="danger"
+        isConfirming={isDeletingSchedule}
+        onConfirm={() => {
+          if (deleteConfirmScheduleId) {
+            void handleDeleteSchedule(deleteConfirmScheduleId);
+          }
+        }}
+        onCancel={() => setDeleteConfirmScheduleId(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={cancelConfirmShiftId !== null}
+        title="Cancel shift?"
+        description="This will remove the crew member's assignment. The shift status will be set to cancelled."
+        confirmLabel="Cancel shift"
+        tone="danger"
+        isConfirming={isCancellingShift}
+        onConfirm={() => {
+          if (cancelConfirmShiftId) {
+            void handleCancelShift(cancelConfirmShiftId);
+          }
+        }}
+        onCancel={() => setCancelConfirmShiftId(null)}
+      />
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite">

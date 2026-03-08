@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
+import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageHeader } from "../../../components/shared/page-header";
 import { ProgressRing } from "../../../components/shared/progress-ring";
 import { RatingCircles } from "../../../components/shared/rating-circles";
@@ -1136,7 +1137,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
         return;
       }
 
-      showToast("success", "Review shared with employee.");
+      showToast("success", "Review shared successfully.");
       refreshOverview();
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to share review.");
@@ -1189,6 +1190,11 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
             </Link>
           ) : null
         }
+      />
+
+      <FeatureBanner
+        moduleId="performance"
+        description="Performance is in limited pilot. Review cycles, ratings, and calibration are available for testing"
       />
 
       {overviewQuery.isLoading ? performanceSkeleton() : null}
@@ -1567,7 +1573,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                                         disabled={isSharingReview}
                                         onClick={() => { void shareReview(assignment.id); }}
                                       >
-                                        {isSharingReview ? "Sharing..." : "Share with employee"}
+                                        {isSharingReview ? "Sharing..." : "Share review"}
                                       </button>
                                     )
                                   ) : (
@@ -1778,7 +1784,6 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                           <th>Status</th>
                           <th>Sharing</th>
                           <th>Updated</th>
-                          <th className="table-action-column">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1805,17 +1810,6 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
                               </td>
                               <td title={formatDateTimeTooltip(assignment.updatedAt)}>
                                 {formatRelativeTime(assignment.updatedAt)}
-                              </td>
-                              <td className="table-row-action-cell">
-                                <button
-                                  type="button"
-                                  className="table-row-action"
-                                  onClick={() => {
-                                    showToast("info", `Cycle: ${assignment.cycleName}`);
-                                  }}
-                                >
-                                  View
-                                </button>
                               </td>
                             </tr>
                           );

@@ -44,7 +44,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
         />
         <EmptyState
           title="Scheduling is for Customer Success"
-          description="Scheduling is available for Customer Success team members. If you believe you should have access, contact your manager."
+          description="Scheduling is available for Customer Success crew. If you believe you should have access, contact your manager."
         />
       </>
     );

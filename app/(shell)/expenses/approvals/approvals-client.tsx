@@ -494,16 +494,6 @@ export function ExpenseApprovalsClient({
       return;
     }
 
-    const confirmed = window.confirm(
-      rejectMode === "manager"
-        ? `Reject ${rejectTarget.employeeName}'s expense?`
-        : `Finance reject ${rejectTarget.employeeName}'s expense?`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setIsRejecting(true);
     setIsMutatingId(rejectTarget.id);
 
@@ -781,6 +771,7 @@ export function ExpenseApprovalsClient({
                     <th>Employee</th>
                     <th>Category</th>
                     <th>Description</th>
+                    <th>Vendor</th>
                     <th>Amount</th>
                     <th>Country</th>
                     <th>
@@ -824,6 +815,23 @@ export function ExpenseApprovalsClient({
                       <td>{getExpenseCategoryLabel(expense.category)}</td>
                       <td>
                         <p className="expenses-description">{expense.description}</p>
+                      </td>
+                      <td>
+                        {expense.vendorName ? (
+                          <div className="documents-cell-copy">
+                            <p className="documents-cell-title">{expense.vendorName}</p>
+                            {expense.vendorBankAccountName ? (
+                              <p className="documents-cell-description">
+                                {expense.vendorBankAccountName}
+                                {expense.vendorBankAccountNumber
+                                  ? ` ••${expense.vendorBankAccountNumber.slice(-4)}`
+                                  : ""}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
                       </td>
                       <td>
                         <CurrencyDisplay amount={expense.amount} currency={expense.currency} />

@@ -141,7 +141,7 @@ async function detectShiftConflicts({
         endB: existingEnd
       })
     ) {
-      return "This employee already has an overlapping shift.";
+      return "This crew member already has an overlapping shift.";
     }
   }
 
@@ -161,7 +161,7 @@ async function detectShiftConflicts({
   }
 
   if ((leaveRows ?? []).length > 0) {
-    return "This employee has time off on the selected day.";
+    return "This crew member has time off on the selected day.";
   }
 
   return null;
@@ -494,7 +494,7 @@ export async function PUT(
         data: null,
         error: {
           code: "EMPLOYEE_NOT_FOUND",
-          message: "Employee for this shift was not found."
+          message: "Crew member for this shift was not found."
         },
         meta: buildMeta()
       });
@@ -505,7 +505,7 @@ export async function PUT(
         data: null,
         error: {
           code: "FORBIDDEN",
-          message: "Team lead can only assign employees from their own department."
+          message: "Team leads can only assign crew members from their own department."
         },
         meta: buildMeta()
       });

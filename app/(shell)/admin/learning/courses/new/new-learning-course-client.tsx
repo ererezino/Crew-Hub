@@ -199,7 +199,7 @@ export function NewLearningCourseClient() {
                 className="settings-textarea"
                 value={values.description}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, description: event.target.value }))}
-                placeholder="Required annual security refresher for all employees."
+                placeholder="Required annual security refresher for all team members."
               />
             </label>
             {errors.description ? <p className="form-field-error">{errors.description}</p> : null}

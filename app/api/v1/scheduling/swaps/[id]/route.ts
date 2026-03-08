@@ -319,7 +319,7 @@ export async function PUT(
       data: null,
       error: {
         code: "SHIFT_SWAP_TARGET_REQUIRED",
-        message: "A specific target employee is required for approval."
+        message: "A specific target crew member is required for approval."
       },
       meta: buildMeta()
     });
@@ -341,7 +341,7 @@ export async function PUT(
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only the target employee or a manager can reject this swap."
+        message: "Only the target crew member or a manager can reject this swap."
       },
       meta: buildMeta()
     });
@@ -352,7 +352,7 @@ export async function PUT(
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only the target employee or a manager can accept this swap."
+        message: "Only the target crew member or a manager can accept this swap."
       },
       meta: buildMeta()
     });
@@ -498,7 +498,7 @@ export async function PUT(
           data: null,
           error: {
             code: "SHIFT_SWAP_TARGET_CONFLICT",
-            message: "Target employee has an overlapping shift."
+            message: "Target crew member has an overlapping shift."
           },
           meta: buildMeta()
         });
@@ -525,7 +525,7 @@ export async function PUT(
         data: null,
         error: {
           code: "SHIFT_SWAP_SHIFT_UPDATE_FAILED",
-          message: "Unable to assign shift to target employee."
+          message: "Unable to assign shift to target crew member."
         },
         meta: buildMeta()
       });

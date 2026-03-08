@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
@@ -69,6 +70,7 @@ export function SchedulingSwapsClient({
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [isUpdatingSwapId, setIsUpdatingSwapId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ swapId: string; action: SwapAction } | null>(null);
 
   const sortedSwaps = useMemo(() => {
     const rows = swapsQuery.data?.swaps ?? [];
@@ -136,17 +138,6 @@ export function SchedulingSwapsClient({
   }
 
   async function handleSwapAction(swapId: string, action: SwapAction) {
-    if (action === "cancel" || action === "reject") {
-      const actionLabel = action === "cancel" ? "cancel" : "reject";
-      const confirmed = window.confirm(
-        `Are you sure you want to ${actionLabel} this swap request?`
-      );
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
     setIsUpdatingSwapId(swapId);
     setFeedbackMessage(null);
 
@@ -296,6 +287,7 @@ export function SchedulingSwapsClient({
                     <th>Shift</th>
                     <th>Requester</th>
                     <th>Target</th>
+                    <th>Reason</th>
                     <th>Status</th>
                     <th>Approved by</th>
                     <th className="table-action-column">Actions</th>
@@ -324,6 +316,13 @@ export function SchedulingSwapsClient({
                         </td>
                         <td>{swap.requesterName}</td>
                         <td>{swap.targetName ?? "Open to team"}</td>
+                        <td title={swap.reason ?? undefined}>
+                          {swap.reason
+                            ? (swap.reason.length > 40
+                                ? `${swap.reason.slice(0, 40)}...`
+                                : swap.reason)
+                            : "--"}
+                        </td>
                         <td>
                           <StatusBadge tone={toneForSwapStatus(swap.status)}>
                             {formatSwapStatus(swap.status)}
@@ -336,7 +335,7 @@ export function SchedulingSwapsClient({
                               <button
                                 type="button"
                                 className="table-row-action"
-                                onClick={() => handleSwapAction(swap.id, "cancel")}
+                                onClick={() => setConfirmAction({ swapId: swap.id, action: "cancel" })}
                                 disabled={isUpdatingSwapId === swap.id}
                               >
                                 Cancel
@@ -355,7 +354,7 @@ export function SchedulingSwapsClient({
                                 <button
                                   type="button"
                                   className="table-row-action"
-                                  onClick={() => handleSwapAction(swap.id, "reject")}
+                                  onClick={() => setConfirmAction({ swapId: swap.id, action: "reject" })}
                                   disabled={isUpdatingSwapId === swap.id}
                                 >
                                   Reject
@@ -376,7 +375,7 @@ export function SchedulingSwapsClient({
                               <button
                                 type="button"
                                 className="table-row-action"
-                                onClick={() => handleSwapAction(swap.id, "reject")}
+                                onClick={() => setConfirmAction({ swapId: swap.id, action: "reject" })}
                                 disabled={isUpdatingSwapId === swap.id}
                               >
                                 Reject
@@ -393,6 +392,30 @@ export function SchedulingSwapsClient({
           )}
         </section>
       ) : null}
+
+      <ConfirmDialog
+        isOpen={confirmAction !== null}
+        title={
+          confirmAction?.action === "cancel"
+            ? "Cancel swap request?"
+            : "Reject swap request?"
+        }
+        description={
+          confirmAction?.action === "cancel"
+            ? "The swap request will be cancelled and the shift will return to its original state."
+            : "The swap request will be rejected."
+        }
+        confirmLabel={confirmAction?.action === "cancel" ? "Cancel request" : "Reject"}
+        tone="danger"
+        isConfirming={isUpdatingSwapId !== null}
+        onConfirm={() => {
+          if (confirmAction) {
+            void handleSwapAction(confirmAction.swapId, confirmAction.action);
+            setConfirmAction(null);
+          }
+        }}
+        onCancel={() => setConfirmAction(null)}
+      />
     </>
   );
 }

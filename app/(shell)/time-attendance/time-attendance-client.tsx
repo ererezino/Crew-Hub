@@ -194,7 +194,6 @@ export function TimeAttendanceClient() {
                       <th>Break</th>
                       <th>Method</th>
                       <th>Status</th>
-                      <th className="table-action-column">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -225,13 +224,7 @@ export function TimeAttendanceClient() {
                             {entry.clockOut ? "Closed" : "Open"}
                           </StatusBadge>
                         </td>
-                        <td className="table-row-action-cell">
-                          <div className="timeatt-row-actions">
-                            <button type="button" className="table-row-action">
-                              View
-                            </button>
-                          </div>
-                        </td>
+                        {/* View detail deferred to future release */}
                       </tr>
                       );
                     })}

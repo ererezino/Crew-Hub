@@ -26,18 +26,18 @@ export function maskFromLast4(last4: string | null): string {
   return `****${last4}`;
 }
 
-export function maskWiseRecipientId(recipientId: string | null): string {
-  if (!recipientId) {
-    return "****";
+export function maskCrewTag(crewTag: string | null): string {
+  if (!crewTag) {
+    return "@****";
   }
 
-  const trimmed = recipientId.trim();
+  const trimmed = crewTag.trim().replace(/^@/, "");
 
-  if (trimmed.length <= 4) {
-    return "****";
+  if (trimmed.length <= 3) {
+    return `@${"*".repeat(trimmed.length || 4)}`;
   }
 
-  return `****${trimmed.slice(-4)}`;
+  return `@${trimmed.slice(0, 2)}${"*".repeat(trimmed.length - 2)}`;
 }
 
 export function methodLabel(method: PaymentMethod): string {
@@ -46,8 +46,8 @@ export function methodLabel(method: PaymentMethod): string {
       return "Bank transfer";
     case "mobile_money":
       return "Mobile money";
-    case "wise":
-      return "Wise";
+    case "crew_tag":
+      return "Crew Tag";
     default:
       return method;
   }

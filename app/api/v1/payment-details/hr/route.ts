@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
-import { maskFromLast4, maskWiseRecipientId, holdSecondsRemaining } from "../../../../../lib/payment-details";
+import { maskFromLast4, maskCrewTag, holdSecondsRemaining } from "../../../../../lib/payment-details";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
@@ -27,7 +27,7 @@ const paymentRowSchema = z.object({
   currency: z.string().length(3),
   bank_account_last4: z.string().nullable(),
   mobile_money_last4: z.string().nullable(),
-  wise_recipient_id: z.string().nullable(),
+  crew_tag: z.string().nullable(),
   is_verified: z.boolean(),
   change_effective_at: z.string()
 });
@@ -69,7 +69,7 @@ function maskedDestinationFromRow(row: z.infer<typeof paymentRowSchema>): {
   }
 
   return {
-    maskedDestination: maskWiseRecipientId(row.wise_recipient_id),
+    maskedDestination: maskCrewTag(row.crew_tag),
     last4: null
   };
 }
@@ -113,7 +113,7 @@ export async function GET() {
         supabase
           .from("employee_payment_details")
           .select(
-            "employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, wise_recipient_id, is_verified, change_effective_at"
+            "employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, crew_tag, is_verified, change_effective_at"
           )
           .eq("org_id", session.profile.org_id)
           .eq("is_primary", true)

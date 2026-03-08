@@ -1,6 +1,6 @@
 import type { ApiResponse } from "./auth";
 
-export const PAYMENT_METHODS = ["bank_transfer", "mobile_money", "wise"] as const;
+export const PAYMENT_METHODS = ["bank_transfer", "mobile_money", "crew_tag"] as const;
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
@@ -11,7 +11,7 @@ export type PaymentDetailMasked = {
   currency: string;
   maskedDestination: string;
   last4: string | null;
-  wiseRecipientIdMasked: string | null;
+  crewTagMasked: string | null;
   isPrimary: boolean;
   isVerified: boolean;
   changeEffectiveAt: string;
@@ -45,9 +45,9 @@ export type PaymentDetailsUpdatePayload =
       mobileMoneyNumber: string;
     }
   | {
-      paymentMethod: "wise";
+      paymentMethod: "crew_tag";
       currency: string;
-      wiseRecipientId: string;
+      crewTag: string;
     };
 
 export type MePaymentDetailsMutationData = {

@@ -3,7 +3,6 @@ import type { ApiResponse } from "./auth";
 export const SETTINGS_TABS = [
   "profile",
   "organization",
-  "time-policies",
   "notifications",
   "security",
   "audit"

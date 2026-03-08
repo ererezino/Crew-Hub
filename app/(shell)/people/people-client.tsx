@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { z } from "zod";
@@ -9,8 +10,10 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { usePeople } from "../../../hooks/use-people";
+import { usePresence, type PresenceState } from "../../../hooks/use-presence";
 import { countryFlagFromCode, countryNameFromCode, getCountryDefaults } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { DEPARTMENTS } from "../../../lib/departments";
 import { formatEmploymentType, formatProfileStatus } from "../../../lib/format-labels";
 import { USER_ROLES } from "../../../lib/navigation";
 import type { AppRole } from "../../../types/auth";
@@ -20,6 +23,8 @@ import {
   PROFILE_STATUSES,
   type EmploymentType,
   type PeopleCreateResponse,
+  type PeopleUpdateResponse,
+  type PersonRecord,
   type ProfileStatus
 } from "../../../types/people";
 import { humanizeError } from "@/lib/errors";
@@ -62,6 +67,21 @@ type CreatePersonFormErrors = Partial<Record<keyof CreatePersonFormValues, strin
   form?: string;
 };
 
+type EditPersonFormValues = {
+  roles: AppRole[];
+  department: string;
+  managerId: string;
+  title: string;
+};
+
+type EditPersonFormErrors = {
+  roles?: string;
+  department?: string;
+  managerId?: string;
+  title?: string;
+  form?: string;
+};
+
 const createPersonSchema = z.object({
   email: z.string().trim().email("Email must be valid."),
   fullName: z.string().trim().min(1, "Name is required.").max(200, "Name is too long."),
@@ -97,6 +117,29 @@ const roleLabels: Record<AppRole, string> = {
   FINANCE_ADMIN: "Finance Admin",
   SUPER_ADMIN: "Super Admin"
 };
+
+/** Priority order for roles — higher index = higher priority. */
+const ROLE_PRIORITY: AppRole[] = [
+  "EMPLOYEE",
+  "TEAM_LEAD",
+  "MANAGER",
+  "HR_ADMIN",
+  "FINANCE_ADMIN",
+  "SUPER_ADMIN"
+];
+
+function getPrimaryRole(roles: AppRole[]): AppRole {
+  let best: AppRole = "EMPLOYEE";
+  let bestIndex = -1;
+  for (const role of roles) {
+    const idx = ROLE_PRIORITY.indexOf(role);
+    if (idx > bestIndex) {
+      bestIndex = idx;
+      best = role;
+    }
+  }
+  return best;
+}
 
 const initialCreatePersonFormValues: CreatePersonFormValues = {
   email: "",
@@ -349,6 +392,30 @@ function mapCSVRowToEmployee(row: Record<string, string>) {
   };
 }
 
+const PRESENCE_LABELS: Record<PresenceState, string> = {
+  online: "Online",
+  away: "Away",
+  offline: "Offline"
+};
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+  return (parts[0]?.[0] ?? "?").toUpperCase();
+}
+
+function PresenceDot({ state }: { state: PresenceState }) {
+  return (
+    <span
+      className={`presence-dot presence-dot-${state}`}
+      title={PRESENCE_LABELS[state]}
+      aria-label={PRESENCE_LABELS[state]}
+    />
+  );
+}
+
 function PeopleTableSkeleton() {
   return (
     <div className="table-skeleton" aria-hidden="true">
@@ -370,6 +437,8 @@ export function PeopleClient({
     scope: initialScope
   });
 
+  const { presenceMap } = usePresence(isAdmin === true);
+
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -378,6 +447,24 @@ export function PeopleClient({
   );
   const [createErrors, setCreateErrors] = useState<CreatePersonFormErrors>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Edit person state
+  const [editPerson, setEditPerson] = useState<PersonRecord | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editValues, setEditValues] = useState<EditPersonFormValues>({
+    roles: ["EMPLOYEE"],
+    department: "",
+    managerId: "",
+    title: ""
+  });
+  const [editErrors, setEditErrors] = useState<EditPersonFormErrors>({});
+  const [isEditSaving, setIsEditSaving] = useState(false);
+
+  // Invite state
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [confirmInvitePerson, setConfirmInvitePerson] = useState<PersonRecord | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteLinkPerson, setInviteLinkPerson] = useState<string>("");
 
   // Bulk upload state
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -530,18 +617,134 @@ export function PeopleClient({
       const failed = payload.data.failed ?? 0;
 
       if (created > 0) {
-        addToast("success", `${created} employee${created === 1 ? "" : "s"} imported successfully.`);
+        addToast("success", `${created} ${created === 1 ? "person" : "people"} imported successfully.`);
         refresh();
       }
 
       if (failed > 0) {
-        addToast("error", `${failed} employee${failed === 1 ? "" : "s"} failed to import.`);
+        addToast("error", `${failed} ${failed === 1 ? "person" : "people"} failed to import.`);
       }
     } catch (error) {
       setBulkError(error instanceof Error ? error.message : "Bulk import failed.");
       setBulkStep("preview");
     }
   }, [bulkRows, refresh]);
+
+  /* ── Edit person handlers ── */
+
+  const openEditPanel = useCallback((person: PersonRecord) => {
+    setEditPerson(person);
+    setEditValues({
+      roles: person.roles.length > 0 ? [...person.roles] : ["EMPLOYEE"],
+      department: person.department ?? "",
+      managerId: person.managerId ?? "",
+      title: person.title ?? ""
+    });
+    setEditErrors({});
+    setIsEditOpen(true);
+  }, []);
+
+  const closeEditPanel = useCallback(() => {
+    if (isEditSaving) return;
+    setIsEditOpen(false);
+    setEditPerson(null);
+    setEditErrors({});
+  }, [isEditSaving]);
+
+  const handleEditRoleToggle = useCallback((role: AppRole) => {
+    setEditValues((prev) => {
+      const has = prev.roles.includes(role);
+      const next = has
+        ? prev.roles.filter((r) => r !== role)
+        : [...prev.roles, role];
+      return { ...prev, roles: next.length > 0 ? next : ["EMPLOYEE"] };
+    });
+  }, []);
+
+  const handleEditSave = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editPerson) return;
+
+    const errors: EditPersonFormErrors = {};
+    if (editValues.roles.length === 0) errors.roles = "Select at least one role.";
+    if (Object.values(errors).some(Boolean)) {
+      setEditErrors(errors);
+      return;
+    }
+
+    setIsEditSaving(true);
+    setEditErrors({});
+
+    try {
+      const response = await fetch(`/api/v1/people/${editPerson.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roles: editValues.roles,
+          department: editValues.department.trim() || null,
+          managerId: editValues.managerId.trim() || null,
+          title: editValues.title.trim() || null
+        })
+      });
+
+      const payload = (await response.json()) as PeopleUpdateResponse;
+
+      if (!response.ok || !payload.data?.person) {
+        setEditErrors({ form: humanizeError(payload.error?.message ?? "Unable to save changes.") });
+        return;
+      }
+
+      const updated = payload.data.person;
+
+      setPeople((current) =>
+        current.map((p) => (p.id === updated.id ? updated : p))
+      );
+
+      closeEditPanel();
+      addToast("success", `${updated.fullName} updated.`);
+    } catch (error) {
+      setEditErrors({ form: error instanceof Error ? error.message : "Unable to save changes." });
+    } finally {
+      setIsEditSaving(false);
+    }
+  }, [editPerson, editValues, closeEditPanel, setPeople]);
+
+  /* ── Invite handlers ── */
+
+  const handleSendInvite = useCallback(async (person: PersonRecord) => {
+    setInvitingId(person.id);
+    setInviteLink(null);
+
+    try {
+      const response = await fetch(`/api/v1/people/${person.id}/invite`, {
+        method: "POST"
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok || !payload.data?.inviteSent) {
+        setConfirmInvitePerson(null);
+        addToast("error", humanizeError(payload.error?.message ?? "Unable to send invite."));
+        return;
+      }
+
+      /* Show invite link inside the dialog so admin can copy it */
+      if (payload.data.inviteLink) {
+        setInviteLink(payload.data.inviteLink);
+        setInviteLinkPerson(person.fullName);
+        setConfirmInvitePerson(null);
+        addToast("success", `Invite link generated for ${person.fullName}.`);
+      } else {
+        setConfirmInvitePerson(null);
+        addToast("success", `Invite sent to ${person.fullName}.`);
+      }
+    } catch (error) {
+      setConfirmInvitePerson(null);
+      addToast("error", error instanceof Error ? error.message : "Unable to send invite.");
+    } finally {
+      setInvitingId(null);
+    }
+  }, []);
 
   const closeCreatePanel = () => {
     if (isCreating) {
@@ -652,8 +855,8 @@ export function PeopleClient({
   return (
     <>
       <PageHeader
-        title="People"
-        description="Find people, review roles, and open full profiles."
+        title="Crew Members"
+        description="Find teammates, review roles, and open full profiles."
         actions={
           canManagePeople ? (
             <>
@@ -727,12 +930,12 @@ export function PeopleClient({
                     Name {sortDirection === "asc" ? "↑" : "↓"}
                   </button>
                 </th>
-                {isAdmin ? <th>Roles</th> : null}
+                {isAdmin ? <th>Role</th> : null}
                 <th>Department</th>
                 <th>Country</th>
                 {isAdmin ? <th>Status</th> : null}
-                {isAdmin ? <th>Employment</th> : null}
-                <th>Date Joined</th>
+                {canManagePeople ? <th>Access</th> : null}
+                <th>Joined</th>
                 <th className="table-action-column">Actions</th>
               </tr>
             </thead>
@@ -740,22 +943,55 @@ export function PeopleClient({
               {sortedPeople.map((person) => (
                 <tr key={person.id} className="data-table-row">
                   <td>
-                    <div className="people-cell-copy">
-                      <p className="people-cell-title">{person.fullName}</p>
-                      <p className="people-cell-description">{person.email}</p>
-                    </div>
+                    <Link href={`/people/${person.id}`} className="people-name-cell people-name-link">
+                      <div className="people-avatar-wrap">
+                        {person.avatarUrl ? (
+                          <Image
+                            src={person.avatarUrl}
+                            alt=""
+                            width={36}
+                            height={36}
+                            className="people-avatar-image"
+                          />
+                        ) : (
+                          <div className="people-avatar-fallback" aria-hidden="true">
+                            {getInitials(person.fullName)}
+                          </div>
+                        )}
+                        {isAdmin && presenceMap.has(person.id) ? (
+                          <div className="people-avatar-presence">
+                            <PresenceDot state={presenceMap.get(person.id)!} />
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="people-cell-copy">
+                        <p className="people-cell-title">{person.fullName}</p>
+                        <p className="people-cell-description">{person.email}</p>
+                      </div>
+                    </Link>
                   </td>
                   {isAdmin ? (
                     <td>
-                      <div className="people-role-badges">
+                      <div className="people-role-tags">
                         {person.roles.length > 0 ? (
-                          person.roles.map((role) => (
-                            <StatusBadge key={`${person.id}-${role}`} tone="info">
-                              {roleLabels[role]}
-                            </StatusBadge>
-                          ))
+                          <>
+                            <span
+                              className="role-tag"
+                              title={person.roles.map((r) => roleLabels[r]).join(", ")}
+                            >
+                              {roleLabels[getPrimaryRole(person.roles)]}
+                            </span>
+                            {person.roles.length > 1 ? (
+                              <span
+                                className="role-tag role-tag-count"
+                                title={person.roles.map((r) => roleLabels[r]).join(", ")}
+                              >
+                                +{person.roles.length - 1}
+                              </span>
+                            ) : null}
+                          </>
                         ) : (
-                          <StatusBadge tone="draft">No role</StatusBadge>
+                          <span className="role-tag role-tag-muted">No role</span>
                         )}
                       </div>
                     </td>
@@ -778,9 +1014,17 @@ export function PeopleClient({
                       </StatusBadge>
                     </td>
                   ) : null}
-                  {isAdmin ? (
+                  {canManagePeople ? (
                     <td>
-                      <StatusBadge tone="processing">{formatEmploymentType(person.employmentType)}</StatusBadge>
+                      {person.inviteStatus === "active" ? (
+                        <span className="role-tag role-tag-active" title="Account confirmed and set up">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="role-tag role-tag-muted" title="Has not set up their account yet">
+                          Not set up
+                        </span>
+                      )}
                     </td>
                   ) : null}
                   <td>
@@ -791,13 +1035,35 @@ export function PeopleClient({
                       {formatRelativeTime(toDateTimeValue(person.startDate || person.createdAt))}
                     </time>
                   </td>
-                  <td className="table-row-action-cell">
-                    <div className="people-row-actions">
-                      <Link className="table-row-action" href={`/people/${person.id}`}>
-                        View
-                      </Link>
-                    </div>
-                  </td>
+                  {canManagePeople ? (
+                    <td className="table-row-action-cell">
+                      <div className="people-row-actions">
+                        <button
+                          type="button"
+                          className="table-row-action"
+                          onClick={() => openEditPanel(person)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="table-row-action"
+                          disabled={invitingId === person.id}
+                          onClick={() => setConfirmInvitePerson(person)}
+                        >
+                          {invitingId === person.id ? "Sending..." : "Invite"}
+                        </button>
+                      </div>
+                    </td>
+                  ) : (
+                    <td className="table-row-action-cell">
+                      <div className="people-row-actions">
+                        <Link className="table-row-action" href={`/people/${person.id}`}>
+                          View
+                        </Link>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -835,7 +1101,7 @@ export function PeopleClient({
             <p className="form-field-hint">
               {createValues.isNewHire
                 ? "New hires get an onboarding checklist and welcome email."
-                : "Existing employees get a profile only."}
+                : "Existing team members get a profile only."}
             </p>
           </div>
 
@@ -1297,6 +1563,219 @@ export function PeopleClient({
           ) : null}
         </div>
       </SlidePanel>
+
+      {/* ── Edit Person SlidePanel ── */}
+      <SlidePanel
+        isOpen={isEditOpen}
+        title={editPerson ? `Edit ${editPerson.fullName}` : "Edit Person"}
+        description="Update role, department, and manager for this crew member."
+        onClose={closeEditPanel}
+      >
+        {editPerson ? (
+          <form className="slide-panel-form-wrapper" onSubmit={handleEditSave} noValidate>
+            {editErrors.form ? <p className="form-submit-error">{editErrors.form}</p> : null}
+
+            <div className="edit-person-identity">
+              {editPerson.avatarUrl ? (
+                <Image
+                  src={editPerson.avatarUrl}
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="people-avatar-image"
+                />
+              ) : (
+                <div className="people-avatar-fallback" aria-hidden="true">
+                  {getInitials(editPerson.fullName)}
+                </div>
+              )}
+              <div className="edit-person-copy">
+                <p className="edit-person-name">{editPerson.fullName}</p>
+                <p className="edit-person-email">{editPerson.email}</p>
+              </div>
+            </div>
+
+            <label className="form-field" htmlFor="edit-person-title">
+              <span className="form-label">Job title</span>
+              <input
+                id="edit-person-title"
+                className="form-input"
+                maxLength={200}
+                placeholder="e.g. Software Engineer"
+                value={editValues.title}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setEditValues((prev) => ({ ...prev, title: val }));
+                }}
+              />
+            </label>
+
+            <fieldset className="form-field people-role-fieldset">
+              <legend className="form-label">Roles</legend>
+              <div className="people-role-selection">
+                {USER_ROLES.map((role) => (
+                  <label key={`edit-role-${role}`} className="settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={editValues.roles.includes(role)}
+                      onChange={() => handleEditRoleToggle(role)}
+                    />
+                    <span>{roleLabels[role]}</span>
+                  </label>
+                ))}
+              </div>
+              {editErrors.roles ? <p className="form-field-error">{editErrors.roles}</p> : null}
+            </fieldset>
+
+            <label className="form-field" htmlFor="edit-person-department">
+              <span className="form-label">Department</span>
+              <select
+                id="edit-person-department"
+                className={editErrors.department ? "form-input form-input-error" : "form-input"}
+                value={editValues.department}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setEditValues((prev) => ({ ...prev, department: val }));
+                }}
+              >
+                <option value="">No department</option>
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+              {editErrors.department ? (
+                <p className="form-field-error">{editErrors.department}</p>
+              ) : null}
+            </label>
+
+            <label className="form-field" htmlFor="edit-person-manager">
+              <span className="form-label">Manager</span>
+              <select
+                id="edit-person-manager"
+                className={editErrors.managerId ? "form-input form-input-error" : "form-input"}
+                value={editValues.managerId}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setEditValues((prev) => ({ ...prev, managerId: val }));
+                }}
+              >
+                <option value="">No manager</option>
+                {people
+                  .filter((p) => p.id !== editPerson.id && p.status === "active")
+                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                  .map((p) => (
+                    <option key={`edit-mgr-${p.id}`} value={p.id}>
+                      {p.fullName}
+                    </option>
+                  ))}
+              </select>
+              {editErrors.managerId ? (
+                <p className="form-field-error">{editErrors.managerId}</p>
+              ) : null}
+            </label>
+
+            <div className="slide-panel-actions">
+              <button type="button" className="button" onClick={closeEditPanel} disabled={isEditSaving}>
+                Cancel
+              </button>
+              <button type="submit" className="button button-accent" disabled={isEditSaving}>
+                {isEditSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </SlidePanel>
+
+      {/* ── Send Invite Dialog ── */}
+      {confirmInvitePerson !== null || inviteLink ? (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            if (!invitingId) {
+              setConfirmInvitePerson(null);
+              setInviteLink(null);
+            }
+          }}
+        >
+          <section
+            className="confirm-dialog modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Send Crew Hub invite"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {inviteLink ? (
+              <>
+                <h2 className="modal-title">Invite link ready</h2>
+                <p className="settings-card-description">
+                  Share this link with {inviteLinkPerson} so they can set up their account:
+                </p>
+                <div className="invite-link-input-row" style={{ marginTop: "var(--space-3)" }}>
+                  <input
+                    className="form-input"
+                    value={inviteLink}
+                    readOnly
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                  />
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(inviteLink);
+                      addToast("success", "Invite link copied to clipboard.");
+                    }}
+                  >
+                    Copy Link
+                  </button>
+                </div>
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="button button-subtle"
+                    onClick={() => {
+                      setConfirmInvitePerson(null);
+                      setInviteLink(null);
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="modal-title">Send Crew Hub invite</h2>
+                <p className="settings-card-description">
+                  {confirmInvitePerson
+                    ? `Send an invite email to ${confirmInvitePerson.fullName} (${confirmInvitePerson.email})? They will receive a link to set up their Crew Hub account.`
+                    : ""}
+                </p>
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="button button-subtle"
+                    onClick={() => setConfirmInvitePerson(null)}
+                    disabled={invitingId !== null}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    onClick={() => {
+                      if (confirmInvitePerson) void handleSendInvite(confirmInvitePerson);
+                    }}
+                    disabled={invitingId !== null}
+                  >
+                    {invitingId ? "Sending..." : "Send Invite"}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite">

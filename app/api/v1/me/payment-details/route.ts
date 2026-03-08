@@ -7,7 +7,7 @@ import { encryptSensitiveValue } from "../../../../../lib/crypto";
 import {
   holdSecondsRemaining,
   maskFromLast4,
-  maskWiseRecipientId,
+  maskCrewTag,
   normalizeCurrencyCode,
   extractLast4Digits
 } from "../../../../../lib/payment-details";
@@ -33,7 +33,7 @@ const paymentDetailRowSchema = z.object({
   currency: z.string().length(3),
   bank_account_last4: z.string().nullable(),
   mobile_money_last4: z.string().nullable(),
-  wise_recipient_id: z.string().nullable(),
+  crew_tag: z.string().nullable(),
   is_primary: z.boolean(),
   is_verified: z.boolean(),
   change_effective_at: z.string(),
@@ -57,9 +57,9 @@ const paymentDetailsUpdateSchema = z.discriminatedUnion("paymentMethod", [
     mobileMoneyNumber: z.string().trim().regex(/^\+?[0-9]{6,20}$/)
   }),
   z.object({
-    paymentMethod: z.literal("wise"),
+    paymentMethod: z.literal("crew_tag"),
     currency: z.string().trim().regex(/^[A-Za-z]{3}$/),
-    wiseRecipientId: z.string().trim().min(4).max(200)
+    crewTag: z.string().trim().min(2).max(50).regex(/^[a-zA-Z0-9._-]+$/)
   })
 ]);
 
@@ -83,14 +83,14 @@ function toMaskedPaymentDetail(
         ? row.mobile_money_last4
         : null;
 
-  const wiseRecipientIdMasked =
-    row.payment_method === "wise"
-      ? maskWiseRecipientId(row.wise_recipient_id)
+  const crewTagMasked =
+    row.payment_method === "crew_tag"
+      ? maskCrewTag(row.crew_tag)
       : null;
 
   const maskedDestination =
-    row.payment_method === "wise"
-      ? wiseRecipientIdMasked ?? "****"
+    row.payment_method === "crew_tag"
+      ? crewTagMasked ?? "****"
       : maskFromLast4(last4);
 
   return {
@@ -100,7 +100,7 @@ function toMaskedPaymentDetail(
     currency: row.currency,
     maskedDestination,
     last4,
-    wiseRecipientIdMasked,
+    crewTagMasked,
     isPrimary: row.is_primary,
     isVerified: row.is_verified,
     changeEffectiveAt: row.change_effective_at,
@@ -116,7 +116,7 @@ function auditPayloadFromMasked(detail: PaymentDetailMasked) {
     currency: detail.currency,
     maskedDestination: detail.maskedDestination,
     last4: detail.last4,
-    wiseRecipientIdMasked: detail.wiseRecipientIdMasked,
+    crewTagMasked: detail.crewTagMasked,
     isPrimary: detail.isPrimary,
     isVerified: detail.isVerified,
     changeEffectiveAt: detail.changeEffectiveAt
@@ -145,7 +145,7 @@ async function fetchPrimaryPaymentDetail({
   const { data: row, error } = await supabase
     .from("employee_payment_details")
     .select(
-      "id, employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, wise_recipient_id, is_primary, is_verified, change_effective_at, created_at, updated_at"
+      "id, employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, crew_tag, is_primary, is_verified, change_effective_at, created_at, updated_at"
     )
     .eq("org_id", orgId)
     .eq("employee_id", employeeId)
@@ -278,7 +278,7 @@ export async function PUT(request: Request) {
       bank_routing_number_encrypted: null,
       mobile_money_provider_encrypted: null,
       mobile_money_number_encrypted: null,
-      wise_recipient_id: null,
+      crew_tag: null,
       bank_account_last4: null,
       mobile_money_last4: null,
       is_primary: true,
@@ -311,8 +311,8 @@ export async function PUT(request: Request) {
       writePayload.mobile_money_last4 = extractLast4Digits(payload.mobileMoneyNumber.trim());
     }
 
-    if (payload.paymentMethod === "wise") {
-      writePayload.wise_recipient_id = payload.wiseRecipientId.trim();
+    if (payload.paymentMethod === "crew_tag") {
+      writePayload.crew_tag = payload.crewTag.trim();
     }
 
     const query = existingRow
@@ -330,7 +330,7 @@ export async function PUT(request: Request) {
 
     const { data: mutatedRow, error: mutationError } = await query
       .select(
-        "id, employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, wise_recipient_id, is_primary, is_verified, change_effective_at, created_at, updated_at"
+        "id, employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, crew_tag, is_primary, is_verified, change_effective_at, created_at, updated_at"
       )
       .single();
 

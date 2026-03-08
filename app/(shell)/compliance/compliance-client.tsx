@@ -828,9 +828,11 @@ export function ComplianceClient() {
             ) : null}
 
             {!ackLoading && !ackError && ackStatuses.length === 0 ? (
-              <p className="settings-card-description">
-                No published policies require acknowledgment yet.
-              </p>
+              <EmptyState
+                title="No policies to acknowledge"
+                description="No published policies require acknowledgment yet."
+                showIcon={false}
+              />
             ) : null}
 
             {!ackLoading && !ackError && ackStatuses.length > 0 ? (

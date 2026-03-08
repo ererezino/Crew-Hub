@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { PageHeader } from "../../../components/shared/page-header";
 import type { UserRole } from "../../../lib/navigation";
@@ -83,6 +84,11 @@ export function LearningTabsClient({
       <PageHeader
         title="Learning"
         description="Courses, certificates, and surveys assigned to you."
+      />
+
+      <FeatureBanner
+        moduleId="learning"
+        description="Learning is built but not yet included in the active release. Courses and certificates here are preview-only."
       />
 
       <PageTabs

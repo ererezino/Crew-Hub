@@ -49,75 +49,82 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Home",
         href: "/dashboard",
         icon: "LayoutDashboard",
-        description: "Your personal home in Crew Hub. See what needs attention and jump to your most-used actions.",
+        description: "Your personal home in Crew Hub — see what needs attention and jump to your most-used actions",
         shortcut: "G H"
       },
       {
-        label: "Announcements",
+        label: "Notifications",
         href: "/announcements",
-        icon: "Megaphone",
-        description: "Company updates and news since your last visit.",
+        icon: "Bell",
+        description: "Company updates, alerts, and messages since your last visit",
         shortcut: "G A"
       }
     ]
   },
   {
-    label: "MY WORK",
+    label: "My work",
     items: [
       {
-        label: "Time Off",
+        label: "Time off",
         href: "/time-off",
         icon: "CalendarOff",
-        description: "Request time off, check balances, and track approval status.",
+        description: "Request time off, check balances, and track approval status",
         shortcut: "G T"
       },
       {
-        label: "My Pay",
+        label: "My pay",
         href: "/me/pay",
         icon: "Wallet",
-        description: "Pay statements, payout setup, and compensation in one view.",
+        description: "Pay statements, payout setup, and compensation in one view",
         shortcut: "G Y"
       },
       {
         label: "Documents",
         href: "/documents",
         icon: "FileText",
-        description: "Your documents, required records, and expiry reminders.",
+        description: "Your documents, required records, and expiry reminders",
         shortcut: "G D"
+      },
+      {
+        label: "Expenses",
+        href: "/expenses",
+        icon: "Receipt",
+        description: "Submit expenses, upload receipts, and track reimbursement",
+        shortcut: "G E"
       },
       {
         label: "Learning",
         href: "/learning",
         icon: "GraduationCap",
-        description: "Courses, certificates, and surveys assigned to you.",
+        description: "Courses, certificates, and surveys assigned to you",
         shortcut: "G L",
         moduleId: "learning"
       }
     ]
   },
   {
-    label: "TEAM",
+    label: "Team",
     requiredRoles: ["MANAGER", "TEAM_LEAD", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
     items: [
       {
         label: "Approvals",
         href: "/approvals",
         icon: "CheckCircle",
-        description: "Review and act on pending team requests.",
+        description: "Review and act on pending team requests",
         shortcut: "G V"
       },
       {
-        label: "People",
+        label: "Crew Members",
         href: "/people",
         icon: "Users",
-        description: "Find people, review roles, and open full profiles.",
+        description: "Find teammates, review roles, and open full profiles",
         shortcut: "G P"
       },
       {
         label: "Scheduling",
         href: "/scheduling",
         icon: "Calendar",
-        description: "Build, publish, and manage team shift schedules.",
+        description: "Build, publish, and manage team shift schedules",
         shortcut: "G S",
         moduleId: "scheduling"
       },
@@ -125,56 +132,49 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Onboarding",
         href: "/onboarding",
         icon: "Rocket",
-        description: "Launch onboarding plans, track progress, and resolve blockers.",
+        description: "Launch onboarding plans, track progress, and resolve blockers",
         shortcut: "G O"
       },
       {
-        label: "Team Hub",
+        label: "Team hub",
         href: "/team-hub",
         icon: "BookOpen",
-        description: "Your department's knowledge base: guides, contacts, and resources.",
+        description: "Your department's knowledge base: guides, contacts, and resources",
         shortcut: "G B",
         moduleId: "team_hub"
       }
     ]
   },
   {
-    label: "FINANCE",
+    label: "Finance",
     requiredRoles: ["FINANCE_ADMIN", "HR_ADMIN", "SUPER_ADMIN"],
     items: [
       {
         label: "Payroll",
         href: "/payroll",
         icon: "Calculator",
-        description: "Run payroll with staged approvals and clear payout status.",
+        description: "Run payroll with staged approvals and clear payout status",
         shortcut: "F P",
         moduleId: "payroll"
-      },
-      {
-        label: "Expenses",
-        href: "/expenses",
-        icon: "Receipt",
-        description: "Submit expenses, upload receipts, and track reimbursement.",
-        shortcut: "F E"
       },
       {
         label: "Compensation",
         href: "/admin/compensation",
         icon: "Coins",
-        description: "Manage salary, allowances, and equity for team members.",
+        description: "Manage salary, allowances, and equity for team members",
         shortcut: "F C"
       }
     ]
   },
   {
-    label: "OPERATIONS",
+    label: "Operations",
     requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"],
     items: [
       {
         label: "Performance",
         href: "/performance",
         icon: "Star",
-        description: "Run review cycles, track completion, and calibrate fairly.",
+        description: "Run review cycles, track completion, and calibrate fairly",
         shortcut: "G R",
         moduleId: "performance"
       },
@@ -182,14 +182,14 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Compliance",
         href: "/compliance",
         icon: "ShieldCheck",
-        description: "Statutory filings with due dates, proof, and country tracking.",
+        description: "Statutory filings with due dates, proof, and country tracking",
         shortcut: "G M"
       },
       {
         label: "Analytics",
         href: "/analytics",
         icon: "BarChart3",
-        description: "Workforce and operations trends with filters and exports.",
+        description: "Workforce and operations trends with filters and exports",
         shortcut: "G N",
         moduleId: "analytics"
       },
@@ -197,36 +197,29 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Signatures",
         href: "/signatures",
         icon: "PenTool",
-        description: "Request, sign, and track documents with signer timelines.",
+        description: "Request, sign, and track documents with signer timelines",
         shortcut: "G I",
         moduleId: "signatures"
       }
     ]
   },
   {
-    label: "ADMIN",
+    label: "Admin",
     adminOnly: true,
     requiredRoles: ["SUPER_ADMIN"],
     items: [
       {
-        label: "Organization",
-        href: "/settings?tab=organization",
-        icon: "Building",
-        description: "Company name, logo, countries, and currencies.",
-        shortcut: "A O"
-      },
-      {
-        label: "Roles & Access",
+        label: "Roles & access",
         href: "/admin/access-control",
         icon: "Lock",
-        description: "Default role permissions and per-person overrides.",
+        description: "Default role permissions and per-person overrides",
         shortcut: "A A"
       },
       {
-        label: "Audit Log",
+        label: "Audit log",
         href: "/settings?tab=audit",
         icon: "ScrollText",
-        description: "Who did what, when, and to which record.",
+        description: "Who did what, when, and to which record",
         shortcut: "A L"
       }
     ]

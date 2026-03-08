@@ -452,7 +452,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
                   </p>
                 )}
                 {data.people.metrics.newHiresThisMonth === 0 && (
-                  <p className="metric-hint">Current active employees</p>
+                  <p className="metric-hint">Current active people</p>
                 )}
               </article>
               <article className="metric-card">
@@ -468,7 +468,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               <article className="metric-card">
                 <p className="metric-label">Average tenure</p>
                 <p className="metric-value numeric">{data.people.metrics.avgTenureMonths} mo</p>
-                <p className="metric-hint">Active employees</p>
+                <p className="metric-hint">Active people</p>
               </article>
             </section>
 
@@ -674,9 +674,9 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
 
               <StatRow
                 items={[
-                  { label: "Below midpoint", value: `${data.payroll.compensationBands.belowMidpoint} employees` },
-                  { label: "At midpoint", value: `${data.payroll.compensationBands.atMidpoint} employees` },
-                  { label: "Above midpoint", value: `${data.payroll.compensationBands.aboveMidpoint} employees` }
+                  { label: "Below midpoint", value: `${data.payroll.compensationBands.belowMidpoint} people` },
+                  { label: "At midpoint", value: `${data.payroll.compensationBands.atMidpoint} people` },
+                  { label: "Above midpoint", value: `${data.payroll.compensationBands.aboveMidpoint} people` }
                 ]}
               />
             </article>
@@ -710,7 +710,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
                 <p className="metric-value">
                   <CurrencyDisplay amount={data.expenses.metrics.pendingAmount} currency="NGN" />
                 </p>
-                <p className="metric-hint">Owed to employees</p>
+                <p className="metric-hint">Owed to crew members</p>
               </article>
               <article className="metric-card">
                 <p className="metric-label">Avg processing time</p>

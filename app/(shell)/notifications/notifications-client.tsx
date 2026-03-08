@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
@@ -32,6 +32,19 @@ export function NotificationsClient() {
     limit: 200,
     unreadOnly: filter === "unread"
   });
+
+  /* Auto-mark all as read when the page loads so the bell badge clears */
+  const hasAutoMarkedRef = useRef(false);
+  useEffect(() => {
+    if (
+      !hasAutoMarkedRef.current &&
+      !notificationsQuery.isLoading &&
+      (notificationsQuery.data?.unreadCount ?? 0) > 0
+    ) {
+      hasAutoMarkedRef.current = true;
+      void notificationsQuery.markAllRead();
+    }
+  }, [notificationsQuery]);
 
   const sortedNotifications = useMemo(() => {
     const rows = notificationsQuery.data?.notifications ?? [];

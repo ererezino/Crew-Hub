@@ -122,8 +122,8 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
         throw new Error("Failed to load page.");
       }
 
-      const data = await response.json();
-      setPage(data);
+      const envelope = await response.json();
+      setPage(envelope.data?.page ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
@@ -143,7 +143,7 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
 
       try {
         const response = await fetch(`/api/v1/team-hubs/pages/${pageId}`, {
-          method: "PATCH",
+          method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: editContent })
         });
@@ -152,8 +152,8 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
           throw new Error("Failed to save changes.");
         }
 
-        const updated = await response.json();
-        setPage(updated);
+        const updatedEnvelope = await response.json();
+        setPage(updatedEnvelope.data?.page ?? page);
         setEditOpen(false);
       } catch (err) {
         setSaveError(err instanceof Error ? err.message : "Save failed.");

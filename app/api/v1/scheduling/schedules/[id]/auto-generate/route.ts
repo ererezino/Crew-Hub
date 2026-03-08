@@ -48,6 +48,7 @@ const confirmBodySchema = z.object({
 const generateBodySchema = z.object({
   slots: z.array(slotSchema).min(1, "At least one slot is required."),
   scheduleType: z.enum(["weekday", "weekend", "holiday"]).default("weekday"),
+  employeeIds: z.array(z.string().uuid()).optional(),
   confirm: z.literal(true).optional(),
   assignments: z
     .array(
@@ -308,10 +309,10 @@ export async function POST(
     });
   }
 
-  const { slots, scheduleType } = parsedBody.data;
+  const { slots, scheduleType, employeeIds } = parsedBody.data;
 
   // -----------------------------------------------------------------------
-  // Fetch employees in the schedule's department
+  // Fetch crew members (by explicit IDs or by schedule department)
   // -----------------------------------------------------------------------
 
   let employeesQuery = supabase
@@ -321,7 +322,9 @@ export async function POST(
     .eq("status", "active")
     .is("deleted_at", null);
 
-  if (schedule.department) {
+  if (employeeIds && employeeIds.length > 0) {
+    employeesQuery = employeesQuery.in("id", employeeIds);
+  } else if (schedule.department) {
     employeesQuery = employeesQuery.ilike("department", schedule.department);
   }
 
@@ -332,7 +335,7 @@ export async function POST(
       data: null,
       error: {
         code: "EMPLOYEES_FETCH_FAILED",
-        message: "Unable to load employees for scheduling."
+        message: "Unable to load crew members for scheduling."
       },
       meta: buildMeta()
     });
@@ -343,7 +346,7 @@ export async function POST(
       data: null,
       error: {
         code: "NO_ELIGIBLE_EMPLOYEES",
-        message: "No active employees found for this department."
+        message: "No active crew members found for this department."
       },
       meta: buildMeta()
     });
@@ -504,7 +507,7 @@ export async function POST(
         (a) => a.shiftDate === date && a.slotName === slot.name
       );
       if (!filled) {
-        warnings.push(`${date}: no employee available for ${slot.name}`);
+        warnings.push(`${date}: no one available for ${slot.name}`);
       }
     }
   }

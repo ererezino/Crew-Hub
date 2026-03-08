@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, useMemo, useState } from "react";
+import { type ChangeEvent, type FormEvent, useCallback, useMemo, useRef, useState } from "react";
 
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { z } from "zod";
@@ -11,7 +12,6 @@ import { EmptyState } from "../../../components/shared/empty-state";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import type { UserRole } from "../../../lib/navigation";
 import { type NotificationPreferences, type SettingsTab } from "../../../types/settings";
-import { TimePoliciesClient } from "../admin/time-policies/time-policies-client";
 import { AuditLogViewer } from "./audit-log-viewer";
 
 type SettingsClientProps = {
@@ -35,36 +35,20 @@ type SettingsClientProps = {
 
 type ProfileFormValues = {
   fullName: string;
-  avatarUrl: string;
   phone: string;
 };
 
 type OrganizationFormValues = {
   name: string;
-  logoUrl: string;
 };
 
 const profileSchema = z.object({
   fullName: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
-  avatarUrl: z
-    .string()
-    .trim()
-    .max(500, "Avatar URL is too long")
-    .refine((value) => value.length === 0 || /^https?:\/\//.test(value), {
-      message: "Avatar URL must start with http:// or https://"
-    }),
   phone: z.string().trim().max(30, "Phone number is too long")
 });
 
 const organizationSchema = z.object({
-  name: z.string().trim().min(1, "Organization name is required").max(200, "Name is too long"),
-  logoUrl: z
-    .string()
-    .trim()
-    .max(500, "Logo URL is too long")
-    .refine((value) => value.length === 0 || /^https?:\/\//.test(value), {
-      message: "Logo URL must start with http:// or https://"
-    })
+  name: z.string().trim().min(1, "Organization name is required").max(200, "Name is too long")
 });
 
 const settingsTabs: PageTab[] = [
@@ -86,11 +70,6 @@ const settingsTabs: PageTab[] = [
     requiredRoles: ["SUPER_ADMIN"]
   },
   {
-    key: "time-policies",
-    label: "Time Policies",
-    requiredRoles: ["SUPER_ADMIN"]
-  },
-  {
     key: "audit",
     label: "Audit Log",
     requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"]
@@ -107,7 +86,6 @@ function validateProfile(values: ProfileFormValues) {
   const fieldErrors = parsed.error.flatten().fieldErrors;
   return {
     fullName: fieldErrors.fullName?.[0],
-    avatarUrl: fieldErrors.avatarUrl?.[0],
     phone: fieldErrors.phone?.[0]
   };
 }
@@ -121,13 +99,19 @@ function validateOrganization(values: OrganizationFormValues) {
 
   const fieldErrors = parsed.error.flatten().fieldErrors;
   return {
-    name: fieldErrors.name?.[0],
-    logoUrl: fieldErrors.logoUrl?.[0]
+    name: fieldErrors.name?.[0]
   };
 }
 
 function hasErrors(errors: Record<string, string | undefined>): boolean {
   return Object.values(errors).some((error) => Boolean(error));
+}
+
+function getInitials(fullName: string): string {
+  const tokens = fullName.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return "CH";
+  if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase();
+  return `${tokens[0][0] ?? ""}${tokens[1][0] ?? ""}`.toUpperCase();
 }
 
 export function SettingsClient({
@@ -136,7 +120,7 @@ export function SettingsClient({
   organization,
   canManageOrganization,
   canViewAudit,
-  canViewTimePolicies
+  canViewTimePolicies: _canViewTimePolicies
 }: SettingsClientProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -151,17 +135,13 @@ export function SettingsClient({
           return canManageOrganization;
         }
 
-        if (tab.key === "time-policies") {
-          return canViewTimePolicies;
-        }
-
         if (tab.key === "audit") {
           return canViewAudit;
         }
 
         return true;
       }),
-    [canManageOrganization, canViewAudit, canViewTimePolicies]
+    [canManageOrganization, canViewAudit]
   );
 
   const fallbackTab = (visibleTabs[0]?.key as SettingsTab | undefined) ?? "profile";
@@ -173,16 +153,20 @@ export function SettingsClient({
 
   const [profileValues, setProfileValues] = useState<ProfileFormValues>({
     fullName: profile.fullName,
-    avatarUrl: profile.avatarUrl,
     phone: profile.phone
   });
   const [profileErrors, setProfileErrors] = useState<Record<string, string | undefined>>({});
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [isProfileSaving, setIsProfileSaving] = useState(false);
 
+  // Avatar upload state
+  const [avatarUrl, setAvatarUrl] = useState<string>(profile.avatarUrl);
+  const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+
   const [organizationValues, setOrganizationValues] = useState<OrganizationFormValues>({
-    name: organization.name,
-    logoUrl: organization.logoUrl
+    name: organization.name
   });
   const [organizationErrors, setOrganizationErrors] = useState<Record<string, string | undefined>>(
     {}
@@ -217,6 +201,61 @@ export function SettingsClient({
     });
   };
 
+  const handleAvatarUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsAvatarUploading(true);
+    setAvatarError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/v1/me/avatar", {
+        method: "POST",
+        body: formData
+      });
+
+      const payload = (await response.json()) as {
+        data?: { avatarUrl: string } | null;
+        error?: { message: string } | null;
+      };
+
+      if (!response.ok || !payload.data) {
+        setAvatarError(payload.error?.message ?? "Unable to upload photo.");
+        return;
+      }
+
+      setAvatarUrl(payload.data.avatarUrl);
+    } catch {
+      setAvatarError("Unable to upload photo.");
+    } finally {
+      setIsAvatarUploading(false);
+      if (event.target) event.target.value = "";
+    }
+  }, []);
+
+  const handleAvatarRemove = useCallback(async () => {
+    setIsAvatarUploading(true);
+    setAvatarError(null);
+
+    try {
+      const response = await fetch("/api/v1/me/avatar", { method: "DELETE" });
+
+      if (!response.ok) {
+        setAvatarError("Unable to remove photo.");
+        return;
+      }
+
+      setAvatarUrl("");
+    } catch {
+      setAvatarError("Unable to remove photo.");
+    } finally {
+      setIsAvatarUploading(false);
+    }
+  }, []);
+
   const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -233,10 +272,8 @@ export function SettingsClient({
     try {
       const response = await fetch("/api/v1/settings/profile", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(profileValues)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...profileValues, avatarUrl })
       });
 
       const payload = (await response.json()) as {
@@ -273,9 +310,7 @@ export function SettingsClient({
     try {
       const response = await fetch("/api/v1/settings/organization", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(organizationValues)
       });
 
@@ -310,9 +345,7 @@ export function SettingsClient({
     try {
       const response = await fetch("/api/v1/settings/notifications", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(notificationValues)
       });
 
@@ -338,6 +371,8 @@ export function SettingsClient({
     }
   };
 
+  const initials = getInitials(profile.fullName);
+
   return (
     <section className="settings-layout" aria-label="Settings tabs">
       <PageTabs
@@ -352,6 +387,54 @@ export function SettingsClient({
           <section className="settings-card" aria-label="Profile settings">
             <h2 className="section-title">Profile</h2>
             <p className="settings-card-description">Update your personal contact information.</p>
+
+            {/* Avatar upload */}
+            <div className="profile-avatar-section">
+              <div className="profile-avatar-preview">
+                {avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt={profile.fullName}
+                    width={72}
+                    height={72}
+                    className="profile-avatar-image"
+                    unoptimized
+                  />
+                ) : (
+                  <span className="profile-avatar-placeholder numeric">{initials}</span>
+                )}
+              </div>
+              <div className="profile-avatar-controls">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={handleAvatarUpload}
+                  disabled={isAvatarUploading}
+                />
+                <button
+                  type="button"
+                  className="button"
+                  disabled={isAvatarUploading}
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  {isAvatarUploading ? "Uploading..." : "Upload photo"}
+                </button>
+                {avatarUrl ? (
+                  <button
+                    type="button"
+                    className="table-row-action table-row-action-danger"
+                    disabled={isAvatarUploading}
+                    onClick={() => void handleAvatarRemove()}
+                  >
+                    Remove
+                  </button>
+                ) : null}
+                <p className="settings-card-description">JPG, PNG, or WebP. Max 5 MB.</p>
+              </div>
+              {avatarError ? <p className="form-field-error">{avatarError}</p> : null}
+            </div>
 
             <form className="settings-form" onSubmit={handleProfileSubmit} noValidate>
               <label className="form-field" htmlFor="profile-full-name">
@@ -375,30 +458,6 @@ export function SettingsClient({
                 />
                 {profileErrors.fullName ? (
                   <p className="form-field-error">{profileErrors.fullName}</p>
-                ) : null}
-              </label>
-
-              <label className="form-field" htmlFor="profile-avatar-url">
-                <span className="form-label">Avatar URL</span>
-                <input
-                  id="profile-avatar-url"
-                  className={
-                    profileErrors.avatarUrl ? "form-input form-input-error" : "form-input"
-                  }
-                  value={profileValues.avatarUrl}
-                  onChange={(event) => {
-                    const nextValues = {
-                      ...profileValues,
-                      avatarUrl: event.currentTarget.value
-                    };
-
-                    setProfileValues(nextValues);
-                    setProfileErrors(validateProfile(nextValues));
-                    setFormDirty(true);
-                  }}
-                />
-                {profileErrors.avatarUrl ? (
-                  <p className="form-field-error">{profileErrors.avatarUrl}</p>
                 ) : null}
               </label>
 
@@ -513,7 +572,7 @@ export function SettingsClient({
             <section className="settings-card" aria-label="Organization settings">
               <h2 className="section-title">Organization</h2>
               <p className="settings-card-description">
-                Manage organization branding for Crew Hub.
+                Update your organization name. This is displayed across Crew Hub.
               </p>
 
               <form className="settings-form" onSubmit={handleOrganizationSubmit} noValidate>
@@ -541,30 +600,6 @@ export function SettingsClient({
                   ) : null}
                 </label>
 
-                <label className="form-field" htmlFor="organization-logo-url">
-                  <span className="form-label">Logo URL</span>
-                  <input
-                    id="organization-logo-url"
-                    className={
-                      organizationErrors.logoUrl ? "form-input form-input-error" : "form-input"
-                    }
-                    value={organizationValues.logoUrl}
-                    onChange={(event) => {
-                      const nextValues = {
-                        ...organizationValues,
-                        logoUrl: event.currentTarget.value
-                      };
-
-                      setOrganizationValues(nextValues);
-                      setOrganizationErrors(validateOrganization(nextValues));
-                      setFormDirty(true);
-                    }}
-                  />
-                  {organizationErrors.logoUrl ? (
-                    <p className="form-field-error">{organizationErrors.logoUrl}</p>
-                  ) : null}
-                </label>
-
                 <div className="settings-actions">
                   <button
                     type="submit"
@@ -583,46 +618,32 @@ export function SettingsClient({
           ) : (
             <EmptyState
               title="Organization settings are restricted"
-              description="Only a Super Admin can edit organization name and logo."
+              description="Only a Super Admin can edit the organization name."
               ctaLabel="Back to profile"
               ctaHref="/settings"
             />
           )
         ) : null}
 
-        {activeTab === "time-policies" ? (
-          canViewTimePolicies ? (
-            <TimePoliciesClient embedded />
-          ) : (
-            <EmptyState
-              title="Time policies are restricted"
-              description="Only HR Admin and Super Admin can review attendance policies."
-              ctaLabel="Back to settings"
-              ctaHref="/settings"
-            />
-          )
-        ) : null}
-
         {activeTab === "security" ? (
-          <article className="settings-card">
-            <h3 className="settings-section-title">Security</h3>
-            <p className="settings-field-hint" style={{ marginBottom: "var(--space-4)" }}>
-              Manage your password and active sessions.
+          <section className="settings-card" aria-label="Security settings">
+            <h2 className="section-title">Security</h2>
+            <p className="settings-card-description">
+              Keep your account safe with a strong password.
             </p>
-            <div className="settings-field-group">
-              <label className="settings-label">Change Password</label>
-              <p className="settings-field-hint">
-                Use this to update your password. You will need to enter your current password.
-              </p>
-              <Link
-                href="/change-password"
-                className="button"
-                style={{ display: "inline-block", marginTop: "var(--space-2)" }}
-              >
+
+            <div className="security-action-row">
+              <div className="security-action-copy">
+                <p className="form-label">Password</p>
+                <p className="settings-card-description">
+                  Update your password to keep your account secure. You will need to enter your current password first.
+                </p>
+              </div>
+              <Link href="/change-password" className="button">
                 Change password
               </Link>
             </div>
-          </article>
+          </section>
         ) : null}
 
         {activeTab === "audit" ? (

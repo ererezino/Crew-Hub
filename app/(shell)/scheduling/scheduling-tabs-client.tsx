@@ -125,7 +125,7 @@ export function SchedulingTabsClient({
 
       <FeatureBanner
         moduleId="scheduling"
-        description="Scheduling is in limited pilot for Customer Success. Auto-generate requires shift templates to be configured first."
+        description="Scheduling is in limited pilot for Customer Success. You can create, generate, edit, and publish weekly schedules."
       />
 
       <PageTabs

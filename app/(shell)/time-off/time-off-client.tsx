@@ -109,9 +109,15 @@ const TIME_OFF_CONTEXTUAL_HELP = [
   },
   {
     title: "Team coverage",
-    description: "Check team availability before submitting overlapping dates.",
+    description:
+      "To keep things running smoothly while you\u2019re away, take a quick look at who else is off around the same time.",
     ctaLabel: "View availability",
     ctaHref: "/time-off?tab=calendar"
+  },
+  {
+    title: "Use it or lose it",
+    description:
+      "Unused leave days expire on December 31 each year \u2014 so don\u2019t let them go to waste! Whether it\u2019s a beach sunset or a snowy getaway, we\u2019d love for you to take the time you\u2019ve earned."
   }
 ] as const;
 
@@ -727,8 +733,8 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       ) : null}
 
       <ContextualHelp
-        title="Plan leave with confidence"
-        description="Use these reminders to avoid request delays and team coverage issues."
+        title="Plan your leave with confidence"
+        description="A few helpful reminders so you can relax knowing everything is covered."
         items={TIME_OFF_CONTEXTUAL_HELP}
         ariaLabel="Time off contextual help"
       />
@@ -769,7 +775,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         ) : (
           summaryQuery.data.balances.map((balance) => {
             const scheduledDays = balance.pendingDays;
-            const available = balance.totalDays - balance.usedDays - scheduledDays + balance.carriedDays;
+            const available = balance.totalDays - balance.usedDays - scheduledDays;
 
             return (
               <article key={balance.id} className="timeoff-balance-card">
@@ -783,11 +789,11 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                   {formatDays(available)} days
                 </div>
                 <p className="settings-card-description">
-                  {balance.year} balance including carried days
+                  {balance.year} balance &mdash; unused days expire Dec 31
                 </p>
                 <dl className="timeoff-balance-breakdown">
                   <div>
-                    <dt>Total</dt>
+                    <dt>Allocated</dt>
                     <dd className="numeric">{formatDays(balance.totalDays)}</dd>
                   </div>
                   <div>
@@ -798,12 +804,6 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                     <div>
                       <dt>Scheduled</dt>
                       <dd className="numeric">{formatDays(scheduledDays)}</dd>
-                    </div>
-                  ) : null}
-                  {balance.carriedDays > 0 ? (
-                    <div>
-                      <dt>Carried</dt>
-                      <dd className="numeric">{formatDays(balance.carriedDays)}</dd>
                     </div>
                   ) : null}
                 </dl>

@@ -55,11 +55,11 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
         throw new Error("Failed to load hub sections.");
       }
 
-      const hubData = await hubRes.json();
-      const sectionsData = await sectionsRes.json();
+      const hubEnvelope = await hubRes.json();
+      const sectionsEnvelope = await sectionsRes.json();
 
-      setHub(hubData);
-      setSections(Array.isArray(sectionsData) ? sectionsData : sectionsData.sections ?? []);
+      setHub(hubEnvelope.data?.hub ?? null);
+      setSections(Array.isArray(sectionsEnvelope) ? sectionsEnvelope : sectionsEnvelope.data?.sections ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
@@ -112,13 +112,7 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
       <PageHeader
         title={hub.name}
         description={hub.description ?? undefined}
-        actions={
-          isLeadOrAdmin ? (
-            <Link href={`/team-hub/${hubId}/new-section`} className="button button-accent">
-              Add Section
-            </Link>
-          ) : undefined
-        }
+        actions={undefined}
       />
 
       <nav style={{ marginBottom: "var(--space-4)" }}>
@@ -131,8 +125,8 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
         <EmptyState
           title="No sections yet"
           description="This hub doesn't have any sections. Sections help organize your pages into logical groups."
-          ctaLabel={isLeadOrAdmin ? "Add a section" : undefined}
-          ctaHref={isLeadOrAdmin ? `/team-hub/${hubId}/new-section` : undefined}
+          ctaLabel={undefined}
+          ctaHref={undefined}
         />
       ) : (
         <div

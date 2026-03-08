@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
+import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { usePendingSurveys } from "../../../hooks/use-surveys";
@@ -64,6 +65,13 @@ export function SurveysClient({
               </Link>
             ) : null
           }
+        />
+      ) : null}
+
+      {!embedded ? (
+        <FeatureBanner
+          moduleId="surveys"
+          description="Surveys is built but not yet included in the active release."
         />
       ) : null}
 

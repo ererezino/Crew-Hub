@@ -114,10 +114,11 @@ that work on dark surfaces. Defined as CSS custom properties
 in globals.css :root[data-theme="dark"].
 
 ### Typography
-Fonts: Geist (body), Geist Mono (numbers/data/code)
-Scale: 12px caption, 14px body, 16px section title, 20px page title
-All weights: 400 normal, 600 semibold
-Line heights: 1.25 headings, 1.5 body
+Fonts: DM Sans (body/UI), Playfair Display (display headings)
+Variables: --font-sans (DM Sans), --font-serif (Playfair Display)
+Scale: 11px label, 13px small, 14px base, 15px body, 17px h3, 22px h2, 28px h1, 40px display
+Weights: 400 normal, 600 semibold, 700 bold (headings), 900 black (display)
+Line heights: 1.1–1.3 headings, 1.5–1.65 body
 
 ### Spacing & Shape
 Radius: 6px default, 8px cards, 12px modals

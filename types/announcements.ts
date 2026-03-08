@@ -11,6 +11,8 @@ export type Announcement = {
   updatedAt: string;
   isRead: boolean;
   readAt: string | null;
+  isDismissed: boolean;
+  dismissedAt: string | null;
 };
 
 export type AnnouncementsResponseData = {
@@ -31,3 +33,10 @@ export type AnnouncementReadResponseData = {
 };
 
 export type AnnouncementReadResponse = ApiResponse<AnnouncementReadResponseData>;
+
+export type AnnouncementDismissResponseData = {
+  announcementId: string;
+  dismissedAt: string;
+};
+
+export type AnnouncementDismissResponse = ApiResponse<AnnouncementDismissResponseData>;

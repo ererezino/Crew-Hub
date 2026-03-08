@@ -101,7 +101,7 @@ const expenseFormSchema = z.object({
 });
 
 const INITIAL_FORM_VALUES: ExpenseFormValues = {
-  expenseType: "personal_reimbursement",
+  expenseType: "work_expense",
   category: "travel",
   customCategory: "",
   description: "",

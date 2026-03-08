@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AccessChecklist, type AccessChecklistItem } from "../../../../components/admin/access-checklist";
 import { InviteForm } from "../../../../components/admin/invite-form";
 import { UserListTable } from "../../../../components/admin/user-list-table";
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
@@ -56,10 +57,6 @@ const roleLabels: Record<AppRole, string> = {
   FINANCE_ADMIN: "Finance Admin",
   SUPER_ADMIN: "Super Admin"
 };
-
-function copyToClipboard(value: string) {
-  void navigator.clipboard?.writeText(value);
-}
 
 function fallbackAccessItems(): AccessChecklistItem[] {
   return getNavigationDefinitions()
@@ -122,7 +119,6 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
   const [editError, setEditError] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const [resetPasswordValue, setResetPasswordValue] = useState<string | null>(null);
 
   const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({
     scope: "all"
@@ -153,7 +149,6 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       status: person.status,
       selectedAccessKeys
     });
-    setResetPasswordValue(null);
     setEditError(null);
     setEditMessage(null);
   };
@@ -164,7 +159,6 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     }
 
     setEditValues(null);
-    setResetPasswordValue(null);
     setEditError(null);
     setEditMessage(null);
   };
@@ -217,14 +211,17 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     setActiveTab("users");
   };
 
-  const handleDeactivate = async (person: PersonRecord) => {
-    const confirmed = window.confirm(
-      `Deactivate ${person.fullName}? They will lose active access until reactivated.`
-    );
+  const [deactivateTarget, setDeactivateTarget] = useState<PersonRecord | null>(null);
 
-    if (!confirmed) {
-      return;
-    }
+  const handleDeactivate = (person: PersonRecord) => {
+    setDeactivateTarget(person);
+  };
+
+  const executeDeactivate = async () => {
+    if (!deactivateTarget) return;
+
+    const person = deactivateTarget;
+    setDeactivateTarget(null);
 
     const response = await fetch(`/api/v1/people/${person.id}`, {
       method: "PUT",
@@ -363,7 +360,6 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
         return;
       }
 
-      setResetPasswordValue(null);
       setEditMessage("Password setup link sent. The user should complete setup from their email.");
     } catch (error) {
       setEditError(error instanceof Error ? error.message : "Unable to reset password.");
@@ -598,6 +594,16 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
           </div>
         ) : null}
       </SlidePanel>
+
+      <ConfirmDialog
+        isOpen={deactivateTarget !== null}
+        title={`Deactivate ${deactivateTarget?.fullName ?? ""}?`}
+        description="They will lose active access until reactivated."
+        confirmLabel="Deactivate"
+        tone="danger"
+        onConfirm={() => void executeDeactivate()}
+        onCancel={() => setDeactivateTarget(null)}
+      />
     </>
   );
 }

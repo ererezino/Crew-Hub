@@ -24,7 +24,9 @@ export const NOTIFICATION_TYPES = [
   "review_reminder",
   "survey_launched",
   "document_expiry_warning",
-  "compliance_policy_acknowledgment"
+  "compliance_policy_acknowledgment",
+  "schedule_published",
+  "status_change"
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

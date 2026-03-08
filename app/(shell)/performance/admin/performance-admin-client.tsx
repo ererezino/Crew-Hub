@@ -505,7 +505,7 @@ export function AdminPerformanceClient() {
         return;
       }
 
-      showToast("success", "Review shared with employee.");
+      showToast("success", "Review shared successfully.");
       adminQuery.refresh();
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to share review.");
@@ -609,7 +609,7 @@ export function AdminPerformanceClient() {
     );
 
     if (activeDirectory.length === 0) {
-      showToast("error", "No active employees with managers are available for assignment.");
+      showToast("error", "No active people with managers are available for assignment.");
       return;
     }
 
@@ -889,7 +889,7 @@ export function AdminPerformanceClient() {
               <article className="settings-card">
                 <h2 className="section-title">Templates & Assignment</h2>
                 <p className="settings-card-description">
-                  Create a standard template, then assign the selected cycle to active employees.
+                  Create a standard template, then assign the selected cycle to active people.
                 </p>
 
                 <div className="performance-template-grid">
@@ -957,7 +957,7 @@ export function AdminPerformanceClient() {
                       void assignCycle();
                     }}
                   >
-                    {isAssigning ? "Assigning..." : "Assign to active employees"}
+                    {isAssigning ? "Assigning..." : "Assign to active people"}
                   </button>
                 </div>
               </article>
@@ -996,7 +996,6 @@ export function AdminPerformanceClient() {
                           <th>Status</th>
                           <th>Sharing</th>
                           <th>Updated</th>
-                          <th className="table-action-column">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1043,7 +1042,7 @@ export function AdminPerformanceClient() {
                                       disabled={isSharingReview}
                                       onClick={() => { void shareReview(assignment.id); }}
                                     >
-                                      {isSharingReview ? "Sharing..." : "Share with employee"}
+                                      {isSharingReview ? "Sharing..." : "Share review"}
                                     </button>
                                   )
                                 ) : (
@@ -1052,15 +1051,6 @@ export function AdminPerformanceClient() {
                               </td>
                               <td title={formatDateTimeTooltip(assignment.updatedAt)}>
                                 {formatRelativeTime(assignment.updatedAt)}
-                              </td>
-                              <td className="table-row-action-cell">
-                                <button
-                                  type="button"
-                                  className="table-row-action"
-                                  onClick={() => showToast("info", `Assignment ${assignment.id.slice(0, 8)}`)}
-                                >
-                                  View
-                                </button>
                               </td>
                             </tr>
                           );

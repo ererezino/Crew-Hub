@@ -103,11 +103,11 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
         throw new Error("Failed to load pages.");
       }
 
-      const sectionData = await sectionRes.json();
-      const pagesData = await pagesRes.json();
+      const sectionEnvelope = await sectionRes.json();
+      const pagesEnvelope = await pagesRes.json();
 
-      setSection(sectionData);
-      setPages(Array.isArray(pagesData) ? pagesData : pagesData.pages ?? []);
+      setSection(sectionEnvelope.data?.section ?? null);
+      setPages(Array.isArray(pagesEnvelope) ? pagesEnvelope : pagesEnvelope.data?.pages ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.");
     } finally {
@@ -153,16 +153,7 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
       <PageHeader
         title={section.name}
         description={section.description ?? undefined}
-        actions={
-          isLeadOrAdmin ? (
-            <Link
-              href={`/team-hub/${hubId}/${sectionId}/new-page`}
-              className="button button-accent"
-            >
-              Add Page
-            </Link>
-          ) : undefined
-        }
+        actions={undefined}
       />
 
       <nav style={{ marginBottom: "var(--space-4)" }}>
@@ -175,8 +166,8 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
         <EmptyState
           title="No pages yet"
           description="This section doesn't have any pages. Add documents, contacts, runbooks, and more."
-          ctaLabel={isLeadOrAdmin ? "Add a page" : undefined}
-          ctaHref={isLeadOrAdmin ? `/team-hub/${hubId}/${sectionId}/new-page` : undefined}
+          ctaLabel={undefined}
+          ctaHref={undefined}
         />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>

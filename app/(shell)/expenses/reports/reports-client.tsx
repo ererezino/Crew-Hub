@@ -389,7 +389,7 @@ export function ExpenseReportsClient() {
               <p className="metric-value">
                 <CurrencyDisplay amount={reportsQuery.data.totals.pendingAmount} currency="NGN" />
               </p>
-              <p className="metric-hint">Still owed to employees</p>
+              <p className="metric-hint">Still owed to crew members</p>
             </article>
           </section>
 

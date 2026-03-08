@@ -11,8 +11,8 @@ export default async function AnnouncementsPage() {
     return (
       <>
         <PageHeader
-          title="Announcements"
-          description="Company updates and news since your last visit."
+          title="Notifications"
+          description="Company updates, alerts, and messages since your last visit."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -25,10 +25,12 @@ export default async function AnnouncementsPage() {
   const canManageAnnouncements =
     hasRole(session.profile.roles, "HR_ADMIN") ||
     hasRole(session.profile.roles, "SUPER_ADMIN");
+  const isSuperAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
 
   return (
     <AnnouncementsClient
       canManageAnnouncements={canManageAnnouncements}
+      isSuperAdmin={isSuperAdmin}
       currentUserName={session.profile.full_name}
     />
   );

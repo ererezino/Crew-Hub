@@ -45,6 +45,10 @@ function canManageAnnouncements(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "HR_ADMIN") || hasRole(roles, "SUPER_ADMIN");
 }
 
+function isSuperAdmin(roles: readonly UserRole[]): boolean {
+  return hasRole(roles, "SUPER_ADMIN");
+}
+
 function toAnnouncement(
   row: z.infer<typeof announcementRowSchema>,
   creatorName: string,
@@ -60,7 +64,9 @@ function toAnnouncement(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     isRead: Boolean(readAt),
-    readAt
+    readAt,
+    isDismissed: false,
+    dismissedAt: null
   };
 }
 
@@ -267,6 +273,72 @@ export async function PATCH(request: Request, context: RouteContext) {
     data: {
       announcement
     },
+    error: null,
+    meta: buildMeta()
+  });
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be logged in to delete announcements."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!isSuperAdmin(session.profile.roles)) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only super admins can delete announcements."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedParams = paramsSchema.safeParse(await context.params);
+
+  if (!parsedParams.success) {
+    return jsonResponse<null>(400, {
+      data: null,
+      error: {
+        code: "BAD_REQUEST",
+        message: "Announcement id must be a valid UUID."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const announcementId = parsedParams.data.announcementId;
+
+  const { error: deleteError } = await supabase
+    .from("announcements")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", announcementId)
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null);
+
+  if (deleteError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "ANNOUNCEMENT_DELETE_FAILED",
+        message: "Unable to delete announcement."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  return jsonResponse<{ announcementId: string }>(200, {
+    data: { announcementId },
     error: null,
     meta: buildMeta()
   });

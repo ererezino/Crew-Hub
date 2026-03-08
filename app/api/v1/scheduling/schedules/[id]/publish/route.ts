@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
+import { formatDateRange } from "../../../../../../../lib/datetime";
 import { areDepartmentsEqual } from "../../../../../../../lib/department";
 import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { isSchedulingManager } from "../../../../../../../lib/scheduling";
@@ -239,12 +240,17 @@ export async function POST(
     )
   ];
 
+  const dateRange = formatDateRange(
+    parsedPublishedSchedule.data.week_start,
+    parsedPublishedSchedule.data.week_end
+  );
+
   void createBulkNotifications({
     orgId: session.profile.org_id,
     userIds: assignedUserIds,
     type: "schedule_published",
     title: "New schedule published",
-    body: `${parsedPublishedSchedule.data.name ?? "Weekly schedule"} has been published.`,
+    body: `Check out your new work schedule for ${dateRange}.`,
     link: "/scheduling"
   });
 

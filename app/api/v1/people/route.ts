@@ -107,6 +107,7 @@ const profileRowSchema = z.object({
   emergency_contact_relationship: z.string().nullable().default(null),
   pronouns: z.string().nullable().default(null),
   privacy_settings: z.unknown().default({}),
+  account_setup_at: z.string().nullable().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -119,10 +120,13 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-function resolveAuthRedirectUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.crew-hub.local";
+function resolveAuthRedirectUrl(request: Request): string {
+  const requestUrl = new URL(request.url);
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    requestUrl.origin;
   const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
-  return `${normalizedAppUrl}/reset-password`;
+  return `${normalizedAppUrl}/api/auth/callback?next=/reset-password`;
 }
 
 function canManagePeople(userRoles: readonly UserRole[]): boolean {
@@ -205,6 +209,7 @@ function mapPersonRow(
     emergencyContactRelationship: row.emergency_contact_relationship ?? null,
     pronouns: row.pronouns ?? null,
     privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../types/people").PrivacySettings,
+    inviteStatus: row.account_setup_at ? "active" as const : "not_invited" as const,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -313,7 +318,7 @@ export async function GET(request: Request) {
   let peopleQuery = supabase
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, created_at, updated_at"
     )
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
@@ -393,10 +398,10 @@ export async function GET(request: Request) {
     );
   }
 
+  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById));
+
   return jsonResponse<PeopleListResponseData>(200, {
-    data: {
-      people: parsedPeople.data.map((row) => mapPersonRow(row, managerNameById))
-    },
+    data: { people },
     error: null,
     meta: buildMeta()
   });
@@ -565,7 +570,7 @@ export async function POST(request: Request) {
 
   const serviceRoleClient = createSupabaseServiceRoleClient();
   const normalizedEmail = payload.email.trim().toLowerCase();
-  const authRedirectUrl = resolveAuthRedirectUrl();
+  const authRedirectUrl = resolveAuthRedirectUrl(request);
 
   const isNewEmployee = payload.isNewEmployee;
   const profileStatus: ProfileStatus = isNewEmployee ? "onboarding" : "active";
@@ -732,7 +737,7 @@ export async function POST(request: Request) {
       status: profileStatus
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, created_at, updated_at"
     )
     .single();
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
@@ -49,6 +50,9 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [activeActionTimesheetId, setActiveActionTimesheetId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [rejectTimesheetId, setRejectTimesheetId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionError, setRejectionError] = useState<string | null>(null);
 
   const sortedTimesheets = useMemo(() => {
     const rows = approvalsQuery.data?.timesheets ?? [];
@@ -61,64 +65,72 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
     });
   }, [approvalsQuery.data?.timesheets, sortDirection]);
 
-  const handleTimesheetAction = async (
-    timesheetId: string,
-    action: "approve" | "reject"
-  ) => {
+  const handleApprove = async (timesheetId: string) => {
     setActionMessage(null);
-
-    const rejectionReason =
-      action === "reject"
-        ? window.prompt("Provide a rejection reason for this timesheet:")?.trim() ?? ""
-        : undefined;
-
-    if (action === "reject" && (!rejectionReason || rejectionReason.length === 0)) {
-      setActionMessage("Rejection reason is required.");
-      return;
-    }
-
-    if (action === "reject") {
-      const confirmed = window.confirm(
-        "Reject this timesheet? The employee will be notified with your reason."
-      );
-
-      if (!confirmed) {
-        return;
-      }
-    }
-
     setActiveActionTimesheetId(timesheetId);
 
     try {
       const response = await fetch("/api/v1/time-attendance/approvals", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          timesheetId,
-          action,
-          rejectionReason
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timesheetId, action: "approve" })
       });
 
       const payload = (await response.json()) as TimeAttendanceApprovalMutationResponse;
 
       if (!response.ok || !payload.data) {
-        setActionMessage(payload.error?.message ?? "Unable to update timesheet approval.");
+        setActionMessage(payload.error?.message ?? "Unable to approve timesheet.");
         return;
       }
 
-      setActionMessage(
-        action === "approve"
-          ? "Timesheet approved."
-          : "Timesheet rejected."
-      );
+      setActionMessage("Timesheet approved.");
       approvalsQuery.refresh();
     } catch (error) {
-      setActionMessage(
-        error instanceof Error ? error.message : "Unable to update timesheet approval."
-      );
+      setActionMessage(error instanceof Error ? error.message : "Unable to approve timesheet.");
+    } finally {
+      setActiveActionTimesheetId(null);
+    }
+  };
+
+  const openRejectDialog = (timesheetId: string) => {
+    setRejectTimesheetId(timesheetId);
+    setRejectionReason("");
+    setRejectionError(null);
+    setActionMessage(null);
+  };
+
+  const executeReject = async () => {
+    if (!rejectTimesheetId) return;
+
+    const reason = rejectionReason.trim();
+
+    if (reason.length === 0) {
+      setRejectionError("Rejection reason is required.");
+      return;
+    }
+
+    const timesheetId = rejectTimesheetId;
+    setRejectTimesheetId(null);
+    setActiveActionTimesheetId(timesheetId);
+
+    try {
+      const response = await fetch("/api/v1/time-attendance/approvals", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timesheetId, action: "reject", rejectionReason: reason })
+      });
+
+      const payload = (await response.json()) as TimeAttendanceApprovalMutationResponse;
+
+      if (!response.ok || !payload.data) {
+        setActionMessage(payload.error?.message ?? "Unable to reject timesheet.");
+        return;
+      }
+
+      setActionMessage("Timesheet rejected.");
+      approvalsQuery.refresh();
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Unable to reject timesheet.");
     } finally {
       setActiveActionTimesheetId(null);
     }
@@ -183,7 +195,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
             <table className="data-table" aria-label="Submitted timesheets">
               <thead>
                 <tr>
-                  <th>Employee</th>
+                  <th>Person</th>
                   <th>Country</th>
                   <th>
                     <button
@@ -246,9 +258,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                           type="button"
                           className="table-row-action"
                           disabled={activeActionTimesheetId === timesheet.id}
-                          onClick={() => {
-                            void handleTimesheetAction(timesheet.id, "approve");
-                          }}
+                          onClick={() => void handleApprove(timesheet.id)}
                         >
                           Approve
                         </button>
@@ -256,9 +266,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                           type="button"
                           className="table-row-action"
                           disabled={activeActionTimesheetId === timesheet.id}
-                          onClick={() => {
-                            void handleTimesheetAction(timesheet.id, "reject");
-                          }}
+                          onClick={() => openRejectDialog(timesheet.id)}
                         >
                           Reject
                         </button>
@@ -270,6 +278,59 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
             </table>
           </div>
         </section>
+      ) : null}
+
+      {rejectTimesheetId !== null ? (
+        <div
+          className="modal-overlay"
+          onClick={() => setRejectTimesheetId(null)}
+        >
+          <section
+            className="confirm-dialog modal-dialog modal-dialog-danger"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Reject timesheet"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="modal-title">Reject timesheet?</h2>
+            <p className="settings-card-description">
+              The team member will be notified with your reason.
+            </p>
+            <label className="form-label" htmlFor="rejection-reason">
+              Reason
+            </label>
+            <textarea
+              id="rejection-reason"
+              className="form-textarea"
+              rows={3}
+              placeholder="Explain why this timesheet is being rejected"
+              value={rejectionReason}
+              onChange={(e) => {
+                setRejectionReason(e.target.value);
+                setRejectionError(null);
+              }}
+            />
+            {rejectionError ? (
+              <p className="form-field-error">{rejectionError}</p>
+            ) : null}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={() => setRejectTimesheetId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={() => void executeReject()}
+              >
+                Reject
+              </button>
+            </div>
+          </section>
+        </div>
       ) : null}
     </>
   );

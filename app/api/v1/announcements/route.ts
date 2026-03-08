@@ -10,7 +10,8 @@ import type { ApiResponse } from "../../../../types/auth";
 import type { Announcement, AnnouncementsResponseData } from "../../../../types/announcements";
 
 const listQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(50).optional()
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  dismissed: z.enum(["true", "false"]).optional()
 });
 
 const announcementWriteSchema = z.object({
@@ -36,7 +37,8 @@ const profileRowSchema = z.object({
 
 const readRowSchema = z.object({
   announcement_id: z.string().uuid(),
-  read_at: z.string()
+  read_at: z.string(),
+  dismissed_at: z.string().nullable()
 });
 
 function buildMeta() {
@@ -54,9 +56,11 @@ function canManageAnnouncements(roles: readonly UserRole[]): boolean {
 function toAnnouncement(
   row: z.infer<typeof announcementRowSchema>,
   creatorNameById: ReadonlyMap<string, string>,
-  readAtByAnnouncementId: ReadonlyMap<string, string>
+  readAtByAnnouncementId: ReadonlyMap<string, string>,
+  dismissedAtByAnnouncementId: ReadonlyMap<string, string>
 ): Announcement {
   const readAt = readAtByAnnouncementId.get(row.id) ?? null;
+  const dismissedAt = dismissedAtByAnnouncementId.get(row.id) ?? null;
 
   return {
     id: row.id,
@@ -68,7 +72,9 @@ function toAnnouncement(
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     isRead: Boolean(readAt),
-    readAt
+    readAt,
+    isDismissed: Boolean(dismissedAt),
+    dismissedAt
   };
 }
 
@@ -186,46 +192,49 @@ export async function GET(request: Request) {
   }
 
   let readAtByAnnouncementId = new Map<string, string>();
+  let dismissedAtByAnnouncementId = new Map<string, string>();
 
   if (announcementIds.length > 0) {
     const { data: rawReadRows, error: readRowsError } = await supabase
       .from("announcement_reads")
-      .select("announcement_id, read_at")
+      .select("announcement_id, read_at, dismissed_at")
       .eq("user_id", profile.id)
       .in("announcement_id", announcementIds);
 
     if (readRowsError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "ANNOUNCEMENT_READS_FETCH_FAILED",
-          message: "Unable to load announcement read state."
-        },
-        meta: buildMeta()
+      // Non-fatal: if read state fails, treat all announcements as unread/undismissed
+      console.error("Unable to load announcement read state.", {
+        userId: profile.id,
+        message: readRowsError.message
       });
+    } else {
+      const parsedReadRows = z.array(readRowSchema).safeParse(rawReadRows ?? []);
+
+      if (parsedReadRows.success) {
+        readAtByAnnouncementId = new Map(
+          parsedReadRows.data.map((row) => [row.announcement_id, row.read_at])
+        );
+
+        dismissedAtByAnnouncementId = new Map(
+          parsedReadRows.data
+            .filter((row) => row.dismissed_at !== null)
+            .map((row) => [row.announcement_id, row.dismissed_at!])
+        );
+      } else {
+        console.error("Announcement read state is not in the expected shape.");
+      }
     }
-
-    const parsedReadRows = z.array(readRowSchema).safeParse(rawReadRows ?? []);
-
-    if (!parsedReadRows.success) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "ANNOUNCEMENT_READS_PARSE_FAILED",
-          message: "Announcement read state is not in the expected shape."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    readAtByAnnouncementId = new Map(
-      parsedReadRows.data.map((row) => [row.announcement_id, row.read_at])
-    );
   }
 
-  const announcements = announcementsRows.map((row) =>
-    toAnnouncement(row, creatorNameById, readAtByAnnouncementId)
+  const showDismissed = parsedQuery.data.dismissed === "true";
+
+  const allAnnouncements = announcementsRows.map((row) =>
+    toAnnouncement(row, creatorNameById, readAtByAnnouncementId, dismissedAtByAnnouncementId)
   );
+
+  const announcements = showDismissed
+    ? allAnnouncements.filter((a) => a.isDismissed)
+    : allAnnouncements.filter((a) => !a.isDismissed);
 
   const responseData: AnnouncementsResponseData = {
     announcements
@@ -352,7 +361,8 @@ export async function POST(request: Request) {
   const announcement = toAnnouncement(
     parsedAnnouncement.data,
     new Map([[profile.id, profile.full_name]]),
-    new Map([[parsedAnnouncement.data.id, createdReadAt]])
+    new Map([[parsedAnnouncement.data.id, createdReadAt]]),
+    new Map()
   );
 
   const { data: recipientRows, error: recipientError } = await supabase

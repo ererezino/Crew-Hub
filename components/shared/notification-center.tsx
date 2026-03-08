@@ -11,7 +11,6 @@ import { NotificationActionButton } from "./notification-action-button";
 
 const POLL_INTERVAL_MS = 60_000;
 const PREVIEW_LIMIT = 8;
-const DISMISSED_KEY = "crew-hub-dismissed-bell-items";
 
 type FeedItem = {
   id: string;
@@ -24,28 +23,12 @@ type FeedItem = {
   actions: NotificationAction[];
 };
 
-function loadDismissed(): Set<string> {
-  try {
-    const raw = localStorage.getItem(DISMISSED_KEY);
-    if (!raw) return new Set();
-    return new Set(JSON.parse(raw) as string[]);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveDismissed(dismissed: Set<string>): void {
-  try {
-    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed]));
-  } catch {
-    /* storage full or unavailable */
-  }
-}
-
 export function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [dismissed, setDismissed] = useState<Set<string>>(() => loadDismissed());
+
+  /* Ephemeral optimistic set — never persisted, resets on mount */
+  const [optimisticDismissals, setOptimisticDismissals] = useState<Set<string>>(new Set());
 
   const notifications = useNotifications({ limit: 50 });
   const { announcements, isLoading: announcementsLoading, refresh: refreshAnnouncements } =
@@ -75,15 +58,13 @@ export function NotificationCenter() {
     return () => window.clearInterval(intervalId);
   }, [notifications, refreshAnnouncements]);
 
-  /* Build unified feed */
+  /* Build unified feed — only unread, filtered by optimistic dismissals */
   const feedItems: FeedItem[] = useMemo(() => {
     const items: FeedItem[] = [];
 
-    /* Notifications: only unread */
     for (const n of notifications.data?.notifications ?? []) {
       if (n.isRead) continue;
-      const key = `notification-${n.id}`;
-      if (dismissed.has(key)) continue;
+      if (optimisticDismissals.has(`notification-${n.id}`)) continue;
       items.push({
         id: n.id,
         source: "notification",
@@ -96,16 +77,14 @@ export function NotificationCenter() {
       });
     }
 
-    /* Announcements: show all recent, hide only dismissed */
     for (const a of announcements) {
-      const key = `announcement-${a.id}`;
-      if (dismissed.has(key)) continue;
+      if (a.isRead) continue;
+      if (optimisticDismissals.has(`announcement-${a.id}`)) continue;
       items.push({
         id: a.id,
         source: "announcement",
         title: a.title,
-        body:
-          a.body.length > 120 ? `${a.body.slice(0, 120)}…` : a.body,
+        body: a.body.length > 120 ? `${a.body.slice(0, 120)}…` : a.body,
         link: "/announcements",
         createdAt: a.createdAt,
         isRead: a.isRead,
@@ -118,27 +97,21 @@ export function NotificationCenter() {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    return items.slice(0, PREVIEW_LIMIT);
-  }, [notifications.data?.notifications, announcements, dismissed]);
+    return items;
+  }, [notifications.data?.notifications, announcements, optimisticDismissals]);
 
   const totalCount = feedItems.length;
+  const visibleItems = feedItems.slice(0, PREVIEW_LIMIT);
   const isLoading = notifications.isLoading || announcementsLoading;
   const errorMessage = notifications.errorMessage;
 
-  /* Dismiss a single item — optimistic with server-failure recovery */
+  /* Dismiss a single item — optimistic hide, server confirm, revert on fail */
   const handleDismiss = useCallback(
     async (item: FeedItem) => {
       const key = `${item.source}-${item.id}`;
 
-      /* Optimistic: immediately hide from UI */
-      setDismissed((current) => {
-        const next = new Set(current);
-        next.add(key);
-        saveDismissed(next);
-        return next;
-      });
+      setOptimisticDismissals((prev) => new Set([...prev, key]));
 
-      /* Mark as read on the server; revert on failure */
       try {
         if (item.source === "notification") {
           await notifications.markRead(item.id);
@@ -152,52 +125,49 @@ export function NotificationCenter() {
           if (!response.ok) {
             throw new Error("Server rejected read mark");
           }
+
+          refreshAnnouncements();
         }
+
+        window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
       } catch {
-        /* Server call failed — revert the optimistic dismissal so the item reappears */
-        setDismissed((current) => {
-          const next = new Set(current);
+        setOptimisticDismissals((prev) => {
+          const next = new Set(prev);
           next.delete(key);
-          saveDismissed(next);
           return next;
         });
       }
     },
-    [notifications]
+    [notifications, refreshAnnouncements]
   );
 
-  /* Dismiss all visible items — optimistic with partial failure recovery */
+  /* Dismiss all visible items */
   const handleDismissAll = useCallback(async () => {
-    const itemKeys = feedItems.map((item) => `${item.source}-${item.id}`);
+    const allKeys = feedItems.map((item) => `${item.source}-${item.id}`);
 
-    setDismissed((current) => {
-      const next = new Set(current);
-      for (const key of itemKeys) {
+    setOptimisticDismissals((prev) => {
+      const next = new Set(prev);
+      for (const key of allKeys) {
         next.add(key);
       }
-      saveDismissed(next);
       return next;
     });
 
-    /* Mark notifications as read — revert all on failure */
     try {
       await notifications.markAllRead();
     } catch {
-      /* If bulk mark-read fails, revert notification dismissals */
       const notificationKeys = feedItems
         .filter((i) => i.source === "notification")
         .map((i) => `notification-${i.id}`);
-      setDismissed((current) => {
-        const next = new Set(current);
+      setOptimisticDismissals((prev) => {
+        const next = new Set(prev);
         for (const key of notificationKeys) {
           next.delete(key);
         }
-        saveDismissed(next);
         return next;
       });
     }
 
-    /* Mark announcements as read — revert individually on failure */
     const announcementItems = feedItems.filter((i) => i.source === "announcement");
     await Promise.all(
       announcementItems.map(async (item) => {
@@ -211,16 +181,18 @@ export function NotificationCenter() {
           if (!response.ok) throw new Error("Failed");
         } catch {
           const key = `announcement-${item.id}`;
-          setDismissed((current) => {
-            const next = new Set(current);
+          setOptimisticDismissals((prev) => {
+            const next = new Set(prev);
             next.delete(key);
-            saveDismissed(next);
             return next;
           });
         }
       })
     );
-  }, [feedItems, notifications]);
+
+    refreshAnnouncements();
+    window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+  }, [feedItems, notifications, refreshAnnouncements]);
 
   return (
     <div className="notification-center" ref={containerRef}>
@@ -297,9 +269,9 @@ export function NotificationCenter() {
 
           {!isLoading && !errorMessage ? (
             <>
-              {feedItems.length > 0 ? (
+              {visibleItems.length > 0 ? (
                 <ul className="notification-list">
-                  {feedItems.map((item) => (
+                  {visibleItems.map((item) => (
                     <li
                       key={`${item.source}-${item.id}`}
                       className="notification-item notification-item-unread"

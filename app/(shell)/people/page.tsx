@@ -1,4 +1,5 @@
 import { EmptyState } from "../../../components/shared/empty-state";
+import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
 import type { UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
@@ -27,15 +28,18 @@ export default async function PeoplePage() {
 
   if (!session?.profile) {
     return (
-      <EmptyState
-        title="Profile is unavailable"
-        description="No profile is linked to this account yet."
-      />
+      <>
+        <PageHeader title="Crew Members" description="Find teammates, review roles, and open full profiles." />
+        <EmptyState
+          title="Profile is unavailable"
+          description="No profile is linked to this account yet."
+        />
+      </>
     );
   }
 
   const roles = session.profile.roles;
-  const canManagePeople = hasRole(roles, "SUPER_ADMIN");
+  const canManagePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const isAdmin = hasRole(roles, "HR_ADMIN") || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
   const scope = resolveScope(roles);
 

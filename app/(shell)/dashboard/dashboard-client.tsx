@@ -17,6 +17,7 @@ import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { useDashboard } from "../../../hooks/use-dashboard";
 import { formatDate, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
+import { formatLeaveTypeLabel } from "../../../lib/time-off";
 import type { DashboardResponseData } from "../../../types/dashboard";
 
 import {
@@ -144,7 +145,7 @@ function EmployeeGreeting({ data }: { data: DashboardResponseData }) {
           {greetingIcon(data.greeting.timeOfDay)} {greetingText(data.greeting.timeOfDay)}
         </p>
         <h1 className="home-welcome-title">
-          {greetingText(data.greeting.timeOfDay)}, {data.greeting.firstName}.
+          {data.greeting.firstName}.
         </h1>
         {annualLeave ? (
           <p className="home-welcome-subtitle">
@@ -171,7 +172,7 @@ function ManagerGreeting({ data }: { data: DashboardResponseData }) {
           {greetingIcon(data.greeting.timeOfDay)} {greetingText(data.greeting.timeOfDay)}
         </p>
         <h1 className="home-welcome-title">
-          {greetingText(data.greeting.timeOfDay)}, {data.greeting.firstName}.
+          {data.greeting.firstName}.
         </h1>
 
         {approvals && approvals.total > 0 ? (
@@ -230,12 +231,12 @@ function HrAdminGreeting({ data }: { data: DashboardResponseData }) {
           {greetingIcon(data.greeting.timeOfDay)} {greetingText(data.greeting.timeOfDay)}
         </p>
         <h1 className="home-welcome-title">
-          {greetingText(data.greeting.timeOfDay)}, {data.greeting.firstName}.
+          {data.greeting.firstName}.
         </h1>
       </div>
       <div className="metric-grid">
         <article className="metric-card">
-          <p className="metric-label">Active employees</p>
+          <p className="metric-label">Active people</p>
           <p className="metric-value numeric">{hc?.total ?? 0}</p>
           {hc && hc.delta30d > 0 ? (
             <p className="metric-description numeric">+{hc.delta30d} new this month</p>
@@ -297,7 +298,7 @@ function FinanceAdminGreeting({ data }: { data: DashboardResponseData }) {
           {greetingIcon(data.greeting.timeOfDay)} {greetingText(data.greeting.timeOfDay)}
         </p>
         <h1 className="home-welcome-title">
-          {greetingText(data.greeting.timeOfDay)}, {data.greeting.firstName}.
+          {data.greeting.firstName}.
         </h1>
       </div>
       <div className="dashboard-finance-summary">
@@ -341,7 +342,7 @@ function SuperAdminGreeting({ data }: { data: DashboardResponseData }) {
           {greetingIcon(data.greeting.timeOfDay)} {greetingText(data.greeting.timeOfDay)}
         </p>
         <h1 className="home-welcome-title">
-          {greetingText(data.greeting.timeOfDay)}, {data.greeting.firstName}.
+          {data.greeting.firstName}.
         </h1>
       </div>
 
@@ -487,7 +488,7 @@ function TeamOnLeaveWidget({ data }: { data: DashboardResponseData }) {
           {data.teamOnLeaveToday.map((person) => (
             <li key={person.id} className="dashboard-widget-list-item">
               <span>{person.name}</span>
-              <StatusBadge tone="info">{person.leaveType}</StatusBadge>
+              <StatusBadge tone="info">{formatLeaveTypeLabel(person.leaveType)}</StatusBadge>
             </li>
           ))}
         </ul>
@@ -521,7 +522,7 @@ function LeaveBalanceWidget({ data }: { data: DashboardResponseData }) {
       <ul className="dashboard-widget-list">
         {data.leaveBalance.byType.map((b) => (
           <li key={b.leaveType} className="dashboard-widget-list-item">
-            <span>{b.leaveType}</span>
+            <span>{formatLeaveTypeLabel(b.leaveType)}</span>
             <span className="numeric">
               <strong>{b.available}</strong>/{b.allocated} days
             </span>
@@ -933,9 +934,6 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
       {/* Super Admin widgets */}
       <WidgetErrorBoundary title="Compliance health">
         <ComplianceHealthWidget data={data} />
-      </WidgetErrorBoundary>
-      <WidgetErrorBoundary title="Recent audit activity">
-        <AuditLogWidget data={data} />
       </WidgetErrorBoundary>
     </motion.div>
   );

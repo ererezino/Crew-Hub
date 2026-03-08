@@ -65,7 +65,7 @@ export function PeopleCompensationClient({
         <EmptyState
           title="No compensation profile found"
           description="No compensation records were found for this crew member."
-          ctaLabel="Back to people"
+          ctaLabel="Back to Crew Members"
           ctaHref="/people"
         />
       ) : null}

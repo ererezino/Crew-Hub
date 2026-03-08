@@ -57,8 +57,8 @@ export default async function PeopleProfilePage({
     return (
       <>
         <PageHeader
-          title="People"
-          description="Find people, review roles, and open full profiles."
+          title="Crew Members"
+          description="Find teammates, review roles, and open full profiles."
         />
         <EmptyState
           title="Profile is unavailable"
@@ -75,13 +75,13 @@ export default async function PeopleProfilePage({
     return (
       <>
         <PageHeader
-          title="People"
-          description="Find people, review roles, and open full profiles."
+          title="Crew Members"
+          description="Find teammates, review roles, and open full profiles."
         />
         <EmptyState
           title="Invalid profile id"
           description="The requested crew profile path is not a valid identifier."
-          ctaLabel="Back to people"
+          ctaLabel="Back to Crew Members"
           ctaHref="/people"
         />
       </>
@@ -95,8 +95,8 @@ export default async function PeopleProfilePage({
     return (
       <>
         <PageHeader
-          title="People"
-          description="Find people, review roles, and open full profiles."
+          title="Crew Members"
+          description="Find teammates, review roles, and open full profiles."
         />
         <EmptyState
           title="Access denied"
@@ -114,8 +114,8 @@ export default async function PeopleProfilePage({
   return (
     <>
       <PageHeader
-        title="People"
-        description="Find people, review roles, and open full profiles."
+        title="Crew Members"
+        description="Find teammates, review roles, and open full profiles."
       />
 
       <section className="page-tabs" role="tablist" aria-label="Profile tabs">
@@ -173,7 +173,7 @@ export default async function PeopleProfilePage({
           <EmptyState
             title="Compensation access denied"
             description="Only HR Admin, Finance Admin, Super Admin, or the profile owner can view compensation."
-            ctaLabel="Back to people"
+            ctaLabel="Back to Crew Members"
             ctaHref="/people"
           />
         )

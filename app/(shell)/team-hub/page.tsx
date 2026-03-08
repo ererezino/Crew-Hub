@@ -28,6 +28,8 @@ export default async function TeamHubPage() {
   return (
     <TeamHubClient
       isAdmin={isAdmin}
+      userDepartment={session.profile.department ?? null}
+      userName={session.profile.full_name ?? "A crew member"}
     />
   );
 }

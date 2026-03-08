@@ -34,7 +34,7 @@ type PaymentDetailsFormValues = {
   bankRoutingNumber: string;
   mobileMoneyProvider: string;
   mobileMoneyNumber: string;
-  wiseRecipientId: string;
+  crewTag: string;
 };
 
 type PaymentDetailsFormField = keyof PaymentDetailsFormValues;
@@ -60,7 +60,7 @@ const paymentDetailsFormSchema = z.discriminatedUnion("paymentMethod", [
     bankRoutingNumber: z.string().trim().max(100, "Routing number is too long.").optional(),
     mobileMoneyProvider: z.string().optional(),
     mobileMoneyNumber: z.string().optional(),
-    wiseRecipientId: z.string().optional()
+    crewTag: z.string().optional()
   }),
   z.object({
     paymentMethod: z.literal("mobile_money"),
@@ -78,16 +78,17 @@ const paymentDetailsFormSchema = z.discriminatedUnion("paymentMethod", [
     bankAccountName: z.string().optional(),
     bankAccountNumber: z.string().optional(),
     bankRoutingNumber: z.string().optional(),
-    wiseRecipientId: z.string().optional()
+    crewTag: z.string().optional()
   }),
   z.object({
-    paymentMethod: z.literal("wise"),
+    paymentMethod: z.literal("crew_tag"),
     currency: z.string().trim().regex(/^[A-Za-z]{3}$/, "Currency must be a 3-letter code."),
-    wiseRecipientId: z
+    crewTag: z
       .string()
       .trim()
-      .min(4, "Wise recipient ID is required.")
-      .max(200, "Wise recipient ID is too long."),
+      .min(2, "Crew Tag is required.")
+      .max(50, "Crew Tag is too long.")
+      .regex(/^[a-zA-Z0-9._-]+$/, "Crew Tag can only contain letters, numbers, dots, dashes, and underscores."),
     bankName: z.string().optional(),
     bankAccountName: z.string().optional(),
     bankAccountNumber: z.string().optional(),
@@ -106,7 +107,7 @@ const INITIAL_FORM_VALUES: PaymentDetailsFormValues = {
   bankRoutingNumber: "",
   mobileMoneyProvider: "",
   mobileMoneyNumber: "",
-  wiseRecipientId: ""
+  crewTag: ""
 };
 
 const INITIAL_TOUCHED: PaymentDetailsFormTouched = {
@@ -118,7 +119,7 @@ const INITIAL_TOUCHED: PaymentDetailsFormTouched = {
   bankRoutingNumber: false,
   mobileMoneyProvider: false,
   mobileMoneyNumber: false,
-  wiseRecipientId: false
+  crewTag: false
 };
 
 function createToastId() {
@@ -145,7 +146,7 @@ function activeFieldsForMethod(method: PaymentMethod): PaymentDetailsFormField[]
     return ["paymentMethod", "currency", "mobileMoneyProvider", "mobileMoneyNumber"];
   }
 
-  return ["paymentMethod", "currency", "wiseRecipientId"];
+  return ["paymentMethod", "currency", "crewTag"];
 }
 
 function buildPayloadFromForm(values: PaymentDetailsFormValues): PaymentDetailsUpdatePayload {
@@ -172,9 +173,9 @@ function buildPayloadFromForm(values: PaymentDetailsFormValues): PaymentDetailsU
   }
 
   return {
-    paymentMethod: "wise",
+    paymentMethod: "crew_tag",
     currency: normalizedCurrency,
-    wiseRecipientId: values.wiseRecipientId.trim()
+    crewTag: values.crewTag.trim()
   };
 }
 
@@ -373,7 +374,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
         bankRoutingNumber: "",
         mobileMoneyProvider: "",
         mobileMoneyNumber: "",
-        wiseRecipientId: ""
+        crewTag: ""
       }));
       setFormTouched(INITIAL_TOUCHED);
       setFormErrors({});
@@ -634,20 +635,25 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                 </>
               ) : null}
 
-              {formValues.paymentMethod === "wise" ? (
-                <label className="form-field" htmlFor="wise-recipient-id">
-                  <span className="form-label">Wise recipient ID</span>
-                  <input
-                    id="wise-recipient-id"
-                    className={
-                      formErrors.wiseRecipientId ? "form-input form-input-error" : "form-input"
-                    }
-                    value={formValues.wiseRecipientId}
-                    onChange={handleChange("wiseRecipientId")}
-                    onBlur={() => markTouched("wiseRecipientId")}
-                  />
-                  {formErrors.wiseRecipientId ? (
-                    <p className="form-field-error">{formErrors.wiseRecipientId}</p>
+              {formValues.paymentMethod === "crew_tag" ? (
+                <label className="form-field" htmlFor="crew-tag">
+                  <span className="form-label">Crew Tag</span>
+                  <div className="crewtag-input-wrap">
+                    <span className="crewtag-input-prefix" aria-hidden="true">@</span>
+                    <input
+                      id="crew-tag"
+                      className={
+                        formErrors.crewTag ? "form-input form-input-error crewtag-input" : "form-input crewtag-input"
+                      }
+                      placeholder="username"
+                      value={formValues.crewTag}
+                      onChange={handleChange("crewTag")}
+                      onBlur={() => markTouched("crewTag")}
+                    />
+                  </div>
+                  <p className="form-field-hint">Your Accrue username — e.g. @zino.doe</p>
+                  {formErrors.crewTag ? (
+                    <p className="form-field-error">{formErrors.crewTag}</p>
                   ) : null}
                 </label>
               ) : null}

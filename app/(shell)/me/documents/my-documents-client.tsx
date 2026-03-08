@@ -465,14 +465,6 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
       if (!rejectionTarget) return;
 
-      const confirmed = window.confirm(
-        `Reject travel support request for ${rejectionTarget.employeeName ?? "this employee"}?`
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
       setIsRejecting(true);
       setRejectionError(null);
 

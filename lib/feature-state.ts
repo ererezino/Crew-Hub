@@ -70,8 +70,8 @@ export const FEATURE_STATE_META: Record<FeatureState, FeatureStateMeta> = {
     showBanner: true
   },
   UNAVAILABLE: {
-    label: "Unavailable",
-    description: "This feature is not available in the current release.",
+    label: "Preview",
+    description: "This module is built but not yet included in the active release.",
     tone: "draft",
     actionsDisabled: true,
     hideFromNav: true,
@@ -185,10 +185,12 @@ export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   payroll_withholding_za: "COMING_SOON",
   payroll_withholding_ca: "COMING_SOON",
 
+  // Pilot with known limitations
+  team_hub: "LIMITED_PILOT",
+  performance: "LIMITED_PILOT",
+
   // Hidden from pilot nav — accessible via direct URL only
-  team_hub: "UNAVAILABLE",
   learning: "UNAVAILABLE",
-  performance: "UNAVAILABLE",
   signatures: "UNAVAILABLE",
   surveys: "UNAVAILABLE",
   analytics: "ADMIN_ONLY"

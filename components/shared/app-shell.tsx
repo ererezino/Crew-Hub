@@ -1,6 +1,6 @@
 "use client";
 
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -33,6 +33,7 @@ import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { NavIcon } from "./nav-icon";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
+import { WhoIsOnline } from "./who-is-online";
 
 const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "crew-hub-sidebar-collapsed";
@@ -330,15 +331,64 @@ async function fetchSidebarApprovalCounts(
   };
 }
 
-type AvailabilityStatus = "available" | "in_meeting" | "on_break" | "focusing" | "afk" | "ooo";
+async function fetchActiveAnnouncementCount(): Promise<number> {
+  try {
+    const [announcementsRes, notificationsRes] = await Promise.all([
+      fetch("/api/v1/announcements"),
+      fetch("/api/v1/notifications?unreadOnly=true&limit=1")
+    ]);
 
-const STATUS_OPTIONS: { value: AvailabilityStatus; label: string; color: string }[] = [
-  { value: "available", label: "Available", color: "#22C55E" },
-  { value: "in_meeting", label: "In a meeting", color: "#EAB308" },
-  { value: "on_break", label: "On a break", color: "#EAB308" },
-  { value: "focusing", label: "Focusing", color: "#F97316" },
-  { value: "afk", label: "AFK", color: "#94A3B8" },
-  { value: "ooo", label: "Out of office", color: "#EF4444" },
+    let count = 0;
+
+    if (announcementsRes.ok) {
+      const json = (await announcementsRes.json()) as {
+        data?: { announcements?: { isRead?: boolean }[] } | null;
+      };
+      const announcements = json?.data?.announcements;
+      if (Array.isArray(announcements)) {
+        count += announcements.filter((a) => a.isRead !== true).length;
+      }
+    }
+
+    if (notificationsRes.ok) {
+      const json = (await notificationsRes.json()) as {
+        data?: { unreadCount?: number } | null;
+      };
+      count += json?.data?.unreadCount ?? 0;
+    }
+
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+type AvailabilityStatus = "available" | "afk" | "ooo";
+
+const STATUS_OPTIONS: { value: AvailabilityStatus; label: string }[] = [
+  { value: "available", label: "Available" },
+  { value: "afk", label: "Away From Keyboard" },
+  { value: "ooo", label: "Out of office" },
+];
+
+const AFK_DURATION_OPTIONS: { value: number; label: string }[] = [
+  { value: 15, label: "15 min" },
+  { value: 30, label: "30 min" },
+  { value: 45, label: "45 min" },
+  { value: 60, label: "1 hr" },
+  { value: 75, label: "1 hr 15 min" },
+  { value: 90, label: "1 hr 30 min" },
+  { value: 105, label: "1 hr 45 min" },
+  { value: 120, label: "2 hrs" },
+];
+
+const OOO_DAY_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: "1 day" },
+  { value: 2, label: "2 days" },
+  { value: 3, label: "3 days" },
+  { value: 4, label: "4 days" },
+  { value: 5, label: "5 days" },
+  { value: -1, label: "Other" },
 ];
 
 type UserMenuProps = {
@@ -362,9 +412,16 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<AvailabilityStatus>("available");
+  const [pendingStatus, setPendingStatus] = useState<AvailabilityStatus | null>(null);
   const [statusNote, setStatusNote] = useState("");
+  const [statusDuration, setStatusDuration] = useState(30);
+  const [statusDurationDays, setStatusDurationDays] = useState(1);
+  const [statusCustomDays, setStatusCustomDays] = useState("");
+  const [showCustomDaysInput, setShowCustomDaysInput] = useState(false);
+  const [statusNoteError, setStatusNoteError] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const statusRef = useRef<HTMLDivElement | null>(null);
+  const noteInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -373,6 +430,8 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
       }
       if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
         setIsStatusPickerOpen(false);
+        setPendingStatus(null);
+        setStatusNoteError(false);
       }
     };
 
@@ -380,19 +439,68 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
-  const handleStatusChange = useCallback(async (status: AvailabilityStatus) => {
+  const submitStatusChange = useCallback(async (
+    status: AvailabilityStatus,
+    note: string,
+    durationMinutes?: number,
+    durationDays?: number
+  ) => {
     setCurrentStatus(status);
+    setPendingStatus(null);
     setIsStatusPickerOpen(false);
+    setStatusNoteError(false);
+    setShowCustomDaysInput(false);
     try {
       await fetch("/api/v1/me/status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, note: statusNote })
+        body: JSON.stringify({ status, note, durationMinutes, durationDays })
       });
     } catch {
       // Best effort
     }
-  }, [statusNote]);
+  }, []);
+
+  const handleStatusOptionClick = useCallback((status: AvailabilityStatus) => {
+    if (status === "available") {
+      setStatusNote("");
+      setStatusDuration(30);
+      setStatusDurationDays(1);
+      setStatusCustomDays("");
+      setShowCustomDaysInput(false);
+      void submitStatusChange(status, "");
+      return;
+    }
+    setPendingStatus(status);
+    setStatusNote("");
+    setStatusNoteError(false);
+    if (status === "ooo") {
+      setStatusDurationDays(1);
+      setStatusCustomDays("");
+      setShowCustomDaysInput(false);
+    } else {
+      setStatusDuration(30);
+    }
+    setTimeout(() => noteInputRef.current?.focus(), 50);
+  }, [submitStatusChange]);
+
+  const confirmPendingStatus = useCallback(() => {
+    if (!pendingStatus) return;
+    const trimmed = statusNote.trim();
+    if (!trimmed) {
+      setStatusNoteError(true);
+      noteInputRef.current?.focus();
+      return;
+    }
+    if (pendingStatus === "ooo") {
+      const days = showCustomDaysInput
+        ? Math.min(Math.max(Number(statusCustomDays) || 1, 1), 10)
+        : statusDurationDays;
+      void submitStatusChange(pendingStatus, trimmed, undefined, days);
+    } else {
+      void submitStatusChange(pendingStatus, trimmed, statusDuration);
+    }
+  }, [pendingStatus, statusDuration, statusDurationDays, statusCustomDays, showCustomDaysInput, statusNote, submitStatusChange]);
 
   const handleSignOut = useCallback(async () => {
     setIsSigningOut(true);
@@ -407,45 +515,154 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
   const roleBadge = getRoleBadgeLabel(roles);
 
   return (
-    <div className="user-menu" ref={menuRef} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-      <div ref={statusRef} style={{ position: "relative" }}>
+    <div className="user-menu" ref={menuRef}>
+      <div ref={statusRef} className="user-menu-status-wrapper">
         <button
           type="button"
           className="user-menu-trigger"
           onClick={() => setIsStatusPickerOpen((v) => !v)}
           aria-label="Change status"
         >
-          <span className="user-menu-avatar numeric">{initials}</span>
+          {profile?.avatarUrl ? (
+            <Image src={profile.avatarUrl} alt={profile.fullName} width={32} height={32} className="user-menu-avatar-image" />
+          ) : (
+            <span className="user-menu-avatar numeric">{initials}</span>
+          )}
           <span className={`status-dot status-dot-${currentStatus}`} />
         </button>
 
         {isStatusPickerOpen ? (
           <div className="status-picker">
-            {STATUS_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                className={`status-picker-option${currentStatus === opt.value ? " status-picker-option-active" : ""}`}
-                onClick={() => void handleStatusChange(opt.value)}
-              >
-                <span className="status-picker-option-dot" style={{ background: opt.color }} />
-                {opt.label}
-              </button>
-            ))}
-            {(currentStatus === "afk" || currentStatus === "ooo") ? (
-              <input
-                type="text"
-                className="status-note-input"
-                placeholder="Add a note (optional)"
-                value={statusNote}
-                onChange={(e) => setStatusNote(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    void handleStatusChange(currentStatus);
+            {pendingStatus === null ? (
+              STATUS_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`status-picker-option${currentStatus === opt.value ? " status-picker-option-active" : ""}`}
+                  onClick={() => handleStatusOptionClick(opt.value)}
+                >
+                  <span className={`status-picker-option-dot status-picker-option-dot-${opt.value}`} />
+                  {opt.label}
+                </button>
+              ))
+            ) : (
+              <div className="status-note-panel">
+                <p className="status-note-heading">
+                  {STATUS_OPTIONS.find((o) => o.value === pendingStatus)?.label ?? "Status"}
+                </p>
+                <p className="status-note-label">
+                  Add note &amp; set time <span className="status-note-required">*</span>
+                </p>
+                <input
+                  ref={noteInputRef}
+                  type="text"
+                  className={`status-note-input${statusNoteError ? " status-note-input-error" : ""}`}
+                  placeholder={
+                    pendingStatus === "ooo"
+                      ? "e.g. Taking my leave — back next Monday"
+                      : "e.g. Stepping out to fix Gabby's car"
                   }
-                }}
-              />
-            ) : null}
+                  value={statusNote}
+                  maxLength={200}
+                  onChange={(e) => {
+                    setStatusNote(e.target.value);
+                    if (statusNoteError) setStatusNoteError(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") confirmPendingStatus();
+                    if (e.key === "Escape") {
+                      setPendingStatus(null);
+                      setStatusNoteError(false);
+                    }
+                  }}
+                />
+                {statusNoteError ? (
+                  <p className="status-note-error-text">A note is required.</p>
+                ) : null}
+                <div className="status-duration-row">
+                  <label className="status-duration-label" htmlFor="status-duration-select">
+                    {pendingStatus === "ooo" ? "Days" : "Duration"}
+                  </label>
+                  {pendingStatus === "ooo" ? (
+                    showCustomDaysInput ? (
+                      <div className="status-custom-days-row">
+                        <input
+                          type="number"
+                          className="status-custom-days-input"
+                          min={1}
+                          max={10}
+                          placeholder="1–10"
+                          value={statusCustomDays}
+                          onChange={(e) => setStatusCustomDays(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") confirmPendingStatus();
+                          }}
+                        />
+                        <span className="status-custom-days-suffix">days</span>
+                        <button
+                          type="button"
+                          className="status-custom-days-back"
+                          onClick={() => { setShowCustomDaysInput(false); setStatusCustomDays(""); }}
+                          aria-label="Back to dropdown"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        id="status-duration-select"
+                        className="status-duration-select"
+                        value={statusDurationDays}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (val === -1) {
+                            setShowCustomDaysInput(true);
+                            setStatusCustomDays("");
+                          } else {
+                            setStatusDurationDays(val);
+                          }
+                        }}
+                      >
+                        {OOO_DAY_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    )
+                  ) : (
+                    <select
+                      id="status-duration-select"
+                      className="status-duration-select"
+                      value={statusDuration}
+                      onChange={(e) => setStatusDuration(Number(e.target.value))}
+                    >
+                      {AFK_DURATION_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div className="status-note-actions">
+                  <button
+                    type="button"
+                    className="status-note-cancel"
+                    onClick={() => {
+                      setPendingStatus(null);
+                      setStatusNoteError(false);
+                      setShowCustomDaysInput(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="status-note-confirm"
+                    onClick={confirmPendingStatus}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
       </div>
@@ -455,9 +672,8 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
         className="user-menu-trigger"
         onClick={() => setIsOpen((v) => !v)}
         aria-label="User menu"
-        style={{ position: "relative" }}
       >
-        <svg viewBox="0 0 24 24" style={{ width: "16px", height: "16px" }} aria-hidden="true">
+        <svg viewBox="0 0 24 24" className="user-menu-chevron-icon" aria-hidden="true">
           <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </svg>
       </button>
@@ -465,7 +681,11 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
       {isOpen ? (
         <div className="user-menu-dropdown" role="menu">
           <div className="user-menu-profile">
-            <span className="user-menu-avatar-lg numeric">{initials}</span>
+            {profile?.avatarUrl ? (
+              <Image src={profile.avatarUrl} alt={profile.fullName} width={40} height={40} className="user-menu-avatar-lg-image" />
+            ) : (
+              <span className="user-menu-avatar-lg numeric">{initials}</span>
+            )}
             <div className="user-menu-profile-copy">
               <p className="user-menu-name">{profile?.fullName ?? "User"}</p>
               <p className="user-menu-email">{profile?.email ?? ""}</p>
@@ -574,6 +794,52 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
     retry: 1,
     enabled: hasAnyRole(currentUserRoles, APPROVAL_GROUP_ROLES)
   });
+
+  const announcementCountQuery = useQuery({
+    queryKey: ["sidebar-announcement-count"],
+    queryFn: fetchActiveAnnouncementCount,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 1
+  });
+
+  /* Refresh the sidebar badge when notifications/announcements are dismissed from the bell */
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const handler = () => {
+      void queryClient.invalidateQueries({ queryKey: ["sidebar-announcement-count"] });
+    };
+    window.addEventListener("crew-hub:badge-refresh", handler);
+    return () => window.removeEventListener("crew-hub:badge-refresh", handler);
+  }, [queryClient]);
+
+  /* Presence heartbeat — pings /api/v1/me/heartbeat every 60s while the tab is visible */
+  useEffect(() => {
+    const HEARTBEAT_INTERVAL_MS = 60_000;
+
+    const sendHeartbeat = () => {
+      if (document.visibilityState !== "visible") return;
+      void fetch("/api/v1/me/heartbeat", { method: "POST" }).catch(() => {
+        /* swallow — heartbeat is best-effort */
+      });
+    };
+
+    /* Send initial heartbeat on mount */
+    sendHeartbeat();
+
+    const intervalId = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+    /* Also send one when the tab becomes visible again */
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") sendHeartbeat();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
 
   const fallbackAllowedRouteKeys = useMemo(
     () => new Set(defaultNavVisibilityForRoles(currentUserRoles)),
@@ -831,16 +1097,15 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                     onClick={() => handleSidebarGroupToggle(key, defaultExpanded)}
                     aria-expanded={isExpanded}
                     aria-controls={domId}
-                    style={{
-                      background: "none",
-                      border: 0,
-                      padding: 0,
-                      textAlign: "left",
-                      width: "100%",
-                      cursor: "pointer"
-                    }}
                   >
                     {group.label}
+                    <svg
+                      viewBox="0 0 24 24"
+                      className={`sidebar-section-chevron${isExpanded ? " sidebar-section-chevron-open" : ""}`}
+                      aria-hidden="true"
+                    >
+                      <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                    </svg>
                   </button>
                 ) : null}
 
@@ -850,6 +1115,9 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                     const showApprovalsBadge =
                       item.href === "/approvals" &&
                       (approvalsCountQuery.data?.total ?? 0) > 0;
+                    const showAnnouncementBadge =
+                      item.href === "/announcements" &&
+                      (announcementCountQuery.data ?? 0) > 0;
 
                     return (
                       <li key={item.href}>
@@ -869,6 +1137,11 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                               {approvalsCountQuery.data?.total ?? 0}
                             </span>
                           ) : null}
+                          {showAnnouncementBadge ? (
+                            <span className="sidebar-link-badge numeric" aria-label="Unread announcements">
+                              {announcementCountQuery.data ?? 0}
+                            </span>
+                          ) : null}
                         </Link>
                       </li>
                     );
@@ -878,6 +1151,10 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
             );
           })}
         </nav>
+
+        {isSuperAdmin(currentUserRoles) ? (
+          <WhoIsOnline isSidebarCollapsed={isSidebarCollapsed} />
+        ) : null}
 
         <div className="sidebar-bottom">
           {settingsAllowed ? (
@@ -902,9 +1179,13 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
               className="sidebar-profile-link"
               onClick={() => handleSidebarItemClick("/settings")}
             >
-              <span className="sidebar-profile-avatar numeric" aria-hidden="true">
-                {sidebarProfileInitials}
-              </span>
+              {currentUserProfile?.avatarUrl ? (
+                <Image src={currentUserProfile.avatarUrl} alt="" width={32} height={32} className="sidebar-profile-avatar-image" aria-hidden="true" />
+              ) : (
+                <span className="sidebar-profile-avatar numeric" aria-hidden="true">
+                  {sidebarProfileInitials}
+                </span>
+              )}
               <span className="sidebar-profile-copy">
                 <span className="sidebar-profile-name">{currentUserProfile.fullName}</span>
                 <span className="sidebar-profile-email">{currentUserProfile.email}</span>

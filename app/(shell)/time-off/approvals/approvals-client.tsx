@@ -187,14 +187,6 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       return;
     }
 
-    const confirmed = window.confirm(
-      `Reject ${rejectTarget.employeeName}'s leave request? This action requires a reason and will notify the employee.`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     setIsRejecting(true);
 
     try {

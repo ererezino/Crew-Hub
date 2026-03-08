@@ -309,7 +309,7 @@ export function PayrollRunDetailClient({
 
       showToast(
         "success",
-        `Calculation complete for ${payload.data.employeeCount} employees.`
+        `Calculation complete for ${payload.data.employeeCount} people.`
       );
       runQuery.refresh();
     } catch (error) {

@@ -531,7 +531,7 @@ export async function POST(request: Request) {
           data: null,
           error: {
             code: "SHIFT_SWAP_TARGET_CONFLICT",
-            message: "Target employee has an overlapping shift."
+            message: "Target crew member has an overlapping shift."
           },
           meta: buildMeta()
         });

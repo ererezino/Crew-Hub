@@ -20,14 +20,17 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-function resolveAuthRedirectUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.crew-hub.local";
+function resolveAuthRedirectUrl(request: Request): string {
+  const requestUrl = new URL(request.url);
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    requestUrl.origin;
   const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
-  return `${normalizedAppUrl}/reset-password`;
+  return `${normalizedAppUrl}/api/auth/callback?next=/reset-password`;
 }
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   const session = await getAuthenticatedSession();
@@ -69,7 +72,7 @@ export async function POST(
 
   const personId = parsedParams.data.id;
   const serviceRoleClient = createSupabaseServiceRoleClient();
-  const authRedirectUrl = resolveAuthRedirectUrl();
+  const authRedirectUrl = resolveAuthRedirectUrl(request);
 
   const { data: existingProfile, error: profileError } = await serviceRoleClient
     .from("profiles")

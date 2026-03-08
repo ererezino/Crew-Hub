@@ -1,20 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { Employee360 } from "../../../../components/people/employee-360";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDate as formatDateLib } from "../../../../lib/datetime";
+import { DEPARTMENTS } from "../../../../lib/departments";
+import { USER_ROLES } from "../../../../lib/navigation";
+import type { ApiResponse, AppRole } from "../../../../types/auth";
 import type {
   PersonRecord,
   PeopleListResponse,
   PeopleUpdateResponse,
   PrivacySettings
 } from "../../../../types/people";
-import type { ApiResponse } from "../../../../types/auth";
+import { humanizeError } from "@/lib/errors";
 
 /* ── Types ── */
 
@@ -130,6 +134,24 @@ export function PeopleOverviewClient({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Admin edit state
+  const [isAdminEditOpen, setIsAdminEditOpen] = useState(false);
+  const [adminEditValues, setAdminEditValues] = useState({
+    roles: ["EMPLOYEE"] as AppRole[],
+    department: "",
+    managerId: "",
+    title: ""
+  });
+  const [adminEditError, setAdminEditError] = useState<string | null>(null);
+  const [isAdminEditSaving, setIsAdminEditSaving] = useState(false);
+  const [allPeople, setAllPeople] = useState<PersonRecord[]>([]);
+
+  // Invite state
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteConfirmOpen, setInviteConfirmOpen] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+
   // Offboarding state
   const [isOffboardModalOpen, setIsOffboardModalOpen] = useState(false);
   const [offboardLastDay, setOffboardLastDay] = useState("");
@@ -169,6 +191,7 @@ export function PeopleOverviewClient({
         }
 
         setPerson(found);
+        setAllPeople(payload.data.people);
       } catch (error) {
         if (abortController.signal.aborted) return;
         setPerson(null);
@@ -190,6 +213,128 @@ export function PeopleOverviewClient({
   const refresh = useCallback(() => {
     setReloadToken((v) => v + 1);
   }, []);
+
+  // Role labels
+  const roleLabels: Record<AppRole, string> = useMemo(() => ({
+    EMPLOYEE: "Employee",
+    TEAM_LEAD: "Team Lead",
+    MANAGER: "Manager",
+    HR_ADMIN: "HR Admin",
+    FINANCE_ADMIN: "Finance Admin",
+    SUPER_ADMIN: "Super Admin"
+  }), []);
+
+  // Admin edit handlers
+  const openAdminEdit = useCallback(() => {
+    if (!person) return;
+    setAdminEditValues({
+      roles: person.roles.length > 0 ? [...person.roles] : ["EMPLOYEE"],
+      department: person.department ?? "",
+      managerId: person.managerId ?? "",
+      title: person.title ?? ""
+    });
+    setAdminEditError(null);
+    setIsAdminEditOpen(true);
+  }, [person]);
+
+  const closeAdminEdit = useCallback(() => {
+    if (isAdminEditSaving) return;
+    setIsAdminEditOpen(false);
+    setAdminEditError(null);
+  }, [isAdminEditSaving]);
+
+  const handleAdminEditRoleToggle = useCallback((role: AppRole) => {
+    setAdminEditValues((prev) => {
+      const has = prev.roles.includes(role);
+      const next = has
+        ? prev.roles.filter((r) => r !== role)
+        : [...prev.roles, role];
+      return { ...prev, roles: next.length > 0 ? next : ["EMPLOYEE"] };
+    });
+  }, []);
+
+  const handleAdminEditSave = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (!person) return;
+
+      setIsAdminEditSaving(true);
+      setAdminEditError(null);
+
+      try {
+        const response = await fetch(`/api/v1/people/${person.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            roles: adminEditValues.roles,
+            department: adminEditValues.department.trim() || null,
+            managerId: adminEditValues.managerId.trim() || null,
+            title: adminEditValues.title.trim() || null
+          })
+        });
+
+        const payload = (await response.json()) as PeopleUpdateResponse;
+
+        if (!response.ok || !payload.data?.person) {
+          setAdminEditError(humanizeError(payload.error?.message ?? "Unable to save changes."));
+          return;
+        }
+
+        setPerson(payload.data.person);
+        setIsAdminEditOpen(false);
+      } catch (error) {
+        setAdminEditError(error instanceof Error ? error.message : "Unable to save changes.");
+      } finally {
+        setIsAdminEditSaving(false);
+      }
+    },
+    [person, adminEditValues]
+  );
+
+  // Invite handler
+  const handleSendInvite = useCallback(async () => {
+    if (!person) return;
+
+    setIsInviting(true);
+    setInviteConfirmOpen(false);
+    setInviteMessage(null);
+    setInviteLink(null);
+
+    try {
+      const response = await fetch(`/api/v1/people/${person.id}/invite`, {
+        method: "POST"
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok || !payload.data?.inviteSent) {
+        setInviteMessage({
+          type: "error",
+          text: humanizeError(payload.error?.message ?? "Unable to send invite.")
+        });
+        return;
+      }
+
+      /* Store invite link for manual sharing */
+      if (payload.data.inviteLink) {
+        setInviteLink(payload.data.inviteLink);
+      }
+
+      setInviteMessage({
+        type: "success",
+        text: payload.data.isResend
+          ? `Invite resent to ${person.email}. Copy the link below to share it manually.`
+          : `Invite sent to ${person.email}. Copy the link below to share it manually.`
+      });
+    } catch (error) {
+      setInviteMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Unable to send invite."
+      });
+    } finally {
+      setIsInviting(false);
+    }
+  }, [person]);
 
   // Avatar upload handler
   const handleAvatarUpload = useCallback(
@@ -343,14 +488,6 @@ export function PeopleOverviewClient({
       event.preventDefault();
       if (!person) return;
 
-      const confirmed = window.confirm(
-        `Begin offboarding for ${person.fullName}? This will move the employee to offboarding and create related tasks.`
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
       setIsSubmittingOffboard(true);
       setOffboardError(null);
 
@@ -499,11 +636,62 @@ export function PeopleOverviewClient({
               Edit Profile
             </button>
           ) : null}
+          {isAdmin && !isSelf ? (
+            <>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={openAdminEdit}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => setInviteConfirmOpen(true)}
+                disabled={isInviting}
+              >
+                {isInviting ? "Sending..." : "Send Invite"}
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
       {avatarError ? (
         <div className="form-error-banner">{avatarError}</div>
+      ) : null}
+
+      {inviteMessage ? (
+        <div className={inviteMessage.type === "success" ? "invite-success-banner" : "form-error-banner"}>
+          {inviteMessage.text}
+        </div>
+      ) : null}
+
+      {inviteLink ? (
+        <div className="invite-link-area">
+          <p className="invite-link-label">
+            Invite link — copy and share this link directly with {person.fullName}:
+          </p>
+          <div className="invite-link-input-row">
+            <input
+              className="form-input"
+              value={inviteLink}
+              readOnly
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+            />
+            <button
+              type="button"
+              className="button button-accent"
+              onClick={() => {
+                void navigator.clipboard.writeText(inviteLink);
+                setInviteMessage({ type: "success", text: "Invite link copied to clipboard." });
+              }}
+            >
+              Copy Link
+            </button>
+          </div>
+        </div>
       ) : null}
 
       {/* Details Grid */}
@@ -734,7 +922,7 @@ export function PeopleOverviewClient({
           <div className="offboarding-banner-content">
             <StatusBadge tone="warning">Offboarding</StatusBadge>
             <p className="offboarding-banner-text">
-              This employee is being offboarded.{person.noticePeriodEndDate
+              This person is being offboarded.{person.noticePeriodEndDate
                 ? ` Last working day: ${formatDate(person.noticePeriodEndDate)}.`
                 : ""}
             </p>
@@ -1060,6 +1248,118 @@ export function PeopleOverviewClient({
           </div>
         </form>
       </SlidePanel>
+
+      {/* Admin Edit Slide Panel */}
+      <SlidePanel
+        isOpen={isAdminEditOpen}
+        title={person ? `Edit ${person.fullName}` : "Edit Person"}
+        description="Update role, department, and manager for this crew member."
+        onClose={closeAdminEdit}
+      >
+        {person ? (
+          <form className="slide-panel-form-wrapper" onSubmit={handleAdminEditSave} noValidate>
+            {adminEditError ? <div className="form-error-banner">{adminEditError}</div> : null}
+
+            <label className="form-field" htmlFor="admin-edit-title">
+              <span className="form-label">Job title</span>
+              <input
+                id="admin-edit-title"
+                className="form-input"
+                maxLength={200}
+                placeholder="e.g. Software Engineer"
+                value={adminEditValues.title}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setAdminEditValues((prev) => ({ ...prev, title: val }));
+                }}
+              />
+            </label>
+
+            <fieldset className="form-field people-role-fieldset">
+              <legend className="form-label">Roles</legend>
+              <div className="people-role-selection">
+                {USER_ROLES.map((role) => (
+                  <label key={`admin-role-${role}`} className="settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={adminEditValues.roles.includes(role)}
+                      onChange={() => handleAdminEditRoleToggle(role)}
+                    />
+                    <span>{roleLabels[role]}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="form-field" htmlFor="admin-edit-department">
+              <span className="form-label">Department</span>
+              <select
+                id="admin-edit-department"
+                className="form-input"
+                value={adminEditValues.department}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setAdminEditValues((prev) => ({ ...prev, department: val }));
+                }}
+              >
+                <option value="">No department</option>
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="form-field" htmlFor="admin-edit-manager">
+              <span className="form-label">Manager</span>
+              <select
+                id="admin-edit-manager"
+                className="form-input"
+                value={adminEditValues.managerId}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setAdminEditValues((prev) => ({ ...prev, managerId: val }));
+                }}
+              >
+                <option value="">No manager</option>
+                {allPeople
+                  .filter((p) => p.id !== person.id && p.status === "active")
+                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                  .map((p) => (
+                    <option key={`admin-mgr-${p.id}`} value={p.id}>
+                      {p.fullName}
+                    </option>
+                  ))}
+              </select>
+            </label>
+
+            <div className="slide-panel-actions">
+              <button type="button" className="button button-ghost" onClick={closeAdminEdit} disabled={isAdminEditSaving}>
+                Cancel
+              </button>
+              <button type="submit" className="button button-accent" disabled={isAdminEditSaving}>
+                {isAdminEditSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </SlidePanel>
+
+      {/* Invite Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={inviteConfirmOpen}
+        title="Send Crew Hub invite"
+        description={
+          person
+            ? `Send an invite email to ${person.fullName} (${person.email})? They will receive a link to set up their Crew Hub account.`
+            : ""
+        }
+        confirmLabel="Send Invite"
+        isConfirming={isInviting}
+        onConfirm={() => void handleSendInvite()}
+        onCancel={() => setInviteConfirmOpen(false)}
+      />
     </section>
   );
 }
