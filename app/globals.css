@@ -738,17 +738,18 @@ html.dark .button-orange:hover {
   color: var(--color-accent);
 }
 
-/* Collapsed sidebar: center icons, hide text */
+/* Collapsed sidebar: center icons, hide everything except the icon */
 .sidebar-collapsed .sidebar-link {
   justify-content: center;
   padding: var(--space-2);
+  overflow: hidden;
 }
 
-.sidebar-collapsed .sidebar-link-text,
-.sidebar-collapsed .sidebar-shortcut,
-.sidebar-collapsed .sidebar-link-indicator,
-.sidebar-collapsed .sidebar-link .status-badge {
-  display: none;
+.sidebar-collapsed .sidebar-link > *:not(.sidebar-link-icon) {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
 }
 
 .sidebar-collapsed .sidebar-link-icon {
@@ -758,16 +759,6 @@ html.dark .button-orange:hover {
 .sidebar-collapsed .sidebar-link-active .sidebar-link-icon {
   opacity: 1;
   color: var(--color-accent);
-}
-
-.sidebar-collapsed .sidebar-link-badge {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 0.9rem;
-  height: 0.9rem;
-  font-size: var(--text-xs);
-  padding: 0 var(--space-1);
 }
 
 /* Keep the old dot class for backward compat but hide it */
@@ -8225,6 +8216,18 @@ html.dark .topbar {
     opacity: 1 !important;
     width: auto !important;
     pointer-events: auto !important;
+  }
+
+  /* Restore ALL link children on mobile */
+  .sidebar-collapsed .sidebar-link > * {
+    display: revert !important;
+    width: revert !important;
+    height: revert !important;
+    overflow: revert !important;
+  }
+
+  .sidebar-collapsed .sidebar-link {
+    overflow: visible !important;
   }
 
   .sidebar-collapsed .sidebar-group-title,
