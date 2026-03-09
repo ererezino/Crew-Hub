@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { logAudit } from "../../../../lib/audit";
 import type { ApiResponse } from "../../../../types/auth";
 import type {
   NotificationAction,
@@ -217,6 +218,13 @@ export async function DELETE() {
       meta: buildMeta()
     });
   }
+
+  await logAudit({
+    action: "deleted",
+    tableName: "notifications",
+    recordId: session.profile.id,
+    newValue: { event: "bulk_delete_all_notifications" }
+  }).catch(() => undefined);
 
   return jsonResponse<{ deletedAt: string }>(200, {
     data: { deletedAt: new Date().toISOString() },

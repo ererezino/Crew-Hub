@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { logAudit } from "../../../../../lib/audit";
+import { logger } from "../../../../../lib/logger";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import type { Announcement } from "../../../../../types/announcements";
 
@@ -212,6 +215,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
+  await logAudit({
+    action: "updated",
+    tableName: "announcements",
+    recordId: announcementId,
+    newValue: {
+      title: parsedAnnouncement.data.title,
+      isPinned: parsedAnnouncement.data.is_pinned
+    }
+  }).catch(() => undefined);
+
   const creatorId = parsedAnnouncement.data.created_by;
   let creatorName = "Unknown user";
 
@@ -250,7 +263,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .is("deleted_at", null);
 
   if (recipientError) {
-    console.error("Unable to load announcement update recipients.", {
+    logger.error("Unable to load announcement update recipients.", {
       announcementId,
       message: recipientError.message
     });
@@ -316,10 +329,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
     });
   }
 
-  const supabase = await createSupabaseServerClient();
   const announcementId = parsedParams.data.announcementId;
+  const adminClient = createSupabaseServiceRoleClient();
 
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await adminClient
     .from("announcements")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", announcementId)
@@ -336,6 +349,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
       meta: buildMeta()
     });
   }
+
+  await logAudit({
+    action: "deleted",
+    tableName: "announcements",
+    recordId: announcementId
+  }).catch(() => undefined);
 
   return jsonResponse<{ announcementId: string }>(200, {
     data: { announcementId },

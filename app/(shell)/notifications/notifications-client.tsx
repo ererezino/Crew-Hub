@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
 import { NotificationActionButton } from "../../../components/shared/notification-action-button";
@@ -25,9 +26,15 @@ function notificationsSkeleton() {
   );
 }
 
-export function NotificationsClient() {
+type NotificationsClientProps = {
+  isSuperAdmin?: boolean;
+};
+
+export function NotificationsClient({ isSuperAdmin = false }: NotificationsClientProps) {
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const notificationsQuery = useNotifications({
     limit: 200,
     unreadOnly: filter === "unread"
@@ -188,6 +195,17 @@ export function NotificationsClient() {
                           Mark read
                         </button>
                       ) : null}
+                      {isSuperAdmin ? (
+                        <button
+                          type="button"
+                          className="table-row-action table-row-action-danger"
+                          onClick={() => {
+                            setConfirmDeleteId(notification.id);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -196,6 +214,24 @@ export function NotificationsClient() {
           </table>
         </section>
       ) : null}
+
+      <ConfirmDialog
+        isOpen={confirmDeleteId !== null}
+        title="Delete notification company-wide?"
+        description="This will permanently remove this notification for everyone in the company. This action cannot be undone."
+        confirmLabel="Delete for everyone"
+        tone="danger"
+        isConfirming={isDeleting}
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          setIsDeleting(true);
+          await notificationsQuery.deleteNotification(confirmDeleteId);
+          window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+          setConfirmDeleteId(null);
+          setIsDeleting(false);
+        }}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </section>
   );
 }

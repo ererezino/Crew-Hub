@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { logger } from "../../../../../lib/logger";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import { isIsoDate } from "../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
@@ -276,7 +277,11 @@ export async function POST(request: Request) {
       .single();
 
     if (leaveError || !leaveRequest) {
-      console.error("Failed to create reclassified leave request", leaveError?.message);
+      logger.error("Failed to create reclassified leave request.", {
+        employeeId: session.profile.id,
+        afkDate: parsedBody.data.date,
+        message: leaveError?.message ?? "Leave request not returned."
+      });
     } else {
       leaveRequestId = leaveRequest.id;
 

@@ -138,16 +138,17 @@ describe("Temporary password removal", () => {
     }
   });
 
-  it("reset-password API response does not include temporaryPassword", () => {
+  it("reset-password API response returns resetInitiated + setupLink and does not include temporaryPassword", () => {
     const routeFile = readFileSync(
       join(__dirname, "../app/api/v1/people/[id]/reset-password/route.ts"),
       "utf-8"
     );
-    // The response block should use resetInitiated, not temporaryPassword
+    // Response now returns setupLink for MFA bootstrap, never temporary credentials.
     const responseBlock = routeFile.slice(
-      routeFile.indexOf("jsonResponse<PeoplePasswordResetResponseData>")
+      routeFile.indexOf("jsonResponse<MfaResetResponseData>")
     );
-    expect(responseBlock).toContain("resetInitiated");
+    expect(responseBlock).toContain("resetInitiated: true");
+    expect(responseBlock).toContain("setupLink");
     expect(responseBlock).not.toContain("temporaryPassword");
   });
 

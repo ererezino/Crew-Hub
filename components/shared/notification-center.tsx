@@ -23,11 +23,7 @@ type FeedItem = {
   actions: NotificationAction[];
 };
 
-type NotificationCenterProps = {
-  isSuperAdmin?: boolean;
-};
-
-export function NotificationCenter({ isSuperAdmin = false }: NotificationCenterProps) {
+export function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -129,8 +125,6 @@ export function NotificationCenter({ isSuperAdmin = false }: NotificationCenterP
           if (!response.ok) {
             throw new Error("Server rejected read mark");
           }
-
-          refreshAnnouncements();
         }
 
         window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
@@ -142,7 +136,7 @@ export function NotificationCenter({ isSuperAdmin = false }: NotificationCenterP
         });
       }
     },
-    [notifications, refreshAnnouncements]
+    [notifications]
   );
 
   /* Dismiss all visible items */
@@ -194,9 +188,8 @@ export function NotificationCenter({ isSuperAdmin = false }: NotificationCenterP
       })
     );
 
-    refreshAnnouncements();
     window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-  }, [feedItems, notifications, refreshAnnouncements]);
+  }, [feedItems, notifications]);
 
   return (
     <div className="notification-center" ref={containerRef}>
@@ -247,20 +240,6 @@ export function NotificationCenter({ isSuperAdmin = false }: NotificationCenterP
             >
               Dismiss all
             </button>
-            {isSuperAdmin ? (
-              <button
-                type="button"
-                className="table-row-action notification-delete-all"
-                onClick={() => {
-                  void notifications.deleteAll().then(() => {
-                    refreshAnnouncements();
-                    window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-                  });
-                }}
-              >
-                Delete all
-              </button>
-            ) : null}
             <Link
               className="table-row-action"
               href="/notifications"

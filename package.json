@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed": "npx tsx scripts/seed/seed-foundation.ts",
     "reset-team": "npx tsx scripts/seed/reset-to-real-team.ts"

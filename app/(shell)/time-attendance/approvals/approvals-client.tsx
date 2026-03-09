@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -44,6 +45,7 @@ function toneForStatus(status: "pending" | "submitted" | "approved" | "rejected"
 }
 
 export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?: boolean }) {
+  const queryClient = useQueryClient();
   const approvalsQuery = useTimeAttendanceApprovals({
     status: "submitted"
   });
@@ -53,6 +55,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
   const [rejectTimesheetId, setRejectTimesheetId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejectionError, setRejectionError] = useState<string | null>(null);
+  const [confirmApproveTimesheetId, setConfirmApproveTimesheetId] = useState<string | null>(null);
 
   const sortedTimesheets = useMemo(() => {
     const rows = approvalsQuery.data?.timesheets ?? [];
@@ -85,6 +88,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
 
       setActionMessage("Timesheet approved.");
       approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Unable to approve timesheet.");
     } finally {
@@ -129,11 +133,30 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
 
       setActionMessage("Timesheet rejected.");
       approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Unable to reject timesheet.");
     } finally {
       setActiveActionTimesheetId(null);
     }
+  };
+
+  const openApproveDialog = (timesheetId: string) => {
+    setConfirmApproveTimesheetId(timesheetId);
+  };
+
+  const closeApproveDialog = () => {
+    setConfirmApproveTimesheetId(null);
+  };
+
+  const confirmApprove = async () => {
+    if (!confirmApproveTimesheetId) {
+      return;
+    }
+
+    const targetTimesheetId = confirmApproveTimesheetId;
+    closeApproveDialog();
+    await handleApprove(targetTimesheetId);
   };
 
   return (
@@ -258,7 +281,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                           type="button"
                           className="table-row-action"
                           disabled={activeActionTimesheetId === timesheet.id}
-                          onClick={() => void handleApprove(timesheet.id)}
+                          onClick={() => openApproveDialog(timesheet.id)}
                         >
                           Approve
                         </button>
@@ -332,6 +355,17 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
           </section>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        isOpen={confirmApproveTimesheetId !== null}
+        tone="default"
+        title="Approve timesheet?"
+        description="This timesheet will move forward for payroll processing."
+        confirmLabel="Approve"
+        cancelLabel="Cancel"
+        onConfirm={() => void confirmApprove()}
+        onCancel={closeApproveDialog}
+      />
     </>
   );
 }

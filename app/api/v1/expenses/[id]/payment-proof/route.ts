@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { logAudit } from "../../../../../../lib/audit";
 import {
   ALLOWED_RECEIPT_MIME_TYPES,
   MAX_RECEIPT_FILE_BYTES,
@@ -271,6 +272,13 @@ export async function POST(
       meta: buildMeta()
     });
   }
+
+  await logAudit({
+    action: "updated",
+    tableName: "expenses",
+    recordId: expenseId,
+    newValue: { event: "payment_proof_uploaded" }
+  }).catch(() => undefined);
 
   return jsonResponse<{ path: string }>(200, {
     data: { path: storagePath },

@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 
-type RateLimitBucketName = "auth" | "payments" | "approvals";
+type RateLimitBucketName = "auth" | "payments" | "approvals" | "uploads";
 
 type RateLimitRule = {
   bucket: RateLimitBucketName;
@@ -84,7 +84,11 @@ const RATE_LIMIT_RULES: readonly RateLimitRule[] = [
       }
 
       const { pathname } = request.nextUrl;
-      return pathname === "/api/v1/audit/login" || pathname.startsWith("/api/v1/auth");
+      return (
+        pathname === "/api/v1/audit/login" ||
+        pathname.startsWith("/api/v1/auth") ||
+        pathname === "/api/v1/me/mfa"
+      );
     }
   },
   {
@@ -103,6 +107,24 @@ const RATE_LIMIT_RULES: readonly RateLimitRule[] = [
       }
 
       return pathname.startsWith("/api/v1/payments");
+    }
+  },
+  {
+    bucket: "uploads",
+    limit: 10,
+    windowMs: 60_000,
+    matches: (request) => {
+      if (!isMutationMethod(request)) {
+        return false;
+      }
+
+      const { pathname } = request.nextUrl;
+      return (
+        pathname === "/api/v1/documents/upload" ||
+        pathname.endsWith("/receipt") ||
+        pathname.endsWith("/payment-proof") ||
+        pathname === "/api/v1/me/avatar"
+      );
     }
   },
   {

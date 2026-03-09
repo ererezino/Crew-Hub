@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { type ChangeEvent, type FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { z } from "zod";
@@ -179,6 +179,26 @@ export function SettingsClient({
   );
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [isNotificationSaving, setIsNotificationSaving] = useState(false);
+
+  // MFA state
+  const [mfaEnrolled, setMfaEnrolled] = useState<boolean | null>(null);
+  const [isMfaLoading, setIsMfaLoading] = useState(false);
+
+  const fetchMfaStatus = useCallback(() => {
+    setIsMfaLoading(true);
+    fetch("/api/v1/me/mfa")
+      .then((res) => res.json())
+      .then((data: { data?: { enrolled?: boolean } }) => {
+        setMfaEnrolled(data.data?.enrolled ?? false);
+      })
+      .catch(() => setMfaEnrolled(null))
+      .finally(() => setIsMfaLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "security") return;
+    fetchMfaStatus();
+  }, [activeTab, fetchMfaStatus]);
 
   const [formDirty, setFormDirty] = useState(false);
   useUnsavedGuard(formDirty);
@@ -629,20 +649,39 @@ export function SettingsClient({
           <section className="settings-card" aria-label="Security settings">
             <h2 className="section-title">Security</h2>
             <p className="settings-card-description">
-              Keep your account safe with a strong password.
+              Your account is secured with an authenticator app.
             </p>
 
             <div className="security-action-row">
               <div className="security-action-copy">
-                <p className="form-label">Password</p>
+                <p className="form-label">Authenticator</p>
                 <p className="settings-card-description">
-                  Update your password to keep your account secure. You will need to enter your current password first.
+                  {isMfaLoading
+                    ? "Checking authenticator status..."
+                    : mfaEnrolled
+                      ? "Your authenticator app is your login credential. You use it to generate a 6-digit code every time you sign in."
+                      : "Your authenticator has not been set up yet. You will be prompted to set it up the next time you sign in."}
+                </p>
+                {!isMfaLoading && mfaEnrolled ? (
+                  <p className="settings-card-description" style={{ marginTop: "var(--space-2)" }}>
+                    Need to reset your authenticator? Contact your admin.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="security-action-row">
+              <div className="security-action-copy">
+                <p className="form-label">Support</p>
+                <p className="settings-card-description">
+                  Found a bug or need help? Ping Zino or Eniibukun on Basecamp.
                 </p>
               </div>
-              <Link href="/change-password" className="button">
-                Change password
+              <Link href="/support" className="button">
+                Help & Support
               </Link>
             </div>
+
           </section>
         ) : null}
 

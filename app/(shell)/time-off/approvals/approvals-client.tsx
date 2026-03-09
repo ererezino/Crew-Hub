@@ -2,7 +2,9 @@
 
 import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
@@ -73,12 +75,14 @@ function toneForStatus(status: LeaveRequestRecord["status"]) {
 }
 
 export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolean }) {
+  const queryClient = useQueryClient();
   const approvalsQuery = useTimeOffApprovals();
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isMutatingRequestId, setIsMutatingRequestId] = useState<string | null>(null);
   const [contextTarget, setContextTarget] = useState<LeaveRequestRecord | null>(null);
   const [rejectTarget, setRejectTarget] = useState<LeaveRequestRecord | null>(null);
+  const [approveTarget, setApproveTarget] = useState<LeaveRequestRecord | null>(null);
   const [rejectValues, setRejectValues] = useState<RejectFormValues>({ rejectionReason: "" });
   const [rejectErrors, setRejectErrors] = useState<RejectFormErrors>({});
   const [isRejecting, setIsRejecting] = useState(false);
@@ -130,6 +134,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       }
 
       approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       if (contextTarget?.id === requestRecord.id) {
         setContextTarget(null);
       }
@@ -159,6 +164,24 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
 
   const closeContextPanel = () => {
     setContextTarget(null);
+  };
+
+  const openApproveDialog = (requestRecord: LeaveRequestRecord) => {
+    setApproveTarget(requestRecord);
+  };
+
+  const closeApproveDialog = () => {
+    setApproveTarget(null);
+  };
+
+  const confirmApprove = async () => {
+    if (!approveTarget) {
+      return;
+    }
+
+    const target = approveTarget;
+    closeApproveDialog();
+    await handleApprove(target);
   };
 
   const handleRejectReasonChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -209,6 +232,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       }
 
       approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       closeRejectPanel();
       showToast("info", "Leave request rejected.");
     } catch (error) {
@@ -326,7 +350,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       <button
                         type="button"
                         className="table-row-action"
-                        onClick={() => handleApprove(requestRecord)}
+                        onClick={() => openApproveDialog(requestRecord)}
                         disabled={isMutatingRequestId === requestRecord.id}
                       >
                         {isMutatingRequestId === requestRecord.id ? "Saving..." : "Approve"}
@@ -425,7 +449,10 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
               <button
                 type="button"
                 className="button button-accent"
-                onClick={() => handleApprove(contextTarget)}
+                onClick={() => {
+                  closeContextPanel();
+                  openApproveDialog(contextTarget);
+                }}
                 disabled={isMutatingRequestId === contextTarget.id}
               >
                 {isMutatingRequestId === contextTarget.id ? "Saving..." : "Approve"}
@@ -466,6 +493,23 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
           </div>
         </form>
       </SlidePanel>
+
+      <ConfirmDialog
+        isOpen={Boolean(approveTarget)}
+        title="Approve leave request?"
+        description={
+          approveTarget
+            ? `This will approve ${approveTarget.employeeName}'s leave request and notify them.`
+            : undefined
+        }
+        confirmLabel="Approve request"
+        cancelLabel="Cancel"
+        isConfirming={Boolean(isMutatingRequestId)}
+        onCancel={closeApproveDialog}
+        onConfirm={() => {
+          void confirmApprove();
+        }}
+      />
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite">

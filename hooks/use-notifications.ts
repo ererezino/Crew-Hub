@@ -22,6 +22,7 @@ type UseNotificationsResult = {
   markRead: (notificationId: string) => Promise<boolean>;
   markAllRead: () => Promise<boolean>;
   deleteAll: () => Promise<boolean>;
+  deleteNotification: (notificationId: string) => Promise<boolean>;
 };
 
 function buildNotificationsUrl({
@@ -200,6 +201,37 @@ export function useNotifications(query: NotificationsQuery = {}): UseNotificatio
     }
   }, []);
 
+  const deleteNotification = useCallback(
+    async (notificationId: string) => {
+      try {
+        const response = await fetch(`/api/v1/notifications/${notificationId}`, {
+          method: "DELETE"
+        });
+
+        if (!response.ok) {
+          return false;
+        }
+
+        setData((current) => {
+          if (!current) return current;
+          const notifications = current.notifications.filter(
+            (n) => n.id !== notificationId
+          );
+          return {
+            ...current,
+            notifications,
+            unreadCount: notifications.filter((n) => !n.isRead).length
+          };
+        });
+
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    []
+  );
+
   return {
     data,
     isLoading,
@@ -207,6 +239,7 @@ export function useNotifications(query: NotificationsQuery = {}): UseNotificatio
     refresh,
     markRead,
     markAllRead,
-    deleteAll
+    deleteAll,
+    deleteNotification
   };
 }

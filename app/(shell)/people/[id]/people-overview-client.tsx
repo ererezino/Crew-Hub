@@ -26,6 +26,7 @@ type PeopleOverviewClientProps = {
   employeeId: string;
   isSelf: boolean;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   canInitiateOffboarding: boolean;
 };
 
@@ -113,6 +114,7 @@ export function PeopleOverviewClient({
   employeeId,
   isSelf,
   isAdmin,
+  isSuperAdmin,
   canInitiateOffboarding
 }: PeopleOverviewClientProps) {
   const [person, setPerson] = useState<PersonRecord | null>(null);
@@ -159,6 +161,10 @@ export function PeopleOverviewClient({
   const [offboardConfirmName, setOffboardConfirmName] = useState("");
   const [isSubmittingOffboard, setIsSubmittingOffboard] = useState(false);
   const [offboardError, setOffboardError] = useState<string | null>(null);
+
+  // Disable/enable account state
+  const [confirmDisableOpen, setConfirmDisableOpen] = useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
 
   // Fetch person data
   useEffect(() => {
@@ -481,6 +487,37 @@ export function PeopleOverviewClient({
     },
     [person, editValues, privacyValues]
   );
+
+  // Disable / enable account handler
+  const handleToggleAccountStatus = useCallback(async () => {
+    if (!person) return;
+
+    const newStatus = person.status === "inactive" ? "active" : "inactive";
+    setIsTogglingStatus(true);
+
+    try {
+      const response = await fetch(`/api/v1/people/${person.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const payload = (await response.json()) as PeopleUpdateResponse;
+
+      if (!response.ok || !payload.data) {
+        const msg = payload.error?.message ?? `Unable to ${newStatus === "inactive" ? "disable" : "enable"} account.`;
+        alert(msg);
+        return;
+      }
+
+      setConfirmDisableOpen(false);
+      refresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Something went wrong.");
+    } finally {
+      setIsTogglingStatus(false);
+    }
+  }, [person, refresh]);
 
   // Offboarding handler
   const handleOffboard = useCallback(
@@ -930,31 +967,58 @@ export function PeopleOverviewClient({
         </div>
       ) : null}
 
-      {/* Danger Zone -- HR Admin/Super Admin only, non-self, non-offboarding */}
-      {canInitiateOffboarding && !isSelf && person.status !== "offboarding" ? (
+      {/* Danger Zone -- Super Admin / HR Admin only, non-self, non-offboarding */}
+      {(isSuperAdmin || canInitiateOffboarding) && !isSelf && person.status !== "offboarding" ? (
         <div className="danger-zone">
           <h3 className="danger-zone-title">Danger zone</h3>
-          <div className="danger-zone-content">
-            <div className="danger-zone-description">
-              <p className="danger-zone-label">Initiate offboarding</p>
-              <p className="settings-card-description">
-                Begin the offboarding process for this crew member. This will change their status, create offboarding tasks, and notify relevant parties.
-              </p>
+
+          {/* Disable / Enable account -- Super Admin only */}
+          {isSuperAdmin ? (
+            <div className="danger-zone-content">
+              <div className="danger-zone-description">
+                <p className="danger-zone-label">
+                  {person.status === "inactive" ? "Enable account" : "Disable account"}
+                </p>
+                <p className="settings-card-description">
+                  {person.status === "inactive"
+                    ? "Re-enable this crew member\u2019s account so they can log in and access Crew Hub again."
+                    : "Disable this crew member\u2019s account. They will no longer be able to log in until the account is re-enabled."}
+                </p>
+              </div>
+              <button
+                type="button"
+                className={person.status === "inactive" ? "button button-accent" : "button button-danger"}
+                onClick={() => setConfirmDisableOpen(true)}
+              >
+                {person.status === "inactive" ? "Enable account" : "Disable account"}
+              </button>
             </div>
-            <button
-              type="button"
-              className="button button-danger"
-              onClick={() => {
-                setOffboardLastDay("");
-                setOffboardReason("");
-                setOffboardConfirmName("");
-                setOffboardError(null);
-                setIsOffboardModalOpen(true);
-              }}
-            >
-              Initiate offboarding
-            </button>
-          </div>
+          ) : null}
+
+          {/* Initiate offboarding */}
+          {canInitiateOffboarding ? (
+            <div className="danger-zone-content">
+              <div className="danger-zone-description">
+                <p className="danger-zone-label">Initiate offboarding</p>
+                <p className="settings-card-description">
+                  Begin the offboarding process for this crew member. This will change their status, create offboarding tasks, and notify relevant parties.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={() => {
+                  setOffboardLastDay("");
+                  setOffboardReason("");
+                  setOffboardConfirmName("");
+                  setOffboardError(null);
+                  setIsOffboardModalOpen(true);
+                }}
+              >
+                Initiate offboarding
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1359,6 +1423,26 @@ export function PeopleOverviewClient({
         isConfirming={isInviting}
         onConfirm={() => void handleSendInvite()}
         onCancel={() => setInviteConfirmOpen(false)}
+      />
+
+      {/* Disable / Enable Account Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDisableOpen}
+        title={
+          person?.status === "inactive"
+            ? `Enable account for ${person?.fullName ?? "this person"}`
+            : `Disable account for ${person?.fullName ?? "this person"}`
+        }
+        description={
+          person?.status === "inactive"
+            ? `Are you sure you want to re-enable ${person?.fullName ?? "this person"}'s account? They will be able to log in again.`
+            : `Are you sure you want to disable ${person?.fullName ?? "this person"}'s account? They will no longer be able to log in until the account is re-enabled.`
+        }
+        confirmLabel={person?.status === "inactive" ? "Enable account" : "Disable account"}
+        tone={person?.status === "inactive" ? "default" : "danger"}
+        isConfirming={isTogglingStatus}
+        onConfirm={() => void handleToggleAccountStatus()}
+        onCancel={() => setConfirmDisableOpen(false)}
       />
     </section>
   );

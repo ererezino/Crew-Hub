@@ -33,6 +33,7 @@ import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { NavIcon } from "./nav-icon";
 import { NotificationCenter } from "./notification-center";
 import { ThemeToggle } from "./theme-toggle";
+import { SupportLink } from "./support-link";
 import { UnsavedLeaveDialog } from "./unsaved-leave-dialog";
 import { WhoIsOnline } from "./who-is-online";
 
@@ -977,8 +978,10 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
     setIsMobileSidebarOpen(false);
   };
 
-  const settingsAllowed =
-    isSuperAdmin(currentUserRoles) || allowedRouteKeys.has("/settings");
+  /* Settings is available to all authenticated users — everyone can manage
+     their profile, preferences, and security. Admin-only tabs (Organization,
+     Audit Log) are filtered inside SettingsClient via requiredRoles. */
+  const settingsAllowed = Boolean(currentUserProfile);
 
   const sidebarProfileInitials = currentUserProfile
     ? getInitials(currentUserProfile.fullName)
@@ -1174,6 +1177,8 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
             </Link>
           ) : null}
 
+          <SupportLink isActive={isRouteActive(activePathname, "/support")} />
+
           {settingsAllowed && currentUserProfile ? (
             <Link
               href="/settings?tab=profile"
@@ -1243,7 +1248,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
               <span>Search</span>
               <kbd>Cmd/Ctrl + K</kbd>
             </button>
-            <NotificationCenter isSuperAdmin={hasRole(currentUserRoles, "SUPER_ADMIN")} />
+            <NotificationCenter />
             <ThemeToggle />
             <UserMenu
               profile={currentUserProfile}

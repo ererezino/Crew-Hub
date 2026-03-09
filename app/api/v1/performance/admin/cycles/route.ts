@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { logAudit } from "../../../../../../lib/audit";
+import { logger } from "../../../../../../lib/logger";
 import { createBulkNotifications } from "../../../../../../lib/notifications/service";
 import { sendReviewCycleStartedEmail } from "../../../../../../lib/notifications/email";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
@@ -175,7 +177,7 @@ export async function POST(request: Request) {
         .is("deleted_at", null);
 
       if (assignmentError) {
-        console.error("Unable to load review assignment recipients.", {
+        logger.error("Unable to load review assignment recipients.", {
           cycleId: mappedCycle.id,
           message: assignmentError.message
         });
@@ -211,6 +213,13 @@ export async function POST(request: Request) {
         );
       }
     }
+
+    await logAudit({
+      action: "created",
+      tableName: "review_cycles",
+      recordId: mappedCycle.id,
+      newValue: { name: mappedCycle.name }
+    }).catch(() => undefined);
 
     const responseData: CreateReviewCycleData = {
       cycle: mappedCycle

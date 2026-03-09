@@ -9,7 +9,9 @@ import {
   useState
 } from "react";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
@@ -112,6 +114,7 @@ export function ExpenseApprovalsClient({
   canFinanceApprove: boolean;
   embedded?: boolean;
 }) {
+  const queryClient = useQueryClient();
   const availableStages = useMemo<ExpenseApprovalStage[]>(() => {
     const stages: ExpenseApprovalStage[] = [];
 
@@ -152,6 +155,8 @@ export function ExpenseApprovalsClient({
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const paymentProofInputRef = useRef<HTMLInputElement>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [confirmApproveTarget, setConfirmApproveTarget] = useState<ExpenseRecord | null>(null);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
 
   const queueCurrency = useMemo(() => {
     const rows = approvalsQuery.data?.expenses ?? [];
@@ -268,12 +273,31 @@ export function ExpenseApprovalsClient({
 
       setSelectedIds((current) => current.filter((id) => id !== expense.id));
       approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       showToast("success", "Expense moved to finance disbursement.");
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to approve expense.");
     } finally {
       setIsMutatingId(null);
     }
+  };
+
+  const openApproveConfirm = (expense: ExpenseRecord) => {
+    setConfirmApproveTarget(expense);
+  };
+
+  const closeApproveConfirm = () => {
+    setConfirmApproveTarget(null);
+  };
+
+  const confirmSingleApprove = async () => {
+    if (!confirmApproveTarget) {
+      return;
+    }
+
+    const target = confirmApproveTarget;
+    closeApproveConfirm();
+    await handleSingleManagerApprove(target);
   };
 
   const openDisbursePanel = (expense: ExpenseRecord) => {
@@ -397,6 +421,7 @@ export function ExpenseApprovalsClient({
       closeDisbursePanel();
       setSelectedIds((current) => current.filter((id) => id !== disburseTarget.id));
       approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       showToast("success", "Expense disbursed successfully.");
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to disburse expense.");
@@ -434,6 +459,7 @@ export function ExpenseApprovalsClient({
 
       setSelectedIds([]);
       approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       showToast(
         "success",
         stage === "manager"
@@ -445,6 +471,27 @@ export function ExpenseApprovalsClient({
     } finally {
       setIsBulkApproving(false);
     }
+  };
+
+  const openBulkApproveConfirm = () => {
+    if (selectedIds.length === 0 || isBulkApproving) {
+      return;
+    }
+
+    setShowBulkConfirm(true);
+  };
+
+  const closeBulkApproveConfirm = () => {
+    if (isBulkApproving) {
+      return;
+    }
+
+    setShowBulkConfirm(false);
+  };
+
+  const confirmBulkApprove = async () => {
+    setShowBulkConfirm(false);
+    await handleBulkApprove();
   };
 
   const openRejectPanel = (expense: ExpenseRecord, mode: RejectMode) => {
@@ -526,6 +573,7 @@ export function ExpenseApprovalsClient({
       closeRejectPanel();
       setSelectedIds((current) => current.filter((id) => id !== rejectTarget.id));
       approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       showToast(
         rejectMode === "manager" ? "info" : "error",
         rejectMode === "manager" ? "Expense rejected." : "Expense finance-rejected."
@@ -596,7 +644,7 @@ export function ExpenseApprovalsClient({
             <button
               type="button"
               className="button button-accent"
-              onClick={handleBulkApprove}
+              onClick={openBulkApproveConfirm}
               disabled={selectedIds.length === 0 || isBulkApproving}
             >
               {isBulkApproving
@@ -878,7 +926,7 @@ export function ExpenseApprovalsClient({
                               <button
                                 type="button"
                                 className="table-row-action"
-                                onClick={() => handleSingleManagerApprove(expense)}
+                                onClick={() => openApproveConfirm(expense)}
                                 disabled={isMutatingId === expense.id}
                               >
                                 {isMutatingId === expense.id ? "Saving..." : "Approve"}
@@ -1047,6 +1095,40 @@ export function ExpenseApprovalsClient({
           </div>
         </form>
       </SlidePanel>
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmApproveTarget)}
+        title="Approve expense?"
+        description={
+          confirmApproveTarget
+            ? `Approve ${confirmApproveTarget.employeeName}'s expense and move it to finance disbursement.`
+            : undefined
+        }
+        confirmLabel="Approve expense"
+        cancelLabel="Cancel"
+        isConfirming={Boolean(isMutatingId)}
+        onCancel={closeApproveConfirm}
+        onConfirm={() => {
+          void confirmSingleApprove();
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={showBulkConfirm}
+        title={stage === "manager" ? "Bulk approve expenses?" : "Bulk disburse expenses?"}
+        description={
+          stage === "manager"
+            ? `This will move ${selectedIds.length} selected expenses to finance for disbursement.`
+            : `This will disburse ${selectedIds.length} selected expenses and notify employees.`
+        }
+        confirmLabel={stage === "manager" ? "Approve selected" : "Disburse selected"}
+        cancelLabel="Cancel"
+        isConfirming={isBulkApproving}
+        onCancel={closeBulkApproveConfirm}
+        onConfirm={() => {
+          void confirmBulkApprove();
+        }}
+      />
 
       <div className="toast-region" aria-live="polite" aria-atomic="true">
         {toasts.map((toast) => (

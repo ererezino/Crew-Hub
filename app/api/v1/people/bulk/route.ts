@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
-import { generateStrongPassword } from "../../../../../lib/auth/generate-password";
+import { deriveSystemPassword } from "../../../../../lib/auth/system-password";
 import { logAudit } from "../../../../../lib/audit";
 import { parseDepartment } from "../../../../../lib/departments";
+import { logger } from "../../../../../lib/logger";
 import { USER_ROLES, type UserRole } from "../../../../../lib/navigation";
 import { createNotification } from "../../../../../lib/notifications/service";
 import { sendWelcomeEmail } from "../../../../../lib/notifications/email";
@@ -317,7 +318,7 @@ export async function POST(request: Request) {
     const normalizedEmail = employee.email.trim().toLowerCase();
 
     try {
-      const generatedPassword = generateStrongPassword();
+      const tempPassword = crypto.randomUUID();
       const roles: string[] = [...new Set(["EMPLOYEE", ...(employee.roles ?? ["EMPLOYEE"])])];
       const countryCode = normalizeCountryCode(employee.countryCode);
       const normalizedDepartment =
@@ -333,7 +334,7 @@ export async function POST(request: Request) {
       // Create auth user
       const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
         email: normalizedEmail,
-        password: generatedPassword,
+        password: tempPassword,
         email_confirm: true,
         user_metadata: {
           full_name: employee.fullName.trim()
@@ -353,6 +354,12 @@ export async function POST(request: Request) {
 
       const createdUserId = authData.user.id;
 
+      // Set system-derived password for TOTP login flow
+      const systemPassword = deriveSystemPassword(createdUserId);
+      await serviceRoleClient.auth.admin
+        .updateUserById(createdUserId, { password: systemPassword })
+        .catch(() => undefined);
+
       // Create profile
       const { error: insertProfileError } = await serviceRoleClient
         .from("profiles")
@@ -370,8 +377,7 @@ export async function POST(request: Request) {
           employment_type: employmentType,
           payroll_mode: employmentType === "contractor" ? "contractor_usd_no_withholding" : "employee_local_withholding",
           primary_currency: "USD",
-          status: "onboarding",
-          password_change_required: true
+          status: "onboarding"
         });
 
       if (insertProfileError) {
@@ -388,7 +394,7 @@ export async function POST(request: Request) {
         userId: createdUserId,
         type: "welcome",
         title: "Welcome to Crew Hub",
-        body: "Welcome to the team! Please update your profile and change your password.",
+        body: "Welcome to the team! Please update your profile and set up your authenticator.",
         link: "/settings"
       });
 
@@ -400,7 +406,7 @@ export async function POST(request: Request) {
           loginUrl
         });
       } catch (emailError) {
-        console.error("Failed to send welcome email during bulk upload.", {
+        logger.error("Failed to send welcome email during bulk upload.", {
           email: normalizedEmail,
           error: emailError instanceof Error ? emailError.message : String(emailError)
         });

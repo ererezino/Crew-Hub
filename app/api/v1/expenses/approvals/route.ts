@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { logger } from "../../../../../lib/logger";
 import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
 import { currentMonthKey, isIsoMonth, monthDateRange, parseIntegerAmount } from "../../../../../lib/expenses";
 import { hasRole } from "../../../../../lib/roles";
@@ -131,7 +132,7 @@ async function listFinanceAdminIds({
     .is("deleted_at", null);
 
   if (error) {
-    console.error("Unable to load finance admin recipients for expense bulk approval.", {
+    logger.error("Unable to load finance admin recipients for expense bulk approval.", {
       orgId,
       message: error.message
     });

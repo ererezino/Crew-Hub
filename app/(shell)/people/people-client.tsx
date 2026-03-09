@@ -469,7 +469,7 @@ export function PeopleClient({
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviteLinkPerson, setInviteLinkPerson] = useState<string>("");
 
-  // Reset password state
+  // Reset authenticator state
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [confirmResetPerson, setConfirmResetPerson] = useState<PersonRecord | null>(null);
 
@@ -755,9 +755,9 @@ export function PeopleClient({
     }
   }, []);
 
-  /* ── Reset password handler ── */
+  /* ── Reset authenticator handler ── */
 
-  const handleResetPassword = useCallback(async (person: PersonRecord) => {
+  const handleResetAuthenticator = useCallback(async (person: PersonRecord) => {
     setResettingId(person.id);
 
     try {
@@ -769,15 +769,15 @@ export function PeopleClient({
 
       if (!response.ok || !payload.data?.resetInitiated) {
         setConfirmResetPerson(null);
-        addToast("error", humanizeError(payload.error?.message ?? "Unable to send password reset link."));
+        addToast("error", humanizeError(payload.error?.message ?? "Unable to reset authenticator."));
         return;
       }
 
       setConfirmResetPerson(null);
-      addToast("success", `Password reset link sent for ${person.fullName}.`);
+      addToast("success", `Authenticator reset. Setup link sent for ${person.fullName}.`);
     } catch (error) {
       setConfirmResetPerson(null);
-      addToast("error", error instanceof Error ? error.message : "Unable to send password reset link.");
+      addToast("error", error instanceof Error ? error.message : "Unable to reset authenticator.");
     } finally {
       setResettingId(null);
     }
@@ -1089,7 +1089,7 @@ export function PeopleClient({
                             disabled={resettingId === person.id}
                             onClick={() => setConfirmResetPerson(person)}
                           >
-                            {resettingId === person.id ? "Sending..." : "Reset Password"}
+                            {resettingId === person.id ? "Sending..." : "Reset Authenticator"}
                           </button>
                         ) : (
                           <button
@@ -1850,7 +1850,7 @@ export function PeopleClient({
         </div>
       ) : null}
 
-      {/* ── Reset Password Dialog ── */}
+      {/* ── Reset Authenticator Dialog ── */}
       {confirmResetPerson !== null ? (
         <div
           className="modal-overlay"
@@ -1864,13 +1864,13 @@ export function PeopleClient({
             className="confirm-dialog modal-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label="Reset password"
+            aria-label="Reset authenticator"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="modal-title">Reset password</h2>
+            <h2 className="modal-title">Reset authenticator</h2>
             <p className="settings-card-description">
-              Send a password reset link to {confirmResetPerson.fullName} ({confirmResetPerson.email})?
-              They will receive an email with a link to set a new password.
+              Reset the authenticator for {confirmResetPerson.fullName} ({confirmResetPerson.email})?
+              They will receive an email with a link to set up a new authenticator.
             </p>
             <div className="modal-actions">
               <button
@@ -1885,11 +1885,11 @@ export function PeopleClient({
                 type="button"
                 className="button button-accent"
                 onClick={() => {
-                  if (confirmResetPerson) void handleResetPassword(confirmResetPerson);
+                  if (confirmResetPerson) void handleResetAuthenticator(confirmResetPerson);
                 }}
                 disabled={resettingId !== null}
               >
-                {resettingId ? "Sending..." : "Send Reset Link"}
+                {resettingId ? "Sending..." : "Reset Authenticator"}
               </button>
             </div>
           </section>

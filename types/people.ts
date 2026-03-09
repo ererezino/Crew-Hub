@@ -131,6 +131,7 @@ export type PeopleUpdateResponse = ApiResponse<PeopleUpdateResponseData>;
 export type PeoplePasswordResetResponseData = {
   userId: string;
   resetInitiated: boolean;
+  setupLink?: string | null;
 };
 
 export type PeoplePasswordResetResponse = ApiResponse<PeoplePasswordResetResponseData>;

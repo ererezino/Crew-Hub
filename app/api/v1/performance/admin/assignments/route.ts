@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { logAudit } from "../../../../../../lib/audit";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type { AssignReviewData, AssignReviewPayload } from "../../../../../../types/performance";
 import {
@@ -341,6 +342,13 @@ export async function POST(request: Request) {
       profilesById,
       responsesByAssignmentId: new Map()
     });
+
+    await logAudit({
+      action: "created",
+      tableName: "review_assignments",
+      recordId: parsedTemplate.data.id,
+      newValue: { createdCount: mappedAssignments.length, skippedCount }
+    }).catch(() => undefined);
 
     const responseData: AssignReviewData = {
       assignments: mappedAssignments,

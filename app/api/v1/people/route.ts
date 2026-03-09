@@ -11,8 +11,9 @@ import {
   getDepartmentsValidationMessage,
   parseDepartment
 } from "../../../../lib/departments";
+import { logger } from "../../../../lib/logger";
 import { USER_ROLES, type UserRole } from "../../../../lib/navigation";
-import { generateStrongPassword } from "../../../../lib/auth/generate-password";
+import { deriveSystemPassword } from "../../../../lib/auth/system-password";
 import { sendWelcomeEmail } from "../../../../lib/notifications/email";
 import { createNotification } from "../../../../lib/notifications/service";
 import { createOnboardingInstance } from "../../../../lib/onboarding/create-instance";
@@ -128,7 +129,7 @@ function resolveAuthRedirectUrl(request: Request): string {
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     requestUrl.origin;
   const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
-  return `${normalizedAppUrl}/reset-password`;
+  return `${normalizedAppUrl}/mfa-setup`;
 }
 
 function canManagePeople(userRoles: readonly UserRole[]): boolean {
@@ -724,7 +725,10 @@ export async function POST(request: Request) {
     }
   }
 
-  const tempPassword = generateStrongPassword();
+  /* Create the auth user with a temporary random password.
+     After creation, we immediately replace it with the system-derived
+     password so the email + TOTP login flow works. */
+  const tempPassword = crypto.randomUUID();
 
   const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
     email: normalizedEmail,
@@ -752,6 +756,12 @@ export async function POST(request: Request) {
   }
 
   const createdUserId = authData.user.id;
+
+  /* Replace temporary password with the deterministic system-derived password */
+  const systemPassword = deriveSystemPassword(createdUserId);
+  await serviceRoleClient.auth.admin
+    .updateUserById(createdUserId, { password: systemPassword })
+    .catch(() => undefined);
 
   const { data: insertedProfile, error: insertProfileError } = await serviceRoleClient
     .from("profiles")
@@ -819,7 +829,7 @@ export async function POST(request: Request) {
       setupLink = linkData.properties.action_link;
     }
   } catch (linkError) {
-    console.error("Failed to generate setup link.", {
+    logger.error("Failed to generate setup link.", {
       userId: createdUserId,
       message: linkError instanceof Error ? linkError.message : String(linkError)
     });
@@ -831,7 +841,7 @@ export async function POST(request: Request) {
     recipientName: payload.fullName.trim(),
     setupLink
   }).catch((error) => {
-    console.error("Failed to send welcome email.", {
+    logger.error("Failed to send welcome email.", {
       userId: createdUserId,
       message: error instanceof Error ? error.message : String(error)
     });
@@ -873,7 +883,7 @@ export async function POST(request: Request) {
 
     accessConfigChangedKeys = accessUpdate.changedNavItemKeys;
   } catch (error) {
-    console.error("Unable to apply navigation access during user invite.", {
+    logger.error("Unable to apply navigation access during user invite.", {
       employeeId: createdUserId,
       message: error instanceof Error ? error.message : String(error)
     });
@@ -916,7 +926,7 @@ export async function POST(request: Request) {
         }
       });
     } catch (error) {
-      console.error("Unable to auto-create onboarding instance during user invite.", {
+      logger.error("Unable to auto-create onboarding instance during user invite.", {
         employeeId: createdUserId,
         message: error instanceof Error ? error.message : String(error)
       });

@@ -1,67 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   type ChangeEvent,
   type FormEvent,
   Suspense,
+  useCallback,
+  useRef,
   useState
 } from "react";
 import { z } from "zod";
 
-import { createSupabaseBrowserClient } from "../../lib/supabase/client";
+import { OtpInput } from "../../components/shared/otp-input";
 
-const loginSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email address"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Password must be at least 8 characters")
-});
+const emailSchema = z.string().trim().min(1).email();
 
-type LoginValues = z.infer<typeof loginSchema>;
-type LoginField = keyof LoginValues;
-type LoginErrors = Partial<Record<LoginField, string>>;
-
-type TouchedFields = Record<LoginField, boolean>;
-
-const INITIAL_VALUES: LoginValues = {
-  email: "",
-  password: ""
-};
-
-const INITIAL_TOUCHED: TouchedFields = {
-  email: false,
-  password: false
-};
-
-const ALL_TOUCHED: TouchedFields = {
-  email: true,
-  password: true
-};
-
-function getValidationErrors(values: LoginValues, touched: TouchedFields): LoginErrors {
-  const parsedValues = loginSchema.safeParse(values);
-
-  if (parsedValues.success) {
-    return {};
-  }
-
-  const fieldErrors = parsedValues.error.flatten().fieldErrors;
-
-  return {
-    email: touched.email ? fieldErrors.email?.[0] : undefined,
-    password: touched.password ? fieldErrors.password?.[0] : undefined
-  };
-}
-
-function hasAnyError(errors: LoginErrors): boolean {
-  return Boolean(errors.email || errors.password);
-}
+type LoginStep = "email" | "code";
 
 function getRedirectTarget(): string {
   if (typeof window === "undefined") {
@@ -72,11 +27,20 @@ function getRedirectTarget(): string {
   return redirectTo && redirectTo.startsWith("/") ? redirectTo : "/dashboard";
 }
 
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 const INVITE_ERROR_MESSAGES: Record<string, string> = {
   invite_expired:
     "This invite link has expired or is invalid. Please ask your admin to send a new one.",
   auth_error:
-    "We couldn't verify your link. Please ask your admin to resend the invite."
+    "We couldn't verify your link. Please ask your admin to resend the invite.",
+  account_disabled:
+    "Your account has been disabled. Contact your admin for help."
 };
 
 function LoginForm() {
@@ -86,92 +50,118 @@ function LoginForm() {
   const urlError = searchParams.get("error");
   const inviteBanner = urlError ? INVITE_ERROR_MESSAGES[urlError] ?? null : null;
 
-  const [values, setValues] = useState<LoginValues>(INITIAL_VALUES);
-  const [errors, setErrors] = useState<LoginErrors>({});
-  const [touched, setTouched] = useState<TouchedFields>(INITIAL_TOUCHED);
+  const [step, setStep] = useState<LoginStep>("email");
+  const [email, setEmail] = useState("");
+  const [totpCode, setTotpCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleFieldChange =
-    (field: LoginField) => (event: ChangeEvent<HTMLInputElement>) => {
-      const nextValues = {
-        ...values,
-        [field]: event.currentTarget.value
-      };
+  const acceptedEmailRef = useRef<string>("");
+  const checkingRef = useRef(false);
 
-      setValues(nextValues);
+  const handleEmailChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const next = event.currentTarget.value;
+      setEmail(next);
 
-      if (touched[field]) {
-        setErrors(getValidationErrors(nextValues, touched));
+      if (step === "code" && next.trim().toLowerCase() !== acceptedEmailRef.current) {
+        setStep("email");
+        setTotpCode("");
+        setSubmitError(null);
       }
 
       if (submitError) {
         setSubmitError(null);
       }
-    };
+    },
+    [step, submitError]
+  );
 
-  const handleFieldBlur =
-    (field: LoginField) => () => {
-      const nextTouched = {
-        ...touched,
-        [field]: true
-      };
+  const handleTotpChange = useCallback(
+    (code: string) => {
+      setTotpCode(code);
+      if (submitError) setSubmitError(null);
+    },
+    [submitError]
+  );
 
-      setTouched(nextTouched);
-      setErrors(getValidationErrors(values, nextTouched));
-    };
+  /* Email check — runs silently, no loading indicators */
+  const checkEmail = useCallback(async () => {
+    const trimmed = email.trim();
+    if (!emailSchema.safeParse(trimmed).success) return;
+    if (checkingRef.current) return;
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+    checkingRef.current = true;
 
-    setSubmitError(null);
-    setTouched(ALL_TOUCHED);
+    try {
+      const res = await fetch("/api/v1/auth/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed })
+      });
 
-    const validationErrors = getValidationErrors(values, ALL_TOUCHED);
-    setErrors(validationErrors);
-
-    if (hasAnyError(validationErrors)) {
-      return;
+      if (res.ok) {
+        const json = (await res.json()) as { data?: { emailAccepted?: boolean } | null };
+        if (json.data?.emailAccepted) {
+          acceptedEmailRef.current = trimmed.toLowerCase();
+          setStep("code");
+        }
+      }
+    } catch {
+      /* silent */
+    } finally {
+      checkingRef.current = false;
     }
+  }, [email]);
+
+  /* Full sign-in */
+  const signIn = useCallback(async () => {
+    if (totpCode.length !== 6) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
 
-    let supabase;
     try {
-      supabase = createSupabaseBrowserClient();
+      const res = await fetch("/api/v1/auth/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), totpCode })
+      });
+
+      const json = (await res.json()) as { error: { message?: string } | null };
+
+      if (!res.ok) {
+        setSubmitError(json.error?.message ?? "Unable to sign in. Please try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      /* Audit — fire and forget */
+      fetch("/api/v1/audit/login", { method: "POST", keepalive: true }).catch(() => undefined);
+
+      router.replace(getRedirectTarget());
+      router.refresh();
     } catch {
-      setSubmitError("Authentication is not configured. Check Supabase environment variables.");
+      setSubmitError("Unable to sign in. Please try again.");
       setIsSubmitting(false);
-      return;
     }
+  }, [email, totpCode, router]);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: values.email.trim(),
-      password: values.password
-    });
-
-    if (error) {
-      setSubmitError(error.message);
-      setIsSubmitting(false);
-      return;
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (step === "email") {
+      void checkEmail();
+    } else {
+      void signIn();
     }
-
-    /* Audit log + mark account_setup_at (handled server-side in the audit route) */
-    await fetch("/api/v1/audit/login", {
-      method: "POST",
-      keepalive: true
-    }).catch(() => undefined);
-
-    const nextPath = getRedirectTarget();
-    router.replace(nextPath);
-    router.refresh();
   };
 
   return (
     <main className="standalone-page auth-page">
       <section className="standalone-card auth-card" aria-label="Crew Hub login form">
         <header className="auth-card-header">
-          <h1 className="page-title text-h1">Crew Hub</h1>
+          <h1 className="auth-brand">Crew Hub</h1>
+          <p className="auth-greeting">{getGreeting()}, crewmember</p>
         </header>
 
         {inviteBanner ? (
@@ -186,44 +176,26 @@ function LoginForm() {
             <input
               id="email"
               name="email"
-              className={errors.email ? "form-input form-input-error" : "form-input"}
+              className="form-input"
               type="email"
               autoComplete="email"
-              value={values.email}
-              onChange={handleFieldChange("email")}
-              onBlur={handleFieldBlur("email")}
-              aria-invalid={Boolean(errors.email)}
-              aria-describedby={errors.email ? "email-error" : undefined}
+              value={email}
+              onChange={handleEmailChange}
               disabled={isSubmitting}
             />
-            {errors.email ? (
-              <p id="email-error" className="form-field-error" role="alert">
-                {errors.email}
-              </p>
-            ) : null}
           </label>
 
-          <label className="form-field" htmlFor="password">
-            <span className="form-label">Password</span>
-            <input
-              id="password"
-              name="password"
-              className={errors.password ? "form-input form-input-error" : "form-input"}
-              type="password"
-              autoComplete="current-password"
-              value={values.password}
-              onChange={handleFieldChange("password")}
-              onBlur={handleFieldBlur("password")}
-              aria-invalid={Boolean(errors.password)}
-              aria-describedby={errors.password ? "password-error" : undefined}
-              disabled={isSubmitting}
-            />
-            {errors.password ? (
-              <p id="password-error" className="form-field-error" role="alert">
-                {errors.password}
-              </p>
-            ) : null}
-          </label>
+          {step === "code" ? (
+            <div className="form-field">
+              <span className="form-label">Enter your 6-digit authenticator code</span>
+              <OtpInput
+                value={totpCode}
+                onChange={handleTotpChange}
+                disabled={isSubmitting}
+                hasError={Boolean(submitError)}
+              />
+            </div>
+          ) : null}
 
           {submitError ? (
             <p className="form-submit-error" role="alert">
@@ -237,7 +209,17 @@ function LoginForm() {
         </form>
 
         <p className="auth-footer-link auth-footer-hint">
-          Forgot password? Contact your admin.
+          Lost access? Contact your admin.
+        </p>
+        <p className="auth-footer-link auth-footer-hint">
+          Need help? Email{" "}
+          <a href="mailto:support@useaccrue.com">support@useaccrue.com</a>{" "}
+          or reach us on Basecamp.
+        </p>
+        <p className="auth-footer-link">
+          <Link href="/privacy">Privacy Policy</Link>
+          {" · "}
+          <Link href="/terms">Terms of Service</Link>
         </p>
       </section>
     </main>

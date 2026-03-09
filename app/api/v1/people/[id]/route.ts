@@ -7,6 +7,7 @@ import {
   resolveEffectiveUserNavSelection
 } from "../../../../../lib/auth/navigation-access";
 import { logAudit } from "../../../../../lib/audit";
+import { logger } from "../../../../../lib/logger";
 import {
   getDepartmentsValidationMessage,
   parseDepartment
@@ -303,6 +304,48 @@ export async function PUT(
   const nextRoles: AppRole[] = payload.roles
     ? [...new Set(["EMPLOYEE", ...payload.roles] as AppRole[])]
     : existingRoles;
+  const actorIsSuperAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
+
+  const highRiskRoles = new Set<AppRole>(["SUPER_ADMIN", "HR_ADMIN", "FINANCE_ADMIN"]);
+  const existingHighRiskRoleKey = existingRoles
+    .filter((role): role is AppRole => highRiskRoles.has(role))
+    .sort()
+    .join("|");
+  const nextHighRiskRoleKey = nextRoles
+    .filter((role): role is AppRole => highRiskRoles.has(role))
+    .sort()
+    .join("|");
+
+  if (
+    payload.roles !== undefined &&
+    !actorIsSuperAdmin &&
+    existingHighRiskRoleKey !== nextHighRiskRoleKey
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only a Super Admin can modify admin-role assignments."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // Prevent non-SUPER_ADMIN from assigning SUPER_ADMIN role
+  if (
+    nextRoles.includes("SUPER_ADMIN") &&
+    !existingRoles.includes("SUPER_ADMIN") &&
+    !actorIsSuperAdmin
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only a Super Admin can assign the Super Admin role."
+      },
+      meta: buildMeta()
+    });
+  }
 
   const targetDepartment =
     payload.department === undefined
@@ -492,6 +535,16 @@ export async function PUT(
     }
 
     updatedProfileRow = updatedRow;
+
+    /* Revoke all sessions when an account is disabled */
+    if (
+      payload.status === "inactive" &&
+      parsedExistingProfile.data.status !== "inactive"
+    ) {
+      await serviceRoleClient.auth.admin
+        .signOut(personId, "global")
+        .catch(() => undefined);
+    }
   }
 
   /* Handle crew_tag upsert into employee_payment_details */
@@ -597,7 +650,7 @@ export async function PUT(
             });
 
           if (balanceError) {
-            console.error("Unable to auto-create leave balance on activation.", {
+            logger.error("Unable to auto-create leave balance on activation.", {
               personId,
               leaveType: policy.leave_type,
               year: currentYear,
@@ -607,7 +660,7 @@ export async function PUT(
         }
       }
     } catch (error) {
-      console.error("Leave balance auto-creation failed (non-blocking).", {
+      logger.error("Leave balance auto-creation failed (non-blocking).", {
         personId,
         message: error instanceof Error ? error.message : String(error)
       });
@@ -673,7 +726,7 @@ export async function PUT(
         revoked: accessUpdate.revokedNavItemKeys
       };
     } catch (error) {
-      console.error("Unable to apply navigation access during user update.", {
+      logger.error("Unable to apply navigation access during user update.", {
         personId,
         message: error instanceof Error ? error.message : String(error)
       });

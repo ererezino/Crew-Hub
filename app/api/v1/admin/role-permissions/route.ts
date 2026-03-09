@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { logger } from "../../../../../lib/logger";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 
@@ -138,7 +139,11 @@ export async function PUT(request: Request) {
     );
 
   if (error) {
-    console.error("Failed to save role module config:", error.message);
+    logger.error("Failed to save role module config.", {
+      orgId: session.profile.org_id,
+      role: parsed.data.role,
+      message: error.message
+    });
     return jsonResponse<null>(500, {
       data: null,
       error: { code: "INTERNAL_ERROR", message: "Failed to save role configuration." },

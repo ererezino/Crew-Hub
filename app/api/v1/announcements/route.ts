@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { logAudit } from "../../../../lib/audit";
+import { logger } from "../../../../lib/logger";
 import { createBulkNotifications } from "../../../../lib/notifications/service";
 import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
@@ -203,7 +205,7 @@ export async function GET(request: Request) {
 
     if (readRowsError) {
       // Non-fatal: if read state fails, treat all announcements as unread/undismissed
-      console.error("Unable to load announcement read state.", {
+      logger.error("Unable to load announcement read state.", {
         userId: profile.id,
         message: readRowsError.message
       });
@@ -221,7 +223,9 @@ export async function GET(request: Request) {
             .map((row) => [row.announcement_id, row.dismissed_at!])
         );
       } else {
-        console.error("Announcement read state is not in the expected shape.");
+        logger.error("Announcement read state is not in the expected shape.", {
+          userId: profile.id
+        });
       }
     }
   }
@@ -340,6 +344,16 @@ export async function POST(request: Request) {
     });
   }
 
+  await logAudit({
+    action: "created",
+    tableName: "announcements",
+    recordId: parsedAnnouncement.data.id,
+    newValue: {
+      title: parsedAnnouncement.data.title,
+      isPinned: parsedAnnouncement.data.is_pinned
+    }
+  }).catch(() => undefined);
+
   const createdReadAt = new Date().toISOString();
 
   const { error: readUpsertError } = await supabase.from("announcement_reads").upsert(
@@ -352,7 +366,7 @@ export async function POST(request: Request) {
   );
 
   if (readUpsertError) {
-    console.error("Unable to mark newly created announcement as read.", {
+    logger.error("Unable to mark newly created announcement as read.", {
       announcementId: parsedAnnouncement.data.id,
       message: readUpsertError.message
     });
@@ -372,7 +386,7 @@ export async function POST(request: Request) {
     .is("deleted_at", null);
 
   if (recipientError) {
-    console.error("Unable to load announcement recipients.", {
+    logger.error("Unable to load announcement recipients.", {
       announcementId: parsedAnnouncement.data.id,
       message: recipientError.message
     });

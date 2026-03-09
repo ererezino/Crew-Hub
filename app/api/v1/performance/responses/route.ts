@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { logAudit } from "../../../../../lib/audit";
 import { normalizeReviewSections } from "../../../../../lib/performance/reviews";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
@@ -496,6 +497,13 @@ export async function PATCH(request: Request) {
         meta: buildMeta()
       });
     }
+
+    await logAudit({
+      action: "submitted",
+      tableName: "review_responses",
+      recordId: mappedSavedResponse.id,
+      newValue: { assignmentId: mappedAssignment.id }
+    }).catch(() => undefined);
 
     const responseData: SaveReviewResponseData = {
       assignment: mappedAssignment,

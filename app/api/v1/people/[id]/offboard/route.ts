@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { logger } from "../../../../../../lib/logger";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import { createOnboardingInstance } from "../../../../../../lib/onboarding/create-instance";
 import { hasRole } from "../../../../../../lib/roles";
@@ -273,7 +274,7 @@ export async function POST(
 
       instanceId = result.instance.id;
     } catch (error) {
-      console.error("Unable to create offboarding instance.", {
+      logger.error("Unable to create offboarding instance.", {
         employeeId,
         message: error instanceof Error ? error.message : String(error)
       });

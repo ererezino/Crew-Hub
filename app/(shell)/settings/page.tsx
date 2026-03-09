@@ -65,7 +65,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     <>
       <PageHeader
         title="Settings"
-        description="Profile, workspace preferences, and admin controls."
+        description="Manage your profile, preferences, and security."
       />
 
       <SettingsClient

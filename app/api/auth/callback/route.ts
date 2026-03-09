@@ -8,12 +8,12 @@ import { createSupabaseServerClient } from "../../../../lib/supabase/server";
  * When a user clicks an invite / recovery / magic link, Supabase verifies the
  * token and redirects here with a `code` query parameter (PKCE flow). This
  * route exchanges the code for a session cookie, then sends the user to the
- * page specified by the `next` parameter (defaults to /reset-password).
+ * page specified by the `next` parameter (defaults to /mfa-setup).
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = requestUrl.searchParams.get("next") || "/reset-password";
+  const next = requestUrl.searchParams.get("next") || "/mfa-setup";
 
   if (code) {
     const supabase = await createSupabaseServerClient();

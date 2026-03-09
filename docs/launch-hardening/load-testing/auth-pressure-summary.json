@@ -1,0 +1,195 @@
+{
+    "metrics": {
+        "http_reqs": {
+            "count": 38,
+            "rate": 1.1797563740995045
+        },
+        "http_req_blocked": {
+            "med": 0.013,
+            "max": 1.152,
+            "p(90)": 0.024400000000000015,
+            "p(95)": 0.24019999999999828,
+            "avg": 0.07436842105263153,
+            "min": 0.004
+        },
+        "http_req_duration": {
+            "p(95)": 1541.7974499999987,
+            "avg": 977.621947368421,
+            "min": 718.011,
+            "med": 879.523,
+            "max": 2300.608,
+            "p(90)": 1274.1197000000002
+        },
+        "vus": {
+            "max": 2,
+            "value": 1,
+            "min": 1
+        },
+        "http_req_failed": {
+            "fails": 2,
+            "passes": 36,
+            "value": 0.9473684210526315
+        },
+        "data_received": {
+            "count": 49190,
+            "rate": 1527.1635800514375
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(95)": 2296.9421500000003,
+            "avg": 2263.9495,
+            "min": 2227.291,
+            "med": 2263.9495,
+            "max": 2300.608,
+            "p(90)": 2293.2763
+        },
+        "iteration_duration": {
+            "avg": 3566.976548555556,
+            "min": 3047.081875,
+            "med": 3207.7241875,
+            "max": 6417.594,
+            "p(90)": 4269.166645500001,
+            "p(95)": 6362.43820805
+        },
+        "iterations": {
+            "count": 18,
+            "rate": 0.5588319666787126
+        },
+        "lockout_detected_count": {
+            "count": 36,
+            "rate": 1.1176639333574252,
+            "thresholds": {
+                "count>0": false
+            }
+        },
+        "checks": {
+            "passes": 40,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_sending": {
+            "p(95)": 0.30524999999999997,
+            "avg": 0.07992105263157896,
+            "min": 0.017,
+            "med": 0.0605,
+            "max": 0.32,
+            "p(90)": 0.10370000000000001
+        },
+        "http_req_connecting": {
+            "max": 0.272,
+            "p(90)": 0,
+            "p(95)": 0.038699999999999575,
+            "avg": 0.013947368421052632,
+            "min": 0,
+            "med": 0
+        },
+        "group_duration": {
+            "p(90)": 1419.0464001,
+            "p(95)": 1710.6097751,
+            "avg": 855.2885039259259,
+            "min": 0.007208,
+            "med": 905.1613335,
+            "max": 2300.811792
+        },
+        "vus_max": {
+            "value": 2,
+            "min": 2,
+            "max": 2
+        },
+        "http_req_receiving": {
+            "avg": 0.40139473684210525,
+            "min": 0.143,
+            "med": 0.3605,
+            "max": 1.004,
+            "p(90)": 0.6942999999999999,
+            "p(95)": 0.7377999999999999
+        },
+        "attempt_duration": {
+            "max": 1422,
+            "p(90)": 1119.7,
+            "p(95)": 1390.55,
+            "avg": 912.9444444444445,
+            "min": 718,
+            "med": 838
+        },
+        "data_sent": {
+            "count": 9264,
+            "rate": 287.61218551731076
+        },
+        "http_req_waiting": {
+            "med": 878.8985,
+            "max": 2300.359,
+            "p(90)": 1273.6920000000002,
+            "p(95)": 1541.2543499999986,
+            "avg": 977.1406315789477,
+            "min": 717.644
+        },
+        "http_req_tls_handshaking": {
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0
+        }
+    },
+    "root_group": {
+        "groups": {
+            "Invalid sign-in burst": {
+                "name": "Invalid sign-in burst",
+                "path": "::Invalid sign-in burst",
+                "id": "7d47a6ed51ff31d9c69f808dca5042e5",
+                "groups": {},
+                "checks": {
+                        "lockout status is 429": {
+                            "name": "lockout status is 429",
+                            "path": "::Invalid sign-in burst::lockout status is 429",
+                            "id": "885809545928b732ae93435d9496c378",
+                            "passes": 18,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Lockout persistence check": {
+                "name": "Lockout persistence check",
+                "path": "::Lockout persistence check",
+                "id": "16f96f828df6c01595e0eecc1d71749e",
+                "groups": {},
+                "checks": {
+                        "lockout remains active": {
+                            "name": "lockout remains active",
+                            "path": "::Lockout persistence check::lockout remains active",
+                            "id": "f4983a6ebc82feb10217f3d7d27c6b10",
+                            "passes": 18,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Legitimate sign-in": {
+                "id": "bfeadaef8ba38909e4c1f0c7908d4719",
+                "groups": {},
+                "checks": {
+                        "legitimate sign-in returns 200": {
+                            "name": "legitimate sign-in returns 200",
+                            "path": "::Legitimate sign-in::legitimate sign-in returns 200",
+                            "id": "46e6984c73cd4eed20cd9f3ac231b5ad",
+                            "passes": 2,
+                            "fails": 0
+                        },
+                        "legitimate sign-in response contains signedIn true": {
+                            "name": "legitimate sign-in response contains signedIn true",
+                            "path": "::Legitimate sign-in::legitimate sign-in response contains signedIn true",
+                            "id": "28c8310c7e6a36af5976a4652efb3e19",
+                            "passes": 2,
+                            "fails": 0
+                        }
+                    },
+                "name": "Legitimate sign-in",
+                "path": "::Legitimate sign-in"
+            }
+        },
+        "checks": {},
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+}

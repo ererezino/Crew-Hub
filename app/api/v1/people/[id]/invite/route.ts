@@ -3,7 +3,9 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
+import { logger } from "../../../../../../lib/logger";
 import { sendWelcomeEmail } from "../../../../../../lib/notifications/email";
+import { deriveSystemPassword } from "../../../../../../lib/auth/system-password";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
@@ -35,7 +37,7 @@ function resolveAuthRedirectUrl(request: Request): string {
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     requestUrl.origin;
   const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
-  return `${normalizedAppUrl}/reset-password`;
+  return `${normalizedAppUrl}/mfa-setup`;
 }
 
 export async function POST(
@@ -118,6 +120,15 @@ export async function POST(
 
   if (existingAuthUser?.user) {
     isResend = true;
+  }
+
+  /* Ensure the user's password is set to the system-derived value.
+     This is required for the email + TOTP login flow to work. */
+  if (existingAuthUser?.user) {
+    const systemPassword = deriveSystemPassword(personId);
+    await serviceRoleClient.auth.admin
+      .updateUserById(personId, { password: systemPassword })
+      .catch(() => undefined);
   }
 
   /*
@@ -208,7 +219,7 @@ export async function POST(
     recipientEmail: email,
     recipientName: fullName
   }).catch((error) => {
-    console.error("Failed to send welcome email during invite.", {
+    logger.error("Failed to send welcome email during invite.", {
       personId,
       message: error instanceof Error ? error.message : String(error)
     });

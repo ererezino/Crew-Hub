@@ -14,7 +14,8 @@ export const AUDIT_ACTIONS = [
   "submitted",
   "cancelled",
   "login",
-  "logout"
+  "logout",
+  "failed_login"
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

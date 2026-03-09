@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { logAudit } from "../../../../../lib/audit";
 import {
   ALLOWED_DOCUMENT_EXTENSIONS,
   DOCUMENT_BUCKET_NAME,
@@ -513,6 +514,18 @@ export async function POST(request: Request) {
 
     profileNameById = new Map(parsedProfiles.data.map((row) => [row.id, row.full_name]));
   }
+
+  await logAudit({
+    action: existingDocument ? "updated" : "created",
+    tableName: "documents",
+    recordId: documentId,
+    newValue: {
+      title: documentRow.title,
+      category: documentRow.category,
+      fileName: documentRow.file_name,
+      version: nextVersion
+    }
+  }).catch(() => undefined);
 
   const responseDocument: DocumentRecord = {
     id: documentRow.id,

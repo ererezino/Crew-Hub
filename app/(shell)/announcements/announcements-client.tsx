@@ -9,6 +9,7 @@ import {
 import { z } from "zod";
 import Link from "next/link";
 
+import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
@@ -230,7 +231,7 @@ function AnnouncementCard({
               Edit
             </button>
           ) : null}
-          {isSuperAdmin && isArchiveView ? (
+          {isSuperAdmin ? (
             <button
               type="button"
               className="table-row-action table-row-action-danger"
@@ -286,6 +287,8 @@ export function AnnouncementsClient({
   const [isDismissingById, setIsDismissingById] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [announcementFormDirty, setAnnouncementFormDirty] = useState(false);
+  const [confirmDeleteAnnouncement, setConfirmDeleteAnnouncement] = useState<Announcement | null>(null);
+  const [isDeletingAnnouncement, setIsDeletingAnnouncement] = useState(false);
   useUnsavedGuard(announcementFormDirty);
 
   type UnifiedItem =
@@ -501,6 +504,35 @@ export function AnnouncementsClient({
     }
   };
 
+  const handleDeleteAnnouncement = async (announcement: Announcement) => {
+    setIsDeletingAnnouncement(true);
+
+    try {
+      const response = await fetch(`/api/v1/announcements/${announcement.id}`, {
+        method: "DELETE"
+      });
+
+      const payload = (await response.json()) as { data: { announcementId: string } | null; error?: { message: string } };
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? "Unable to delete announcement.");
+        return;
+      }
+
+      setAnnouncements((current) => current.filter((a) => a.id !== announcement.id));
+      window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+      showToast("success", "Announcement deleted company-wide.");
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to delete announcement."
+      );
+    } finally {
+      setIsDeletingAnnouncement(false);
+      setConfirmDeleteAnnouncement(null);
+    }
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -635,7 +667,7 @@ export function AnnouncementsClient({
                       onDismiss={handleDismiss}
                       onMarkRead={handleMarkRead}
                       onEdit={openEditPanel}
-                      onDelete={() => {}}
+                      onDelete={setConfirmDeleteAnnouncement}
                     />
                   );
                 }
@@ -801,6 +833,21 @@ export function AnnouncementsClient({
           </form>
         </div>
       </SlidePanel>
+
+      <ConfirmDialog
+        isOpen={confirmDeleteAnnouncement !== null}
+        title="Delete announcement company-wide?"
+        description={`This will permanently remove "${confirmDeleteAnnouncement?.title ?? ""}" for everyone in the company. This action cannot be undone.`}
+        confirmLabel="Delete for everyone"
+        tone="danger"
+        isConfirming={isDeletingAnnouncement}
+        onConfirm={() => {
+          if (confirmDeleteAnnouncement) {
+            void handleDeleteAnnouncement(confirmDeleteAnnouncement);
+          }
+        }}
+        onCancel={() => setConfirmDeleteAnnouncement(null)}
+      />
 
       {toasts.length > 0 ? (
         <div className="toast-region" aria-live="polite" aria-atomic="true">

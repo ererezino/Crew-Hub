@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { logAudit } from "../../../../../lib/audit";
 import { formatDateRangeHuman } from "../../../../../lib/datetime";
+import { logger } from "../../../../../lib/logger";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import {
   calculateWorkingDays,
@@ -480,7 +482,7 @@ export async function POST(request: Request) {
         .eq("org_id", employeeProfile.org_id);
 
       if (rollbackResult.error) {
-        console.error("Unable to rollback leave request after balance failure.", {
+        logger.error("Unable to rollback leave request after balance failure.", {
           leaveRequestId: insertedRequest.id,
           message: rollbackResult.error.message
         });
@@ -510,6 +512,18 @@ export async function POST(request: Request) {
     });
   }
 
+  await logAudit({
+    action: "submitted",
+    tableName: "leave_requests",
+    recordId: parsedRequest.data.id,
+    newValue: {
+      leaveType: parsedRequest.data.leave_type,
+      startDate: parsedRequest.data.start_date,
+      endDate: parsedRequest.data.end_date,
+      totalDays: parsedRequest.data.total_days
+    }
+  }).catch(() => undefined);
+
   const responseData: TimeOffRequestMutationResponseData = {
     request: toRequestRecord(parsedRequest.data, employeeProfile)
   };
@@ -521,7 +535,7 @@ export async function POST(request: Request) {
     .is("deleted_at", null);
 
   if (approvalError) {
-    console.error("Unable to load leave approver recipients.", {
+    logger.error("Unable to load leave approver recipients.", {
       leaveRequestId: parsedRequest.data.id,
       message: approvalError.message
     });

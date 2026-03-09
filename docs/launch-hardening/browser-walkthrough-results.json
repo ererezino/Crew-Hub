@@ -1,0 +1,72 @@
+{
+  "baseUrl": "http://localhost:3100",
+  "generatedAt": "2026-03-09T06:36:06.105Z",
+  "results": [
+    {
+      "flow": "Public login/legal/support visibility",
+      "status": "pass",
+      "details": "Login page exposes privacy, terms, and support.",
+      "recordedAt": "2026-03-09T06:34:07.155Z"
+    },
+    {
+      "flow": "Unknown route 404 behavior",
+      "status": "pass",
+      "details": "Unknown route renders explicit page-not-found screen.",
+      "recordedAt": "2026-03-09T06:34:12.354Z"
+    },
+    {
+      "flow": "Admin MFA enforcement",
+      "status": "pass",
+      "details": "Admin login blocked until authenticator setup/verification is satisfied.",
+      "recordedAt": "2026-03-09T06:34:57.990Z"
+    },
+    {
+      "flow": "Employee login/logout",
+      "status": "pass",
+      "details": "Employee can sign in and sign out via user menu.",
+      "recordedAt": "2026-03-09T06:35:03.943Z"
+    },
+    {
+      "flow": "Time-off request submission",
+      "status": "pass",
+      "details": "Employee successfully submitted a leave request.",
+      "recordedAt": "2026-03-09T06:35:16.359Z"
+    },
+    {
+      "flow": "Expense submission",
+      "status": "pass",
+      "details": "Employee submitted an expense with receipt upload.",
+      "recordedAt": "2026-03-09T06:35:23.880Z"
+    },
+    {
+      "flow": "Document upload validation",
+      "status": "pass",
+      "details": "Invalid document type is rejected in the upload panel.",
+      "recordedAt": "2026-03-09T06:35:35.914Z"
+    },
+    {
+      "flow": "Time-off approval confirmation",
+      "status": "pass",
+      "details": "Approve action requires confirmation and succeeds.",
+      "recordedAt": "2026-03-09T06:35:46.941Z"
+    },
+    {
+      "flow": "Expense approval confirmation",
+      "status": "pass",
+      "details": "Expense approval requires confirmation and succeeds.",
+      "recordedAt": "2026-03-09T06:35:53.075Z"
+    },
+    {
+      "flow": "Privacy + support path",
+      "status": "pass",
+      "details": "Privacy policy and support/reporting path are reachable from authenticated UI.",
+      "recordedAt": "2026-03-09T06:35:59.384Z"
+    },
+    {
+      "flow": "Performance/scheduling/disabled-feature honesty",
+      "status": "pass",
+      "details": "Performance and scheduling load; payroll payment-rail actions are not exposed.",
+      "recordedAt": "2026-03-09T06:36:05.966Z"
+    }
+  ]
+}

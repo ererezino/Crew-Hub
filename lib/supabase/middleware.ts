@@ -17,6 +17,15 @@ function getSupabasePublicEnv() {
 }
 
 export async function applySupabaseAuthMiddleware(request: NextRequest) {
+  // Generate a correlation ID for every request (used in logging and error tracking)
+  const requestId =
+    request.headers.get("x-request-id") ?? crypto.randomUUID();
+
+  /** Apply security headers and attach request ID to every response */
+  function secure(response: NextResponse): NextResponse {
+    return applySecurityHeaders(response, { requestId });
+  }
+
   const isApiRoute = request.nextUrl.pathname.startsWith("/api/");
   const isMutationRequest = ["POST", "PUT", "PATCH", "DELETE"].includes(
     request.method.toUpperCase()
@@ -26,7 +35,7 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
     const csrfDecision = validateCsrfRequest(request);
 
     if (!csrfDecision.valid) {
-      return applySecurityHeaders(
+      return secure(
         NextResponse.json(
           {
             data: null,
@@ -83,14 +92,14 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
         response.headers.set("X-RateLimit-Bucket", rateLimitDecision.bucket);
       }
 
-      return applySecurityHeaders(response);
+      return secure(response);
     }
   }
 
   const env = getSupabasePublicEnv();
 
   if (!env) {
-    return applySecurityHeaders(NextResponse.next({ request }));
+    return secure(NextResponse.next({ request }));
   }
 
   let response = NextResponse.next({ request });
@@ -120,50 +129,136 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
   const isLoginRoute = pathname === "/login";
-  const isChangePasswordRoute = pathname === "/change-password";
-  const isPublicAuthRoute = pathname === "/reset-password" || pathname === "/tmp-reset";
+  const isMfaSetupRoute = pathname === "/mfa-setup";
+  const isMfaApiRoute = pathname === "/api/v1/me/mfa";
+  const isAuthSignInApiRoute = pathname === "/api/v1/auth/sign-in";
+  const isAuthSignOutApiRoute = pathname === "/api/auth/sign-out";
+  const isPublicLegalRoute = pathname === "/privacy" || pathname === "/terms";
 
-  if (!user && !isLoginRoute && !isApiRoute && !isPublicAuthRoute) {
+  if (!user && !isLoginRoute && !isApiRoute && !isPublicLegalRoute) {
     const redirectUrl = new URL("/login", request.url);
 
     if (pathname !== "/") {
       redirectUrl.searchParams.set("redirectTo", `${pathname}${search}`);
     }
 
-    return applySecurityHeaders(NextResponse.redirect(redirectUrl));
+    return secure(NextResponse.redirect(redirectUrl));
   }
 
   if (user && isLoginRoute) {
-    return applySecurityHeaders(
+    return secure(
       NextResponse.redirect(new URL("/dashboard", request.url))
     );
   }
 
-  // Password change enforcement: redirect authenticated users who still
-  // need to change their temporary password.  Only check on non-API,
-  // non-login, non-change-password routes to minimise performance impact.
-  if (user && !isApiRoute && !isLoginRoute) {
+  // MFA enforcement and account status checks for authenticated users.
+  if (user && !isLoginRoute) {
     const { data: profileRow } = await supabase
       .from("profiles")
-      .select("password_change_required")
+      .select("roles, status")
       .eq("id", user.id)
       .is("deleted_at", null)
       .maybeSingle();
 
-    const mustChangePassword = profileRow?.password_change_required === true;
+    /* ── Inactive account check ── */
+    if (profileRow?.status === "inactive") {
+      await supabase.auth.signOut();
 
-    if (mustChangePassword && !isChangePasswordRoute) {
-      return applySecurityHeaders(
-        NextResponse.redirect(new URL("/change-password", request.url))
-      );
+      if (isApiRoute) {
+        return secure(
+          NextResponse.json(
+            {
+              data: null,
+              error: {
+                code: "ACCOUNT_DISABLED",
+                message: "Your account has been disabled. Contact your admin."
+              },
+              meta: { timestamp: new Date().toISOString() }
+            },
+            { status: 403 }
+          )
+        );
+      }
+
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("error", "account_disabled");
+      return secure(NextResponse.redirect(loginUrl));
     }
 
-    if (!mustChangePassword && isChangePasswordRoute) {
-      return applySecurityHeaders(
-        NextResponse.redirect(new URL("/dashboard", request.url))
-      );
+    /* ── MFA enforcement for ALL users ── */
+    const { data: factorsData } =
+      await supabase.auth.mfa.listFactors();
+
+    const verifiedFactors = (factorsData?.totp ?? []).filter(
+      (f) => f.status === "verified"
+    );
+
+    if (verifiedFactors.length === 0) {
+      /* User has no verified TOTP — must complete MFA setup */
+      const isMfaExemptApiRoute =
+        isMfaApiRoute || isAuthSignInApiRoute || isAuthSignOutApiRoute;
+
+      if (isApiRoute && !isMfaExemptApiRoute) {
+        return secure(
+          NextResponse.json(
+            {
+              data: null,
+              error: {
+                code: "MFA_REQUIRED",
+                message:
+                  "Authenticator setup is required. Complete setup to continue."
+              },
+              meta: {
+                timestamp: new Date().toISOString()
+              }
+            },
+            { status: 403 }
+          )
+        );
+      }
+
+      if (!isApiRoute && !isMfaSetupRoute) {
+        return secure(
+          NextResponse.redirect(new URL("/mfa-setup", request.url))
+        );
+      }
+    }
+
+    /* ── AAL2 enforcement (defense in depth) ── */
+    if (verifiedFactors.length > 0) {
+      const { data: aalData } =
+        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+      if (aalData?.currentLevel === "aal1") {
+        /* Session is AAL1 but user has TOTP — force re-login */
+        const isMfaExemptApiRoute =
+          isMfaApiRoute || isAuthSignInApiRoute || isAuthSignOutApiRoute;
+
+        if (isApiRoute && !isMfaExemptApiRoute) {
+          return secure(
+            NextResponse.json(
+              {
+                data: null,
+                error: {
+                  code: "MFA_VERIFICATION_REQUIRED",
+                  message: "Please sign in again to verify your authenticator."
+                },
+                meta: { timestamp: new Date().toISOString() }
+              },
+              { status: 403 }
+            )
+          );
+        }
+
+        if (!isApiRoute && !isMfaSetupRoute) {
+          await supabase.auth.signOut();
+          return secure(
+            NextResponse.redirect(new URL("/login", request.url))
+          );
+        }
+      }
     }
   }
 
-  return applySecurityHeaders(response);
+  return secure(response);
 }

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { logAudit } from "../../../../../../lib/audit";
 import { formatDateRangeHuman } from "../../../../../../lib/datetime";
 import { sendLeaveStatusEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
@@ -513,6 +514,19 @@ export async function PATCH(request: Request, context: RouteContext) {
       rejectionReason: emailStatus === "rejected" ? nextRejectionReason : null
     });
 
+    await logAudit({
+      action: nextStatus === "approved" ? "approved" : "rejected",
+      tableName: "leave_requests",
+      recordId: existingRequest.id,
+      oldValue: { status: existingRequest.status },
+      newValue: {
+        status: nextStatus,
+        leaveType: existingRequest.leave_type,
+        employeeId: existingRequest.employee_id,
+        rejectionReason: nextRejectionReason
+      }
+    }).catch(() => undefined);
+
     return jsonResponse<TimeOffRequestMutationResponseData>(200, {
       data: responseData,
       error: null,
@@ -592,6 +606,18 @@ export async function PATCH(request: Request, context: RouteContext) {
     const parsedApprover = approverProfileSchema.safeParse(approverRow);
     approverName = parsedApprover.success ? parsedApprover.data.full_name : "Unknown user";
   }
+
+  await logAudit({
+    action: "cancelled",
+    tableName: "leave_requests",
+    recordId: existingRequest.id,
+    oldValue: { status: existingRequest.status },
+    newValue: {
+      status: nextStatus,
+      leaveType: existingRequest.leave_type,
+      employeeId: existingRequest.employee_id
+    }
+  }).catch(() => undefined);
 
   const responseData: TimeOffRequestMutationResponseData = {
     request: toLeaveRequestRecord({

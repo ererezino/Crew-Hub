@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { logAudit } from "../../../../../../lib/audit";
 import { normalizeReviewSections } from "../../../../../../lib/performance/reviews";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type {
@@ -141,6 +142,13 @@ export async function POST(request: Request) {
         meta: buildMeta()
       });
     }
+
+    await logAudit({
+      action: "created",
+      tableName: "review_templates",
+      recordId: parsedTemplate.data.id,
+      newValue: { name: parsedTemplate.data.name }
+    }).catch(() => undefined);
 
     const responseData: CreateReviewTemplateData = {
       template: mapTemplateRow(parsedTemplate.data)

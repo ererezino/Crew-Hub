@@ -118,7 +118,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
   const [editMessage, setEditMessage] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isResettingAuthenticator, setIsResettingAuthenticator] = useState(false);
 
   const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({
     scope: "all"
@@ -154,7 +154,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
   };
 
   const closeEditPanel = () => {
-    if (isSavingEdit || isResettingPassword) {
+    if (isSavingEdit || isResettingAuthenticator) {
       return;
     }
 
@@ -340,12 +340,12 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleResetAuthenticator = async () => {
     if (!editValues) {
       return;
     }
 
-    setIsResettingPassword(true);
+    setIsResettingAuthenticator(true);
     setEditError(null);
     setEditMessage(null);
 
@@ -356,15 +356,15 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       const payload = (await response.json()) as PeoplePasswordResetResponse;
 
       if (!response.ok || !payload.data?.resetInitiated) {
-        setEditError(payload.error?.message ?? "Unable to reset password.");
+        setEditError(payload.error?.message ?? "Unable to reset authenticator.");
         return;
       }
 
-      setEditMessage("Password setup link sent. The user should complete setup from their email.");
+      setEditMessage("Authenticator reset. Setup link sent. The user should complete setup from their email.");
     } catch (error) {
-      setEditError(error instanceof Error ? error.message : "Unable to reset password.");
+      setEditError(error instanceof Error ? error.message : "Unable to reset authenticator.");
     } finally {
-      setIsResettingPassword(false);
+      setIsResettingAuthenticator(false);
     }
   };
 
@@ -582,10 +582,10 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
               <button
                 type="button"
                 className="button button-ghost"
-                onClick={handleResetPassword}
-                disabled={isResettingPassword}
+                onClick={handleResetAuthenticator}
+                disabled={isResettingAuthenticator}
               >
-                {isResettingPassword ? "Resetting..." : "Reset Password"}
+                {isResettingAuthenticator ? "Resetting..." : "Reset Authenticator"}
               </button>
             </div>
 
