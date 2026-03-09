@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
+import { SlidePanel } from "../../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { formatRelativeTime } from "../../../../../lib/datetime";
 
@@ -84,6 +85,9 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
   const [pages, setPages] = useState<SectionPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddPageOpen, setIsAddPageOpen] = useState(false);
+  const [addPageBusy, setAddPageBusy] = useState(false);
+  const [addPageError, setAddPageError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -119,6 +123,44 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
     fetchData();
   }, [fetchData]);
 
+  const handleAddPage = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setAddPageBusy(true);
+      setAddPageError(null);
+      const form = event.currentTarget;
+      const fd = new FormData(form);
+
+      try {
+        const res = await fetch(`/api/v1/team-hubs/${hubId}/sections/${sectionId}/pages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: fd.get("title"),
+            pageType: fd.get("pageType") || "document",
+            content: fd.get("content") || undefined,
+            icon: fd.get("icon") || undefined
+          })
+        });
+
+        if (!res.ok) {
+          const envelope = await res.json().catch(() => null);
+          throw new Error(envelope?.error?.message ?? "Failed to create page.");
+        }
+
+        setIsAddPageOpen(false);
+        setAddPageError(null);
+        form.reset();
+        fetchData();
+      } catch (err) {
+        setAddPageError(err instanceof Error ? err.message : "Failed to create page.");
+      } finally {
+        setAddPageBusy(false);
+      }
+    },
+    [hubId, sectionId, fetchData]
+  );
+
   if (loading) {
     return (
       <>
@@ -153,7 +195,20 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
       <PageHeader
         title={section.name}
         description={section.description ?? undefined}
-        actions={undefined}
+        actions={
+          isLeadOrAdmin ? (
+            <button
+              type="button"
+              className="button button-accent"
+              onClick={() => {
+                setAddPageError(null);
+                setIsAddPageOpen(true);
+              }}
+            >
+              Add Page
+            </button>
+          ) : undefined
+        }
       />
 
       <nav style={{ marginBottom: "var(--space-4)" }}>
@@ -275,6 +330,84 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
           })}
         </div>
       )}
+
+      <SlidePanel
+        isOpen={isAddPageOpen}
+        title="Add Page"
+        description="Create a new page in this section."
+        onClose={() => {
+          if (!addPageBusy) {
+            setAddPageError(null);
+          }
+          setIsAddPageOpen(false);
+        }}
+      >
+        <form onSubmit={handleAddPage} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <label className="field-label">
+            Title
+            <input
+              name="title"
+              type="text"
+              className="input"
+              required
+              maxLength={300}
+              placeholder="e.g. Onboarding Checklist"
+              autoFocus
+            />
+          </label>
+
+          <label className="field-label">
+            Type
+            <select name="pageType" className="input" defaultValue="document">
+              <option value="document">Document</option>
+              <option value="runbook">Runbook</option>
+              <option value="contact_list">Contact List</option>
+              <option value="reference_list">Reference List</option>
+              <option value="table">Table</option>
+              <option value="link">Link</option>
+            </select>
+          </label>
+
+          <label className="field-label">
+            Icon (emoji)
+            <input
+              name="icon"
+              type="text"
+              className="input"
+              maxLength={4}
+              placeholder="e.g. 📄"
+            />
+          </label>
+
+          <label className="field-label">
+            Content
+            <textarea
+              name="content"
+              className="input"
+              rows={5}
+              placeholder="Initial content (optional, can be edited later)"
+            />
+          </label>
+
+          {addPageError ? <p className="form-field-error">{addPageError}</p> : null}
+
+          <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => {
+                setAddPageError(null);
+                setIsAddPageOpen(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="button button-accent" disabled={addPageBusy}>
+              {addPageBusy ? "Adding…" : "Add Page"}
+            </button>
+          </div>
+        </form>
+      </SlidePanel>
     </>
   );
 }

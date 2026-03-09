@@ -24,7 +24,7 @@ export function DecisionCard({
   onDecline,
 }: DecisionCardProps) {
   const [status, setStatus] = useState<
-    "idle" | "approving" | "declining" | "done"
+    "idle" | "approving" | "declining" | "done" | "error"
   >("idle");
   const [showDeclineInput, setShowDeclineInput] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -35,7 +35,7 @@ export function DecisionCard({
       await onApprove(id);
       setStatus("done");
     } catch {
-      setStatus("idle");
+      setStatus("error");
     }
   };
 
@@ -45,7 +45,7 @@ export function DecisionCard({
       await onDecline(id, declineReason || undefined);
       setStatus("done");
     } catch {
-      setStatus("idle");
+      setStatus("error");
     }
   };
 
@@ -73,6 +73,19 @@ export function DecisionCard({
         <p className="decision-card-subtitle">{subtitle}</p>
         <p className="decision-card-detail">{detail}</p>
       </div>
+
+      {status === "error" && (
+        <div className="decision-card-error">
+          <p className="decision-card-error-text">Something went wrong. Please try again.</p>
+          <button
+            type="button"
+            className="button button-ghost decision-card-btn"
+            onClick={() => setStatus("idle")}
+          >
+            Try again
+          </button>
+        </div>
+      )}
 
       {showDeclineInput ? (
         <div className="decision-card-decline-input">
@@ -108,14 +121,14 @@ export function DecisionCard({
           <button
             className="button button-danger decision-card-btn"
             onClick={() => setShowDeclineInput(true)}
-            disabled={status === "approving"}
+            disabled={status === "approving" || status === "error"}
           >
             Decline
           </button>
           <button
             className="button button-primary decision-card-btn"
             onClick={handleApprove}
-            disabled={status === "approving"}
+            disabled={status === "approving" || status === "error"}
           >
             {status === "approving" ? "Approving..." : "Approve"}
           </button>

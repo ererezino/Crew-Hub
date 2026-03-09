@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "results": [
+    {
+      "check": "employee-onboarding-page-load",
+      "pass": true
+    },
+    {
+      "check": "documents-page-load",
+      "pass": true
+    }
+  ],
+  "screenshots": [
+    "docs/product-audit/batch-d-regression-runtime/after/01-employee-onboarding.png",
+    "docs/product-audit/batch-d-regression-runtime/after/02-documents.png"
+  ]
+}

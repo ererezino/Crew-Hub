@@ -53,11 +53,11 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G H"
       },
       {
-        label: "Notifications",
+        label: "Announcements",
         href: "/announcements",
         icon: "Bell",
-        description: "Company updates, alerts, and messages since your last visit",
-        shortcut: "G A"
+        description: "Company announcements and updates",
+        shortcut: "G C"
       }
     ]
   },
@@ -91,6 +91,14 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "Receipt",
         description: "Submit expenses, upload receipts, and track reimbursement",
         shortcut: "G E"
+      },
+      {
+        label: "Time tracking",
+        href: "/time-attendance",
+        icon: "Clock",
+        description: "Clock in/out, view timesheets, and track hours worked",
+        shortcut: "G K",
+        moduleId: "time_attendance"
       },
       {
         label: "Learning",

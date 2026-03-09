@@ -137,6 +137,7 @@ export type AnalyticsPayrollSection = {
     totalDeductions: number;
     runCount: number;
     avgNetPerEmployee: number;
+    currency: string;
   };
   trend: AnalyticsPayrollTrendRow[];
   byDepartment: AnalyticsPayrollDepartmentRow[];
@@ -179,6 +180,7 @@ export type AnalyticsExpensesSection = {
     avgProcessingDays: number;
     approvedAmount: number;
     expenseCount: number;
+    currency: string;
   };
   byCategory: AnalyticsExpensesCategoryRow[];
   trend: AnalyticsExpensesTrendRow[];

@@ -199,6 +199,7 @@ export async function GET(request: Request) {
   if (parsedExpenses.data.length === 0) {
     const emptyResponse: ExpenseReportsResponseData = {
       month,
+      primaryCurrency: "USD",
       totals: {
         expenseCount: 0,
         totalAmount: 0,
@@ -346,11 +347,13 @@ export async function GET(request: Request) {
   let submissionToManagerApprovalCount = 0;
   let managerApprovalToDisbursementHoursTotal = 0;
   let managerApprovalToDisbursementCount = 0;
+  const currencyCounts = new Map<string, number>();
 
   for (const expense of filteredExpenses) {
     const amount = typeof expense.amount === "number" ? expense.amount : Number.parseInt(expense.amount, 10);
     const safeAmount = Number.isFinite(amount) ? Math.trunc(amount) : 0;
     totalAmount += safeAmount;
+    currencyCounts.set(expense.currency, (currencyCounts.get(expense.currency) ?? 0) + 1);
 
     if (
       expense.status === "pending" ||
@@ -647,8 +650,19 @@ export async function GET(request: Request) {
     }))
     .sort((left, right) => right.totalAmount - left.totalAmount);
 
+  // Derive primary currency from most common currency in filtered expenses
+  let primaryCurrency = "USD";
+  let maxCurrencyCount = 0;
+  for (const [code, count] of currencyCounts) {
+    if (count > maxCurrencyCount) {
+      maxCurrencyCount = count;
+      primaryCurrency = code;
+    }
+  }
+
   const responseData: ExpenseReportsResponseData = {
     month,
+    primaryCurrency,
     totals: {
       expenseCount: filteredExpenses.length,
       totalAmount,

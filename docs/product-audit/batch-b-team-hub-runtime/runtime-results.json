@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "results": [
+    {
+      "check": "team-hub-banner-no-coming-soon",
+      "pass": true
+    },
+    {
+      "check": "create-hub-error-visible",
+      "pass": true
+    },
+    {
+      "check": "add-section-error-visible",
+      "pass": true
+    },
+    {
+      "check": "add-page-error-visible",
+      "pass": true
+    }
+  ],
+  "screenshots": [
+    "docs/product-audit/batch-b-team-hub-runtime/after/01-team-hub-banner.png",
+    "docs/product-audit/batch-b-team-hub-runtime/after/02-create-hub-error.png",
+    "docs/product-audit/batch-b-team-hub-runtime/after/03-add-section-error.png",
+    "docs/product-audit/batch-b-team-hub-runtime/after/04-add-page-error.png"
+  ]
+}

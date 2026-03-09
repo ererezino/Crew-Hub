@@ -43,10 +43,12 @@ function ReportsSkeleton() {
 
 function ExpenseReportBars({
   title,
-  rows
+  rows,
+  currency
 }: {
   title: string;
   rows: ExpenseReportBucket[];
+  currency: string;
 }) {
   const maxAmount = useMemo(
     () => rows.reduce((currentMax, row) => Math.max(currentMax, row.totalAmount), 0),
@@ -72,7 +74,7 @@ function ExpenseReportBars({
                 <div className="expenses-report-row-copy">
                   <p className="expenses-report-row-title">{row.label}</p>
                   <p className="expenses-report-row-meta">
-                    <CurrencyDisplay amount={row.totalAmount} currency="NGN" /> |{" "}
+                    <CurrencyDisplay amount={row.totalAmount} currency={currency} /> |{" "}
                     <span className="numeric">{row.count}</span> items
                   </p>
                 </div>
@@ -91,7 +93,7 @@ function ExpenseReportBars({
   );
 }
 
-function EmployeeTable({ rows }: { rows: EnhancedEmployeeBucket[] }) {
+function EmployeeTable({ rows, currency }: { rows: EnhancedEmployeeBucket[]; currency: string }) {
   if (rows.length === 0) {
     return <p className="settings-card-description">No employee data for this period.</p>;
   }
@@ -116,7 +118,7 @@ function EmployeeTable({ rows }: { rows: EnhancedEmployeeBucket[] }) {
               <td>{row.department ?? "-"}</td>
               <td className="numeric">{row.count}</td>
               <td className="numeric">
-                <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
+                <CurrencyDisplay amount={row.totalAmount} currency={currency} />
               </td>
               <td className="numeric">
                 {row.avgProcessingHours !== null
@@ -140,7 +142,7 @@ function EmployeeTable({ rows }: { rows: EnhancedEmployeeBucket[] }) {
   );
 }
 
-function CategoryTable({ rows }: { rows: EnhancedCategoryBucket[] }) {
+function CategoryTable({ rows, currency }: { rows: EnhancedCategoryBucket[]; currency: string }) {
   if (rows.length === 0) {
     return <p className="settings-card-description">No category data for this period.</p>;
   }
@@ -163,7 +165,7 @@ function CategoryTable({ rows }: { rows: EnhancedCategoryBucket[] }) {
               <td>{row.label}</td>
               <td className="numeric">{row.count}</td>
               <td className="numeric">
-                <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
+                <CurrencyDisplay amount={row.totalAmount} currency={currency} />
               </td>
               <td className="numeric">{row.pctOfTotal}%</td>
               <td>{row.mostCommonVendor ?? "-"}</td>
@@ -175,7 +177,7 @@ function CategoryTable({ rows }: { rows: EnhancedCategoryBucket[] }) {
   );
 }
 
-function DepartmentTable({ rows }: { rows: EnhancedDepartmentBucket[] }) {
+function DepartmentTable({ rows, currency }: { rows: EnhancedDepartmentBucket[]; currency: string }) {
   if (rows.length === 0) {
     return <p className="settings-card-description">No department data for this period.</p>;
   }
@@ -198,7 +200,7 @@ function DepartmentTable({ rows }: { rows: EnhancedDepartmentBucket[] }) {
               <td>{row.label}</td>
               <td className="numeric">{row.count}</td>
               <td className="numeric">
-                <CurrencyDisplay amount={row.totalAmount} currency="NGN" />
+                <CurrencyDisplay amount={row.totalAmount} currency={currency} />
               </td>
               <td className="numeric">{row.uniqueEmployees}</td>
               <td>{row.topCategory ? getExpenseCategoryLabel(row.topCategory as never) : "-"}</td>
@@ -357,7 +359,7 @@ export function ExpenseReportsClient() {
             <article className="metric-card">
               <p className="metric-label">Total Submitted</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.totalAmount} currency="NGN" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.totalAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
               <p className="metric-hint">
                 <span className="numeric">{reportsQuery.data.totals.expenseCount}</span> expenses
@@ -366,28 +368,28 @@ export function ExpenseReportsClient() {
             <article className="metric-card">
               <p className="metric-label">Manager Approved</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.managerApprovedAmount} currency="NGN" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.managerApprovedAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
               <p className="metric-hint">Awaiting finance review</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Finance Approved</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.financeApprovedAmount} currency="NGN" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.financeApprovedAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
               <p className="metric-hint">Approved for reimbursement</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Reimbursed</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.reimbursedAmount} currency="NGN" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.reimbursedAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
               <p className="metric-hint">Paid out this month</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Pending Reimbursement</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={reportsQuery.data.totals.pendingAmount} currency="NGN" />
+                <CurrencyDisplay amount={reportsQuery.data.totals.pendingAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
               <p className="metric-hint">Still owed to crew members</p>
             </article>
@@ -439,7 +441,7 @@ export function ExpenseReportsClient() {
                           <div className="expenses-report-row-copy">
                             <p className="expenses-report-row-title">{row.label}</p>
                             <p className="expenses-report-row-meta">
-                              <CurrencyDisplay amount={row.totalAmount} currency="NGN" /> |{" "}
+                              <CurrencyDisplay amount={row.totalAmount} currency={reportsQuery.data!.primaryCurrency} /> |{" "}
                               <span className="numeric">{row.count}</span> items
                             </p>
                           </div>
@@ -448,7 +450,7 @@ export function ExpenseReportsClient() {
                     </ul>
                   )}
                 </article>
-                <ExpenseReportBars title="By Category" rows={reportsQuery.data.byCategory} />
+                <ExpenseReportBars title="By Category" rows={reportsQuery.data.byCategory} currency={reportsQuery.data.primaryCurrency} />
               </section>
 
               {/* ── Tabbed breakdown sections ── */}
@@ -483,13 +485,13 @@ export function ExpenseReportsClient() {
 
                 <div className="expenses-report-tab-panel">
                   {activeTab === "employee" && (
-                    <EmployeeTable rows={reportsQuery.data.enhancedByEmployee} />
+                    <EmployeeTable rows={reportsQuery.data.enhancedByEmployee} currency={reportsQuery.data.primaryCurrency} />
                   )}
                   {activeTab === "category" && (
-                    <CategoryTable rows={reportsQuery.data.enhancedByCategory} />
+                    <CategoryTable rows={reportsQuery.data.enhancedByCategory} currency={reportsQuery.data.primaryCurrency} />
                   )}
                   {activeTab === "department" && (
-                    <DepartmentTable rows={reportsQuery.data.enhancedByDepartment} />
+                    <DepartmentTable rows={reportsQuery.data.enhancedByDepartment} currency={reportsQuery.data.primaryCurrency} />
                   )}
                 </div>
               </section>

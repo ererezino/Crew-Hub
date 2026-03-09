@@ -1,0 +1,44 @@
+{
+  "ok": true,
+  "results": [
+    {
+      "check": "sidebar-announcements-visible",
+      "pass": true
+    },
+    {
+      "check": "sidebar-time-tracking-visible",
+      "pass": true
+    },
+    {
+      "check": "keyboard-ga-approvals",
+      "pass": true
+    },
+    {
+      "check": "notification-view-all-announcements",
+      "pass": true
+    },
+    {
+      "check": "time-tracking-route",
+      "pass": true
+    },
+    {
+      "check": "reports-primary-currency-field",
+      "pass": true
+    },
+    {
+      "check": "analytics-currency-fields",
+      "pass": true
+    },
+    {
+      "check": "decision-card-error-runtime",
+      "pass": true,
+      "method": "Created pending leave request as employee then validated manager dashboard error state under forced mutation failure."
+    }
+  ],
+  "screenshots": [
+    "docs/product-audit/batch-c-nav-and-currency-runtime/after/01-dashboard-nav.png",
+    "docs/product-audit/batch-c-nav-and-currency-runtime/after/02-announcements-route.png",
+    "docs/product-audit/batch-c-nav-and-currency-runtime/after/03-time-tracking-route.png",
+    "docs/product-audit/batch-c-nav-and-currency-runtime/after/05-decision-card-error-manager.png"
+  ]
+}

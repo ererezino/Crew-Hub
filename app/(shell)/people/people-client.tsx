@@ -24,6 +24,7 @@ import {
   type EmploymentType,
   type PeopleCreateResponse,
   type PeopleInviteResponse,
+  type PeoplePasswordResetResponse,
   type PeopleUpdateResponse,
   type PersonRecord,
   type ProfileStatus
@@ -37,7 +38,10 @@ type ToastVariant = "success" | "error" | "info";
 type PeopleClientProps = {
   currentUserId: string;
   initialScope: PeopleScope;
-  canManagePeople: boolean;
+  canCreatePeople: boolean;
+  canInvitePeople: boolean;
+  canEditPeople: boolean;
+  canResetAuthenticator: boolean;
   isAdmin?: boolean;
 };
 
@@ -462,7 +466,10 @@ function PeopleTableSkeleton() {
 export function PeopleClient({
   currentUserId,
   initialScope,
-  canManagePeople,
+  canCreatePeople,
+  canInvitePeople,
+  canEditPeople,
+  canResetAuthenticator,
   isAdmin = false
 }: PeopleClientProps) {
   const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({
@@ -501,6 +508,7 @@ export function PeopleClient({
   // Reset authenticator state
   const [resettingId, setResettingId] = useState<string | null>(null);
   const [confirmResetPerson, setConfirmResetPerson] = useState<PersonRecord | null>(null);
+  const [resetSetupLink, setResetSetupLink] = useState<string | null>(null);
 
   // Bulk upload state
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -527,6 +535,9 @@ export function PeopleClient({
         .sort((leftPerson, rightPerson) => leftPerson.fullName.localeCompare(rightPerson.fullName)),
     [currentUserId, people]
   );
+
+  const canViewAccessState = canInvitePeople || canResetAuthenticator;
+  const canManageAnyPersonAction = canEditPeople || canInvitePeople || canResetAuthenticator;
 
   const addToast = (variant: ToastVariant, message: string) => {
     const id = createToastId();
@@ -755,6 +766,17 @@ export function PeopleClient({
     setInviteLink(null);
   }, [invitingId]);
 
+  const openResetDialog = useCallback((person: PersonRecord) => {
+    setConfirmResetPerson(person);
+    setResetSetupLink(null);
+  }, []);
+
+  const closeResetDialog = useCallback(() => {
+    if (resettingId !== null) return;
+    setConfirmResetPerson(null);
+    setResetSetupLink(null);
+  }, [resettingId]);
+
   const handleCopyInviteLink = useCallback(async () => {
     if (!inviteLink) return;
     if (!navigator?.clipboard?.writeText) {
@@ -769,6 +791,21 @@ export function PeopleClient({
       addToast("error", error instanceof Error ? error.message : "Unable to copy invite link.");
     }
   }, [inviteLink]);
+
+  const handleCopyResetSetupLink = useCallback(async () => {
+    if (!resetSetupLink) return;
+    if (!navigator?.clipboard?.writeText) {
+      addToast("error", "Clipboard access is not available in this browser.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(resetSetupLink);
+      addToast("success", "Setup link copied to clipboard.");
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Unable to copy setup link.");
+    }
+  }, [resetSetupLink]);
 
   const handleSendInvite = useCallback(async (person: PersonRecord) => {
     setInvitingId(person.id);
@@ -812,18 +849,19 @@ export function PeopleClient({
         method: "POST"
       });
 
-      const payload = await response.json();
+      const payload = await parseJsonResponse<PeoplePasswordResetResponse>(response);
 
-      if (!response.ok || !payload.data?.resetInitiated) {
-        setConfirmResetPerson(null);
-        addToast("error", humanizeError(payload.error?.message ?? "Unable to reset authenticator."));
+      if (!response.ok || !payload?.data?.resetInitiated) {
+        addToast(
+          "error",
+          humanizeError(payload?.error?.message ?? "Unable to reset authenticator.")
+        );
         return;
       }
 
-      setConfirmResetPerson(null);
-      addToast("success", `Authenticator reset. Setup link sent for ${person.fullName}.`);
+      setResetSetupLink(payload.data.setupLink ?? null);
+      addToast("success", `Authenticator reset. Setup link generated for ${person.fullName}.`);
     } catch (error) {
-      setConfirmResetPerson(null);
       addToast("error", error instanceof Error ? error.message : "Unable to reset authenticator.");
     } finally {
       setResettingId(null);
@@ -942,7 +980,7 @@ export function PeopleClient({
         title="Crew Members"
         description="Find teammates, review roles, and open full profiles."
         actions={
-          canManagePeople ? (
+          canCreatePeople ? (
             <>
               <button
                 type="button"
@@ -980,11 +1018,11 @@ export function PeopleClient({
             icon={<Users size={32} />}
             title="No crew members found"
             description="Add your first team member to start using people workflows."
-            {...(canManagePeople
+            {...(canCreatePeople
               ? { ctaLabel: "Add person", onCtaClick: () => setIsCreateOpen(true) }
               : {})}
           />
-          {canManagePeople ? (
+          {canCreatePeople ? (
             <button
               type="button"
               className="button button-accent"
@@ -1018,7 +1056,7 @@ export function PeopleClient({
                 <th>Department</th>
                 <th>Country</th>
                 {isAdmin ? <th>Status</th> : null}
-                {canManagePeople ? <th>Access</th> : null}
+                {canViewAccessState ? <th>Access</th> : null}
                 <th>Joined</th>
                 <th className="table-action-column">Actions</th>
               </tr>
@@ -1098,7 +1136,7 @@ export function PeopleClient({
                       </StatusBadge>
                     </td>
                   ) : null}
-                  {canManagePeople ? (
+                  {canViewAccessState ? (
                     <td>
                       {person.inviteStatus === "active" ? (
                         <span className="role-tag role-tag-active" title="Account confirmed and set up">
@@ -1119,26 +1157,29 @@ export function PeopleClient({
                       {formatRelativeTime(toDateTimeValue(person.startDate || person.createdAt))}
                     </time>
                   </td>
-                  {canManagePeople ? (
+                  {canManageAnyPersonAction ? (
                     <td className="table-row-action-cell">
                       <div className="people-row-actions">
-                        <button
-                          type="button"
-                          className="table-row-action"
-                          onClick={() => openEditPanel(person)}
-                        >
-                          Edit
-                        </button>
-                        {person.inviteStatus === "active" ? (
+                        {canEditPeople ? (
+                          <button
+                            type="button"
+                            className="table-row-action"
+                            onClick={() => openEditPanel(person)}
+                          >
+                            Edit
+                          </button>
+                        ) : null}
+                        {person.inviteStatus === "active" && canResetAuthenticator ? (
                           <button
                             type="button"
                             className="table-row-action"
                             disabled={resettingId === person.id}
-                            onClick={() => setConfirmResetPerson(person)}
+                            onClick={() => openResetDialog(person)}
                           >
-                            {resettingId === person.id ? "Sending..." : "Reset Authenticator"}
+                            {resettingId === person.id ? "Resetting..." : "Reset Authenticator"}
                           </button>
-                        ) : (
+                        ) : null}
+                        {person.inviteStatus !== "active" && canInvitePeople ? (
                           <button
                             type="button"
                             className="table-row-action"
@@ -1147,7 +1188,7 @@ export function PeopleClient({
                           >
                             {invitingId === person.id ? "Sending..." : "Invite"}
                           </button>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   ) : (
@@ -1896,11 +1937,7 @@ export function PeopleClient({
       {confirmResetPerson !== null ? (
         <div
           className="modal-overlay"
-          onClick={() => {
-            if (!resettingId) {
-              setConfirmResetPerson(null);
-            }
-          }}
+          onClick={closeResetDialog}
         >
           <section
             className="confirm-dialog modal-dialog"
@@ -1912,13 +1949,50 @@ export function PeopleClient({
             <h2 className="modal-title">Reset authenticator</h2>
             <p className="settings-card-description">
               Reset the authenticator for {confirmResetPerson.fullName} ({confirmResetPerson.email})?
-              They will receive an email with a link to set up a new authenticator.
+              They will receive an email with a link to set up a new authenticator. You can also copy the generated setup link below.
             </p>
+
+            {resetSetupLink ? (
+              <div className="invite-success-banner" role="status">
+                New setup link generated. Share it directly if email delivery is delayed.
+              </div>
+            ) : null}
+
+            <div className="invite-link-area">
+              <p className="invite-link-label">Setup link</p>
+              <div className="invite-link-input-row">
+                <input
+                  className="form-input"
+                  value={resetSetupLink ?? ""}
+                  readOnly
+                  placeholder="Click “Reset Authenticator” to generate a setup link."
+                  onClick={(event) => {
+                    if (resetSetupLink) {
+                      (event.target as HTMLInputElement).select();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => {
+                    void handleCopyResetSetupLink();
+                  }}
+                  disabled={!resetSetupLink || resettingId !== null}
+                >
+                  Copy Link
+                </button>
+              </div>
+              <p className="invite-link-note">
+                Setup links are one-time and time-limited. If a link expires, generate a fresh one.
+              </p>
+            </div>
+
             <div className="modal-actions">
               <button
                 type="button"
                 className="button button-subtle"
-                onClick={() => setConfirmResetPerson(null)}
+                onClick={closeResetDialog}
                 disabled={resettingId !== null}
               >
                 Cancel
@@ -1931,7 +2005,7 @@ export function PeopleClient({
                 }}
                 disabled={resettingId !== null}
               >
-                {resettingId ? "Sending..." : "Reset Authenticator"}
+                {resettingId ? "Resetting..." : resetSetupLink ? "Generate new link" : "Reset Authenticator"}
               </button>
             </div>
           </section>

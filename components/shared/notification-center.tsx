@@ -242,7 +242,7 @@ export function NotificationCenter() {
             </button>
             <Link
               className="table-row-action"
-              href="/notifications"
+              href="/announcements"
               onClick={() => setIsOpen(false)}
             >
               View all

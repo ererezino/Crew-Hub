@@ -1,3 +1,5 @@
+import { getCurrencySymbol } from "../../lib/format-currency";
+
 type MoneyInputProps = {
   id: string;
   value: string;
@@ -8,25 +10,6 @@ type MoneyInputProps = {
   disabled?: boolean;
   hasError?: boolean;
 };
-
-function currencySymbol(currency: string): string {
-  switch (currency.trim().toUpperCase()) {
-    case "USD":
-      return "$";
-    case "CAD":
-      return "CA$";
-    case "NGN":
-      return "NGN";
-    case "GHS":
-      return "GHS";
-    case "KES":
-      return "KES";
-    case "ZAR":
-      return "ZAR";
-    default:
-      return currency.trim().toUpperCase() || "$";
-  }
-}
 
 function sanitizeMoneyInput(value: string): string {
   const normalized = value.replace(",", ".");
@@ -52,7 +35,7 @@ export function MoneyInput({
 }: MoneyInputProps) {
   return (
     <label className={hasError ? "money-input money-input-error" : "money-input"} htmlFor={id}>
-      <span className="money-input-prefix">{currencySymbol(currency)}</span>
+      <span className="money-input-prefix">{getCurrencySymbol(currency)}</span>
       <input
         id={id}
         className="money-input-field numeric"

@@ -169,6 +169,7 @@ export type EnhancedDepartmentBucket = {
 
 export type ExpenseReportsResponseData = {
   month: string;
+  primaryCurrency: string;
   totals: {
     expenseCount: number;
     totalAmount: number;

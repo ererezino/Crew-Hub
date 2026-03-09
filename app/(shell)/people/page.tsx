@@ -39,7 +39,10 @@ export default async function PeoplePage() {
   }
 
   const roles = session.profile.roles;
-  const canManagePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
+  const canCreatePeople = hasRole(roles, "SUPER_ADMIN");
+  const canInvitePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
+  const canEditPeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
+  const canResetAuthenticator = hasRole(roles, "SUPER_ADMIN");
   const isAdmin = hasRole(roles, "HR_ADMIN") || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
   const scope = resolveScope(roles);
 
@@ -47,7 +50,10 @@ export default async function PeoplePage() {
     <PeopleClient
       currentUserId={session.profile.id}
       initialScope={scope}
-      canManagePeople={canManagePeople}
+      canCreatePeople={canCreatePeople}
+      canInvitePeople={canInvitePeople}
+      canEditPeople={canEditPeople}
+      canResetAuthenticator={canResetAuthenticator}
       isAdmin={isAdmin}
     />
   );

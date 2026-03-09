@@ -292,6 +292,16 @@ export async function POST(request: Request) {
     }
 
     if (!factorId) {
+      /* In development, allow sign-in without MFA so users can reach /mfa-setup */
+      if (process.env.NODE_ENV === "development") {
+        clearFailedLogins(email).catch(() => undefined);
+        return jsonResponse<SignInResponseData>(200, {
+          data: { signedIn: true },
+          error: null,
+          meta: buildMeta()
+        });
+      }
+
       supabase.auth.signOut().catch(() => undefined);
 
       return jsonResponse<null>(403, {

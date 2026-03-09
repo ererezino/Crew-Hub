@@ -7,6 +7,7 @@ import { EmptyState } from "../../../components/shared/empty-state";
 import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { NavIcon } from "../../../components/shared/nav-icon";
 import { PageHeader } from "../../../components/shared/page-header";
+import { SlidePanel } from "../../../components/shared/slide-panel";
 
 /* ── Types ── */
 
@@ -86,6 +87,9 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
   const [error, setError] = useState<string | null>(null);
   const [requestedHubIds, setRequestedHubIds] = useState<Set<string>>(new Set());
   const [requestingHubId, setRequestingHubId] = useState<string | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const fetchHubs = useCallback(async () => {
     setLoading(true);
@@ -144,6 +148,44 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
       setRequestingHubId(null);
     },
     [requestedHubIds, requestingHubId, userName]
+  );
+
+  const handleCreateHub = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      setCreateBusy(true);
+      setCreateError(null);
+      const form = event.currentTarget;
+      const fd = new FormData(form);
+
+      try {
+        const res = await fetch("/api/v1/team-hubs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: fd.get("name"),
+            department: fd.get("department") || undefined,
+            description: fd.get("description") || undefined,
+            visibility: "department"
+          })
+        });
+
+        if (!res.ok) {
+          const envelope = await res.json().catch(() => null);
+          throw new Error(envelope?.error?.message ?? "Failed to create hub.");
+        }
+
+        setIsCreateOpen(false);
+        setCreateError(null);
+        form.reset();
+        fetchHubs();
+      } catch (err) {
+        setCreateError(err instanceof Error ? err.message : "Failed to create hub.");
+      } finally {
+        setCreateBusy(false);
+      }
+    },
+    [fetchHubs]
   );
 
   if (loading) {
@@ -222,11 +264,25 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
       <PageHeader
         title="Team Hub"
         description="Your department's knowledge base: guides, contacts, and resources."
+        actions={
+          isAdmin ? (
+            <button
+              type="button"
+              className="button button-accent"
+              onClick={() => {
+                setCreateError(null);
+                setIsCreateOpen(true);
+              }}
+            >
+              Create Hub
+            </button>
+          ) : undefined
+        }
       />
 
       <FeatureBanner
         moduleId="team_hub"
-        description="Team Hub is in limited pilot. Content management features are coming soon."
+        description="Team Hub is in limited pilot. Access and workflows may evolve as rollout expands."
       />
 
       <div className="thub-grid">
@@ -324,6 +380,74 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
           );
         })}
       </div>
+
+      <SlidePanel
+        isOpen={isCreateOpen}
+        title="Create Hub"
+        description="Add a new knowledge base for your team."
+        onClose={() => {
+          if (!createBusy) {
+            setCreateError(null);
+          }
+          setIsCreateOpen(false);
+        }}
+      >
+        <form onSubmit={handleCreateHub} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <label className="field-label">
+            Name
+            <input
+              name="name"
+              type="text"
+              className="input"
+              required
+              maxLength={200}
+              placeholder="e.g. Engineering Hub"
+              autoFocus
+            />
+          </label>
+
+          <label className="field-label">
+            Department
+            <input
+              name="department"
+              type="text"
+              className="input"
+              maxLength={100}
+              placeholder="e.g. Engineering"
+              defaultValue={userDepartment ?? ""}
+            />
+          </label>
+
+          <label className="field-label">
+            Description
+            <textarea
+              name="description"
+              className="input"
+              rows={3}
+              maxLength={2000}
+              placeholder="What is this hub for?"
+            />
+          </label>
+
+          {createError ? <p className="form-field-error">{createError}</p> : null}
+
+          <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => {
+                setCreateError(null);
+                setIsCreateOpen(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="button button-accent" disabled={createBusy}>
+              {createBusy ? "Creating…" : "Create Hub"}
+            </button>
+          </div>
+        </form>
+      </SlidePanel>
     </>
   );
 }

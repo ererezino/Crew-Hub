@@ -615,28 +615,28 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
                 <article className="metric-card">
                   <p className="metric-label">Gross (last run)</p>
                   <p className="metric-value">
-                    <CurrencyDisplay amount={data.payroll.metrics.lastRunGross} currency="NGN" />
+                    <CurrencyDisplay amount={data.payroll.metrics.lastRunGross} currency={data.payroll.metrics.currency} />
                   </p>
                   <p className="metric-hint">Last completed payroll run</p>
                 </article>
                 <article className="metric-card">
                   <p className="metric-label">Net (last run)</p>
                   <p className="metric-value">
-                    <CurrencyDisplay amount={data.payroll.metrics.lastRunNet} currency="NGN" />
+                    <CurrencyDisplay amount={data.payroll.metrics.lastRunNet} currency={data.payroll.metrics.currency} />
                   </p>
                   <p className="metric-hint">Last completed payroll run</p>
                 </article>
                 <article className="metric-card">
                   <p className="metric-label">Avg gross salary</p>
                   <p className="metric-value">
-                    <CurrencyDisplay amount={data.payroll.metrics.avgGrossSalary} currency="NGN" />
+                    <CurrencyDisplay amount={data.payroll.metrics.avgGrossSalary} currency={data.payroll.metrics.currency} />
                   </p>
                   <p className="metric-hint">From compensation records</p>
                 </article>
                 <article className="metric-card">
                   <p className="metric-label">Total allowances</p>
                   <p className="metric-value">
-                    <CurrencyDisplay amount={data.payroll.metrics.totalAllowances} currency="NGN" />
+                    <CurrencyDisplay amount={data.payroll.metrics.totalAllowances} currency={data.payroll.metrics.currency} />
                   </p>
                   <p className="metric-hint">Monthly allowance cost</p>
                 </article>
@@ -694,21 +694,21 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               <article className="metric-card">
                 <p className="metric-label">Total submitted</p>
                 <p className="metric-value">
-                  <CurrencyDisplay amount={data.expenses.metrics.totalAmount} currency="NGN" />
+                  <CurrencyDisplay amount={data.expenses.metrics.totalAmount} currency={data.expenses.metrics.currency} />
                 </p>
                 <p className="metric-hint">All expenses in range</p>
               </article>
               <article className="metric-card">
                 <p className="metric-label">Total reimbursed</p>
                 <p className="metric-value">
-                  <CurrencyDisplay amount={data.expenses.metrics.reimbursedAmount} currency="NGN" />
+                  <CurrencyDisplay amount={data.expenses.metrics.reimbursedAmount} currency={data.expenses.metrics.currency} />
                 </p>
                 <p className="metric-hint">Reimbursed in range</p>
               </article>
               <article className="metric-card">
                 <p className="metric-label">Pending reimbursement</p>
                 <p className="metric-value">
-                  <CurrencyDisplay amount={data.expenses.metrics.pendingAmount} currency="NGN" />
+                  <CurrencyDisplay amount={data.expenses.metrics.pendingAmount} currency={data.expenses.metrics.currency} />
                 </p>
                 <p className="metric-hint">Owed to crew members</p>
               </article>

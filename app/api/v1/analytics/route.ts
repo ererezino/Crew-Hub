@@ -224,7 +224,8 @@ function normalizePayroll(value: unknown): Omit<AnalyticsPayrollSection, "compen
       totalNet: Math.trunc(toNumber(metrics.totalNet)),
       totalDeductions: Math.trunc(toNumber(metrics.totalDeductions)),
       runCount: Math.trunc(toNumber(metrics.runCount)),
-      avgNetPerEmployee: Math.trunc(toNumber(metrics.avgNetPerEmployee))
+      avgNetPerEmployee: Math.trunc(toNumber(metrics.avgNetPerEmployee)),
+      currency: "USD"
     },
     trend: asArray(source.trend).map((rowValue) => {
       const row = asRecord(rowValue);
@@ -271,7 +272,8 @@ function normalizeExpenses(value: unknown): AnalyticsExpensesSection {
       pendingAmount: Math.trunc(toNumber(metrics.pendingAmount)),
       avgProcessingDays: 0,
       approvedAmount: Math.trunc(toNumber(metrics.approvedAmount)),
-      expenseCount: Math.trunc(toNumber(metrics.expenseCount))
+      expenseCount: Math.trunc(toNumber(metrics.expenseCount)),
+      currency: "USD"
     },
     byCategory: asArray(source.byCategory).map((rowValue) => {
       const row = asRecord(rowValue);
@@ -711,7 +713,7 @@ async function queryPayrollEnhanced(ctx: EnhancedQueryCtx) {
   // Average gross salary from compensation_records
   const { data: compRecords } = await supabase
     .from("compensation_records")
-    .select("base_salary_amount, profiles!inner(country_code, department)")
+    .select("base_salary_amount, currency, profiles!inner(country_code, department)")
     .eq("org_id", orgId)
     .is("deleted_at", null);
 
@@ -780,12 +782,30 @@ async function queryPayrollEnhanced(ctx: EnhancedQueryCtx) {
     }
   }
 
+  // Derive primary currency from compensation records
+  const payrollCurrencyCounts = new Map<string, number>();
+  if (compRecords) {
+    for (const row of compRecords) {
+      const cur = (row as unknown as { currency: string | null }).currency;
+      if (cur) payrollCurrencyCounts.set(cur, (payrollCurrencyCounts.get(cur) ?? 0) + 1);
+    }
+  }
+  let payrollCurrency = "USD";
+  let maxPayrollCurrencyCount = 0;
+  for (const [code, count] of payrollCurrencyCounts) {
+    if (count > maxPayrollCurrencyCount) {
+      maxPayrollCurrencyCount = count;
+      payrollCurrency = code;
+    }
+  }
+
   return {
     lastRunGross,
     lastRunNet,
     avgGrossSalary,
     totalAllowances,
-    compensationBands: { belowMidpoint, atMidpoint, aboveMidpoint }
+    compensationBands: { belowMidpoint, atMidpoint, aboveMidpoint },
+    currency: payrollCurrency
   };
 }
 
@@ -795,7 +815,7 @@ async function queryExpensesEnhanced(ctx: EnhancedQueryCtx) {
   // Reimbursed amount
   let reimbursedQuery = supabase
     .from("expenses")
-    .select("amount")
+    .select("amount, currency")
     .eq("org_id", orgId)
     .eq("status", "reimbursed")
     .gte("expense_date", startDate)
@@ -832,7 +852,24 @@ async function queryExpensesEnhanced(ctx: EnhancedQueryCtx) {
     avgProcessingDays = Math.round((totalDays / processingData.length) * 10) / 10;
   }
 
-  return { reimbursedAmount, avgProcessingDays };
+  // Derive primary currency from expenses
+  const expenseCurrencyCounts = new Map<string, number>();
+  if (reimbursedData) {
+    for (const row of reimbursedData) {
+      const cur = (row as unknown as { currency: string | null }).currency;
+      if (cur) expenseCurrencyCounts.set(cur, (expenseCurrencyCounts.get(cur) ?? 0) + 1);
+    }
+  }
+  let expenseCurrency = "USD";
+  let maxExpenseCurrencyCount = 0;
+  for (const [code, count] of expenseCurrencyCounts) {
+    if (count > maxExpenseCurrencyCount) {
+      maxExpenseCurrencyCount = count;
+      expenseCurrency = code;
+    }
+  }
+
+  return { reimbursedAmount, avgProcessingDays, currency: expenseCurrency };
 }
 
 async function queryPipeline(ctx: EnhancedQueryCtx): Promise<AnalyticsPipelineSection> {
@@ -1143,7 +1180,8 @@ export async function GET(request: Request) {
       lastRunGross: enhancedPayroll.lastRunGross,
       lastRunNet: enhancedPayroll.lastRunNet,
       avgGrossSalary: enhancedPayroll.avgGrossSalary,
-      totalAllowances: enhancedPayroll.totalAllowances
+      totalAllowances: enhancedPayroll.totalAllowances,
+      currency: enhancedPayroll.currency
     },
     compensationBands: enhancedPayroll.compensationBands
   };
@@ -1154,7 +1192,8 @@ export async function GET(request: Request) {
     metrics: {
       ...normalizeExpenses(expensesResult.data).metrics,
       reimbursedAmount: enhancedExpenses.reimbursedAmount,
-      avgProcessingDays: enhancedExpenses.avgProcessingDays
+      avgProcessingDays: enhancedExpenses.avgProcessingDays,
+      currency: enhancedExpenses.currency
     }
   };
 
