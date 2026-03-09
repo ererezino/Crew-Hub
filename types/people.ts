@@ -128,6 +128,16 @@ export type PeopleUpdateResponseData = {
 
 export type PeopleUpdateResponse = ApiResponse<PeopleUpdateResponseData>;
 
+export type PeopleInviteResponseData = {
+  personId: string;
+  email: string;
+  inviteSent: boolean;
+  isResend: boolean;
+  inviteLink: string | null;
+};
+
+export type PeopleInviteResponse = ApiResponse<PeopleInviteResponseData>;
+
 export type PeoplePasswordResetResponseData = {
   userId: string;
   resetInitiated: boolean;

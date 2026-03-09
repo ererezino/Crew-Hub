@@ -136,8 +136,8 @@ export async function sendWelcomeEmail({
     const effectiveLoginUrl = loginUrl || "https://app.crew-hub.local/login";
 
     const setupInstruction = setupLink
-      ? `To get started, click the link below to set your password:\n${setupLink}`
-      : `To get started, contact your admin for a setup link. Once you have set your password you can sign in at ${effectiveLoginUrl}.`;
+      ? `To get started, click the link below to set up your authenticator:\n${setupLink}`
+      : `To get started, contact your admin for a setup link. Once your authenticator is set up, sign in at ${effectiveLoginUrl}.`;
 
     await sendResendEmail({
       to: [recipientEmail],

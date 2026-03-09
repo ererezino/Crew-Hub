@@ -465,7 +465,30 @@ describe("Production Hardening", () => {
   });
 
   // =========================================================================
-  // 13. Login protection
+  // 13. Invite setup link reliability
+  // =========================================================================
+  describe("Invite setup link reliability (app/api/v1/people/[id]/invite/route.ts)", () => {
+    it("invite route uses auth callback redirect for onboarding links", () => {
+      const content = readFileSync(
+        resolve(ROOT, "app/api/v1/people/[id]/invite/route.ts"),
+        "utf-8"
+      );
+      expect(content).toContain("/api/auth/callback?next=/mfa-setup");
+    });
+
+    it("invite route constructs token_hash callback links", () => {
+      const content = readFileSync(
+        resolve(ROOT, "app/api/v1/people/[id]/invite/route.ts"),
+        "utf-8"
+      );
+      expect(content).toContain("token_hash");
+      expect(content).toContain("buildSetupLink");
+      expect(content).toContain("callbackUrl.searchParams.set(\"type\"");
+    });
+  });
+
+  // =========================================================================
+  // 14. Login protection
   // =========================================================================
   describe("Login protection (lib/security/login-protection.ts)", () => {
     it("module file exists", () => {
@@ -500,7 +523,7 @@ describe("Production Hardening", () => {
   });
 
   // =========================================================================
-  // 14. Upload validation
+  // 15. Upload validation
   // =========================================================================
   describe("Upload validation (lib/security/upload-signatures.ts)", () => {
     it("module file exists", () => {

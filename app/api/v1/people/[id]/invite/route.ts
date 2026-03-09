@@ -22,6 +22,9 @@ type InviteResponseData = {
   inviteLink: string | null;
 };
 
+const supportedInviteLinkTypes = ["invite", "recovery", "magiclink"] as const;
+type SupportedInviteLinkType = (typeof supportedInviteLinkTypes)[number];
+
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
 }
@@ -30,14 +33,41 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-function resolveAuthRedirectUrl(request: Request): string {
-  /* Derive origin from the incoming request so the link works in any environment */
+function resolveAppUrl(request: Request): string {
+  /* Derive origin from the incoming request so links work in any environment */
   const requestUrl = new URL(request.url);
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     requestUrl.origin;
-  const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
-  return `${normalizedAppUrl}/mfa-setup`;
+  return appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
+}
+
+function resolveAuthRedirectUrl(request: Request): string {
+  const appUrl = resolveAppUrl(request);
+  return `${appUrl}/api/auth/callback?next=/mfa-setup`;
+}
+
+function buildSetupLink({
+  request,
+  type,
+  hashedToken,
+  actionLink
+}: {
+  request: Request;
+  type: SupportedInviteLinkType;
+  hashedToken?: string | null;
+  actionLink?: string | null;
+}): string | null {
+  if (typeof hashedToken === "string" && hashedToken.length > 0) {
+    const appUrl = resolveAppUrl(request);
+    const callbackUrl = new URL("/api/auth/callback", appUrl);
+    callbackUrl.searchParams.set("token_hash", hashedToken);
+    callbackUrl.searchParams.set("type", type);
+    callbackUrl.searchParams.set("next", "/mfa-setup");
+    return callbackUrl.toString();
+  }
+
+  return actionLink ?? null;
 }
 
 export async function POST(
@@ -110,6 +140,7 @@ export async function POST(
 
   const email = profile.email as string;
   const fullName = profile.full_name as string;
+  const appUrl = resolveAppUrl(request);
   const authRedirectUrl = resolveAuthRedirectUrl(request);
 
   /* Check if an auth user already exists (profile id = auth user id) */
@@ -148,7 +179,7 @@ export async function POST(
       options: { redirectTo: authRedirectUrl }
     });
 
-    if (linkError || !linkData?.properties?.action_link) {
+    if (linkError || !linkData?.properties) {
       /* Fallback: try magic link */
       const { data: magicData, error: magicError } = await serviceRoleClient.auth.admin.generateLink({
         type: "magiclink",
@@ -156,7 +187,7 @@ export async function POST(
         options: { redirectTo: authRedirectUrl }
       });
 
-      if (magicError || !magicData?.properties?.action_link) {
+      if (magicError || !magicData?.properties) {
         return jsonResponse<null>(500, {
           data: null,
           error: {
@@ -167,9 +198,19 @@ export async function POST(
         });
       }
 
-      inviteLink = magicData.properties.action_link;
+      inviteLink = buildSetupLink({
+        request,
+        type: "magiclink",
+        hashedToken: magicData.properties.hashed_token,
+        actionLink: magicData.properties.action_link
+      });
     } else {
-      inviteLink = linkData.properties.action_link;
+      inviteLink = buildSetupLink({
+        request,
+        type: "recovery",
+        hashedToken: linkData.properties.hashed_token,
+        actionLink: linkData.properties.action_link
+      });
     }
 
     /* Also try the standard invite email (may silently fail if email not configured) */
@@ -190,7 +231,7 @@ export async function POST(
       }
     });
 
-    if (linkError || !linkData?.properties?.action_link) {
+    if (linkError || !linkData?.properties) {
       return jsonResponse<null>(500, {
         data: null,
         error: {
@@ -201,7 +242,12 @@ export async function POST(
       });
     }
 
-    inviteLink = linkData.properties.action_link;
+    inviteLink = buildSetupLink({
+      request,
+      type: "invite",
+      hashedToken: linkData.properties.hashed_token,
+      actionLink: linkData.properties.action_link
+    });
 
     /* Also fire the standard Supabase invite email so the user receives
        a message in their inbox.  generateLink only creates the link —
@@ -217,7 +263,9 @@ export async function POST(
   /* Send welcome email (fire-and-forget) */
   sendWelcomeEmail({
     recipientEmail: email,
-    recipientName: fullName
+    recipientName: fullName,
+    loginUrl: `${appUrl}/login`,
+    setupLink: inviteLink ?? undefined
   }).catch((error) => {
     logger.error("Failed to send welcome email during invite.", {
       personId,

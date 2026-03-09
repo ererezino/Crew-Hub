@@ -23,6 +23,7 @@ import {
   PROFILE_STATUSES,
   type EmploymentType,
   type PeopleCreateResponse,
+  type PeopleInviteResponse,
   type PeopleUpdateResponse,
   type PersonRecord,
   type ProfileStatus
@@ -467,7 +468,6 @@ export function PeopleClient({
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [confirmInvitePerson, setConfirmInvitePerson] = useState<PersonRecord | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [inviteLinkPerson, setInviteLinkPerson] = useState<string>("");
 
   // Reset authenticator state
   const [resettingId, setResettingId] = useState<string | null>(null);
@@ -720,35 +720,50 @@ export function PeopleClient({
 
   /* ── Invite handlers ── */
 
+  const closeInviteDialog = useCallback(() => {
+    if (invitingId !== null) return;
+    setConfirmInvitePerson(null);
+    setInviteLink(null);
+  }, [invitingId]);
+
+  const handleCopyInviteLink = useCallback(async () => {
+    if (!inviteLink) return;
+    if (!navigator?.clipboard?.writeText) {
+      addToast("error", "Clipboard access is not available in this browser.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      addToast("success", "Invite link copied to clipboard.");
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Unable to copy invite link.");
+    }
+  }, [inviteLink]);
+
   const handleSendInvite = useCallback(async (person: PersonRecord) => {
     setInvitingId(person.id);
-    setInviteLink(null);
 
     try {
       const response = await fetch(`/api/v1/people/${person.id}/invite`, {
         method: "POST"
       });
 
-      const payload = await response.json();
+      const payload = (await response.json()) as PeopleInviteResponse;
 
       if (!response.ok || !payload.data?.inviteSent) {
-        setConfirmInvitePerson(null);
         addToast("error", humanizeError(payload.error?.message ?? "Unable to send invite."));
         return;
       }
 
-      /* Show invite link inside the dialog so admin can copy it */
-      if (payload.data.inviteLink) {
-        setInviteLink(payload.data.inviteLink);
-        setInviteLinkPerson(person.fullName);
-        setConfirmInvitePerson(null);
-        addToast("success", `Invite link generated for ${person.fullName}.`);
-      } else {
-        setConfirmInvitePerson(null);
-        addToast("success", `Invite sent to ${person.fullName}.`);
-      }
+      setInviteLink(payload.data.inviteLink);
+      addToast(
+        "success",
+        payload.data.isResend
+          ? `Fresh invite generated for ${person.fullName}.`
+          : `Invite sent to ${person.fullName}.`
+      );
     } catch (error) {
-      setConfirmInvitePerson(null);
       addToast("error", error instanceof Error ? error.message : "Unable to send invite.");
     } finally {
       setInvitingId(null);
@@ -1762,15 +1777,10 @@ export function PeopleClient({
       </SlidePanel>
 
       {/* ── Send Invite Dialog ── */}
-      {confirmInvitePerson !== null || inviteLink ? (
+      {confirmInvitePerson !== null ? (
         <div
           className="modal-overlay"
-          onClick={() => {
-            if (!invitingId) {
-              setConfirmInvitePerson(null);
-              setInviteLink(null);
-            }
-          }}
+          onClick={closeInviteDialog}
         >
           <section
             className="confirm-dialog modal-dialog"
@@ -1779,73 +1789,73 @@ export function PeopleClient({
             aria-label="Send Crew Hub invite"
             onClick={(e) => e.stopPropagation()}
           >
+            <h2 className="modal-title">Send Crew Hub invite</h2>
+            <p className="settings-card-description">
+              Send an invite to {confirmInvitePerson.fullName} ({confirmInvitePerson.email}).
+              They can use the generated setup link below to enroll their authenticator and start using Crew Hub.
+            </p>
+
             {inviteLink ? (
-              <>
-                <h2 className="modal-title">Invite link ready</h2>
-                <p className="settings-card-description">
-                  Share this link with {inviteLinkPerson} so they can set up their account:
-                </p>
-                <div className="invite-link-input-row" style={{ marginTop: "var(--space-3)" }}>
-                  <input
-                    className="form-input"
-                    value={inviteLink}
-                    readOnly
-                    onClick={(e) => (e.target as HTMLInputElement).select()}
-                  />
-                  <button
-                    type="button"
-                    className="button button-accent"
-                    onClick={() => {
-                      void navigator.clipboard.writeText(inviteLink);
-                      addToast("success", "Invite link copied to clipboard.");
-                    }}
-                  >
-                    Copy Link
-                  </button>
-                </div>
-                <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="button button-subtle"
-                    onClick={() => {
-                      setConfirmInvitePerson(null);
-                      setInviteLink(null);
-                    }}
-                  >
-                    Done
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h2 className="modal-title">Send Crew Hub invite</h2>
-                <p className="settings-card-description">
-                  {confirmInvitePerson
-                    ? `Send an invite email to ${confirmInvitePerson.fullName} (${confirmInvitePerson.email})? They will receive a link to set up their Crew Hub account.`
-                    : ""}
-                </p>
-                <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="button button-subtle"
-                    onClick={() => setConfirmInvitePerson(null)}
-                    disabled={invitingId !== null}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="button button-accent"
-                    onClick={() => {
-                      if (confirmInvitePerson) void handleSendInvite(confirmInvitePerson);
-                    }}
-                    disabled={invitingId !== null}
-                  >
-                    {invitingId ? "Sending..." : "Send Invite"}
-                  </button>
-                </div>
-              </>
-            )}
+              <div className="invite-success-banner" role="status">
+                Invite link is ready. Share it directly if email delivery is delayed.
+              </div>
+            ) : null}
+
+            <div className="invite-link-area">
+              <p className="invite-link-label">Setup link</p>
+              <div className="invite-link-input-row">
+                <input
+                  className="form-input"
+                  value={inviteLink ?? ""}
+                  readOnly
+                  placeholder="Click “Send Invite” to generate a setup link."
+                  onClick={(e) => {
+                    if (inviteLink) {
+                      (e.target as HTMLInputElement).select();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => {
+                    void handleCopyInviteLink();
+                  }}
+                  disabled={!inviteLink || invitingId !== null}
+                >
+                  Copy Link
+                </button>
+              </div>
+              <p className="invite-link-note">
+                Setup links are one-time and time-limited. If the user sees an expired link message, click
+                “Send Invite” again to generate a fresh link.
+              </p>
+            </div>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={closeInviteDialog}
+                disabled={invitingId !== null}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => {
+                  void handleSendInvite(confirmInvitePerson);
+                }}
+                disabled={invitingId !== null}
+              >
+                {invitingId === confirmInvitePerson.id
+                  ? "Sending..."
+                  : inviteLink
+                    ? "Resend Invite"
+                    : "Send Invite"}
+              </button>
+            </div>
           </section>
         </div>
       ) : null}
