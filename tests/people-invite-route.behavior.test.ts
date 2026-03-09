@@ -95,8 +95,11 @@ async function callInviteRoute() {
 }
 
 describe("People invite route behavior", () => {
+  const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
 
     getAuthenticatedSessionMock.mockResolvedValue({
       profile: {
@@ -146,7 +149,31 @@ describe("People invite route behavior", () => {
 
     expect(result.status).toBe(500);
     expect(result.body.error?.code).toBe("INVITE_REQUEST_FAILED");
-    expect(result.body.error?.message).toBe("Unable to send invite. Please try again.");
+    expect(result.body.error?.message).toContain("Unable to send invite.");
     expect(loggerErrorMock).toHaveBeenCalled();
+  });
+
+  it("returns auth config error when system password secret is missing for resend users", async () => {
+    getUserByIdMock.mockResolvedValueOnce({
+      data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+      error: null
+    });
+    deriveSystemPasswordMock.mockImplementationOnce(() => {
+      throw new Error("AUTH_SYSTEM_SECRET is not set");
+    });
+
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(500);
+    expect(result.body.error?.code).toBe("AUTH_CONFIG_ERROR");
+  });
+
+  it("accepts app URL values without explicit protocol", async () => {
+    process.env.NEXT_PUBLIC_APP_URL = "crew-hub.useaccrue.com";
+
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(200);
+    expect(result.body.data?.inviteLink).toContain("https://crew-hub.useaccrue.com/api/auth/callback");
   });
 });

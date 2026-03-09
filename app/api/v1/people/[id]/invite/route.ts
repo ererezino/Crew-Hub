@@ -22,8 +22,7 @@ type InviteResponseData = {
   inviteLink: string | null;
 };
 
-const supportedInviteLinkTypes = ["invite", "recovery", "magiclink"] as const;
-type SupportedInviteLinkType = (typeof supportedInviteLinkTypes)[number];
+type SupportedInviteLinkType = "invite" | "recovery" | "magiclink";
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -33,13 +32,30 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
+function normalizeConfiguredAppUrl(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    return new URL(candidate).origin;
+  } catch {
+    return null;
+  }
+}
+
 function resolveAppUrl(request: Request): string {
   /* Derive origin from the incoming request so links work in any environment */
-  const requestUrl = new URL(request.url);
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    requestUrl.origin;
-  return appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
+  const requestOrigin = new URL(request.url).origin;
+  const configuredAppUrl = normalizeConfiguredAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+  return configuredAppUrl ?? requestOrigin;
 }
 
 function resolveAuthRedirectUrl(request: Request): string {
@@ -139,8 +155,22 @@ export async function POST(
       });
     }
 
-  const email = profile.email as string;
-  const fullName = profile.full_name as string;
+  const email = typeof profile.email === "string" ? profile.email.trim() : "";
+  if (email.length === 0) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "INVALID_EMAIL",
+        message: "This person does not have a valid email address."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const fullName =
+    typeof profile.full_name === "string" && profile.full_name.trim().length > 0
+      ? profile.full_name.trim()
+      : "Crew member";
   const appUrl = resolveAppUrl(request);
   const authRedirectUrl = resolveAuthRedirectUrl(request);
 
@@ -148,7 +178,21 @@ export async function POST(
   let isResend = false;
   let inviteLink: string | null = null;
 
-  const { data: existingAuthUser } = await serviceRoleClient.auth.admin.getUserById(personId);
+  const {
+    data: existingAuthUser,
+    error: existingAuthUserError
+  } = await serviceRoleClient.auth.admin.getUserById(personId);
+
+  if (existingAuthUserError && !/user/i.test(existingAuthUserError.message)) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "AUTH_LOOKUP_FAILED",
+        message: "Unable to verify existing account state. Please try again."
+      },
+      meta: buildMeta()
+    });
+  }
 
   if (existingAuthUser?.user) {
     isResend = true;
@@ -157,7 +201,20 @@ export async function POST(
   /* Ensure the user's password is set to the system-derived value.
      This is required for the email + TOTP login flow to work. */
   if (existingAuthUser?.user) {
-    const systemPassword = deriveSystemPassword(personId);
+    let systemPassword = "";
+    try {
+      systemPassword = deriveSystemPassword(personId);
+    } catch {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "AUTH_CONFIG_ERROR",
+          message: "Authentication system is not fully configured. Contact your admin."
+        },
+        meta: buildMeta()
+      });
+    }
+
     await serviceRoleClient.auth.admin
       .updateUserById(personId, { password: systemPassword })
       .catch(() => undefined);
@@ -310,11 +367,13 @@ export async function POST(
       message: error instanceof Error ? error.message : String(error)
     });
 
+    const detail = error instanceof Error ? error.message : "Unknown error";
+
     return jsonResponse<null>(500, {
       data: null,
       error: {
         code: "INVITE_REQUEST_FAILED",
-        message: "Unable to send invite. Please try again."
+        message: `Unable to send invite. ${detail}`
       },
       meta: buildMeta()
     });
