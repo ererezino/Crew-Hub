@@ -108,6 +108,35 @@ function getBrowserTimezone(): string {
   }
 }
 
+async function parseJsonResponse<T>(response: Response): Promise<T | null> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return null;
+  }
+
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function fallbackInviteErrorMessage(status: number): string {
+  if (status === 401) {
+    return "Your session has expired. Please sign in again.";
+  }
+
+  if (status === 403) {
+    return "You do not have permission to send invites.";
+  }
+
+  if (status === 404) {
+    return "Person not found. Refresh and try again.";
+  }
+
+  return "Unable to send invite.";
+}
+
 /* ── Component ── */
 
 export function PeopleOverviewClient({
@@ -311,20 +340,22 @@ export function PeopleOverviewClient({
         method: "POST"
       });
 
-      const payload = await response.json();
+      const payload = await parseJsonResponse<ApiResponse<{
+        inviteSent: boolean;
+        inviteLink: string | null;
+        isResend: boolean;
+      }>>(response);
 
-      if (!response.ok || !payload.data?.inviteSent) {
+      if (!response.ok || !payload?.data?.inviteSent) {
         setInviteMessage({
           type: "error",
-          text: humanizeError(payload.error?.message ?? "Unable to send invite.")
+          text: humanizeError(payload?.error?.message ?? fallbackInviteErrorMessage(response.status))
         });
         return;
       }
 
       /* Store invite link for manual sharing */
-      if (payload.data.inviteLink) {
-        setInviteLink(payload.data.inviteLink);
-      }
+      setInviteLink(payload.data.inviteLink ?? null);
 
       setInviteMessage({
         type: "success",

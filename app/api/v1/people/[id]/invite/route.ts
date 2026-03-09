@@ -74,69 +74,70 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = await getAuthenticatedSession();
+  try {
+    const session = await getAuthenticatedSession();
 
-  if (!session?.profile) {
-    return jsonResponse<null>(401, {
-      data: null,
-      error: {
-        code: "UNAUTHORIZED",
-        message: "You must be logged in to send invites."
-      },
-      meta: buildMeta()
-    });
-  }
+    if (!session?.profile) {
+      return jsonResponse<null>(401, {
+        data: null,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "You must be logged in to send invites."
+        },
+        meta: buildMeta()
+      });
+    }
 
-  const canInvite =
-    hasRole(session.profile.roles, "SUPER_ADMIN") ||
-    hasRole(session.profile.roles, "HR_ADMIN");
+    const canInvite =
+      hasRole(session.profile.roles, "SUPER_ADMIN") ||
+      hasRole(session.profile.roles, "HR_ADMIN");
 
-  if (!canInvite) {
-    return jsonResponse<null>(403, {
-      data: null,
-      error: {
-        code: "FORBIDDEN",
-        message: "Only Super Admin and HR Admin can send invites."
-      },
-      meta: buildMeta()
-    });
-  }
+    if (!canInvite) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Only Super Admin and HR Admin can send invites."
+        },
+        meta: buildMeta()
+      });
+    }
 
-  const parsedParams = paramsSchema.safeParse(await context.params);
+    const parsedParams = paramsSchema.safeParse(await context.params);
 
-  if (!parsedParams.success) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: parsedParams.error.issues[0]?.message ?? "Invalid user id."
-      },
-      meta: buildMeta()
-    });
-  }
+    if (!parsedParams.success) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: parsedParams.error.issues[0]?.message ?? "Invalid user id."
+        },
+        meta: buildMeta()
+      });
+    }
 
-  const personId = parsedParams.data.id;
-  const serviceRoleClient = createSupabaseServiceRoleClient();
+    const personId = parsedParams.data.id;
+    const serviceRoleClient = createSupabaseServiceRoleClient();
 
-  /* Look up the profile to get the email */
-  const { data: profile, error: profileError } = await serviceRoleClient
-    .from("profiles")
-    .select("id, email, full_name, status")
-    .eq("id", personId)
-    .eq("org_id", session.profile.org_id)
-    .is("deleted_at", null)
-    .maybeSingle();
+    /* Look up the profile to get the email */
+    const { data: profile, error: profileError } = await serviceRoleClient
+      .from("profiles")
+      .select("id, email, full_name, status")
+      .eq("id", personId)
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .maybeSingle();
 
-  if (profileError || !profile) {
-    return jsonResponse<null>(404, {
-      data: null,
-      error: {
-        code: "NOT_FOUND",
-        message: "Person not found in this organization."
-      },
-      meta: buildMeta()
-    });
-  }
+    if (profileError || !profile) {
+      return jsonResponse<null>(404, {
+        data: null,
+        error: {
+          code: "NOT_FOUND",
+          message: "Person not found in this organization."
+        },
+        meta: buildMeta()
+      });
+    }
 
   const email = profile.email as string;
   const fullName = profile.full_name as string;
@@ -273,27 +274,49 @@ export async function POST(
     });
   });
 
-  await logAudit({
-    action: "updated",
-    tableName: "profiles",
-    recordId: personId,
-    newValue: {
-      email,
-      fullName,
-      isResend,
-      invitedBy: session.profile.id
+    try {
+      await logAudit({
+        action: "updated",
+        tableName: "profiles",
+        recordId: personId,
+        newValue: {
+          email,
+          fullName,
+          isResend,
+          invitedBy: session.profile.id
+        }
+      });
+    } catch (error) {
+      logger.error("Failed to record invite audit log.", {
+        personId,
+        message: error instanceof Error ? error.message : String(error)
+      });
     }
-  });
 
-  return jsonResponse<InviteResponseData>(200, {
-    data: {
-      personId,
-      email,
-      inviteSent: true,
-      isResend,
-      inviteLink
-    },
-    error: null,
-    meta: buildMeta()
-  });
+    return jsonResponse<InviteResponseData>(200, {
+      data: {
+        personId,
+        email,
+        inviteSent: true,
+        isResend,
+        inviteLink
+      },
+      error: null,
+      meta: buildMeta()
+    });
+  } catch (error) {
+    logger.error("Invite request failed unexpectedly.", {
+      path: request.url,
+      message: error instanceof Error ? error.message : String(error)
+    });
+
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "INVITE_REQUEST_FAILED",
+        message: "Unable to send invite. Please try again."
+      },
+      meta: buildMeta()
+    });
+  }
 }
