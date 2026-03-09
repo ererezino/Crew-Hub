@@ -95,6 +95,14 @@ export default function ResetPasswordPage() {
             return;
           }
 
+          /*
+           * The @supabase/ssr browser client stores sessions in cookies.
+           * setSession() may not reliably trigger cookie persistence, so
+           * we call refreshSession() which forces a token refresh and
+           * ensures the cookie storage adapter writes the session.
+           */
+          await supabase.auth.refreshSession();
+
           // Clean up the hash from the URL so it's not visible
           window.history.replaceState(null, "", window.location.pathname);
         }
@@ -170,7 +178,23 @@ export default function ResetPasswordPage() {
           .is("account_setup_at", null);
       }
 
-      router.replace("/login");
+      /*
+       * Establish a fresh password-based session. The current session came
+       * from a one-time recovery token which may be short-lived or get
+       * invalidated after the password change.  Signing in with the password
+       * the user just chose guarantees a durable session that will survive
+       * middleware checks and page refreshes.
+       */
+      const { data: currentUser } = await supabase.auth.getUser();
+      if (currentUser?.user?.email) {
+        await supabase.auth.signInWithPassword({
+          email: currentUser.user.email,
+          password
+        });
+      }
+
+      router.replace("/dashboard");
+      router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
       setIsSubmitting(false);

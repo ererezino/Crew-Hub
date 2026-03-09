@@ -123,15 +123,21 @@ async function fetchEmailsByRole({
 export async function sendWelcomeEmail({
   recipientEmail,
   recipientName,
-  loginUrl
+  loginUrl,
+  setupLink
 }: {
   recipientEmail: string;
   recipientName: string;
   loginUrl?: string;
+  setupLink?: string;
 }): Promise<void> {
   try {
     const firstName = recipientName.trim().split(/\s+/)[0] || "there";
     const effectiveLoginUrl = loginUrl || "https://app.crew-hub.local/login";
+
+    const setupInstruction = setupLink
+      ? `To get started, click the link below to set your password:\n${setupLink}`
+      : `To get started, contact your admin for a setup link. Once you have set your password you can sign in at ${effectiveLoginUrl}.`;
 
     await sendResendEmail({
       to: [recipientEmail],
@@ -143,7 +149,7 @@ export async function sendWelcomeEmail({
         "",
         `Your login email is: ${recipientEmail}`,
         "",
-        `To get started, visit ${effectiveLoginUrl} and use "Forgot password" to set your password.`,
+        setupInstruction,
         "",
         "If you have any questions, reach out to your manager or HR.",
         "",

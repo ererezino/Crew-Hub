@@ -12,6 +12,7 @@ import {
   parseDepartment
 } from "../../../../lib/departments";
 import { USER_ROLES, type UserRole } from "../../../../lib/navigation";
+import { generateStrongPassword } from "../../../../lib/auth/generate-password";
 import { sendWelcomeEmail } from "../../../../lib/notifications/email";
 import { createNotification } from "../../../../lib/notifications/service";
 import { createOnboardingInstance } from "../../../../lib/onboarding/create-instance";
@@ -723,15 +724,16 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: authData, error: authError } = await serviceRoleClient.auth.admin.inviteUserByEmail(
-    normalizedEmail,
-    {
-      data: {
-        full_name: payload.fullName.trim()
-      },
-      redirectTo: authRedirectUrl
+  const tempPassword = generateStrongPassword();
+
+  const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
+    email: normalizedEmail,
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: {
+      full_name: payload.fullName.trim()
     }
-  );
+  });
 
   if (authError || !authData.user) {
     const message =
@@ -804,10 +806,30 @@ export async function POST(request: Request) {
     });
   }
 
-  // Send welcome email with login link (fire-and-forget)
+  // Generate a password-setup link so the user can set their own password
+  let setupLink: string | undefined;
+  try {
+    const { data: linkData } = await serviceRoleClient.auth.admin.generateLink({
+      type: "recovery",
+      email: normalizedEmail,
+      options: { redirectTo: authRedirectUrl }
+    });
+
+    if (linkData?.properties?.action_link) {
+      setupLink = linkData.properties.action_link;
+    }
+  } catch (linkError) {
+    console.error("Failed to generate setup link.", {
+      userId: createdUserId,
+      message: linkError instanceof Error ? linkError.message : String(linkError)
+    });
+  }
+
+  // Send welcome email with setup link (fire-and-forget)
   sendWelcomeEmail({
     recipientEmail: normalizedEmail,
-    recipientName: payload.fullName.trim()
+    recipientName: payload.fullName.trim(),
+    setupLink
   }).catch((error) => {
     console.error("Failed to send welcome email.", {
       userId: createdUserId,
