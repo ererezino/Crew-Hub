@@ -129,13 +129,15 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
   const isLoginRoute = pathname === "/login";
+  const isAuthContinueRoute = pathname === "/auth/continue";
   const isMfaSetupRoute = pathname === "/mfa-setup";
   const isMfaApiRoute = pathname === "/api/v1/me/mfa";
   const isAuthSignInApiRoute = pathname === "/api/v1/auth/sign-in";
   const isAuthSignOutApiRoute = pathname === "/api/auth/sign-out";
+  const isAuthCallbackVerifyApiRoute = pathname === "/api/auth/callback/verify";
   const isPublicLegalRoute = pathname === "/privacy" || pathname === "/terms";
 
-  if (!user && !isLoginRoute && !isApiRoute && !isPublicLegalRoute) {
+  if (!user && !isApiRoute && !isLoginRoute && !isPublicLegalRoute && !isAuthContinueRoute) {
     const redirectUrl = new URL("/login", request.url);
 
     if (pathname !== "/") {
@@ -196,7 +198,10 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
     if (verifiedFactors.length === 0) {
       /* User has no verified TOTP — must complete MFA setup */
       const isMfaExemptApiRoute =
-        isMfaApiRoute || isAuthSignInApiRoute || isAuthSignOutApiRoute;
+        isMfaApiRoute ||
+        isAuthSignInApiRoute ||
+        isAuthSignOutApiRoute ||
+        isAuthCallbackVerifyApiRoute;
 
       if (isApiRoute && !isMfaExemptApiRoute) {
         return secure(
@@ -231,8 +236,11 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
 
       if (aalData?.currentLevel === "aal1") {
         /* Session is AAL1 but user has TOTP — force re-login */
-        const isMfaExemptApiRoute =
-          isMfaApiRoute || isAuthSignInApiRoute || isAuthSignOutApiRoute;
+      const isMfaExemptApiRoute =
+          isMfaApiRoute ||
+          isAuthSignInApiRoute ||
+          isAuthSignOutApiRoute ||
+          isAuthCallbackVerifyApiRoute;
 
         if (isApiRoute && !isMfaExemptApiRoute) {
           return secure(

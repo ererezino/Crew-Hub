@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { createSupabaseServerClient } from "../../../../lib/supabase/server";
-
 const supportedEmailOtpTypes = ["recovery", "invite", "magiclink", "signup", "email_change", "email"] as const;
 type SupportedEmailOtpType = (typeof supportedEmailOtpTypes)[number];
 
@@ -19,12 +17,37 @@ function parseOtpType(value: string | null): SupportedEmailOtpType | null {
     : null;
 }
 
+function buildContinueUrl(
+  requestUrl: URL,
+  params: {
+    code?: string | null;
+    tokenHash?: string | null;
+    otpType?: SupportedEmailOtpType | null;
+    next: string;
+  }
+) {
+  const continueUrl = new URL("/auth/continue", requestUrl.origin);
+  continueUrl.searchParams.set("next", params.next);
+
+  if (params.code) {
+    continueUrl.searchParams.set("code", params.code);
+  }
+
+  if (params.tokenHash && params.otpType) {
+    continueUrl.searchParams.set("token_hash", params.tokenHash);
+    continueUrl.searchParams.set("type", params.otpType);
+  }
+
+  return continueUrl;
+}
+
 /**
  * Supabase Auth callback handler.
  *
  * Handles both PKCE (`code`) and OTP-hash (`token_hash` + `type`) callbacks.
- * Either path must set a session cookie server-side before redirecting to the
- * target route; otherwise middleware will bounce back to /login.
+ * This route intentionally does not verify callback tokens directly on GET.
+ * It redirects to an interstitial page where a real user explicitly confirms
+ * continuation. This prevents link-preview bots from consuming one-time tokens.
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -33,28 +56,23 @@ export async function GET(request: Request) {
   const otpType = parseOtpType(requestUrl.searchParams.get("type"));
   const next = normalizeNextPath(requestUrl.searchParams.get("next"));
 
-  const supabase = await createSupabaseServerClient();
-
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (!error) {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
-    }
+    return NextResponse.redirect(
+      buildContinueUrl(requestUrl, { code, next })
+    );
   }
 
   if (tokenHash && otpType) {
-    const { error } = await supabase.auth.verifyOtp({
-      type: otpType,
-      token_hash: tokenHash
-    });
-
-    if (!error) {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
-    }
+    return NextResponse.redirect(
+      buildContinueUrl(requestUrl, {
+        tokenHash,
+        otpType,
+        next
+      })
+    );
   }
 
-  /* If code exchange fails, send to login with an error hint */
+  /* Invalid callback payload — send to login with an error hint */
   const loginUrl = new URL("/login", requestUrl.origin);
   loginUrl.searchParams.set("error", "invite_expired");
   return NextResponse.redirect(loginUrl);
