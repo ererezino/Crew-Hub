@@ -21,33 +21,32 @@ const THEME_STORAGE_KEY = "crew-hub-theme";
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  try {
+    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (storedTheme === "dark" || storedTheme === "light") {
+      return storedTheme;
+    }
+
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      return "dark";
+    }
+  } catch {
+    // Fallback to light if storage or media query APIs are unavailable.
+  }
+
+  return "light";
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
-  const [isReady, setIsReady] = useState(false);
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const isReady = true;
 
   useEffect(() => {
-    let resolvedTheme: Theme = "light";
-
-    try {
-      const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (storedTheme === "dark" || storedTheme === "light") {
-        resolvedTheme = storedTheme;
-      } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        resolvedTheme = "dark";
-      }
-    } catch {
-      resolvedTheme = "light";
-    }
-
-    setTheme(resolvedTheme);
-    setIsReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isReady) {
-      return;
-    }
-
     const root = document.documentElement;
     root.classList.toggle("dark", theme === "dark");
     root.dataset.theme = theme;

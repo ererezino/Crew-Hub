@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   type ChangeEvent,
@@ -210,16 +209,6 @@ function LoginForm() {
 
         <p className="auth-footer-link auth-footer-hint">
           Lost access? Contact your admin.
-        </p>
-        <p className="auth-footer-link auth-footer-hint">
-          Need help? Email{" "}
-          <a href="mailto:support@useaccrue.com">support@useaccrue.com</a>{" "}
-          or reach us on Basecamp.
-        </p>
-        <p className="auth-footer-link">
-          <Link href="/privacy">Privacy Policy</Link>
-          {" · "}
-          <Link href="/terms">Terms of Service</Link>
         </p>
       </section>
     </main>
