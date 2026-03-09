@@ -7643,6 +7643,26 @@ html.dark .topbar {
   margin-top: var(--space-2);
 }
 
+/* Keep MFA setup readable even when the global dark theme is active. */
+.mfa-setup-card {
+  --text-primary: #1A2B3C;
+  --text-secondary: #495057;
+  --text-muted: #727272;
+  --border-default: #E8DFD0;
+  --border-subtle: #E8DFD0;
+  --bg-canvas: #FFFAF3;
+  --bg-surface: #FFFFFF;
+  color: var(--text-primary);
+}
+
+.mfa-setup-card .form-input {
+  color: var(--text-primary);
+}
+
+.mfa-setup-card .form-input::placeholder {
+  color: var(--text-muted);
+}
+
 .auth-form {
   display: grid;
   gap: var(--space-3);
