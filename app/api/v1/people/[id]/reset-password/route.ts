@@ -20,13 +20,26 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-function resolveAuthRedirectUrl(request: Request): string {
+function resolveAppUrl(request: Request): string {
   const requestUrl = new URL(request.url);
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     requestUrl.origin;
-  const normalizedAppUrl = appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
-  return `${normalizedAppUrl}/mfa-setup`;
+  return appUrl.endsWith("/") ? appUrl.slice(0, -1) : appUrl;
+}
+
+function resolveAuthRedirectUrl(request: Request): string {
+  const appUrl = resolveAppUrl(request);
+  return `${appUrl}/api/auth/callback?next=/mfa-setup`;
+}
+
+function buildRecoveryCallbackLink(request: Request, hashedToken: string): string {
+  const appUrl = resolveAppUrl(request);
+  const callbackUrl = new URL("/api/auth/callback", appUrl);
+  callbackUrl.searchParams.set("token_hash", hashedToken);
+  callbackUrl.searchParams.set("type", "recovery");
+  callbackUrl.searchParams.set("next", "/mfa-setup");
+  return callbackUrl.toString();
 }
 
 type MfaResetResponseData = {
@@ -193,7 +206,22 @@ export async function POST(
     options: { redirectTo: authRedirectUrl }
   });
 
-  if (linkError || !linkData?.properties?.action_link) {
+  if (linkError || !linkData?.properties) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "MFA_RESET_LINK_FAILED",
+        message: "Unable to generate an MFA setup link for this user."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const setupLink = typeof linkData.properties.hashed_token === "string" && linkData.properties.hashed_token.length > 0
+    ? buildRecoveryCallbackLink(request, linkData.properties.hashed_token)
+    : linkData.properties.action_link;
+
+  if (!setupLink) {
     return jsonResponse<null>(500, {
       data: null,
       error: {
@@ -219,7 +247,7 @@ export async function POST(
     data: {
       userId: personId,
       resetInitiated: true,
-      setupLink: linkData.properties.action_link
+      setupLink
     },
     error: null,
     meta: buildMeta()
