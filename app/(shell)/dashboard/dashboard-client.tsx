@@ -1,9 +1,9 @@
 "use client";
 
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 
 import { DecisionCard } from "../../../components/dashboard/decision-card";
 import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skeleton";
@@ -1006,22 +1006,5 @@ function DashboardContent() {
    ══════════════════════════════════════════════ */
 
 export function DashboardClient() {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 2 * 60 * 1000,
-            gcTime: 10 * 60 * 1000,
-            refetchOnWindowFocus: false
-          }
-        }
-      })
-  );
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <DashboardContent />
-    </QueryClientProvider>
-  );
+  return <DashboardContent />;
 }
