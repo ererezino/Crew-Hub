@@ -24,6 +24,21 @@ type InviteResponseData = {
 };
 
 type SupportedInviteLinkType = "invite" | "recovery" | "magiclink";
+type InviteGenerateLinkOptions = {
+  data?: Record<string, unknown>;
+  redirectTo?: string;
+};
+type InviteGenerateLinkRequest =
+  | {
+      type: "invite" | "magiclink";
+      emailAddress: string;
+      options?: InviteGenerateLinkOptions;
+    }
+  | {
+      type: "recovery";
+      emailAddress: string;
+      options?: Pick<InviteGenerateLinkOptions, "redirectTo">;
+    };
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -85,6 +100,11 @@ function buildSetupLink({
   }
 
   return actionLink ?? null;
+}
+
+function isRedirectConfigurationError(message: string | undefined): boolean {
+  if (!message) return false;
+  return /(redirect|redirect_to|site url|url.*allow|allow.*url)/i.test(message);
 }
 
 export async function POST(
@@ -168,102 +188,206 @@ export async function POST(
       });
     }
 
-  const email = typeof profile.email === "string" ? profile.email.trim() : "";
-  if (email.length === 0) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "INVALID_EMAIL",
-        message: "This person does not have a valid email address."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  const fullName =
-    typeof profile.full_name === "string" && profile.full_name.trim().length > 0
-      ? profile.full_name.trim()
-      : "Crew member";
-  const appUrl = resolveAppUrl(request);
-  const authRedirectUrl = resolveAuthRedirectUrl(request);
-
-  /* Check if an auth user already exists (profile id = auth user id) */
-  let isResend = false;
-  let inviteLink: string | null = null;
-
-  const {
-    data: existingAuthUser,
-    error: existingAuthUserError
-  } = await serviceRoleClient.auth.admin.getUserById(personId);
-
-  if (existingAuthUserError && !/user/i.test(existingAuthUserError.message)) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "AUTH_LOOKUP_FAILED",
-        message: "Unable to verify existing account state. Please try again."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  if (existingAuthUser?.user) {
-    isResend = true;
-  }
-
-  /* Ensure the user's password is set to the system-derived value.
-     This is required for the email + TOTP login flow to work. */
-  if (existingAuthUser?.user) {
-    let systemPassword = "";
-    try {
-      systemPassword = deriveSystemPassword(personId);
-    } catch {
-      return jsonResponse<null>(500, {
+    const email = typeof profile.email === "string" ? profile.email.trim() : "";
+    if (email.length === 0) {
+      return jsonResponse<null>(422, {
         data: null,
         error: {
-          code: "AUTH_CONFIG_ERROR",
-          message: "Authentication system is not fully configured. Contact your admin."
+          code: "INVALID_EMAIL",
+          message: "This person does not have a valid email address."
         },
         meta: buildMeta()
       });
     }
 
-    await serviceRoleClient.auth.admin
-      .updateUserById(personId, { password: systemPassword })
-      .catch(() => undefined);
-  }
+    const fullName =
+      typeof profile.full_name === "string" && profile.full_name.trim().length > 0
+        ? profile.full_name.trim()
+        : "Crew member";
+    const appUrl = resolveAppUrl(request);
+    const authRedirectUrl = resolveAuthRedirectUrl(request);
 
-  /*
-   * Strategy:
-   *   1. Use generateLink to create a usable link (invite for new, recovery for existing).
-   *      generateLink always returns the link even if the email provider isn't configured.
-   *   2. Try to send the Supabase invite email (fire-and-forget, may silently fail).
-   *   3. Send our own welcome email (fire-and-forget).
-   *   4. Return the invite link so the admin can copy & share it manually if needed.
-   */
+    const generateLinkWithRedirectFallback = async ({
+      type,
+      emailAddress,
+      options
+    }: InviteGenerateLinkRequest) => {
+      const primaryParams =
+        type === "recovery"
+          ? {
+              type,
+              email: emailAddress,
+              options: options?.redirectTo
+                ? { redirectTo: options.redirectTo }
+                : undefined
+            }
+          : {
+              type,
+              email: emailAddress,
+              options
+            };
 
-  if (isResend) {
-    /* Existing auth user — generate a recovery (password reset) link */
-    const { data: linkData, error: linkError } = await serviceRoleClient.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo: authRedirectUrl }
-    });
+      const { data, error } = await serviceRoleClient.auth.admin.generateLink(
+        primaryParams as never
+      );
 
-    if (linkError || !linkData?.properties) {
-      /* Fallback: try magic link */
-      const { data: magicData, error: magicError } = await serviceRoleClient.auth.admin.generateLink({
-        type: "magiclink",
-        email,
+      if (!error && data?.properties) {
+        return { data, error: null };
+      }
+
+      const primaryErrorMessage = error?.message;
+      if (
+        !options?.redirectTo ||
+        !isRedirectConfigurationError(primaryErrorMessage)
+      ) {
+        return { data, error };
+      }
+
+      const fallbackParams =
+        type === "recovery"
+          ? { type, email: emailAddress }
+          : options?.data
+            ? {
+                type,
+                email: emailAddress,
+                options: { data: options.data }
+              }
+            : { type, email: emailAddress };
+
+      const fallback = await serviceRoleClient.auth.admin.generateLink(
+        fallbackParams as never
+      );
+
+      if (!fallback.error && fallback.data?.properties) {
+        logger.warn("Recovered invite link generation without redirect URL.", {
+          personId,
+          email: emailAddress,
+          type,
+          redirectTo: options.redirectTo
+        });
+        return { data: fallback.data, error: null };
+      }
+
+      return { data, error };
+    };
+
+    /* Check if an auth user already exists (profile id = auth user id) */
+    let isResend = false;
+    let inviteLink: string | null = null;
+
+    const {
+      data: existingAuthUser,
+      error: existingAuthUserError
+    } = await serviceRoleClient.auth.admin.getUserById(personId);
+
+    if (existingAuthUserError && !/user/i.test(existingAuthUserError.message)) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "AUTH_LOOKUP_FAILED",
+          message: "Unable to verify existing account state. Please try again."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (existingAuthUser?.user) {
+      isResend = true;
+    }
+
+    /* Ensure the user's password is set to the system-derived value.
+       If the secret is temporarily unavailable, continue invite generation
+       so admin can still share a setup link. */
+    if (existingAuthUser?.user) {
+      try {
+        const systemPassword = deriveSystemPassword(personId);
+        await serviceRoleClient.auth.admin
+          .updateUserById(personId, { password: systemPassword })
+          .catch(() => undefined);
+      } catch (error) {
+        logger.warn("Skipped password sync during invite because auth secret is unavailable.", {
+          personId,
+          message: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+
+    /*
+     * Strategy:
+     *   1. Use generateLink to create a usable link (invite for new, recovery for existing).
+     *      generateLink always returns the link even if the email provider isn't configured.
+     *   2. If redirect URL configuration is stale, retry without redirectTo.
+     *   3. Try to send the Supabase invite email (fire-and-forget, may silently fail).
+     *   4. Send our own welcome email (fire-and-forget).
+     *   5. Return the invite link so the admin can copy & share it manually if needed.
+     */
+
+    if (isResend) {
+      /* Existing auth user — generate a recovery (password reset) link */
+      const { data: linkData, error: linkError } = await generateLinkWithRedirectFallback({
+        type: "recovery",
+        emailAddress: email,
         options: { redirectTo: authRedirectUrl }
       });
 
-      if (magicError || !magicData?.properties) {
+      if (linkError || !linkData?.properties) {
+        /* Fallback: try magic link */
+        const { data: magicData, error: magicError } = await generateLinkWithRedirectFallback({
+          type: "magiclink",
+          emailAddress: email,
+          options: { redirectTo: authRedirectUrl }
+        });
+
+        if (magicError || !magicData?.properties) {
+          return jsonResponse<null>(500, {
+            data: null,
+            error: {
+              code: "INVITE_RESEND_FAILED",
+              message: "Unable to generate invite link. Please try again."
+            },
+            meta: buildMeta()
+          });
+        }
+
+        inviteLink = buildSetupLink({
+          request,
+          type: "magiclink",
+          hashedToken: magicData.properties.hashed_token,
+          actionLink: magicData.properties.action_link
+        });
+      } else {
+        inviteLink = buildSetupLink({
+          request,
+          type: "recovery",
+          hashedToken: linkData.properties.hashed_token,
+          actionLink: linkData.properties.action_link
+        });
+      }
+
+      /* Also try the standard invite email (may silently fail if email not configured) */
+      serviceRoleClient.auth.admin.inviteUserByEmail(email, {
+        data: { full_name: fullName },
+        redirectTo: authRedirectUrl
+      }).catch(() => {
+        /* Swallow — the manual link is the reliable path */
+      });
+    } else {
+      /* No auth account — generate an invite link (creates the auth user + generates link) */
+      const { data: linkData, error: linkError } = await generateLinkWithRedirectFallback({
+        type: "invite",
+        emailAddress: email,
+        options: {
+          data: { full_name: fullName },
+          redirectTo: authRedirectUrl
+        }
+      });
+
+      if (linkError || !linkData?.properties) {
         return jsonResponse<null>(500, {
           data: null,
           error: {
-            code: "INVITE_RESEND_FAILED",
-            message: "Unable to generate invite link. Please try again."
+            code: "INVITE_FAILED",
+            message: linkError?.message || "Unable to generate invite link."
           },
           meta: buildMeta()
         });
@@ -271,78 +395,34 @@ export async function POST(
 
       inviteLink = buildSetupLink({
         request,
-        type: "magiclink",
-        hashedToken: magicData.properties.hashed_token,
-        actionLink: magicData.properties.action_link
-      });
-    } else {
-      inviteLink = buildSetupLink({
-        request,
-        type: "recovery",
+        type: "invite",
         hashedToken: linkData.properties.hashed_token,
         actionLink: linkData.properties.action_link
       });
-    }
 
-    /* Also try the standard invite email (may silently fail if email not configured) */
-    serviceRoleClient.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: fullName },
-      redirectTo: authRedirectUrl
-    }).catch(() => {
-      /* Swallow — the manual link is the reliable path */
-    });
-  } else {
-    /* No auth account — generate an invite link (creates the auth user + generates link) */
-    const { data: linkData, error: linkError } = await serviceRoleClient.auth.admin.generateLink({
-      type: "invite",
-      email,
-      options: {
+      /* Also fire the standard Supabase invite email so the user receives
+         a message in their inbox. generateLink only creates the link —
+         it doesn't send anything. */
+      serviceRoleClient.auth.admin.inviteUserByEmail(email, {
         data: { full_name: fullName },
         redirectTo: authRedirectUrl
-      }
-    });
-
-    if (linkError || !linkData?.properties) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "INVITE_FAILED",
-          message: linkError?.message || "Unable to generate invite link."
-        },
-        meta: buildMeta()
+      }).catch(() => {
+        /* Swallow — the manual link is the reliable fallback */
       });
     }
 
-    inviteLink = buildSetupLink({
-      request,
-      type: "invite",
-      hashedToken: linkData.properties.hashed_token,
-      actionLink: linkData.properties.action_link
+    /* Send welcome email (fire-and-forget) */
+    sendWelcomeEmail({
+      recipientEmail: email,
+      recipientName: fullName,
+      loginUrl: `${appUrl}/login`,
+      setupLink: inviteLink ?? undefined
+    }).catch((error) => {
+      logger.error("Failed to send welcome email during invite.", {
+        personId,
+        message: error instanceof Error ? error.message : String(error)
+      });
     });
-
-    /* Also fire the standard Supabase invite email so the user receives
-       a message in their inbox.  generateLink only creates the link —
-       it doesn't send anything. */
-    serviceRoleClient.auth.admin.inviteUserByEmail(email, {
-      data: { full_name: fullName },
-      redirectTo: authRedirectUrl
-    }).catch(() => {
-      /* Swallow — the manual link is the reliable fallback */
-    });
-  }
-
-  /* Send welcome email (fire-and-forget) */
-  sendWelcomeEmail({
-    recipientEmail: email,
-    recipientName: fullName,
-    loginUrl: `${appUrl}/login`,
-    setupLink: inviteLink ?? undefined
-  }).catch((error) => {
-    logger.error("Failed to send welcome email during invite.", {
-      personId,
-      message: error instanceof Error ? error.message : String(error)
-    });
-  });
 
     try {
       await logAudit({

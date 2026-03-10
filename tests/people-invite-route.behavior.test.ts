@@ -153,7 +153,7 @@ describe("People invite route behavior", () => {
     expect(loggerErrorMock).toHaveBeenCalled();
   });
 
-  it("returns auth config error when system password secret is missing for resend users", async () => {
+  it("continues resend invite generation when system password derivation is unavailable", async () => {
     getUserByIdMock.mockResolvedValueOnce({
       data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
       error: null
@@ -164,8 +164,37 @@ describe("People invite route behavior", () => {
 
     const result = await callInviteRoute();
 
-    expect(result.status).toBe(500);
-    expect(result.body.error?.code).toBe("AUTH_CONFIG_ERROR");
+    expect(result.status).toBe(200);
+    expect(result.body.data?.inviteSent).toBe(true);
+    expect(result.body.data?.isResend).toBe(true);
+  });
+
+  it("falls back to generate link without redirect URL when redirect config is stale", async () => {
+    generateLinkMock
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "redirect_to URL is not allowed" }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          properties: {
+            hashed_token: "fallback-token",
+            action_link: "https://example.com/fallback-action"
+          }
+        },
+        error: null
+      });
+
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(200);
+    expect(result.body.data?.inviteSent).toBe(true);
+    expect(generateLinkMock).toHaveBeenCalledTimes(2);
+    expect(generateLinkMock.mock.calls[1]?.[0]).toEqual({
+      type: "invite",
+      email: "invitee@useaccrue.com",
+      options: { data: { full_name: "Invitee Person" } }
+    });
   });
 
   it("accepts app URL values without explicit protocol", async () => {
