@@ -21,7 +21,7 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
  * Returns the current user's MFA enrollment status.
  */
 export async function GET() {
-  const session = await getAuthenticatedSession();
+  const session = await getAuthenticatedSession({ requireMfa: false });
 
   if (!session?.profile) {
     return jsonResponse<null>(401, {
@@ -77,7 +77,7 @@ const enrollSchema = z.object({
  * - action: "unenroll" — removes a verified factor (SUPER_ADMIN only for themselves)
  */
 export async function POST(request: Request) {
-  const session = await getAuthenticatedSession();
+  const session = await getAuthenticatedSession({ requireMfa: false });
 
   if (!session?.profile) {
     return jsonResponse<null>(401, {

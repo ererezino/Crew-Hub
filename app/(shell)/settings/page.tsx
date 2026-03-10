@@ -32,7 +32,7 @@ function resolveTab(searchParams: Record<string, string | string[] | undefined>)
 }
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
-  const session = await getAuthenticatedSession();
+  const session = await getAuthenticatedSession({ includeOrg: true });
 
   if (!session?.profile) {
     return (

@@ -96,6 +96,12 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
     }
   }
 
+  /* API routes enforce auth/role checks in route handlers.
+     Skip expensive middleware auth lookups to reduce API latency. */
+  if (isApiRoute) {
+    return secure(NextResponse.next({ request }));
+  }
+
   const env = getSupabasePublicEnv();
 
   if (!env) {

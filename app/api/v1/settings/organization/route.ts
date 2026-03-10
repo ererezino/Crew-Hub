@@ -33,7 +33,7 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
 export async function PATCH(request: Request) {
   const session = await getAuthenticatedSession();
 
-  if (!session?.profile || !session.org) {
+  if (!session?.profile) {
     return jsonResponse<null>(401, {
       data: null,
       error: {
@@ -91,7 +91,7 @@ export async function PATCH(request: Request) {
       name: parsed.data.name,
       logo_url: parsed.data.logoUrl || null
     })
-    .eq("id", session.org.id)
+    .eq("id", session.profile.org_id)
     .select("name, logo_url")
     .single();
 

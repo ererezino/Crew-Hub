@@ -32,7 +32,16 @@ export type AuthenticatedSession = {
   org: SessionOrg | null;
 };
 
-export async function getAuthenticatedSession(): Promise<AuthenticatedSession | null> {
+type GetAuthenticatedSessionOptions = {
+  includeOrg?: boolean;
+  requireMfa?: boolean;
+};
+
+export async function getAuthenticatedSession(
+  options: GetAuthenticatedSessionOptions = {}
+): Promise<AuthenticatedSession | null> {
+  const includeOrg = options.includeOrg === true;
+  const requireMfa = options.requireMfa !== false;
   let supabase;
 
   try {
@@ -48,6 +57,30 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
 
   if (userError || !user) {
     return null;
+  }
+
+  if (requireMfa) {
+    const { data: factorsData, error: factorsError } =
+      await supabase.auth.mfa.listFactors();
+
+    if (factorsError) {
+      return null;
+    }
+
+    const verifiedFactors = (factorsData?.totp ?? []).filter(
+      (factor) => factor.status === "verified"
+    );
+
+    if (verifiedFactors.length === 0) {
+      return null;
+    }
+
+    const { data: aalData, error: aalError } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+    if (aalError || aalData?.currentLevel !== "aal2") {
+      return null;
+    }
   }
 
   const { data: profileData, error: profileError } = await supabase
@@ -87,6 +120,14 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
     country_code: profileData.country_code,
     status: profileData.status
   };
+
+  if (!includeOrg) {
+    return {
+      userId: user.id,
+      profile,
+      org: null
+    };
+  }
 
   const { data: orgData, error: orgError } = await supabase
     .from("orgs")
