@@ -415,21 +415,46 @@ async function fetchRecentExpenses(
   }
 }
 
+type ManagerReportProfile = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+};
+
+async function fetchManagerReports(
+  supabase: SupabaseClient,
+  orgId: string,
+  managerUserId: string
+): Promise<ManagerReportProfile[]> {
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, avatar_url")
+      .eq("org_id", orgId)
+      .eq("manager_id", managerUserId)
+      .is("deleted_at", null);
+
+    if (error || !data || data.length === 0) {
+      return [];
+    }
+
+    return data as ManagerReportProfile[];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchPendingApprovals(
   supabase: SupabaseClient,
   orgId: string,
-  userId: string
+  userId: string,
+  managerReports?: ManagerReportProfile[]
 ): Promise<DashboardPendingApprovals> {
   try {
-    // Fetch direct-report IDs so managers see only their team's pending items
-    const reportsResult = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("manager_id", userId)
-      .is("deleted_at", null);
-
-    const reportIds = (reportsResult.data ?? []).map((r) => r.id);
+    const reports =
+      managerReports ??
+      (await fetchManagerReports(supabase, orgId, userId));
+    const reportIds = reports.map((report) => report.id);
 
     if (reportIds.length === 0) {
       return { leave: 0, expenses: 0, timesheets: 0, total: 0 };
@@ -477,18 +502,14 @@ async function fetchPendingApprovals(
 async function fetchPendingApprovalItems(
   supabase: SupabaseClient,
   orgId: string,
-  userId: string
+  userId: string,
+  managerReports?: ManagerReportProfile[]
 ): Promise<DashboardApprovalItem[]> {
   try {
-    const reportsResult = await supabase
-      .from("profiles")
-      .select("id, full_name")
-      .eq("org_id", orgId)
-      .eq("manager_id", userId)
-      .is("deleted_at", null);
-
-    const reports = reportsResult.data ?? [];
-    const reportIds = reports.map((r) => r.id);
+    const reports =
+      managerReports ??
+      (await fetchManagerReports(supabase, orgId, userId));
+    const reportIds = reports.map((report) => report.id);
 
     if (reportIds.length === 0) return [];
 
@@ -559,12 +580,6 @@ async function fetchPendingApprovalItems(
   }
 }
 
-type ManagerProfileRow = {
-  id: string;
-  full_name: string | null;
-  avatar_url: string | null;
-};
-
 type ManagerOnboardingInstanceRow = {
   id: string;
   employee_id: string;
@@ -581,21 +596,18 @@ type ManagerOnboardingTaskRow = {
 async function fetchManagerOnboarding(
   supabase: SupabaseClient,
   orgId: string,
-  managerUserId: string
+  managerUserId: string,
+  managerReports?: ManagerReportProfile[]
 ): Promise<DashboardManagerOnboardingItem[]> {
   try {
-    const { data: rawReports, error: reportsError } = await supabase
-      .from("profiles")
-      .select("id, full_name, avatar_url")
-      .eq("org_id", orgId)
-      .eq("manager_id", managerUserId)
-      .is("deleted_at", null);
+    const reports =
+      managerReports ??
+      (await fetchManagerReports(supabase, orgId, managerUserId));
 
-    if (reportsError || !rawReports || rawReports.length === 0) {
+    if (reports.length === 0) {
       return [];
     }
 
-    const reports = rawReports as ManagerProfileRow[];
     const reportIds = reports
       .map((row) => row.id)
       .filter((value): value is string => typeof value === "string");
@@ -1173,32 +1185,38 @@ export async function GET() {
 
     /* ── Step 1: Determine persona ── */
 
-    const [profileExtrasResult, onboardingResult] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("start_date, employment_type")
-        .eq("id", profile.id)
-        .single(),
-      supabase
-        .from("onboarding_instances")
-        .select("id, status, started_at")
-        .eq("employee_id", profile.id)
-        .eq("type", "onboarding")
-        .eq("status", "active")
-        .is("deleted_at", null)
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    ]);
+    const roleBasedPersona: DashboardPersona | null = hasRole(roles, "SUPER_ADMIN")
+      ? "super_admin"
+      : hasRole(roles, "FINANCE_ADMIN")
+      ? "finance_admin"
+      : hasRole(roles, "HR_ADMIN")
+      ? "hr_admin"
+      : hasRole(roles, "MANAGER") || hasRole(roles, "TEAM_LEAD")
+      ? "manager"
+      : null;
 
-    const startDate = profileExtrasResult.data?.start_date ?? null;
-    const employmentType = profileExtrasResult.data?.employment_type ?? null;
-    const activeOnboarding = onboardingResult.data;
+    const employmentType = profile.employment_type;
+    const activeOnboarding = roleBasedPersona
+      ? null
+      : (
+          await supabase
+            .from("onboarding_instances")
+            .select("id, status, started_at")
+            .eq("employee_id", profile.id)
+            .eq("type", "onboarding")
+            .eq("status", "active")
+            .is("deleted_at", null)
+            .order("started_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ).data;
 
-    const persona = getDashboardPersona(
-      { roles, startDate },
-      activeOnboarding ? { status: activeOnboarding.status } : null
-    );
+    const persona =
+      roleBasedPersona ??
+      getDashboardPersona(
+        { roles, startDate: profile.start_date },
+        activeOnboarding ? { status: activeOnboarding.status } : null
+      );
     const allowedWidgetKeys = await resolveAllowedWidgetKeys(
       supabase,
       profile.org_id,
@@ -1283,6 +1301,12 @@ export async function GET() {
       }
 
       case "manager": {
+        const managerReports = await fetchManagerReports(
+          supabase,
+          profile.org_id,
+          profile.id
+        );
+
         const [
           pendingApprovals,
           pendingApprovalItems,
@@ -1292,9 +1316,9 @@ export async function GET() {
           recentExpenses,
           hasPolicy
         ] = await Promise.all([
-          fetchPendingApprovals(supabase, profile.org_id, profile.id),
-          fetchPendingApprovalItems(supabase, profile.org_id, profile.id),
-          fetchManagerOnboarding(supabase, profile.org_id, profile.id),
+          fetchPendingApprovals(supabase, profile.org_id, profile.id, managerReports),
+          fetchPendingApprovalItems(supabase, profile.org_id, profile.id, managerReports),
+          fetchManagerOnboarding(supabase, profile.org_id, profile.id, managerReports),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
           fetchUpcomingShifts(supabase, profile.org_id, profile.id),
           fetchRecentExpenses(supabase, profile.org_id, profile.id),
@@ -1367,6 +1391,12 @@ export async function GET() {
       }
 
       case "super_admin": {
+        const managerReports = await fetchManagerReports(
+          supabase,
+          profile.org_id,
+          profile.id
+        );
+
         const [
           headcount,
           headcountByCountry,
@@ -1385,8 +1415,8 @@ export async function GET() {
           fetchHeadcount(supabase, profile.org_id),
           fetchHeadcountByCountry(supabase, profile.org_id),
           fetchHeadcountByDept(supabase, profile.org_id),
-          fetchPendingApprovals(supabase, profile.org_id, profile.id),
-          fetchPendingApprovalItems(supabase, profile.org_id, profile.id),
+          fetchPendingApprovals(supabase, profile.org_id, profile.id, managerReports),
+          fetchPendingApprovalItems(supabase, profile.org_id, profile.id, managerReports),
           fetchPayrollStatus(supabase, profile.org_id),
           fetchComplianceDeadlines(supabase, profile.org_id),
           fetchComplianceHealth(supabase, profile.org_id),

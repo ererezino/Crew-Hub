@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
@@ -70,14 +71,59 @@ function buildCalendarUrl(query: CalendarQuery): string {
   return queryString.length > 0 ? `/api/v1/time-off/calendar?${queryString}` : "/api/v1/time-off/calendar";
 }
 
+async function fetchSummary(endpoint: string, signal: AbortSignal): Promise<TimeOffSummaryResponseData> {
+  const response = await fetchWithRetry(endpoint, signal);
+  const payload = (await response.json()) as TimeOffSummaryResponse;
+
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load time off summary.");
+  }
+
+  return payload.data;
+}
+
+async function fetchApprovals(
+  endpoint: string,
+  signal: AbortSignal
+): Promise<TimeOffApprovalsResponseData> {
+  const response = await fetchWithRetry(endpoint, signal);
+  const payload = (await response.json()) as TimeOffApprovalsResponse;
+
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load leave approvals.");
+  }
+
+  return payload.data;
+}
+
+async function fetchCalendar(
+  endpoint: string,
+  signal: AbortSignal
+): Promise<TimeOffCalendarResponseData> {
+  const response = await fetchWithRetry(endpoint, signal);
+  const payload = (await response.json()) as TimeOffCalendarResponse;
+
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load time off calendar.");
+  }
+
+  return payload.data;
+}
+
+async function fetchAfkLogs(signal: AbortSignal): Promise<AfkLogsResponseData> {
+  const response = await fetchWithRetry("/api/v1/time-off/afk", signal);
+  const payload = (await response.json()) as AfkLogsResponse;
+
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load AFK logs.");
+  }
+
+  return payload.data;
+}
+
 export function useTimeOffSummary(query: SummaryQuery = {}): UseFetchState<TimeOffSummaryResponseData> {
   const year = query.year;
   const month = query.month;
-
-  const [data, setData] = useState<TimeOffSummaryResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
 
   const endpoint = useMemo(
     () =>
@@ -88,123 +134,52 @@ export function useTimeOffSummary(query: SummaryQuery = {}): UseFetchState<TimeO
     [month, year]
   );
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await fetchWithRetry(endpoint, abortController.signal);
-        const payload = (await response.json()) as TimeOffSummaryResponse;
-
-        if (!response.ok || !payload.data) {
-          setData(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load time off summary.");
-          return;
-        }
-
-        setData(payload.data);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setData(null);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load time off summary.");
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [endpoint, reloadToken]);
+  const queryResult = useQuery({
+    queryKey: ["time-off-summary", year ?? "current", month ?? "current"],
+    queryFn: ({ signal }) => fetchSummary(endpoint, signal),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
 
   const refresh = useCallback(() => {
-    setReloadToken((currentValue) => currentValue + 1);
-  }, []);
+    void queryResult.refetch();
+  }, [queryResult]);
 
   return {
-    data,
-    isLoading,
-    errorMessage,
+    data: queryResult.data ?? null,
+    isLoading: queryResult.isPending && !queryResult.data,
+    errorMessage: queryResult.error instanceof Error ? queryResult.error.message : null,
     refresh
   };
 }
 
 export function useTimeOffApprovals(): UseFetchState<TimeOffApprovalsResponseData> {
-  const [data, setData] = useState<TimeOffApprovalsResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-
   const endpoint = useMemo(() => buildApprovalsUrl(), []);
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await fetchWithRetry(endpoint, abortController.signal);
-
-        const payload = (await response.json()) as TimeOffApprovalsResponse;
-
-        if (!response.ok || !payload.data) {
-          setData(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load leave approvals.");
-          return;
-        }
-
-        setData(payload.data);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setData(null);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load leave approvals.");
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [endpoint, reloadToken]);
+  const queryResult = useQuery({
+    queryKey: ["time-off-approvals"],
+    queryFn: ({ signal }) => fetchApprovals(endpoint, signal),
+    staleTime: 90 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
 
   const refresh = useCallback(() => {
-    setReloadToken((currentValue) => currentValue + 1);
-  }, []);
+    void queryResult.refetch();
+  }, [queryResult]);
 
   return {
-    data,
-    isLoading,
-    errorMessage,
+    data: queryResult.data ?? null,
+    isLoading: queryResult.isPending && !queryResult.data,
+    errorMessage: queryResult.error instanceof Error ? queryResult.error.message : null,
     refresh
   };
 }
 
 export function useTimeOffCalendar(query: CalendarQuery = {}): UseFetchState<TimeOffCalendarResponseData> {
-  const [data, setData] = useState<TimeOffCalendarResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-
   const endpoint = useMemo(
     () =>
       buildCalendarUrl({
@@ -215,112 +190,50 @@ export function useTimeOffCalendar(query: CalendarQuery = {}): UseFetchState<Tim
     [query.countryCode, query.department, query.month]
   );
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await fetchWithRetry(endpoint, abortController.signal);
-
-        const payload = (await response.json()) as TimeOffCalendarResponse;
-
-        if (!response.ok || !payload.data) {
-          setData(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load time off calendar.");
-          return;
-        }
-
-        setData(payload.data);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setData(null);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load time off calendar.");
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [endpoint, reloadToken]);
+  const queryResult = useQuery({
+    queryKey: [
+      "time-off-calendar",
+      query.month ?? "current",
+      query.countryCode ?? "all",
+      query.department ?? "all"
+    ],
+    queryFn: ({ signal }) => fetchCalendar(endpoint, signal),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
 
   const refresh = useCallback(() => {
-    setReloadToken((currentValue) => currentValue + 1);
-  }, []);
+    void queryResult.refetch();
+  }, [queryResult]);
 
   return {
-    data,
-    isLoading,
-    errorMessage,
+    data: queryResult.data ?? null,
+    isLoading: queryResult.isPending && !queryResult.data,
+    errorMessage: queryResult.error instanceof Error ? queryResult.error.message : null,
     refresh
   };
 }
 
 export function useAfkLogs(): UseFetchState<AfkLogsResponseData> {
-  const [data, setData] = useState<AfkLogsResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await fetchWithRetry("/api/v1/time-off/afk", abortController.signal);
-
-        const payload = (await response.json()) as AfkLogsResponse;
-
-        if (!response.ok || !payload.data) {
-          setData(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load AFK logs.");
-          return;
-        }
-
-        setData(payload.data);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setData(null);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load AFK logs.");
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [reloadToken]);
+  const queryResult = useQuery({
+    queryKey: ["time-off-afk-logs"],
+    queryFn: ({ signal }) => fetchAfkLogs(signal),
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
 
   const refresh = useCallback(() => {
-    setReloadToken((currentValue) => currentValue + 1);
-  }, []);
+    void queryResult.refetch();
+  }, [queryResult]);
 
   return {
-    data,
-    isLoading,
-    errorMessage,
+    data: queryResult.data ?? null,
+    isLoading: queryResult.isPending && !queryResult.data,
+    errorMessage: queryResult.error instanceof Error ? queryResult.error.message : null,
     refresh
   };
 }

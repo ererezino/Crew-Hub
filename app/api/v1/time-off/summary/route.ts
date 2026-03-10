@@ -20,12 +20,7 @@ const querySchema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/).optional()
 });
 
-const profileRowSchema = z.object({
-  id: z.string().uuid(),
-  full_name: z.string(),
-  department: z.string().nullable(),
-  country_code: z.string().nullable(),
-  status: z.string().nullable(),
+const profileDobRowSchema = z.object({
   date_of_birth: z.string().nullable().optional().default(null)
 });
 
@@ -141,58 +136,54 @@ export async function GET(request: Request) {
   const yearStart = `${String(year)}-01-01`;
   const yearEnd = `${String(year)}-12-31`;
 
-  let profileRow: Record<string, unknown> | null = null;
-  let profileError: { message: string } | null = null;
+  const employeeProfile = {
+    id: session.profile.id,
+    full_name: session.profile.full_name,
+    department: session.profile.department,
+    country_code: session.profile.country_code,
+    status: session.profile.status,
+    date_of_birth: null as string | null
+  };
 
-  // Try with date_of_birth first; fall back without it if column doesn't exist yet
-  const profileResult = await supabase
+  const profileDobResult = await supabase
     .from("profiles")
-    .select("id, full_name, department, country_code, status, date_of_birth")
+    .select("date_of_birth")
     .eq("id", session.profile.id)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
-    .single();
+    .maybeSingle();
 
-  if (profileResult.error) {
-    const fallbackResult = await supabase
-      .from("profiles")
-      .select("id, full_name, department, country_code, status")
-      .eq("id", session.profile.id)
-      .eq("org_id", session.profile.org_id)
-      .is("deleted_at", null)
-      .single();
+  if (profileDobResult.error) {
+    const message = profileDobResult.error.message.toLowerCase();
+    const missingDateOfBirthColumn =
+      profileDobResult.error.code === "42703" || message.includes("date_of_birth");
 
-    profileRow = fallbackResult.data as Record<string, unknown> | null;
-    profileError = fallbackResult.error;
-  } else {
-    profileRow = profileResult.data as Record<string, unknown> | null;
+    if (!missingDateOfBirthColumn) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PROFILE_FETCH_FAILED",
+          message: "Unable to resolve employee profile for time off."
+        },
+        meta: buildMeta()
+      });
+    }
+  } else if (profileDobResult.data) {
+    const parsedProfileDob = profileDobRowSchema.safeParse(profileDobResult.data);
+    if (!parsedProfileDob.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PROFILE_PARSE_FAILED",
+          message: "Employee profile data is not in the expected shape."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    employeeProfile.date_of_birth = parsedProfileDob.data.date_of_birth;
   }
 
-  if (profileError || !profileRow) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "PROFILE_FETCH_FAILED",
-        message: "Unable to resolve employee profile for time off."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  const parsedProfile = profileRowSchema.safeParse(profileRow);
-
-  if (!parsedProfile.success) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "PROFILE_PARSE_FAILED",
-        message: "Employee profile data is not in the expected shape."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  const employeeProfile = parsedProfile.data;
   const orgId = session.profile.org_id;
 
   // Build policies query — try with is_unlimited, fall back without it

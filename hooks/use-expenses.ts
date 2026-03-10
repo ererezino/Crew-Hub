@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
@@ -100,12 +101,46 @@ function buildReportsUrl(query: ExpenseReportsQuery): string {
     : "/api/v1/expenses/reports";
 }
 
-export function useExpenses(query: ExpensesQuery = {}): UseFetchState<ExpensesListResponseData> {
-  const [data, setData] = useState<ExpensesListResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+async function fetchExpenses(endpoint: string, signal: AbortSignal): Promise<ExpensesListResponseData> {
+  const response = await fetchWithRetry(endpoint, signal);
+  const payload = (await response.json()) as ExpensesListResponse;
 
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load expenses.");
+  }
+
+  return payload.data;
+}
+
+async function fetchExpenseApprovals(
+  endpoint: string,
+  signal: AbortSignal
+): Promise<ExpenseApprovalsResponseData> {
+  const response = await fetchWithRetry(endpoint, signal);
+  const payload = (await response.json()) as ExpenseApprovalsResponse;
+
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load expense approvals.");
+  }
+
+  return payload.data;
+}
+
+async function fetchExpenseReports(
+  endpoint: string,
+  signal: AbortSignal
+): Promise<ExpenseReportsResponseData> {
+  const response = await fetchWithRetry(endpoint, signal);
+  const payload = (await response.json()) as ExpenseReportsResponse;
+
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load expense reports.");
+  }
+
+  return payload.data;
+}
+
+export function useExpenses(query: ExpensesQuery = {}): UseFetchState<ExpensesListResponseData> {
   const endpoint = useMemo(
     () =>
       buildExpensesUrl({
@@ -115,54 +150,23 @@ export function useExpenses(query: ExpensesQuery = {}): UseFetchState<ExpensesLi
     [query.month, query.status]
   );
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await fetchWithRetry(endpoint, abortController.signal);
-
-        const payload = (await response.json()) as ExpensesListResponse;
-
-        if (!response.ok || !payload.data) {
-          setData(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load expenses.");
-          return;
-        }
-
-        setData(payload.data);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setData(null);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load expenses.");
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [endpoint, reloadToken]);
+  const queryResult = useQuery({
+    queryKey: ["expenses", query.status ?? "all", query.month ?? "all"],
+    queryFn: ({ signal }) => fetchExpenses(endpoint, signal),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
 
   const refresh = useCallback(() => {
-    setReloadToken((current) => current + 1);
-  }, []);
+    void queryResult.refetch();
+  }, [queryResult]);
 
   return {
-    data,
-    isLoading,
-    errorMessage,
+    data: queryResult.data ?? null,
+    isLoading: queryResult.isPending && !queryResult.data,
+    errorMessage: queryResult.error instanceof Error ? queryResult.error.message : null,
     refresh
   };
 }
@@ -172,63 +176,25 @@ export function useExpenseApprovals(
 ): UseFetchState<ExpenseApprovalsResponseData> {
   const month = query.month;
   const stage = query.stage;
-  const [data, setData] = useState<ExpenseApprovalsResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-
   const endpoint = useMemo(() => buildApprovalsUrl({ month, stage }), [month, stage]);
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await fetchWithRetry(endpoint, abortController.signal);
-
-        const payload = (await response.json()) as ExpenseApprovalsResponse;
-
-        if (!response.ok || !payload.data) {
-          setData(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load expense approvals.");
-          return;
-        }
-
-        setData(payload.data);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setData(null);
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load expense approvals."
-        );
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [endpoint, reloadToken]);
+  const queryResult = useQuery({
+    queryKey: ["expense-approvals", month ?? "all", stage ?? "all"],
+    queryFn: ({ signal }) => fetchExpenseApprovals(endpoint, signal),
+    staleTime: 90 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
 
   const refresh = useCallback(() => {
-    setReloadToken((current) => current + 1);
-  }, []);
+    void queryResult.refetch();
+  }, [queryResult]);
 
   return {
-    data,
-    isLoading,
-    errorMessage,
+    data: queryResult.data ?? null,
+    isLoading: queryResult.isPending && !queryResult.data,
+    errorMessage: queryResult.error instanceof Error ? queryResult.error.message : null,
     refresh
   };
 }
@@ -241,66 +207,36 @@ export function useExpenseReports(
   const department = query.department;
   const status = query.status;
   const category = query.category;
-  const [data, setData] = useState<ExpenseReportsResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
 
   const endpoint = useMemo(
     () => buildReportsUrl({ month, country, department, status, category }),
     [month, country, department, status, category]
   );
 
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await fetchWithRetry(endpoint, abortController.signal);
-
-        const payload = (await response.json()) as ExpenseReportsResponse;
-
-        if (!response.ok || !payload.data) {
-          setData(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load expense reports.");
-          return;
-        }
-
-        setData(payload.data);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setData(null);
-        setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load expense reports."
-        );
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [endpoint, reloadToken]);
+  const queryResult = useQuery({
+    queryKey: [
+      "expense-reports",
+      month ?? "all",
+      country ?? "all",
+      department ?? "all",
+      status ?? "all",
+      category ?? "all"
+    ],
+    queryFn: ({ signal }) => fetchExpenseReports(endpoint, signal),
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
 
   const refresh = useCallback(() => {
-    setReloadToken((current) => current + 1);
-  }, []);
+    void queryResult.refetch();
+  }, [queryResult]);
 
   return {
-    data,
-    isLoading,
-    errorMessage,
+    data: queryResult.data ?? null,
+    isLoading: queryResult.isPending && !queryResult.data,
+    errorMessage: queryResult.error instanceof Error ? queryResult.error.message : null,
     refresh
   };
 }

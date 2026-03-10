@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchWithRetry } from "./use-fetch-with-retry";
 import type {
@@ -39,12 +40,33 @@ function buildNotificationsUrl({
   return `/api/v1/notifications?${params.toString()}`;
 }
 
-export function useNotifications(query: NotificationsQuery = {}): UseNotificationsResult {
-  const [data, setData] = useState<NotificationsResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
+async function fetchNotifications(
+  endpoint: string,
+  signal: AbortSignal
+): Promise<NotificationsResponseData> {
+  const response = await fetchWithRetry(endpoint, signal);
+  const payload = (await response.json()) as NotificationsResponse;
 
+  if (!response.ok || !payload.data) {
+    throw new Error(payload.error?.message ?? "Unable to load notifications.");
+  }
+
+  return payload.data;
+}
+
+function updateNotificationCache(
+  current: NotificationsResponseData | undefined,
+  updater: (current: NotificationsResponseData) => NotificationsResponseData
+): NotificationsResponseData | undefined {
+  if (!current) {
+    return current;
+  }
+
+  return updater(current);
+}
+
+export function useNotifications(query: NotificationsQuery = {}): UseNotificationsResult {
+  const queryClient = useQueryClient();
   const endpoint = useMemo(
     () =>
       buildNotificationsUrl({
@@ -54,49 +76,23 @@ export function useNotifications(query: NotificationsQuery = {}): UseNotificatio
     [query.limit, query.unreadOnly]
   );
 
-  useEffect(() => {
-    const abortController = new AbortController();
+  const queryKey = useMemo(
+    () => ["notifications", query.limit ?? 50, query.unreadOnly === true ? "unread" : "all"] as const,
+    [query.limit, query.unreadOnly]
+  );
 
-    const load = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await fetchWithRetry(endpoint, abortController.signal);
-
-        const payload = (await response.json()) as NotificationsResponse;
-
-        if (!response.ok || !payload.data) {
-          setData(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load notifications.");
-          return;
-        }
-
-        setData(payload.data);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setData(null);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load notifications.");
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [endpoint, reloadToken]);
+  const queryResult = useQuery({
+    queryKey,
+    queryFn: ({ signal }) => fetchNotifications(endpoint, signal),
+    staleTime: 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
 
   const refresh = useCallback(() => {
-    setReloadToken((current) => current + 1);
-  }, []);
+    void queryResult.refetch();
+  }, [queryResult]);
 
   const markRead = useCallback(
     async (notificationId: string) => {
@@ -110,35 +106,34 @@ export function useNotifications(query: NotificationsQuery = {}): UseNotificatio
           return false;
         }
 
-        setData((current) => {
-          if (!current) {
-            return current;
-          }
+        queryClient.setQueriesData<NotificationsResponseData>(
+          { queryKey: ["notifications"] },
+          (current) =>
+            updateNotificationCache(current, (state) => {
+              const notifications = state.notifications.map((notification) =>
+                notification.id === notificationId
+                  ? {
+                      ...notification,
+                      isRead: true,
+                      readAt: payload.data?.readAt ?? notification.readAt
+                    }
+                  : notification
+              );
 
-          const notifications = current.notifications.map((notification) =>
-            notification.id === notificationId
-              ? {
-                  ...notification,
-                  isRead: true,
-                  readAt: payload.data?.readAt ?? notification.readAt
-                }
-              : notification
-          );
-          const unreadCount = notifications.filter((notification) => !notification.isRead).length;
-
-          return {
-            ...current,
-            notifications,
-            unreadCount
-          };
-        });
+              return {
+                ...state,
+                notifications,
+                unreadCount: notifications.filter((notification) => !notification.isRead).length
+              };
+            })
+        );
 
         return true;
       } catch {
         return false;
       }
     },
-    []
+    [queryClient]
   );
 
   const markAllRead = useCallback(async () => {
@@ -154,27 +149,25 @@ export function useNotifications(query: NotificationsQuery = {}): UseNotificatio
 
       const readAt = payload.data.readAt;
 
-      setData((current) => {
-        if (!current) {
-          return current;
-        }
-
-        return {
-          ...current,
-          unreadCount: 0,
-          notifications: current.notifications.map((notification) => ({
-            ...notification,
-            isRead: true,
-            readAt: notification.readAt ?? readAt
+      queryClient.setQueriesData<NotificationsResponseData>(
+        { queryKey: ["notifications"] },
+        (current) =>
+          updateNotificationCache(current, (state) => ({
+            ...state,
+            unreadCount: 0,
+            notifications: state.notifications.map((notification) => ({
+              ...notification,
+              isRead: true,
+              readAt: notification.readAt ?? readAt
+            }))
           }))
-        };
-      });
+      );
 
       return true;
     } catch {
       return false;
     }
-  }, []);
+  }, [queryClient]);
 
   const deleteAll = useCallback(async () => {
     try {
@@ -186,20 +179,21 @@ export function useNotifications(query: NotificationsQuery = {}): UseNotificatio
         return false;
       }
 
-      setData((current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          notifications: [],
-          unreadCount: 0
-        };
-      });
+      queryClient.setQueriesData<NotificationsResponseData>(
+        { queryKey: ["notifications"] },
+        (current) =>
+          updateNotificationCache(current, (state) => ({
+            ...state,
+            notifications: [],
+            unreadCount: 0
+          }))
+      );
 
       return true;
     } catch {
       return false;
     }
-  }, []);
+  }, [queryClient]);
 
   const deleteNotification = useCallback(
     async (notificationId: string) => {
@@ -212,30 +206,34 @@ export function useNotifications(query: NotificationsQuery = {}): UseNotificatio
           return false;
         }
 
-        setData((current) => {
-          if (!current) return current;
-          const notifications = current.notifications.filter(
-            (n) => n.id !== notificationId
-          );
-          return {
-            ...current,
-            notifications,
-            unreadCount: notifications.filter((n) => !n.isRead).length
-          };
-        });
+        queryClient.setQueriesData<NotificationsResponseData>(
+          { queryKey: ["notifications"] },
+          (current) =>
+            updateNotificationCache(current, (state) => {
+              const notifications = state.notifications.filter(
+                (notification) => notification.id !== notificationId
+              );
+
+              return {
+                ...state,
+                notifications,
+                unreadCount: notifications.filter((notification) => !notification.isRead).length
+              };
+            })
+        );
 
         return true;
       } catch {
         return false;
       }
     },
-    []
+    [queryClient]
   );
 
   return {
-    data,
-    isLoading,
-    errorMessage,
+    data: queryResult.data ?? null,
+    isLoading: queryResult.isPending && !queryResult.data,
+    errorMessage: queryResult.error instanceof Error ? queryResult.error.message : null,
     refresh,
     markRead,
     markAllRead,

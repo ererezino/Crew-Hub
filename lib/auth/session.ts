@@ -24,6 +24,8 @@ export type SessionProfile = {
   roles: UserRole[];
   manager_id: string | null;
   country_code: string | null;
+  start_date: string | null;
+  employment_type: string | null;
   status: "active" | "inactive" | "onboarding" | "offboarding";
 };
 
@@ -225,7 +227,7 @@ const getAuthenticatedSessionInternal = cache(
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select(
-        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, status"
+        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, start_date, employment_type, status"
       )
       .eq("id", user.id)
       .is("deleted_at", null)
@@ -260,6 +262,8 @@ const getAuthenticatedSessionInternal = cache(
       roles,
       manager_id: profileData.manager_id,
       country_code: profileData.country_code,
+      start_date: profileData.start_date,
+      employment_type: profileData.employment_type,
       status: profileData.status
     };
 
