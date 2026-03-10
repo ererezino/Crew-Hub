@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { getAuthMutationBlockReason } from "../../../../../../lib/auth/auth-mutation-guard";
 import { logAudit } from "../../../../../../lib/audit";
 import { logger } from "../../../../../../lib/logger";
 import { sendWelcomeEmail } from "../../../../../../lib/notifications/email";
@@ -114,6 +115,18 @@ export async function POST(
         error: {
           code: "FORBIDDEN",
           message: "Only Super Admin and HR Admin can send invites."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const authMutationBlockReason = getAuthMutationBlockReason();
+    if (authMutationBlockReason) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "AUTH_MUTATION_BLOCKED",
+          message: authMutationBlockReason
         },
         meta: buildMeta()
       });

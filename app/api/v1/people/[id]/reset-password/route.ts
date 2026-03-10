@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { getAuthMutationBlockReason } from "../../../../../../lib/auth/auth-mutation-guard";
 import { deriveSystemPassword } from "../../../../../../lib/auth/system-password";
 import { logAudit } from "../../../../../../lib/audit";
 import { hasRole } from "../../../../../../lib/roles";
@@ -71,6 +72,18 @@ export async function POST(
       error: {
         code: "FORBIDDEN",
         message: "Only Super Admin can reset authenticator access."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const authMutationBlockReason = getAuthMutationBlockReason();
+  if (authMutationBlockReason) {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "AUTH_MUTATION_BLOCKED",
+        message: authMutationBlockReason
       },
       meta: buildMeta()
     });
