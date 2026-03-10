@@ -308,31 +308,19 @@ async function fetchSidebarApprovalCounts(
 
 async function fetchActiveAnnouncementCount(): Promise<number> {
   try {
-    const [announcementsRes, notificationsRes] = await Promise.all([
-      fetch("/api/v1/announcements"),
-      fetch("/api/v1/notifications?unreadOnly=true&limit=1")
-    ]);
+    const response = await fetch("/api/v1/navigation/badge-count", {
+      method: "GET"
+    });
 
-    let count = 0;
-
-    if (announcementsRes.ok) {
-      const json = (await announcementsRes.json()) as {
-        data?: { announcements?: { isRead?: boolean }[] } | null;
-      };
-      const announcements = json?.data?.announcements;
-      if (Array.isArray(announcements)) {
-        count += announcements.filter((a) => a.isRead !== true).length;
-      }
+    if (!response.ok) {
+      return 0;
     }
 
-    if (notificationsRes.ok) {
-      const json = (await notificationsRes.json()) as {
-        data?: { unreadCount?: number } | null;
-      };
-      count += json?.data?.unreadCount ?? 0;
-    }
+    const json = (await response.json()) as {
+      data?: { total?: number } | null;
+    };
 
-    return count;
+    return json?.data?.total ?? 0;
   } catch {
     return 0;
   }
