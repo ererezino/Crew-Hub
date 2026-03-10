@@ -7642,6 +7642,15 @@ html.dark .topbar {
 .auth-card .form-input {
   background: rgba(255, 255, 255, 0.6);
   border-color: rgba(0, 0, 0, 0.08);
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+}
+
+.auth-card .form-input::placeholder {
+  color: var(--text-muted);
+  -webkit-text-fill-color: var(--text-muted);
+  opacity: 1;
 }
 
 .auth-card .form-input:focus {
@@ -7652,7 +7661,7 @@ html.dark .topbar {
 .auth-card .form-input:-webkit-autofill:hover,
 .auth-card .form-input:-webkit-autofill:focus,
 .auth-card .form-input:-webkit-autofill:active {
-  -webkit-text-fill-color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary) !important;
   transition: background-color 9999s ease-in-out 0s;
   box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.75) inset;
 }
