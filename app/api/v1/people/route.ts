@@ -98,18 +98,7 @@ const profileRowSchema = z.object({
   payroll_mode: z.enum(PAYROLL_MODES),
   primary_currency: z.string(),
   status: z.enum(PROFILE_STATUSES),
-  notice_period_end_date: z.string().nullable().default(null),
-  bio: z.string().nullable().default(null),
-  favorite_music: z.string().nullable().default(null),
-  favorite_books: z.string().nullable().default(null),
-  favorite_sports: z.string().nullable().default(null),
-  date_of_birth: z.string().nullable().default(null),
   avatar_url: z.string().nullable().default(null),
-  emergency_contact_name: z.string().nullable().default(null),
-  emergency_contact_phone: z.string().nullable().default(null),
-  emergency_contact_relationship: z.string().nullable().default(null),
-  pronouns: z.string().nullable().default(null),
-  privacy_settings: z.unknown().default({}),
   account_setup_at: z.string().nullable().default(null),
   last_seen_at: z.string().nullable().default(null),
   created_at: z.string(),
@@ -204,24 +193,24 @@ function mapPersonRow(
     timezone: row.timezone,
     phone: row.phone,
     startDate: row.start_date,
-    dateOfBirth: row.date_of_birth,
+    dateOfBirth: null,
     managerId: row.manager_id,
     managerName: row.manager_id ? managerNameById.get(row.manager_id) ?? null : null,
     employmentType: row.employment_type,
     payrollMode: row.payroll_mode,
     primaryCurrency: row.primary_currency,
     status: row.status,
-    noticePeriodEndDate: row.notice_period_end_date ?? null,
+    noticePeriodEndDate: null,
     avatarUrl: row.avatar_url ?? null,
-    bio: row.bio ?? null,
-    favoriteMusic: row.favorite_music ?? null,
-    favoriteBooks: row.favorite_books ?? null,
-    favoriteSports: row.favorite_sports ?? null,
-    emergencyContactName: row.emergency_contact_name ?? null,
-    emergencyContactPhone: row.emergency_contact_phone ?? null,
-    emergencyContactRelationship: row.emergency_contact_relationship ?? null,
-    pronouns: row.pronouns ?? null,
-    privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../types/people").PrivacySettings,
+    bio: null,
+    favoriteMusic: null,
+    favoriteBooks: null,
+    favoriteSports: null,
+    emergencyContactName: null,
+    emergencyContactPhone: null,
+    emergencyContactRelationship: null,
+    pronouns: null,
+    privacySettings: {},
     crewTag: crewTagById?.get(row.id) ?? null,
     inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at),
     createdAt: row.created_at,
@@ -332,7 +321,7 @@ export async function GET(request: Request) {
   let peopleQuery = supabase
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
@@ -797,7 +786,7 @@ export async function POST(request: Request) {
       status: profileStatus
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 
