@@ -249,8 +249,35 @@ export async function POST(request: Request) {
     const userId = profileRow.id as string;
     const systemPassword = deriveSystemPassword(userId);
 
-    const { data: signInData, error: signInError } =
+    let { data: signInData, error: signInError } =
       await supabase.auth.signInWithPassword({ email, password: systemPassword });
+
+    /* Self-heal password drift (for legacy users / secret rotations):
+       re-apply deterministic system password and retry once. */
+    if (signInError || !signInData?.user) {
+      const { error: passwordSyncError } = await serviceClient.auth.admin.updateUserById(
+        userId,
+        { password: systemPassword }
+      );
+
+      if (!passwordSyncError) {
+        const retry = await supabase.auth.signInWithPassword({
+          email,
+          password: systemPassword
+        });
+
+        signInData = retry.data;
+        signInError = retry.error;
+
+        if (!signInError && signInData?.user) {
+          logger.warn("Recovered sign-in after syncing system password.", {
+            email,
+            ipAddress,
+            userId
+          });
+        }
+      }
+    }
 
     if (signInError || !signInData?.user) {
       recordFailedLogin(email, ipAddress).catch(() => undefined);
@@ -258,6 +285,7 @@ export async function POST(request: Request) {
       logger.error("System password sign-in failed.", {
         email,
         ipAddress,
+        userId,
         message: signInError?.message ?? "No user data returned."
       });
 

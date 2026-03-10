@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const recordFailedLoginMock = vi.fn();
 const clearFailedLoginsMock = vi.fn();
 const deriveSystemPasswordMock = vi.fn();
+const updateUserByIdMock = vi.fn();
 
 const signInWithPasswordMock = vi.fn();
 const signOutMock = vi.fn();
@@ -106,7 +107,12 @@ vi.mock("../lib/supabase/server", () => ({
 
 vi.mock("../lib/supabase/service-role", () => ({
   createSupabaseServiceRoleClient: vi.fn(() => ({
-    from: vi.fn((table: string) => createFromQuery(table))
+    from: vi.fn((table: string) => createFromQuery(table)),
+    auth: {
+      admin: {
+        updateUserById: updateUserByIdMock
+      }
+    }
   }))
 }));
 
@@ -144,6 +150,7 @@ describe("Auth sign-in route behavior", () => {
     recordFailedLoginMock.mockReset();
     clearFailedLoginsMock.mockReset();
     deriveSystemPasswordMock.mockReset();
+    updateUserByIdMock.mockReset();
     signInWithPasswordMock.mockReset();
     signOutMock.mockReset();
     listFactorsMock.mockReset();
@@ -157,6 +164,7 @@ describe("Auth sign-in route behavior", () => {
     dbState.profile = { id: "user-1", status: "active" };
 
     deriveSystemPasswordMock.mockReturnValue("system-password");
+    updateUserByIdMock.mockResolvedValue({ error: null });
 
     signInWithPasswordMock.mockResolvedValue({
       data: {
@@ -253,6 +261,35 @@ describe("Auth sign-in route behavior", () => {
       "coo@accrue.test",
       "203.0.113.10"
     );
+  });
+
+  it("retries after syncing deterministic password when first sign-in fails", async () => {
+    signInWithPasswordMock
+      .mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: "Invalid login credentials." }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          user: {
+            id: "user-1",
+            factors: [{ id: "factor-1", factor_type: "totp", status: "verified" }]
+          }
+        },
+        error: null
+      });
+
+    const result = await callSignIn({
+      email: "coo@accrue.test",
+      totpCode: "123456"
+    });
+
+    expect(result.status).toBe(200);
+    expect(signInWithPasswordMock).toHaveBeenCalledTimes(2);
+    expect(updateUserByIdMock).toHaveBeenCalledWith("user-1", {
+      password: "system-password"
+    });
+    expect(clearFailedLoginsMock).toHaveBeenCalledWith("coo@accrue.test");
   });
 
   it("clears failed logins and returns 200 on successful sign-in", async () => {
