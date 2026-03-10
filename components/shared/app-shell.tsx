@@ -41,6 +41,7 @@ const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "crew-hub-sidebar-collapsed";
 const SIDEBAR_GROUP_STORAGE_KEY = "crew-hub-sidebar-groups";
 const RECENT_ROUTE_LIMIT = 6;
+const ROUTE_PREFETCH_LIMIT = 10;
 const APPROVAL_GROUP_ROLES: readonly UserRole[] = [
   "MANAGER",
   "TEAM_LEAD",
@@ -903,6 +904,54 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
       window.removeEventListener("keydown", handleCommandShortcut);
     };
   }, []);
+
+  useEffect(() => {
+    const prefetchTargets = commandRoutes
+      .map((route) => route.href)
+      .filter((href, index, allHrefs) => href !== activePathname && allHrefs.indexOf(href) === index)
+      .slice(0, ROUTE_PREFETCH_LIMIT);
+
+    if (prefetchTargets.length === 0) {
+      return;
+    }
+
+    let canceled = false;
+    let prefetchTimerId: number | null = null;
+
+    const prefetchNext = (index: number) => {
+      if (canceled || index >= prefetchTargets.length) {
+        return;
+      }
+
+      router.prefetch(prefetchTargets[index]);
+      prefetchTimerId = window.setTimeout(() => {
+        prefetchNext(index + 1);
+      }, 50);
+    };
+
+    const schedulePrefetch = () => {
+      prefetchNext(0);
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleHandle = window.requestIdleCallback(schedulePrefetch, { timeout: 600 });
+      return () => {
+        canceled = true;
+        if (prefetchTimerId !== null) {
+          window.clearTimeout(prefetchTimerId);
+        }
+        window.cancelIdleCallback(idleHandle);
+      };
+    }
+
+    prefetchTimerId = window.setTimeout(schedulePrefetch, 250);
+    return () => {
+      canceled = true;
+      if (prefetchTimerId !== null) {
+        window.clearTimeout(prefetchTimerId);
+      }
+    };
+  }, [activePathname, commandRoutes, router]);
 
   const registerRouteVisit = (href: string) => {
     setRecentRouteHrefs((previousRoutes) => {
