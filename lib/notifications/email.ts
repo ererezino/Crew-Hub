@@ -5,7 +5,15 @@ import { formatDateRangeHuman } from "../datetime";
 import { formatLeaveTypeLabel } from "../time-off";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
-const RESEND_FROM = "Crew Hub <no-reply@crew-hub.local>";
+
+function resolveResendFrom(): string {
+  const configuredFrom = process.env.RESEND_FROM?.trim();
+  if (configuredFrom && configuredFrom.length > 0) {
+    return configuredFrom;
+  }
+
+  return "Crew Hub <onboarding@resend.dev>";
+}
 
 type ResendPayload = {
   to: string[];
@@ -67,7 +75,7 @@ async function sendResendEmail(payload: ResendPayload): Promise<void> {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      from: RESEND_FROM,
+      from: resolveResendFrom(),
       to: [...new Set(payload.to)],
       subject: payload.subject,
       text: payload.text

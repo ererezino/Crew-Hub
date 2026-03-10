@@ -6,6 +6,15 @@ import type { PaymentMethod } from "../../types/payment-details";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
+function resolveResendFrom(): string {
+  const configuredFrom = process.env.RESEND_FROM?.trim();
+  if (configuredFrom && configuredFrom.length > 0) {
+    return configuredFrom;
+  }
+
+  return "Crew Hub <onboarding@resend.dev>";
+}
+
 function shouldNotifyRole(roles: readonly string[]): boolean {
   return roles.includes("HR_ADMIN") || roles.includes("SUPER_ADMIN");
 }
@@ -69,7 +78,7 @@ export async function notifyHrPaymentDetailsChanged({
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        from: "Crew Hub <no-reply@crew-hub.local>",
+        from: resolveResendFrom(),
         to: uniqueRecipients,
         subject: `Crew Hub payment details updated for ${employeeName}`,
         text: [
