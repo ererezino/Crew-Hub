@@ -97,6 +97,17 @@ export async function GET() {
 
   const profile: MeProfile = parsedProfile.data;
 
+  if (profile.status === "inactive") {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "ACCOUNT_DISABLED",
+        message: "Your account has been disabled. Contact your admin."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const { data: orgData, error: orgError } = await supabase
     .from("orgs")
     .select("id, name, logo_url")

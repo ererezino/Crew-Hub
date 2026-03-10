@@ -31,21 +31,6 @@ function resolveInitialTab(requestedTab: string, visibleTabs: PageTab[]): string
   return "all";
 }
 
-async function fetchCountFromList(url: string, key: string): Promise<number> {
-  const response = await fetch(url, { method: "GET" });
-
-  if (!response.ok) {
-    return 0;
-  }
-
-  const payload = (await response.json()) as {
-    data: Record<string, unknown> | null;
-  };
-  const rows = payload.data?.[key];
-
-  return Array.isArray(rows) ? rows.length : 0;
-}
-
 export function ApprovalsClient({
   requestedTab,
   userRoles,
@@ -71,29 +56,31 @@ export function ApprovalsClient({
       canReviewTimesheets
     ],
     queryFn: async () => {
-      const [timeOffCount, managerExpenseCount, financeExpenseCount, timesheetsCount] =
-        await Promise.all([
-          canReviewTimeOff
-            ? fetchCountFromList("/api/v1/time-off/approvals?status=pending", "requests")
-            : Promise.resolve(0),
-          canManagerApproveExpenses
-            ? fetchCountFromList("/api/v1/expenses/approvals?stage=manager", "expenses")
-            : Promise.resolve(0),
-          canFinanceApproveExpenses
-            ? fetchCountFromList("/api/v1/expenses/approvals?stage=finance", "expenses")
-            : Promise.resolve(0),
-          canReviewTimesheets
-            ? fetchCountFromList("/api/v1/time-attendance/approvals?status=submitted", "timesheets")
-            : Promise.resolve(0)
-        ]);
+      const response = await fetch("/api/v1/approvals/counts", { method: "GET" });
+
+      if (!response.ok) {
+        return {
+          timeOff: 0,
+          expenses: 0,
+          timesheets: 0
+        };
+      }
+
+      const payload = (await response.json()) as {
+        data?: {
+          timeOff?: number;
+          expenses?: number;
+          timesheets?: number;
+        } | null;
+      };
 
       return {
-        timeOff: timeOffCount,
-        expenses: managerExpenseCount + financeExpenseCount,
-        timesheets: timesheetsCount
+        timeOff: payload.data?.timeOff ?? 0,
+        expenses: payload.data?.expenses ?? 0,
+        timesheets: payload.data?.timesheets ?? 0
       };
     },
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
     gcTime: 2 * 60 * 1000
   });
 

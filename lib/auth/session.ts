@@ -69,6 +69,10 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
 
   const roles = normalizeUserRoles(profileData.roles);
 
+  if (profileData.status === "inactive") {
+    return null;
+  }
+
   const profile: SessionProfile = {
     id: profileData.id,
     org_id: profileData.org_id,

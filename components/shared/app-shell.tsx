@@ -263,67 +263,40 @@ async function fetchMyAccessConfig() {
   return payload.data;
 }
 
-async function fetchJsonSafely<T>(url: string): Promise<T | null> {
-  try {
-    const response = await fetch(url, { method: "GET" });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = (await response.json()) as { data?: T | null };
-    return payload.data ?? null;
-  } catch {
-    return null;
-  }
-}
-
 async function fetchSidebarApprovalCounts(
   currentUserRoles: readonly UserRole[]
 ): Promise<SidebarApprovalCounts> {
-  const canViewTimeOff =
-    hasRole(currentUserRoles, "MANAGER") ||
-    hasRole(currentUserRoles, "HR_ADMIN") ||
-    hasRole(currentUserRoles, "SUPER_ADMIN");
-  const canViewManagerExpenses =
-    hasRole(currentUserRoles, "MANAGER") || hasRole(currentUserRoles, "SUPER_ADMIN");
-  const canViewFinanceExpenses =
-    hasRole(currentUserRoles, "FINANCE_ADMIN") || hasRole(currentUserRoles, "SUPER_ADMIN");
-  const canViewTimesheets = hasAnyRole(currentUserRoles, APPROVAL_GROUP_ROLES);
+  if (!hasAnyRole(currentUserRoles, APPROVAL_GROUP_ROLES)) {
+    return {
+      timeOff: 0,
+      expenses: 0,
+      timesheets: 0,
+      total: 0
+    };
+  }
 
-  const [timeOffData, managerExpensesData, financeExpensesData, timesheetsData] =
-    await Promise.all([
-      canViewTimeOff
-        ? fetchJsonSafely<{ requests: unknown[] }>("/api/v1/time-off/approvals?status=pending")
-        : Promise.resolve(null),
-      canViewManagerExpenses
-        ? fetchJsonSafely<{ expenses: unknown[] }>(
-            "/api/v1/expenses/approvals?stage=manager"
-          )
-        : Promise.resolve(null),
-      canViewFinanceExpenses
-        ? fetchJsonSafely<{ expenses: unknown[] }>(
-            "/api/v1/expenses/approvals?stage=finance"
-          )
-        : Promise.resolve(null),
-      canViewTimesheets
-        ? fetchJsonSafely<{ timesheets: unknown[] }>(
-            "/api/v1/time-attendance/approvals?status=submitted"
-          )
-        : Promise.resolve(null)
-    ]);
+  const response = await fetch("/api/v1/approvals/counts", { method: "GET" });
+  if (!response.ok) {
+    return {
+      timeOff: 0,
+      expenses: 0,
+      timesheets: 0,
+      total: 0
+    };
+  }
 
-  const timeOff = Array.isArray(timeOffData?.requests) ? timeOffData.requests.length : 0;
-  const managerExpenses = Array.isArray(managerExpensesData?.expenses)
-    ? managerExpensesData.expenses.length
-    : 0;
-  const financeExpenses = Array.isArray(financeExpensesData?.expenses)
-    ? financeExpensesData.expenses.length
-    : 0;
-  const expenses = managerExpenses + financeExpenses;
-  const timesheets = Array.isArray(timesheetsData?.timesheets)
-    ? timesheetsData.timesheets.length
-    : 0;
+  const payload = (await response.json()) as {
+    data?: {
+      timeOff?: number;
+      expenses?: number;
+      timesheets?: number;
+      total?: number;
+    } | null;
+  };
+
+  const timeOff = payload.data?.timeOff ?? 0;
+  const expenses = payload.data?.expenses ?? 0;
+  const timesheets = payload.data?.timesheets ?? 0;
 
   return {
     timeOff,
@@ -791,7 +764,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
   const approvalsCountQuery = useQuery({
     queryKey: ["sidebar-approvals-count", currentUserRoles.join("|")],
     queryFn: () => fetchSidebarApprovalCounts(currentUserRoles),
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
     gcTime: 2 * 60 * 1000,
     retry: 1,
     enabled: hasAnyRole(currentUserRoles, APPROVAL_GROUP_ROLES)
@@ -800,7 +773,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
   const announcementCountQuery = useQuery({
     queryKey: ["sidebar-announcement-count"],
     queryFn: fetchActiveAnnouncementCount,
-    staleTime: 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     retry: 1
   });
@@ -1295,7 +1268,8 @@ export function AppShell({ currentUserRoles, currentUserProfile, children }: App
         defaultOptions: {
           queries: {
             staleTime: 5 * 60 * 1000,
-            gcTime: 15 * 60 * 1000
+            gcTime: 15 * 60 * 1000,
+            refetchOnWindowFocus: false
           }
         }
       })

@@ -155,36 +155,24 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
 
   // MFA enforcement and account status checks for authenticated users.
   if (user && !isLoginRoute) {
-    const { data: profileRow } = await supabase
-      .from("profiles")
-      .select("roles, status")
-      .eq("id", user.id)
-      .is("deleted_at", null)
-      .maybeSingle();
+    /* For API routes, skip profile-table lookups here.
+       Route handlers already load profile via getAuthenticatedSession(). */
+    if (!isApiRoute) {
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("status")
+        .eq("id", user.id)
+        .is("deleted_at", null)
+        .maybeSingle();
 
-    /* ── Inactive account check ── */
-    if (profileRow?.status === "inactive") {
-      await supabase.auth.signOut();
+      /* ── Inactive account check ── */
+      if (profileRow?.status === "inactive") {
+        await supabase.auth.signOut();
 
-      if (isApiRoute) {
-        return secure(
-          NextResponse.json(
-            {
-              data: null,
-              error: {
-                code: "ACCOUNT_DISABLED",
-                message: "Your account has been disabled. Contact your admin."
-              },
-              meta: { timestamp: new Date().toISOString() }
-            },
-            { status: 403 }
-          )
-        );
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("error", "account_disabled");
+        return secure(NextResponse.redirect(loginUrl));
       }
-
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("error", "account_disabled");
-      return secure(NextResponse.redirect(loginUrl));
     }
 
     /* ── MFA enforcement for ALL users ── */
