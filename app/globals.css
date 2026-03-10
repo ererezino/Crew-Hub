@@ -7509,6 +7509,17 @@ html.dark .topbar {
 }
 
 .auth-page {
+  color-scheme: light;
+  --bg-canvas: #FFFAF3;
+  --bg-surface: #FFFFFF;
+  --text-primary: #1A2B3C;
+  --text-secondary: #495057;
+  --text-muted: #727272;
+  --border-default: #E8DFD0;
+  --border-subtle: #F0EBE1;
+  --status-error-bg: #FDECEA;
+  --status-error-text: #C0392B;
+  --status-error-border: #F5B7B1;
   background:
     radial-gradient(ellipse at 20% 80%, rgba(45, 106, 79, 0.08) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 20%, rgba(253, 139, 5, 0.10) 0%, transparent 50%),
@@ -7635,6 +7646,15 @@ html.dark .topbar {
 
 .auth-card .form-input:focus {
   background: rgba(255, 255, 255, 0.85);
+}
+
+.auth-card .form-input:-webkit-autofill,
+.auth-card .form-input:-webkit-autofill:hover,
+.auth-card .form-input:-webkit-autofill:focus,
+.auth-card .form-input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--text-primary);
+  transition: background-color 9999s ease-in-out 0s;
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.75) inset;
 }
 
 .auth-card .auth-footer-hint {
