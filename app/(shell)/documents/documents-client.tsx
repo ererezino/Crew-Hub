@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState, useEffect } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 
 import { DocumentUploadPanel } from "../../../components/shared/document-upload-panel";
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -8,6 +8,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDocuments } from "../../../hooks/use-documents";
+import { usePeople } from "../../../hooks/use-people";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import {
@@ -22,7 +23,6 @@ import {
   type DocumentSignedUrlResponse
 } from "../../../types/documents";
 import type { CreateSignatureRequestResponse } from "../../../types/esignatures";
-import type { PeopleListResponse } from "../../../types/people";
 import { FileText } from "lucide-react";
 import { humanizeError } from "@/lib/errors";
 
@@ -181,33 +181,26 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   const [sigReqError, setSigReqError] = useState<string | null>(null);
 
   type SignerOption = { id: string; fullName: string; department: string | null; title: string | null };
-  const [signerOptions, setSignerOptions] = useState<SignerOption[]>([]);
-  const [isSignerOptionsLoading, setIsSignerOptionsLoading] = useState(false);
-
-  // Load signer options when request panel opens
-  useEffect(() => {
-    if (!sigReqTarget || !canManageDocuments) return;
-    const ac = new AbortController();
-    setIsSignerOptionsLoading(true);
-
-    void (async () => {
-      try {
-        const res = await fetch("/api/v1/people?scope=all&limit=250", { signal: ac.signal });
-        const payload = (await res.json()) as PeopleListResponse;
-        if (res.ok && payload.data) {
-          setSignerOptions(
-            payload.data.people
-              .filter((p) => p.id !== currentUserId && p.status === "active")
-              .sort((a, b) => a.fullName.localeCompare(b.fullName))
-              .map((p) => ({ id: p.id, fullName: p.fullName, department: p.department, title: p.title }))
-          );
-        }
-      } catch { /* ignore abort */ }
-      finally { if (!ac.signal.aborted) setIsSignerOptionsLoading(false); }
-    })();
-
-    return () => { ac.abort(); };
-  }, [sigReqTarget, canManageDocuments, currentUserId]);
+  const signerPeople = usePeople({
+    scope: "all",
+    enabled: Boolean(sigReqTarget && canManageDocuments)
+  });
+  const signerOptions = useMemo(
+    () =>
+      signerPeople.people
+        .filter((person) => person.id !== currentUserId && person.status === "active")
+        .sort((leftPerson, rightPerson) => leftPerson.fullName.localeCompare(rightPerson.fullName))
+        .map(
+          (person): SignerOption => ({
+            id: person.id,
+            fullName: person.fullName,
+            department: person.department,
+            title: person.title
+          })
+        ),
+    [currentUserId, signerPeople.people]
+  );
+  const isSignerOptionsLoading = signerPeople.isLoading;
 
   const filteredDocuments = useMemo(() => {
     const nextDocuments = documents.filter((document) => {

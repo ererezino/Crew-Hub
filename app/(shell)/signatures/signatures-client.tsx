@@ -17,6 +17,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDocuments } from "../../../hooks/use-documents";
+import { usePeople } from "../../../hooks/use-people";
 import { useSignatures } from "../../../hooks/use-signatures";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
@@ -26,7 +27,6 @@ import type {
   SignatureRequestRecord
 } from "../../../types/esignatures";
 import type { DocumentSignedUrlResponse } from "../../../types/documents";
-import type { PeopleListResponse } from "../../../types/people";
 import { PenSquare } from "lucide-react";
 import { humanizeError } from "@/lib/errors";
 
@@ -181,9 +181,6 @@ export function SignaturesClient({
   const [createValues, setCreateValues] = useState<CreateFormValues>(INITIAL_FORM_VALUES);
   const [createErrors, setCreateErrors] = useState<CreateFormErrors>({});
   const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
-  const [signerOptions, setSignerOptions] = useState<SignerOption[]>([]);
-  const [isSignerOptionsLoading, setIsSignerOptionsLoading] = useState(false);
-  const [signerOptionsError, setSignerOptionsError] = useState<string | null>(null);
   const [isOpeningByRequestId, setIsOpeningByRequestId] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -196,65 +193,27 @@ export function SignaturesClient({
   const [isSubmittingSignature, setIsSubmittingSignature] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
-
-  useEffect(() => {
-    if (!canManageSignatures) {
-      return;
-    }
-
-    const abortController = new AbortController();
-
-    const fetchSignerOptions = async () => {
-      setIsSignerOptionsLoading(true);
-      setSignerOptionsError(null);
-
-      try {
-        const response = await fetch("/api/v1/people?scope=all&limit=250", {
-          method: "GET",
-          signal: abortController.signal
-        });
-
-        const payload = (await response.json()) as PeopleListResponse;
-
-        if (!response.ok || !payload.data) {
-          setSignerOptions([]);
-          setSignerOptionsError(payload.error?.message ?? "Unable to load signer options.");
-          return;
-        }
-
-        const options = payload.data.people
-          .filter((person) => person.id !== currentUserId && person.status === "active")
-          .sort((leftPerson, rightPerson) => leftPerson.fullName.localeCompare(rightPerson.fullName))
-          .map((person) => ({
+  const signerPeople = usePeople({
+    scope: "all",
+    enabled: canManageSignatures
+  });
+  const signerOptions = useMemo(
+    () =>
+      signerPeople.people
+        .filter((person) => person.id !== currentUserId && person.status === "active")
+        .sort((leftPerson, rightPerson) => leftPerson.fullName.localeCompare(rightPerson.fullName))
+        .map(
+          (person): SignerOption => ({
             id: person.id,
             fullName: person.fullName,
             department: person.department,
             title: person.title
-          }));
-
-        setSignerOptions(options);
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setSignerOptions([]);
-        setSignerOptionsError(
-          error instanceof Error ? error.message : "Unable to load signer options."
-        );
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsSignerOptionsLoading(false);
-        }
-      }
-    };
-
-    void fetchSignerOptions();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [canManageSignatures, currentUserId]);
+          })
+        ),
+    [currentUserId, signerPeople.people]
+  );
+  const isSignerOptionsLoading = signerPeople.isLoading;
+  const signerOptionsError = signerPeople.errorMessage;
 
   const dismissToast = (toastId: string) => {
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));

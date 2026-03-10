@@ -15,6 +15,7 @@ type PeopleScope = "all" | "reports" | "me";
 
 type UsePeopleOptions = {
   scope?: PeopleScope;
+  enabled?: boolean;
 };
 
 type UsePeopleResult = {
@@ -50,6 +51,7 @@ async function fetchPeople(endpoint: string, signal: AbortSignal): Promise<Peopl
 
 export function usePeople(options: UsePeopleOptions = {}): UsePeopleResult {
   const scope = options.scope ?? "all";
+  const enabled = options.enabled ?? true;
   const endpoint = useMemo(() => buildPeopleUrl({ scope }), [scope]);
   const queryKey = useMemo(() => ["people", scope] as const, [scope]);
   const queryClient = useQueryClient();
@@ -57,8 +59,9 @@ export function usePeople(options: UsePeopleOptions = {}): UsePeopleResult {
   const query = useQuery({
     queryKey,
     queryFn: ({ signal }) => fetchPeople(endpoint, signal),
-    staleTime: 2 * 60 * 1000,
-    gcTime: 15 * 60 * 1000,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false
   });
@@ -86,7 +89,7 @@ export function usePeople(options: UsePeopleOptions = {}): UsePeopleResult {
 
   return {
     people: query.data?.people ?? [],
-    isLoading: query.isPending && !query.data,
+    isLoading: enabled && query.isPending && !query.data,
     errorMessage: query.error instanceof Error ? query.error.message : null,
     refresh,
     setPeople

@@ -41,7 +41,7 @@ const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "crew-hub-sidebar-collapsed";
 const SIDEBAR_GROUP_STORAGE_KEY = "crew-hub-sidebar-groups";
 const RECENT_ROUTE_LIMIT = 6;
-const ROUTE_PREFETCH_LIMIT = 10;
+const ROUTE_PREFETCH_LIMIT = 14;
 const APPROVAL_GROUP_ROLES: readonly UserRole[] = [
   "MANAGER",
   "TEAM_LEAD",

@@ -11,12 +11,12 @@ import {
   useSchedulingShifts,
   useSchedulingTemplates
 } from "../../../../hooks/use-scheduling";
+import { usePeople } from "../../../../hooks/use-people";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { DEPARTMENTS } from "../../../../lib/departments";
 import { formatScheduleStatus, formatShiftStatus } from "../../../../lib/format-labels";
 import { formatTimeRangeLabel } from "../../../../lib/scheduling";
-import type { PeopleListResponse } from "../../../../types/people";
 import type { ShiftStatus } from "../../../../types/scheduling";
 
 type SortDirection = "asc" | "desc";
@@ -149,10 +149,21 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
     scope: "team"
   });
   const templatesQuery = useSchedulingTemplates();
-
-  const [people, setPeople] = useState<PersonOption[]>([]);
-  const [isLoadingPeople, setIsLoadingPeople] = useState(true);
-  const [peopleError, setPeopleError] = useState<string | null>(null);
+  const peopleQuery = usePeople({
+    scope: "all"
+  });
+  const people = useMemo<PersonOption[]>(
+    () =>
+      peopleQuery.people.map((person) => ({
+        id: person.id,
+        fullName: person.fullName,
+        department: person.department,
+        countryCode: person.countryCode
+      })),
+    [peopleQuery.people]
+  );
+  const isLoadingPeople = peopleQuery.isLoading;
+  const peopleError = peopleQuery.errorMessage;
 
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(defaultScheduleForm);
   const [shiftForm, setShiftForm] = useState<ShiftFormState>(defaultShiftForm);
@@ -193,55 +204,6 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
   const [dayNotes, setDayNotes] = useState<Record<string, DayNote[]>>({});
   const [dayNotesLoading, setDayNotesLoading] = useState<Record<string, boolean>>({});
   const [savingNoteKey, setSavingNoteKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    const abortController = new AbortController();
-
-    const run = async () => {
-      setIsLoadingPeople(true);
-      setPeopleError(null);
-
-      try {
-        const response = await fetch("/api/v1/people?scope=all&limit=250", {
-          method: "GET",
-          signal: abortController.signal
-        });
-        const payload = (await response.json()) as PeopleListResponse;
-
-        if (!response.ok || !payload.data) {
-          setPeople([]);
-          setPeopleError(payload.error?.message ?? "Unable to load crew members.");
-          return;
-        }
-
-        setPeople(
-          payload.data.people.map((person) => ({
-            id: person.id,
-            fullName: person.fullName,
-            department: person.department,
-            countryCode: person.countryCode
-          }))
-        );
-      } catch (error) {
-        if (abortController.signal.aborted) {
-          return;
-        }
-
-        setPeople([]);
-        setPeopleError(error instanceof Error ? error.message : "Unable to load crew members.");
-      } finally {
-        if (!abortController.signal.aborted) {
-          setIsLoadingPeople(false);
-        }
-      }
-    };
-
-    void run();
-
-    return () => {
-      abortController.abort();
-    };
-  }, []);
 
   const sortedSchedules = useMemo(() => {
     const rows = schedulesQuery.data?.schedules ?? [];
