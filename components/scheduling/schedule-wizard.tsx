@@ -111,6 +111,24 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     return { startDate, endDate };
   }, [month, months, isCustomPeriod, customStartDate, customEndDate]);
 
+  const selectedDepartment = useMemo(() => {
+    if (rosterSelected.size === 0) {
+      return undefined;
+    }
+
+    const employeeById = new Map(employees.map((employee) => [employee.id, employee] as const));
+    const departments = new Set<string>();
+
+    for (const selection of rosterSelected.values()) {
+      const department = employeeById.get(selection.employeeId)?.department?.trim();
+      if (department) {
+        departments.add(department);
+      }
+    }
+
+    return departments.size === 1 ? [...departments][0] : undefined;
+  }, [employees, rosterSelected]);
+
   const handleNext = useCallback(async () => {
     const nextIndex = currentStepIndex + 1;
     if (nextIndex >= STEPS.length) return;
@@ -139,6 +157,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
             startDate: isCustomPeriod ? startDate : undefined,
             endDate: isCustomPeriod ? endDate : undefined,
             name: `${track === "weekend" ? t("track.weekendSchedule") : t("track.weekdaySchedule")}`,
+            department: selectedDepartment,
             roster: rosterEntries.map((r) => ({
               employeeId: r.employeeId,
               weekendHours: track === "weekend" ? r.weekendHours : undefined
@@ -233,7 +252,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     }
 
     setStep(nextStep);
-  }, [currentStepIndex, track, rosterSelected, computedDateRange, month, months, isCustomPeriod, t]);
+  }, [currentStepIndex, track, rosterSelected, computedDateRange, month, months, isCustomPeriod, selectedDepartment, t]);
 
   const handleBack = useCallback(() => {
     const prevIndex = currentStepIndex - 1;

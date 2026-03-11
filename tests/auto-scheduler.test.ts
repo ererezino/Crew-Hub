@@ -141,4 +141,56 @@ describe("autoGenerateSchedule", () => {
       new Set(["solo"])
     );
   });
+
+  it("fills all weekday slots across a month range when enough roster members are selected", () => {
+    const employees: EmployeeScheduleInfo[] = Array.from({ length: 12 }, (_, index) => ({
+      id: `employee-${index + 1}`,
+      fullName: `Employee ${index + 1}`,
+      scheduleType: "weekday",
+      blockedDates: []
+    }));
+
+    const coverageSlots: ShiftSlot[] = [
+      {
+        name: "Morning Shift",
+        startTime: "08:00",
+        endTime: "16:00"
+      },
+      {
+        name: "Evening Shift",
+        startTime: "16:00",
+        endTime: "00:00"
+      }
+    ];
+
+    const assignments = autoGenerateSchedule({
+      employees,
+      slots: coverageSlots,
+      startDate: "2026-04-01",
+      endDate: "2026-05-31",
+      scheduleType: "weekday",
+      respectEmployeeScheduleType: false
+    });
+
+    const requiredDates: string[] = [];
+    const cursor = new Date("2026-04-01T00:00:00.000Z");
+    const last = new Date("2026-05-31T00:00:00.000Z");
+
+    while (cursor <= last) {
+      const day = cursor.getUTCDay();
+      if (day !== 0 && day !== 6) {
+        requiredDates.push(cursor.toISOString().slice(0, 10));
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    expect(assignments).toHaveLength(requiredDates.length * coverageSlots.length);
+
+    for (const date of requiredDates) {
+      const dateAssignments = assignments.filter((assignment) => assignment.shiftDate === date);
+      expect(new Set(dateAssignments.map((assignment) => assignment.slotName))).toEqual(
+        new Set(["Morning Shift", "Evening Shift"])
+      );
+    }
+  });
 });

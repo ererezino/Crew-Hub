@@ -45,7 +45,8 @@ const shiftRowSchema = z.object({
 
 const scheduleRowSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().nullable()
+  name: z.string().nullable(),
+  department: z.string().nullable()
 });
 
 const templateRowSchema = z.object({
@@ -151,7 +152,7 @@ export async function GET(request: Request) {
     scheduleIds.length > 0
       ? supabase
           .from("schedules")
-          .select("id, name")
+          .select("id, name, department")
           .eq("org_id", session.profile.org_id)
           .is("deleted_at", null)
           .in("id", scheduleIds)
@@ -191,31 +192,46 @@ export async function GET(request: Request) {
     });
   }
 
-  const scheduleNameById = new Map(parsedScheduleRows.data.map((row) => [row.id, row.name] as const));
+  const scheduleById = new Map(parsedScheduleRows.data.map((row) => [row.id, row] as const));
   const templateNameById = new Map(parsedTemplateRows.data.map((row) => [row.id, row.name] as const));
 
-  const shifts: ShiftRecord[] = parsedRows.data.map((row) => ({
-    id: row.id,
-    orgId: row.org_id,
-    scheduleId: row.schedule_id,
-    scheduleName: scheduleNameById.get(row.schedule_id) ?? null,
-    templateId: row.template_id,
-    templateName: row.template_id ? templateNameById.get(row.template_id) ?? null : null,
-    employeeId: null,
-    employeeName: null,
-    employeeDepartment: null,
-    employeeCountryCode: null,
-    shiftDate: row.shift_date,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    breakMinutes: parseInteger(row.break_minutes),
-    status: row.status,
-    notes: row.notes,
-    color: row.color,
-    isOpenShift: true,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  }));
+  const departmentFilter = session.profile.department?.trim() || null;
+
+  const shifts: ShiftRecord[] = parsedRows.data
+    .filter((row) => {
+      if (!departmentFilter) {
+        return true;
+      }
+
+      const schedule = scheduleById.get(row.schedule_id);
+      if (!schedule?.department || schedule.department.trim().length === 0) {
+        return true;
+      }
+
+      return schedule.department.toLowerCase() === departmentFilter.toLowerCase();
+    })
+    .map((row) => ({
+      id: row.id,
+      orgId: row.org_id,
+      scheduleId: row.schedule_id,
+      scheduleName: scheduleById.get(row.schedule_id)?.name ?? null,
+      templateId: row.template_id,
+      templateName: row.template_id ? templateNameById.get(row.template_id) ?? null : null,
+      employeeId: null,
+      employeeName: null,
+      employeeDepartment: null,
+      employeeCountryCode: null,
+      shiftDate: row.shift_date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      breakMinutes: parseInteger(row.break_minutes),
+      status: row.status,
+      notes: row.notes,
+      color: row.color,
+      isOpenShift: true,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
 
   return jsonResponse<SchedulingShiftsResponseData>(200, {
     data: {

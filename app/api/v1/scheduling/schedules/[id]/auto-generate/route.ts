@@ -136,6 +136,47 @@ function shouldRequireCoverageOnDate({
   return holidayDates.has(isoDate);
 }
 
+const hhmmPattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+const hhmmssPattern = /^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/;
+
+function normalizeSlotTime(rawValue: unknown, fallback: string): string {
+  if (typeof rawValue !== "string") {
+    return fallback;
+  }
+
+  const value = rawValue.trim();
+
+  if (hhmmPattern.test(value)) {
+    return value;
+  }
+
+  if (hhmmssPattern.test(value)) {
+    return value.slice(0, 5);
+  }
+
+  if (value.includes("T")) {
+    const parsed = new Date(value);
+    if (Number.isFinite(parsed.getTime())) {
+      return `${String(parsed.getUTCHours()).padStart(2, "0")}:${String(parsed.getUTCMinutes()).padStart(2, "0")}`;
+    }
+  }
+
+  return fallback;
+}
+
+function defaultSlotsForScheduleType(
+  scheduleType: "weekday" | "weekend" | "holiday"
+): ShiftSlot[] {
+  if (scheduleType === "holiday") {
+    return [{ name: "Holiday Shift", startTime: "09:00", endTime: "17:00" }];
+  }
+
+  return [
+    { name: "Morning Shift", startTime: "08:00", endTime: "16:00" },
+    { name: "Evening Shift", startTime: "16:00", endTime: "00:00" }
+  ];
+}
+
 type EnrichedAssignment = GeneratedAssignment & {
   employeeName: string;
 };
@@ -630,28 +671,45 @@ export async function POST(
       endTime: s.endTime
     }));
   } else {
-    const { data: templates } = await supabase
+    let templatesQuery = supabase
       .from("shift_templates")
-      .select("name, start_time, end_time")
+      .select("name, start_time, end_time, department")
       .eq("org_id", session.profile.org_id)
       .is("deleted_at", null);
 
-    if (!templates || templates.length === 0) {
-      typedSlots = scheduleType === "weekend"
-        ? [{ name: "Weekend Shift", startTime: "09:00", endTime: "17:00" }]
-        : [{ name: "Day Shift", startTime: "09:00", endTime: "17:00" }];
-    } else {
-      typedSlots = templates.map((t) => {
-        const startRaw = typeof t.start_time === "string" ? t.start_time : "09:00";
-        const endRaw = typeof t.end_time === "string" ? t.end_time : "17:00";
-        const startTime = startRaw.includes("T") ? startRaw.slice(11, 16) : startRaw;
-        const endTime = endRaw.includes("T") ? endRaw.slice(11, 16) : endRaw;
+    if (typeof schedule.department === "string" && schedule.department.trim().length > 0) {
+      templatesQuery = templatesQuery.ilike("department", schedule.department);
+    }
+
+    const { data: templates, error: templatesError } = await templatesQuery;
+
+    if (templatesError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SHIFT_TEMPLATES_FETCH_FAILED",
+          message: "Unable to load shift templates."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const normalizedTemplateSlots =
+      templates?.map((t) => {
+        const startTime = normalizeSlotTime(t.start_time, "08:00");
+        const endTime = normalizeSlotTime(t.end_time, "16:00");
         return {
-          name: typeof t.name === "string" ? t.name : "Shift",
+          name: typeof t.name === "string" && t.name.trim().length > 0 ? t.name : "Shift",
           startTime,
           endTime
-        };
-      });
+        } satisfies ShiftSlot;
+      }) ?? [];
+
+    // Guard against unrelated multi-team templates creating noisy, unfillable schedules.
+    if (normalizedTemplateSlots.length > 0 && normalizedTemplateSlots.length <= 2) {
+      typedSlots = normalizedTemplateSlots;
+    } else {
+      typedSlots = defaultSlotsForScheduleType(scheduleType);
     }
   }
 

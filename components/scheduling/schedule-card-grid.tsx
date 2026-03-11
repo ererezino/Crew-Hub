@@ -1,11 +1,14 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type { ScheduleRecord } from "../../types/scheduling";
 import { ScheduleCard } from "./schedule-card";
 
 type ScheduleCardGridProps = {
   schedules: ScheduleRecord[];
   onPublish: (id: string) => void;
+  onRegenerate: (id: string) => void;
   onDelete: (id: string) => void;
   onViewShifts: (id: string) => void;
   onCreateNew: () => void;
@@ -15,11 +18,14 @@ type ScheduleCardGridProps = {
 export function ScheduleCardGrid({
   schedules,
   onPublish,
+  onRegenerate,
   onDelete,
   onViewShifts,
   onCreateNew,
   publishingId
 }: ScheduleCardGridProps) {
+  const t = useTranslations("scheduling");
+
   if (schedules.length === 0) {
     return (
       <div className="schedule-empty-state">
@@ -32,12 +38,12 @@ export function ScheduleCardGrid({
             <path d="M12 14v4m-2-2h4" />
           </svg>
         </div>
-        <h3 className="schedule-empty-title">No schedules yet</h3>
+        <h3 className="schedule-empty-title">{t("cardGrid.emptyTitle")}</h3>
         <p className="schedule-empty-desc">
-          Create your first monthly schedule in a few clicks.
+          {t("cardGrid.emptyDescription")}
         </p>
         <button type="button" className="button button-primary" onClick={onCreateNew}>
-          Create Schedule
+          {t("cardGrid.createSchedule")}
         </button>
       </div>
     );
@@ -50,6 +56,7 @@ export function ScheduleCardGrid({
           key={schedule.id}
           schedule={schedule}
           onPublish={onPublish}
+          onRegenerate={onRegenerate}
           onDelete={onDelete}
           onViewShifts={onViewShifts}
           isPublishing={publishingId === schedule.id}

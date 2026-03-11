@@ -46,12 +46,18 @@ export function SchedulingCalendarClient({
   const schedulesData = schedulesQuery.data;
   const schedules = useMemo(() => schedulesData?.schedules ?? [], [schedulesData]);
   const visibleSchedules = useMemo(() => {
-    if (canManageShifts || !viewerDepartment) {
+    if (!viewerDepartment) {
       return schedules;
     }
 
-    return schedules.filter((schedule) => areDepartmentsEqual(schedule.department, viewerDepartment));
-  }, [canManageShifts, schedules, viewerDepartment]);
+    return schedules.filter((schedule) => {
+      if (!schedule.department || schedule.department.trim().length === 0) {
+        return true;
+      }
+
+      return areDepartmentsEqual(schedule.department, viewerDepartment);
+    });
+  }, [schedules, viewerDepartment]);
 
   // Default to the most recent published schedule
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);

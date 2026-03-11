@@ -10,6 +10,7 @@ import { ScheduleWizard } from "../../../../components/scheduling/schedule-wizar
 import type { RosterEmployee } from "../../../../components/scheduling/roster-selector";
 import { useSchedulingSchedules } from "../../../../hooks/use-scheduling";
 import { usePeople } from "../../../../hooks/use-people";
+import { areDepartmentsEqual } from "../../../../lib/department";
 
 
 type ToastMessage = {
@@ -20,7 +21,7 @@ type ToastMessage = {
 
 let toastCounter = 0;
 
-export function SchedulingManageClient() {
+export function SchedulingManageClient({ viewerDepartment = null }: { viewerDepartment?: string | null }) {
   const t = useTranslations("scheduling");
   const tc = useTranslations("common");
   const router = useRouter();
@@ -61,8 +62,14 @@ export function SchedulingManageClient() {
   }, [people]);
 
   const schedules = useMemo(() => {
-    return schedulesData?.schedules ?? [];
-  }, [schedulesData]);
+    const all = schedulesData?.schedules ?? [];
+
+    if (!viewerDepartment) {
+      return all;
+    }
+
+    return all.filter((schedule) => areDepartmentsEqual(schedule.department, viewerDepartment));
+  }, [schedulesData, viewerDepartment]);
 
   // Auto-dismiss toasts
   useEffect(() => {
@@ -95,6 +102,67 @@ export function SchedulingManageClient() {
       refreshSchedules();
     } catch (err) {
       addToast("error", err instanceof Error ? err.message : t("manage.failedPublish"));
+    } finally {
+      setPublishingId(null);
+    }
+  }, [addToast, refreshSchedules, t]);
+
+  const handleRegenerate = useCallback(async (scheduleId: string) => {
+    setPublishingId(scheduleId);
+
+    try {
+      const previewResponse = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({})
+      });
+
+      const previewPayload = await previewResponse.json().catch(() => null);
+
+      if (!previewResponse.ok) {
+        throw new Error(previewPayload?.error?.message ?? t("wizard.failedGenerate"));
+      }
+
+      const assignments = (previewPayload?.data?.assignments ?? []) as Array<{
+        employeeId: string;
+        shiftDate: string;
+        slotName: string;
+        startTime: string;
+        endTime: string;
+      }>;
+
+      if (assignments.length === 0) {
+        throw new Error(t("wizard.failedGenerate"));
+      }
+
+      const saveResponse = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          confirm: true,
+          assignments: assignments.map((assignment) => ({
+            employeeId: assignment.employeeId,
+            shiftDate: assignment.shiftDate,
+            slotName: assignment.slotName,
+            startTime: assignment.startTime,
+            endTime: assignment.endTime
+          }))
+        })
+      });
+
+      if (!saveResponse.ok) {
+        const savePayload = await saveResponse.json().catch(() => null);
+        throw new Error(savePayload?.error?.message ?? t("wizard.failedGenerate"));
+      }
+
+      addToast("success", t("manage.toastCreated"));
+      refreshSchedules();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : t("wizard.failedGenerate"));
     } finally {
       setPublishingId(null);
     }
@@ -167,6 +235,7 @@ export function SchedulingManageClient() {
       <ScheduleCardGrid
         schedules={schedules}
         onPublish={(id) => setConfirmPublish(id)}
+        onRegenerate={handleRegenerate}
         onDelete={(id) => setConfirmDelete(id)}
         onViewShifts={handleViewShifts}
         onCreateNew={() => setWizardOpen(true)}
