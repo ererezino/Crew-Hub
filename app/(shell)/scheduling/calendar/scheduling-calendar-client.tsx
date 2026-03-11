@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
+import { ShiftEditModal } from "../../../../components/scheduling/shift-edit-modal";
 import { TeamScheduleCalendar } from "../../../../components/scheduling/team-schedule-calendar";
 import { useSchedulingSchedules, useSchedulingShifts } from "../../../../hooks/use-scheduling";
+import { usePeople } from "../../../../hooks/use-people";
 import { areDepartmentsEqual } from "../../../../lib/department";
 import { formatDateShort, formatMonth } from "../../../../lib/datetime";
 import type { ShiftRecord } from "../../../../types/scheduling";
@@ -21,7 +23,16 @@ type PendingMove = {
   targetDate: string;
 };
 
+type ShiftEditFormValues = {
+  employeeId: string | null;
+  shiftDate: string;
+  startTime: string;
+  endTime: string;
+};
+
 let toastCounter = 0;
+const SHIFT_EDIT_TOAST_SUCCESS = "Shift updated successfully.";
+const SHIFT_EDIT_TOAST_ERROR = "Unable to update shift.";
 
 function formatShiftMoveDate(isoDate: string): string {
   return formatDateShort(isoDate);
@@ -62,8 +73,11 @@ export function SchedulingCalendarClient({
   // Default to the most recent published schedule
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
   const [isMovingShift, setIsMovingShift] = useState(false);
+  const [isSavingShiftEdit, setIsSavingShiftEdit] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const peopleQuery = usePeople({ scope: "all", enabled: canManageShifts });
 
   const activeSchedule = useMemo(() => {
     if (visibleSchedules.length === 0) return null;
@@ -79,8 +93,49 @@ export function SchedulingCalendarClient({
       : {}
   );
 
-  const shifts = shiftsQuery.data?.shifts ?? [];
+  const shifts = useMemo(() => shiftsQuery.data?.shifts ?? [], [shiftsQuery.data]);
   const isLoading = schedulesQuery.isLoading || shiftsQuery.isLoading;
+  const activeScheduleMembers = useMemo(() => {
+    const byId = new Map<string, { id: string; fullName: string; department: string | null }>();
+
+    for (const person of peopleQuery.people) {
+      if (person.status !== "active" && person.status !== "onboarding") {
+        continue;
+      }
+
+      byId.set(person.id, {
+        id: person.id,
+        fullName: person.fullName,
+        department: person.department
+      });
+    }
+
+    for (const shift of shifts) {
+      if (!shift.employeeId || !shift.employeeName) {
+        continue;
+      }
+
+      if (!byId.has(shift.employeeId)) {
+        byId.set(shift.employeeId, {
+          id: shift.employeeId,
+          fullName: shift.employeeName,
+          department: shift.employeeDepartment
+        });
+      }
+    }
+
+    let members = [...byId.values()];
+
+    if (activeSchedule?.department && activeSchedule.department.trim().length > 0) {
+      members = members.filter((member) =>
+        areDepartmentsEqual(member.department, activeSchedule.department)
+      );
+    }
+
+    return members
+      .map((member) => ({ id: member.id, fullName: member.fullName }))
+      .sort((left, right) => left.fullName.localeCompare(right.fullName));
+  }, [activeSchedule?.department, peopleQuery.people, shifts]);
 
   useEffect(() => {
     if (!initialScheduleId) {
@@ -101,6 +156,15 @@ export function SchedulingCalendarClient({
   const addToast = useCallback((type: ToastMessage["type"], text: string) => {
     setToasts((current) => [...current, { id: ++toastCounter, type, text }]);
   }, []);
+
+  const scheduleTrackLabel = activeSchedule
+    ? activeSchedule.scheduleTrack === "weekend"
+      ? t("track.weekend")
+      : t("track.weekday")
+    : "";
+  const scheduleSummary = activeSchedule
+    ? `${activeSchedule.name ?? t("calendar.publishedSchedule")} · ${scheduleTrackLabel} ${t("track.trackSuffix")}`
+    : "";
 
   const handleRequestMove = useCallback((shift: ShiftRecord, targetDate: string) => {
     setPendingMove({ shift, targetDate });
@@ -136,6 +200,42 @@ export function SchedulingCalendarClient({
     }
   }, [addToast, pendingMove, shiftsQuery, t]);
 
+  const handleSaveShiftEdit = useCallback(async (values: ShiftEditFormValues) => {
+    if (!editingShift) {
+      return;
+    }
+
+    setIsSavingShiftEdit(true);
+
+    try {
+      const response = await fetch(`/api/v1/scheduling/shifts/${editingShift.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          employeeId: values.employeeId,
+          shiftDate: values.shiftDate,
+          startTime: values.startTime,
+          endTime: values.endTime
+        })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message ?? SHIFT_EDIT_TOAST_ERROR);
+      }
+
+      addToast("success", SHIFT_EDIT_TOAST_SUCCESS);
+      setEditingShift(null);
+      shiftsQuery.refresh();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : SHIFT_EDIT_TOAST_ERROR);
+    } finally {
+      setIsSavingShiftEdit(false);
+    }
+  }, [addToast, editingShift, shiftsQuery]);
+
   if (isLoading) {
     return (
       <section className="compensation-layout">
@@ -163,7 +263,7 @@ export function SchedulingCalendarClient({
           >
             {visibleSchedules.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name ?? t("calendar.scheduleLabel")} &mdash; {s.startDate} to {s.endDate}
+                {t("calendar.scheduleDateRange", { name: s.name ?? t("calendar.scheduleLabel"), startDate: s.startDate, endDate: s.endDate })}
               </option>
             ))}
           </select>
@@ -177,8 +277,7 @@ export function SchedulingCalendarClient({
               {formatMonth(activeSchedule.startDate)}
             </h3>
             <p className="settings-card-description">
-              {activeSchedule.name ?? t("calendar.publishedSchedule")} &middot;{" "}
-              {activeSchedule.scheduleTrack === "weekend" ? t("track.weekend") : t("track.weekday")} {t("track.trackSuffix")}
+              {scheduleSummary}
             </p>
             {canManageShifts ? (
               <p className="teamcal-helper-text">
@@ -192,6 +291,7 @@ export function SchedulingCalendarClient({
             scheduleEndDate={activeSchedule.endDate}
             canManage={canManageShifts}
             onRequestMove={handleRequestMove}
+            onShiftSelect={canManageShifts ? setEditingShift : undefined}
           />
         </>
       ) : (
@@ -203,6 +303,7 @@ export function SchedulingCalendarClient({
           onRequestMove={() => {
             // no-op for empty state
           }}
+          onShiftSelect={undefined}
         />
       )}
 
@@ -225,6 +326,22 @@ export function SchedulingCalendarClient({
         onCancel={() => setPendingMove(null)}
         isConfirming={isMovingShift}
       />
+
+      {editingShift ? (
+        <ShiftEditModal
+          key={`${editingShift.id}:${editingShift.updatedAt}`}
+          isOpen
+          shift={editingShift}
+          assignees={activeScheduleMembers}
+          minDate={activeSchedule?.startDate ?? new Date().toISOString().slice(0, 10)}
+          maxDate={activeSchedule?.endDate ?? new Date().toISOString().slice(0, 10)}
+          isSubmitting={isSavingShiftEdit}
+          onClose={() => setEditingShift(null)}
+          onSubmit={(values) => {
+            void handleSaveShiftEdit(values);
+          }}
+        />
+      ) : null}
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite">

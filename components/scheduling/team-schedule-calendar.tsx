@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight, Move } from "lucide-react";
 
 import { EmptyState } from "../shared/empty-state";
+import { formatMonth } from "../../lib/datetime";
 import type { ShiftRecord } from "../../types/scheduling";
 
 type CalendarDay = {
@@ -21,9 +23,10 @@ type TeamScheduleCalendarProps = {
   scheduleEndDate: string;
   canManage: boolean;
   onRequestMove: (shift: ShiftRecord, targetDate: string) => void;
+  onShiftSelect?: (shift: ShiftRecord) => void;
 };
 
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// DAY_NAMES moved inside component for i18n
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -169,8 +172,10 @@ export function TeamScheduleCalendar({
   scheduleStartDate,
   scheduleEndDate,
   canManage,
-  onRequestMove
+  onRequestMove,
+  onShiftSelect
 }: TeamScheduleCalendarProps) {
+  const t = useTranslations("scheduling");
   const scheduleStart = new Date(`${scheduleStartDate}T00:00:00`);
   const scheduleEnd = new Date(`${scheduleEndDate}T00:00:00`);
 
@@ -191,11 +196,15 @@ export function TeamScheduleCalendar({
     [viewYear, viewMonth, shifts, scheduleStartDate, scheduleEndDate]
   );
 
+  const dayNames = useMemo(() => [
+    t("myCalendar.dayMon"), t("myCalendar.dayTue"), t("myCalendar.dayWed"),
+    t("myCalendar.dayThu"), t("myCalendar.dayFri"), t("myCalendar.daySat"), t("myCalendar.daySun")
+  ], [t]);
+
   const shiftById = useMemo(() => new Map(shifts.map((shift) => [shift.id, shift] as const)), [shifts]);
 
   const monthLabel = useMemo(() => {
-    const d = new Date(viewYear, viewMonth, 1);
-    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    return formatMonth(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`);
   }, [viewYear, viewMonth]);
 
   const canGoPrev = monthKey(viewYear, viewMonth) > monthKey(scheduleStart.getFullYear(), scheduleStart.getMonth());
@@ -232,9 +241,9 @@ export function TeamScheduleCalendar({
     return (
       <EmptyState
         icon={<Move size={32} />}
-        title="No published shifts in this schedule"
-        description="Publish shifts from Manage before reviewing the team calendar."
-        ctaLabel="Manage schedules"
+        title={t("calendar.noPublishedTitle")}
+        description={t("calendar.noPublishedDescription")}
+        ctaLabel={t("calendar.manageSchedules")}
         ctaHref="/scheduling?tab=manage"
       />
     );
@@ -247,7 +256,7 @@ export function TeamScheduleCalendar({
           type="button"
           className="icon-button"
           onClick={goToPrevMonth}
-          aria-label="Previous month"
+          aria-label={t("myCalendar.previousMonth")}
           disabled={!canGoPrev}
         >
           <ChevronLeft size={18} />
@@ -257,7 +266,7 @@ export function TeamScheduleCalendar({
           type="button"
           className="icon-button"
           onClick={goToNextMonth}
-          aria-label="Next month"
+          aria-label={t("myCalendar.nextMonth")}
           disabled={!canGoNext}
         >
           <ChevronRight size={18} />
@@ -265,7 +274,7 @@ export function TeamScheduleCalendar({
       </div>
 
       <div className="mycal-grid mycal-day-names">
-        {DAY_NAMES.map((name) => (
+        {dayNames.map((name) => (
           <div key={name} className="mycal-day-name">{name}</div>
         ))}
       </div>
@@ -316,10 +325,12 @@ export function TeamScheduleCalendar({
 
                 {day.shifts.map((shift) => {
                   const isDraggable = canManage && shift.status !== "cancelled";
+                  const isSelectable = Boolean(onShiftSelect);
+                  const shiftTimeLabel = `${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
                   return (
                     <article
                       key={shift.id}
-                      className={`teamcal-shift ${statusClass(shift.status)} ${isDraggable ? "teamcal-shift-draggable" : ""}`}
+                      className={`teamcal-shift ${statusClass(shift.status)} ${isDraggable ? "teamcal-shift-draggable" : ""} ${isSelectable ? "teamcal-shift-selectable" : ""}`}
                       draggable={isDraggable}
                       onDragStart={() => {
                         if (!isDraggable) return;
@@ -329,11 +340,24 @@ export function TeamScheduleCalendar({
                         setDraggingShiftId(null);
                         setDragTargetDate(null);
                       }}
-                      title={`${shift.employeeName ?? "Open shift"} · ${formatTime(shift.startTime)}–${formatTime(shift.endTime)}`}
+                      onClick={() => {
+                        if (!onShiftSelect) return;
+                        onShiftSelect(shift);
+                      }}
+                      onKeyDown={(event) => {
+                        if (!onShiftSelect) return;
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        onShiftSelect(shift);
+                      }}
+                      role={isSelectable ? "button" : undefined}
+                      tabIndex={isSelectable ? 0 : undefined}
+                      style={isSelectable ? { cursor: "pointer" } : undefined}
+                      title={`${shift.employeeName ?? t("calendar.openShift")} · ${formatTime(shift.startTime)}–${formatTime(shift.endTime)}`}
                     >
-                      <span className="teamcal-shift-name">{shift.employeeName ?? "Open shift"}</span>
+                      <span className="teamcal-shift-name">{shift.employeeName ?? t("calendar.openShift")}</span>
                       <span className="teamcal-shift-time">
-                        {formatTime(shift.startTime)} - {formatTime(shift.endTime)}
+                        {shiftTimeLabel}
                       </span>
                     </article>
                   );
