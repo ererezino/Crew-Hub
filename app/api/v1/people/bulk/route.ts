@@ -72,6 +72,60 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
+function normalizeConfiguredAppUrl(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    return new URL(candidate).origin;
+  } catch {
+    return null;
+  }
+}
+
+function resolveAppUrl(request: Request): string {
+  const requestOrigin = new URL(request.url).origin;
+  const configuredAppUrl = normalizeConfiguredAppUrl(process.env.NEXT_PUBLIC_APP_URL);
+  return configuredAppUrl ?? requestOrigin;
+}
+
+function resolveAuthRedirectUrl(request: Request): string {
+  return `${resolveAppUrl(request)}/api/auth/callback?next=/mfa-setup`;
+}
+
+function buildRecoverySetupLink({
+  request,
+  hashedToken,
+  actionLink
+}: {
+  request: Request;
+  hashedToken?: string | null;
+  actionLink?: string | null;
+}): string | null {
+  if (typeof hashedToken === "string" && hashedToken.length > 0) {
+    const callbackUrl = new URL("/api/auth/callback", resolveAppUrl(request));
+    callbackUrl.searchParams.set("token_hash", hashedToken);
+    callbackUrl.searchParams.set("type", "recovery");
+    callbackUrl.searchParams.set("next", "/mfa-setup");
+    return callbackUrl.toString();
+  }
+
+  return actionLink ?? null;
+}
+
+function isRedirectConfigurationError(message: string | undefined): boolean {
+  if (!message) return false;
+  return /(redirect|redirect_to|site url|url.*allow|allow.*url)/i.test(message);
+}
+
 function canManagePeople(userRoles: readonly UserRole[]): boolean {
   return hasRole(userRoles, "SUPER_ADMIN");
 }
@@ -321,10 +375,7 @@ export async function POST(request: Request) {
   const results: BulkResult[] = [];
   let createdCount = 0;
   let failedCount = 0;
-
-  const loginUrl = process.env.NEXT_PUBLIC_APP_URL
-    ? `${process.env.NEXT_PUBLIC_APP_URL}/login`
-    : "https://app.crew-hub.local/login";
+  const authRedirectUrl = resolveAuthRedirectUrl(request);
 
   for (const row of validRows) {
     const employee = row.data;
@@ -366,12 +417,52 @@ export async function POST(request: Request) {
       }
 
       const createdUserId = authData.user.id;
+      let setupLink: string | undefined;
 
       // Set system-derived password for TOTP login flow
       const systemPassword = deriveSystemPassword(createdUserId);
       await serviceRoleClient.auth.admin
         .updateUserById(createdUserId, { password: systemPassword })
         .catch(() => undefined);
+
+      // Generate recovery link so new hires land on authenticator setup.
+      const {
+        data: primaryLinkData,
+        error: primaryLinkError
+      } = await serviceRoleClient.auth.admin.generateLink({
+        type: "recovery",
+        email: normalizedEmail,
+        options: { redirectTo: authRedirectUrl }
+      });
+
+      let resolvedLinkData = primaryLinkData;
+      let resolvedLinkError = primaryLinkError;
+
+      if (
+        (resolvedLinkError || !resolvedLinkData?.properties) &&
+        isRedirectConfigurationError(resolvedLinkError?.message)
+      ) {
+        const fallback = await serviceRoleClient.auth.admin.generateLink({
+          type: "recovery",
+          email: normalizedEmail
+        });
+        resolvedLinkData = fallback.data;
+        resolvedLinkError = fallback.error;
+      }
+
+      if (!resolvedLinkError && resolvedLinkData?.properties) {
+        const generatedSetupLink = buildRecoverySetupLink({
+          request,
+          hashedToken: resolvedLinkData.properties.hashed_token,
+          actionLink: resolvedLinkData.properties.action_link
+        });
+        setupLink = generatedSetupLink ?? undefined;
+      } else {
+        logger.warn("Unable to generate setup link during bulk upload.", {
+          email: normalizedEmail,
+          message: resolvedLinkError?.message ?? "unknown"
+        });
+      }
 
       // Create profile
       const { error: insertProfileError } = await serviceRoleClient
@@ -416,7 +507,7 @@ export async function POST(request: Request) {
         await sendWelcomeEmail({
           recipientEmail: normalizedEmail,
           recipientName: employee.fullName.trim(),
-          setupLink: undefined,
+          setupLink,
           isNewHire: true,
           department: normalizedDepartment || undefined
         });

@@ -54,6 +54,13 @@ export async function GET(request: Request) {
 
   if (docsError) {
     console.error("Failed to fetch expiring documents:", docsError.message);
+    return NextResponse.json(
+      {
+        error: "Failed to fetch expiring documents",
+        expiryDate
+      },
+      { status: 500 }
+    );
   }
 
   let warningsSent = 0;
