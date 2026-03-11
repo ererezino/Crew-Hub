@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { SlidePanel } from "../shared/slide-panel";
 import type { ScheduleTrack } from "../../types/scheduling";
 import { TrackSelector } from "./track-selector";
-import { PeriodPicker, getDefaultMonth } from "./period-picker";
+import { PeriodPicker, getDefaultMonth, getDefaultCustomStart, getDefaultCustomEnd } from "./period-picker";
 import { RosterSelector, type RosterEmployee, type RosterSelection } from "./roster-selector";
 import { ScheduleReview } from "./schedule-review";
 
@@ -37,6 +37,8 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
   const [track, setTrack] = useState<ScheduleTrack | null>(null);
   const [month, setMonth] = useState(getDefaultMonth);
   const [months, setMonths] = useState(1);
+  const [customStartDate, setCustomStartDate] = useState(getDefaultCustomStart);
+  const [customEndDate, setCustomEndDate] = useState(getDefaultCustomEnd);
   const [rosterSelected, setRosterSelected] = useState<Map<string, RosterSelection>>(new Map());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -53,18 +55,44 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
   } | null>(null);
 
   const currentStepIndex = STEPS.indexOf(step);
+  const isCustomPeriod = months === 0;
+
+  // Auto-select Customer Success members the first time the roster step appears
+  const [csAutoSelected, setCsAutoSelected] = useState(false);
+
+  if (step === "roster" && !csAutoSelected && rosterSelected.size === 0 && employees.length > 0) {
+    const csDept = "customer success";
+    const preselected = new Map<string, RosterSelection>();
+    for (const emp of employees) {
+      if (emp.department?.toLowerCase() === csDept) {
+        preselected.set(emp.id, { employeeId: emp.id, weekendHours: emp.weekendShiftHours });
+      }
+    }
+    if (preselected.size > 0) {
+      setRosterSelected(preselected);
+    }
+    setCsAutoSelected(true);
+  }
 
   const canProceed = useMemo(() => {
     switch (step) {
       case "track": return track !== null;
-      case "period": return month.length > 0;
+      case "period":
+        if (isCustomPeriod) {
+          return customStartDate.length > 0 && customEndDate.length > 0 && customEndDate >= customStartDate;
+        }
+        return month.length > 0;
       case "roster": return rosterSelected.size > 0;
       case "review": return previewData !== null && !isGenerating;
       default: return false;
     }
-  }, [step, track, month, rosterSelected.size, previewData, isGenerating]);
+  }, [step, track, month, isCustomPeriod, customStartDate, customEndDate, rosterSelected.size, previewData, isGenerating]);
 
   const computedDateRange = useMemo(() => {
+    if (isCustomPeriod) {
+      return { startDate: customStartDate, endDate: customEndDate };
+    }
+
     const [yearStr, monthStr] = month.split("-");
     const year = Number(yearStr);
     const mon = Number(monthStr);
@@ -77,7 +105,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     const endDate = `${endYear}-${String(endMon).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
     return { startDate, endDate };
-  }, [month, months]);
+  }, [month, months, isCustomPeriod, customStartDate, customEndDate]);
 
   const handleNext = useCallback(async () => {
     const nextIndex = currentStepIndex + 1;
@@ -102,8 +130,10 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             scheduleTrack: track,
-            month,
-            months,
+            month: isCustomPeriod ? undefined : month,
+            months: isCustomPeriod ? undefined : months,
+            startDate: isCustomPeriod ? startDate : undefined,
+            endDate: isCustomPeriod ? endDate : undefined,
             name: `${track === "weekend" ? "Weekend" : "Weekday"} Schedule`,
             roster: rosterEntries.map((r) => ({
               employeeId: r.employeeId,
@@ -163,7 +193,6 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
         // Count warnings about employees on leave
         const leaveWarnings: Array<{ message: string }> = [];
         if (genWarnings.length > 0) {
-          // Summarize rather than list all unfilled slots
           const uniqueDates = new Set(genWarnings.map((w: string) => w.split(":")[0]));
           leaveWarnings.push({
             message: `${uniqueDates.size} day(s) have unfilled shifts due to limited availability.`
@@ -195,7 +224,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     }
 
     setStep(nextStep);
-  }, [currentStepIndex, track, rosterSelected, computedDateRange, month, months]);
+  }, [currentStepIndex, track, rosterSelected, computedDateRange, month, months, isCustomPeriod]);
 
   const handleBack = useCallback(() => {
     const prevIndex = currentStepIndex - 1;
@@ -220,8 +249,11 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
       setTrack(null);
       setMonth(getDefaultMonth());
       setMonths(1);
+      setCustomStartDate(getDefaultCustomStart());
+      setCustomEndDate(getDefaultCustomEnd());
       setRosterSelected(new Map());
       setPreviewData(null);
+      setCsAutoSelected(false);
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -233,8 +265,11 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     setTrack(null);
     setMonth(getDefaultMonth());
     setMonths(1);
+    setCustomStartDate(getDefaultCustomStart());
+    setCustomEndDate(getDefaultCustomEnd());
     setRosterSelected(new Map());
     setPreviewData(null);
+    setCsAutoSelected(false);
     onClose();
   }, [onClose]);
 
@@ -245,7 +280,19 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
       description={STEP_TITLES[step]}
       onClose={handleCloseWizard}
     >
-      <div className="schedule-wizard">
+      {/* Wrap in a form with preventDefault to block Enter-key page navigation */}
+      <form
+        className="schedule-wizard"
+        onSubmit={(e) => {
+          e.preventDefault();
+          // If user presses Enter, treat it as clicking Next / Done
+          if (step === "review") {
+            if (canProceed && !isSubmitting) void handleCreate();
+          } else {
+            if (canProceed) void handleNext();
+          }
+        }}
+      >
         {/* Step indicators */}
         <div className="schedule-wizard-steps">
           {STEPS.map((s, i) => (
@@ -266,8 +313,12 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
             <PeriodPicker
               month={month}
               months={months}
+              customStartDate={customStartDate}
+              customEndDate={customEndDate}
               onMonthChange={setMonth}
               onMonthsChange={setMonths}
+              onCustomStartChange={setCustomStartDate}
+              onCustomEndChange={setCustomEndDate}
             />
           ) : null}
 
@@ -308,25 +359,23 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
 
           {step === "review" ? (
             <button
-              type="button"
+              type="submit"
               className="button button-primary"
-              onClick={handleCreate}
               disabled={!canProceed || isSubmitting}
             >
               {isSubmitting ? "Finishing..." : "Done"}
             </button>
           ) : (
             <button
-              type="button"
+              type="submit"
               className="button button-primary"
-              onClick={handleNext}
               disabled={!canProceed}
             >
               Next
             </button>
           )}
         </div>
-      </div>
+      </form>
     </SlidePanel>
   );
 }

@@ -24,6 +24,8 @@ export type ShiftTemplateRecord = {
 
 export type ScheduleTrack = "weekday" | "weekend";
 
+export type WeekendHourOption = "2" | "3" | "4" | "8";
+
 export type ScheduleRecord = {
   id: string;
   orgId: string;
@@ -49,7 +51,7 @@ export type ScheduleRosterEntry = {
   employeeDepartment?: string;
   employeeCountryCode?: string;
   scheduleType?: string;
-  weekendHours: "full" | "part" | null;
+  weekendHours: WeekendHourOption | null;
 };
 
 export type ShiftRecord = {

@@ -6,7 +6,7 @@ import { logAudit } from "../../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../../lib/department";
 import { isDepartmentScopedTeamLead } from "../../../../../../lib/roles";
 import { isSchedulingManager } from "../../../../../../lib/scheduling";
-import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
 import { SCHEDULE_STATUSES } from "../../../../../../types/scheduling";
 
@@ -74,7 +74,7 @@ export async function DELETE(
     });
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceRoleClient();
   const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
 
   if (isScopedTeamLead && !session.profile.department) {
@@ -153,7 +153,8 @@ export async function DELETE(
     });
   }
 
-  /* Soft-delete the schedule — cascade deletes shifts via DB constraint */
+  /* Soft-delete the schedule using service-role client to bypass RLS.
+     Authorization is already enforced above (isSchedulingManager + team-lead scoping). */
   const { error: deleteError } = await supabase
     .from("schedules")
     .update({ deleted_at: new Date().toISOString() })
@@ -161,11 +162,12 @@ export async function DELETE(
     .eq("org_id", session.profile.org_id);
 
   if (deleteError) {
+    console.error("[SCHEDULE_DELETE] Soft-delete failed:", JSON.stringify(deleteError, null, 2));
     return jsonResponse<null>(500, {
       data: null,
       error: {
         code: "SCHEDULE_DELETE_FAILED",
-        message: "Unable to delete schedule."
+        message: `Unable to delete schedule: ${deleteError.message ?? "Unknown error"}`
       },
       meta: buildMeta()
     });

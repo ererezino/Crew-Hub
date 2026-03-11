@@ -9,6 +9,7 @@ import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { PageHeader } from "../../../components/shared/page-header";
 import type { UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
+import { SchedulingCalendarClient } from "./calendar/scheduling-calendar-client";
 import { SchedulingManageClient } from "./manage/scheduling-manage-client";
 import { SchedulingOpenShiftsClient } from "./open-shifts/scheduling-open-shifts-client";
 import { SchedulingClient } from "./scheduling-client";
@@ -57,6 +58,10 @@ export function SchedulingTabsClient({
       {
         key: "my-shifts",
         label: "My Schedule"
+      },
+      {
+        key: "team-calendar",
+        label: "Team Calendar"
       },
       {
         key: "open-shifts",
@@ -132,6 +137,7 @@ export function SchedulingTabsClient({
           transition={{ duration: 0.18, ease: "easeOut" }}
         >
           {activeTab === "my-shifts" ? <SchedulingClient embedded /> : null}
+          {activeTab === "team-calendar" ? <SchedulingCalendarClient embedded /> : null}
           {activeTab === "open-shifts" ? <SchedulingOpenShiftsClient embedded /> : null}
           {activeTab === "manage" && canManage ? <SchedulingManageClient embedded /> : null}
         </motion.section>

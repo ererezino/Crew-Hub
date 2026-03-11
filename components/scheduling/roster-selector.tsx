@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-import type { ScheduleTrack } from "../../types/scheduling";
+import type { ScheduleTrack, WeekendHourOption } from "../../types/scheduling";
 
 export type RosterEmployee = {
   id: string;
@@ -10,12 +10,12 @@ export type RosterEmployee = {
   department: string | null;
   countryCode: string | null;
   scheduleType: string;
-  weekendShiftHours: "full" | "part";
+  weekendShiftHours: WeekendHourOption;
 };
 
 export type RosterSelection = {
   employeeId: string;
-  weekendHours: "full" | "part";
+  weekendHours: WeekendHourOption;
 };
 
 type RosterSelectorProps = {
@@ -24,6 +24,28 @@ type RosterSelectorProps = {
   selected: Map<string, RosterSelection>;
   onChange: (selected: Map<string, RosterSelection>) => void;
 };
+
+const WEEKEND_HOUR_CYCLE: WeekendHourOption[] = ["8", "4", "3", "2"];
+
+function nextWeekendHours(current: WeekendHourOption): WeekendHourOption {
+  const idx = WEEKEND_HOUR_CYCLE.indexOf(current);
+  return WEEKEND_HOUR_CYCLE[(idx + 1) % WEEKEND_HOUR_CYCLE.length]!;
+}
+
+function weekendHoursBadgeClass(hours: WeekendHourOption): string {
+  switch (hours) {
+    case "8":
+      return "schedule-roster-hours-full";
+    case "4":
+      return "schedule-roster-hours-part";
+    case "3":
+      return "schedule-roster-hours-3";
+    case "2":
+      return "schedule-roster-hours-2";
+    default:
+      return "schedule-roster-hours-full";
+  }
+}
 
 function getCountryFlag(code: string | null): string {
   if (!code || code.length !== 2) return "";
@@ -78,13 +100,13 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
     }
   }, [allSelected, eligible, selected, onChange]);
 
-  const handleToggleWeekendHours = useCallback((empId: string) => {
+  const handleCycleWeekendHours = useCallback((empId: string) => {
     const entry = selected.get(empId);
     if (!entry) return;
     const next = new Map(selected);
     next.set(empId, {
       ...entry,
-      weekendHours: entry.weekendHours === "full" ? "part" : "full"
+      weekendHours: nextWeekendHours(entry.weekendHours)
     });
     onChange(next);
   }, [selected, onChange]);
@@ -111,39 +133,54 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
       ) : null}
 
       <div className="schedule-roster-list">
-        {filtered.map((emp) => {
+        {filtered.map((emp, idx) => {
           const isChecked = selected.has(emp.id);
           const entry = selected.get(emp.id);
           const flag = getCountryFlag(emp.countryCode);
 
+          // Show a section divider between Customer Success and other departments
+          const csDept = "customer success";
+          const prevDept = idx > 0 ? filtered[idx - 1]?.department : null;
+          const isFirstNonCS =
+            idx > 0 &&
+            emp.department?.toLowerCase() !== csDept &&
+            prevDept?.toLowerCase() === csDept;
+
           return (
-            <label key={emp.id} className="schedule-roster-row">
-              <input
-                type="checkbox"
-                checked={isChecked}
-                onChange={() => handleToggle(emp)}
-              />
-              <span className="schedule-roster-name">
-                {flag ? <span className="schedule-roster-flag">{flag}</span> : null}
-                {emp.fullName}
-              </span>
-              {emp.department ? (
-                <span className="schedule-roster-dept">{emp.department}</span>
+            <div key={emp.id}>
+              {isFirstNonCS ? (
+                <div className="schedule-roster-divider">
+                  <span className="schedule-roster-divider-label">Other team members</span>
+                </div>
               ) : null}
-              {track === "weekend" && isChecked ? (
-                <button
-                  type="button"
-                  className={`schedule-roster-hours-badge ${entry?.weekendHours === "part" ? "schedule-roster-hours-part" : "schedule-roster-hours-full"}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleToggleWeekendHours(emp.id);
-                  }}
-                  title="Click to toggle between full-time (8hr) and part-time (4hr)"
-                >
-                  {entry?.weekendHours === "part" ? "4hr" : "8hr"}
-                </button>
-              ) : null}
-            </label>
+              <label className="schedule-roster-row">
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => handleToggle(emp)}
+                />
+                <span className="schedule-roster-name">
+                  {flag ? <span className="schedule-roster-flag">{flag}</span> : null}
+                  {emp.fullName}
+                </span>
+                {emp.department ? (
+                  <span className="schedule-roster-dept">{emp.department}</span>
+                ) : null}
+                {track === "weekend" && isChecked ? (
+                  <button
+                    type="button"
+                    className={`schedule-roster-hours-badge ${weekendHoursBadgeClass(entry?.weekendHours ?? "8")}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleCycleWeekendHours(emp.id);
+                    }}
+                    title="Click to cycle: 8hr → 4hr → 3hr → 2hr"
+                  >
+                    {entry?.weekendHours ?? "8"}hr
+                  </button>
+                ) : null}
+              </label>
+            </div>
           );
         })}
 

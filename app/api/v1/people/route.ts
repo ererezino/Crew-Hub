@@ -322,25 +322,40 @@ export async function GET(request: Request) {
     }
   }
 
-  let peopleQuery = supabase
-    .from("profiles")
-    .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, schedule_type, weekend_shift_hours, account_setup_at, last_seen_at, created_at, updated_at"
-    )
-    .eq("org_id", profile.org_id)
-    .is("deleted_at", null)
-    .order("full_name", { ascending: true })
-    .limit(query.limit);
+  const PEOPLE_SELECT_FULL =
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, schedule_type, weekend_shift_hours, account_setup_at, last_seen_at, created_at, updated_at";
+  const PEOPLE_SELECT_COMPAT =
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, account_setup_at, last_seen_at, created_at, updated_at";
 
-  if (scope === "me") {
-    peopleQuery = peopleQuery.eq("id", profile.id);
+  async function runPeopleQuery(selectString: string) {
+    let q = supabase
+      .from("profiles")
+      .select(selectString)
+      .eq("org_id", profile.org_id)
+      .is("deleted_at", null)
+      .order("full_name", { ascending: true })
+      .limit(query.limit);
+
+    if (scope === "me") {
+      q = q.eq("id", profile.id);
+    }
+
+    if (scope === "reports") {
+      q = q.in("id", reportsUserIds.length > 0 ? reportsUserIds : [profile.id]);
+    }
+
+    return q;
   }
 
-  if (scope === "reports") {
-    peopleQuery = peopleQuery.in("id", reportsUserIds.length > 0 ? reportsUserIds : [profile.id]);
-  }
+  let { data: rawPeople, error: peopleError } = await runPeopleQuery(PEOPLE_SELECT_FULL);
 
-  const { data: rawPeople, error: peopleError } = await peopleQuery;
+  // Fallback: if the query fails (e.g. schedule_type/weekend_shift_hours columns
+  // don't exist yet), retry without those columns
+  if (peopleError) {
+    const fallback = await runPeopleQuery(PEOPLE_SELECT_COMPAT);
+    rawPeople = fallback.data;
+    peopleError = fallback.error;
+  }
 
   if (peopleError) {
     return jsonResponse<null>(500, {
@@ -790,7 +805,7 @@ export async function POST(request: Request) {
       status: profileStatus
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, schedule_type, weekend_shift_hours, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 

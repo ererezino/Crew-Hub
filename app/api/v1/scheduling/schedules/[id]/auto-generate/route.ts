@@ -468,15 +468,18 @@ export async function POST(
       ? (rawType as EmployeeScheduleInfo["scheduleType"])
       : "weekday";
 
-    const profileWeekendHours = typeof emp.weekend_shift_hours === "string" ? emp.weekend_shift_hours : "full";
-    const effectiveWeekendHours = weekendHoursOverrides.get(empId) ?? profileWeekendHours;
+    const rawProfileHours = typeof emp.weekend_shift_hours === "string" ? emp.weekend_shift_hours : "8";
+    // Migrate legacy values: full → 8, part → 4
+    const profileWeekendHours = rawProfileHours === "full" ? "8" : rawProfileHours === "part" ? "4" : rawProfileHours;
+    const rawEffective = weekendHoursOverrides.get(empId) ?? profileWeekendHours;
+    const effectiveWeekendHours = rawEffective === "full" ? "8" : rawEffective === "part" ? "4" : rawEffective;
 
     return {
       id: empId,
       fullName,
       scheduleType: schedType,
       blockedDates: blockedByEmployee.get(empId) ?? [],
-      weekendHours: effectiveWeekendHours as "full" | "part"
+      weekendHours: effectiveWeekendHours as "2" | "3" | "4" | "8"
     };
   });
 

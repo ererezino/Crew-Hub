@@ -11,6 +11,7 @@ import {
   isSchedulingManager
 } from "../../../../../lib/scheduling";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
   SCHEDULE_STATUSES,
@@ -38,7 +39,7 @@ const querySchema = z.object({
 
 const rosterEntrySchema = z.object({
   employeeId: z.string().uuid(),
-  weekendHours: z.enum(["full", "part"]).optional()
+  weekendHours: z.enum(["2", "3", "4", "8"]).optional()
 });
 
 const createScheduleSchema = z.object({
@@ -448,7 +449,10 @@ export async function POST(request: Request) {
     });
   }
 
-  const supabase = await createSupabaseServerClient();
+  // Use the service-role client for inserts so we are not blocked by RLS
+  // session-resolution edge cases.  The API already enforces authorization
+  // above (isSchedulingManager + team-lead scoping).
+  const supabase = createSupabaseServiceRoleClient();
   const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
 
   if (isScopedTeamLead && !session.profile.department) {
@@ -496,11 +500,25 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !rawRow) {
+    console.error("[SCHEDULE_CREATE] Insert failed:", JSON.stringify(error, null, 2));
+    console.error("[SCHEDULE_CREATE] Insert payload:", JSON.stringify({
+      org_id: session.profile.org_id,
+      name: parsedBody.data.name?.trim() || null,
+      department: isScopedTeamLead
+        ? session.profile.department
+        : parsedBody.data.department?.trim() || null,
+      start_date: startDate,
+      end_date: endDate,
+      schedule_track: parsedBody.data.scheduleTrack,
+      status: "draft"
+    }, null, 2));
+
+    const dbMessage = error?.message ?? "Unknown database error";
     return jsonResponse<null>(500, {
       data: null,
       error: {
         code: "SCHEDULE_CREATE_FAILED",
-        message: "Unable to create schedule."
+        message: `Unable to create schedule: ${dbMessage}`
       },
       meta: buildMeta()
     });

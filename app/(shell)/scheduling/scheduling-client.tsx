@@ -1,38 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import { CalendarClock } from "lucide-react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
-import { StatusBadge } from "../../../components/shared/status-badge";
+import { MyScheduleCalendar } from "../../../components/scheduling/my-schedule-calendar";
+import { ShiftSwapModal } from "../../../components/scheduling/shift-swap-modal";
 import {
   useOpenShifts,
   useSchedulingShifts,
   useSchedulingSwaps
 } from "../../../hooks/use-scheduling";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
-import { formatShiftStatus } from "../../../lib/format-labels";
-import { formatTimeRangeLabel } from "../../../lib/scheduling";
-import type { ShiftStatus } from "../../../types/scheduling";
-import { CalendarClock } from "lucide-react";
-
-type SortDirection = "asc" | "desc";
-
-function toneForShiftStatus(status: ShiftStatus) {
-  switch (status) {
-    case "scheduled":
-      return "info" as const;
-    case "swap_requested":
-      return "pending" as const;
-    case "swapped":
-      return "success" as const;
-    case "cancelled":
-      return "error" as const;
-    default:
-      return "draft" as const;
-  }
-}
+import type { ShiftRecord } from "../../../types/scheduling";
 
 function schedulingSkeleton() {
   return (
@@ -53,31 +34,56 @@ function schedulingSkeleton() {
 }
 
 export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
-  const shiftsQuery = useSchedulingShifts({
-    scope: "mine"
-  });
+  const shiftsQuery = useSchedulingShifts({ scope: "mine" });
   const openShiftsQuery = useOpenShifts();
-  const swapsQuery = useSchedulingSwaps({
-    scope: "mine",
-    status: "pending"
-  });
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [currentTime] = useState(() => Date.now());
+  const swapsQuery = useSchedulingSwaps({ scope: "mine", status: "pending" });
+
+  const [swapModalOpen, setSwapModalOpen] = useState(false);
+  const [swapAnchorShift, setSwapAnchorShift] = useState<ShiftRecord | null>(null);
+
   const isInitialLoading = shiftsQuery.isLoading && shiftsQuery.data === null;
+  const shifts = shiftsQuery.data?.shifts ?? [];
+  const currentTime = Date.now();
+  const upcomingCount = shifts.filter((s) => new Date(s.endTime).getTime() >= currentTime).length;
+  const swapRequestedCount = shifts.filter((s) => s.status === "swap_requested").length;
 
-  const sortedShifts = useMemo(() => {
-    const rows = shiftsQuery.data?.shifts ?? [];
+  const handleShiftClick = useCallback((shift: ShiftRecord) => {
+    // Only allow swap requests on scheduled shifts
+    if (shift.status !== "scheduled") return;
+    setSwapAnchorShift(shift);
+    setSwapModalOpen(true);
+  }, []);
 
-    return [...rows].sort((leftShift, rightShift) => {
-      const leftValue = new Date(leftShift.startTime).getTime();
-      const rightValue = new Date(rightShift.startTime).getTime();
+  const handleSwapSubmit = useCallback(async (shiftIds: string[], reason: string) => {
+    // Submit swap requests for each shift
+    const results = await Promise.allSettled(
+      shiftIds.map((shiftId) =>
+        fetch("/api/v1/scheduling/swaps", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shiftId, reason: reason || undefined })
+        }).then(async (res) => {
+          if (!res.ok) {
+            const data = await res.json().catch(() => null);
+            throw new Error(data?.error?.message ?? "Failed to request swap.");
+          }
+          return res.json();
+        })
+      )
+    );
 
-      return sortDirection === "asc" ? leftValue - rightValue : rightValue - leftValue;
-    });
-  }, [shiftsQuery.data?.shifts, sortDirection]);
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      const firstError = (failures[0] as PromiseRejectedResult).reason;
+      throw new Error(
+        firstError instanceof Error ? firstError.message : "Some swap requests failed."
+      );
+    }
 
-  const upcomingCount = sortedShifts.filter((shift) => new Date(shift.endTime).getTime() >= currentTime).length;
-  const swapRequestedCount = sortedShifts.filter((shift) => shift.status === "swap_requested").length;
+    // Refresh data
+    shiftsQuery.refresh();
+    swapsQuery.refresh();
+  }, [shiftsQuery, swapsQuery]);
 
   return (
     <>
@@ -112,6 +118,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
 
       {!shiftsQuery.isLoading && !shiftsQuery.errorMessage ? (
         <section className="compensation-layout" aria-label="Scheduling overview">
+          {/* Metric cards */}
           <article className="metric-grid">
             <article className="metric-card">
               <p className="metric-label">Upcoming shifts</p>
@@ -135,6 +142,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
             </article>
           </article>
 
+          {/* Quick actions */}
           <article className="metric-card">
             <div>
               <h2 className="section-title">Quick actions</h2>
@@ -146,23 +154,24 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
               <Link href="/scheduling?tab=open-shifts" className="button">
                 Open shifts
               </Link>
-              <Link href="/scheduling?tab=manage" className="button">
-                Manage schedules
+              <Link href="/scheduling?tab=team-calendar" className="button">
+                Team calendar
               </Link>
             </div>
           </article>
 
+          {/* Calendar view */}
           <article className="compensation-section">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">My upcoming shifts</h2>
+                <h2 className="section-title">My schedule</h2>
                 <p className="settings-card-description">
-                  Weekly shifts sorted by start time.
+                  Click on a shift to request a swap.
                 </p>
               </div>
             </header>
 
-            {sortedShifts.length === 0 ? (
+            {shifts.length === 0 ? (
               <EmptyState
                 icon={<CalendarClock size={32} />}
                 title="No shifts yet"
@@ -171,67 +180,23 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
                 ctaHref="/scheduling?tab=open-shifts"
               />
             ) : (
-              <div className="data-table-container">
-                <table className="data-table" aria-label="My shifts">
-                  <thead>
-                    <tr>
-                      <th>
-                        <button
-                          type="button"
-                          className="table-sort-trigger"
-                          onClick={() =>
-                            setSortDirection((currentDirection) =>
-                              currentDirection === "asc" ? "desc" : "asc"
-                            )
-                          }
-                        >
-                          Shift date
-                          <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
-                        </button>
-                      </th>
-                      <th>Time</th>
-                      <th>Schedule</th>
-                      <th>Template</th>
-                      <th>Break</th>
-                      <th>Notes</th>
-                      <th>Status</th>
-                      <th className="table-action-column">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedShifts.map((shift) => (
-                      <tr key={shift.id} className="data-table-row">
-                        <td>
-                          <span title={formatDateTimeTooltip(`${shift.shiftDate}T00:00:00.000Z`)}>
-                            {formatRelativeTime(`${shift.shiftDate}T00:00:00.000Z`)}
-                          </span>
-                        </td>
-                        <td className="numeric">{formatTimeRangeLabel(shift.startTime, shift.endTime)}</td>
-                        <td>{shift.scheduleName ?? "Schedule"}</td>
-                        <td>{shift.templateName ?? "--"}</td>
-                        <td className="numeric">{shift.breakMinutes}m</td>
-                        <td>{shift.notes ? <span title={shift.notes}>{shift.notes.length > 30 ? `${shift.notes.slice(0, 30)}...` : shift.notes}</span> : "--"}</td>
-                        <td>
-                          <StatusBadge tone={toneForShiftStatus(shift.status)}>
-                            {formatShiftStatus(shift.status)}
-                          </StatusBadge>
-                        </td>
-                        <td className="table-row-action-cell">
-                          <div className="timeatt-row-actions">
-                            <Link href="/scheduling?tab=open-shifts" className="table-row-action">
-                              Swap
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <MyScheduleCalendar
+                shifts={shifts}
+                onShiftClick={handleShiftClick}
+              />
             )}
           </article>
         </section>
       ) : null}
+
+      {/* Swap modal */}
+      <ShiftSwapModal
+        isOpen={swapModalOpen}
+        anchorShift={swapAnchorShift}
+        allShifts={shifts}
+        onClose={() => setSwapModalOpen(false)}
+        onSubmit={handleSwapSubmit}
+      />
     </>
   );
 }

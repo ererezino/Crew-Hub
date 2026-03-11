@@ -4,9 +4,13 @@ import { useMemo } from "react";
 
 type PeriodPickerProps = {
   month: string; // YYYY-MM
-  months: number; // 1, 2, or 3
+  months: number; // 0 = custom, 1, 2, or 3
+  customStartDate: string; // YYYY-MM-DD
+  customEndDate: string; // YYYY-MM-DD
   onMonthChange: (month: string) => void;
   onMonthsChange: (months: number) => void;
+  onCustomStartChange: (date: string) => void;
+  onCustomEndChange: (date: string) => void;
 };
 
 function formatMonthLabel(yyyymm: string): string {
@@ -28,6 +32,18 @@ function computeDateRange(month: string, months: number): { startLabel: string; 
   const endMon = ((endMonth - 1) % 12) + 1;
   const lastDay = new Date(Date.UTC(endYear, endMon, 0)).getUTCDate();
   const endDate = new Date(Date.UTC(endYear, endMon - 1, lastDay));
+  const endLabel = endDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+  return { startLabel, endLabel };
+}
+
+function formatCustomRange(start: string, end: string): { startLabel: string; endLabel: string } {
+  if (!start || !end) return { startLabel: "", endLabel: "" };
+
+  const startDate = new Date(`${start}T00:00:00Z`);
+  const endDate = new Date(`${end}T00:00:00Z`);
+
+  const startLabel = startDate.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
   const endLabel = endDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 
   return { startLabel, endLabel };
@@ -69,34 +85,49 @@ function getMonthOptions(): Array<{ value: string; label: string }> {
   return options;
 }
 
+function getDefaultCustomStart(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function getDefaultCustomEnd(): string {
+  const now = new Date();
+  const end = new Date(now);
+  end.setMonth(end.getMonth() + 1);
+  return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+}
+
 const DURATION_OPTIONS = [
   { value: 1, label: "1 Month" },
   { value: 2, label: "2 Months" },
-  { value: 3, label: "3 Months" }
+  { value: 3, label: "3 Months" },
+  { value: 0, label: "Custom" }
 ];
 
-export { getDefaultMonth };
+export { getDefaultMonth, getDefaultCustomStart, getDefaultCustomEnd };
 
-export function PeriodPicker({ month, months, onMonthChange, onMonthsChange }: PeriodPickerProps) {
+export function PeriodPicker({
+  month,
+  months,
+  customStartDate,
+  customEndDate,
+  onMonthChange,
+  onMonthsChange,
+  onCustomStartChange,
+  onCustomEndChange
+}: PeriodPickerProps) {
   const monthOptions = useMemo(() => getMonthOptions(), []);
-  const range = useMemo(() => computeDateRange(month, months), [month, months]);
+  const isCustom = months === 0;
+
+  const range = useMemo(() => {
+    if (isCustom) {
+      return formatCustomRange(customStartDate, customEndDate);
+    }
+    return computeDateRange(month, months);
+  }, [isCustom, month, months, customStartDate, customEndDate]);
 
   return (
     <div className="schedule-period-picker">
-      <div className="schedule-period-field">
-        <label className="form-label" htmlFor="schedule-start-month">Starting month</label>
-        <select
-          id="schedule-start-month"
-          className="form-input"
-          value={month}
-          onChange={(e) => onMonthChange(e.target.value)}
-        >
-          {monthOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-
       <div className="schedule-period-field">
         <label className="form-label">Duration</label>
         <div className="schedule-duration-options">
@@ -113,9 +144,50 @@ export function PeriodPicker({ month, months, onMonthChange, onMonthsChange }: P
         </div>
       </div>
 
-      <div className="schedule-period-summary">
-        <span className="schedule-period-range">{range.startLabel} &ndash; {range.endLabel}</span>
-      </div>
+      {!isCustom ? (
+        <div className="schedule-period-field">
+          <label className="form-label" htmlFor="schedule-start-month">Starting month</label>
+          <select
+            id="schedule-start-month"
+            className="form-input"
+            value={month}
+            onChange={(e) => onMonthChange(e.target.value)}
+          >
+            {monthOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="schedule-period-custom-range">
+          <div className="schedule-period-field">
+            <label className="form-label" htmlFor="schedule-custom-start">Start date</label>
+            <input
+              id="schedule-custom-start"
+              type="date"
+              className="form-input"
+              value={customStartDate}
+              onChange={(e) => onCustomStartChange(e.target.value)}
+            />
+          </div>
+          <div className="schedule-period-field">
+            <label className="form-label" htmlFor="schedule-custom-end">End date</label>
+            <input
+              id="schedule-custom-end"
+              type="date"
+              className="form-input"
+              value={customEndDate}
+              onChange={(e) => onCustomEndChange(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
+      {range.startLabel && range.endLabel ? (
+        <div className="schedule-period-summary">
+          <span className="schedule-period-range">{range.startLabel} &ndash; {range.endLabel}</span>
+        </div>
+      ) : null}
     </div>
   );
 }

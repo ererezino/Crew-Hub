@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS schedule_roster (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   schedule_id UUID NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
   employee_id UUID NOT NULL REFERENCES profiles(id),
-  weekend_hours VARCHAR(6) DEFAULT NULL CHECK (weekend_hours IN ('full', 'part')),
+  weekend_hours VARCHAR(6) DEFAULT NULL CHECK (weekend_hours IN ('2', '3', '4', '8')),
   created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(schedule_id, employee_id)
 );
@@ -46,5 +46,5 @@ CREATE POLICY "schedule_roster_org_isolation" ON schedule_roster
   );
 
 -- 3. Add default weekend_shift_hours to profiles
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS weekend_shift_hours VARCHAR(6) DEFAULT 'full'
-  CHECK (weekend_shift_hours IN ('full', 'part'));
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS weekend_shift_hours VARCHAR(6) DEFAULT '8'
+  CHECK (weekend_shift_hours IN ('2', '3', '4', '8'));

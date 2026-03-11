@@ -28,10 +28,12 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Convert people data to roster employees
+  // Convert people data to roster employees – Customer Success members first
+  const CS_DEPT = "Customer Success";
+
   const rosterEmployees: RosterEmployee[] = useMemo(() => {
     if (!people || people.length === 0) return [];
-    return people
+    const mapped = people
       .filter((p) => p.status === "active" || p.status === "onboarding")
       .map((p) => ({
         id: p.id,
@@ -39,8 +41,18 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
         department: p.department,
         countryCode: p.countryCode,
         scheduleType: p.scheduleType ?? "weekday",
-        weekendShiftHours: (p.weekendShiftHours ?? "full") as "full" | "part"
+        weekendShiftHours: (p.weekendShiftHours === "full" || p.weekendShiftHours === "part")
+          ? (p.weekendShiftHours === "full" ? "8" : "4")
+          : (p.weekendShiftHours as "2" | "3" | "4" | "8") ?? "8"
       }));
+
+    // Sort: Customer Success first, then alphabetical within each group
+    return mapped.sort((a, b) => {
+      const aIsCS = a.department?.toLowerCase() === CS_DEPT.toLowerCase() ? 0 : 1;
+      const bIsCS = b.department?.toLowerCase() === CS_DEPT.toLowerCase() ? 0 : 1;
+      if (aIsCS !== bIsCS) return aIsCS - bIsCS;
+      return a.fullName.localeCompare(b.fullName);
+    });
   }, [people]);
 
   const schedules = useMemo(() => {

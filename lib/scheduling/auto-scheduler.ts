@@ -15,7 +15,7 @@ export type EmployeeScheduleInfo = {
   fullName: string;
   scheduleType: "weekday" | "weekend_primary" | "weekend_rotation" | "flexible";
   blockedDates: string[]; // YYYY-MM-DD
-  weekendHours?: "full" | "part"; // full = 8hr, part = 4hr
+  weekendHours?: "2" | "3" | "4" | "8"; // shift duration in hours
 };
 
 export type ShiftSlot = {
@@ -262,18 +262,21 @@ export function autoGenerateSchedule(params: {
 
       const chosen = tiedCandidates[0]!;
 
-      // For part-time weekend employees, generate a 4hr shift instead of the full slot
+      // For reduced-hour weekend employees, shorten the shift to their assigned hours
       const assignedStartTime = slot.startTime;
       let assignedEndTime = slot.endTime;
       let assignedHours = hours;
 
-      if (weekend && chosen.weekendHours === "part" && hours > 4) {
-        const startMin = timeToMinutes(slot.startTime);
-        const partEndMin = startMin + 4 * 60;
-        const partEndHour = Math.floor(partEndMin / 60) % 24;
-        const partEndMinute = partEndMin % 60;
-        assignedEndTime = `${String(partEndHour).padStart(2, "0")}:${String(partEndMinute).padStart(2, "0")}`;
-        assignedHours = 4;
+      if (weekend && chosen.weekendHours && chosen.weekendHours !== "8") {
+        const targetHours = Number(chosen.weekendHours);
+        if (targetHours < hours) {
+          const startMin = timeToMinutes(slot.startTime);
+          const shortEndMin = startMin + targetHours * 60;
+          const shortEndHour = Math.floor(shortEndMin / 60) % 24;
+          const shortEndMinute = shortEndMin % 60;
+          assignedEndTime = `${String(shortEndHour).padStart(2, "0")}:${String(shortEndMinute).padStart(2, "0")}`;
+          assignedHours = targetHours;
+        }
       }
 
       assignments.push({

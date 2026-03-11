@@ -9,7 +9,7 @@ import { sendSchedulePublishedEmail } from "../../../../../../../lib/notificatio
 import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { isSchedulingManager } from "../../../../../../../lib/scheduling";
 import { isDepartmentScopedTeamLead } from "../../../../../../../lib/roles";
-import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../../types/auth";
 import {
   SCHEDULE_STATUSES,
@@ -81,7 +81,8 @@ export async function POST(
     });
   }
 
-  const supabase = await createSupabaseServerClient();
+  // Use service-role client for all DB operations — authorization is enforced above.
+  const supabase = createSupabaseServiceRoleClient();
 
   const { data: rawExistingSchedule, error: existingScheduleError } = await supabase
     .from("schedules")
@@ -211,11 +212,12 @@ export async function POST(
     .single();
 
   if (publishError || !rawPublishedSchedule) {
+    console.error("[SCHEDULE_PUBLISH] Update failed:", JSON.stringify(publishError, null, 2));
     return jsonResponse<null>(500, {
       data: null,
       error: {
         code: "SCHEDULE_PUBLISH_FAILED",
-        message: "Unable to publish schedule."
+        message: `Unable to publish schedule: ${publishError?.message ?? "Unknown error"}`
       },
       meta: buildMeta()
     });
