@@ -10,7 +10,6 @@ import { ScheduleWizard } from "../../../../components/scheduling/schedule-wizar
 import type { RosterEmployee } from "../../../../components/scheduling/roster-selector";
 import { useSchedulingSchedules } from "../../../../hooks/use-scheduling";
 import { usePeople } from "../../../../hooks/use-people";
-import { areDepartmentsEqual } from "../../../../lib/department";
 
 
 type ToastMessage = {
@@ -21,7 +20,7 @@ type ToastMessage = {
 
 let toastCounter = 0;
 
-export function SchedulingManageClient({ viewerDepartment = null }: { viewerDepartment?: string | null }) {
+export function SchedulingManageClient() {
   const t = useTranslations("scheduling");
   const tc = useTranslations("common");
   const router = useRouter();
@@ -61,15 +60,7 @@ export function SchedulingManageClient({ viewerDepartment = null }: { viewerDepa
     });
   }, [people]);
 
-  const schedules = useMemo(() => {
-    const all = schedulesData?.schedules ?? [];
-
-    if (!viewerDepartment) {
-      return all;
-    }
-
-    return all.filter((schedule) => areDepartmentsEqual(schedule.department, viewerDepartment));
-  }, [schedulesData, viewerDepartment]);
+  const schedules = useMemo(() => schedulesData?.schedules ?? [], [schedulesData]);
 
   // Auto-dismiss toasts
   useEffect(() => {

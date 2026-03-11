@@ -40,12 +40,10 @@ function formatShiftMoveDate(isoDate: string): string {
 
 export function SchedulingCalendarClient({
   canManageShifts = false,
-  initialScheduleId = null,
-  viewerDepartment = null
+  initialScheduleId = null
 }: {
   canManageShifts?: boolean;
   initialScheduleId?: string | null;
-  viewerDepartment?: string | null;
 }) {
   const t = useTranslations("scheduling");
   const tc = useTranslations("common");
@@ -56,19 +54,7 @@ export function SchedulingCalendarClient({
   });
   const schedulesData = schedulesQuery.data;
   const schedules = useMemo(() => schedulesData?.schedules ?? [], [schedulesData]);
-  const visibleSchedules = useMemo(() => {
-    if (!viewerDepartment) {
-      return schedules;
-    }
-
-    return schedules.filter((schedule) => {
-      if (!schedule.department || schedule.department.trim().length === 0) {
-        return true;
-      }
-
-      return areDepartmentsEqual(schedule.department, viewerDepartment);
-    });
-  }, [schedules, viewerDepartment]);
+  const visibleSchedules = schedules;
 
   // Default to the most recent published schedule
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);

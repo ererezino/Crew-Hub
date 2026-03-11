@@ -43,4 +43,17 @@ describe("Scheduling runtime hardening", () => {
 
     expect(card).toContain('schedule.status === "draft" ? tc("edit") : t("card.viewShifts")');
   });
+
+  it("manage and team calendar do not hide server-returned schedules with client-side department filtering", () => {
+    const manageClient = read("app/(shell)/scheduling/manage/scheduling-manage-client.tsx");
+    const calendarClient = read("app/(shell)/scheduling/calendar/scheduling-calendar-client.tsx");
+    const tabsClient = read("app/(shell)/scheduling/scheduling-tabs-client.tsx");
+
+    expect(manageClient).toContain("const schedules = useMemo(() => schedulesData?.schedules ?? [], [schedulesData]);");
+    expect(manageClient).not.toContain("viewerDepartment");
+    expect(calendarClient).toContain("const visibleSchedules = schedules;");
+    expect(calendarClient).not.toContain("viewerDepartment");
+    expect(tabsClient).toContain("<SchedulingManageClient />");
+    expect(tabsClient).not.toContain("viewerDepartment={userDepartment ?? null}");
+  });
 });

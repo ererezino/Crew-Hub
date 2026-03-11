@@ -150,11 +150,10 @@ export function SchedulingTabsClient({
             <SchedulingCalendarClient
               canManageShifts={canManage}
               initialScheduleId={requestedScheduleId}
-              viewerDepartment={userDepartment ?? null}
             />
           ) : null}
           {activeTab === "manage" && canManage ? (
-            <SchedulingManageClient viewerDepartment={userDepartment ?? null} />
+            <SchedulingManageClient />
           ) : null}
         </motion.section>
       </AnimatePresence>
