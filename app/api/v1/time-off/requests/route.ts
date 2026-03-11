@@ -10,6 +10,7 @@ import {
   calculateWorkingDays,
   formatLeaveTypeLabel,
   isIsoDate,
+  isSickLeaveType,
   parseNumeric
 } from "../../../../../lib/time-off";
 import { sendLeaveRequestedEmail } from "../../../../../lib/notifications/email";
@@ -434,7 +435,7 @@ export async function POST(request: Request) {
   }
 
   // Sick leave > 2 consecutive working days requires documentation
-  const requiresDocumentation = parsedBody.data.leaveType === "sick_leave" && totalDays > 2;
+  const requiresDocumentation = isSickLeaveType(parsedBody.data.leaveType) && totalDays > 2;
 
   if (requiresDocumentation && !parsedBody.data.medicalEvidencePath) {
     return jsonResponse<null>(422, {

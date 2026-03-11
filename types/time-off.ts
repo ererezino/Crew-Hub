@@ -13,7 +13,7 @@ export const LEAVE_TYPES = [
 export type LeaveType = (typeof LEAVE_TYPES)[number];
 
 /** Leave types where balance tracking is skipped entirely (unlimited). */
-export const UNLIMITED_LEAVE_TYPES: ReadonlySet<string> = new Set(["sick_leave"]);
+export const UNLIMITED_LEAVE_TYPES: ReadonlySet<string> = new Set(["sick_leave", "sick"]);
 
 /** Leave types that should NOT appear in the employee request form (auto-granted). */
 export const AUTO_GRANTED_LEAVE_TYPES: ReadonlySet<string> = new Set(["birthday_leave"]);

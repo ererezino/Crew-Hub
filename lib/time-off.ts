@@ -152,6 +152,15 @@ export function normalizeCountryCode(countryCode: string | null | undefined): st
   return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
 }
 
+/**
+ * Checks whether a leave-type value represents sick leave,
+ * regardless of whether the DB stores it as "sick" or "sick_leave".
+ */
+export function isSickLeaveType(leaveType: string): boolean {
+  const normalized = leaveType.trim().toLowerCase();
+  return normalized === "sick" || normalized === "sick_leave";
+}
+
 export function formatLeaveTypeLabel(leaveType: string, locale?: "en" | "fr"): string {
   const normalized = leaveType.trim().toLowerCase();
   const isFr = locale === "fr";

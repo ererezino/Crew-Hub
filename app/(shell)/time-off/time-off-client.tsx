@@ -32,6 +32,7 @@ import {
   formatLeaveTypeLabel,
   getBirthdayLeaveOptions,
   getCurrentMonthKey,
+  isSickLeaveType,
   isoDateToUtcDate,
   isIsoDate,
   monthToDateRange
@@ -377,7 +378,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     return td("requestPanel.balanceWarning", { requested: calculatedWorkingDays, available: selectedLeaveBalance.availableDays });
   }, [calculatedWorkingDays, isSelectedTypeUnlimited, selectedLeaveBalance, td]);
 
-  const requiresMedicalEvidence = formValues.leaveType === "sick_leave" && calculatedWorkingDays > 2;
+  const requiresMedicalEvidence = isSickLeaveType(formValues.leaveType) && calculatedWorkingDays > 2;
 
   const sortedRequests = useMemo(() => {
     const requests = summaryQuery.data?.requests ?? [];
@@ -622,7 +623,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       return;
     }
 
-    const isSickLeaveOverTwoDays = formValues.leaveType === "sick_leave" && calculatedWorkingDays > 2;
+    const isSickLeaveOverTwoDays = isSickLeaveType(formValues.leaveType) && calculatedWorkingDays > 2;
 
     if (isSickLeaveOverTwoDays && !medicalEvidenceFile) {
       setSubmitError(td("requestPanel.medicalEvidenceRequired"));
@@ -1237,7 +1238,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
               </p>
             ) : null}
             {balanceWarning ? <p className="form-field-error">{balanceWarning}</p> : null}
-            {formValues.leaveType === "sick_leave" && calculatedWorkingDays > 2 ? (
+            {isSickLeaveType(formValues.leaveType) && calculatedWorkingDays > 2 ? (
               <p className="settings-card-description">
                 {t('requestPanel.sickLeaveNote')}
               </p>
