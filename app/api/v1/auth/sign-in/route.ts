@@ -37,6 +37,24 @@ function extractIpAddress(request: Request): string {
   );
 }
 
+function shouldAttemptPasswordSync(): boolean {
+  const override = process.env.AUTH_PASSWORD_SYNC_ENABLED?.trim().toLowerCase();
+  if (override === "true") {
+    return true;
+  }
+  if (override === "false") {
+    return false;
+  }
+
+  // Keep behavioral tests deterministic.
+  if (process.env.NODE_ENV === "test") {
+    return true;
+  }
+
+  // Default to production-only to avoid cross-environment password churn.
+  return process.env.VERCEL_ENV === "production";
+}
+
 export async function POST(request: Request) {
   let body: unknown;
 
@@ -254,7 +272,7 @@ export async function POST(request: Request) {
 
     /* Self-heal password drift (for legacy users / secret rotations):
        re-apply deterministic system password and retry once. */
-    if (signInError || !signInData?.user) {
+    if ((signInError || !signInData?.user) && shouldAttemptPasswordSync()) {
       const { error: passwordSyncError } = await serviceClient.auth.admin.updateUserById(
         userId,
         { password: systemPassword }

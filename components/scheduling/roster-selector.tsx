@@ -34,18 +34,9 @@ function getCountryFlag(code: string | null): string {
 export function RosterSelector({ employees, track, selected, onChange }: RosterSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const eligible = useMemo(() => {
-    return employees.filter((emp) => {
-      if (track === "weekday") {
-        return emp.scheduleType === "weekday" || emp.scheduleType === "flexible";
-      }
-      return (
-        emp.scheduleType === "weekend_primary" ||
-        emp.scheduleType === "weekend_rotation" ||
-        emp.scheduleType === "flexible"
-      );
-    });
-  }, [employees, track]);
+  // Show all employees regardless of track — any team member might need
+  // to chip in for customer success weeks or help with support workload
+  const eligible = employees;
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return eligible;
@@ -160,7 +151,7 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
           <div className="schedule-roster-empty">
             {searchQuery.trim()
               ? "No team members match your search."
-              : "No eligible team members for this schedule type."}
+              : "No active team members found."}
           </div>
         ) : null}
       </div>

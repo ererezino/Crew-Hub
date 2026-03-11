@@ -83,6 +83,10 @@ export function renderEmailTemplate(options: EmailTemplateOptions): string {
     footerOverride
   } = options;
 
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://crew.useaccrue.com";
+  const logoUrl = `${appUrl}/brand/dark.png`;
+
   const buttonHtml = ctaButton
     ? renderButton(ctaButton.label, ctaButton.url, ctaButton.style)
     : "";
@@ -164,11 +168,7 @@ export function renderEmailTemplate(options: EmailTemplateOptions): string {
           <!-- Brand mark -->
           <tr>
             <td align="left" style="padding-bottom:32px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td width="36" height="36" align="center" valign="middle" style="width:36px;height:36px;background:#000000;border-radius:8px;font-family:'Playfair Display',Georgia,serif;font-size:18px;font-weight:600;color:#ffffff;text-align:center;line-height:36px;">C</td>
-                </tr>
-              </table>
+              <img src="${escapeAttr(logoUrl)}" width="120" height="36" alt="Accrue" style="display:block;width:120px;height:auto;max-height:36px;border:0;outline:none;text-decoration:none;" />
             </td>
           </tr>
 
@@ -228,7 +228,7 @@ export function renderEmailTemplate(options: EmailTemplateOptions): string {
           <!-- Tagline below card -->
           <tr>
             <td align="center" style="padding-top:24px;">
-              <p style="margin:0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:12px;font-weight:400;color:#C4CBCF;">Sent from Crew Hub, your team's home base.</p>
+              <p style="margin:0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:12px;font-weight:400;color:#C4CBCF;">Sent from Crew Hub with ❤️</p>
             </td>
           </tr>
 

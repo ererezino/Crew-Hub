@@ -32,7 +32,7 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
   const rosterEmployees: RosterEmployee[] = useMemo(() => {
     if (!people || people.length === 0) return [];
     return people
-      .filter((p) => p.status === "active")
+      .filter((p) => p.status === "active" || p.status === "onboarding")
       .map((p) => ({
         id: p.id,
         fullName: p.fullName,

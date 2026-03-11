@@ -23,7 +23,7 @@ function resolveResendFrom(): string {
 
 function resolveAppUrl(): string {
   return (
-    process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://crew-hub.useaccrue.com"
+    process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://crew.useaccrue.com"
   );
 }
 
