@@ -73,6 +73,23 @@ describe("Auth callback interstitial behavior", () => {
     expect(body.data?.redirectTo).toBe("/mfa-setup");
   });
 
+  it("verifies token-hash payloads via GET and redirects to next path", async () => {
+    const { GET } = await import("../app/api/auth/callback/verify/route");
+
+    const response = await GET(
+      new Request(
+        "http://localhost:3000/api/auth/callback/verify?token_hash=abc123&type=invite&next=/mfa-setup"
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("http://localhost:3000/mfa-setup");
+    expect(verifyOtpMock).toHaveBeenCalledWith({
+      type: "invite",
+      token_hash: "abc123"
+    });
+  });
+
   it("returns 401 when callback token verification fails", async () => {
     verifyOtpMock.mockResolvedValueOnce({
       error: { message: "expired token" }

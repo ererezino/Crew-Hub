@@ -3,17 +3,6 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 
-type CallbackVerifyResponse = {
-  data: {
-    redirectTo: string;
-    verified: true;
-  } | null;
-  error: {
-    code: string;
-    message: string;
-  } | null;
-};
-
 function normalizeNextPath(next: string | null): string {
   if (!next || !next.startsWith("/") || next.startsWith("//")) {
     return "/mfa-setup";
@@ -48,31 +37,19 @@ function AuthContinuePageContent() {
     setError(null);
 
     try {
-      const response = await fetch("/api/auth/callback/verify", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: code ?? undefined,
-          tokenHash: tokenHash ?? undefined,
-          otpType: otpType ?? undefined,
-          next
-        })
-      });
-
-      const payload = (await response.json()) as CallbackVerifyResponse;
-
-      if (!response.ok || !payload.data?.redirectTo) {
-        setError(
-          payload.error?.message ??
-            "This setup link has expired or is invalid. Ask your admin for a new invite."
-        );
-        return;
+      const verifyUrl = new URL("/api/auth/callback/verify", window.location.origin);
+      verifyUrl.searchParams.set("next", next);
+      if (code) {
+        verifyUrl.searchParams.set("code", code);
+      } else if (tokenHash && otpType) {
+        verifyUrl.searchParams.set("token_hash", tokenHash);
+        verifyUrl.searchParams.set("type", otpType);
       }
 
-      // Force a full navigation so session cookies set by the verification
-      // response are committed before MFA setup requests are made.
-      window.location.assign(payload.data.redirectTo);
+      // Use full-page navigation so auth cookies from callback verification
+      // are committed in the same redirect chain.
+      window.location.assign(verifyUrl.toString());
+      return;
     } catch {
       setError("Unable to continue setup right now. Please try again.");
     } finally {

@@ -54,6 +54,81 @@ function normalizeNextPath(next: string | undefined): string {
   return next;
 }
 
+function normalizeNextPathFromNullable(next: string | null): string {
+  return normalizeNextPath(next ?? undefined);
+}
+
+async function verifyCallbackPayload(payload: {
+  code?: string;
+  tokenHash?: string;
+  otpType?: (typeof supportedEmailOtpTypes)[number];
+}): Promise<"ok" | "invalid"> {
+  const supabase = await createSupabaseServerClient();
+
+  if (payload.code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(payload.code);
+    return error ? "invalid" : "ok";
+  }
+
+  const { error } = await supabase.auth.verifyOtp({
+    type: payload.otpType!,
+    token_hash: payload.tokenHash!
+  });
+
+  return error ? "invalid" : "ok";
+}
+
+function invalidSetupLinkResponse() {
+  return jsonResponse<null>(401, {
+    data: null,
+    error: {
+      code: "INVALID_OR_EXPIRED_LINK",
+      message: "This setup link has expired or is invalid. Ask your admin for a new invite."
+    },
+    meta: buildMeta()
+  });
+}
+
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+
+  const code = requestUrl.searchParams.get("code") ?? undefined;
+  const tokenHash = requestUrl.searchParams.get("token_hash") ?? undefined;
+  const otpTypeRaw = requestUrl.searchParams.get("type");
+  const next = normalizeNextPathFromNullable(requestUrl.searchParams.get("next"));
+
+  const otpType = otpTypeRaw && (supportedEmailOtpTypes as readonly string[]).includes(otpTypeRaw)
+    ? (otpTypeRaw as (typeof supportedEmailOtpTypes)[number])
+    : undefined;
+
+  const parsed = callbackVerifySchema.safeParse({
+    code,
+    tokenHash,
+    otpType,
+    next
+  });
+
+  if (!parsed.success) {
+    const loginUrl = new URL("/login", requestUrl.origin);
+    loginUrl.searchParams.set("error", "invite_expired");
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const verification = await verifyCallbackPayload({
+    code: parsed.data.code,
+    tokenHash: parsed.data.tokenHash,
+    otpType: parsed.data.otpType
+  });
+
+  if (verification !== "ok") {
+    const loginUrl = new URL("/login", requestUrl.origin);
+    loginUrl.searchParams.set("error", "invite_expired");
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.redirect(new URL(next, requestUrl.origin));
+}
+
 export async function POST(request: Request) {
   let body: unknown;
 
@@ -86,46 +161,14 @@ export async function POST(request: Request) {
   const { code, tokenHash, otpType, next } = parsed.data;
   const redirectTo = normalizeNextPath(next);
 
-  const supabase = await createSupabaseServerClient();
-
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (error) {
-      return jsonResponse<null>(401, {
-        data: null,
-        error: {
-          code: "INVALID_OR_EXPIRED_LINK",
-          message: "This setup link has expired or is invalid. Ask your admin for a new invite."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    return jsonResponse<CallbackVerifyResponseData>(200, {
-      data: {
-        redirectTo,
-        verified: true
-      },
-      error: null,
-      meta: buildMeta()
-    });
-  }
-
-  const { error } = await supabase.auth.verifyOtp({
-    type: otpType!,
-    token_hash: tokenHash!
+  const verification = await verifyCallbackPayload({
+    code,
+    tokenHash,
+    otpType
   });
 
-  if (error) {
-    return jsonResponse<null>(401, {
-      data: null,
-      error: {
-        code: "INVALID_OR_EXPIRED_LINK",
-        message: "This setup link has expired or is invalid. Ask your admin for a new invite."
-      },
-      meta: buildMeta()
-    });
+  if (verification !== "ok") {
+    return invalidSetupLinkResponse();
   }
 
   return jsonResponse<CallbackVerifyResponseData>(200, {
