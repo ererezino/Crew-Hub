@@ -104,15 +104,6 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G E"
       },
       {
-        label: "Time tracking",
-        labelKey: "timeTracking",
-        href: "/time-attendance",
-        icon: "Clock",
-        description: "Clock in/out, view timesheets, and track hours worked",
-        shortcut: "G K",
-        moduleId: "time_attendance"
-      },
-      {
         label: "Learning",
         labelKey: "learning",
         href: "/learning",

@@ -85,7 +85,12 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           roles: session.profile.roles,
           notificationPreferences: normalizeNotificationPreferences(
             session.profile.notification_preferences
-          )
+          ),
+          bio: session.profile.bio ?? "",
+          pronouns: session.profile.pronouns ?? "",
+          emergencyContactName: session.profile.emergency_contact_name ?? "",
+          emergencyContactPhone: session.profile.emergency_contact_phone ?? "",
+          emergencyContactRelationship: session.profile.emergency_contact_relationship ?? ""
         }}
         organization={{
           name: session.org?.name ?? "",

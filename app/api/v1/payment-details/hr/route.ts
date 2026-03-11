@@ -53,24 +53,29 @@ function canViewPaymentDetails(roles: readonly UserRole[]): boolean {
 function maskedDestinationFromRow(row: z.infer<typeof paymentRowSchema>): {
   maskedDestination: string;
   last4: string | null;
+  crewTagFull: string | null;
 } {
   if (row.payment_method === "bank_transfer") {
     return {
       maskedDestination: maskFromLast4(row.bank_account_last4),
-      last4: row.bank_account_last4
+      last4: row.bank_account_last4,
+      crewTagFull: null
     };
   }
 
   if (row.payment_method === "mobile_money") {
     return {
       maskedDestination: maskFromLast4(row.mobile_money_last4),
-      last4: row.mobile_money_last4
+      last4: row.mobile_money_last4,
+      crewTagFull: null
     };
   }
 
+  // CrewTag is a public username, not sensitive — return full value for finance visibility
   return {
     maskedDestination: maskCrewTag(row.crew_tag),
-    last4: null
+    last4: null,
+    crewTagFull: row.crew_tag
   };
 }
 
@@ -163,6 +168,7 @@ export async function GET() {
           currency: null,
           maskedDestination: null,
           last4: null,
+          crewTagFull: null,
           isVerified: null,
           changeEffectiveAt: null,
           holdSecondsRemaining: 0,
@@ -182,6 +188,7 @@ export async function GET() {
         currency: paymentRow.currency,
         maskedDestination: maskedValue.maskedDestination,
         last4: maskedValue.last4,
+        crewTagFull: maskedValue.crewTagFull,
         isVerified: paymentRow.is_verified,
         changeEffectiveAt: paymentRow.change_effective_at,
         holdSecondsRemaining: holdSecondsRemaining(paymentRow.change_effective_at),

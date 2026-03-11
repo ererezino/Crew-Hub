@@ -7,7 +7,6 @@ const EMPLOYEE_DEFAULT_ACCESS = [
   "/time-off",
   "/expenses",
   "/scheduling",
-  "/time-attendance",
   "/documents",
   "/me/pay",
   "/learning",

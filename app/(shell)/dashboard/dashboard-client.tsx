@@ -59,7 +59,7 @@ function greetingIcon(tod: "morning" | "afternoon" | "evening") {
 
 /* ── Quick Actions Row ── */
 
-function QuickActionsRow({ hasTimePolicy }: { hasTimePolicy: boolean }) {
+function QuickActionsRow() {
   const t = useTranslations('dashboard');
   return (
     <div className="home-quick-actions" role="list" aria-label={t('quickActions.ariaLabel')}>
@@ -75,12 +75,6 @@ function QuickActionsRow({ hasTimePolicy }: { hasTimePolicy: boolean }) {
         <span className="home-quick-action-icon"><FileText size={20} /></span>
         <span className="home-quick-action-label">{t('quickActions.viewPayslips')}</span>
       </Link>
-      {hasTimePolicy ? (
-        <Link href="/time-attendance" className="home-quick-action-card" role="listitem">
-          <span className="home-quick-action-icon"><Clock size={20} /></span>
-          <span className="home-quick-action-label">{t('quickActions.clockIn')}</span>
-        </Link>
-      ) : null}
     </div>
   );
 }
@@ -157,7 +151,7 @@ function EmployeeGreeting({ data }: { data: DashboardResponseData }) {
           </p>
         ) : null}
       </div>
-      <QuickActionsRow hasTimePolicy={data.hasTimePolicy} />
+      <QuickActionsRow />
     </motion.section>
   );
 }
@@ -201,7 +195,7 @@ function ManagerGreeting({ data }: { data: DashboardResponseData }) {
           </div>
         )}
       </div>
-      <QuickActionsRow hasTimePolicy={data.hasTimePolicy} />
+      <QuickActionsRow />
     </motion.section>
   );
 }

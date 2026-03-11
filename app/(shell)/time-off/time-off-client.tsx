@@ -46,6 +46,7 @@ import { AUTO_GRANTED_LEAVE_TYPES, UNLIMITED_LEAVE_TYPES } from "../../../types/
 import { CalendarOff } from "lucide-react";
 import { humanizeError } from "@/lib/errors";
 
+
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
 
@@ -311,6 +312,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
   const [formErrors, setFormErrors] = useState<RequestFormErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [medicalEvidenceFile, setMedicalEvidenceFile] = useState<File | null>(null);
   const [isCancellingRequestId, setIsCancellingRequestId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isAfkPanelOpen, setIsAfkPanelOpen] = useState(false);
@@ -374,6 +376,8 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
     return td("requestPanel.balanceWarning", { requested: calculatedWorkingDays, available: selectedLeaveBalance.availableDays });
   }, [calculatedWorkingDays, isSelectedTypeUnlimited, selectedLeaveBalance, td]);
+
+  const requiresMedicalEvidence = formValues.leaveType === "sick_leave" && calculatedWorkingDays > 2;
 
   const sortedRequests = useMemo(() => {
     const requests = summaryQuery.data?.requests ?? [];
@@ -564,6 +568,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     setFormTouched(INITIAL_FORM_TOUCHED);
     setFormErrors({});
     setSubmitError(null);
+    setMedicalEvidenceFile(null);
     setIsRequestPanelOpen(true);
   };
 
@@ -573,6 +578,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     setFormTouched(INITIAL_FORM_TOUCHED);
     setFormErrors({});
     setSubmitError(null);
+    setMedicalEvidenceFile(null);
   };
 
   const handleFieldChange =
@@ -616,9 +622,43 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       return;
     }
 
+    const isSickLeaveOverTwoDays = formValues.leaveType === "sick_leave" && calculatedWorkingDays > 2;
+
+    if (isSickLeaveOverTwoDays && !medicalEvidenceFile) {
+      setSubmitError(td("requestPanel.medicalEvidenceRequired"));
+      showToast("error", td("requestPanel.medicalEvidenceRequired"));
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      let medicalEvidencePath: string | undefined;
+
+      if (isSickLeaveOverTwoDays && medicalEvidenceFile) {
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", medicalEvidenceFile);
+
+        const uploadResponse = await fetch("/api/v1/time-off/medical-evidence", {
+          method: "POST",
+          body: uploadFormData
+        });
+
+        const uploadPayload = (await uploadResponse.json()) as {
+          data?: { filePath?: string } | null;
+          error?: { message?: string } | null;
+        };
+
+        if (!uploadResponse.ok || !uploadPayload.data?.filePath) {
+          const message = uploadPayload.error?.message ?? td("toast.unableToSubmitLeave");
+          setSubmitError(message);
+          showToast("error", message);
+          return;
+        }
+
+        medicalEvidencePath = uploadPayload.data.filePath;
+      }
+
       const response = await fetch("/api/v1/time-off/requests", {
         method: "POST",
         headers: {
@@ -628,7 +668,8 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           leaveType: formValues.leaveType.trim(),
           startDate: formValues.startDate,
           endDate: formValues.endDate,
-          reason: formValues.reason.trim()
+          reason: formValues.reason.trim(),
+          ...(medicalEvidencePath ? { medicalEvidencePath } : {})
         })
       });
 
@@ -845,11 +886,11 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         </section>
       ) : null}
 
-      {/* Probation notice */}
+      {/* Onboarding restriction notice */}
       {summaryQuery.data.profile.status === "onboarding" ? (
-        <section className="settings-card" aria-label={td('probation.notice')}>
+        <section className="settings-card" aria-label={td('onboardingNotice.notice')}>
           <p className="settings-card-description">
-            {t('probation.notice')}
+            {t('onboardingNotice.notice')}
           </p>
         </section>
       ) : null}
@@ -1115,6 +1156,9 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         onClose={closeRequestPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSubmitRequest} noValidate>
+          {availableLeaveTypes.length === 0 ? (
+            <p className="form-field-error">{t('requestPanel.noPoliciesConfigured')}</p>
+          ) : (
           <label className="form-field" htmlFor="timeoff-leave-type">
             <span className="form-label">{t('requestPanel.leaveTypeLabel')}</span>
             <select
@@ -1133,6 +1177,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             </select>
             {formErrors.leaveType ? <p className="form-field-error">{formErrors.leaveType}</p> : null}
           </label>
+          )}
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="timeoff-start-date">
@@ -1199,13 +1244,32 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             ) : null}
           </section>
 
+          {requiresMedicalEvidence ? (
+            <label className="form-field" htmlFor="timeoff-medical-evidence">
+              <span className="form-label">{t('requestPanel.medicalEvidenceLabel')}</span>
+              <p className="settings-card-description">{t('requestPanel.sickLeaveUploadNote')}</p>
+              <input
+                id="timeoff-medical-evidence"
+                type="file"
+                className="form-input"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  setMedicalEvidenceFile(event.currentTarget.files?.[0] ?? null);
+                }}
+              />
+              {!medicalEvidenceFile ? (
+                <p className="form-field-error">{t('requestPanel.medicalEvidenceRequired')}</p>
+              ) : null}
+            </label>
+          ) : null}
+
           {submitError ? <p className="form-submit-error">{submitError}</p> : null}
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeRequestPanel}>
               {tCommon('cancel')}
             </button>
-            <button type="submit" className="button button-accent" disabled={isSubmitting}>
+            <button type="submit" className="button button-accent" disabled={isSubmitting || (requiresMedicalEvidence && !medicalEvidenceFile)}>
               {isSubmitting ? t('requestPanel.submitting') : t('requestPanel.submitRequest')}
             </button>
           </div>

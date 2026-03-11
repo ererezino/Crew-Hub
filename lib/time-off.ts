@@ -172,6 +172,14 @@ export function formatLeaveTypeLabel(leaveType: string, locale?: "en" | "fr"): s
     return isFr ? "Congé anniversaire" : "Birthday Leave";
   }
 
+  if (normalized === "maternity" || normalized === "maternity_leave") {
+    return isFr ? "Congé maternité" : "Maternity Leave";
+  }
+
+  if (normalized === "paternity" || normalized === "paternity_leave") {
+    return isFr ? "Congé paternité" : "Paternity Leave";
+  }
+
   const baseLabel = leaveType
     .replace(/_/g, " ")
     .split(" ")

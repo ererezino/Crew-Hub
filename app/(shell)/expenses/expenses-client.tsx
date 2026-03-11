@@ -41,6 +41,7 @@ import {
   toneForExpenseStatus
 } from "../../../lib/expenses";
 import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries";
+import { useMePaymentDetails } from "../../../hooks/use-payment-details";
 import { Receipt } from "lucide-react";
 import type {
   CreateExpenseCommentResponse,
@@ -66,6 +67,8 @@ type ToastMessage = {
   message: string;
 };
 
+type VendorPaymentMethodOption = "bank_transfer" | "mobile_money" | "crew_tag" | "international_wire";
+
 type ExpenseFormValues = {
   expenseType: ExpenseType;
   category: ExpenseCategory;
@@ -75,8 +78,18 @@ type ExpenseFormValues = {
   expenseDate: string;
   currency: string;
   vendorName: string;
+  vendorPaymentMethod: VendorPaymentMethodOption;
   vendorBankAccountName: string;
   vendorBankAccountNumber: string;
+  vendorMobileMoneyProvider: string;
+  vendorMobileMoneyNumber: string;
+  vendorCrewTag: string;
+  vendorWireBankName: string;
+  vendorWireAccountNumber: string;
+  vendorWireSwiftBic: string;
+  vendorWireIban: string;
+  vendorWireBankCountry: string;
+  vendorWireCurrency: string;
   saveVendor: boolean;
 };
 
@@ -115,8 +128,18 @@ const INITIAL_FORM_VALUES: ExpenseFormValues = {
   expenseDate: todayIsoDate(),
   currency: "USD",
   vendorName: "",
+  vendorPaymentMethod: "bank_transfer",
   vendorBankAccountName: "",
   vendorBankAccountNumber: "",
+  vendorMobileMoneyProvider: "",
+  vendorMobileMoneyNumber: "",
+  vendorCrewTag: "",
+  vendorWireBankName: "",
+  vendorWireAccountNumber: "",
+  vendorWireSwiftBic: "",
+  vendorWireIban: "",
+  vendorWireBankCountry: "",
+  vendorWireCurrency: "",
   saveVendor: false
 };
 
@@ -130,8 +153,18 @@ const INITIAL_TOUCHED: ExpenseFormTouched = {
   currency: false,
   receipt: false,
   vendorName: false,
+  vendorPaymentMethod: false,
   vendorBankAccountName: false,
   vendorBankAccountNumber: false,
+  vendorMobileMoneyProvider: false,
+  vendorMobileMoneyNumber: false,
+  vendorCrewTag: false,
+  vendorWireBankName: false,
+  vendorWireAccountNumber: false,
+  vendorWireSwiftBic: false,
+  vendorWireIban: false,
+  vendorWireBankCountry: false,
+  vendorWireCurrency: false,
   saveVendor: false
 };
 
@@ -145,8 +178,18 @@ const ALL_TOUCHED: ExpenseFormTouched = {
   currency: true,
   receipt: true,
   vendorName: true,
+  vendorPaymentMethod: true,
   vendorBankAccountName: true,
   vendorBankAccountNumber: true,
+  vendorMobileMoneyProvider: true,
+  vendorMobileMoneyNumber: true,
+  vendorCrewTag: true,
+  vendorWireBankName: true,
+  vendorWireAccountNumber: true,
+  vendorWireSwiftBic: true,
+  vendorWireIban: true,
+  vendorWireBankCountry: true,
+  vendorWireCurrency: true,
   saveVendor: true
 };
 
@@ -517,6 +560,7 @@ export function ExpensesClient({
   const [month, setMonth] = useState(currentMonthKey());
   const expensesQuery = useExpenses({ month });
   const vendorBeneficiaries = useVendorBeneficiaries();
+  const mePaymentDetails = useMePaymentDetails();
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isDraggingReceipt, setIsDraggingReceipt] = useState(false);
@@ -647,6 +691,24 @@ export function ExpensesClient({
       }
     };
 
+  const handleFormChange = (field: keyof ExpenseFormValues, value: string | boolean) => {
+    const nextValues = {
+      ...formValues,
+      [field]: value
+    };
+
+    setFormValues(nextValues);
+    setExpenseFormDirty(true);
+
+    if (formTouched[field as ExpenseFormField]) {
+      setFormErrors(getFormErrors(nextValues, formTouched, receiptFile, td));
+    }
+
+    if (submitError) {
+      setSubmitError(null);
+    }
+  };
+
   const handleFieldBlur = (field: ExpenseFormField) => () => {
     const nextTouched = {
       ...formTouched,
@@ -658,7 +720,7 @@ export function ExpensesClient({
   };
 
   const handleVendorInputChange =
-    (field: "vendorName" | "vendorBankAccountName" | "vendorBankAccountNumber") =>
+    (field: "vendorName" | "vendorBankAccountName" | "vendorBankAccountNumber" | "vendorMobileMoneyProvider" | "vendorMobileMoneyNumber" | "vendorCrewTag" | "vendorWireBankName" | "vendorWireAccountNumber" | "vendorWireSwiftBic" | "vendorWireIban" | "vendorWireBankCountry" | "vendorWireCurrency") =>
     (value: string) => {
       const nextValues = {
         ...formValues,
@@ -754,8 +816,18 @@ export function ExpensesClient({
     formData.set("receipt", receiptFile);
     if (formValues.expenseType === "work_expense") {
       formData.set("vendorName", formValues.vendorName.trim());
+      formData.set("vendorPaymentMethod", formValues.vendorPaymentMethod);
       formData.set("vendorBankAccountName", formValues.vendorBankAccountName.trim());
       formData.set("vendorBankAccountNumber", formValues.vendorBankAccountNumber.trim());
+      formData.set("vendorMobileMoneyProvider", formValues.vendorMobileMoneyProvider.trim());
+      formData.set("vendorMobileMoneyNumber", formValues.vendorMobileMoneyNumber.trim());
+      formData.set("vendorCrewTag", formValues.vendorCrewTag.trim());
+      formData.set("vendorWireBankName", formValues.vendorWireBankName.trim());
+      formData.set("vendorWireAccountNumber", formValues.vendorWireAccountNumber.trim());
+      formData.set("vendorWireSwiftBic", formValues.vendorWireSwiftBic.trim());
+      formData.set("vendorWireIban", formValues.vendorWireIban.trim());
+      formData.set("vendorWireBankCountry", formValues.vendorWireBankCountry.trim());
+      formData.set("vendorWireCurrency", formValues.vendorWireCurrency.trim());
       if (formValues.saveVendor && !selectedVendorId) {
         formData.set("saveVendor", "true");
       }
@@ -1421,16 +1493,92 @@ export function ExpensesClient({
                                     <dl className="expenses-detail-grid">
                                       <dt>{t('vendorDetails.vendor')}</dt>
                                       <dd>{expense.vendorName}</dd>
-                                      {expense.vendorBankAccountName ? (
+                                      <dt>{t('paymentRailLabel')}</dt>
+                                      <dd>
+                                        {expense.vendorPaymentMethod === "mobile_money"
+                                          ? t('vendorMobileMoney')
+                                          : expense.vendorPaymentMethod === "crew_tag"
+                                            ? t('vendorCrewTag')
+                                            : expense.vendorPaymentMethod === "international_wire"
+                                              ? t('vendorInternationalWire')
+                                              : t('vendorBankTransfer')}
+                                      </dd>
+                                      {(!expense.vendorPaymentMethod || expense.vendorPaymentMethod === "bank_transfer") ? (
                                         <>
-                                          <dt>{t('vendorDetails.accountName')}</dt>
-                                          <dd>{expense.vendorBankAccountName}</dd>
+                                          {expense.vendorBankAccountName ? (
+                                            <>
+                                              <dt>{t('vendorDetails.accountName')}</dt>
+                                              <dd>{expense.vendorBankAccountName}</dd>
+                                            </>
+                                          ) : null}
+                                          {expense.vendorBankAccountNumber ? (
+                                            <>
+                                              <dt>{t('vendorDetails.accountNumber')}</dt>
+                                              <dd className="numeric">{expense.vendorBankAccountNumber}</dd>
+                                            </>
+                                          ) : null}
                                         </>
                                       ) : null}
-                                      {expense.vendorBankAccountNumber ? (
+                                      {expense.vendorPaymentMethod === "mobile_money" ? (
                                         <>
-                                          <dt>{t('vendorDetails.accountNumber')}</dt>
-                                          <dd className="numeric">{expense.vendorBankAccountNumber}</dd>
+                                          {expense.vendorMobileMoneyProvider ? (
+                                            <>
+                                              <dt>{t('vendorMobileProvider')}</dt>
+                                              <dd>{expense.vendorMobileMoneyProvider}</dd>
+                                            </>
+                                          ) : null}
+                                          {expense.vendorMobileMoneyNumber ? (
+                                            <>
+                                              <dt>{t('vendorMobileNumber')}</dt>
+                                              <dd className="numeric">{expense.vendorMobileMoneyNumber}</dd>
+                                            </>
+                                          ) : null}
+                                        </>
+                                      ) : null}
+                                      {expense.vendorPaymentMethod === "crew_tag" && expense.vendorCrewTag ? (
+                                        <>
+                                          <dt>{t('vendorCrewTagUsername')}</dt>
+                                          <dd>{expense.vendorCrewTag}</dd>
+                                        </>
+                                      ) : null}
+                                      {expense.vendorPaymentMethod === "international_wire" ? (
+                                        <>
+                                          {expense.vendorWireBankName ? (
+                                            <>
+                                              <dt>{t('vendorWireBankName')}</dt>
+                                              <dd>{expense.vendorWireBankName}</dd>
+                                            </>
+                                          ) : null}
+                                          {expense.vendorWireAccountNumber ? (
+                                            <>
+                                              <dt>{t('vendorWireAccountNumber')}</dt>
+                                              <dd className="numeric">{expense.vendorWireAccountNumber}</dd>
+                                            </>
+                                          ) : null}
+                                          {expense.vendorWireSwiftBic ? (
+                                            <>
+                                              <dt>{t('vendorWireSwiftBic')}</dt>
+                                              <dd className="numeric">{expense.vendorWireSwiftBic}</dd>
+                                            </>
+                                          ) : null}
+                                          {expense.vendorWireIban ? (
+                                            <>
+                                              <dt>{t('vendorWireIban')}</dt>
+                                              <dd className="numeric">{expense.vendorWireIban}</dd>
+                                            </>
+                                          ) : null}
+                                          {expense.vendorWireBankCountry ? (
+                                            <>
+                                              <dt>{t('vendorWireBankCountry')}</dt>
+                                              <dd>{expense.vendorWireBankCountry}</dd>
+                                            </>
+                                          ) : null}
+                                          {expense.vendorWireCurrency ? (
+                                            <>
+                                              <dt>{t('vendorWireCurrency')}</dt>
+                                              <dd className="numeric">{expense.vendorWireCurrency}</dd>
+                                            </>
+                                          ) : null}
                                         </>
                                       ) : null}
                                     </dl>
@@ -1506,6 +1654,14 @@ export function ExpensesClient({
         onClose={closePanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSubmitExpense}>
+          <div className="expenses-type-badge-row">
+            <StatusBadge tone={formValues.expenseType === "work_expense" ? "info" : "success"}>
+              {formValues.expenseType === "work_expense"
+                ? t('submitPanel.workExpense')
+                : t('submitPanel.personalReimbursement')}
+            </StatusBadge>
+          </div>
+
           <div className="form-field">
             <span className="form-label">{t('submitPanel.expenseTypeLabel')}</span>
             <div className="expenses-type-toggle">
@@ -1535,13 +1691,39 @@ export function ExpensesClient({
           </div>
 
           {formValues.expenseType === "personal_reimbursement" ? (
-            <div className="expenses-info-banner">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="expenses-info-icon">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
-                <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-              <p>{t('submitPanel.personalReimbursementNote')}</p>
-            </div>
+            <>
+              <div className="expenses-info-banner">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="expenses-info-icon">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
+                  <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+                <p>{t('submitPanel.personalReimbursementNote')}</p>
+              </div>
+              <div className="expenses-payout-display">
+                <span className="form-label">{t('payoutAccount')}</span>
+                {mePaymentDetails.isLoading ? (
+                  <p className="settings-card-description">{tCommon('loading')}</p>
+                ) : mePaymentDetails.data?.paymentDetail ? (
+                  <dl className="expenses-detail-grid">
+                    <dt>{t('vendorPaymentMethod')}</dt>
+                    <dd>{mePaymentDetails.data.paymentDetail.paymentMethod === "bank_transfer"
+                      ? t('vendorBankTransfer')
+                      : mePaymentDetails.data.paymentDetail.paymentMethod === "mobile_money"
+                        ? t('vendorMobileMoney')
+                        : t('vendorCrewTag')}</dd>
+                    <dt>{t('payoutAccount')}</dt>
+                    <dd className="numeric">{mePaymentDetails.data.paymentDetail.maskedDestination}</dd>
+                  </dl>
+                ) : (
+                  <div className="expenses-info-banner">
+                    <p>{t('noPayoutConfigured')}</p>
+                    <Link href="/payment-details" className="button">
+                      {t('setupPayment')}
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </>
           ) : null}
 
           <div className="form-field">
@@ -1689,8 +1871,18 @@ export function ExpensesClient({
                         const nextValues = {
                           ...formValues,
                           vendorName: vendor.vendorName,
+                          vendorPaymentMethod: (vendor.paymentMethod ?? "bank_transfer") as VendorPaymentMethodOption,
                           vendorBankAccountName: vendor.bankAccountName,
                           vendorBankAccountNumber: vendor.bankAccountNumber,
+                          vendorMobileMoneyProvider: vendor.mobileMoneyProvider ?? "",
+                          vendorMobileMoneyNumber: vendor.mobileMoneyNumber ?? "",
+                          vendorCrewTag: vendor.crewTag ?? "",
+                          vendorWireBankName: vendor.wireBankName ?? "",
+                          vendorWireAccountNumber: vendor.wireAccountNumber ?? "",
+                          vendorWireSwiftBic: vendor.wireSwiftBic ?? "",
+                          vendorWireIban: vendor.wireIban ?? "",
+                          vendorWireBankCountry: vendor.wireBankCountry ?? "",
+                          vendorWireCurrency: vendor.wireCurrency ?? "",
                           saveVendor: false
                         };
                         setFormValues(nextValues);
@@ -1703,11 +1895,20 @@ export function ExpensesClient({
                     disabled={isSubmitting}
                   >
                     <option value="">{t('submitPanel.chooseSavedVendor')}</option>
-                    {vendorBeneficiaries.vendors.map((vendor) => (
-                      <option key={vendor.id} value={vendor.id}>
-                        {vendor.vendorName} - {vendor.bankAccountNumber}
-                      </option>
-                    ))}
+                    {vendorBeneficiaries.vendors.map((vendor) => {
+                      const label = vendor.paymentMethod === "mobile_money"
+                        ? `${vendor.vendorName} - ${vendor.mobileMoneyNumber ?? ""}`
+                        : vendor.paymentMethod === "crew_tag"
+                          ? `${vendor.vendorName} - ${vendor.crewTag ?? ""}`
+                          : vendor.paymentMethod === "international_wire"
+                            ? `${vendor.vendorName} - ${vendor.wireAccountNumber ?? ""}`
+                            : `${vendor.vendorName} - ${vendor.bankAccountNumber}`;
+                      return (
+                        <option key={vendor.id} value={vendor.id}>
+                          {label}
+                        </option>
+                      );
+                    })}
                   </select>
                 </label>
               ) : null}
@@ -1729,39 +1930,183 @@ export function ExpensesClient({
                 ) : null}
               </label>
 
-              <label className="form-field">
-                <span className="form-label">{t('submitPanel.bankAccountNameLabel')} <span className="form-required">*</span></span>
-                <input
-                  className={formErrors.vendorBankAccountName ? "form-input form-input-error" : "form-input"}
-                  type="text"
-                  value={formValues.vendorBankAccountName}
-                  onChange={(e) => handleVendorInputChange("vendorBankAccountName")(e.target.value)}
-                  onBlur={handleFieldBlur("vendorBankAccountName")}
-                  placeholder={t('submitPanel.bankAccountNamePlaceholder')}
+              <label className="form-field" htmlFor="expense-vendor-payment-method">
+                <span className="form-label">{t('vendorPaymentMethod')}</span>
+                <select
+                  id="expense-vendor-payment-method"
+                  className="form-input"
+                  value={formValues.vendorPaymentMethod}
+                  onChange={(e) => handleFormChange("vendorPaymentMethod", e.target.value)}
                   disabled={isSubmitting}
-                  maxLength={200}
-                />
-                {formErrors.vendorBankAccountName ? (
-                  <p className="form-field-error">{formErrors.vendorBankAccountName}</p>
-                ) : null}
+                >
+                  <option value="bank_transfer">{t('vendorBankTransfer')}</option>
+                  <option value="mobile_money">{t('vendorMobileMoney')}</option>
+                  <option value="crew_tag">{t('vendorCrewTag')}</option>
+                  <option value="international_wire">{t('vendorInternationalWire')}</option>
+                </select>
               </label>
 
-              <label className="form-field">
-                <span className="form-label">{t('submitPanel.bankAccountNumberLabel')} <span className="form-required">*</span></span>
-                <input
-                  className={formErrors.vendorBankAccountNumber ? "form-input form-input-error" : "form-input"}
-                  type="text"
-                  value={formValues.vendorBankAccountNumber}
-                  onChange={(e) => handleVendorInputChange("vendorBankAccountNumber")(e.target.value)}
-                  onBlur={handleFieldBlur("vendorBankAccountNumber")}
-                  placeholder={t('submitPanel.bankAccountNumberPlaceholder')}
-                  disabled={isSubmitting}
-                  maxLength={50}
-                />
-                {formErrors.vendorBankAccountNumber ? (
-                  <p className="form-field-error">{formErrors.vendorBankAccountNumber}</p>
-                ) : null}
-              </label>
+              {formValues.vendorPaymentMethod === "bank_transfer" ? (
+                <>
+                  <label className="form-field">
+                    <span className="form-label">{t('submitPanel.bankAccountNameLabel')} <span className="form-required">*</span></span>
+                    <input
+                      className={formErrors.vendorBankAccountName ? "form-input form-input-error" : "form-input"}
+                      type="text"
+                      value={formValues.vendorBankAccountName}
+                      onChange={(e) => handleVendorInputChange("vendorBankAccountName")(e.target.value)}
+                      onBlur={handleFieldBlur("vendorBankAccountName")}
+                      placeholder={t('submitPanel.bankAccountNamePlaceholder')}
+                      disabled={isSubmitting}
+                      maxLength={200}
+                    />
+                    {formErrors.vendorBankAccountName ? (
+                      <p className="form-field-error">{formErrors.vendorBankAccountName}</p>
+                    ) : null}
+                  </label>
+                  <label className="form-field">
+                    <span className="form-label">{t('submitPanel.bankAccountNumberLabel')} <span className="form-required">*</span></span>
+                    <input
+                      className={formErrors.vendorBankAccountNumber ? "form-input form-input-error" : "form-input"}
+                      type="text"
+                      value={formValues.vendorBankAccountNumber}
+                      onChange={(e) => handleVendorInputChange("vendorBankAccountNumber")(e.target.value)}
+                      onBlur={handleFieldBlur("vendorBankAccountNumber")}
+                      placeholder={t('submitPanel.bankAccountNumberPlaceholder')}
+                      disabled={isSubmitting}
+                      maxLength={50}
+                    />
+                    {formErrors.vendorBankAccountNumber ? (
+                      <p className="form-field-error">{formErrors.vendorBankAccountNumber}</p>
+                    ) : null}
+                  </label>
+                </>
+              ) : null}
+
+              {formValues.vendorPaymentMethod === "mobile_money" ? (
+                <>
+                  <label className="form-field">
+                    <span className="form-label">{t('vendorMobileProvider')} <span className="form-required">*</span></span>
+                    <input
+                      className="form-input"
+                      type="text"
+                      value={formValues.vendorMobileMoneyProvider}
+                      onChange={(e) => handleVendorInputChange("vendorMobileMoneyProvider")(e.target.value)}
+                      onBlur={handleFieldBlur("vendorMobileMoneyProvider")}
+                      disabled={isSubmitting}
+                      maxLength={100}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span className="form-label">{t('vendorMobileNumber')} <span className="form-required">*</span></span>
+                    <input
+                      className="form-input"
+                      type="text"
+                      value={formValues.vendorMobileMoneyNumber}
+                      onChange={(e) => handleVendorInputChange("vendorMobileMoneyNumber")(e.target.value)}
+                      onBlur={handleFieldBlur("vendorMobileMoneyNumber")}
+                      disabled={isSubmitting}
+                      maxLength={30}
+                    />
+                  </label>
+                </>
+              ) : null}
+
+              {formValues.vendorPaymentMethod === "crew_tag" ? (
+                <label className="form-field">
+                  <span className="form-label">{t('vendorCrewTagUsername')} <span className="form-required">*</span></span>
+                  <input
+                    className="form-input"
+                    type="text"
+                    value={formValues.vendorCrewTag}
+                    onChange={(e) => handleVendorInputChange("vendorCrewTag")(e.target.value)}
+                    onBlur={handleFieldBlur("vendorCrewTag")}
+                    disabled={isSubmitting}
+                    maxLength={100}
+                  />
+                </label>
+              ) : null}
+
+              {formValues.vendorPaymentMethod === "international_wire" ? (
+                <>
+                  <label className="form-field">
+                    <span className="form-label">{t('vendorWireBankName')} <span className="form-required">*</span></span>
+                    <input
+                      className="form-input"
+                      type="text"
+                      value={formValues.vendorWireBankName}
+                      onChange={(e) => handleVendorInputChange("vendorWireBankName")(e.target.value)}
+                      onBlur={handleFieldBlur("vendorWireBankName")}
+                      disabled={isSubmitting}
+                      maxLength={200}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span className="form-label">{t('vendorWireAccountNumber')} <span className="form-required">*</span></span>
+                    <input
+                      className="form-input"
+                      type="text"
+                      value={formValues.vendorWireAccountNumber}
+                      onChange={(e) => handleVendorInputChange("vendorWireAccountNumber")(e.target.value)}
+                      onBlur={handleFieldBlur("vendorWireAccountNumber")}
+                      disabled={isSubmitting}
+                      maxLength={50}
+                    />
+                  </label>
+                  <div className="expenses-form-grid">
+                    <label className="form-field">
+                      <span className="form-label">{t('vendorWireSwiftBic')}</span>
+                      <input
+                        className="form-input"
+                        type="text"
+                        value={formValues.vendorWireSwiftBic}
+                        onChange={(e) => handleVendorInputChange("vendorWireSwiftBic")(e.target.value)}
+                        onBlur={handleFieldBlur("vendorWireSwiftBic")}
+                        disabled={isSubmitting}
+                        maxLength={11}
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span className="form-label">{t('vendorWireIban')}</span>
+                      <input
+                        className="form-input"
+                        type="text"
+                        value={formValues.vendorWireIban}
+                        onChange={(e) => handleVendorInputChange("vendorWireIban")(e.target.value)}
+                        onBlur={handleFieldBlur("vendorWireIban")}
+                        disabled={isSubmitting}
+                        maxLength={34}
+                      />
+                    </label>
+                  </div>
+                  <div className="expenses-form-grid">
+                    <label className="form-field">
+                      <span className="form-label">{t('vendorWireBankCountry')}</span>
+                      <input
+                        className="form-input"
+                        type="text"
+                        value={formValues.vendorWireBankCountry}
+                        onChange={(e) => handleVendorInputChange("vendorWireBankCountry")(e.target.value)}
+                        onBlur={handleFieldBlur("vendorWireBankCountry")}
+                        disabled={isSubmitting}
+                        maxLength={100}
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span className="form-label">{t('vendorWireCurrency')}</span>
+                      <input
+                        className="form-input"
+                        type="text"
+                        value={formValues.vendorWireCurrency}
+                        onChange={(e) => handleVendorInputChange("vendorWireCurrency")(e.target.value.toUpperCase())}
+                        onBlur={handleFieldBlur("vendorWireCurrency")}
+                        disabled={isSubmitting}
+                        maxLength={3}
+                      />
+                    </label>
+                  </div>
+                </>
+              ) : null}
 
               {!selectedVendorId ? (
                 <label className="expenses-save-vendor-check">

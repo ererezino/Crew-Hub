@@ -9,7 +9,7 @@ import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../types/auth";
-import type { Announcement, AnnouncementsResponseData } from "../../../../types/announcements";
+import type { Announcement, AnnouncementAttachment, AnnouncementsResponseData } from "../../../../types/announcements";
 
 const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).optional(),
@@ -55,11 +55,22 @@ function canManageAnnouncements(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "HR_ADMIN") || hasRole(roles, "SUPER_ADMIN");
 }
 
+type AttachmentRow = {
+  id: string;
+  announcement_id: string;
+  file_name: string;
+  file_path: string;
+  file_size_bytes: number;
+  mime_type: string;
+  created_at: string;
+};
+
 function toAnnouncement(
   row: z.infer<typeof announcementRowSchema>,
   creatorNameById: ReadonlyMap<string, string>,
   readAtByAnnouncementId: ReadonlyMap<string, string>,
-  dismissedAtByAnnouncementId: ReadonlyMap<string, string>
+  dismissedAtByAnnouncementId: ReadonlyMap<string, string>,
+  attachmentsByAnnouncementId: ReadonlyMap<string, AnnouncementAttachment[]>
 ): Announcement {
   const readAt = readAtByAnnouncementId.get(row.id) ?? null;
   const dismissedAt = dismissedAtByAnnouncementId.get(row.id) ?? null;
@@ -76,7 +87,8 @@ function toAnnouncement(
     isRead: Boolean(readAt),
     readAt,
     isDismissed: Boolean(dismissedAt),
-    dismissedAt
+    dismissedAt,
+    attachments: attachmentsByAnnouncementId.get(row.id) ?? []
   };
 }
 
@@ -230,10 +242,41 @@ export async function GET(request: Request) {
     }
   }
 
+  // Fetch attachments for all announcements
+  let attachmentsByAnnouncementId = new Map<string, AnnouncementAttachment[]>();
+
+  if (announcementIds.length > 0) {
+    const { data: rawAttachments } = await supabase
+      .from("announcement_attachments")
+      .select("id, announcement_id, file_name, file_path, file_size_bytes, mime_type, created_at")
+      .in("announcement_id", announcementIds)
+      .eq("org_id", profile.org_id)
+      .order("created_at", { ascending: true });
+
+    if (rawAttachments) {
+      const grouped = new Map<string, AnnouncementAttachment[]>();
+      for (const row of rawAttachments as AttachmentRow[]) {
+        const mapped: AnnouncementAttachment = {
+          id: row.id,
+          announcementId: row.announcement_id,
+          fileName: row.file_name,
+          filePath: row.file_path,
+          fileSizeBytes: row.file_size_bytes,
+          mimeType: row.mime_type,
+          createdAt: row.created_at
+        };
+        const existing = grouped.get(row.announcement_id) ?? [];
+        existing.push(mapped);
+        grouped.set(row.announcement_id, existing);
+      }
+      attachmentsByAnnouncementId = grouped;
+    }
+  }
+
   const showDismissed = parsedQuery.data.dismissed === "true";
 
   const allAnnouncements = announcementsRows.map((row) =>
-    toAnnouncement(row, creatorNameById, readAtByAnnouncementId, dismissedAtByAnnouncementId)
+    toAnnouncement(row, creatorNameById, readAtByAnnouncementId, dismissedAtByAnnouncementId, attachmentsByAnnouncementId)
   );
 
   const announcements = showDismissed
@@ -376,6 +419,7 @@ export async function POST(request: Request) {
     parsedAnnouncement.data,
     new Map([[profile.id, profile.full_name]]),
     new Map([[parsedAnnouncement.data.id, createdReadAt]]),
+    new Map(),
     new Map()
   );
 

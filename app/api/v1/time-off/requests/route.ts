@@ -32,7 +32,8 @@ const createLeaveRequestSchema = z.object({
   endDate: z
     .string()
     .refine((value) => isIsoDate(value), "End date must be in YYYY-MM-DD format"),
-  reason: z.string().trim().min(1, "Reason is required").max(2000, "Reason is too long")
+  reason: z.string().trim().min(1, "Reason is required").max(2000, "Reason is too long"),
+  medicalEvidencePath: z.string().trim().max(500).optional()
 });
 
 const profileRowSchema = z.object({
@@ -286,7 +287,7 @@ export async function POST(request: Request) {
     });
   }
 
-  // Probation restriction: only unpaid personal days allowed
+  // Onboarding restriction: only unpaid personal days allowed
   if (
     employeeProfile.status === "onboarding" &&
     parsedBody.data.leaveType !== "unpaid_personal_day"
@@ -294,8 +295,8 @@ export async function POST(request: Request) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
-        code: "PROBATION_RESTRICTION",
-        message: "During probation, only unpaid personal days can be requested."
+        code: "ONBOARDING_RESTRICTION",
+        message: "During your onboarding period, only unpaid personal days can be requested. Once onboarding is complete, all leave types become available."
       },
       meta: buildMeta()
     });
@@ -435,6 +436,17 @@ export async function POST(request: Request) {
   // Sick leave > 2 consecutive working days requires documentation
   const requiresDocumentation = parsedBody.data.leaveType === "sick_leave" && totalDays > 2;
 
+  if (requiresDocumentation && !parsedBody.data.medicalEvidencePath) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "MEDICAL_EVIDENCE_REQUIRED",
+        message: "Medical evidence is required for sick leave longer than 2 days."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const { data: insertedRequest, error: requestInsertError } = await supabase
     .from("leave_requests")
     .insert({
@@ -446,7 +458,8 @@ export async function POST(request: Request) {
       total_days: totalDays,
       status: "pending",
       reason: parsedBody.data.reason.trim(),
-      requires_documentation: requiresDocumentation
+      requires_documentation: requiresDocumentation,
+      medical_evidence_path: parsedBody.data.medicalEvidencePath ?? null
     })
     .select(
       "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"

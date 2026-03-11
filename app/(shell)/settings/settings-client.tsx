@@ -29,6 +29,11 @@ type SettingsClientProps = {
     email: string;
     roles: UserRole[];
     notificationPreferences: NotificationPreferences;
+    bio: string;
+    pronouns: string;
+    emergencyContactName: string;
+    emergencyContactPhone: string;
+    emergencyContactRelationship: string;
   };
   organization: {
     name: string;
@@ -42,6 +47,11 @@ type SettingsClientProps = {
 type ProfileFormValues = {
   fullName: string;
   phone: string;
+  bio: string;
+  pronouns: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+  emergencyContactRelationship: string;
 };
 
 type OrganizationFormValues = {
@@ -51,7 +61,12 @@ type OrganizationFormValues = {
 function makeProfileSchema(msgs: { nameRequired: string; nameTooLong: string; phoneTooLong: string }) {
   return z.object({
     fullName: z.string().trim().min(1, msgs.nameRequired).max(200, msgs.nameTooLong),
-    phone: z.string().trim().max(30, msgs.phoneTooLong)
+    phone: z.string().trim().max(30, msgs.phoneTooLong),
+    bio: z.string().trim().max(500).optional(),
+    pronouns: z.string().trim().max(50).optional(),
+    emergencyContactName: z.string().trim().max(200).optional(),
+    emergencyContactPhone: z.string().trim().max(30).optional(),
+    emergencyContactRelationship: z.string().trim().max(100).optional()
   });
 }
 
@@ -160,7 +175,12 @@ export function SettingsClient({
 
   const [profileValues, setProfileValues] = useState<ProfileFormValues>({
     fullName: profile.fullName,
-    phone: profile.phone
+    phone: profile.phone,
+    bio: profile.bio,
+    pronouns: profile.pronouns,
+    emergencyContactName: profile.emergencyContactName,
+    emergencyContactPhone: profile.emergencyContactPhone,
+    emergencyContactRelationship: profile.emergencyContactRelationship
   });
   const [profileErrors, setProfileErrors] = useState<Record<string, string | undefined>>({});
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
@@ -615,6 +635,87 @@ export function SettingsClient({
                 <span className="form-label">{t('profile.email')}</span>
                 <input id="profile-email" className="form-input" value={profile.email} disabled />
               </label>
+
+              <label className="form-field" htmlFor="profile-pronouns">
+                <span className="form-label">{t('profile.pronounsLabel')}</span>
+                <input
+                  id="profile-pronouns"
+                  className="form-input"
+                  maxLength={50}
+                  placeholder={t('profile.pronounsPlaceholder')}
+                  value={profileValues.pronouns}
+                  onChange={(event) => {
+                    const nextValues = { ...profileValues, pronouns: event.currentTarget.value };
+                    setProfileValues(nextValues);
+                    setFormDirty(true);
+                  }}
+                />
+              </label>
+
+              <label className="form-field" htmlFor="profile-bio">
+                <span className="form-label">{t('profile.bioLabel')}</span>
+                <textarea
+                  id="profile-bio"
+                  className="form-input"
+                  maxLength={500}
+                  rows={3}
+                  placeholder={t('profile.bioPlaceholder')}
+                  value={profileValues.bio}
+                  onChange={(event) => {
+                    const nextValues = { ...profileValues, bio: event.currentTarget.value };
+                    setProfileValues(nextValues);
+                    setFormDirty(true);
+                  }}
+                />
+              </label>
+
+              <fieldset className="form-field">
+                <legend className="form-label">{t('profile.emergencyContactTitle')}</legend>
+                <div className="settings-emergency-fields">
+                  <label className="form-field" htmlFor="profile-ec-name">
+                    <span className="form-label-sm">{t('profile.emergencyContactNameLabel')}</span>
+                    <input
+                      id="profile-ec-name"
+                      className="form-input"
+                      maxLength={200}
+                      value={profileValues.emergencyContactName}
+                      onChange={(event) => {
+                        const nextValues = { ...profileValues, emergencyContactName: event.currentTarget.value };
+                        setProfileValues(nextValues);
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-ec-phone">
+                    <span className="form-label-sm">{t('profile.emergencyContactPhoneLabel')}</span>
+                    <input
+                      id="profile-ec-phone"
+                      className="form-input"
+                      maxLength={30}
+                      value={profileValues.emergencyContactPhone}
+                      onChange={(event) => {
+                        const nextValues = { ...profileValues, emergencyContactPhone: event.currentTarget.value };
+                        setProfileValues(nextValues);
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-ec-relationship">
+                    <span className="form-label-sm">{t('profile.emergencyContactRelationshipLabel')}</span>
+                    <input
+                      id="profile-ec-relationship"
+                      className="form-input"
+                      maxLength={100}
+                      value={profileValues.emergencyContactRelationship}
+                      onChange={(event) => {
+                        const nextValues = { ...profileValues, emergencyContactRelationship: event.currentTarget.value };
+                        setProfileValues(nextValues);
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                </div>
+              </fieldset>
 
               <div className="settings-actions">
                 <button type="submit" className="button button-accent" disabled={isProfileSaving}>

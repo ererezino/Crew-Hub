@@ -49,12 +49,13 @@ export function MyOnboardingClient() {
   const t = useTranslations('myOnboarding');
   const locale = useLocale() as AppLocale;
 
-  const { instances, isLoading: isInstancesLoading, errorMessage: instancesError } =
+  const { instances, isLoading: isInstancesLoading, errorMessage: instancesError, refresh: refreshInstances } =
     useOnboardingInstances({
       scope: "me"
     });
 
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const resolvedSelectedInstanceId = useMemo(() => {
     if (instances.length === 0) {
       return null;
@@ -71,8 +72,36 @@ export function MyOnboardingClient() {
   const {
     detail,
     isLoading: isDetailLoading,
-    errorMessage: detailError
+    errorMessage: detailError,
+    refresh: refreshDetail
   } = useOnboardingInstanceDetail(resolvedSelectedInstanceId);
+
+  const handleCompleteTask = async (instanceId: string, taskId: string) => {
+    setCompletingTaskId(taskId);
+
+    try {
+      const response = await fetch(
+        `/api/v1/onboarding/instances/${instanceId}/tasks/${taskId}/complete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "complete" })
+        }
+      );
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: { message?: string } };
+        return;
+      }
+
+      refreshDetail();
+      refreshInstances();
+    } catch {
+      // Swallow — task state unchanged
+    } finally {
+      setCompletingTaskId(null);
+    }
+  };
 
   const selectedInstance = useMemo(
     () => instances.find((instance) => instance.id === resolvedSelectedInstanceId) ?? null,
@@ -231,9 +260,21 @@ export function MyOnboardingClient() {
                       {t('signNow')}
                     </Link>
                   ) : null}
-                  <p className="settings-card-description">
-                    {t('completedBy', { name: task.completedByName ?? "--" })}
-                  </p>
+                  {task.taskType !== "e_signature" && task.status !== "completed" ? (
+                    <button
+                      type="button"
+                      className="button button-accent button-sm"
+                      disabled={completingTaskId === task.id}
+                      onClick={() => handleCompleteTask(detail.instance.id, task.id)}
+                    >
+                      {completingTaskId === task.id ? t('completing') : t('markComplete')}
+                    </button>
+                  ) : null}
+                  {task.status === "completed" ? (
+                    <p className="settings-card-description">
+                      {t('completedBy', { name: task.completedByName ?? "--" })}
+                    </p>
+                  ) : null}
                 </article>
               ))}
             </section>

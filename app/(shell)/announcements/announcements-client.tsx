@@ -19,7 +19,7 @@ import { useAnnouncements } from "../../../hooks/use-announcements";
 import { useNotifications } from "../../../hooks/use-notifications";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
-import { Archive, Megaphone } from "lucide-react";
+import { Archive, Megaphone, Paperclip, X } from "lucide-react";
 import type {
   Announcement,
   AnnouncementDismissResponse,
@@ -184,6 +184,23 @@ function AnnouncementCard({
 
         <p className="announcement-item-body">{announcement.body}</p>
 
+        {announcement.attachments.length > 0 ? (
+          <div className="announcement-attachments">
+            <p className="announcement-attachments-label">
+              <Paperclip size={14} aria-hidden="true" />
+              {t('attachmentsLabel')}
+            </p>
+            <ul className="attachment-list">
+              {announcement.attachments.map((attachment) => (
+                <li key={attachment.id} className="attachment-list-item">
+                  <Paperclip size={14} aria-hidden="true" />
+                  <span className="attachment-file-name">{attachment.fileName}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         <div className="announcement-row-actions">
           {!announcement.isRead ? (
             <button
@@ -304,6 +321,7 @@ export function AnnouncementsClient({
   const [isDismissingById, setIsDismissingById] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [announcementFormDirty, setAnnouncementFormDirty] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [confirmDeleteAnnouncement, setConfirmDeleteAnnouncement] = useState<Announcement | null>(null);
   const [isDeletingAnnouncement, setIsDeletingAnnouncement] = useState(false);
   useUnsavedGuard(announcementFormDirty);
@@ -346,6 +364,7 @@ export function AnnouncementsClient({
     setFormTouched(INITIAL_FORM_TOUCHED);
     setFormErrors({});
     setSubmitError(null);
+    setSelectedFiles([]);
     setIsPanelOpen(true);
   };
 
@@ -359,6 +378,7 @@ export function AnnouncementsClient({
     setFormTouched(INITIAL_FORM_TOUCHED);
     setFormErrors({});
     setSubmitError(null);
+    setSelectedFiles([]);
     setIsPanelOpen(true);
   };
 
@@ -369,6 +389,7 @@ export function AnnouncementsClient({
     setFormTouched(INITIAL_FORM_TOUCHED);
     setFormErrors({});
     setSubmitError(null);
+    setSelectedFiles([]);
     setAnnouncementFormDirty(false);
   };
 
@@ -425,6 +446,36 @@ export function AnnouncementsClient({
 
     setFormValues(nextValues);
     setAnnouncementFormDirty(true);
+  };
+
+  const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+  const ACCEPTED_FILE_TYPES = ".pdf,.docx,.png,.jpg,.jpeg,.gif,.webp";
+
+  const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.currentTarget.files;
+    if (!files || files.length === 0) return;
+
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        showToast("error", `${file.name}: file exceeds 25 MB limit.`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      setSelectedFiles((current) => [...current, ...validFiles]);
+      setAnnouncementFormDirty(true);
+    }
+
+    // Reset the input so selecting the same file again triggers onChange
+    event.currentTarget.value = "";
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles((current) => current.filter((_, i) => i !== index));
   };
 
   const handleMarkRead = async (announcementId: string) => {
@@ -591,6 +642,29 @@ export function AnnouncementsClient({
         setSubmitError(message);
         showToast("error", message);
         return;
+      }
+
+      const savedAnnouncementId = result.data.announcement.id;
+
+      // Upload attachments sequentially after successful create/edit
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const uploadResponse = await fetch(
+              `/api/v1/announcements/${savedAnnouncementId}/attachments`,
+              { method: "POST", body: formData }
+            );
+
+            if (!uploadResponse.ok) {
+              showToast("error", t('uploadFailed'));
+            }
+          } catch {
+            showToast("error", t('uploadFailed'));
+          }
+        }
       }
 
       showToast(
@@ -830,6 +904,42 @@ export function AnnouncementsClient({
               />
               <span>{t('pinLabel')}</span>
             </label>
+
+            <div className="form-field">
+              <label className="form-label" htmlFor="announcement-attachments">
+                {t('attachmentsLabel')}
+              </label>
+              <input
+                id="announcement-attachments"
+                type="file"
+                className="form-input"
+                accept={ACCEPTED_FILE_TYPES}
+                multiple
+                onChange={handleFilesSelected}
+                disabled={isSaving}
+              />
+              <p className="form-hint">{t('attachmentsHint')}</p>
+              {selectedFiles.length > 0 ? (
+                <ul className="attachment-list">
+                  {selectedFiles.map((file, index) => (
+                    <li key={`${file.name}-${index}`} className="attachment-list-item">
+                      <Paperclip size={14} aria-hidden="true" />
+                      <span className="attachment-file-name">{file.name}</span>
+                      <button
+                        type="button"
+                        className="button button-ghost attachment-remove-button"
+                        onClick={() => handleRemoveFile(index)}
+                        disabled={isSaving}
+                        aria-label={`${t('removeAttachment')}: ${file.name}`}
+                      >
+                        <X size={14} />
+                        {t('removeAttachment')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
 
             {submitError ? (
               <p className="form-submit-error" role="alert">

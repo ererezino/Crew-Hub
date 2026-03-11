@@ -154,7 +154,6 @@ export type ModuleId =
   | "analytics"
   | "signatures"
   | "surveys"
-  | "time_attendance"
   | "notifications";
 
 export const MODULE_STATES: Record<ModuleId, FeatureState> = {
@@ -168,7 +167,6 @@ export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   onboarding: "LIVE",
   expenses: "LIVE",
   compliance: "LIVE",
-  time_attendance: "LIVE",
   notifications: "LIVE",
   announcements: "LIVE",
   compensation: "LIVE",

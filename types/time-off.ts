@@ -5,7 +5,9 @@ export const LEAVE_TYPES = [
   "sick_leave",
   "personal_day",
   "birthday_leave",
-  "unpaid_personal_day"
+  "unpaid_personal_day",
+  "maternity_leave",
+  "paternity_leave"
 ] as const;
 
 export type LeaveType = (typeof LEAVE_TYPES)[number];
@@ -77,6 +79,7 @@ export type LeaveRequestRecord = {
   approverName: string | null;
   rejectionReason: string | null;
   requiresDocumentation?: boolean;
+  medicalEvidencePath?: string | null;
   createdAt: string;
   updatedAt: string;
 };

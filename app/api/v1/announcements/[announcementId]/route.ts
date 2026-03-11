@@ -69,7 +69,8 @@ function toAnnouncement(
     isRead: Boolean(readAt),
     readAt,
     isDismissed: false,
-    dismissedAt: null
+    dismissedAt: null,
+    attachments: []
   };
 }
 

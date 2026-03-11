@@ -352,7 +352,6 @@ describe("Production Hardening", () => {
         "analytics",
         "signatures",
         "surveys",
-        "time_attendance",
         "notifications"
       ];
 

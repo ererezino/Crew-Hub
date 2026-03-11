@@ -11,7 +11,6 @@ import { PageHeader } from "../../../components/shared/page-header";
 import type { UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
 import { ExpenseApprovalsClient } from "../expenses/approvals/approvals-client";
-import { TimeAttendanceApprovalsClient } from "../time-attendance/approvals/approvals-client";
 import { TimeOffApprovalsClient } from "../time-off/approvals/approvals-client";
 
 type ApprovalsClientProps = {
@@ -19,7 +18,6 @@ type ApprovalsClientProps = {
   userRoles: UserRole[];
   canReviewTimeOff: boolean;
   canReviewExpenses: boolean;
-  canReviewTimesheets: boolean;
 };
 
 function resolveInitialTab(requestedTab: string, visibleTabs: PageTab[]): string {
@@ -36,8 +34,7 @@ export function ApprovalsClient({
   requestedTab,
   userRoles,
   canReviewTimeOff,
-  canReviewExpenses,
-  canReviewTimesheets
+  canReviewExpenses
 }: ApprovalsClientProps) {
   const tNav = useTranslations('nav');
   const t = useTranslations('approvalsPage');
@@ -55,8 +52,7 @@ export function ApprovalsClient({
       "approvals-tab-counts",
       userRoles.join("|"),
       canReviewTimeOff,
-      canReviewExpenses,
-      canReviewTimesheets
+      canReviewExpenses
     ],
     queryFn: async () => {
       const response = await fetch("/api/v1/approvals/counts", { method: "GET" });
@@ -64,8 +60,7 @@ export function ApprovalsClient({
       if (!response.ok) {
         return {
           timeOff: 0,
-          expenses: 0,
-          timesheets: 0
+          expenses: 0
         };
       }
 
@@ -79,8 +74,7 @@ export function ApprovalsClient({
 
       return {
         timeOff: payload.data?.timeOff ?? 0,
-        expenses: payload.data?.expenses ?? 0,
-        timesheets: payload.data?.timesheets ?? 0
+        expenses: payload.data?.expenses ?? 0
       };
     },
     staleTime: 2 * 60 * 1000,
@@ -89,9 +83,8 @@ export function ApprovalsClient({
 
   const timeOffCount = approvalsCountQuery.data?.timeOff ?? 0;
   const expensesCount = approvalsCountQuery.data?.expenses ?? 0;
-  const timesheetsCount = approvalsCountQuery.data?.timesheets ?? 0;
 
-  const totalPendingCount = timeOffCount + expensesCount + timesheetsCount;
+  const totalPendingCount = timeOffCount + expensesCount;
 
   const tabs = useMemo<PageTab[]>(
     () => [
@@ -111,15 +104,9 @@ export function ApprovalsClient({
         label: t('tab.expenses'),
         badge: expensesCount,
         requiredRoles: ["MANAGER", "FINANCE_ADMIN", "SUPER_ADMIN"]
-      },
-      {
-        key: "timesheets",
-        label: t('tab.timesheets'),
-        badge: timesheetsCount,
-        requiredRoles: ["TEAM_LEAD", "MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]
       }
     ],
-    [expensesCount, timeOffCount, timesheetsCount, totalPendingCount, t]
+    [expensesCount, timeOffCount, totalPendingCount, t]
   );
 
   const visibleTabs = tabs.filter((tab) => {
@@ -199,17 +186,6 @@ export function ApprovalsClient({
                       <span className="all-pending-arrow">→</span>
                     </button>
                   ) : null}
-                  {timesheetsCount > 0 ? (
-                    <button
-                      type="button"
-                      className="all-pending-item"
-                      onClick={() => handleTabChange("timesheets")}
-                    >
-                      <span className="all-pending-badge all-pending-badge-timesheets">{t('tab.timesheets')}</span>
-                      <span className="all-pending-count">{t('pendingTimesheets', { count: timesheetsCount })}</span>
-                      <span className="all-pending-arrow">→</span>
-                    </button>
-                  ) : null}
                 </div>
               )}
             </section>
@@ -225,7 +201,6 @@ export function ApprovalsClient({
             />
           ) : null}
 
-          {activeTab === "timesheets" ? <TimeAttendanceApprovalsClient embedded /> : null}
         </motion.section>
       </AnimatePresence>
     </>

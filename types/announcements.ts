@@ -1,5 +1,15 @@
 import type { ApiResponse } from "./auth";
 
+export type AnnouncementAttachment = {
+  id: string;
+  announcementId: string;
+  fileName: string;
+  filePath: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  createdAt: string;
+};
+
 export type Announcement = {
   id: string;
   title: string;
@@ -13,6 +23,7 @@ export type Announcement = {
   readAt: string | null;
   isDismissed: boolean;
   dismissedAt: string | null;
+  attachments: AnnouncementAttachment[];
 };
 
 export type AnnouncementsResponseData = {

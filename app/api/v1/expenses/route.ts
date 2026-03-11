@@ -51,8 +51,18 @@ const createExpensePayloadSchema = z.object({
   currency: z.string().trim().length(3).optional(),
   expenseType: z.enum(["personal_reimbursement", "work_expense"]).default("personal_reimbursement"),
   vendorName: z.string().trim().max(200, "Vendor name is too long").optional(),
+  vendorPaymentMethod: z.enum(["bank_transfer", "mobile_money", "crew_tag", "international_wire"]).default("bank_transfer"),
   vendorBankAccountName: z.string().trim().max(200, "Bank account name is too long").optional(),
   vendorBankAccountNumber: z.string().trim().max(50, "Bank account number is too long").optional(),
+  vendorMobileMoneyProvider: z.string().trim().max(200, "Mobile money provider is too long").optional(),
+  vendorMobileMoneyNumber: z.string().trim().max(30, "Mobile money number is too long").optional(),
+  vendorCrewTag: z.string().trim().max(100, "Crew Tag is too long").optional(),
+  vendorWireBankName: z.string().trim().max(200, "Wire bank name is too long").optional(),
+  vendorWireAccountNumber: z.string().trim().max(50, "Wire account number is too long").optional(),
+  vendorWireSwiftBic: z.string().trim().max(20, "SWIFT/BIC code is too long").optional(),
+  vendorWireIban: z.string().trim().max(50, "IBAN is too long").optional(),
+  vendorWireBankCountry: z.string().trim().max(100, "Bank country is too long").optional(),
+  vendorWireCurrency: z.string().trim().length(3, "Wire currency must be a 3-letter code").optional(),
   saveVendor: z.enum(["true", "false"]).optional()
 });
 
@@ -342,8 +352,18 @@ export async function POST(request: Request) {
     currency: getFormString(formData, "currency"),
     expenseType: getFormString(formData, "expenseType") || "personal_reimbursement",
     vendorName: getFormString(formData, "vendorName") || undefined,
+    vendorPaymentMethod: (getFormString(formData, "vendorPaymentMethod") || "bank_transfer") as "bank_transfer" | "mobile_money" | "crew_tag" | "international_wire",
     vendorBankAccountName: getFormString(formData, "vendorBankAccountName") || undefined,
     vendorBankAccountNumber: getFormString(formData, "vendorBankAccountNumber") || undefined,
+    vendorMobileMoneyProvider: getFormString(formData, "vendorMobileMoneyProvider") || undefined,
+    vendorMobileMoneyNumber: getFormString(formData, "vendorMobileMoneyNumber") || undefined,
+    vendorCrewTag: getFormString(formData, "vendorCrewTag") || undefined,
+    vendorWireBankName: getFormString(formData, "vendorWireBankName") || undefined,
+    vendorWireAccountNumber: getFormString(formData, "vendorWireAccountNumber") || undefined,
+    vendorWireSwiftBic: getFormString(formData, "vendorWireSwiftBic") || undefined,
+    vendorWireIban: getFormString(formData, "vendorWireIban") || undefined,
+    vendorWireBankCountry: getFormString(formData, "vendorWireBankCountry") || undefined,
+    vendorWireCurrency: getFormString(formData, "vendorWireCurrency") || undefined,
     saveVendor: getFormString(formData, "saveVendor") || undefined
   });
 
@@ -446,8 +466,18 @@ export async function POST(request: Request) {
     expense_date: payload.expenseDate,
     status: "pending" as const,
     vendor_name: payload.expenseType === "work_expense" ? (payload.vendorName?.trim() || null) : null,
+    vendor_payment_method: payload.expenseType === "work_expense" ? payload.vendorPaymentMethod : null,
     vendor_bank_account_name: payload.expenseType === "work_expense" ? (payload.vendorBankAccountName?.trim() || null) : null,
-    vendor_bank_account_number: payload.expenseType === "work_expense" ? (payload.vendorBankAccountNumber?.trim() || null) : null
+    vendor_bank_account_number: payload.expenseType === "work_expense" ? (payload.vendorBankAccountNumber?.trim() || null) : null,
+    vendor_mobile_money_provider: payload.expenseType === "work_expense" ? (payload.vendorMobileMoneyProvider?.trim() || null) : null,
+    vendor_mobile_money_number: payload.expenseType === "work_expense" ? (payload.vendorMobileMoneyNumber?.trim() || null) : null,
+    vendor_crew_tag: payload.expenseType === "work_expense" ? (payload.vendorCrewTag?.trim() || null) : null,
+    vendor_wire_bank_name: payload.expenseType === "work_expense" ? (payload.vendorWireBankName?.trim() || null) : null,
+    vendor_wire_account_number: payload.expenseType === "work_expense" ? (payload.vendorWireAccountNumber?.trim() || null) : null,
+    vendor_wire_swift_bic: payload.expenseType === "work_expense" ? (payload.vendorWireSwiftBic?.trim() || null) : null,
+    vendor_wire_iban: payload.expenseType === "work_expense" ? (payload.vendorWireIban?.trim() || null) : null,
+    vendor_wire_bank_country: payload.expenseType === "work_expense" ? (payload.vendorWireBankCountry?.trim() || null) : null,
+    vendor_wire_currency: payload.expenseType === "work_expense" ? (payload.vendorWireCurrency?.trim() || null) : null
   };
 
   const { data: insertedExpense, error: insertExpenseError } = await supabase
@@ -538,18 +568,27 @@ export async function POST(request: Request) {
   if (
     payload.expenseType === "work_expense" &&
     payload.saveVendor === "true" &&
-    payload.vendorName?.trim() &&
-    payload.vendorBankAccountName?.trim() &&
-    payload.vendorBankAccountNumber?.trim()
+    payload.vendorName?.trim()
   ) {
     try {
-      await supabase.from("vendor_beneficiaries").insert({
+      const vendorRow: Record<string, unknown> = {
         org_id: session.profile.org_id,
         employee_id: session.profile.id,
         vendor_name: payload.vendorName.trim(),
-        bank_account_name: payload.vendorBankAccountName.trim(),
-        bank_account_number: payload.vendorBankAccountNumber.trim()
-      });
+        payment_method: payload.vendorPaymentMethod,
+        bank_account_name: payload.vendorBankAccountName?.trim() || null,
+        bank_account_number: payload.vendorBankAccountNumber?.trim() || null,
+        mobile_money_provider: payload.vendorMobileMoneyProvider?.trim() || null,
+        mobile_money_number: payload.vendorMobileMoneyNumber?.trim() || null,
+        crew_tag: payload.vendorCrewTag?.trim() || null,
+        wire_bank_name: payload.vendorWireBankName?.trim() || null,
+        wire_account_number: payload.vendorWireAccountNumber?.trim() || null,
+        wire_swift_bic: payload.vendorWireSwiftBic?.trim() || null,
+        wire_iban: payload.vendorWireIban?.trim() || null,
+        wire_bank_country: payload.vendorWireBankCountry?.trim() || null,
+        wire_currency: payload.vendorWireCurrency?.trim() || null
+      };
+      await supabase.from("vendor_beneficiaries").insert(vendorRow);
     } catch {
       // Non-critical — vendor save failure should not block expense creation
     }

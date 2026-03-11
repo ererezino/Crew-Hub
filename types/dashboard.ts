@@ -175,7 +175,6 @@ export type DashboardResponseData = {
     byType: DashboardLeaveBalanceItem[];
     totalAvailable: number;
   } | null;
-  hasTimePolicy: boolean;
   recentExpenses: DashboardExpenseItem[];
   upcomingShifts: DashboardShiftItem[];
 

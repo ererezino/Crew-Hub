@@ -51,14 +51,7 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
     hasRole(roles, "MANAGER") ||
     hasRole(roles, "FINANCE_ADMIN") ||
     hasRole(roles, "SUPER_ADMIN");
-  const canReviewTimesheets =
-    hasRole(roles, "TEAM_LEAD") ||
-    hasRole(roles, "MANAGER") ||
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN");
-
-  if (!canReviewTimeOff && !canReviewExpenses && !canReviewTimesheets) {
+  if (!canReviewTimeOff && !canReviewExpenses) {
     const tApprovals = await getTranslations('approvalsPage');
     return (
       <>
@@ -83,7 +76,6 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
       userRoles={roles}
       canReviewTimeOff={canReviewTimeOff}
       canReviewExpenses={canReviewExpenses}
-      canReviewTimesheets={canReviewTimesheets}
     />
   );
 }

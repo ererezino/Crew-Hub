@@ -69,6 +69,7 @@ export type HrPaymentDetailsRow = {
   currency: string | null;
   maskedDestination: string | null;
   last4: string | null;
+  crewTagFull: string | null;
   isVerified: boolean | null;
   changeEffectiveAt: string | null;
   holdSecondsRemaining: number;

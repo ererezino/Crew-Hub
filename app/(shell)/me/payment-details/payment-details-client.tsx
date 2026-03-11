@@ -236,6 +236,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [liveHoldSeconds, setLiveHoldSeconds] = useState(0);
+  const [crewTagConfirmOpen, setCrewTagConfirmOpen] = useState(false);
 
   useEffect(() => {
     const holdEndsAt = paymentDetailsQuery.data?.holdEndsAt;
@@ -330,26 +331,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
     setFormErrors(getFormErrors(nextValues, nextTouched));
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const nextTouched: PaymentDetailsFormTouched = {
-      ...formTouched
-    };
-
-    for (const field of activeFields) {
-      nextTouched[field] = true;
-    }
-
-    setFormTouched(nextTouched);
-
-    const errors = getFormErrors(formValues, nextTouched);
-    setFormErrors(errors);
-
-    if (hasErrors(errors)) {
-      return;
-    }
-
+  const performSave = async () => {
     const payload = buildPayloadFromForm(formValues);
 
     setIsSubmitting(true);
@@ -393,6 +375,39 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const nextTouched: PaymentDetailsFormTouched = {
+      ...formTouched
+    };
+
+    for (const field of activeFields) {
+      nextTouched[field] = true;
+    }
+
+    setFormTouched(nextTouched);
+
+    const errors = getFormErrors(formValues, nextTouched);
+    setFormErrors(errors);
+
+    if (hasErrors(errors)) {
+      return;
+    }
+
+    if (formValues.paymentMethod === "crew_tag") {
+      setCrewTagConfirmOpen(true);
+      return;
+    }
+
+    await performSave();
+  };
+
+  const handleCrewTagConfirm = async () => {
+    setCrewTagConfirmOpen(false);
+    await performSave();
   };
 
   return (
@@ -690,6 +705,35 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
             </article>
           ))}
         </section>
+      ) : null}
+
+      {crewTagConfirmOpen ? (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="crew-tag-confirm-title">
+          <div className="modal-panel">
+            <h3 id="crew-tag-confirm-title" className="modal-title">{t('crewTagConfirmTitle')}</h3>
+            <p className="modal-description">
+              {t('crewTagConfirmDescription', { tag: `@${formValues.crewTag.trim()}` })}
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => setCrewTagConfirmOpen(false)}
+                disabled={isSubmitting}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                className="button-primary"
+                onClick={handleCrewTagConfirm}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? t('saving') : t('crewTagConfirmButton')}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </>
   );

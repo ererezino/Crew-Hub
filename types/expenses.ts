@@ -40,6 +40,9 @@ export type ExpenseAction = (typeof EXPENSE_ACTIONS)[number];
 export const EXPENSE_TYPES = ["personal_reimbursement", "work_expense"] as const;
 export type ExpenseType = (typeof EXPENSE_TYPES)[number];
 
+export const VENDOR_PAYMENT_METHODS = ["bank_transfer", "mobile_money", "crew_tag", "international_wire"] as const;
+export type VendorPaymentMethod = (typeof VENDOR_PAYMENT_METHODS)[number];
+
 export type ExpenseRecord = {
   id: string;
   orgId: string;
@@ -58,8 +61,18 @@ export type ExpenseRecord = {
   expenseDate: string;
   status: ExpenseStatus;
   vendorName: string | null;
+  vendorPaymentMethod: VendorPaymentMethod | null;
   vendorBankAccountName: string | null;
   vendorBankAccountNumber: string | null;
+  vendorMobileMoneyProvider: string | null;
+  vendorMobileMoneyNumber: string | null;
+  vendorCrewTag: string | null;
+  vendorWireBankName: string | null;
+  vendorWireAccountNumber: string | null;
+  vendorWireSwiftBic: string | null;
+  vendorWireIban: string | null;
+  vendorWireBankCountry: string | null;
+  vendorWireCurrency: string | null;
   managerApprovedBy: string | null;
   managerApprovedByName: string | null;
   managerApprovedAt: string | null;

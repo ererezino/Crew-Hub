@@ -91,7 +91,6 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     managerInfo: null,
     onboardingProgress: null,
     leaveBalance: null,
-    hasTimePolicy: false,
     recentExpenses: [],
     upcomingShifts: [],
     pendingApprovals: null,
@@ -1077,40 +1076,6 @@ async function fetchRecentAuditLog(
   }
 }
 
-async function checkTimePolicy(
-  supabase: SupabaseClient,
-  orgId: string,
-  employmentType: string | null,
-  department: string | null
-): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from("time_policies")
-      .select("id, applies_to_departments, applies_to_types, is_active")
-      .eq("org_id", orgId)
-      .eq("is_active", true)
-      .is("deleted_at", null);
-
-    if (error || !data || data.length === 0) return false;
-
-    return data.some((policy) => {
-      const depts = Array.isArray(policy.applies_to_departments)
-        ? policy.applies_to_departments
-        : null;
-      const types = Array.isArray(policy.applies_to_types)
-        ? policy.applies_to_types
-        : null;
-
-      const deptMatch = !depts || depts.length === 0 || (department && depts.includes(department));
-      const typeMatch = !types || types.length === 0 || (employmentType && types.includes(employmentType));
-
-      return deptMatch && typeMatch;
-    });
-  } catch {
-    return false;
-  }
-}
-
 async function fetchHeadcountByCountry(
   supabase: SupabaseClient,
   orgId: string
@@ -1367,18 +1332,16 @@ export async function GET() {
       }
 
       case "employee": {
-        const [leaveBalance, upcomingShifts, recentExpenses, hasPolicy] =
+        const [leaveBalance, upcomingShifts, recentExpenses] =
           await Promise.all([
             fetchLeaveBalance(supabase, profile.org_id, profile.id),
             fetchUpcomingShifts(supabase, profile.org_id, profile.id),
-            fetchRecentExpenses(supabase, profile.org_id, profile.id),
-            checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+            fetchRecentExpenses(supabase, profile.org_id, profile.id)
           ]);
 
         response.leaveBalance = leaveBalance;
         response.upcomingShifts = upcomingShifts;
         response.recentExpenses = recentExpenses;
-        response.hasTimePolicy = hasPolicy;
         break;
       }
 
@@ -1395,16 +1358,14 @@ export async function GET() {
           managerOnboarding,
           leaveBalance,
           upcomingShifts,
-          recentExpenses,
-          hasPolicy
+          recentExpenses
         ] = await Promise.all([
           fetchPendingApprovals(supabase, profile.org_id, profile.id, managerReports),
           fetchPendingApprovalItems(supabase, profile.org_id, profile.id, managerReports),
           fetchManagerOnboarding(supabase, profile.org_id, profile.id, managerReports),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
           fetchUpcomingShifts(supabase, profile.org_id, profile.id),
-          fetchRecentExpenses(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+          fetchRecentExpenses(supabase, profile.org_id, profile.id)
         ]);
 
         response.pendingApprovals = pendingApprovals;
@@ -1413,7 +1374,6 @@ export async function GET() {
         response.leaveBalance = leaveBalance;
         response.upcomingShifts = upcomingShifts;
         response.recentExpenses = recentExpenses;
-        response.hasTimePolicy = hasPolicy;
         break;
       }
 
@@ -1425,7 +1385,6 @@ export async function GET() {
           activeReviewCycles,
           expiringDocuments,
           leaveBalance,
-          hasPolicy,
           healthAlerts
         ] = await Promise.all([
           fetchHeadcount(supabase, profile.org_id),
@@ -1434,7 +1393,6 @@ export async function GET() {
           fetchActiveReviewCycles(supabase, profile.org_id),
           fetchExpiringDocuments(supabase, profile.org_id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department),
           getOrgHealthAlerts(supabase, profile.org_id)
         ]);
 
@@ -1444,7 +1402,6 @@ export async function GET() {
         response.activeReviewCycles = activeReviewCycles;
         response.expiringDocuments = expiringDocuments;
         response.leaveBalance = leaveBalance;
-        response.hasTimePolicy = hasPolicy;
         response.healthAlerts = healthAlerts;
         break;
       }
@@ -1454,21 +1411,18 @@ export async function GET() {
           payroll,
           pendingExpenseApprovals,
           expensePipeline,
-          leaveBalance,
-          hasPolicy
+          leaveBalance
         ] = await Promise.all([
           fetchPayrollStatus(supabase, profile.org_id),
           fetchPendingExpenseApprovals(supabase, profile.org_id),
           fetchExpensePipeline(supabase, profile.org_id),
-          fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department)
+          fetchLeaveBalance(supabase, profile.org_id, profile.id)
         ]);
 
         response.payroll = payroll;
         response.pendingExpenseApprovals = pendingExpenseApprovals;
         response.expensePipeline = expensePipeline;
         response.leaveBalance = leaveBalance;
-        response.hasTimePolicy = hasPolicy;
         break;
       }
 
@@ -1492,7 +1446,6 @@ export async function GET() {
           recentAuditLog,
           expiringDocuments,
           leaveBalance,
-          hasPolicy,
           healthAlerts
         ] = await Promise.all([
           fetchHeadcount(supabase, profile.org_id),
@@ -1507,7 +1460,6 @@ export async function GET() {
           fetchRecentAuditLog(supabase, profile.org_id),
           fetchExpiringDocuments(supabase, profile.org_id),
           fetchLeaveBalance(supabase, profile.org_id, profile.id),
-          checkTimePolicy(supabase, profile.org_id, employmentType, profile.department),
           getOrgHealthAlerts(supabase, profile.org_id)
         ]);
 
@@ -1523,7 +1475,6 @@ export async function GET() {
         response.recentAuditLog = recentAuditLog;
         response.expiringDocuments = expiringDocuments;
         response.leaveBalance = leaveBalance;
-        response.hasTimePolicy = hasPolicy;
         response.healthAlerts = healthAlerts;
         break;
       }

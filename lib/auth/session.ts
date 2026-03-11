@@ -28,6 +28,11 @@ export type SessionProfile = {
   employment_type: string | null;
   status: "active" | "inactive" | "onboarding" | "offboarding";
   preferred_locale: string;
+  bio: string | null;
+  pronouns: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
 };
 
 export type AuthenticatedSession = {
@@ -228,7 +233,7 @@ const getAuthenticatedSessionInternal = cache(
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select(
-        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, start_date, employment_type, status, preferred_locale"
+        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, start_date, employment_type, status, preferred_locale, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship"
       )
       .eq("id", user.id)
       .is("deleted_at", null)
@@ -266,7 +271,12 @@ const getAuthenticatedSessionInternal = cache(
       start_date: profileData.start_date,
       employment_type: profileData.employment_type,
       status: profileData.status,
-      preferred_locale: profileData.preferred_locale ?? "en"
+      preferred_locale: profileData.preferred_locale ?? "en",
+      bio: profileData.bio ?? null,
+      pronouns: profileData.pronouns ?? null,
+      emergency_contact_name: profileData.emergency_contact_name ?? null,
+      emergency_contact_phone: profileData.emergency_contact_phone ?? null,
+      emergency_contact_relationship: profileData.emergency_contact_relationship ?? null
     };
 
     if (!includeOrg) {

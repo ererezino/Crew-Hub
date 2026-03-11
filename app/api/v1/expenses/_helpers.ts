@@ -14,7 +14,7 @@ import {
 export const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 export const expenseStatusSchema = z.enum(EXPENSE_STATUSES);
 export const expenseSelectColumns =
-  "id, org_id, employee_id, expense_type, category, custom_category, description, amount, currency, receipt_file_path, expense_date, status, vendor_name, vendor_bank_account_name, vendor_bank_account_number, manager_approved_by, manager_approved_at, finance_approved_by, finance_approved_at, finance_rejected_by, finance_rejected_at, finance_rejection_reason, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, reimbursement_receipt_path, created_at, updated_at";
+  "id, org_id, employee_id, expense_type, category, custom_category, description, amount, currency, receipt_file_path, expense_date, status, vendor_name, vendor_payment_method, vendor_bank_account_name, vendor_bank_account_number, vendor_mobile_money_provider, vendor_mobile_money_number, vendor_crew_tag, vendor_wire_bank_name, vendor_wire_account_number, vendor_wire_swift_bic, vendor_wire_iban, vendor_wire_bank_country, vendor_wire_currency, manager_approved_by, manager_approved_at, finance_approved_by, finance_approved_at, finance_rejected_by, finance_rejected_at, finance_rejection_reason, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, reimbursement_receipt_path, created_at, updated_at";
 
 export const expenseRowSchema = z.object({
   id: z.string().uuid(),
@@ -30,8 +30,18 @@ export const expenseRowSchema = z.object({
   expense_date: z.string(),
   status: expenseStatusSchema,
   vendor_name: z.string().nullable().default(null),
+  vendor_payment_method: z.string().nullable().default(null),
   vendor_bank_account_name: z.string().nullable().default(null),
   vendor_bank_account_number: z.string().nullable().default(null),
+  vendor_mobile_money_provider: z.string().nullable().default(null),
+  vendor_mobile_money_number: z.string().nullable().default(null),
+  vendor_crew_tag: z.string().nullable().default(null),
+  vendor_wire_bank_name: z.string().nullable().default(null),
+  vendor_wire_account_number: z.string().nullable().default(null),
+  vendor_wire_swift_bic: z.string().nullable().default(null),
+  vendor_wire_iban: z.string().nullable().default(null),
+  vendor_wire_bank_country: z.string().nullable().default(null),
+  vendor_wire_currency: z.string().nullable().default(null),
   manager_approved_by: z.string().uuid().nullable(),
   manager_approved_at: z.string().nullable(),
   finance_approved_by: z.string().uuid().nullable(),
@@ -138,8 +148,18 @@ export function toExpenseRecord(
     expenseDate: row.expense_date,
     status: row.status,
     vendorName: row.vendor_name ?? null,
+    vendorPaymentMethod: (row.vendor_payment_method as ExpenseRecord["vendorPaymentMethod"]) ?? null,
     vendorBankAccountName: row.vendor_bank_account_name ?? null,
     vendorBankAccountNumber: row.vendor_bank_account_number ?? null,
+    vendorMobileMoneyProvider: row.vendor_mobile_money_provider ?? null,
+    vendorMobileMoneyNumber: row.vendor_mobile_money_number ?? null,
+    vendorCrewTag: row.vendor_crew_tag ?? null,
+    vendorWireBankName: row.vendor_wire_bank_name ?? null,
+    vendorWireAccountNumber: row.vendor_wire_account_number ?? null,
+    vendorWireSwiftBic: row.vendor_wire_swift_bic ?? null,
+    vendorWireIban: row.vendor_wire_iban ?? null,
+    vendorWireBankCountry: row.vendor_wire_bank_country ?? null,
+    vendorWireCurrency: row.vendor_wire_currency ?? null,
     managerApprovedBy: row.manager_approved_by ?? row.approved_by,
     managerApprovedByName: managerApprovedBy?.full_name ?? approvedBy?.full_name ?? null,
     managerApprovedAt: row.manager_approved_at ?? row.approved_at,

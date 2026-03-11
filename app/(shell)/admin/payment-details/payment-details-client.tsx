@@ -173,7 +173,7 @@ export function AdminPaymentDetailsClient() {
                           "--"
                         )}
                       </td>
-                      <td className="numeric">{row.maskedDestination ?? "--"}</td>
+                      <td className="numeric">{row.crewTagFull ? `@${row.crewTagFull}` : row.maskedDestination ?? "--"}</td>
                       <td className="numeric">{row.currency ?? "--"}</td>
                       <td>
                         {row.missingDetails ? (

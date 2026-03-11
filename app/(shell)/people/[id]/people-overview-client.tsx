@@ -163,7 +163,8 @@ export function PeopleOverviewClient({
     roles: ["EMPLOYEE"] as AppRole[],
     department: "",
     managerId: "",
-    title: ""
+    title: "",
+    status: "active" as string
   });
   const [adminEditError, setAdminEditError] = useState<string | null>(null);
   const [isAdminEditSaving, setIsAdminEditSaving] = useState(false);
@@ -258,7 +259,8 @@ export function PeopleOverviewClient({
       roles: person.roles.length > 0 ? [...person.roles] : ["EMPLOYEE"],
       department: person.department ?? "",
       managerId: person.managerId ?? "",
-      title: person.title ?? ""
+      title: person.title ?? "",
+      status: person.status ?? "active"
     });
     setAdminEditError(null);
     setIsAdminEditOpen(true);
@@ -296,7 +298,8 @@ export function PeopleOverviewClient({
             roles: adminEditValues.roles,
             department: adminEditValues.department.trim() || null,
             managerId: adminEditValues.managerId.trim() || null,
-            title: adminEditValues.title.trim() || null
+            title: adminEditValues.title.trim() || null,
+            status: adminEditValues.status || undefined
           })
         });
 
@@ -1427,6 +1430,24 @@ export function PeopleOverviewClient({
                       {p.fullName}
                     </option>
                   ))}
+              </select>
+            </label>
+
+            <label className="form-field" htmlFor="admin-edit-status">
+              <span className="form-label">{t('adminEditPanel.statusLabel')}</span>
+              <select
+                id="admin-edit-status"
+                className="form-input"
+                value={adminEditValues.status}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setAdminEditValues((prev) => ({ ...prev, status: val }));
+                }}
+              >
+                <option value="active">{t('adminEditPanel.statusActive')}</option>
+                <option value="onboarding">{t('adminEditPanel.statusOnboarding')}</option>
+                <option value="offboarding">{t('adminEditPanel.statusOffboarding')}</option>
+                <option value="inactive">{t('adminEditPanel.statusInactive')}</option>
               </select>
             </label>
 
