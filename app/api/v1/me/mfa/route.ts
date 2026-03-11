@@ -135,10 +135,12 @@ export async function POST(request: Request) {
       }
     }
 
+    const enrollmentLabel = `Crew Hub ${session.profile.email} ${new Date().toISOString().slice(0, 16)}`;
+
     const { data: enrollData, error: enrollError } =
       await supabase.auth.mfa.enroll({
         factorType: "totp",
-        friendlyName: "Crew Hub Authenticator"
+        friendlyName: enrollmentLabel
       });
 
     if (enrollError || !enrollData) {
@@ -194,11 +196,18 @@ export async function POST(request: Request) {
     });
 
     if (verifyError) {
+      console.warn("MFA verification failed.", {
+        userId: session.userId,
+        factorId,
+        message: verifyError.message
+      });
+
       return jsonResponse<null>(422, {
         data: null,
         error: {
           code: "MFA_VERIFY_FAILED",
-          message: "Invalid verification code. Please try again."
+          message:
+            "Invalid verification code. Use the newest code from the Crew Hub entry you just added, and ensure your phone time is set to automatic."
         },
         meta: buildMeta()
       });

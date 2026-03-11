@@ -167,6 +167,10 @@ export default function MfaSetupPage() {
               Scan this QR code with your authenticator app, then enter the
               6-digit code below.
             </p>
+            <p style={{ color: "var(--text-muted)", marginBottom: 12, fontSize: 13 }}>
+              If you already have older Crew Hub entries in your authenticator app,
+              remove them and use the newest one. Keep your phone time on automatic.
+            </p>
             <div
               style={{
                 display: "flex",
