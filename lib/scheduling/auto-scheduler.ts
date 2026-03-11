@@ -15,6 +15,7 @@ export type EmployeeScheduleInfo = {
   fullName: string;
   scheduleType: "weekday" | "weekend_primary" | "weekend_rotation" | "flexible";
   blockedDates: string[]; // YYYY-MM-DD
+  weekendHours?: "full" | "part"; // full = 8hr, part = 4hr
 };
 
 export type ShiftSlot = {
@@ -261,15 +262,29 @@ export function autoGenerateSchedule(params: {
 
       const chosen = tiedCandidates[0]!;
 
+      // For part-time weekend employees, generate a 4hr shift instead of the full slot
+      const assignedStartTime = slot.startTime;
+      let assignedEndTime = slot.endTime;
+      let assignedHours = hours;
+
+      if (weekend && chosen.weekendHours === "part" && hours > 4) {
+        const startMin = timeToMinutes(slot.startTime);
+        const partEndMin = startMin + 4 * 60;
+        const partEndHour = Math.floor(partEndMin / 60) % 24;
+        const partEndMinute = partEndMin % 60;
+        assignedEndTime = `${String(partEndHour).padStart(2, "0")}:${String(partEndMinute).padStart(2, "0")}`;
+        assignedHours = 4;
+      }
+
       assignments.push({
         employeeId: chosen.id,
         shiftDate: date,
         slotName: slot.name,
-        startTime: slot.startTime,
-        endTime: slot.endTime
+        startTime: assignedStartTime,
+        endTime: assignedEndTime
       });
 
-      hoursMap.set(chosen.id, (hoursMap.get(chosen.id) ?? 0) + hours);
+      hoursMap.set(chosen.id, (hoursMap.get(chosen.id) ?? 0) + assignedHours);
     }
 
     // Advance rotation counter at the end of each Sunday

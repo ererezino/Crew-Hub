@@ -99,6 +99,8 @@ const profileRowSchema = z.object({
   primary_currency: z.string(),
   status: z.enum(PROFILE_STATUSES),
   avatar_url: z.string().nullable().default(null),
+  schedule_type: z.string().nullable().default(null),
+  weekend_shift_hours: z.string().nullable().default(null),
   account_setup_at: z.string().nullable().default(null),
   last_seen_at: z.string().nullable().default(null),
   created_at: z.string(),
@@ -211,6 +213,8 @@ function mapPersonRow(
     emergencyContactRelationship: null,
     pronouns: null,
     privacySettings: {},
+    scheduleType: row.schedule_type,
+    weekendShiftHours: row.weekend_shift_hours,
     crewTag: crewTagById?.get(row.id) ?? null,
     inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at),
     createdAt: row.created_at,
@@ -321,7 +325,7 @@ export async function GET(request: Request) {
   let peopleQuery = supabase
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, schedule_type, weekend_shift_hours, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
@@ -786,7 +790,7 @@ export async function POST(request: Request) {
       status: profileStatus
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, schedule_type, weekend_shift_hours, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 

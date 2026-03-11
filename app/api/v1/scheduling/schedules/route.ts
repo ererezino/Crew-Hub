@@ -7,7 +7,6 @@ import { areDepartmentsEqual } from "../../../../../lib/department";
 import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
 import {
   canViewTeamSchedules,
-  endDateFromWeekStart,
   isIsoDate,
   isSchedulingManager
 } from "../../../../../lib/scheduling";
@@ -23,29 +22,46 @@ import {
 const querySchema = z.object({
   scope: z.enum(["mine", "team"]).default("mine"),
   status: z.enum(SCHEDULE_STATUSES).optional(),
-  weekStart: z
+  startDate: z
     .string()
     .trim()
-    .refine((value) => value.length === 0 || isIsoDate(value), "weekStart must be YYYY-MM-DD.")
+    .refine((value) => value.length === 0 || isIsoDate(value), "startDate must be YYYY-MM-DD.")
     .optional(),
-  weekEnd: z
+  endDate: z
     .string()
     .trim()
-    .refine((value) => value.length === 0 || isIsoDate(value), "weekEnd must be YYYY-MM-DD.")
+    .refine((value) => value.length === 0 || isIsoDate(value), "endDate must be YYYY-MM-DD.")
     .optional(),
   sortDir: z.enum(["asc", "desc"]).default("desc"),
   limit: z.coerce.number().int().min(1).max(300).default(120)
 });
 
+const rosterEntrySchema = z.object({
+  employeeId: z.string().uuid(),
+  weekendHours: z.enum(["full", "part"]).optional()
+});
+
 const createScheduleSchema = z.object({
   name: z.string().trim().max(200).optional(),
   department: z.string().trim().max(100).optional(),
-  weekStart: z.string().trim().refine((value) => isIsoDate(value), "weekStart must be YYYY-MM-DD."),
-  weekEnd: z
+  scheduleTrack: z.enum(["weekday", "weekend"]).default("weekday"),
+  month: z
     .string()
     .trim()
-    .refine((value) => value.length === 0 || isIsoDate(value), "weekEnd must be YYYY-MM-DD.")
-    .optional()
+    .regex(/^\d{4}-\d{2}$/, "month must be YYYY-MM format.")
+    .optional(),
+  months: z.coerce.number().int().min(1).max(3).default(1),
+  startDate: z
+    .string()
+    .trim()
+    .refine((value) => isIsoDate(value), "startDate must be YYYY-MM-DD.")
+    .optional(),
+  endDate: z
+    .string()
+    .trim()
+    .refine((value) => isIsoDate(value), "endDate must be YYYY-MM-DD.")
+    .optional(),
+  roster: z.array(rosterEntrySchema).optional()
 });
 
 const scheduleRowSchema = z.object({
@@ -53,8 +69,9 @@ const scheduleRowSchema = z.object({
   org_id: z.string().uuid(),
   name: z.string().nullable(),
   department: z.string().nullable(),
-  week_start: z.string(),
-  week_end: z.string(),
+  start_date: z.string(),
+  end_date: z.string(),
+  schedule_track: z.string().nullable(),
   status: z.enum(SCHEDULE_STATUSES),
   published_at: z.string().nullable(),
   published_by: z.string().uuid().nullable(),
@@ -75,8 +92,21 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-function maxWeekEndFromStart(weekStart: string): string | null {
-  return endDateFromWeekStart(weekStart);
+function computeDateRange(month: string, months: number): { startDate: string; endDate: string } {
+  const [yearStr, monthStr] = month.split("-");
+  const year = Number(yearStr);
+  const mon = Number(monthStr);
+
+  const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
+
+  const endMonth = mon + months - 1;
+  const endYear = year + Math.floor((endMonth - 1) / 12);
+  const endMon = ((endMonth - 1) % 12) + 1;
+
+  const lastDay = new Date(Date.UTC(endYear, endMon, 0)).getUTCDate();
+  const endDate = `${endYear}-${String(endMon).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+
+  return { startDate, endDate };
 }
 
 async function mapSchedules({
@@ -148,8 +178,9 @@ async function mapSchedules({
     orgId: row.org_id,
     name: row.name,
     department: row.department,
-    weekStart: row.week_start,
-    weekEnd: row.week_end,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    scheduleTrack: (row.schedule_track === "weekend" ? "weekend" : "weekday") as "weekday" | "weekend",
     status: row.status,
     publishedAt: row.published_at,
     publishedBy: row.published_by,
@@ -216,12 +247,12 @@ export async function GET(request: Request) {
       .eq("employee_id", session.profile.id)
       .is("deleted_at", null);
 
-    if (query.weekStart && query.weekStart.length > 0) {
-      shiftsForMineQuery = shiftsForMineQuery.gte("shift_date", query.weekStart);
+    if (query.startDate && query.startDate.length > 0) {
+      shiftsForMineQuery = shiftsForMineQuery.gte("shift_date", query.startDate);
     }
 
-    if (query.weekEnd && query.weekEnd.length > 0) {
-      shiftsForMineQuery = shiftsForMineQuery.lte("shift_date", query.weekEnd);
+    if (query.endDate && query.endDate.length > 0) {
+      shiftsForMineQuery = shiftsForMineQuery.lte("shift_date", query.endDate);
     }
 
     const { data: rawShiftRows, error: shiftsError } = await shiftsForMineQuery;
@@ -257,23 +288,23 @@ export async function GET(request: Request) {
   let schedulesQuery = supabase
     .from("schedules")
     .select(
-      "id, org_id, name, department, week_start, week_end, status, published_at, published_by, created_at, updated_at"
+      "id, org_id, name, department, start_date, end_date, schedule_track, status, published_at, published_by, created_at, updated_at"
     )
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
-    .order("week_start", { ascending: query.sortDir === "asc" })
+    .order("start_date", { ascending: query.sortDir === "asc" })
     .limit(query.limit);
 
   if (query.status) {
     schedulesQuery = schedulesQuery.eq("status", query.status);
   }
 
-  if (query.weekStart && query.weekStart.length > 0) {
-    schedulesQuery = schedulesQuery.gte("week_start", query.weekStart);
+  if (query.startDate && query.startDate.length > 0) {
+    schedulesQuery = schedulesQuery.gte("start_date", query.startDate);
   }
 
-  if (query.weekEnd && query.weekEnd.length > 0) {
-    schedulesQuery = schedulesQuery.lte("week_end", query.weekEnd);
+  if (query.endDate && query.endDate.length > 0) {
+    schedulesQuery = schedulesQuery.lte("end_date", query.endDate);
   }
 
   if (scope === "mine") {
@@ -385,28 +416,33 @@ export async function POST(request: Request) {
     });
   }
 
-  const weekStart = parsedBody.data.weekStart;
-  const computedWeekEnd = maxWeekEndFromStart(weekStart);
+  let startDate: string;
+  let endDate: string;
 
-  if (!computedWeekEnd) {
+  if (parsedBody.data.month) {
+    const range = computeDateRange(parsedBody.data.month, parsedBody.data.months);
+    startDate = range.startDate;
+    endDate = range.endDate;
+  } else if (parsedBody.data.startDate && parsedBody.data.endDate) {
+    startDate = parsedBody.data.startDate;
+    endDate = parsedBody.data.endDate;
+  } else {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "weekStart must be in YYYY-MM-DD format."
+        message: "Either month or startDate+endDate must be provided."
       },
       meta: buildMeta()
     });
   }
 
-  const requestedWeekEnd = parsedBody.data.weekEnd?.trim() || computedWeekEnd;
-
-  if (requestedWeekEnd < weekStart || requestedWeekEnd > computedWeekEnd) {
+  if (endDate < startDate) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "weekEnd must be within the week that starts on weekStart."
+        message: "endDate must be on or after startDate."
       },
       meta: buildMeta()
     });
@@ -449,12 +485,13 @@ export async function POST(request: Request) {
       department: isScopedTeamLead
         ? session.profile.department
         : parsedBody.data.department?.trim() || null,
-      week_start: weekStart,
-      week_end: requestedWeekEnd,
+      start_date: startDate,
+      end_date: endDate,
+      schedule_track: parsedBody.data.scheduleTrack,
       status: "draft"
     })
     .select(
-      "id, org_id, name, department, week_start, week_end, status, published_at, published_by, created_at, updated_at"
+      "id, org_id, name, department, start_date, end_date, schedule_track, status, published_at, published_by, created_at, updated_at"
     )
     .single();
 
@@ -482,13 +519,31 @@ export async function POST(request: Request) {
     });
   }
 
+  const roster = parsedBody.data.roster;
+  if (roster && roster.length > 0) {
+    const rosterRows = roster.map((entry) => ({
+      schedule_id: parsedRow.data.id,
+      employee_id: entry.employeeId,
+      weekend_hours: entry.weekendHours ?? null
+    }));
+
+    const { error: rosterError } = await supabase
+      .from("schedule_roster")
+      .insert(rosterRows);
+
+    if (rosterError) {
+      console.error("Failed to insert schedule roster:", rosterError);
+    }
+  }
+
   const schedule: ScheduleRecord = {
     id: parsedRow.data.id,
     orgId: parsedRow.data.org_id,
     name: parsedRow.data.name,
     department: parsedRow.data.department,
-    weekStart: parsedRow.data.week_start,
-    weekEnd: parsedRow.data.week_end,
+    startDate: parsedRow.data.start_date,
+    endDate: parsedRow.data.end_date,
+    scheduleTrack: parsedRow.data.schedule_track === "weekend" ? "weekend" : "weekday",
     status: parsedRow.data.status,
     publishedAt: parsedRow.data.published_at,
     publishedBy: parsedRow.data.published_by,
@@ -504,8 +559,9 @@ export async function POST(request: Request) {
     recordId: schedule.id,
     oldValue: null,
     newValue: {
-      week_start: schedule.weekStart,
-      week_end: schedule.weekEnd,
+      start_date: schedule.startDate,
+      end_date: schedule.endDate,
+      schedule_track: schedule.scheduleTrack,
       status: schedule.status
     }
   });

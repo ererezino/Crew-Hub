@@ -15,8 +15,9 @@ const scheduleRowSchema = z.object({
   org_id: z.string().uuid(),
   name: z.string().nullable(),
   department: z.string().nullable(),
-  week_start: z.string(),
-  week_end: z.string(),
+  start_date: z.string(),
+  end_date: z.string(),
+  schedule_track: z.string().nullable(),
   status: z.enum(SCHEDULE_STATUSES),
   published_at: z.string().nullable(),
   published_by: z.string().uuid().nullable(),
@@ -91,7 +92,7 @@ export async function DELETE(
   const { data: rawSchedule, error: fetchError } = await supabase
     .from("schedules")
     .select(
-      "id, org_id, name, department, week_start, week_end, status, published_at, published_by, created_at, updated_at"
+      "id, org_id, name, department, start_date, end_date, schedule_track, status, published_at, published_by, created_at, updated_at"
     )
     .eq("id", scheduleId)
     .eq("org_id", session.profile.org_id)

@@ -46,8 +46,8 @@ const confirmBodySchema = z.object({
 });
 
 const generateBodySchema = z.object({
-  slots: z.array(slotSchema).min(1, "At least one slot is required."),
-  scheduleType: z.enum(["weekday", "weekend", "holiday"]).default("weekday"),
+  slots: z.array(slotSchema).min(1, "At least one slot is required.").optional(),
+  scheduleType: z.enum(["weekday", "weekend", "holiday"]).optional(),
   employeeIds: z.array(z.string().uuid()).optional(),
   confirm: z.literal(true).optional(),
   assignments: z
@@ -67,8 +67,9 @@ const scheduleRowSchema = z.object({
   id: z.string().uuid(),
   org_id: z.string().uuid(),
   department: z.string().nullable(),
-  week_start: z.string(),
-  week_end: z.string(),
+  start_date: z.string(),
+  end_date: z.string(),
+  schedule_track: z.string().nullable(),
   status: z.enum(SCHEDULE_STATUSES)
 });
 
@@ -144,7 +145,6 @@ export async function POST(
     });
   }
 
-  // Parse body
   let body: unknown;
 
   try {
@@ -160,7 +160,6 @@ export async function POST(
     });
   }
 
-  // Use service-role client to bypass RLS for cross-table lookups
   const supabase = createSupabaseServiceRoleClient();
 
   // -----------------------------------------------------------------------
@@ -169,7 +168,7 @@ export async function POST(
 
   const { data: rawSchedule, error: scheduleError } = await supabase
     .from("schedules")
-    .select("id, org_id, department, week_start, week_end, status")
+    .select("id, org_id, department, start_date, end_date, schedule_track, status")
     .eq("id", scheduleId)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -309,20 +308,40 @@ export async function POST(
     });
   }
 
-  const { slots, scheduleType, employeeIds } = parsedBody.data;
+  const scheduleType = parsedBody.data.scheduleType ?? (schedule.schedule_track === "weekend" ? "weekend" : "weekday");
 
   // -----------------------------------------------------------------------
-  // Fetch crew members (by explicit IDs or by schedule department)
+  // Fetch crew — prefer roster, fall back to explicit IDs or department
   // -----------------------------------------------------------------------
+
+  const { data: rosterRows } = await supabase
+    .from("schedule_roster")
+    .select("employee_id, weekend_hours")
+    .eq("schedule_id", scheduleId);
+
+  const rosterEmployeeIds = (rosterRows ?? []).map((r) =>
+    typeof r.employee_id === "string" ? r.employee_id : ""
+  ).filter(Boolean);
+
+  const weekendHoursOverrides = new Map<string, string>();
+  for (const r of rosterRows ?? []) {
+    if (typeof r.employee_id === "string" && typeof r.weekend_hours === "string") {
+      weekendHoursOverrides.set(r.employee_id, r.weekend_hours);
+    }
+  }
+
+  const { employeeIds } = parsedBody.data;
 
   let employeesQuery = supabase
     .from("profiles")
-    .select("id, full_name, schedule_type")
+    .select("id, full_name, schedule_type, weekend_shift_hours")
     .eq("org_id", session.profile.org_id)
     .eq("status", "active")
     .is("deleted_at", null);
 
-  if (employeeIds && employeeIds.length > 0) {
+  if (rosterEmployeeIds.length > 0) {
+    employeesQuery = employeesQuery.in("id", rosterEmployeeIds);
+  } else if (employeeIds && employeeIds.length > 0) {
     employeesQuery = employeesQuery.in("id", employeeIds);
   } else if (schedule.department) {
     employeesQuery = employeesQuery.ilike("department", schedule.department);
@@ -346,14 +365,14 @@ export async function POST(
       data: null,
       error: {
         code: "NO_ELIGIBLE_EMPLOYEES",
-        message: "No active crew members found for this department."
+        message: "No active crew members found for this schedule."
       },
       meta: buildMeta()
     });
   }
 
   // -----------------------------------------------------------------------
-  // Fetch approved leave requests for the date range as blocked dates
+  // Fetch leave and holidays as blocked dates
   // -----------------------------------------------------------------------
 
   const { data: rawLeaves, error: leavesError } = await supabase
@@ -362,8 +381,8 @@ export async function POST(
     .eq("org_id", session.profile.org_id)
     .eq("status", "approved")
     .is("deleted_at", null)
-    .lte("start_date", schedule.week_end)
-    .gte("end_date", schedule.week_start);
+    .lte("start_date", schedule.end_date)
+    .gte("end_date", schedule.start_date);
 
   if (leavesError) {
     return jsonResponse<null>(500, {
@@ -376,14 +395,13 @@ export async function POST(
     });
   }
 
-  // Fetch holidays for the date range
   const { data: rawHolidays, error: holidaysError } = await supabase
     .from("holiday_calendars")
     .select("date")
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
-    .gte("date", schedule.week_start)
-    .lte("date", schedule.week_end);
+    .gte("date", schedule.start_date)
+    .lte("date", schedule.end_date);
 
   if (holidaysError) {
     return jsonResponse<null>(500, {
@@ -403,14 +421,11 @@ export async function POST(
     })
   );
 
-  // Build blocked dates per employee
   const blockedByEmployee = new Map<string, string[]>();
 
   for (const leave of rawLeaves ?? []) {
-    const empId =
-      typeof leave.employee_id === "string" ? leave.employee_id : null;
-    const startStr =
-      typeof leave.start_date === "string" ? leave.start_date : null;
+    const empId = typeof leave.employee_id === "string" ? leave.employee_id : null;
+    const startStr = typeof leave.start_date === "string" ? leave.start_date : null;
     const endStr = typeof leave.end_date === "string" ? leave.end_date : null;
 
     if (!empId || !startStr || !endStr) continue;
@@ -428,7 +443,6 @@ export async function POST(
     blockedByEmployee.set(empId, [...existing, ...dates]);
   }
 
-  // Add holiday dates as blocked for all employees
   for (const emp of rawEmployees) {
     const empId = typeof emp.id === "string" ? emp.id : "";
     const existing = blockedByEmployee.get(empId) ?? [];
@@ -449,35 +463,66 @@ export async function POST(
   const employees: EmployeeScheduleInfo[] = rawEmployees.map((emp) => {
     const empId = typeof emp.id === "string" ? emp.id : "";
     const fullName = typeof emp.full_name === "string" ? emp.full_name : "";
-    const rawType =
-      typeof emp.schedule_type === "string" ? emp.schedule_type : "weekday";
+    const rawType = typeof emp.schedule_type === "string" ? emp.schedule_type : "weekday";
     const schedType = VALID_SCHEDULE_TYPES.has(rawType)
       ? (rawType as EmployeeScheduleInfo["scheduleType"])
       : "weekday";
+
+    const profileWeekendHours = typeof emp.weekend_shift_hours === "string" ? emp.weekend_shift_hours : "full";
+    const effectiveWeekendHours = weekendHoursOverrides.get(empId) ?? profileWeekendHours;
 
     return {
       id: empId,
       fullName,
       scheduleType: schedType,
-      blockedDates: blockedByEmployee.get(empId) ?? []
+      blockedDates: blockedByEmployee.get(empId) ?? [],
+      weekendHours: effectiveWeekendHours as "full" | "part"
     };
   });
 
-  const typedSlots: ShiftSlot[] = slots.map((s) => ({
-    name: s.name,
-    startTime: s.startTime,
-    endTime: s.endTime
-  }));
+  // Resolve slots: use provided or auto-resolve from templates
+  let typedSlots: ShiftSlot[];
+
+  if (parsedBody.data.slots && parsedBody.data.slots.length > 0) {
+    typedSlots = parsedBody.data.slots.map((s) => ({
+      name: s.name,
+      startTime: s.startTime,
+      endTime: s.endTime
+    }));
+  } else {
+    const { data: templates } = await supabase
+      .from("shift_templates")
+      .select("name, start_time, end_time")
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null);
+
+    if (!templates || templates.length === 0) {
+      typedSlots = scheduleType === "weekend"
+        ? [{ name: "Weekend Shift", startTime: "09:00", endTime: "17:00" }]
+        : [{ name: "Day Shift", startTime: "09:00", endTime: "17:00" }];
+    } else {
+      typedSlots = templates.map((t) => {
+        const startRaw = typeof t.start_time === "string" ? t.start_time : "09:00";
+        const endRaw = typeof t.end_time === "string" ? t.end_time : "17:00";
+        const startTime = startRaw.includes("T") ? startRaw.slice(11, 16) : startRaw;
+        const endTime = endRaw.includes("T") ? endRaw.slice(11, 16) : endRaw;
+        return {
+          name: typeof t.name === "string" ? t.name : "Shift",
+          startTime,
+          endTime
+        };
+      });
+    }
+  }
 
   const assignments = autoGenerateSchedule({
     employees,
     slots: typedSlots,
-    startDate: schedule.week_start,
-    endDate: schedule.week_end,
+    startDate: schedule.start_date,
+    endDate: schedule.end_date,
     scheduleType
   });
 
-  // Build employee name lookup for enriched response
   const nameMap = new Map<string, string>();
   for (const emp of employees) {
     nameMap.set(emp.id, emp.fullName);
@@ -488,12 +533,11 @@ export async function POST(
     employeeName: nameMap.get(a.employeeId) ?? "Unknown"
   }));
 
-  // Detect unfilled slots (dates × slots that have no assignment)
   const warnings: string[] = [];
   const dates = (() => {
     const result: string[] = [];
-    const cur = new Date(`${schedule.week_start}T00:00:00Z`);
-    const last = new Date(`${schedule.week_end}T00:00:00Z`);
+    const cur = new Date(`${schedule.start_date}T00:00:00Z`);
+    const last = new Date(`${schedule.end_date}T00:00:00Z`);
     while (cur <= last) {
       result.push(cur.toISOString().slice(0, 10));
       cur.setUTCDate(cur.getUTCDate() + 1);

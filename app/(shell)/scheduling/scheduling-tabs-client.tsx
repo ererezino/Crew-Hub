@@ -9,11 +9,9 @@ import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { PageHeader } from "../../../components/shared/page-header";
 import type { UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
-import { SchedulingTemplatesAdminClient } from "../admin/scheduling/templates/scheduling-templates-admin-client";
 import { SchedulingManageClient } from "./manage/scheduling-manage-client";
 import { SchedulingOpenShiftsClient } from "./open-shifts/scheduling-open-shifts-client";
 import { SchedulingClient } from "./scheduling-client";
-import { SchedulingSwapsClient } from "./swaps/scheduling-swaps-client";
 
 type SchedulingTabsClientProps = {
   requestedTab: string;
@@ -54,31 +52,20 @@ export function SchedulingTabsClient({
       hasRole(userRoles, "MANAGER")
     ));
 
-  const canManageTemplates = isSuperAdmin || (isCSTeam && hasRole(userRoles, "HR_ADMIN"));
-
   const tabs = useMemo<PageTab[]>(
     () => [
       {
         key: "my-shifts",
-        label: "My Shifts"
+        label: "My Schedule"
       },
       {
         key: "open-shifts",
         label: "Open Shifts"
       },
       {
-        key: "swaps",
-        label: "Swap Requests"
-      },
-      {
         key: "manage",
         label: "Manage",
         requiredRoles: ["TEAM_LEAD", "MANAGER", "HR_ADMIN", "SUPER_ADMIN"]
-      },
-      {
-        key: "templates",
-        label: "Templates",
-        requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"]
       }
     ],
     []
@@ -125,7 +112,7 @@ export function SchedulingTabsClient({
 
       <FeatureBanner
         moduleId="scheduling"
-        description="Scheduling is in limited pilot for Customer Success. You can create, generate, edit, and publish weekly schedules."
+        description="Scheduling is in limited pilot for Customer Success. Create monthly schedules for your team in a few clicks."
       />
 
       <PageTabs
@@ -146,25 +133,7 @@ export function SchedulingTabsClient({
         >
           {activeTab === "my-shifts" ? <SchedulingClient embedded /> : null}
           {activeTab === "open-shifts" ? <SchedulingOpenShiftsClient embedded /> : null}
-          {activeTab === "swaps" ? (
-            <SchedulingSwapsClient
-              currentUserId={currentUserId}
-              canManageSwaps={canManage}
-              embedded
-            />
-          ) : null}
           {activeTab === "manage" && canManage ? <SchedulingManageClient embedded /> : null}
-          {activeTab === "templates" && canManageTemplates ? (
-            <>
-              <div className="scheduling-template-explanation">
-                <p>
-                  Shift templates are reusable time presets for common shift patterns
-                  (e.g. Morning 8–4, Evening 4–12) so you don&apos;t re-enter times each time you create a shift.
-                </p>
-              </div>
-              <SchedulingTemplatesAdminClient embedded />
-            </>
-          ) : null}
         </motion.section>
       </AnimatePresence>
     </>

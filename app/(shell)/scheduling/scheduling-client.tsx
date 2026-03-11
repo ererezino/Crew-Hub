@@ -146,8 +146,8 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
               <Link href="/scheduling?tab=open-shifts" className="button">
                 Open shifts
               </Link>
-              <Link href="/scheduling?tab=swaps" className="button">
-                Shift swaps
+              <Link href="/scheduling?tab=manage" className="button">
+                Manage schedules
               </Link>
             </div>
           </article>
@@ -218,7 +218,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
                         </td>
                         <td className="table-row-action-cell">
                           <div className="timeatt-row-actions">
-                            <Link href="/scheduling?tab=swaps" className="table-row-action">
+                            <Link href="/scheduling?tab=open-shifts" className="table-row-action">
                               Swap
                             </Link>
                           </div>

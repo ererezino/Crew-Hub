@@ -21,8 +21,9 @@ const scheduleRowSchema = z.object({
   org_id: z.string().uuid(),
   name: z.string().nullable(),
   department: z.string().nullable(),
-  week_start: z.string(),
-  week_end: z.string(),
+  start_date: z.string(),
+  end_date: z.string(),
+  schedule_track: z.string().nullable(),
   status: z.enum(SCHEDULE_STATUSES),
   published_at: z.string().nullable(),
   published_by: z.string().uuid().nullable(),
@@ -85,7 +86,7 @@ export async function POST(
   const { data: rawExistingSchedule, error: existingScheduleError } = await supabase
     .from("schedules")
     .select(
-      "id, org_id, name, department, week_start, week_end, status, published_at, published_by, created_at, updated_at"
+      "id, org_id, name, department, start_date, end_date, schedule_track, status, published_at, published_by, created_at, updated_at"
     )
     .eq("id", scheduleId)
     .eq("org_id", session.profile.org_id)
@@ -205,7 +206,7 @@ export async function POST(
     .eq("id", scheduleId)
     .eq("org_id", session.profile.org_id)
     .select(
-      "id, org_id, name, department, week_start, week_end, status, published_at, published_by, created_at, updated_at"
+      "id, org_id, name, department, start_date, end_date, schedule_track, status, published_at, published_by, created_at, updated_at"
     )
     .single();
 
@@ -242,8 +243,8 @@ export async function POST(
   ];
 
   const dateRange = formatDateRange(
-    parsedPublishedSchedule.data.week_start,
-    parsedPublishedSchedule.data.week_end
+    parsedPublishedSchedule.data.start_date,
+    parsedPublishedSchedule.data.end_date
   );
 
   void createBulkNotifications({
@@ -255,7 +256,7 @@ export async function POST(
     link: "/scheduling"
   });
 
-  const scheduleStartDate = new Date(parsedPublishedSchedule.data.week_start + "T00:00:00Z");
+  const scheduleStartDate = new Date(parsedPublishedSchedule.data.start_date + "T00:00:00Z");
   const scheduleMonth = scheduleStartDate.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
   const scheduleYear = String(scheduleStartDate.getUTCFullYear());
 
@@ -293,8 +294,9 @@ export async function POST(
         orgId: parsedPublishedSchedule.data.org_id,
         name: parsedPublishedSchedule.data.name,
         department: parsedPublishedSchedule.data.department,
-        weekStart: parsedPublishedSchedule.data.week_start,
-        weekEnd: parsedPublishedSchedule.data.week_end,
+        startDate: parsedPublishedSchedule.data.start_date,
+        endDate: parsedPublishedSchedule.data.end_date,
+        scheduleTrack: (parsedPublishedSchedule.data.schedule_track === "weekend" ? "weekend" : "weekday") as "weekday" | "weekend",
         status: parsedPublishedSchedule.data.status,
         publishedAt: parsedPublishedSchedule.data.published_at,
         publishedBy: parsedPublishedSchedule.data.published_by,

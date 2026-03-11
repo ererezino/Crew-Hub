@@ -22,13 +22,16 @@ export type ShiftTemplateRecord = {
   updatedAt: string;
 };
 
+export type ScheduleTrack = "weekday" | "weekend";
+
 export type ScheduleRecord = {
   id: string;
   orgId: string;
   name: string | null;
   department: string | null;
-  weekStart: string;
-  weekEnd: string;
+  startDate: string;
+  endDate: string;
+  scheduleTrack: ScheduleTrack;
   status: ScheduleStatus;
   publishedAt: string | null;
   publishedBy: string | null;
@@ -36,6 +39,17 @@ export type ScheduleRecord = {
   createdAt: string;
   updatedAt: string;
   shiftCount: number;
+};
+
+export type ScheduleRosterEntry = {
+  id: string;
+  scheduleId: string;
+  employeeId: string;
+  employeeName?: string;
+  employeeDepartment?: string;
+  employeeCountryCode?: string;
+  scheduleType?: string;
+  weekendHours: "full" | "part" | null;
 };
 
 export type ShiftRecord = {

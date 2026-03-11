@@ -24,8 +24,8 @@ type UseFetchState<T> = {
 type SchedulesQuery = {
   scope?: "mine" | "team";
   status?: "draft" | "published" | "locked";
-  weekStart?: string;
-  weekEnd?: string;
+  startDate?: string;
+  endDate?: string;
 };
 
 type ShiftsQuery = {
@@ -137,10 +137,10 @@ export function useSchedulingSchedules(query: SchedulesQuery = {}): UseFetchStat
       buildEndpoint("/api/v1/scheduling/schedules", [
         ["scope", query.scope],
         ["status", query.status],
-        ["weekStart", query.weekStart],
-        ["weekEnd", query.weekEnd]
+        ["startDate", query.startDate],
+        ["endDate", query.endDate]
       ]),
-    [query.scope, query.status, query.weekEnd, query.weekStart]
+    [query.scope, query.status, query.endDate, query.startDate]
   );
 
   return useDataFetch<SchedulingSchedulesResponse, SchedulingSchedulesResponseData>({

@@ -58,6 +58,8 @@ export type PersonRecord = {
   emergencyContactRelationship: string | null;
   pronouns: string | null;
   privacySettings: PrivacySettings;
+  scheduleType: string | null;
+  weekendShiftHours: string | null;
   crewTag: string | null;
   inviteStatus: "not_invited" | "invited" | "active";
   createdAt: string;
