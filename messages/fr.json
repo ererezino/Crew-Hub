@@ -342,6 +342,7 @@
       "newSchedule": "Nouvel horaire",
       "stepTrack": "Type d'horaire",
       "stepPeriod": "Période",
+      "stepSlots": "Heures de quart",
       "stepRoster": "Membres de l'équipe",
       "stepReview": "Révision et création",
       "failedCreate": "Échec de la création de l'horaire",
@@ -360,6 +361,14 @@
       "startingMonth": "Mois de début",
       "startDate": "Date de début",
       "endDate": "Date de fin"
+    },
+    "slots": {
+      "minimumHint": "Choisissez au moins deux quarts pour cet horaire.",
+      "addShift": "Ajouter un quart",
+      "shiftName": "Nom du quart",
+      "startTime": "Heure de début",
+      "endTime": "Heure de fin",
+      "remove": "Supprimer"
     },
     "roster": {
       "selectedCount": "{selected} sur {total} sélectionné(s)",
@@ -400,6 +409,8 @@
     "manage": {
       "title": "Horaires",
       "description": "Créez et gérez les horaires mensuels de votre équipe.",
+      "viewSchedules": "Horaires",
+      "viewTeamSetup": "Configuration équipe",
       "confirmPublishTitle": "Publier l'horaire ?",
       "confirmPublishBody": "La publication notifiera tous les membres assignés. Cette action est irréversible.",
       "confirmDeleteTitle": "Supprimer l'horaire ?",
@@ -409,6 +420,19 @@
       "toastCreated": "Horaire créé avec des quarts auto-générés.",
       "failedPublish": "Échec de la publication de l'horaire.",
       "failedDelete": "Échec de la suppression de l'horaire."
+    },
+    "teamSetup": {
+      "title": "Configuration d'équipe",
+      "description": "Définissez les membres de semaine et de fin de semaine avant de générer les horaires.",
+      "searchPlaceholder": "Rechercher des membres…",
+      "weekday": "Travail semaine",
+      "weekend": "Travail week-end",
+      "weekendHours": "Heures week-end",
+      "saved": "Configuration enregistrée.",
+      "saveFailed": "Impossible d'enregistrer la configuration.",
+      "emptyTitle": "Aucun membre trouvé",
+      "emptyBody": "Ajoutez des membres actifs pour configurer les types d'horaire.",
+      "noDepartment": "Aucun département"
     },
     "calendar": {
       "noShiftsTitle": "Aucun quart à afficher",

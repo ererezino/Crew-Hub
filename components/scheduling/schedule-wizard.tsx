@@ -9,21 +9,56 @@ import { TrackSelector } from "./track-selector";
 import { PeriodPicker, getDefaultMonth, getDefaultCustomStart, getDefaultCustomEnd } from "./period-picker";
 import { RosterSelector, type RosterEmployee, type RosterSelection } from "./roster-selector";
 import { ScheduleReview } from "./schedule-review";
+import {
+  ShiftSlotsSelector,
+  type ShiftSlotSelection
+} from "./shift-slots-selector";
 
-type WizardStep = "track" | "period" | "roster" | "review";
+type WizardStep = "track" | "period" | "slots" | "roster" | "review";
 
-const STEPS: WizardStep[] = ["track", "period", "roster", "review"];
+const STEPS: WizardStep[] = ["track", "period", "slots", "roster", "review"];
+
+const SLOT_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const DEFAULT_WEEKDAY_SLOTS: ShiftSlotSelection[] = [
+  { name: "Morning Shift", startTime: "08:00", endTime: "16:00" },
+  { name: "Afternoon Shift", startTime: "16:00", endTime: "00:00" }
+];
+
+const DEFAULT_WEEKEND_SLOTS: ShiftSlotSelection[] = [
+  { name: "Weekend Day Shift", startTime: "08:00", endTime: "16:00" },
+  { name: "Weekend Evening Shift", startTime: "16:00", endTime: "00:00" }
+];
+
+function defaultSlotsForTrack(track: ScheduleTrack | null): ShiftSlotSelection[] {
+  if (track === "weekend") {
+    return DEFAULT_WEEKEND_SLOTS.map((slot) => ({ ...slot }));
+  }
+
+  return DEFAULT_WEEKDAY_SLOTS.map((slot) => ({ ...slot }));
+}
+
+function isValidSlot(slot: ShiftSlotSelection): boolean {
+  const name = slot.name.trim();
+  if (name.length === 0) {
+    return false;
+  }
+
+  if (
+    !SLOT_TIME_PATTERN.test(slot.startTime) ||
+    !SLOT_TIME_PATTERN.test(slot.endTime)
+  ) {
+    return false;
+  }
+
+  return slot.startTime !== slot.endTime;
+}
 
 type ScheduleWizardProps = {
   isOpen: boolean;
   onClose: () => void;
   employees: RosterEmployee[];
-  onSubmit: (data: {
-    track: ScheduleTrack;
-    month: string;
-    months: number;
-    roster: RosterSelection[];
-  }) => Promise<void>;
+  onSubmit: () => Promise<void>;
 };
 
 export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: ScheduleWizardProps) {
@@ -33,6 +68,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
   const stepTitles: Record<WizardStep, string> = {
     track: t("wizard.stepTrack"),
     period: t("wizard.stepPeriod"),
+    slots: t("wizard.stepSlots"),
     roster: t("wizard.stepRoster"),
     review: t("wizard.stepReview")
   };
@@ -41,6 +77,9 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
   const [track, setTrack] = useState<ScheduleTrack | null>(null);
   const [month, setMonth] = useState(getDefaultMonth);
   const [months, setMonths] = useState(1);
+  const [slots, setSlots] = useState<ShiftSlotSelection[]>(() =>
+    defaultSlotsForTrack(null)
+  );
   const [customStartDate, setCustomStartDate] = useState(getDefaultCustomStart);
   const [customEndDate, setCustomEndDate] = useState(getDefaultCustomEnd);
   const [rosterSelected, setRosterSelected] = useState<Map<string, RosterSelection>>(new Map());
@@ -86,11 +125,29 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
           return customStartDate.length > 0 && customEndDate.length > 0 && customEndDate >= customStartDate;
         }
         return month.length > 0;
+      case "slots":
+        return slots.length >= 2 && slots.every((slot) => isValidSlot(slot));
       case "roster": return rosterSelected.size > 0;
       case "review": return previewData !== null && !isGenerating;
       default: return false;
     }
-  }, [step, track, month, isCustomPeriod, customStartDate, customEndDate, rosterSelected.size, previewData, isGenerating]);
+  }, [
+    step,
+    track,
+    month,
+    isCustomPeriod,
+    customStartDate,
+    customEndDate,
+    slots,
+    rosterSelected.size,
+    previewData,
+    isGenerating
+  ]);
+
+  const handleTrackChange = useCallback((nextTrack: ScheduleTrack) => {
+    setTrack(nextTrack);
+    setSlots(defaultSlotsForTrack(nextTrack));
+  }, []);
 
   const computedDateRange = useMemo(() => {
     if (isCustomPeriod) {
@@ -182,7 +239,12 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            scheduleType: track
+            scheduleType: track,
+            slots: slots.map((slot) => ({
+              name: slot.name.trim(),
+              startTime: slot.startTime,
+              endTime: slot.endTime
+            }))
           })
         });
 
@@ -252,7 +314,18 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     }
 
     setStep(nextStep);
-  }, [currentStepIndex, track, rosterSelected, computedDateRange, month, months, isCustomPeriod, selectedDepartment, t]);
+  }, [
+    currentStepIndex,
+    track,
+    rosterSelected,
+    computedDateRange,
+    month,
+    months,
+    isCustomPeriod,
+    selectedDepartment,
+    slots,
+    t
+  ]);
 
   const handleBack = useCallback(() => {
     const prevIndex = currentStepIndex - 1;
@@ -265,18 +338,14 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     setIsSubmitting(true);
 
     try {
-      await onSubmit({
-        track,
-        month,
-        months,
-        roster: [...rosterSelected.values()]
-      });
+      await onSubmit();
 
       // Reset wizard state
       setStep("track");
       setTrack(null);
       setMonth(getDefaultMonth());
       setMonths(1);
+      setSlots(defaultSlotsForTrack(null));
       setCustomStartDate(getDefaultCustomStart());
       setCustomEndDate(getDefaultCustomEnd());
       setRosterSelected(new Map());
@@ -286,13 +355,14 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     } finally {
       setIsSubmitting(false);
     }
-  }, [track, month, months, rosterSelected, isSubmitting, onSubmit, onClose]);
+  }, [track, isSubmitting, onSubmit, onClose]);
 
   const handleCloseWizard = useCallback(() => {
     setStep("track");
     setTrack(null);
     setMonth(getDefaultMonth());
     setMonths(1);
+    setSlots(defaultSlotsForTrack(null));
     setCustomStartDate(getDefaultCustomStart());
     setCustomEndDate(getDefaultCustomEnd());
     setRosterSelected(new Map());
@@ -334,7 +404,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
         {/* Step content */}
         <div className="schedule-wizard-content">
           {step === "track" ? (
-            <TrackSelector value={track} onChange={setTrack} />
+            <TrackSelector value={track} onChange={handleTrackChange} />
           ) : null}
 
           {step === "period" ? (
@@ -347,6 +417,13 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
               onMonthsChange={setMonths}
               onCustomStartChange={setCustomStartDate}
               onCustomEndChange={setCustomEndDate}
+            />
+          ) : null}
+
+          {step === "slots" ? (
+            <ShiftSlotsSelector
+              slots={slots}
+              onChange={setSlots}
             />
           ) : null}
 

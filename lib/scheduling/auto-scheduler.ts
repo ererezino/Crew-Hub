@@ -2,7 +2,7 @@
  * Auto-scheduler: generates draft shift assignments for a date range.
  *
  * Rules:
- *  - Weekday dates: only "weekday" and "flexible" employees
+ *  - Weekday dates: "weekday"/"flexible" employees, plus weekend workers on Thu/Fri support days
  *  - Weekend dates: "weekend_primary" (full Sat+Sun), "weekend_rotation" (evenly distributed), "flexible"
  *  - If `respectEmployeeScheduleType` is false, selected roster members are all eligible
  *  - Blocked dates (approved leave, holidays) are skipped
@@ -53,6 +53,11 @@ function dateRange(start: string, end: string): string[] {
 function isWeekend(dateStr: string): boolean {
   const day = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
   return day === 0 || day === 6;
+}
+
+function isThursdayOrFriday(dateStr: string): boolean {
+  const day = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
+  return day === 4 || day === 5;
 }
 
 /** Convert "HH:MM" to minutes-since-midnight. */
@@ -108,14 +113,27 @@ function isBackToBack(
 
     for (const prev of prevAssignments) {
       const prevSlot = slots.find((s) => s.name === prev.slotName);
-      if (prevSlot && timeToMinutes(prevSlot.endTime) >= CLOSE_THRESHOLD) {
+      if (!prevSlot) {
+        continue;
+      }
+
+      const prevStart = timeToMinutes(prevSlot.startTime);
+      let prevEnd = timeToMinutes(prevSlot.endTime);
+      if (prevEnd <= prevStart) {
+        prevEnd += 24 * 60;
+      }
+
+      if (prevEnd >= CLOSE_THRESHOLD) {
         return true;
       }
     }
   }
 
   // Check if the current slot ends late and employee has an early shift tomorrow
-  const slotEnd = timeToMinutes(slot.endTime);
+  let slotEnd = timeToMinutes(slot.endTime);
+  if (slotEnd <= slotStart) {
+    slotEnd += 24 * 60;
+  }
 
   if (slotEnd >= CLOSE_THRESHOLD) {
     const nextDate = new Date(`${date}T00:00:00Z`);
@@ -132,6 +150,54 @@ function isBackToBack(
         return true;
       }
     }
+  }
+
+  return false;
+}
+
+function isEligibleForDate({
+  employee,
+  date,
+  weekend,
+  scheduleType,
+  respectEmployeeScheduleType
+}: {
+  employee: EmployeeScheduleInfo;
+  date: string;
+  weekend: boolean;
+  scheduleType: "weekday" | "weekend" | "holiday";
+  respectEmployeeScheduleType: boolean;
+}): boolean {
+  if (!respectEmployeeScheduleType) {
+    return true;
+  }
+
+  if (scheduleType === "holiday") {
+    return employee.scheduleType === "flexible";
+  }
+
+  if (weekend) {
+    return (
+      employee.scheduleType === "weekend_primary" ||
+      employee.scheduleType === "weekend_rotation" ||
+      employee.scheduleType === "flexible"
+    );
+  }
+
+  if (
+    employee.scheduleType === "weekday" ||
+    employee.scheduleType === "flexible"
+  ) {
+    return true;
+  }
+
+  // Weekend workers still cover two weekday support days (Thu/Fri).
+  if (
+    (employee.scheduleType === "weekend_primary" ||
+      employee.scheduleType === "weekend_rotation") &&
+    isThursdayOrFriday(date)
+  ) {
+    return true;
   }
 
   return false;
@@ -179,12 +245,6 @@ export function autoGenerateSchedule(params: {
     blockedSets.set(emp.id, new Set(emp.blockedDates));
   }
 
-  // Identify weekend-rotation employees for even distribution
-  const weekendRotationIds = employees
-    .filter((e) => e.scheduleType === "weekend_rotation")
-    .map((e) => e.id);
-  let rotationIndex = 0;
-
   // Process each date
   for (const date of dates) {
     const weekend = isWeekend(date);
@@ -197,28 +257,16 @@ export function autoGenerateSchedule(params: {
       continue;
     }
 
-    // Determine eligible employees for this date based on schedule type
-    let eligible: EmployeeScheduleInfo[];
-
-    if (!respectEmployeeScheduleType) {
-      eligible = [...employees];
-    } else if (scheduleType === "holiday") {
-      // Holiday schedules: flexible employees only
-      eligible = employees.filter((e) => e.scheduleType === "flexible");
-    } else if (weekend) {
-      // Weekend dates
-      eligible = employees.filter(
-        (e) =>
-          e.scheduleType === "weekend_primary" ||
-          e.scheduleType === "weekend_rotation" ||
-          e.scheduleType === "flexible"
-      );
-    } else {
-      // Weekday dates
-      eligible = employees.filter(
-        (e) => e.scheduleType === "weekday" || e.scheduleType === "flexible"
-      );
-    }
+    // Determine eligible employees for this date based on schedule type.
+    let eligible = employees.filter((employee) =>
+      isEligibleForDate({
+        employee,
+        date,
+        weekend,
+        scheduleType,
+        respectEmployeeScheduleType
+      })
+    );
 
     // Remove blocked employees
     eligible = eligible.filter((e) => !blockedSets.get(e.id)?.has(date));
@@ -227,92 +275,75 @@ export function autoGenerateSchedule(params: {
       continue;
     }
 
-    // For each slot on this date, pick the best candidate
-    for (const slot of slots) {
+    // Assign enough rows so every available teammate gets work each required day.
+    // If available teammates are fewer than slot count, allow re-use to keep slot coverage.
+    const requiredAssignments = Math.max(eligible.length, slots.length);
+    const baseAssignmentsPerSlot = Math.floor(requiredAssignments / slots.length);
+    const remainderAssignments = requiredAssignments % slots.length;
+    const assignedOnDate = new Set<string>();
+
+    for (let slotIndex = 0; slotIndex < slots.length; slotIndex++) {
+      const slot = slots[slotIndex]!;
       const hours = slotHours(slot);
+      const targetAssignmentsForSlot =
+        baseAssignmentsPerSlot + (slotIndex < remainderAssignments ? 1 : 0);
 
-      // For weekend rotation, only include the rotation employee scheduled for this weekend
-      let candidates: EmployeeScheduleInfo[];
+      for (let assignmentIndex = 0; assignmentIndex < targetAssignmentsForSlot; assignmentIndex++) {
+        const candidates = eligible.filter(
+          (employee) => !isBackToBack(slot, date, employee.id, assignments, slots)
+        );
 
-      if (weekend && scheduleType !== "holiday" && respectEmployeeScheduleType) {
-        candidates = eligible.filter((e) => {
-          if (e.scheduleType === "weekend_rotation") {
-            // Only include if it's this employee's rotation turn
-            const idx = weekendRotationIds.indexOf(e.id);
-            if (idx === -1) return false;
-            return idx === rotationIndex % weekendRotationIds.length;
-          }
+        const unassignedCandidates = candidates.filter(
+          (employee) => !assignedOnDate.has(employee.id)
+        );
+        const candidatePool =
+          unassignedCandidates.length > 0 ? unassignedCandidates : candidates;
 
-          return true;
-        });
-      } else {
-        candidates = [...eligible];
-      }
-
-      // Filter out back-to-back conflicts
-      candidates = candidates.filter(
-        (e) => !isBackToBack(slot, date, e.id, assignments, slots)
-      );
-
-      // Filter out employees already assigned to a slot on this date
-      const assignedOnDate = new Set(
-        assignments.filter((a) => a.shiftDate === date).map((a) => a.employeeId)
-      );
-      const unassignedCandidates = candidates.filter((e) => !assignedOnDate.has(e.id));
-      const candidatePool = unassignedCandidates.length > 0 ? unassignedCandidates : candidates;
-
-      if (candidatePool.length === 0) {
-        continue;
-      }
-
-      // Sort by fewest hours (balancing), then shuffle within tied groups
-      candidatePool.sort((a, b) => {
-        const hoursA = hoursMap.get(a.id) ?? 0;
-        const hoursB = hoursMap.get(b.id) ?? 0;
-        return hoursA - hoursB;
-      });
-
-      // Find the group of candidates with the minimum hours and shuffle them
-      const minHours = hoursMap.get(candidatePool[0]!.id) ?? 0;
-      const threshold = minHours * 1.1; // 10% tolerance
-      const tiedCandidates = candidatePool.filter(
-        (c) => (hoursMap.get(c.id) ?? 0) <= threshold
-      );
-      shuffle(tiedCandidates);
-
-      const chosen = tiedCandidates[0]!;
-
-      // For reduced-hour weekend employees, shorten the shift to their assigned hours
-      const assignedStartTime = slot.startTime;
-      let assignedEndTime = slot.endTime;
-      let assignedHours = hours;
-
-      if (weekend && chosen.weekendHours && chosen.weekendHours !== "8") {
-        const targetHours = Number(chosen.weekendHours);
-        if (targetHours < hours) {
-          const startMin = timeToMinutes(slot.startTime);
-          const shortEndMin = startMin + targetHours * 60;
-          const shortEndHour = Math.floor(shortEndMin / 60) % 24;
-          const shortEndMinute = shortEndMin % 60;
-          assignedEndTime = `${String(shortEndHour).padStart(2, "0")}:${String(shortEndMinute).padStart(2, "0")}`;
-          assignedHours = targetHours;
+        if (candidatePool.length === 0) {
+          continue;
         }
+
+        candidatePool.sort((left, right) => {
+          const leftHours = hoursMap.get(left.id) ?? 0;
+          const rightHours = hoursMap.get(right.id) ?? 0;
+          return leftHours - rightHours;
+        });
+
+        const minHours = hoursMap.get(candidatePool[0]!.id) ?? 0;
+        const threshold = minHours * 1.1; // 10% tolerance
+        const tiedCandidates = candidatePool.filter(
+          (candidate) => (hoursMap.get(candidate.id) ?? 0) <= threshold
+        );
+        shuffle(tiedCandidates);
+
+        const chosen = tiedCandidates[0]!;
+        const assignedStartTime = slot.startTime;
+        let assignedEndTime = slot.endTime;
+        let assignedHours = hours;
+
+        if (weekend && chosen.weekendHours && chosen.weekendHours !== "8") {
+          const targetHours = Number(chosen.weekendHours);
+          if (targetHours < hours) {
+            const startMin = timeToMinutes(slot.startTime);
+            const shortEndMin = startMin + targetHours * 60;
+            const shortEndHour = Math.floor(shortEndMin / 60) % 24;
+            const shortEndMinute = shortEndMin % 60;
+            assignedEndTime = `${String(shortEndHour).padStart(2, "0")}:${String(shortEndMinute).padStart(2, "0")}`;
+            assignedHours = targetHours;
+          }
+        }
+
+        assignments.push({
+          employeeId: chosen.id,
+          shiftDate: date,
+          slotName: slot.name,
+          startTime: assignedStartTime,
+          endTime: assignedEndTime
+        });
+
+        assignedOnDate.add(chosen.id);
+        hoursMap.set(chosen.id, (hoursMap.get(chosen.id) ?? 0) + assignedHours);
       }
-
-      assignments.push({
-        employeeId: chosen.id,
-        shiftDate: date,
-        slotName: slot.name,
-        startTime: assignedStartTime,
-        endTime: assignedEndTime
-      });
-
-      hoursMap.set(chosen.id, (hoursMap.get(chosen.id) ?? 0) + assignedHours);
-    }
-
-    // Advance rotation counter at the end of each Sunday
-    if (weekend && new Date(`${date}T00:00:00Z`).getUTCDay() === 0) {
-      rotationIndex++;
     }
   }
 
@@ -349,18 +380,16 @@ export function autoGenerateSchedule(params: {
         if (blockedSets.get(e.id)?.has(date)) return false;
 
         // Check schedule type eligibility (unless roster-selected mode bypasses this)
-        if (respectEmployeeScheduleType) {
-          if (weekend) {
-            if (
-              e.scheduleType !== "weekend_primary" &&
-              e.scheduleType !== "weekend_rotation" &&
-              e.scheduleType !== "flexible"
-            )
-              return false;
-          } else {
-            if (e.scheduleType !== "weekday" && e.scheduleType !== "flexible")
-              return false;
-          }
+        if (
+          !isEligibleForDate({
+            employee: e,
+            date,
+            weekend,
+            scheduleType,
+            respectEmployeeScheduleType
+          })
+        ) {
+          return false;
         }
 
         // No back-to-back

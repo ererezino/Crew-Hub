@@ -342,6 +342,7 @@
       "newSchedule": "New Schedule",
       "stepTrack": "Schedule Type",
       "stepPeriod": "Time Period",
+      "stepSlots": "Shift Times",
       "stepRoster": "Team Members",
       "stepReview": "Review & Create",
       "failedCreate": "Failed to create schedule",
@@ -360,6 +361,14 @@
       "startingMonth": "Starting month",
       "startDate": "Start date",
       "endDate": "End date"
+    },
+    "slots": {
+      "minimumHint": "Pick at least two shifts for this schedule.",
+      "addShift": "Add shift",
+      "shiftName": "Shift name",
+      "startTime": "Start time",
+      "endTime": "End time",
+      "remove": "Remove"
     },
     "roster": {
       "selectedCount": "{selected} of {total} selected",
@@ -400,6 +409,8 @@
     "manage": {
       "title": "Schedules",
       "description": "Create and manage monthly schedules for your team.",
+      "viewSchedules": "Schedules",
+      "viewTeamSetup": "Team setup",
       "confirmPublishTitle": "Publish schedule?",
       "confirmPublishBody": "Publishing will notify all assigned team members. This action cannot be undone.",
       "confirmDeleteTitle": "Delete schedule?",
@@ -409,6 +420,19 @@
       "toastCreated": "Schedule created with auto-generated shifts.",
       "failedPublish": "Failed to publish schedule.",
       "failedDelete": "Failed to delete schedule."
+    },
+    "teamSetup": {
+      "title": "Team setup",
+      "description": "Mark which teammates are weekday or weekend workers before generating schedules.",
+      "searchPlaceholder": "Search team members…",
+      "weekday": "Weekday worker",
+      "weekend": "Weekend worker",
+      "weekendHours": "Weekend hours",
+      "saved": "Team setup saved.",
+      "saveFailed": "Unable to save team setup.",
+      "emptyTitle": "No team members found",
+      "emptyBody": "Add active team members to configure schedule types.",
+      "noDepartment": "No department"
     },
     "calendar": {
       "noShiftsTitle": "No shifts to display",

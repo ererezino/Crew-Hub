@@ -153,7 +153,10 @@ export function SchedulingTabsClient({
             />
           ) : null}
           {activeTab === "manage" && canManage ? (
-            <SchedulingManageClient />
+            <SchedulingManageClient
+              userRoles={userRoles}
+              userDepartment={userDepartment}
+            />
           ) : null}
         </motion.section>
       </AnimatePresence>

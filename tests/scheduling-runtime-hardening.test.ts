@@ -53,7 +53,9 @@ describe("Scheduling runtime hardening", () => {
     expect(manageClient).not.toContain("viewerDepartment");
     expect(calendarClient).toContain("const visibleSchedules = schedules;");
     expect(calendarClient).not.toContain("viewerDepartment");
-    expect(tabsClient).toContain("<SchedulingManageClient />");
+    expect(tabsClient).toContain("<SchedulingManageClient");
+    expect(tabsClient).toContain("userRoles={userRoles}");
+    expect(tabsClient).toContain("userDepartment={userDepartment}");
     expect(tabsClient).not.toContain("viewerDepartment={userDepartment ?? null}");
   });
 });

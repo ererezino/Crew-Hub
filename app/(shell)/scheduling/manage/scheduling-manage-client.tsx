@@ -7,9 +7,12 @@ import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { ScheduleCardGrid } from "../../../../components/scheduling/schedule-card-grid";
 import { ScheduleWizard } from "../../../../components/scheduling/schedule-wizard";
+import { TeamSetupPanel } from "../../../../components/scheduling/team-setup-panel";
 import type { RosterEmployee } from "../../../../components/scheduling/roster-selector";
 import { useSchedulingSchedules } from "../../../../hooks/use-scheduling";
 import { usePeople } from "../../../../hooks/use-people";
+import type { UserRole } from "../../../../lib/navigation";
+import { hasRole } from "../../../../lib/roles";
 
 
 type ToastMessage = {
@@ -20,14 +23,29 @@ type ToastMessage = {
 
 let toastCounter = 0;
 
-export function SchedulingManageClient() {
+export function SchedulingManageClient({
+  userRoles,
+  userDepartment
+}: {
+  userRoles: UserRole[];
+  userDepartment?: string | null;
+}) {
   const t = useTranslations("scheduling");
   const tc = useTranslations("common");
   const router = useRouter();
   const { data: schedulesData, isLoading, refresh: refreshSchedules } = useSchedulingSchedules({ scope: "team" });
-  const { people } = usePeople();
+  const {
+    people,
+    isLoading: isPeopleLoading,
+    setPeople
+  } = usePeople();
+  const isSuperAdmin = hasRole(userRoles, "SUPER_ADMIN");
+  const isHrAdmin = hasRole(userRoles, "HR_ADMIN");
 
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [manageView, setManageView] = useState<"schedules" | "team-setup">(
+    "schedules"
+  );
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -61,6 +79,21 @@ export function SchedulingManageClient() {
   }, [people]);
 
   const schedules = useMemo(() => schedulesData?.schedules ?? [], [schedulesData]);
+  const teamSetupMembers = useMemo(() => {
+    if (isSuperAdmin || isHrAdmin) {
+      return people;
+    }
+
+    if (!userDepartment) {
+      return [];
+    }
+
+    const normalizedDepartment = userDepartment.trim().toLowerCase();
+    return people.filter(
+      (person) =>
+        person.department?.trim().toLowerCase() === normalizedDepartment
+    );
+  }, [isHrAdmin, isSuperAdmin, people, userDepartment]);
 
   // Auto-dismiss toasts
   useEffect(() => {
@@ -190,6 +223,31 @@ export function SchedulingManageClient() {
     addToast("success", t("manage.toastCreated"));
   }, [refreshSchedules, addToast, t]);
 
+  const handleTeamMemberUpdated = useCallback(
+    ({
+      personId,
+      scheduleType,
+      weekendShiftHours
+    }: {
+      personId: string;
+      scheduleType: string;
+      weekendShiftHours: string | null;
+    }) => {
+      setPeople((current) =>
+        current.map((person) =>
+          person.id === personId
+            ? {
+                ...person,
+                scheduleType,
+                weekendShiftHours
+              }
+            : person
+        )
+      );
+    },
+    [setPeople]
+  );
+
   if (isLoading) {
     return (
       <section className="compensation-layout">
@@ -213,25 +271,56 @@ export function SchedulingManageClient() {
             {t("manage.description")}
           </p>
         </div>
+        {manageView === "schedules" ? (
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={() => setWizardOpen(true)}
+          >
+            {t("wizard.newSchedule")}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="schedule-manage-view-toggle" role="tablist">
         <button
           type="button"
-          className="button button-primary"
-          onClick={() => setWizardOpen(true)}
+          role="tab"
+          aria-selected={manageView === "schedules"}
+          className={manageView === "schedules" ? "active" : ""}
+          onClick={() => setManageView("schedules")}
         >
-          {t("wizard.newSchedule")}
+          {t("manage.viewSchedules")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={manageView === "team-setup"}
+          className={manageView === "team-setup" ? "active" : ""}
+          onClick={() => setManageView("team-setup")}
+        >
+          {t("manage.viewTeamSetup")}
         </button>
       </div>
 
-      {/* Schedule cards grid */}
-      <ScheduleCardGrid
-        schedules={schedules}
-        onPublish={(id) => setConfirmPublish(id)}
-        onRegenerate={handleRegenerate}
-        onDelete={(id) => setConfirmDelete(id)}
-        onViewShifts={handleViewShifts}
-        onCreateNew={() => setWizardOpen(true)}
-        publishingId={publishingId}
-      />
+      {manageView === "schedules" ? (
+        <ScheduleCardGrid
+          schedules={schedules}
+          onPublish={(id) => setConfirmPublish(id)}
+          onRegenerate={handleRegenerate}
+          onDelete={(id) => setConfirmDelete(id)}
+          onViewShifts={handleViewShifts}
+          onCreateNew={() => setWizardOpen(true)}
+          publishingId={publishingId}
+        />
+      ) : (
+        <TeamSetupPanel
+          members={teamSetupMembers}
+          isLoading={isPeopleLoading}
+          onMemberUpdated={handleTeamMemberUpdated}
+          onToast={addToast}
+        />
+      )}
 
       {/* Wizard slide panel */}
       <ScheduleWizard

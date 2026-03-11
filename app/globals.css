@@ -1704,6 +1704,36 @@ html.dark .topbar {
   gap: var(--space-4);
 }
 
+.schedule-manage-view-toggle {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+}
+
+.schedule-manage-view-toggle button {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-hover), color var(--transition-hover);
+}
+
+.schedule-manage-view-toggle button:hover {
+  color: var(--text-default);
+}
+
+.schedule-manage-view-toggle button.active {
+  background: rgba(232, 121, 73, 0.12);
+  color: var(--accent-primary);
+}
+
 /* ── Scheduling: Card Grid + Empty State ── */
 
 .schedule-card-grid {
@@ -2021,6 +2051,46 @@ html.dark .topbar {
   display: inline-block;
 }
 
+/* ── Scheduling: Slots Selector (Step 3) ── */
+
+.schedule-slot-selector {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.schedule-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.schedule-slot-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.schedule-slot-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+}
+
+.schedule-slot-name-field {
+  min-width: 0;
+}
+
+.schedule-slot-time-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
 /* ── Scheduling: Roster Selector (Step 3) ── */
 
 .schedule-roster-selector {
@@ -2151,6 +2221,101 @@ html.dark .topbar {
   color: var(--text-muted);
   border-top: 1px solid var(--border-default);
   padding-top: var(--space-2);
+}
+
+/* ── Scheduling: Team Setup ── */
+
+.schedule-team-setup {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.schedule-team-setup-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.schedule-team-setup-search {
+  width: min(360px, 100%);
+}
+
+.schedule-team-setup-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.schedule-team-setup-row {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+}
+
+.schedule-team-setup-member h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-default);
+}
+
+.schedule-team-setup-member p {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.schedule-team-setup-controls {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.schedule-team-setup-type-toggle {
+  display: inline-flex;
+  gap: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  width: fit-content;
+  padding: 2px;
+  background: var(--bg-surface);
+}
+
+.schedule-team-setup-type-toggle button {
+  border: 0;
+  background: transparent;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.schedule-team-setup-type-toggle button.active {
+  background: rgba(232, 121, 73, 0.12);
+  color: var(--accent-primary);
+}
+
+.schedule-team-setup-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.schedule-team-setup-hours .form-input {
+  min-width: 6rem;
+}
+
+.schedule-team-setup-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* ── Scheduling: Review (Step 4) ── */
@@ -2391,6 +2556,34 @@ html.dark .topbar {
     gap: var(--space-3);
   }
 
+  .schedule-manage-view-toggle {
+    width: 100%;
+  }
+
+  .schedule-manage-view-toggle button {
+    flex: 1;
+  }
+
+  .schedule-slot-row {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-slot-time-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-team-setup-row {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-team-setup-actions {
+    justify-content: stretch;
+  }
+
+  .schedule-team-setup-actions .button {
+    width: 100%;
+  }
+
   .schedule-calendar-header,
   .schedule-calendar-row {
     grid-template-columns: 160px repeat(var(--slot-count, 3), 1fr) 100px;
@@ -2595,6 +2788,25 @@ html.dark .topbar {
 .teamcal-shift-scheduled {
   border-color: color-mix(in srgb, var(--color-primary) 22%, var(--border-subtle));
   background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.teamcal-shift-band-default {
+  border-left: 3px solid color-mix(in srgb, var(--border-default) 70%, transparent);
+}
+
+.teamcal-shift-band-morning {
+  border-left: 3px solid #2d7f5e;
+  background: color-mix(in srgb, #2d7f5e 8%, transparent);
+}
+
+.teamcal-shift-band-afternoon {
+  border-left: 3px solid #fd8b05;
+  background: color-mix(in srgb, #fd8b05 9%, transparent);
+}
+
+.teamcal-shift-band-night {
+  border-left: 3px solid #1a2b3c;
+  background: color-mix(in srgb, #1a2b3c 10%, transparent);
 }
 
 .teamcal-shift-swap-requested {

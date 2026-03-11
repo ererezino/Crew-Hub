@@ -49,6 +49,7 @@ const generateBodySchema = z.object({
   slots: z.array(slotSchema).min(1, "At least one slot is required.").optional(),
   scheduleType: z.enum(["weekday", "weekend", "holiday"]).optional(),
   employeeIds: z.array(z.string().uuid()).optional(),
+  respectEmployeeScheduleType: z.boolean().optional(),
   confirm: z.literal(true).optional(),
   assignments: z
     .array(
@@ -123,6 +124,10 @@ function shouldRequireCoverageOnDate({
   scheduleType: "weekday" | "weekend" | "holiday";
   holidayDates: Set<string>;
 }): boolean {
+  if (scheduleType !== "holiday" && holidayDates.has(isoDate)) {
+    return false;
+  }
+
   const weekend = isWeekendDate(isoDate);
 
   if (scheduleType === "weekday") {
@@ -713,15 +718,14 @@ export async function POST(
     }
   }
 
-  const hasExplicitRoster = rosterEmployeeIds.length > 0 || ((employeeIds?.length ?? 0) > 0);
-
   const assignments = autoGenerateSchedule({
     employees,
     slots: typedSlots,
     startDate: schedule.start_date,
     endDate: schedule.end_date,
     scheduleType,
-    respectEmployeeScheduleType: !hasExplicitRoster
+    respectEmployeeScheduleType:
+      parsedBody.data.respectEmployeeScheduleType ?? true
   });
 
   const nameMap = new Map<string, string>();

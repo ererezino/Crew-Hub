@@ -61,7 +61,7 @@ describe("autoGenerateSchedule", () => {
       respectEmployeeScheduleType: false
     });
 
-    expect(assignments).toHaveLength(2);
+    expect(assignments).toHaveLength(4);
     expect(new Set(assignments.map((assignment) => assignment.employeeId))).toEqual(
       new Set(["weekday-employee", "weekend-employee"])
     );
@@ -99,10 +99,28 @@ describe("autoGenerateSchedule", () => {
       respectEmployeeScheduleType: false
     });
 
-    expect(assignments).toHaveLength(2);
+    expect(assignments).toHaveLength(4);
     expect(new Set(assignments.map((assignment) => assignment.shiftDate))).toEqual(
       new Set(["2026-03-07", "2026-03-08"])
     );
+  });
+
+  it("includes weekend workers on Thursday and Friday for weekday schedules", () => {
+    const assignments = autoGenerateSchedule({
+      employees: baseEmployees,
+      slots,
+      startDate: "2026-03-04", // Wednesday
+      endDate: "2026-03-06", // Friday
+      scheduleType: "weekday"
+    });
+
+    expect(assignments).toHaveLength(5);
+
+    const weekendEmployeeDates = assignments
+      .filter((assignment) => assignment.employeeId === "weekend-employee")
+      .map((assignment) => assignment.shiftDate);
+
+    expect(new Set(weekendEmployeeDates)).toEqual(new Set(["2026-03-05", "2026-03-06"]));
   });
 
   it("falls back to same-day double assignment when needed for coverage", () => {
@@ -142,7 +160,7 @@ describe("autoGenerateSchedule", () => {
     );
   });
 
-  it("fills all weekday slots across a month range when enough roster members are selected", () => {
+  it("assigns all selected weekday roster members each weekday and splits across slots", () => {
     const employees: EmployeeScheduleInfo[] = Array.from({ length: 12 }, (_, index) => ({
       id: `employee-${index + 1}`,
       fullName: `Employee ${index + 1}`,
@@ -184,13 +202,25 @@ describe("autoGenerateSchedule", () => {
       cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
 
-    expect(assignments).toHaveLength(requiredDates.length * coverageSlots.length);
+    expect(assignments).toHaveLength(requiredDates.length * employees.length);
 
     for (const date of requiredDates) {
       const dateAssignments = assignments.filter((assignment) => assignment.shiftDate === date);
+
+      expect(dateAssignments).toHaveLength(12);
       expect(new Set(dateAssignments.map((assignment) => assignment.slotName))).toEqual(
         new Set(["Morning Shift", "Evening Shift"])
       );
+
+      const morningCount = dateAssignments.filter(
+        (assignment) => assignment.slotName === "Morning Shift"
+      ).length;
+      const eveningCount = dateAssignments.filter(
+        (assignment) => assignment.slotName === "Evening Shift"
+      ).length;
+
+      expect(morningCount).toBe(6);
+      expect(eveningCount).toBe(6);
     }
   });
 });

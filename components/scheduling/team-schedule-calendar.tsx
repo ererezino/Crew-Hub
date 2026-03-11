@@ -167,6 +167,26 @@ function statusClass(status: ShiftRecord["status"]): string {
   }
 }
 
+function shiftBandClass(shift: ShiftRecord): string {
+  const source = shift.startTime.includes("T")
+    ? new Date(shift.startTime).getUTCHours()
+    : Number(shift.startTime.split(":")[0]);
+
+  if (Number.isNaN(source)) {
+    return "teamcal-shift-band-default";
+  }
+
+  if (source >= 5 && source < 12) {
+    return "teamcal-shift-band-morning";
+  }
+
+  if (source >= 12 && source < 18) {
+    return "teamcal-shift-band-afternoon";
+  }
+
+  return "teamcal-shift-band-night";
+}
+
 export function TeamScheduleCalendar({
   shifts,
   scheduleStartDate,
@@ -330,7 +350,7 @@ export function TeamScheduleCalendar({
                   return (
                     <article
                       key={shift.id}
-                      className={`teamcal-shift ${statusClass(shift.status)} ${isDraggable ? "teamcal-shift-draggable" : ""} ${isSelectable ? "teamcal-shift-selectable" : ""}`}
+                      className={`teamcal-shift ${statusClass(shift.status)} ${shiftBandClass(shift)} ${isDraggable ? "teamcal-shift-draggable" : ""} ${isSelectable ? "teamcal-shift-selectable" : ""}`}
                       draggable={isDraggable}
                       onDragStart={() => {
                         if (!isDraggable) return;
