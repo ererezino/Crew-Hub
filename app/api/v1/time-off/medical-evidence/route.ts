@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logger } from "../../../../../lib/logger";
@@ -15,6 +16,12 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg"
 ]);
+
+const uploadPayloadSchema = z.object({
+  fileName: z.string().min(1),
+  mimeType: z.string().min(1),
+  size: z.number().int().min(1).max(MAX_FILE_BYTES)
+});
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -61,6 +68,25 @@ export async function POST(request: Request) {
       error: {
         code: "VALIDATION_ERROR",
         message: "A file is required."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedUploadPayload = uploadPayloadSchema.safeParse({
+    fileName: file.name,
+    mimeType: file.type,
+    size: file.size
+  });
+
+  if (!parsedUploadPayload.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message:
+          parsedUploadPayload.error.issues[0]?.message ??
+          "Invalid file payload."
       },
       meta: buildMeta()
     });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
+import { logAudit } from "../../../../../../lib/audit";
 import { logger } from "../../../../../../lib/logger";
 import { hasRole } from "../../../../../../lib/roles";
 import { sanitizeFileName } from "../../../../../../lib/documents";
@@ -24,6 +25,9 @@ const ALLOWED_MIME_TYPES = new Set([
 
 const paramsSchema = z.object({
   announcementId: z.string().uuid()
+});
+const deleteAttachmentSchema = z.object({
+  attachmentId: z.string().uuid()
 });
 
 function buildMeta() {
@@ -67,6 +71,7 @@ export async function GET(
     .select("id, announcement_id, file_name, file_path, file_size_bytes, mime_type, created_at")
     .eq("announcement_id", paramsParsed.data.announcementId)
     .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -236,6 +241,20 @@ export async function POST(
     createdAt: inserted.created_at
   };
 
+  void logAudit({
+    action: "created",
+    tableName: "announcement_attachments",
+    recordId: attachment.id,
+    oldValue: null,
+    newValue: {
+      announcement_id: attachment.announcementId,
+      file_name: attachment.fileName,
+      file_path: attachment.filePath,
+      file_size_bytes: attachment.fileSizeBytes,
+      mime_type: attachment.mimeType
+    }
+  });
+
   return jsonResponse<{ attachment: AnnouncementAttachment }>(201, {
     data: { attachment },
     error: null,
@@ -266,9 +285,9 @@ export async function DELETE(
     });
   }
 
-  let body: { attachmentId?: string };
+  let body: unknown;
   try {
-    body = (await request.json()) as { attachmentId?: string };
+    body = await request.json();
   } catch {
     return jsonResponse<null>(400, {
       data: null,
@@ -277,22 +296,31 @@ export async function DELETE(
     });
   }
 
-  if (!body.attachmentId || typeof body.attachmentId !== "string") {
+  const parsedBody = deleteAttachmentSchema.safeParse(body);
+
+  if (!parsedBody.success) {
     return jsonResponse<null>(422, {
       data: null,
-      error: { code: "VALIDATION_ERROR", message: "attachmentId is required." },
+      error: {
+        code: "VALIDATION_ERROR",
+        message:
+          parsedBody.error.issues[0]?.message ?? "attachmentId is required."
+      },
       meta: buildMeta()
     });
   }
 
   const supabase = await createSupabaseServerClient();
+  const attachmentId = parsedBody.data.attachmentId;
+  const deletedAt = new Date().toISOString();
 
   // Fetch attachment to get file_path
   const { data: attachment } = await supabase
     .from("announcement_attachments")
     .select("id, file_path")
-    .eq("id", body.attachmentId)
+    .eq("id", attachmentId)
     .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
     .single();
 
   if (!attachment) {
@@ -309,13 +337,15 @@ export async function DELETE(
   // Delete DB record
   const { error: deleteError } = await supabase
     .from("announcement_attachments")
-    .delete()
-    .eq("id", body.attachmentId);
+    .update({ deleted_at: deletedAt })
+    .eq("id", attachmentId)
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null);
 
   if (deleteError) {
     logger.error("Announcement attachment delete failed.", {
       error: deleteError.message,
-      attachmentId: body.attachmentId
+      attachmentId
     });
     return jsonResponse<null>(500, {
       data: null,
@@ -324,8 +354,20 @@ export async function DELETE(
     });
   }
 
+  void logAudit({
+    action: "deleted",
+    tableName: "announcement_attachments",
+    recordId: attachmentId,
+    oldValue: {
+      file_path: attachment.file_path
+    },
+    newValue: {
+      deleted_at: deletedAt
+    }
+  });
+
   return jsonResponse<{ attachmentId: string }>(200, {
-    data: { attachmentId: body.attachmentId },
+    data: { attachmentId },
     error: null,
     meta: buildMeta()
   });
