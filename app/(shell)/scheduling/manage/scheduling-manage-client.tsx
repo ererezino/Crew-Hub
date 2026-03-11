@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { ScheduleCardGrid } from "../../../../components/scheduling/schedule-card-grid";
@@ -18,7 +19,8 @@ type ToastMessage = {
 
 let toastCounter = 0;
 
-export function SchedulingManageClient({ embedded = false }: { embedded?: boolean }) {
+export function SchedulingManageClient() {
+  const router = useRouter();
   const { data: schedulesData, isLoading, refresh: refreshSchedules } = useSchedulingSchedules({ scope: "team" });
   const { people } = usePeople();
 
@@ -115,10 +117,10 @@ export function SchedulingManageClient({ embedded = false }: { embedded?: boolea
     }
   }, [addToast, refreshSchedules]);
 
-  const handleViewShifts = useCallback((_scheduleId: string) => {
-    // For now, just show an info toast. Future: could open a shift detail panel.
-    addToast("info", "Shift details are visible in the My Schedule tab after publishing.");
-  }, [addToast]);
+  const handleViewShifts = useCallback((scheduleId: string) => {
+    void scheduleId;
+    router.replace("/scheduling");
+  }, [router]);
 
   const handleWizardSubmit = useCallback(async () => {
     // The wizard already created the schedule and generated shifts

@@ -1815,6 +1815,13 @@ html.dark .topbar {
   color: var(--status-error-text);
 }
 
+.schedule-card-delete:disabled,
+.schedule-card-delete-disabled {
+  color: var(--text-disabled);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Scheduling: Track & Status Badges ── */
 
 .schedule-track-badge {
@@ -2251,6 +2258,12 @@ html.dark .topbar {
   margin-bottom: var(--space-2);
 }
 
+.teamcal-helper-text {
+  margin-top: var(--space-1);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .schedule-calendar-wrapper {
   overflow-x: auto;
   border: 1px solid var(--border-default);
@@ -2548,6 +2561,73 @@ html.dark .topbar {
   letter-spacing: 0.02em;
 }
 
+/* ── Team Calendar (monthly team view) ── */
+
+.teamcal .mycal-cell {
+  min-height: 110px;
+}
+
+.teamcal-cell-outside-range {
+  background: var(--surface-subtle);
+}
+
+.teamcal-drop-target {
+  box-shadow: inset 0 0 0 2px var(--accent-primary);
+}
+
+.teamcal-shift {
+  display: grid;
+  gap: 1px;
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
+}
+
+.teamcal-shift-draggable {
+  cursor: grab;
+}
+
+.teamcal-shift-draggable:active {
+  cursor: grabbing;
+}
+
+.teamcal-shift-scheduled {
+  border-color: color-mix(in srgb, var(--color-primary) 22%, var(--border-subtle));
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.teamcal-shift-swap-requested {
+  border-color: color-mix(in srgb, var(--color-warning) 34%, var(--border-subtle));
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+}
+
+.teamcal-shift-swapped {
+  border-color: color-mix(in srgb, var(--color-success) 30%, var(--border-subtle));
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+
+.teamcal-shift-cancelled {
+  opacity: 0.7;
+  text-decoration: line-through;
+}
+
+.teamcal-shift-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamcal-shift-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
 @media (max-width: 640px) {
   .mycal-cell {
     min-height: 56px;
@@ -2565,6 +2645,18 @@ html.dark .topbar {
   .mycal-month-label {
     min-width: 120px;
     font-size: var(--text-sm);
+  }
+
+  .teamcal .mycal-cell {
+    min-height: 72px;
+  }
+
+  .teamcal-shift-name {
+    font-size: 0.66rem;
+  }
+
+  .teamcal-shift-time {
+    font-size: 0.62rem;
   }
 }
 

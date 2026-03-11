@@ -137,9 +137,11 @@ export function SchedulingTabsClient({
           transition={{ duration: 0.18, ease: "easeOut" }}
         >
           {activeTab === "my-shifts" ? <SchedulingClient embedded /> : null}
-          {activeTab === "team-calendar" ? <SchedulingCalendarClient embedded /> : null}
+          {activeTab === "team-calendar" ? (
+            <SchedulingCalendarClient canManageShifts={canManage} />
+          ) : null}
           {activeTab === "open-shifts" ? <SchedulingOpenShiftsClient embedded /> : null}
-          {activeTab === "manage" && canManage ? <SchedulingManageClient embedded /> : null}
+          {activeTab === "manage" && canManage ? <SchedulingManageClient /> : null}
         </motion.section>
       </AnimatePresence>
     </>

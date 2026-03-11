@@ -40,6 +40,7 @@ function statusLabel(status: string): string {
 
 export function ScheduleCard({ schedule, onPublish, onDelete, onViewShifts, isPublishing }: ScheduleCardProps) {
   const trackLabel = schedule.scheduleTrack === "weekend" ? "Weekend" : "Weekday";
+  const canDelete = schedule.status === "draft";
 
   return (
     <article className="schedule-card">
@@ -77,27 +78,27 @@ export function ScheduleCard({ schedule, onPublish, onDelete, onViewShifts, isPu
         </button>
 
         {schedule.status === "draft" ? (
-          <>
-            <button
-              type="button"
-              className="button button-primary"
-              onClick={() => onPublish(schedule.id)}
-              disabled={isPublishing || schedule.shiftCount === 0}
-            >
-              {isPublishing ? "Publishing..." : "Publish"}
-            </button>
-            <button
-              type="button"
-              className="button button-ghost schedule-card-delete"
-              onClick={() => onDelete(schedule.id)}
-              title="Delete schedule"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 16, height: 16 }}>
-                <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          </>
+          <button
+            type="button"
+            className="button button-primary"
+            onClick={() => onPublish(schedule.id)}
+            disabled={isPublishing || schedule.shiftCount === 0}
+          >
+            {isPublishing ? "Publishing..." : "Publish"}
+          </button>
         ) : null}
+        <button
+          type="button"
+          className={`button button-ghost schedule-card-delete ${!canDelete ? "schedule-card-delete-disabled" : ""}`}
+          onClick={() => onDelete(schedule.id)}
+          title={canDelete ? "Delete schedule" : "Only draft schedules can be deleted."}
+          disabled={!canDelete}
+          aria-label={canDelete ? "Delete schedule" : "Only draft schedules can be deleted"}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 16, height: 16 }}>
+            <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
       </div>
     </article>
   );

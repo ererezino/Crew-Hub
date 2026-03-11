@@ -4,6 +4,7 @@
  * Rules:
  *  - Weekday dates: only "weekday" and "flexible" employees
  *  - Weekend dates: "weekend_primary" (full Sat+Sun), "weekend_rotation" (evenly distributed), "flexible"
+ *  - If `respectEmployeeScheduleType` is false, selected roster members are all eligible
  *  - Blocked dates (approved leave, holidays) are skipped
  *  - No back-to-back close+open (ending >= 21:00 blocks next-day start <= 09:00)
  *  - Hours balanced within 10% across employees
@@ -146,8 +147,16 @@ export function autoGenerateSchedule(params: {
   startDate: string;
   endDate: string;
   scheduleType: "weekday" | "weekend" | "holiday";
+  respectEmployeeScheduleType?: boolean;
 }): GeneratedAssignment[] {
-  const { employees, slots, startDate, endDate, scheduleType } = params;
+  const {
+    employees,
+    slots,
+    startDate,
+    endDate,
+    scheduleType,
+    respectEmployeeScheduleType = true
+  } = params;
 
   if (employees.length === 0 || slots.length === 0) {
     return [];
@@ -183,7 +192,9 @@ export function autoGenerateSchedule(params: {
     // Determine eligible employees for this date based on schedule type
     let eligible: EmployeeScheduleInfo[];
 
-    if (scheduleType === "holiday") {
+    if (!respectEmployeeScheduleType) {
+      eligible = [...employees];
+    } else if (scheduleType === "holiday") {
       // Holiday schedules: flexible employees only
       eligible = employees.filter((e) => e.scheduleType === "flexible");
     } else if (weekend) {
@@ -215,7 +226,7 @@ export function autoGenerateSchedule(params: {
       // For weekend rotation, only include the rotation employee scheduled for this weekend
       let candidates: EmployeeScheduleInfo[];
 
-      if (weekend && scheduleType !== "holiday") {
+      if (weekend && scheduleType !== "holiday" && respectEmployeeScheduleType) {
         candidates = eligible.filter((e) => {
           if (e.scheduleType === "weekend_rotation") {
             // Only include if it's this employee's rotation turn
@@ -328,17 +339,19 @@ export function autoGenerateSchedule(params: {
         if ((hoursMap.get(e.id) ?? 0) >= lowerBound) return false;
         if (blockedSets.get(e.id)?.has(date)) return false;
 
-        // Check schedule type eligibility
-        if (weekend) {
-          if (
-            e.scheduleType !== "weekend_primary" &&
-            e.scheduleType !== "weekend_rotation" &&
-            e.scheduleType !== "flexible"
-          )
-            return false;
-        } else {
-          if (e.scheduleType !== "weekday" && e.scheduleType !== "flexible")
-            return false;
+        // Check schedule type eligibility (unless roster-selected mode bypasses this)
+        if (respectEmployeeScheduleType) {
+          if (weekend) {
+            if (
+              e.scheduleType !== "weekend_primary" &&
+              e.scheduleType !== "weekend_rotation" &&
+              e.scheduleType !== "flexible"
+            )
+              return false;
+          } else {
+            if (e.scheduleType !== "weekday" && e.scheduleType !== "flexible")
+              return false;
+          }
         }
 
         // No back-to-back

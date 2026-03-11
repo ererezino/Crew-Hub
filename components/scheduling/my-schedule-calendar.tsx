@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { ShiftRecord, ShiftStatus } from "../../types/scheduling";
@@ -158,25 +158,25 @@ export function MyScheduleCalendar({ shifts, onShiftClick }: MyScheduleCalendarP
     return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   }, [viewYear, viewMonth]);
 
-  const goToPrevMonth = useCallback(() => {
+  const goToPrevMonth = () => {
     setViewMonth((m) => {
       if (m === 0) { setViewYear((y) => y - 1); return 11; }
       return m - 1;
     });
-  }, []);
+  };
 
-  const goToNextMonth = useCallback(() => {
+  const goToNextMonth = () => {
     setViewMonth((m) => {
       if (m === 11) { setViewYear((y) => y + 1); return 0; }
       return m + 1;
     });
-  }, []);
+  };
 
-  const goToToday = useCallback(() => {
+  const goToToday = () => {
     const t = new Date();
     setViewYear(t.getFullYear());
     setViewMonth(t.getMonth());
-  }, []);
+  };
 
   const weeks: CalendarDay[][] = [];
   for (let i = 0; i < calendarDays.length; i += 7) {

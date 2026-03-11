@@ -336,7 +336,7 @@ export async function POST(
     .from("profiles")
     .select("id, full_name, schedule_type, weekend_shift_hours")
     .eq("org_id", session.profile.org_id)
-    .eq("status", "active")
+    .in("status", ["active", "onboarding"])
     .is("deleted_at", null);
 
   if (rosterEmployeeIds.length > 0) {
@@ -518,12 +518,15 @@ export async function POST(
     }
   }
 
+  const hasExplicitRoster = rosterEmployeeIds.length > 0 || ((employeeIds?.length ?? 0) > 0);
+
   const assignments = autoGenerateSchedule({
     employees,
     slots: typedSlots,
     startDate: schedule.start_date,
     endDate: schedule.end_date,
-    scheduleType
+    scheduleType,
+    respectEmployeeScheduleType: !hasExplicitRoster
   });
 
   const nameMap = new Map<string, string>();

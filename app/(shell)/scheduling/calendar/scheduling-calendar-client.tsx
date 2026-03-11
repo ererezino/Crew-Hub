@@ -1,16 +1,47 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ScheduleCalendar } from "../../../../components/scheduling/schedule-calendar";
+import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
+import { TeamScheduleCalendar } from "../../../../components/scheduling/team-schedule-calendar";
 import { useSchedulingSchedules, useSchedulingShifts } from "../../../../hooks/use-scheduling";
+import type { ShiftRecord } from "../../../../types/scheduling";
 
-export function SchedulingCalendarClient({ embedded = false }: { embedded?: boolean }) {
+type ToastMessage = {
+  id: number;
+  type: "success" | "error" | "info";
+  text: string;
+};
+
+type PendingMove = {
+  shift: ShiftRecord;
+  targetDate: string;
+};
+
+let toastCounter = 0;
+
+function formatShiftMoveDate(isoDate: string): string {
+  return new Date(`${isoDate}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+export function SchedulingCalendarClient({
+  canManageShifts = false
+}: {
+  canManageShifts?: boolean;
+}) {
   const schedulesQuery = useSchedulingSchedules({ scope: "team", status: "published" });
-  const schedules = schedulesQuery.data?.schedules ?? [];
+  const schedulesData = schedulesQuery.data;
+  const schedules = useMemo(() => schedulesData?.schedules ?? [], [schedulesData]);
 
   // Default to the most recent published schedule
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  const [isMovingShift, setIsMovingShift] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const activeSchedule = useMemo(() => {
     if (schedules.length === 0) return null;
@@ -28,6 +59,52 @@ export function SchedulingCalendarClient({ embedded = false }: { embedded?: bool
 
   const shifts = shiftsQuery.data?.shifts ?? [];
   const isLoading = schedulesQuery.isLoading || shiftsQuery.isLoading;
+
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const timer = setTimeout(() => {
+      setToasts((current) => current.slice(1));
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [toasts]);
+
+  const addToast = useCallback((type: ToastMessage["type"], text: string) => {
+    setToasts((current) => [...current, { id: ++toastCounter, type, text }]);
+  }, []);
+
+  const handleRequestMove = useCallback((shift: ShiftRecord, targetDate: string) => {
+    setPendingMove({ shift, targetDate });
+  }, []);
+
+  const handleConfirmMove = useCallback(async () => {
+    if (!pendingMove) return;
+
+    setIsMovingShift(true);
+    try {
+      const response = await fetch(`/api/v1/scheduling/shifts/${pendingMove.shift.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          shiftDate: pendingMove.targetDate
+        })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message ?? "Unable to move shift.");
+      }
+
+      addToast("success", "Shift moved successfully.");
+      shiftsQuery.refresh();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : "Unable to move shift.");
+    } finally {
+      setIsMovingShift(false);
+      setPendingMove(null);
+    }
+  }, [addToast, pendingMove, shiftsQuery]);
 
   if (isLoading) {
     return (
@@ -76,22 +153,67 @@ export function SchedulingCalendarClient({ embedded = false }: { embedded?: bool
               {activeSchedule.name ?? "Published schedule"} &middot;{" "}
               {activeSchedule.scheduleTrack === "weekend" ? "Weekend" : "Weekday"} track
             </p>
+            {canManageShifts ? (
+              <p className="teamcal-helper-text">
+                Drag and drop any shift to a new day to reschedule it.
+              </p>
+            ) : null}
           </div>
-          <ScheduleCalendar
+          <TeamScheduleCalendar
             shifts={shifts}
-            startDate={activeSchedule.startDate}
-            endDate={activeSchedule.endDate}
-            scheduleTrack={activeSchedule.scheduleTrack}
+            scheduleStartDate={activeSchedule.startDate}
+            scheduleEndDate={activeSchedule.endDate}
+            canManage={canManageShifts}
+            onRequestMove={handleRequestMove}
           />
         </>
       ) : (
-        <ScheduleCalendar
+        <TeamScheduleCalendar
           shifts={[]}
-          startDate=""
-          endDate=""
-          scheduleTrack="weekday"
+          scheduleStartDate={new Date().toISOString().slice(0, 10)}
+          scheduleEndDate={new Date().toISOString().slice(0, 10)}
+          canManage={false}
+          onRequestMove={() => {
+            // no-op for empty state
+          }}
         />
       )}
+
+      <ConfirmDialog
+        isOpen={pendingMove !== null}
+        title="Move shift?"
+        description={
+          pendingMove
+            ? `${pendingMove.shift.employeeName ?? "Crew member"} will move from ${formatShiftMoveDate(pendingMove.shift.shiftDate)} to ${formatShiftMoveDate(pendingMove.targetDate)}.`
+            : undefined
+        }
+        confirmLabel="Confirm move"
+        onConfirm={() => {
+          void handleConfirmMove();
+        }}
+        onCancel={() => setPendingMove(null)}
+        isConfirming={isMovingShift}
+      />
+
+      {toasts.length > 0 ? (
+        <section className="toast-region" aria-live="polite">
+          {toasts.map((toast) => (
+            <div key={toast.id} className={`toast-message toast-message-${toast.type}`}>
+              <span>{toast.text}</span>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setToasts((current) => current.filter((entry) => entry.id !== toast.id))}
+                aria-label="Dismiss"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </section>
+      ) : null}
     </section>
   );
 }

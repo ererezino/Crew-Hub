@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 
@@ -43,7 +43,7 @@ export function SchedulingClient({ embedded = false }: { embedded?: boolean }) {
 
   const isInitialLoading = shiftsQuery.isLoading && shiftsQuery.data === null;
   const shifts = shiftsQuery.data?.shifts ?? [];
-  const currentTime = Date.now();
+  const [currentTime] = useState(() => Date.now());
   const upcomingCount = shifts.filter((s) => new Date(s.endTime).getTime() >= currentTime).length;
   const swapRequestedCount = shifts.filter((s) => s.status === "swap_requested").length;
 
