@@ -29,9 +29,12 @@ import {
 } from "../../../../lib/expenses";
 import { EXPENSE_CATEGORIES } from "../../../../types/expenses";
 import type {
+  CreateExpenseCommentResponse,
   ExpenseCategory,
   ExpenseApprovalStage,
   ExpenseBulkApproveResponse,
+  ExpenseCommentRecord,
+  ExpenseCommentsResponse,
   ExpenseReceiptSignedUrlResponse,
   ExpenseRecord,
   UpdateExpenseResponse
@@ -57,6 +60,10 @@ type RejectFormErrors = {
   reason?: string;
 };
 
+type RequestInfoFormErrors = {
+  message?: string;
+};
+
 type DisburseFormValues = {
   reimbursementReference: string;
   reimbursementNotes: string;
@@ -64,6 +71,7 @@ type DisburseFormValues = {
 
 type DisburseFormErrors = {
   reimbursementReference?: string;
+  paymentProof?: string;
 };
 
 const rejectSchema = z.object({
@@ -145,6 +153,12 @@ export function ExpenseApprovalsClient({
   const [rejectValues, setRejectValues] = useState<RejectFormValues>({ reason: "" });
   const [rejectErrors, setRejectErrors] = useState<RejectFormErrors>({});
   const [isRejecting, setIsRejecting] = useState(false);
+  const [requestInfoTarget, setRequestInfoTarget] = useState<ExpenseRecord | null>(null);
+  const [requestInfoMessage, setRequestInfoMessage] = useState("");
+  const [requestInfoThread, setRequestInfoThread] = useState<ExpenseCommentRecord[]>([]);
+  const [requestInfoErrors, setRequestInfoErrors] = useState<RequestInfoFormErrors>({});
+  const [isLoadingRequestInfoThread, setIsLoadingRequestInfoThread] = useState(false);
+  const [isRequestingInfo, setIsRequestingInfo] = useState(false);
   const [disburseTarget, setDisburseTarget] = useState<ExpenseRecord | null>(null);
   const [disburseValues, setDisburseValues] = useState<DisburseFormValues>({
     reimbursementReference: "",
@@ -274,7 +288,7 @@ export function ExpenseApprovalsClient({
       setSelectedIds((current) => current.filter((id) => id !== expense.id));
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
-      showToast("success", "Expense moved to finance disbursement.");
+      showToast("success", "Expense moved to finance payment queue.");
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to approve expense.");
     } finally {
@@ -298,6 +312,123 @@ export function ExpenseApprovalsClient({
     const target = confirmApproveTarget;
     closeApproveConfirm();
     await handleSingleManagerApprove(target);
+  };
+
+  const loadRequestInfoThread = async (expenseId: string) => {
+    setIsLoadingRequestInfoThread(true);
+    try {
+      const response = await fetch(`/api/v1/expenses/${expenseId}/comments`, {
+        method: "GET"
+      });
+      const payload = (await response.json()) as ExpenseCommentsResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? "Unable to load expense conversation.");
+        setRequestInfoThread([]);
+        return;
+      }
+
+      setRequestInfoThread(payload.data.comments);
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "Unable to load expense conversation."
+      );
+      setRequestInfoThread([]);
+    } finally {
+      setIsLoadingRequestInfoThread(false);
+    }
+  };
+
+  const openRequestInfoPanel = (expense: ExpenseRecord) => {
+    setRequestInfoTarget(expense);
+    setRequestInfoMessage("");
+    setRequestInfoErrors({});
+    setRequestInfoThread([]);
+    void loadRequestInfoThread(expense.id);
+  };
+
+  const closeRequestInfoPanel = () => {
+    if (isRequestingInfo) {
+      return;
+    }
+
+    setRequestInfoTarget(null);
+    setRequestInfoMessage("");
+    setRequestInfoErrors({});
+    setRequestInfoThread([]);
+  };
+
+  const handleRequestInfoMessageChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    const value = event.currentTarget.value;
+    setRequestInfoMessage(value);
+
+    if (value.trim().length === 0) {
+      setRequestInfoErrors({ message: "Message is required." });
+      return;
+    }
+
+    if (value.trim().length > 2000) {
+      setRequestInfoErrors({ message: "Message is too long." });
+      return;
+    }
+
+    setRequestInfoErrors({});
+  };
+
+  const submitRequestInfo = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!requestInfoTarget) {
+      return;
+    }
+
+    const trimmedMessage = requestInfoMessage.trim();
+    if (!trimmedMessage) {
+      setRequestInfoErrors({ message: "Message is required." });
+      return;
+    }
+
+    if (trimmedMessage.length > 2000) {
+      setRequestInfoErrors({ message: "Message is too long." });
+      return;
+    }
+
+    setIsRequestingInfo(true);
+    setIsMutatingId(requestInfoTarget.id);
+
+    try {
+      const response = await fetch(`/api/v1/expenses/${requestInfoTarget.id}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "request_info",
+          message: trimmedMessage
+        })
+      });
+
+      const payload = (await response.json()) as CreateExpenseCommentResponse;
+
+      if (!response.ok || !payload.data?.comment) {
+        showToast("error", payload.error?.message ?? "Unable to request additional info.");
+        return;
+      }
+      const createdComment = payload.data.comment;
+
+      setRequestInfoThread((current) => [...current, createdComment]);
+      setRequestInfoMessage("");
+      setRequestInfoErrors({});
+      approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      showToast("info", "Info request sent to employee.");
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to request additional info.");
+    } finally {
+      setIsRequestingInfo(false);
+      setIsMutatingId(null);
+    }
   };
 
   const openDisbursePanel = (expense: ExpenseRecord) => {
@@ -349,6 +480,10 @@ export function ExpenseApprovalsClient({
   const handlePaymentProofChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     setPaymentProofFile(file);
+    setDisburseErrors((current) => ({
+      ...current,
+      paymentProof: undefined
+    }));
   };
 
   const submitDisbursement = async (event: FormEvent<HTMLFormElement>) => {
@@ -362,7 +497,16 @@ export function ExpenseApprovalsClient({
 
     if (!validation.success) {
       setDisburseErrors({
-        reimbursementReference: validation.error.flatten().fieldErrors.reimbursementReference?.[0]
+        reimbursementReference: validation.error.flatten().fieldErrors.reimbursementReference?.[0],
+        paymentProof: undefined
+      });
+      return;
+    }
+
+    if (!paymentProofFile) {
+      setDisburseErrors({
+        reimbursementReference: undefined,
+        paymentProof: "Payment proof receipt is required."
       });
       return;
     }
@@ -371,33 +515,34 @@ export function ExpenseApprovalsClient({
     setIsMutatingId(disburseTarget.id);
 
     try {
-      // Step 1: Upload payment proof file if provided
-      let receiptPath: string | undefined;
+      // Step 1: Upload payment proof file
+      const uploadForm = new FormData();
+      uploadForm.set("paymentProof", paymentProofFile);
 
-      if (paymentProofFile) {
-        const uploadForm = new FormData();
-        uploadForm.set("paymentProof", paymentProofFile);
+      const uploadResponse = await fetch(
+        `/api/v1/expenses/${disburseTarget.id}/payment-proof`,
+        { method: "POST", body: uploadForm }
+      );
 
-        const uploadResponse = await fetch(
-          `/api/v1/expenses/${disburseTarget.id}/payment-proof`,
-          { method: "POST", body: uploadForm }
+      if (!uploadResponse.ok) {
+        const uploadPayload = await uploadResponse.json().catch(() => null);
+        showToast(
+          "error",
+          (uploadPayload as { error?: { message?: string } } | null)?.error?.message ??
+            "Unable to upload payment proof."
         );
-
-        if (!uploadResponse.ok) {
-          const uploadPayload = await uploadResponse.json().catch(() => null);
-          showToast(
-            "error",
-            (uploadPayload as { error?: { message?: string } } | null)?.error?.message ??
-              "Unable to upload payment proof."
-          );
-          return;
-        }
-
-        const uploadResult = (await uploadResponse.json()) as { data?: { path?: string } };
-        receiptPath = uploadResult.data?.path;
+        return;
       }
 
-      // Step 2: Disburse the expense
+      const uploadResult = (await uploadResponse.json()) as { data?: { path?: string } };
+      const receiptPath = uploadResult.data?.path;
+
+      if (!receiptPath) {
+        showToast("error", "Unable to upload payment proof.");
+        return;
+      }
+
+      // Step 2: Mark the expense as paid
       const response = await fetch(`/api/v1/expenses/${disburseTarget.id}`, {
         method: "PATCH",
         headers: {
@@ -414,7 +559,7 @@ export function ExpenseApprovalsClient({
       const payload = (await response.json()) as UpdateExpenseResponse;
 
       if (!response.ok || !payload.data?.expense) {
-        showToast("error", payload.error?.message ?? "Unable to disburse expense.");
+        showToast("error", payload.error?.message ?? "Unable to mark expense as paid.");
         return;
       }
 
@@ -422,9 +567,9 @@ export function ExpenseApprovalsClient({
       setSelectedIds((current) => current.filter((id) => id !== disburseTarget.id));
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
-      showToast("success", "Expense disbursed successfully.");
+      showToast("success", "Expense marked as paid.");
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to disburse expense.");
+      showToast("error", error instanceof Error ? error.message : "Unable to mark expense as paid.");
     } finally {
       setIsDisbursing(false);
       setIsMutatingId(null);
@@ -432,6 +577,11 @@ export function ExpenseApprovalsClient({
   };
 
   const handleBulkApprove = async () => {
+    if (stage !== "manager") {
+      showToast("error", "Bulk processing is only available for manager approvals.");
+      return;
+    }
+
     if (selectedIds.length === 0) {
       return;
     }
@@ -462,9 +612,7 @@ export function ExpenseApprovalsClient({
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       showToast(
         "success",
-        stage === "manager"
-          ? `Moved ${payload.data.approvedCount} expenses to finance.`
-          : `Disbursed ${payload.data.approvedCount} expenses.`
+        `Moved ${payload.data.approvedCount} expenses to finance.`
       );
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : "Unable to process selected expenses.");
@@ -474,6 +622,10 @@ export function ExpenseApprovalsClient({
   };
 
   const openBulkApproveConfirm = () => {
+    if (stage !== "manager") {
+      return;
+    }
+
     if (selectedIds.length === 0 || isBulkApproving) {
       return;
     }
@@ -616,16 +768,17 @@ export function ExpenseApprovalsClient({
     }
   };
 
-  const stageTitle = stage === "manager" ? "Pending My Approval" : "Pending Disbursement";
+  const stageTitle = stage === "manager" ? "Pending My Approval" : "Pending Payment";
   const stageDescription =
     stage === "manager"
       ? "Expenses from your direct reports awaiting manager approval."
-      : "Manager-approved expenses ready for finance disbursement.";
+      : "Manager-approved expenses awaiting finance payment confirmation with uploaded payment proof.";
   const hasActiveFilters =
     employeeFilter.trim().length > 0 ||
     categoryFilter !== "all" ||
     fromDateFilter.length > 0 ||
     toDateFilter.length > 0;
+  const canBulkProcess = stage === "manager";
 
   const clearFilters = () => {
     setEmployeeFilter("");
@@ -639,22 +792,18 @@ export function ExpenseApprovalsClient({
       {!embedded ? (
         <PageHeader
           title="Expense Approvals"
-          description="Process manager-approved expenses, disburse reimbursements, and close the finance queue efficiently."
+          description="Process manager-approved expenses, confirm payments, and close the finance queue efficiently."
           actions={
-            <button
-              type="button"
-              className="button button-accent"
-              onClick={openBulkApproveConfirm}
-              disabled={selectedIds.length === 0 || isBulkApproving}
-            >
-              {isBulkApproving
-                ? stage === "manager"
-                  ? "Approving..."
-                  : "Disbursing..."
-                : stage === "manager"
-                  ? `Bulk approve (${selectedIds.length})`
-                  : `Bulk disburse (${selectedIds.length})`}
-            </button>
+            canBulkProcess ? (
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={openBulkApproveConfirm}
+                disabled={selectedIds.length === 0 || isBulkApproving}
+              >
+                {isBulkApproving ? "Approving..." : `Bulk approve (${selectedIds.length})`}
+              </button>
+            ) : null
           }
         />
       ) : null}
@@ -673,7 +822,7 @@ export function ExpenseApprovalsClient({
             className={stage === "finance" ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setStage("finance")}
           >
-            Pending Disbursement
+            Pending Payment
           </button>
         </section>
       ) : null}
@@ -771,7 +920,7 @@ export function ExpenseApprovalsClient({
         <>
           <section className="expenses-metric-grid" aria-label="Pending approvals summary">
             <article className="metric-card">
-              <p className="metric-label">{stage === "manager" ? "Pending Manager Approval" : "Pending Disbursement"}</p>
+              <p className="metric-label">{stage === "manager" ? "Pending Manager Approval" : "Pending Payment"}</p>
               <p className="metric-value numeric">{approvalsQuery.data.pendingCount}</p>
               <p className="metric-hint">{stageDescription}</p>
             </article>
@@ -791,7 +940,7 @@ export function ExpenseApprovalsClient({
                   ? "No expenses match current filters"
                   : stage === "manager"
                     ? "No expenses pending manager approval"
-                    : "No expenses pending disbursement"
+                    : "No expenses pending payment confirmation"
               }
               description={
                 hasActiveFilters
@@ -807,14 +956,16 @@ export function ExpenseApprovalsClient({
                 <thead>
                   <tr>
                     <th>
-                      <label className="expenses-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={allSelected}
-                          onChange={toggleSelectAll}
-                          aria-label={`Select all ${stageTitle.toLowerCase()} expenses`}
-                        />
-                      </label>
+                      {canBulkProcess ? (
+                        <label className="expenses-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={toggleSelectAll}
+                            aria-label={`Select all ${stageTitle.toLowerCase()} expenses`}
+                          />
+                        </label>
+                      ) : null}
                     </th>
                     <th>Employee</th>
                     <th>Category</th>
@@ -843,14 +994,16 @@ export function ExpenseApprovalsClient({
                   {filteredExpenses.map((expense) => (
                     <tr key={expense.id} className="data-table-row">
                       <td>
-                        <label className="expenses-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(expense.id)}
-                            onChange={() => toggleSelected(expense.id)}
-                            aria-label={`Select expense from ${expense.employeeName}`}
-                          />
-                        </label>
+                        {canBulkProcess ? (
+                          <label className="expenses-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(expense.id)}
+                              onChange={() => toggleSelected(expense.id)}
+                              aria-label={`Select expense from ${expense.employeeName}`}
+                            />
+                          </label>
+                        ) : null}
                       </td>
                       <td>
                         <div className="documents-cell-copy">
@@ -902,6 +1055,19 @@ export function ExpenseApprovalsClient({
                         <StatusBadge tone={toneForExpenseStatus(expense.status)}>
                           {getExpenseStatusLabel(expense.status)}
                         </StatusBadge>
+                        {expense.infoRequestState === "requested" ? (
+                          <p className="documents-cell-description">
+                            Info requested
+                            {expense.infoRequestUpdatedByName
+                              ? ` by ${expense.infoRequestUpdatedByName}`
+                              : ""}.
+                          </p>
+                        ) : null}
+                        {expense.infoRequestState === "responded" ? (
+                          <p className="documents-cell-description">
+                            Employee replied to info request.
+                          </p>
+                        ) : null}
                       </td>
                       <td>
                         <time
@@ -934,6 +1100,14 @@ export function ExpenseApprovalsClient({
                               <button
                                 type="button"
                                 className="table-row-action"
+                                onClick={() => openRequestInfoPanel(expense)}
+                                disabled={isMutatingId === expense.id}
+                              >
+                                Request info
+                              </button>
+                              <button
+                                type="button"
+                                className="table-row-action"
                                 onClick={() => openRejectPanel(expense, "manager")}
                                 disabled={isMutatingId === expense.id}
                               >
@@ -948,7 +1122,7 @@ export function ExpenseApprovalsClient({
                                 onClick={() => openDisbursePanel(expense)}
                                 disabled={isMutatingId === expense.id}
                               >
-                                {isMutatingId === expense.id ? "Saving..." : "Disburse"}
+                                {isMutatingId === expense.id ? "Saving..." : "Mark paid"}
                               </button>
                               <button
                                 type="button"
@@ -1009,10 +1183,10 @@ export function ExpenseApprovalsClient({
 
       <SlidePanel
         isOpen={Boolean(disburseTarget)}
-        title="Disburse expense"
+        title="Mark expense as paid"
         description={
           disburseTarget
-            ? `Finalize reimbursement for ${disburseTarget.employeeName}.`
+            ? `Record payment confirmation for ${disburseTarget.employeeName}.`
             : undefined
         }
         onClose={closeDisbursePanel}
@@ -1038,7 +1212,7 @@ export function ExpenseApprovalsClient({
               rows={3}
               value={disburseValues.reimbursementNotes}
               onChange={handleDisburseFieldChange("reimbursementNotes")}
-              placeholder="Optional disbursement notes."
+              placeholder="Optional payment notes."
               disabled={isDisbursing}
             />
           </label>
@@ -1057,6 +1231,10 @@ export function ExpenseApprovalsClient({
                     className="payment-proof-remove"
                     onClick={() => {
                       setPaymentProofFile(null);
+                      setDisburseErrors((current) => ({
+                        ...current,
+                        paymentProof: "Payment proof receipt is required."
+                      }));
                       if (paymentProofInputRef.current) {
                         paymentProofInputRef.current.value = "";
                       }
@@ -1084,13 +1262,82 @@ export function ExpenseApprovalsClient({
                 style={{ display: "none" }}
               />
             </div>
+            {disburseErrors.paymentProof ? (
+              <p className="form-field-error">{disburseErrors.paymentProof}</p>
+            ) : null}
           </div>
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeDisbursePanel} disabled={isDisbursing}>
               Cancel
             </button>
             <button type="submit" className="button button-accent" disabled={isDisbursing}>
-              {isDisbursing ? "Disbursing..." : "Confirm disbursement"}
+              {isDisbursing ? "Saving..." : "Confirm payment"}
+            </button>
+          </div>
+        </form>
+      </SlidePanel>
+
+      <SlidePanel
+        isOpen={Boolean(requestInfoTarget)}
+        title="Request more info"
+        description={
+          requestInfoTarget
+            ? `Ask ${requestInfoTarget.employeeName} for additional details before approval.`
+            : undefined
+        }
+        onClose={closeRequestInfoPanel}
+      >
+        <form className="slide-panel-form-wrapper" onSubmit={submitRequestInfo}>
+          <section className="settings-card" aria-label="Expense conversation">
+            <h3 className="section-title">Conversation</h3>
+            {isLoadingRequestInfoThread ? (
+              <p className="settings-card-description">Loading conversation...</p>
+            ) : requestInfoThread.length === 0 ? (
+              <p className="settings-card-description">No prior messages.</p>
+            ) : (
+              <ul className="compensation-history-list">
+                {requestInfoThread.map((comment) => (
+                  <li key={comment.id} className="compensation-history-item">
+                    <div className="compensation-history-item-title">
+                      <span>{comment.authorName}</span>
+                      <StatusBadge tone={comment.commentType === "request_info" ? "warning" : "info"}>
+                        {comment.commentType === "request_info" ? "Requested info" : "Response"}
+                      </StatusBadge>
+                    </div>
+                    <p>{comment.message}</p>
+                    <p className="compensation-history-item-meta" title={formatDateTimeTooltip(comment.createdAt)}>
+                      {formatRelativeTime(comment.createdAt)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <label className="form-field">
+            <span className="form-label">Message to employee</span>
+            <textarea
+              className={requestInfoErrors.message ? "form-input form-input-error" : "form-input"}
+              rows={4}
+              value={requestInfoMessage}
+              onChange={handleRequestInfoMessageChange}
+              placeholder="What additional details do you need?"
+              disabled={isRequestingInfo}
+            />
+            {requestInfoErrors.message ? (
+              <p className="form-field-error">{requestInfoErrors.message}</p>
+            ) : null}
+          </label>
+          <div className="slide-panel-actions">
+            <button
+              type="button"
+              className="button"
+              onClick={closeRequestInfoPanel}
+              disabled={isRequestingInfo}
+            >
+              Cancel
+            </button>
+            <button type="submit" className="button button-accent" disabled={isRequestingInfo}>
+              {isRequestingInfo ? "Sending..." : "Send request"}
             </button>
           </div>
         </form>
@@ -1101,7 +1348,7 @@ export function ExpenseApprovalsClient({
         title="Approve expense?"
         description={
           confirmApproveTarget
-            ? `Approve ${confirmApproveTarget.employeeName}'s expense and move it to finance disbursement.`
+            ? `Approve ${confirmApproveTarget.employeeName}'s expense and move it to finance payment queue.`
             : undefined
         }
         confirmLabel="Approve expense"
@@ -1115,13 +1362,9 @@ export function ExpenseApprovalsClient({
 
       <ConfirmDialog
         isOpen={showBulkConfirm}
-        title={stage === "manager" ? "Bulk approve expenses?" : "Bulk disburse expenses?"}
-        description={
-          stage === "manager"
-            ? `This will move ${selectedIds.length} selected expenses to finance for disbursement.`
-            : `This will disburse ${selectedIds.length} selected expenses and notify employees.`
-        }
-        confirmLabel={stage === "manager" ? "Approve selected" : "Disburse selected"}
+        title="Bulk approve expenses?"
+        description={`This will move ${selectedIds.length} selected expenses to finance for payment.`}
+        confirmLabel="Approve selected"
         cancelLabel="Cancel"
         isConfirming={isBulkApproving}
         onCancel={closeBulkApproveConfirm}

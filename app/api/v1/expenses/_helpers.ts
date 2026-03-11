@@ -14,7 +14,7 @@ import {
 export const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 export const expenseStatusSchema = z.enum(EXPENSE_STATUSES);
 export const expenseSelectColumns =
-  "id, org_id, employee_id, expense_type, category, custom_category, description, amount, currency, receipt_file_path, expense_date, status, vendor_name, vendor_bank_account_name, vendor_bank_account_number, manager_approved_by, manager_approved_at, finance_approved_by, finance_approved_at, finance_rejected_by, finance_rejected_at, finance_rejection_reason, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, created_at, updated_at";
+  "id, org_id, employee_id, expense_type, category, custom_category, description, amount, currency, receipt_file_path, expense_date, status, vendor_name, vendor_bank_account_name, vendor_bank_account_number, manager_approved_by, manager_approved_at, finance_approved_by, finance_approved_at, finance_rejected_by, finance_rejected_at, finance_rejection_reason, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, reimbursement_receipt_path, created_at, updated_at";
 
 export const expenseRowSchema = z.object({
   id: z.string().uuid(),
@@ -48,6 +48,7 @@ export const expenseRowSchema = z.object({
   reimbursed_at: z.string().nullable(),
   reimbursement_reference: z.string().nullable(),
   reimbursement_notes: z.string().nullable(),
+  reimbursement_receipt_path: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -161,7 +162,10 @@ export function toExpenseRecord(
     reimbursedAt: row.reimbursed_at,
     reimbursementReference: row.reimbursement_reference,
     reimbursementNotes: row.reimbursement_notes,
-    reimbursementReceiptPath: null,
+    reimbursementReceiptPath: row.reimbursement_receipt_path ?? null,
+    infoRequestState: "none",
+    infoRequestUpdatedAt: null,
+    infoRequestUpdatedByName: null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

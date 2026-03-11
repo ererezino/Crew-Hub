@@ -739,7 +739,7 @@ export async function sendExpenseApprovedEmail({
         greeting: "Hey there,",
         bodyHtml: [
           p(
-            "An expense has been approved and is ready for disbursement:"
+            "An expense has been approved and is ready for finance payment confirmation:"
           ),
           renderInfoBlock([
             {
@@ -760,7 +760,7 @@ export async function sendExpenseApprovedEmail({
 
       await sendResendEmail({
         to: financeEmails,
-        subject: `Expense approved, ready for disbursement: ${description}`,
+        subject: `Expense approved, ready for payment confirmation: ${description}`,
         html
       });
     }
@@ -895,6 +895,122 @@ export async function sendExpenseDisbursedEmail({
     });
   } catch (error) {
     console.error("Unexpected expense disbursed email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 13b. Expense Info Requested (ACTIVE)
+ * -------------------------------------------------------------------------*/
+
+export async function sendExpenseInfoRequestedEmail({
+  orgId,
+  userId,
+  requesterName,
+  description,
+  message
+}: {
+  orgId: string;
+  userId: string;
+  requesterName: string;
+  description: string;
+  message: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("expenseInfoRequested")) return;
+
+    const employee = await fetchRecipientProfile({ orgId, userId });
+    if (!employee) return;
+
+    const canSend = await checkEmailPreference(orgId, userId, "approvals");
+    if (!canSend) return;
+
+    const name = firstName(employee.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "More details requested",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p(`${requesterName} requested more information before approving your expense.`),
+        renderInfoBlock([
+          { label: "Expense", value: description },
+          { label: "Request", value: message }
+        ])
+      ].join("\n"),
+      ctaButton: {
+        label: "Reply in Crew Hub",
+        url: `${appUrl}/expenses`,
+        style: "cta"
+      }
+    });
+
+    await sendResendEmail({
+      to: [employee.email],
+      subject: "More info requested for your expense",
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected expense info-requested email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 13c. Expense Info Response (ACTIVE)
+ * -------------------------------------------------------------------------*/
+
+export async function sendExpenseInfoResponseEmail({
+  orgId,
+  userId,
+  responderName,
+  description,
+  message
+}: {
+  orgId: string;
+  userId: string;
+  responderName: string;
+  description: string;
+  message: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("expenseInfoResponse")) return;
+
+    const reviewer = await fetchRecipientProfile({ orgId, userId });
+    if (!reviewer) return;
+
+    const canSend = await checkEmailPreference(orgId, userId, "approvals");
+    if (!canSend) return;
+
+    const name = firstName(reviewer.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "Expense response received",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p(`${responderName} replied to your request for more info.`),
+        renderInfoBlock([
+          { label: "Expense", value: description },
+          { label: "Response", value: message }
+        ])
+      ].join("\n"),
+      ctaButton: {
+        label: "Review expense",
+        url: `${appUrl}/expenses/approvals`,
+        style: "cta"
+      }
+    });
+
+    await sendResendEmail({
+      to: [reviewer.email],
+      subject: "Expense response received",
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected expense info-response email failure.", {
       error: error instanceof Error ? error.message : String(error)
     });
   }

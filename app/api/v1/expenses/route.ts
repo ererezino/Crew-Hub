@@ -29,6 +29,7 @@ import {
   profileRowSchema,
   toExpenseRecord
 } from "./_helpers";
+import { loadLatestExpenseCommentStates } from "./_comment-state";
 
 const listQuerySchema = z.object({
   status: expenseStatusSchema.optional(),
@@ -157,7 +158,19 @@ export async function GET(request: Request) {
     });
   }
 
-  const profileIds = collectProfileIds(parsedExpenses.data);
+  const latestCommentStates = await loadLatestExpenseCommentStates({
+    supabase,
+    orgId: session.profile.org_id,
+    expenseIds: parsedExpenses.data.map((row) => row.id)
+  });
+
+  const commentAuthorIds = [...new Set(
+    [...latestCommentStates.values()]
+      .map((state) => state.updatedBy)
+      .filter((id): id is string => Boolean(id))
+  )];
+
+  const profileIds = [...new Set([...collectProfileIds(parsedExpenses.data), ...commentAuthorIds])];
   let profileById = new Map<string, z.infer<typeof profileRowSchema>>();
 
   if (profileIds.length > 0) {
@@ -195,7 +208,23 @@ export async function GET(request: Request) {
     profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
   }
 
-  const expenses = parsedExpenses.data.map((row) => toExpenseRecord(row, profileById));
+  const expenses = parsedExpenses.data.map((row) => {
+    const baseExpense = toExpenseRecord(row, profileById);
+    const commentState = latestCommentStates.get(row.id);
+
+    if (!commentState) {
+      return baseExpense;
+    }
+
+    return {
+      ...baseExpense,
+      infoRequestState: commentState.state,
+      infoRequestUpdatedAt: commentState.updatedAt,
+      infoRequestUpdatedByName: commentState.updatedBy
+        ? profileById.get(commentState.updatedBy)?.full_name ?? null
+        : null
+    };
+  });
   const summary = summarizeExpenses(expenses);
 
   const responseData: ExpensesListResponseData = {
@@ -247,7 +276,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Receipt file is required."
+        message: "Receipt or invoice file is required."
       },
       meta: buildMeta()
     });
@@ -258,7 +287,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Uploaded receipt is empty."
+        message: "Uploaded receipt/invoice is empty."
       },
       meta: buildMeta()
     });
@@ -269,7 +298,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Receipt exceeds the 10MB upload limit."
+        message: "Receipt/invoice exceeds the 10MB upload limit."
       },
       meta: buildMeta()
     });
@@ -280,7 +309,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Unsupported file type. Allowed formats: pdf, png, jpg."
+        message: "Unsupported file type. Allowed formats for receipt/invoice: pdf, png, jpg."
       },
       meta: buildMeta()
     });
@@ -298,7 +327,7 @@ export async function POST(request: Request) {
       error: {
         code: "VALIDATION_ERROR",
         message:
-          "Receipt signature validation failed. Upload a file whose binary format matches the selected extension."
+          "Receipt/invoice signature validation failed. Upload a file whose binary format matches the selected extension."
       },
       meta: buildMeta()
     });

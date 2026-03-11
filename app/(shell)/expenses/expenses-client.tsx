@@ -42,8 +42,11 @@ import {
 import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries";
 import { Receipt } from "lucide-react";
 import type {
+  CreateExpenseCommentResponse,
   CreateExpenseResponse,
+  ExpenseCommentRecord,
   ExpenseCategory,
+  ExpenseCommentsResponse,
   ExpenseReceiptSignedUrlResponse,
   ExpenseRecord,
   ExpenseType,
@@ -162,12 +165,12 @@ const uploadAcceptValue = ALLOWED_RECEIPT_EXTENSIONS.map((extension) => `.${exte
 const EXPENSE_CONTEXTUAL_HELP = [
   {
     title: "Receipt checklist",
-    description: "Upload PDF, PNG, or JPG receipts under 10MB so approvals do not stall."
+    description: "Upload PDF, PNG, or JPG receipts/invoices under 10MB so approvals do not stall."
   },
   {
     title: "Approval flow",
     description:
-      "Crew Hub routes each submission through manager approval before finance disbursement."
+      "Crew Hub routes each submission through manager approval before finance payment confirmation."
   },
   {
     title: "Policy reference",
@@ -221,11 +224,11 @@ function hasFormErrors(errors: ExpenseFormErrors): boolean {
 
 function validateReceipt(file: File | null): string | undefined {
   if (!file) {
-    return "Receipt is required.";
+    return "Receipt or invoice is required.";
   }
 
   if (file.size > MAX_RECEIPT_FILE_BYTES) {
-    return "Receipt exceeds the 10MB upload limit.";
+    return "Receipt/invoice exceeds the 10MB upload limit.";
   }
 
   if (!isAllowedReceiptUpload(file.name, file.type)) {
@@ -523,6 +526,7 @@ export function ExpensesClient({
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isDraggingReceipt, setIsDraggingReceipt] = useState(false);
   const [formValues, setFormValues] = useState<ExpenseFormValues>(INITIAL_FORM_VALUES);
+  const [selectedVendorId, setSelectedVendorId] = useState("");
   const [formTouched, setFormTouched] = useState<ExpenseFormTouched>(INITIAL_TOUCHED);
   const [formErrors, setFormErrors] = useState<ExpenseFormErrors>({});
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -532,6 +536,12 @@ export function ExpensesClient({
   const [isOpeningReceiptById, setIsOpeningReceiptById] = useState<Record<string, boolean>>({});
   const [isMutatingExpenseId, setIsMutatingExpenseId] = useState<string | null>(null);
   const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
+  const [commentsByExpenseId, setCommentsByExpenseId] = useState<Record<string, ExpenseCommentRecord[]>>({});
+  const [canReplyByExpenseId, setCanReplyByExpenseId] = useState<Record<string, boolean>>({});
+  const [isLoadingCommentsByExpenseId, setIsLoadingCommentsByExpenseId] = useState<Record<string, boolean>>({});
+  const [commentDraftByExpenseId, setCommentDraftByExpenseId] = useState<Record<string, string>>({});
+  const [commentErrorByExpenseId, setCommentErrorByExpenseId] = useState<Record<string, string | null>>({});
+  const [isSubmittingCommentByExpenseId, setIsSubmittingCommentByExpenseId] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
@@ -575,6 +585,7 @@ export function ExpensesClient({
       ...INITIAL_FORM_VALUES,
       expenseDate: todayIsoDate()
     });
+    setSelectedVendorId("");
     setFormTouched(INITIAL_TOUCHED);
     setFormErrors({});
     setReceiptFile(null);
@@ -589,6 +600,7 @@ export function ExpensesClient({
 
     setIsPanelOpen(false);
     setFormValues(INITIAL_FORM_VALUES);
+    setSelectedVendorId("");
     setFormTouched(INITIAL_TOUCHED);
     setFormErrors({});
     setReceiptFile(null);
@@ -632,6 +644,30 @@ export function ExpensesClient({
     setFormTouched(nextTouched);
     setFormErrors(getFormErrors(formValues, nextTouched, receiptFile));
   };
+
+  const handleVendorInputChange =
+    (field: "vendorName" | "vendorBankAccountName" | "vendorBankAccountNumber") =>
+    (value: string) => {
+      const nextValues = {
+        ...formValues,
+        [field]: value,
+        saveVendor: selectedVendorId ? false : formValues.saveVendor
+      };
+
+      setFormValues(nextValues);
+      if (selectedVendorId) {
+        setSelectedVendorId("");
+      }
+      setExpenseFormDirty(true);
+
+      if (formTouched[field]) {
+        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile));
+      }
+
+      if (submitError) {
+        setSubmitError(null);
+      }
+    };
 
   const handleReceiptSelection = (file: File | null) => {
     const nextTouched = {
@@ -708,7 +744,7 @@ export function ExpensesClient({
       formData.set("vendorName", formValues.vendorName.trim());
       formData.set("vendorBankAccountName", formValues.vendorBankAccountName.trim());
       formData.set("vendorBankAccountNumber", formValues.vendorBankAccountNumber.trim());
-      if (formValues.saveVendor) {
+      if (formValues.saveVendor && !selectedVendorId) {
         formData.set("saveVendor", "true");
       }
     }
@@ -794,6 +830,121 @@ export function ExpensesClient({
     }
   };
 
+  const loadExpenseComments = async (expenseId: string) => {
+    setIsLoadingCommentsByExpenseId((current) => ({
+      ...current,
+      [expenseId]: true
+    }));
+
+    try {
+      const response = await fetch(`/api/v1/expenses/${expenseId}/comments`, {
+        method: "GET"
+      });
+
+      const payload = (await response.json()) as ExpenseCommentsResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? "Unable to load expense conversation.");
+        return;
+      }
+
+      setCommentsByExpenseId((current) => ({
+        ...current,
+        [expenseId]: payload.data?.comments ?? []
+      }));
+      setCanReplyByExpenseId((current) => ({
+        ...current,
+        [expenseId]: payload.data?.canReply ?? false
+      }));
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to load expense conversation.");
+    } finally {
+      setIsLoadingCommentsByExpenseId((current) => ({
+        ...current,
+        [expenseId]: false
+      }));
+    }
+  };
+
+  const submitExpenseReply = async (expense: ExpenseRecord) => {
+    const message = commentDraftByExpenseId[expense.id]?.trim() ?? "";
+
+    if (!message) {
+      setCommentErrorByExpenseId((current) => ({
+        ...current,
+        [expense.id]: "Response is required."
+      }));
+      return;
+    }
+
+    if (message.length > 2000) {
+      setCommentErrorByExpenseId((current) => ({
+        ...current,
+        [expense.id]: "Response is too long."
+      }));
+      return;
+    }
+
+    setCommentErrorByExpenseId((current) => ({
+      ...current,
+      [expense.id]: null
+    }));
+    setIsSubmittingCommentByExpenseId((current) => ({
+      ...current,
+      [expense.id]: true
+    }));
+
+    try {
+      const response = await fetch(`/api/v1/expenses/${expense.id}/comments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          action: "response",
+          message
+        })
+      });
+
+      const payload = (await response.json()) as CreateExpenseCommentResponse;
+
+      if (!response.ok || !payload.data?.comment) {
+        setCommentErrorByExpenseId((current) => ({
+          ...current,
+          [expense.id]: payload.error?.message ?? "Unable to send response."
+        }));
+        return;
+      }
+      const createdComment = payload.data.comment;
+
+      setCommentDraftByExpenseId((current) => ({
+        ...current,
+        [expense.id]: ""
+      }));
+      setCommentsByExpenseId((current) => ({
+        ...current,
+        [expense.id]: [...(current[expense.id] ?? []), createdComment]
+      }));
+      setCanReplyByExpenseId((current) => ({
+        ...current,
+        [expense.id]: false
+      }));
+
+      expensesQuery.refresh();
+      showToast("success", "Response sent to approver.");
+    } catch (error) {
+      setCommentErrorByExpenseId((current) => ({
+        ...current,
+        [expense.id]: error instanceof Error ? error.message : "Unable to send response."
+      }));
+    } finally {
+      setIsSubmittingCommentByExpenseId((current) => ({
+        ...current,
+        [expense.id]: false
+      }));
+    }
+  };
+
   const mutateExpense = async ({
     expense,
     action
@@ -834,7 +985,7 @@ export function ExpensesClient({
     <>
       <PageHeader
         title="Expenses"
-        description="Submit expenses, upload receipts, and track reimbursement."
+        description="Submit expenses, upload receipts/invoices, and track reimbursement."
         actions={
           <>
             {canViewReports ? (
@@ -873,7 +1024,7 @@ export function ExpensesClient({
         </div>
         <div className="expenses-toolbar-actions">
           <p className="settings-card-description">
-            Most claims are reviewed within 3 business days once submitted with a valid receipt.
+            Most claims are reviewed within 3 business days once submitted with a valid receipt/invoice.
           </p>
           <Link className="button" href="/documents">
             View Expense Policy
@@ -921,7 +1072,7 @@ export function ExpensesClient({
               <p className="metric-value numeric">
                 {expensesQuery.data.summary.managerApprovedCount + expensesQuery.data.summary.approvedCount}
               </p>
-              <p className="metric-hint">Manager-approved and awaiting disbursement</p>
+              <p className="metric-hint">Manager-approved and awaiting payment confirmation</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Reimbursed</p>
@@ -972,6 +1123,12 @@ export function ExpensesClient({
                 <tbody>
                   {expenses.map((expense) => {
                     const isExpanded = expandedExpenseId === expense.id;
+                    const commentThread = commentsByExpenseId[expense.id] ?? [];
+                    const canReplyToInfoRequest = canReplyByExpenseId[expense.id] ?? false;
+                    const commentDraft = commentDraftByExpenseId[expense.id] ?? "";
+                    const commentError = commentErrorByExpenseId[expense.id] ?? null;
+                    const isLoadingComments = isLoadingCommentsByExpenseId[expense.id] ?? false;
+                    const isSubmittingComment = isSubmittingCommentByExpenseId[expense.id] ?? false;
 
                     const managerDescription = expense.managerApprovedByName
                       ? `Approved by ${expense.managerApprovedByName}.`
@@ -980,10 +1137,10 @@ export function ExpensesClient({
                         : "Awaiting manager decision.";
 
                     const financeDescription = expense.reimbursedAt
-                      ? `Disbursed by ${expense.reimbursedByName ?? "Finance"}${expense.reimbursementReference ? ` (Ref: ${expense.reimbursementReference})` : ""}.`
+                      ? `Marked paid by ${expense.reimbursedByName ?? "Finance"}${expense.reimbursementReference ? ` (Ref: ${expense.reimbursementReference})` : ""}.`
                       : expense.financeRejectedAt
                         ? `Rejected by ${expense.financeRejectedByName ?? "Finance"}.${expense.financeRejectionReason ? ` Reason: ${expense.financeRejectionReason}` : ""}`
-                        : "Awaiting finance disbursement.";
+                        : "Awaiting finance payment confirmation.";
 
                     return (
                       <Fragment key={expense.id}>
@@ -1030,6 +1187,12 @@ export function ExpensesClient({
                             <StatusBadge tone={toneForExpenseStatus(expense.status)}>
                               {getExpenseStatusLabel(expense.status)}
                             </StatusBadge>
+                            {expense.infoRequestState === "requested" ? (
+                              <p className="documents-cell-description">Action needed: manager requested more info.</p>
+                            ) : null}
+                            {expense.infoRequestState === "responded" ? (
+                              <p className="documents-cell-description">Info response sent to manager.</p>
+                            ) : null}
                           </td>
                           <td>
                             <time
@@ -1047,7 +1210,7 @@ export function ExpensesClient({
                                 onClick={() => openReceipt(expense)}
                                 disabled={Boolean(isOpeningReceiptById[expense.id])}
                               >
-                                {isOpeningReceiptById[expense.id] ? "Opening..." : "Receipt"}
+                                {isOpeningReceiptById[expense.id] ? "Opening..." : "Receipt/Invoice"}
                               </button>
 
                               {expense.status === "reimbursed" && expense.reimbursementReceiptPath ? (
@@ -1064,11 +1227,15 @@ export function ExpensesClient({
                               <button
                                 type="button"
                                 className="table-row-action"
-                                onClick={() =>
-                                  setExpandedExpenseId((currentId) =>
-                                    currentId === expense.id ? null : expense.id
-                                  )
-                                }
+                                onClick={() => {
+                                  setExpandedExpenseId((currentId) => {
+                                    const nextId = currentId === expense.id ? null : expense.id;
+                                    if (nextId === expense.id) {
+                                      void loadExpenseComments(expense.id);
+                                    }
+                                    return nextId;
+                                  });
+                                }}
                               >
                                 {isExpanded ? "Hide details" : "Details"}
                               </button>
@@ -1111,7 +1278,7 @@ export function ExpensesClient({
                                     }
                                   />
                                   <ExpenseTimelineItem
-                                    title="Finance Disbursement"
+                                    title="Finance Payment"
                                     timestamp={expense.reimbursedAt ?? expense.financeRejectedAt}
                                     description={financeDescription}
                                     tone={
@@ -1123,6 +1290,81 @@ export function ExpensesClient({
                                     }
                                   />
                                 </ul>
+
+                                <div className="expenses-transaction-details">
+                                  <h3 className="section-title">Info Requests</h3>
+                                  {isLoadingComments ? (
+                                    <p className="settings-card-description">Loading conversation...</p>
+                                  ) : commentThread.length === 0 ? (
+                                    <p className="settings-card-description">
+                                      No info requests on this expense.
+                                    </p>
+                                  ) : (
+                                    <ul className="compensation-history-list">
+                                      {commentThread.map((comment) => (
+                                        <li key={comment.id} className="compensation-history-item">
+                                          <div className="compensation-history-item-title">
+                                            <span>{comment.authorName}</span>
+                                            <StatusBadge
+                                              tone={comment.commentType === "request_info" ? "warning" : "info"}
+                                            >
+                                              {comment.commentType === "request_info"
+                                                ? "Requested info"
+                                                : "Response"}
+                                            </StatusBadge>
+                                          </div>
+                                          <p>{comment.message}</p>
+                                          <p
+                                            className="compensation-history-item-meta"
+                                            title={formatDateTimeTooltip(comment.createdAt)}
+                                          >
+                                            {formatRelativeTime(comment.createdAt)}
+                                          </p>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+
+                                  {canReplyToInfoRequest ? (
+                                    <div className="settings-form" style={{ marginTop: "0.75rem" }}>
+                                      <label className="form-field">
+                                        <span className="form-label">Your response</span>
+                                        <textarea
+                                          className={commentError ? "form-input form-input-error" : "form-input"}
+                                          rows={3}
+                                          value={commentDraft}
+                                          onChange={(event) =>
+                                            {
+                                              setCommentDraftByExpenseId((current) => ({
+                                                ...current,
+                                                [expense.id]: event.currentTarget.value
+                                              }));
+                                              setCommentErrorByExpenseId((current) => ({
+                                                ...current,
+                                                [expense.id]: null
+                                              }));
+                                            }
+                                          }
+                                          placeholder="Reply with the details requested by your approver."
+                                          disabled={isSubmittingComment}
+                                        />
+                                        {commentError ? (
+                                          <p className="form-field-error">{commentError}</p>
+                                        ) : null}
+                                      </label>
+                                      <button
+                                        type="button"
+                                        className="button button-accent"
+                                        onClick={() => {
+                                          void submitExpenseReply(expense);
+                                        }}
+                                        disabled={isSubmittingComment}
+                                      >
+                                        {isSubmittingComment ? "Sending..." : "Send response"}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
 
                                 {(expense.status === "rejected" || expense.status === "finance_rejected") ? (
                                   <div className="expenses-rejection-details">
@@ -1174,13 +1416,13 @@ export function ExpensesClient({
                                       ) : null}
                                       {expense.reimbursedByName ? (
                                         <>
-                                          <dt>Disbursed by</dt>
+                                          <dt>Marked paid by</dt>
                                           <dd>{expense.reimbursedByName}</dd>
                                         </>
                                       ) : null}
                                       {expense.reimbursedAt ? (
                                         <>
-                                          <dt>Disbursed on</dt>
+                                          <dt>Paid on</dt>
                                           <dd>
                                             <time dateTime={expense.reimbursedAt}>
                                               {formatRelativeTime(expense.reimbursedAt)}
@@ -1227,7 +1469,7 @@ export function ExpensesClient({
       <SlidePanel
         isOpen={isPanelOpen}
         title="Submit expense"
-        description="Upload a receipt and submit an expense for approval."
+        description="Upload a receipt/invoice and submit an expense for approval."
         onClose={closePanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSubmitExpense}>
@@ -1236,18 +1478,7 @@ export function ExpensesClient({
             <div className="expenses-type-toggle">
               <button
                 type="button"
-                className={formValues.expenseType === "personal_reimbursement" ? "expenses-type-btn expenses-type-btn-active" : "expenses-type-btn"}
-                onClick={() => {
-                  setFormValues((prev) => ({ ...prev, expenseType: "personal_reimbursement" }));
-                  setSubmitError(null);
-                }}
-                disabled={isSubmitting}
-              >
-                Personal Reimbursement
-              </button>
-              <button
-                type="button"
-                className={formValues.expenseType === "work_expense" ? "expenses-type-btn expenses-type-btn-active" : "expenses-type-btn"}
+                className={formValues.expenseType === "work_expense" ? "expenses-type-btn active" : "expenses-type-btn"}
                 onClick={() => {
                   setFormValues((prev) => ({ ...prev, expenseType: "work_expense" }));
                   setSubmitError(null);
@@ -1255,6 +1486,17 @@ export function ExpensesClient({
                 disabled={isSubmitting}
               >
                 Work Expense
+              </button>
+              <button
+                type="button"
+                className={formValues.expenseType === "personal_reimbursement" ? "expenses-type-btn active" : "expenses-type-btn"}
+                onClick={() => {
+                  setFormValues((prev) => ({ ...prev, expenseType: "personal_reimbursement" }));
+                  setSubmitError(null);
+                }}
+                disabled={isSubmitting}
+              >
+                Personal Reimbursement
               </button>
             </div>
           </div>
@@ -1405,16 +1647,24 @@ export function ExpensesClient({
                   <span className="form-label">Select saved vendor</span>
                   <select
                     className="form-input"
-                    value=""
+                    value={selectedVendorId}
                     onChange={(e) => {
-                      const vendor = vendorBeneficiaries.vendors.find((v) => v.id === e.target.value);
+                      const nextVendorId = e.target.value;
+                      setSelectedVendorId(nextVendorId);
+                      const vendor = vendorBeneficiaries.vendors.find((v) => v.id === nextVendorId);
                       if (vendor) {
-                        setFormValues((prev) => ({
-                          ...prev,
+                        const nextValues = {
+                          ...formValues,
                           vendorName: vendor.vendorName,
                           vendorBankAccountName: vendor.bankAccountName,
-                          vendorBankAccountNumber: vendor.bankAccountNumber
-                        }));
+                          vendorBankAccountNumber: vendor.bankAccountNumber,
+                          saveVendor: false
+                        };
+                        setFormValues(nextValues);
+                        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile));
+                        setExpenseFormDirty(true);
+                      } else {
+                        setExpenseFormDirty(true);
                       }
                     }}
                     disabled={isSubmitting}
@@ -1435,7 +1685,7 @@ export function ExpensesClient({
                   className={formErrors.vendorName ? "form-input form-input-error" : "form-input"}
                   type="text"
                   value={formValues.vendorName}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, vendorName: e.target.value }))}
+                  onChange={(e) => handleVendorInputChange("vendorName")(e.target.value)}
                   onBlur={handleFieldBlur("vendorName")}
                   placeholder="Company or vendor name"
                   disabled={isSubmitting}
@@ -1452,7 +1702,7 @@ export function ExpensesClient({
                   className={formErrors.vendorBankAccountName ? "form-input form-input-error" : "form-input"}
                   type="text"
                   value={formValues.vendorBankAccountName}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, vendorBankAccountName: e.target.value }))}
+                  onChange={(e) => handleVendorInputChange("vendorBankAccountName")(e.target.value)}
                   onBlur={handleFieldBlur("vendorBankAccountName")}
                   placeholder="Account holder name"
                   disabled={isSubmitting}
@@ -1469,7 +1719,7 @@ export function ExpensesClient({
                   className={formErrors.vendorBankAccountNumber ? "form-input form-input-error" : "form-input"}
                   type="text"
                   value={formValues.vendorBankAccountNumber}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, vendorBankAccountNumber: e.target.value }))}
+                  onChange={(e) => handleVendorInputChange("vendorBankAccountNumber")(e.target.value)}
                   onBlur={handleFieldBlur("vendorBankAccountNumber")}
                   placeholder="Bank account number"
                   disabled={isSubmitting}
@@ -1480,20 +1730,22 @@ export function ExpensesClient({
                 ) : null}
               </label>
 
-              <label className="expenses-save-vendor-check">
-                <input
-                  type="checkbox"
-                  checked={formValues.saveVendor}
-                  onChange={(e) => setFormValues((prev) => ({ ...prev, saveVendor: e.target.checked }))}
-                  disabled={isSubmitting}
-                />
-                <span>Save this vendor for future expenses</span>
-              </label>
+              {!selectedVendorId ? (
+                <label className="expenses-save-vendor-check">
+                  <input
+                    type="checkbox"
+                    checked={formValues.saveVendor}
+                    onChange={(e) => setFormValues((prev) => ({ ...prev, saveVendor: e.target.checked }))}
+                    disabled={isSubmitting}
+                  />
+                  <span>Save this vendor for future expenses</span>
+                </label>
+              ) : null}
             </div>
           ) : null}
 
           <div className="form-field">
-            <span className="form-label">Receipt <span className="form-required">*</span></span>
+            <span className="form-label">Receipt/Invoice <span className="form-required">*</span></span>
             <div
               className={isDraggingReceipt ? "document-dropzone document-dropzone-active" : "document-dropzone"}
               onDragOver={handleDragOver}
@@ -1506,7 +1758,7 @@ export function ExpensesClient({
               style={{ cursor: "pointer" }}
             >
               <p className="document-dropzone-title">
-                {receiptFile ? receiptFile.name : "Click or drag and drop a receipt file"}
+                {receiptFile ? receiptFile.name : "Click or drag and drop a receipt/invoice file"}
               </p>
               <p className="document-dropzone-hint">
                 PDF, PNG, JPG up to 10MB. Mobile camera capture is supported.

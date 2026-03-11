@@ -19,6 +19,8 @@ export const EMAIL_FEATURES = {
   expenseApproved: true,
   expenseRejected: true,
   expenseDisbursed: true,
+  expenseInfoRequested: true,
+  expenseInfoResponse: true,
   signatureRequest: true,
   passwordReset: true,
   paymentDetailsUpdated: true,

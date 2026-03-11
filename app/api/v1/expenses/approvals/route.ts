@@ -25,6 +25,7 @@ import {
   profileRowSchema,
   toExpenseRecord
 } from "../_helpers";
+import { loadLatestExpenseCommentStates } from "../_comment-state";
 
 const approvalsQuerySchema = z.object({
   month: z
@@ -49,7 +50,7 @@ function statusForStage(stage: ExpenseApprovalStage): "pending" | "manager_appro
 }
 
 function stageLabel(stage: ExpenseApprovalStage): string {
-  return stage === "manager" ? "manager approval" : "finance disbursement";
+  return stage === "manager" ? "manager approval" : "finance payment confirmation";
 }
 
 function resolveStage({
@@ -309,7 +310,18 @@ export async function GET(request: Request) {
     });
   }
 
-  const profileIds = collectProfileIds(parsedExpenses.data);
+  const latestCommentStates = await loadLatestExpenseCommentStates({
+    supabase,
+    orgId: profile.org_id,
+    expenseIds: parsedExpenses.data.map((row) => row.id)
+  });
+  const commentAuthorIds = [...new Set(
+    [...latestCommentStates.values()]
+      .map((state) => state.updatedBy)
+      .filter((id): id is string => Boolean(id))
+  )];
+
+  const profileIds = [...new Set([...collectProfileIds(parsedExpenses.data), ...commentAuthorIds])];
   const { data: rawProfiles, error: profilesError } = await supabase
     .from("profiles")
     .select("id, full_name, department, country_code, manager_id")
@@ -342,7 +354,23 @@ export async function GET(request: Request) {
   }
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
-  const expenses = parsedExpenses.data.map((row) => toExpenseRecord(row, profileById));
+  const expenses = parsedExpenses.data.map((row) => {
+    const baseExpense = toExpenseRecord(row, profileById);
+    const commentState = latestCommentStates.get(row.id);
+
+    if (!commentState) {
+      return baseExpense;
+    }
+
+    return {
+      ...baseExpense,
+      infoRequestState: commentState.state,
+      infoRequestUpdatedAt: commentState.updatedAt,
+      infoRequestUpdatedByName: commentState.updatedBy
+        ? profileById.get(commentState.updatedBy)?.full_name ?? null
+        : null
+    };
+  });
   const pendingAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
 
   const responseData: ExpenseApprovalsResponseData = {
@@ -429,6 +457,17 @@ export async function POST(request: Request) {
       error: {
         code: "FORBIDDEN",
         message: "You do not have permission to bulk process this stage."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (stage === "finance") {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Bulk mark paid is disabled. Each expense must include an uploaded payment proof receipt."
       },
       meta: buildMeta()
     });
@@ -624,7 +663,7 @@ export async function POST(request: Request) {
       userIds: employeeIds,
       type: "expense_status",
       title: "Expense manager-approved",
-      body: "Your expense was approved by your manager and is pending finance disbursement.",
+      body: "Your expense was approved by your manager and is pending finance payment confirmation.",
       link: "/expenses"
     });
 
@@ -637,8 +676,8 @@ export async function POST(request: Request) {
       orgId: profile.org_id,
       userIds: financeAdminIds,
       type: "expense_status",
-      title: "Expenses ready for disbursement",
-      body: `${expenses.length} expense${expenses.length === 1 ? "" : "s"} are ready for finance disbursement.`,
+      title: "Expenses ready for payment confirmation",
+      body: `${expenses.length} expense${expenses.length === 1 ? "" : "s"} are ready for finance payment confirmation.`,
       link: "/expenses/approvals"
     });
   } else {
@@ -655,7 +694,7 @@ export async function POST(request: Request) {
       )
     );
 
-    // Fire-and-forget email notifications for bulk disbursement
+    // Fire-and-forget email notifications for bulk payment confirmations
     for (const expense of expenses) {
       sendExpenseDisbursedEmail({
         orgId: profile.org_id,

@@ -83,6 +83,9 @@ export type ExpenseRecord = {
   reimbursementReference: string | null;
   reimbursementNotes: string | null;
   reimbursementReceiptPath: string | null;
+  infoRequestState: "none" | "requested" | "responded";
+  infoRequestUpdatedAt: string | null;
+  infoRequestUpdatedByName: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -196,6 +199,24 @@ export type ExpenseReceiptSignedUrlResponseData = {
   expiresInSeconds: number;
 };
 
+export type ExpenseCommentType = "request_info" | "response";
+
+export type ExpenseCommentRecord = {
+  id: string;
+  expenseId: string;
+  authorId: string;
+  authorName: string;
+  commentType: ExpenseCommentType;
+  message: string;
+  createdAt: string;
+};
+
+export type ExpenseCommentsResponseData = {
+  comments: ExpenseCommentRecord[];
+  canRequestInfo: boolean;
+  canReply: boolean;
+};
+
 export type CreateExpenseResponse = ApiResponse<ExpenseMutationResponseData>;
 export type UpdateExpensePayload = {
   action: ExpenseAction;
@@ -215,3 +236,9 @@ export type ExpenseBulkApprovePayload = {
 export type ExpenseBulkApproveResponse = ApiResponse<ExpenseBulkApproveResponseData>;
 export type ExpenseReportsResponse = ApiResponse<ExpenseReportsResponseData>;
 export type ExpenseReceiptSignedUrlResponse = ApiResponse<ExpenseReceiptSignedUrlResponseData>;
+export type ExpenseCommentsResponse = ApiResponse<ExpenseCommentsResponseData>;
+export type CreateExpenseCommentPayload = {
+  action: ExpenseCommentType;
+  message: string;
+};
+export type CreateExpenseCommentResponse = ApiResponse<{ comment: ExpenseCommentRecord }>;

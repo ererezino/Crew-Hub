@@ -128,6 +128,7 @@ export async function PATCH(
       meta: buildMeta()
     });
   }
+  const profile = session.profile;
 
   const { id: expenseId } = await params;
 
@@ -289,20 +290,32 @@ export async function PATCH(
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Only Finance Admin or Super Admin can disburse this expense."
+            message: "Only Finance Admin or Super Admin can mark this expense as paid."
           },
           meta: buildMeta()
         });
       }
 
       const reimbursementReference = payload.reimbursementReference?.trim();
+      const reimbursementReceiptPath = payload.reimbursementReceiptPath?.trim();
 
       if (!reimbursementReference) {
         return jsonResponse<null>(422, {
           data: null,
           error: {
             code: "VALIDATION_ERROR",
-            message: "Reimbursement reference is required for finance disbursement."
+            message: "Reimbursement reference is required for finance payment confirmation."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      if (!reimbursementReceiptPath) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Payment proof receipt is required before marking this expense as paid."
           },
           meta: buildMeta()
         });
@@ -316,7 +329,7 @@ export async function PATCH(
         reimbursed_at: nowIso,
         reimbursement_reference: reimbursementReference,
         reimbursement_notes: payload.reimbursementNotes?.trim() || null,
-        reimbursement_receipt_path: payload.reimbursementReceiptPath?.trim() || null,
+        reimbursement_receipt_path: reimbursementReceiptPath,
         finance_rejected_by: null,
         finance_rejected_at: null,
         finance_rejection_reason: null
@@ -580,7 +593,7 @@ export async function PATCH(
       userId: updatedExpense.employeeId,
       type: "expense_status",
       title: "Expense manager-approved",
-      body: `Your expense was approved by your manager and is pending finance disbursement.`,
+      body: `Your expense was approved by your manager and is pending finance payment confirmation.`,
       link: "/expenses"
     });
 
@@ -588,8 +601,8 @@ export async function PATCH(
       orgId: session.profile.org_id,
       userIds: financeAdminUserIds.filter((userId) => userId !== updatedExpense.employeeId),
       type: "expense_status",
-      title: "Expense ready for disbursement",
-      body: `${updatedExpense.employeeName}'s expense was approved by a manager and is ready for finance disbursement.`,
+      title: "Expense ready for payment confirmation",
+      body: `${updatedExpense.employeeName}'s expense was approved by a manager and is ready for finance payment confirmation.`,
       link: "/expenses/approvals"
     });
 
@@ -606,6 +619,8 @@ export async function PATCH(
   if (normalizedAction === "approve" && updatedExpense.status === "reimbursed") {
     const amountText = formatMinorUnits(updatedExpense.amount, updatedExpense.currency);
     const referenceText = updatedExpense.reimbursementReference ?? "N/A";
+    const managerRecipientIds = [updatedExpense.managerApprovedBy]
+      .filter((id): id is string => Boolean(id) && id !== updatedExpense.employeeId && id !== profile.id);
 
     await createNotification({
       orgId: session.profile.org_id,
@@ -616,7 +631,18 @@ export async function PATCH(
       link: "/expenses"
     });
 
-    // Fire-and-forget email notification for expense disbursement
+    if (managerRecipientIds.length > 0) {
+      await createBulkNotifications({
+        orgId: session.profile.org_id,
+        userIds: managerRecipientIds,
+        type: "expense_status",
+        title: "Expense marked paid",
+        body: `${updatedExpense.employeeName}'s expense was marked paid by finance. Reference: ${referenceText}.`,
+        link: "/expenses/approvals"
+      });
+    }
+
+    // Fire-and-forget email notification for marked-paid confirmation
     sendExpenseDisbursedEmail({
       orgId: session.profile.org_id,
       userId: updatedExpense.employeeId,
