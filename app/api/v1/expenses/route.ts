@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { sendExpenseSubmittedEmail } from "../../../../lib/notifications/email";
 import { createBulkNotifications } from "../../../../lib/notifications/service";
 import {
   ALLOWED_RECEIPT_EXTENSIONS,
@@ -552,6 +553,31 @@ export async function POST(request: Request) {
         }
       ]
     });
+  }
+
+  // Fire-and-forget email notification for expense submission
+  if (employeeProfile?.manager_id) {
+    const currency = expense.currency;
+    const major = expense.amount / 100;
+    let formattedAmount: string;
+    try {
+      formattedAmount = new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(major);
+    } catch {
+      formattedAmount = `${currency} ${major.toFixed(2)}`;
+    }
+
+    sendExpenseSubmittedEmail({
+      orgId: session.profile.org_id,
+      userId: session.profile.id,
+      managerId: employeeProfile.manager_id,
+      amount: formattedAmount,
+      description: expense.description
+    }).catch(err => console.error('Email send failed:', err));
   }
 
   const responseData: ExpenseMutationResponseData = {

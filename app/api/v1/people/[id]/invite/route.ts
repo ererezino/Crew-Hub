@@ -411,12 +411,12 @@ export async function POST(
       });
     }
 
-    /* Send welcome email (fire-and-forget) */
+    /* Send welcome email (fire-and-forget, always existing employee for resend) */
     sendWelcomeEmail({
       recipientEmail: email,
       recipientName: fullName,
-      loginUrl: `${appUrl}/login`,
-      setupLink: inviteLink ?? undefined
+      setupLink: inviteLink ?? undefined,
+      isNewHire: false
     }).catch((error) => {
       logger.error("Failed to send welcome email during invite.", {
         personId,

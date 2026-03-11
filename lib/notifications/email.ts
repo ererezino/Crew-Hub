@@ -3,6 +3,13 @@ import "server-only";
 import { createSupabaseServiceRoleClient } from "../supabase/service-role";
 import { formatDateRangeHuman } from "../datetime";
 import { formatLeaveTypeLabel } from "../time-off";
+import {
+  renderEmailTemplate,
+  renderInfoBlock,
+  p,
+  pLast
+} from "./email-template";
+import { isEmailEnabled } from "./email-config";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -11,20 +18,29 @@ function resolveResendFrom(): string {
   if (configuredFrom && configuredFrom.length > 0) {
     return configuredFrom;
   }
-
   return "Crew Hub <onboarding@resend.dev>";
+}
+
+function resolveAppUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://crew-hub.useaccrue.com"
+  );
 }
 
 type ResendPayload = {
   to: string[];
   subject: string;
-  text: string;
+  html: string;
 };
 
 type RecipientProfile = {
   email: string;
   fullName: string;
 };
+
+/* ---------------------------------------------------------------------------
+ * Helpers
+ * -------------------------------------------------------------------------*/
 
 async function fetchRecipientProfile({
   orgId,
@@ -61,40 +77,6 @@ async function fetchRecipientProfile({
   };
 }
 
-async function sendResendEmail(payload: ResendPayload): Promise<void> {
-  const resendApiKey = process.env.RESEND_API_KEY;
-
-  if (!resendApiKey || payload.to.length === 0) {
-    return;
-  }
-
-  const response = await fetch(RESEND_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${resendApiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      from: resolveResendFrom(),
-      to: [...new Set(payload.to)],
-      subject: payload.subject,
-      text: payload.text
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Failed to send Resend notification email.", {
-      status: response.status,
-      body: errorText
-    });
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * Helper: fetch emails for all users with a given role in an org
- * -------------------------------------------------------------------------*/
-
 async function fetchEmailsByRole({
   orgId,
   role
@@ -124,46 +106,183 @@ async function fetchEmailsByRole({
     .filter((e): e is string => typeof e === "string" && e.length > 0);
 }
 
+async function sendResendEmail(payload: ResendPayload): Promise<void> {
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  if (!resendApiKey || payload.to.length === 0) {
+    return;
+  }
+
+  const response = await fetch(RESEND_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      from: resolveResendFrom(),
+      to: [...new Set(payload.to)],
+      subject: payload.subject,
+      html: payload.html
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Failed to send Resend notification email.", {
+      status: response.status,
+      body: errorText
+    });
+  }
+}
+
+function firstName(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] || "there";
+}
+
 /* ---------------------------------------------------------------------------
- * Welcome email (direct – no DB lookup needed)
+ * Notification preference check
+ *
+ * Categories:
+ *   announcements: review cycle, review shared, review reminders,
+ *     schedule published, document expiry, compliance reminders,
+ *     onboarding started/completed
+ *   approvals: leave status, expense status, signature requests,
+ *     payroll approval, payment details updated, swap requests
+ *
+ * Auth emails (welcome, invite, reset) always send.
+ * -------------------------------------------------------------------------*/
+
+export type EmailCategory = "announcements" | "approvals";
+
+export async function checkEmailPreference(
+  orgId: string,
+  userId: string,
+  category: EmailCategory
+): Promise<boolean> {
+  try {
+    const serviceClient = createSupabaseServiceRoleClient();
+    const { data, error } = await serviceClient
+      .from("profiles")
+      .select("notification_preferences")
+      .eq("org_id", orgId)
+      .eq("id", userId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error || !data) {
+      // Default to sending if we cannot resolve preferences
+      return true;
+    }
+
+    const prefs = data.notification_preferences as Record<string, unknown> | null;
+    if (!prefs) {
+      return true;
+    }
+
+    if (category === "announcements") {
+      return prefs.emailAnnouncements !== false;
+    }
+    if (category === "approvals") {
+      return prefs.emailApprovals !== false;
+    }
+
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 1. Welcome Email - NEW HIRE (ACTIVE, auth - always sends)
  * -------------------------------------------------------------------------*/
 
 export async function sendWelcomeEmail({
   recipientEmail,
   recipientName,
-  loginUrl,
-  setupLink
+  setupLink,
+  department,
+  managerName,
+  isNewHire = true
 }: {
   recipientEmail: string;
   recipientName: string;
-  loginUrl?: string;
   setupLink?: string;
+  department?: string;
+  managerName?: string;
+  isNewHire?: boolean;
 }): Promise<void> {
   try {
-    const firstName = recipientName.trim().split(/\s+/)[0] || "there";
-    const effectiveLoginUrl = loginUrl || "https://app.crew-hub.local/login";
+    const name = firstName(recipientName);
+    const appUrl = resolveAppUrl();
+    const effectiveSetupLink = setupLink || `${appUrl}/login`;
 
-    const setupInstruction = setupLink
-      ? `To get started, click the link below to set up your authenticator:\n${setupLink}`
-      : `To get started, contact your admin for a setup link. Once your authenticator is set up, sign in at ${effectiveLoginUrl}.`;
+    if (isNewHire) {
+      // Template 1: New Hire Welcome
+      const infoRows: Array<{ label: string; value: string }> = [
+        { label: "Login email", value: recipientEmail }
+      ];
+      if (department) {
+        infoRows.push({ label: "Your team", value: department });
+      }
+      if (managerName) {
+        infoRows.push({ label: "Your manager", value: managerName });
+      }
 
-    await sendResendEmail({
-      to: [recipientEmail],
-      subject: `Welcome to Accrue, ${firstName}!`,
-      text: [
-        `Hello ${recipientName},`,
-        "",
-        "Welcome to the team! Your Crew Hub account has been created.",
-        "",
-        `Your login email is: ${recipientEmail}`,
-        "",
-        setupInstruction,
-        "",
-        "If you have any questions, reach out to your manager or HR.",
-        "",
-        "-- The Crew Hub Team"
-      ].join("\n")
-    });
+      const html = renderEmailTemplate({
+        preheaderText: "Your Crew Hub account is ready",
+        greeting: `Hey ${name},`,
+        bodyHtml: [
+          p("Welcome to Accrue. We're glad you're here."),
+          p(
+            "Your Crew Hub account is ready. Crew Hub is where you'll find everything you need: your team, your pay, your time off, and your documents. Think of it as home base."
+          ),
+          pLast(
+            "To get started, tap the button below to set up your login and authenticator:"
+          ),
+          renderInfoBlock(infoRows)
+        ].join("\n"),
+        ctaButton: {
+          label: "Set Up Your Account",
+          url: effectiveSetupLink,
+          style: "cta"
+        },
+        closingText:
+          "If anything feels off or you have questions, reach out to your manager or the Operations team."
+      });
+
+      await sendResendEmail({
+        to: [recipientEmail],
+        subject: `Welcome to Accrue, ${name}`,
+        html
+      });
+    } else {
+      // Template 2: Existing Employee Invite
+      const html = renderEmailTemplate({
+        preheaderText: "Set up your login to get started",
+        greeting: `Hey ${name},`,
+        bodyHtml: [
+          p(
+            "We've set up Crew Hub, a new internal platform for the Accrue team. It's where you'll manage your pay, time off, documents, and team info going forward."
+          ),
+          pLast("Your account is ready. Tap below to set up your login:"),
+          renderInfoBlock([{ label: "Login email", value: recipientEmail }])
+        ].join("\n"),
+        ctaButton: {
+          label: "Get Started",
+          url: effectiveSetupLink,
+          style: "cta"
+        },
+        closingText:
+          "Everything you need will be in one place. If you run into any issues getting set up, reach out to the Operations team."
+      });
+
+      await sendResendEmail({
+        to: [recipientEmail],
+        subject: "Your Crew Hub account is ready",
+        html
+      });
+    }
   } catch (error) {
     console.error("Unexpected welcome email failure.", {
       error: error instanceof Error ? error.message : String(error)
@@ -172,7 +291,7 @@ export async function sendWelcomeEmail({
 }
 
 /* ---------------------------------------------------------------------------
- * Leave notifications
+ * 3. Leave Request Approved (ACTIVE)
  * -------------------------------------------------------------------------*/
 
 export async function sendLeaveStatusEmail({
@@ -182,7 +301,8 @@ export async function sendLeaveStatusEmail({
   status,
   startDate,
   endDate,
-  rejectionReason
+  rejectionReason,
+  approverName
 }: {
   orgId: string;
   userId: string;
@@ -191,32 +311,83 @@ export async function sendLeaveStatusEmail({
   startDate: string;
   endDate: string;
   rejectionReason?: string | null;
+  approverName?: string;
 }): Promise<void> {
   try {
+    const featureKey = status === "approved" ? "leaveApproved" : "leaveDenied";
+    if (!isEmailEnabled(featureKey)) return;
+
     const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
 
-    if (!recipient) {
-      return;
+    const canSend = await checkEmailPreference(orgId, userId, "approvals");
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+    const dateRange = formatDateRangeHuman(startDate, endDate);
+    const resolvedApprover = approverName || "your manager";
+
+    if (status === "approved") {
+      const infoRows = [
+        { label: "Type", value: formatLeaveTypeLabel(leaveType) },
+        { label: "Dates", value: dateRange },
+        { label: "Approved by", value: resolvedApprover }
+      ];
+
+      const html = renderEmailTemplate({
+        preheaderText: "You're all set",
+        greeting: `Hey ${name},`,
+        bodyHtml: [
+          p("Your time off request has been approved."),
+          renderInfoBlock(infoRows),
+          pLast("It's on the calendar. Enjoy your time.")
+        ].join("\n"),
+        ctaButton: {
+          label: "View in Crew Hub",
+          url: `${appUrl}/time-off`,
+          style: "cta"
+        }
+      });
+
+      await sendResendEmail({
+        to: [recipient.email],
+        subject: "Your time off is approved",
+        html
+      });
+    } else {
+      const infoRows = [
+        { label: "Type", value: formatLeaveTypeLabel(leaveType) },
+        { label: "Dates", value: dateRange },
+        { label: "Reviewed by", value: resolvedApprover }
+      ];
+      if (rejectionReason?.trim()) {
+        infoRows.push({ label: "Reason", value: rejectionReason.trim() });
+      }
+
+      const html = renderEmailTemplate({
+        preheaderText: "Your request was reviewed",
+        greeting: `Hey ${name},`,
+        bodyHtml: [
+          p("Your time off request was not approved."),
+          renderInfoBlock(infoRows),
+          pLast(
+            `If you'd like to discuss or adjust the dates, reach out to ${resolvedApprover} directly.`
+          )
+        ].join("\n"),
+        ctaButton: {
+          label: "View in Crew Hub",
+          url: `${appUrl}/time-off`,
+          style: "primary"
+        }
+      });
+
+      await sendResendEmail({
+        to: [recipient.email],
+        subject: "Update on your time off request",
+        html
+      });
     }
-
-    const subjectPrefix = status === "approved" ? "Approved" : "Update";
-    const lines = [
-      `Hello ${recipient.fullName},`,
-      "",
-      `Your ${formatLeaveTypeLabel(leaveType)} request (${formatDateRangeHuman(startDate, endDate)}) is ${status}.`
-    ];
-
-    if (status === "rejected" && rejectionReason?.trim()) {
-      lines.push(`Reason: ${rejectionReason.trim()}`);
-    }
-
-    lines.push("", "Open Crew Hub to view details.");
-
-    await sendResendEmail({
-      to: [recipient.email],
-      subject: `Crew Hub: ${subjectPrefix} leave request`,
-      text: lines.join("\n")
-    });
   } catch (error) {
     console.error("Unexpected leave status email failure.", {
       error: error instanceof Error ? error.message : String(error)
@@ -224,13 +395,18 @@ export async function sendLeaveStatusEmail({
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * 5. Leave Submitted to Manager (ACTIVE)
+ * -------------------------------------------------------------------------*/
+
 export async function sendLeaveRequestedEmail({
   orgId,
   managerId,
   employeeName,
   leaveType,
   startDate,
-  endDate
+  endDate,
+  note
 }: {
   orgId: string;
   managerId: string;
@@ -238,27 +414,47 @@ export async function sendLeaveRequestedEmail({
   leaveType: string;
   startDate: string;
   endDate: string;
+  note?: string | null;
 }): Promise<void> {
   try {
-    const manager = await fetchRecipientProfile({
-      orgId,
-      userId: managerId
-    });
+    if (!isEmailEnabled("leaveSubmitted")) return;
 
-    if (!manager) {
-      return;
+    const manager = await fetchRecipientProfile({ orgId, userId: managerId });
+    if (!manager) return;
+
+    const canSend = await checkEmailPreference(orgId, managerId, "approvals");
+    if (!canSend) return;
+
+    const managerFirst = firstName(manager.fullName);
+    const appUrl = resolveAppUrl();
+    const dateRange = formatDateRangeHuman(startDate, endDate);
+
+    const infoRows: Array<{ label: string; value: string }> = [
+      { label: "Type", value: formatLeaveTypeLabel(leaveType) },
+      { label: "Dates", value: dateRange }
+    ];
+    if (note?.trim()) {
+      infoRows.push({ label: "Note", value: note.trim() });
     }
+
+    const html = renderEmailTemplate({
+      preheaderText: "Review their request",
+      greeting: `Hey ${managerFirst},`,
+      bodyHtml: [
+        p(`${employeeName} submitted a time off request:`),
+        renderInfoBlock(infoRows)
+      ].join("\n"),
+      ctaButton: {
+        label: "Review Request",
+        url: `${appUrl}/time-off`,
+        style: "cta"
+      }
+    });
 
     await sendResendEmail({
       to: [manager.email],
-      subject: `Crew Hub: New leave request from ${employeeName}`,
-      text: [
-        `Hello ${manager.fullName},`,
-        "",
-        `${employeeName} has requested ${formatLeaveTypeLabel(leaveType)} leave for ${formatDateRangeHuman(startDate, endDate)}.`,
-        "",
-        "View in Crew Hub > Time Off to approve or decline this request."
-      ].join("\n")
+      subject: `${employeeName} requested time off`,
+      html
     });
   } catch (error) {
     console.error("Unexpected leave requested email failure.", {
@@ -266,6 +462,10 @@ export async function sendLeaveRequestedEmail({
     });
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * 6. Leave Cancelled (DORMANT)
+ * -------------------------------------------------------------------------*/
 
 export async function sendLeaveCancelledEmail({
   orgId,
@@ -283,25 +483,34 @@ export async function sendLeaveCancelledEmail({
   endDate: string;
 }): Promise<void> {
   try {
-    const manager = await fetchRecipientProfile({
-      orgId,
-      userId: managerId
-    });
+    if (!isEmailEnabled("leaveCancelled")) return;
 
-    if (!manager) {
-      return;
-    }
+    const manager = await fetchRecipientProfile({ orgId, userId: managerId });
+    if (!manager) return;
+
+    const canSend = await checkEmailPreference(orgId, managerId, "approvals");
+    if (!canSend) return;
+
+    const managerFirst = firstName(manager.fullName);
+    const dateRange = formatDateRangeHuman(startDate, endDate);
+
+    const html = renderEmailTemplate({
+      preheaderText: "No action needed",
+      greeting: `Hey ${managerFirst},`,
+      bodyHtml: [
+        p(`${employeeName} cancelled their time off request:`),
+        renderInfoBlock([
+          { label: "Type", value: formatLeaveTypeLabel(leaveType) },
+          { label: "Dates", value: dateRange }
+        ]),
+        p("No action needed on your end.")
+      ].join("\n")
+    });
 
     await sendResendEmail({
       to: [manager.email],
-      subject: `Crew Hub: Leave cancelled by ${employeeName}`,
-      text: [
-        `Hello ${manager.fullName},`,
-        "",
-        `${employeeName} has cancelled their ${formatLeaveTypeLabel(leaveType)} leave for ${formatDateRangeHuman(startDate, endDate)}.`,
-        "",
-        "View in Crew Hub > Time Off for details."
-      ].join("\n")
+      subject: `${employeeName} cancelled their time off`,
+      html
     });
   } catch (error) {
     console.error("Unexpected leave cancelled email failure.", {
@@ -311,7 +520,7 @@ export async function sendLeaveCancelledEmail({
 }
 
 /* ---------------------------------------------------------------------------
- * Payslip notifications
+ * 7. Payslip Ready (ACTIVE)
  * -------------------------------------------------------------------------*/
 
 export async function sendPayslipReadyEmail({
@@ -324,22 +533,38 @@ export async function sendPayslipReadyEmail({
   payPeriod: string;
 }): Promise<void> {
   try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!isEmailEnabled("payslipReady")) return;
 
-    if (!recipient) {
-      return;
-    }
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(orgId, userId, "announcements");
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "View your payment statement",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        pLast(
+          `Your payslip for ${payPeriod} is now available in Crew Hub.`
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View Payslip",
+        url: `${appUrl}/payments`,
+        style: "cta"
+      },
+      closingText:
+        "If anything looks off, reach out to the Operations team."
+    });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `Crew Hub: Payment statement ready (${payPeriod})`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `Your payment statement for ${payPeriod} is now available in Crew Hub.`,
-        "",
-        "Open Crew Hub > Payments to view or download it."
-      ].join("\n")
+      subject: `Your payslip for ${payPeriod} is ready`,
+      html
     });
   } catch (error) {
     console.error("Unexpected payslip ready email failure.", {
@@ -349,371 +574,7 @@ export async function sendPayslipReadyEmail({
 }
 
 /* ---------------------------------------------------------------------------
- * Compliance notifications
- * -------------------------------------------------------------------------*/
-
-export async function sendComplianceReminderEmail({
-  orgId,
-  userId,
-  requirement,
-  dueDate
-}: {
-  orgId: string;
-  userId: string;
-  requirement: string;
-  dueDate: string;
-}): Promise<void> {
-  try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
-
-    if (!recipient) {
-      return;
-    }
-
-    await sendResendEmail({
-      to: [recipient.email],
-      subject: `Crew Hub: Compliance reminder for ${requirement}`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `Reminder: "${requirement}" has a compliance deadline on ${dueDate}.`,
-        "",
-        "Open Crew Hub > Compliance to review status and attach proof."
-      ].join("\n")
-    });
-  } catch (error) {
-    console.error("Unexpected compliance reminder email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-export async function sendComplianceOverdueEmail({
-  orgId,
-  userId,
-  requirement
-}: {
-  orgId: string;
-  userId: string;
-  requirement: string;
-}): Promise<void> {
-  try {
-    const owner = await fetchRecipientProfile({ orgId, userId });
-    const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
-
-    if (owner) {
-      await sendResendEmail({
-        to: [owner.email],
-        subject: `Crew Hub: Compliance overdue – ${requirement}`,
-        text: [
-          `Hello ${owner.fullName},`,
-          "",
-          `The compliance requirement "${requirement}" is now overdue. Please complete it immediately to avoid further escalation.`,
-          "",
-          "View in Crew Hub > Compliance to take action."
-        ].join("\n")
-      });
-    }
-
-    if (hrEmails.length > 0) {
-      await sendResendEmail({
-        to: hrEmails,
-        subject: `Crew Hub: Compliance overdue – ${requirement}`,
-        text: [
-          "Hello,",
-          "",
-          `The compliance requirement "${requirement}" assigned to ${owner?.fullName ?? "a team member"} is now overdue and may require escalation.`,
-          "",
-          "View in Crew Hub > Compliance to review overdue items."
-        ].join("\n")
-      });
-    }
-  } catch (error) {
-    console.error("Unexpected compliance overdue email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * Signature notifications
- * -------------------------------------------------------------------------*/
-
-export async function sendSignatureRequestEmail({
-  orgId,
-  userId,
-  requestTitle,
-  requestedByName
-}: {
-  orgId: string;
-  userId: string;
-  requestTitle: string;
-  requestedByName: string;
-}): Promise<void> {
-  try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
-
-    if (!recipient) {
-      return;
-    }
-
-    await sendResendEmail({
-      to: [recipient.email],
-      subject: `Crew Hub: Signature request - ${requestTitle}`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `${requestedByName} requested your signature on "${requestTitle}".`,
-        "",
-        "Open Crew Hub > Signatures to review and sign the document."
-      ].join("\n")
-    });
-  } catch (error) {
-    console.error("Unexpected signature request email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * Performance review notifications
- * -------------------------------------------------------------------------*/
-
-export async function sendReviewCycleStartedEmail({
-  orgId,
-  userId,
-  cycleName,
-  selfReviewDeadline
-}: {
-  orgId: string;
-  userId: string;
-  cycleName: string;
-  selfReviewDeadline: string | null;
-}): Promise<void> {
-  try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
-
-    if (!recipient) {
-      return;
-    }
-
-    const deadlineText = selfReviewDeadline
-      ? ` Your self-review is due by ${selfReviewDeadline}.`
-      : "";
-
-    await sendResendEmail({
-      to: [recipient.email],
-      subject: `Crew Hub: ${cycleName} review has started`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `Your ${cycleName} review has started.${deadlineText}`,
-        "",
-        "Open Crew Hub > Performance to get started."
-      ].join("\n")
-    });
-  } catch (error) {
-    console.error("Unexpected review cycle started email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-export async function sendReviewReminderEmail({
-  orgId,
-  userId,
-  cycleName,
-  deadline
-}: {
-  orgId: string;
-  userId: string;
-  cycleName: string;
-  deadline: string;
-}): Promise<void> {
-  try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
-
-    if (!recipient) {
-      return;
-    }
-
-    await sendResendEmail({
-      to: [recipient.email],
-      subject: `Crew Hub: Self-review due soon for ${cycleName}`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `Your self-review for ${cycleName} is due in 2 days. Complete it before ${deadline}.`,
-        "",
-        "Open Crew Hub > Performance to submit your self-review."
-      ].join("\n")
-    });
-  } catch (error) {
-    console.error("Unexpected review reminder email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-export async function sendReviewSharedEmail({
-  orgId,
-  userId,
-  cycleName
-}: {
-  orgId: string;
-  userId: string;
-  cycleName: string;
-}): Promise<void> {
-  try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
-
-    if (!recipient) {
-      return;
-    }
-
-    await sendResendEmail({
-      to: [recipient.email],
-      subject: `Crew Hub: Your ${cycleName} review has been shared`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `Your ${cycleName} review has been shared with you. Tap to read.`,
-        "",
-        "Open Crew Hub > Performance to view your review."
-      ].join("\n")
-    });
-  } catch (error) {
-    console.error("Unexpected review shared email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-export async function sendReviewAcknowledgedEmail({
-  orgId,
-  userId,
-  cycleName,
-  employeeName
-}: {
-  orgId: string;
-  userId: string;
-  cycleName: string;
-  employeeName: string;
-}): Promise<void> {
-  try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
-
-    if (!recipient) {
-      return;
-    }
-
-    await sendResendEmail({
-      to: [recipient.email],
-      subject: `Crew Hub: ${employeeName} acknowledged ${cycleName}`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `${employeeName} has acknowledged their ${cycleName} review.`,
-        "",
-        "Open Crew Hub > Performance to continue follow-up actions."
-      ].join("\n")
-    });
-  } catch (error) {
-    console.error("Unexpected review acknowledged email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * Document notifications
- * -------------------------------------------------------------------------*/
-
-export async function sendDocumentExpiryEmail({
-  orgId,
-  userId,
-  documentTitle,
-  expiryDate
-}: {
-  orgId: string;
-  userId: string;
-  documentTitle: string;
-  expiryDate: string;
-}): Promise<void> {
-  try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
-
-    if (!recipient) {
-      return;
-    }
-
-    await sendResendEmail({
-      to: [recipient.email],
-      subject: `Crew Hub: ${documentTitle} expires on ${expiryDate}`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `"${documentTitle}" expires on ${expiryDate}. Please renew it.`,
-        "",
-        "Open Crew Hub > Documents to view and renew the document."
-      ].join("\n")
-    });
-  } catch (error) {
-    console.error("Unexpected document expiry email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-export async function sendDocumentExpiredEmail({
-  orgId,
-  userId,
-  documentTitle
-}: {
-  orgId: string;
-  userId: string;
-  documentTitle: string;
-}): Promise<void> {
-  try {
-    const employee = await fetchRecipientProfile({ orgId, userId });
-    const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
-
-    if (employee) {
-      await sendResendEmail({
-        to: [employee.email],
-        subject: `Crew Hub: ${documentTitle} has expired`,
-        text: [
-          `Hello ${employee.fullName},`,
-          "",
-          `Your document "${documentTitle}" has expired. Please upload a renewed version as soon as possible.`,
-          "",
-          "View in Crew Hub > Documents to upload the renewal."
-        ].join("\n")
-      });
-    }
-
-    if (hrEmails.length > 0) {
-      await sendResendEmail({
-        to: hrEmails,
-        subject: `Crew Hub: ${documentTitle} has expired`,
-        text: [
-          "Hello,",
-          "",
-          `The document "${documentTitle}" for ${employee?.fullName ?? "a team member"} has expired and requires follow-up.`,
-          "",
-          "View in Crew Hub > Documents to review expired documents."
-        ].join("\n")
-      });
-    }
-  } catch (error) {
-    console.error("Unexpected document expired email failure.", {
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
-}
-
-/* ---------------------------------------------------------------------------
- * Expense notifications
+ * 8 & 9. Expense Submitted (ACTIVE) - to Employee + Manager
  * -------------------------------------------------------------------------*/
 
 export async function sendExpenseSubmittedEmail({
@@ -730,37 +591,80 @@ export async function sendExpenseSubmittedEmail({
   description: string;
 }): Promise<void> {
   try {
+    if (!isEmailEnabled("expenseSubmitted")) return;
+
     const [employee, manager] = await Promise.all([
       fetchRecipientProfile({ orgId, userId }),
       fetchRecipientProfile({ orgId, userId: managerId })
     ]);
 
+    const appUrl = resolveAppUrl();
+
+    // Template 8: to Employee
     if (employee) {
-      await sendResendEmail({
-        to: [employee.email],
-        subject: `Crew Hub: Expense submitted – ${description}`,
-        text: [
-          `Hello ${employee.fullName},`,
-          "",
-          `Your expense "${description}" for ${amount} has been submitted and is pending approval.`,
-          "",
-          "View in Crew Hub > Expenses to track its status."
-        ].join("\n")
-      });
+      const canSend = await checkEmailPreference(orgId, userId, "approvals");
+      if (canSend) {
+        const name = firstName(employee.fullName);
+        const html = renderEmailTemplate({
+          preheaderText: "We've got it",
+          greeting: `Hey ${name},`,
+          bodyHtml: [
+            p("Your expense claim has been submitted and is pending review."),
+            renderInfoBlock([
+              { label: "Expense", value: description },
+              { label: "Amount", value: amount }
+            ]),
+            pLast("You'll get an update once it's reviewed.")
+          ].join("\n"),
+          ctaButton: {
+            label: "View Expense",
+            url: `${appUrl}/expenses`,
+            style: "cta"
+          }
+        });
+
+        await sendResendEmail({
+          to: [employee.email],
+          subject: "Your expense was submitted",
+          html
+        });
+      }
     }
 
+    // Template 9: to Manager
     if (manager) {
-      await sendResendEmail({
-        to: [manager.email],
-        subject: `Crew Hub: New expense awaiting approval – ${description}`,
-        text: [
-          `Hello ${manager.fullName},`,
-          "",
-          `${employee?.fullName ?? "A team member"} submitted an expense "${description}" for ${amount} that requires your approval.`,
-          "",
-          "View in Crew Hub > Expenses to review and approve or reject."
-        ].join("\n")
-      });
+      const canSend = await checkEmailPreference(
+        orgId,
+        managerId,
+        "approvals"
+      );
+      if (canSend) {
+        const managerFirst = firstName(manager.fullName);
+        const html = renderEmailTemplate({
+          preheaderText: "Review needed",
+          greeting: `Hey ${managerFirst},`,
+          bodyHtml: [
+            p(
+              `${employee?.fullName || "A team member"} submitted an expense for your review:`
+            ),
+            renderInfoBlock([
+              { label: "Expense", value: description },
+              { label: "Amount", value: amount }
+            ])
+          ].join("\n"),
+          ctaButton: {
+            label: "Review Expense",
+            url: `${appUrl}/expenses`,
+            style: "cta"
+          }
+        });
+
+        await sendResendEmail({
+          to: [manager.email],
+          subject: `${employee?.fullName || "A team member"} submitted an expense`,
+          html
+        });
+      }
     }
   } catch (error) {
     console.error("Unexpected expense submitted email failure.", {
@@ -769,49 +673,95 @@ export async function sendExpenseSubmittedEmail({
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * 10 & 11. Expense Approved (ACTIVE) - to Employee + Finance
+ * -------------------------------------------------------------------------*/
+
 export async function sendExpenseApprovedEmail({
   orgId,
   userId,
   amount,
-  description
+  description,
+  approverName
 }: {
   orgId: string;
   userId: string;
   amount: string;
   description: string;
+  approverName?: string;
 }): Promise<void> {
   try {
+    if (!isEmailEnabled("expenseApproved")) return;
+
     const employee = await fetchRecipientProfile({ orgId, userId });
     const financeEmails = await fetchEmailsByRole({
       orgId,
       role: "FINANCE_ADMIN"
     });
+    const appUrl = resolveAppUrl();
+    const resolvedApprover = approverName || "your manager";
 
+    // Template 10: to Employee
     if (employee) {
-      await sendResendEmail({
-        to: [employee.email],
-        subject: `Crew Hub: Expense approved – ${description}`,
-        text: [
-          `Hello ${employee.fullName},`,
-          "",
-          `Your expense "${description}" for ${amount} has been approved. It will be processed for disbursement.`,
-          "",
-          "View in Crew Hub > Expenses to track disbursement."
-        ].join("\n")
-      });
+      const canSend = await checkEmailPreference(orgId, userId, "approvals");
+      if (canSend) {
+        const name = firstName(employee.fullName);
+        const html = renderEmailTemplate({
+          preheaderText: "Good news",
+          greeting: `Hey ${name},`,
+          bodyHtml: [
+            p("Your expense claim has been approved."),
+            renderInfoBlock([
+              { label: "Expense", value: description },
+              { label: "Amount", value: amount },
+              { label: "Approved by", value: resolvedApprover }
+            ])
+          ].join("\n"),
+          ctaButton: {
+            label: "View Expense",
+            url: `${appUrl}/expenses`,
+            style: "cta"
+          }
+        });
+
+        await sendResendEmail({
+          to: [employee.email],
+          subject: "Your expense was approved",
+          html
+        });
+      }
     }
 
+    // Template 11: to Finance
     if (financeEmails.length > 0) {
+      const html = renderEmailTemplate({
+        preheaderText: `${amount} for ${employee?.fullName || "a team member"}`,
+        greeting: "Hey there,",
+        bodyHtml: [
+          p(
+            "An expense has been approved and is ready for disbursement:"
+          ),
+          renderInfoBlock([
+            {
+              label: "Employee",
+              value: employee?.fullName || "A team member"
+            },
+            { label: "Expense", value: description },
+            { label: "Amount", value: amount },
+            { label: "Approved by", value: resolvedApprover }
+          ])
+        ].join("\n"),
+        ctaButton: {
+          label: "Process in Crew Hub",
+          url: `${appUrl}/expenses`,
+          style: "cta"
+        }
+      });
+
       await sendResendEmail({
         to: financeEmails,
-        subject: `Crew Hub: Expense approved and ready for disbursement – ${description}`,
-        text: [
-          "Hello,",
-          "",
-          `An expense "${description}" for ${amount} (submitted by ${employee?.fullName ?? "a team member"}) has been approved and is ready for disbursement.`,
-          "",
-          "View in Crew Hub > Expenses to process the payment."
-        ].join("\n")
+        subject: `Expense approved, ready for disbursement: ${description}`,
+        html
       });
     }
   } catch (error) {
@@ -821,37 +771,68 @@ export async function sendExpenseApprovedEmail({
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * 12. Expense Rejected (ACTIVE)
+ * -------------------------------------------------------------------------*/
+
 export async function sendExpenseRejectedEmail({
   orgId,
   userId,
   amount,
   description,
-  reason
+  reason,
+  approverName
 }: {
   orgId: string;
   userId: string;
   amount: string;
   description: string;
-  reason: string;
+  reason?: string;
+  approverName?: string;
 }): Promise<void> {
   try {
-    const employee = await fetchRecipientProfile({ orgId, userId });
+    if (!isEmailEnabled("expenseRejected")) return;
 
-    if (!employee) {
-      return;
+    const employee = await fetchRecipientProfile({ orgId, userId });
+    if (!employee) return;
+
+    const canSend = await checkEmailPreference(orgId, userId, "approvals");
+    if (!canSend) return;
+
+    const name = firstName(employee.fullName);
+    const appUrl = resolveAppUrl();
+    const resolvedApprover = approverName || "your manager";
+
+    const infoRows = [
+      { label: "Expense", value: description },
+      { label: "Amount", value: amount },
+      { label: "Reviewed by", value: resolvedApprover }
+    ];
+    if (reason?.trim()) {
+      infoRows.push({ label: "Reason", value: reason.trim() });
     }
+
+    const html = renderEmailTemplate({
+      preheaderText: "Your expense was reviewed",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p("Your expense claim was not approved."),
+        renderInfoBlock(infoRows),
+        pLast(
+          `If you have questions or want to resubmit with changes, reach out to ${resolvedApprover} directly.`
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View Expense",
+        url: `${appUrl}/expenses`,
+        style: "primary"
+      }
+    });
 
     await sendResendEmail({
       to: [employee.email],
-      subject: `Crew Hub: Expense rejected – ${description}`,
-      text: [
-        `Hello ${employee.fullName},`,
-        "",
-        `Your expense "${description}" for ${amount} has been rejected.`,
-        `Reason: ${reason}`,
-        "",
-        "View in Crew Hub > Expenses to review or resubmit."
-      ].join("\n")
+      subject: "Update on your expense claim",
+      html
     });
   } catch (error) {
     console.error("Unexpected expense rejected email failure.", {
@@ -859,6 +840,10 @@ export async function sendExpenseRejectedEmail({
     });
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * 13. Expense Disbursed (ACTIVE)
+ * -------------------------------------------------------------------------*/
 
 export async function sendExpenseDisbursedEmail({
   orgId,
@@ -872,22 +857,41 @@ export async function sendExpenseDisbursedEmail({
   description: string;
 }): Promise<void> {
   try {
-    const employee = await fetchRecipientProfile({ orgId, userId });
+    if (!isEmailEnabled("expenseDisbursed")) return;
 
-    if (!employee) {
-      return;
-    }
+    const employee = await fetchRecipientProfile({ orgId, userId });
+    if (!employee) return;
+
+    const canSend = await checkEmailPreference(orgId, userId, "approvals");
+    if (!canSend) return;
+
+    const name = firstName(employee.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "Payment is on the way",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p("Your expense claim has been reimbursed."),
+        renderInfoBlock([
+          { label: "Expense", value: description },
+          { label: "Amount", value: amount }
+        ]),
+        pLast(
+          "The payment should reflect in your account shortly."
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View Expense",
+        url: `${appUrl}/expenses`,
+        style: "cta"
+      }
+    });
 
     await sendResendEmail({
       to: [employee.email],
-      subject: `Crew Hub: Expense disbursed – ${description}`,
-      text: [
-        `Hello ${employee.fullName},`,
-        "",
-        `Your expense "${description}" for ${amount} has been disbursed. Please check your account for the payment.`,
-        "",
-        "View in Crew Hub > Expenses for full details."
-      ].join("\n")
+      subject: "Your expense has been reimbursed",
+      html
     });
   } catch (error) {
     console.error("Unexpected expense disbursed email failure.", {
@@ -897,7 +901,684 @@ export async function sendExpenseDisbursedEmail({
 }
 
 /* ---------------------------------------------------------------------------
- * Onboarding notifications
+ * 14. Signature Request (ACTIVE)
+ * -------------------------------------------------------------------------*/
+
+export async function sendSignatureRequestEmail({
+  orgId,
+  userId,
+  requestTitle,
+  requestedByName,
+  signatureUrl
+}: {
+  orgId: string;
+  userId: string;
+  requestTitle: string;
+  requestedByName: string;
+  signatureUrl?: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("signatureRequest")) return;
+
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(orgId, userId, "approvals");
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: `${requestedByName} needs your signature`,
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p(`${requestedByName} has sent you a document to sign.`),
+        renderInfoBlock([{ label: "Document", value: requestTitle }])
+      ].join("\n"),
+      ctaButton: {
+        label: "Review and Sign",
+        url: signatureUrl || `${appUrl}/signatures`,
+        style: "cta"
+      }
+    });
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Signature request: ${requestTitle}`,
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected signature request email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 15. Payment Details Updated (ACTIVE)
+ * -------------------------------------------------------------------------*/
+
+export async function sendPaymentDetailsUpdatedEmail({
+  orgId,
+  employeeName,
+  employeeEmail,
+  paymentMethod,
+  changeEffectiveAt
+}: {
+  orgId: string;
+  employeeName: string;
+  employeeEmail: string;
+  paymentMethod: string;
+  changeEffectiveAt: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("paymentDetailsUpdated")) return;
+
+    const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
+    const adminEmails = await fetchEmailsByRole({ orgId, role: "SUPER_ADMIN" });
+    const recipients = [...new Set([...hrEmails, ...adminEmails])];
+
+    if (recipients.length === 0) return;
+
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "Review the change",
+      greeting: "Hey there,",
+      bodyHtml: [
+        p(
+          `${employeeName} (${employeeEmail}) has updated their payment details.`
+        ),
+        renderInfoBlock([
+          { label: "Payment method", value: paymentMethod },
+          { label: "Effective", value: changeEffectiveAt }
+        ]),
+        pLast(
+          "Please review and confirm the update is correct."
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View in Crew Hub",
+        url: `${appUrl}/people`,
+        style: "primary"
+      }
+    });
+
+    await sendResendEmail({
+      to: recipients,
+      subject: `Payment details updated for ${employeeName}`,
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected payment details updated email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 16. Compliance Reminder (DORMANT)
+ * -------------------------------------------------------------------------*/
+
+export async function sendComplianceReminderEmail({
+  orgId,
+  userId,
+  requirement,
+  dueDate
+}: {
+  orgId: string;
+  userId: string;
+  requirement: string;
+  dueDate: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("complianceReminder")) return;
+
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(
+      orgId,
+      userId,
+      "announcements"
+    );
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: `Action needed by ${dueDate}`,
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p("This is a reminder about an upcoming compliance deadline."),
+        renderInfoBlock([
+          { label: "Requirement", value: requirement },
+          { label: "Due date", value: dueDate }
+        ]),
+        pLast(
+          "Please make sure this is completed on time. If you need help, reach out to the Operations team."
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View in Crew Hub",
+        url: `${appUrl}/compliance`,
+        style: "cta"
+      }
+    });
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Compliance reminder: ${requirement}`,
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected compliance reminder email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 17. Compliance Overdue (DORMANT)
+ * -------------------------------------------------------------------------*/
+
+export async function sendComplianceOverdueEmail({
+  orgId,
+  userId,
+  requirement,
+  dueDate,
+  ownerName
+}: {
+  orgId: string;
+  userId: string;
+  requirement: string;
+  dueDate?: string;
+  ownerName?: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("complianceOverdue")) return;
+
+    const owner = await fetchRecipientProfile({ orgId, userId });
+    const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
+    const appUrl = resolveAppUrl();
+    const resolvedOwner = ownerName || owner?.fullName || "a team member";
+
+    if (owner) {
+      const canSend = await checkEmailPreference(
+        orgId,
+        userId,
+        "announcements"
+      );
+      if (canSend) {
+        const name = firstName(owner.fullName);
+
+        const infoRows: Array<{ label: string; value: string }> = [
+          { label: "Requirement", value: requirement }
+        ];
+        if (dueDate) {
+          infoRows.push({ label: "Was due", value: dueDate });
+        }
+        infoRows.push({ label: "Assigned to", value: resolvedOwner });
+
+        const html = renderEmailTemplate({
+          preheaderText: "Immediate action required",
+          greeting: `Hey ${name},`,
+          bodyHtml: [
+            p("A compliance requirement is now overdue."),
+            renderInfoBlock(infoRows),
+            pLast(
+              "This needs immediate attention. Please follow up directly."
+            )
+          ].join("\n"),
+          ctaButton: {
+            label: "View in Crew Hub",
+            url: `${appUrl}/compliance`,
+            style: "cta"
+          }
+        });
+
+        await sendResendEmail({
+          to: [owner.email],
+          subject: `Compliance overdue: ${requirement}`,
+          html
+        });
+      }
+    }
+
+    if (hrEmails.length > 0) {
+      const infoRows: Array<{ label: string; value: string }> = [
+        { label: "Requirement", value: requirement }
+      ];
+      if (dueDate) {
+        infoRows.push({ label: "Was due", value: dueDate });
+      }
+      infoRows.push({ label: "Assigned to", value: resolvedOwner });
+
+      const html = renderEmailTemplate({
+        preheaderText: "Immediate action required",
+        greeting: "Hey there,",
+        bodyHtml: [
+          p("A compliance requirement is now overdue."),
+          renderInfoBlock(infoRows),
+          pLast(
+            "This needs immediate attention. Please follow up directly."
+          )
+        ].join("\n"),
+        ctaButton: {
+          label: "View in Crew Hub",
+          url: `${appUrl}/compliance`,
+          style: "cta"
+        }
+      });
+
+      await sendResendEmail({
+        to: hrEmails,
+        subject: `Compliance overdue: ${requirement}`,
+        html
+      });
+    }
+  } catch (error) {
+    console.error("Unexpected compliance overdue email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 18. Review Cycle Started (DORMANT)
+ * -------------------------------------------------------------------------*/
+
+export async function sendReviewCycleStartedEmail({
+  orgId,
+  userId,
+  cycleName,
+  selfReviewDeadline
+}: {
+  orgId: string;
+  userId: string;
+  cycleName: string;
+  selfReviewDeadline: string | null;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("reviewCycleStarted")) return;
+
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(
+      orgId,
+      userId,
+      "announcements"
+    );
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const bodyParts = [
+      p(`The ${cycleName} review cycle is now open.`)
+    ];
+    if (selfReviewDeadline) {
+      bodyParts.push(
+        renderInfoBlock([
+          { label: "Self-review deadline", value: selfReviewDeadline }
+        ])
+      );
+    }
+
+    const html = renderEmailTemplate({
+      preheaderText: "Time to complete your self-review",
+      greeting: `Hey ${name},`,
+      bodyHtml: bodyParts.join("\n"),
+      ctaButton: {
+        label: "Start Your Review",
+        url: `${appUrl}/performance`,
+        style: "cta"
+      }
+    });
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `${cycleName} review has started`,
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected review cycle started email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 19. Self-Review Reminder (DORMANT)
+ * -------------------------------------------------------------------------*/
+
+export async function sendReviewReminderEmail({
+  orgId,
+  userId,
+  cycleName,
+  deadline
+}: {
+  orgId: string;
+  userId: string;
+  cycleName: string;
+  deadline: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("selfReviewReminder")) return;
+
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(
+      orgId,
+      userId,
+      "announcements"
+    );
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: `Deadline is ${deadline}`,
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        pLast(
+          `Your self-review for ${cycleName} is due on ${deadline}. Please make sure it's submitted on time.`
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "Complete Self-Review",
+        url: `${appUrl}/performance`,
+        style: "cta"
+      }
+    });
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Reminder: self-review due soon for ${cycleName}`,
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected review reminder email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 20. Review Shared (DORMANT)
+ * -------------------------------------------------------------------------*/
+
+export async function sendReviewSharedEmail({
+  orgId,
+  userId,
+  cycleName
+}: {
+  orgId: string;
+  userId: string;
+  cycleName: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("reviewShared")) return;
+
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(
+      orgId,
+      userId,
+      "announcements"
+    );
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "Your manager shared your review",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        pLast(
+          `Your review for ${cycleName} has been shared with you. Take a look when you have a moment.`
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View Your Review",
+        url: `${appUrl}/performance`,
+        style: "cta"
+      }
+    });
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `Your ${cycleName} review has been shared`,
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected review shared email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 21. Review Acknowledged (DORMANT)
+ * -------------------------------------------------------------------------*/
+
+export async function sendReviewAcknowledgedEmail({
+  orgId,
+  userId,
+  cycleName,
+  employeeName
+}: {
+  orgId: string;
+  userId: string;
+  cycleName: string;
+  employeeName: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("reviewAcknowledged")) return;
+
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(
+      orgId,
+      userId,
+      "announcements"
+    );
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "Review acknowledged",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        pLast(
+          `${employeeName} has acknowledged their ${cycleName} review. No action needed on your end.`
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View in Crew Hub",
+        url: `${appUrl}/performance`,
+        style: "primary"
+      }
+    });
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `${employeeName} acknowledged their ${cycleName} review`,
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected review acknowledged email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 22. Document Expiring Soon (DORMANT)
+ * -------------------------------------------------------------------------*/
+
+export async function sendDocumentExpiryEmail({
+  orgId,
+  userId,
+  documentTitle,
+  expiryDate
+}: {
+  orgId: string;
+  userId: string;
+  documentTitle: string;
+  expiryDate: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("documentExpiring")) return;
+
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(
+      orgId,
+      userId,
+      "announcements"
+    );
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "Document expiring soon",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p("A document is expiring soon."),
+        renderInfoBlock([
+          { label: "Document", value: documentTitle },
+          { label: "Expiry date", value: expiryDate }
+        ]),
+        pLast(
+          "Please review and take any necessary action before it expires."
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View Document",
+        url: `${appUrl}/documents`,
+        style: "cta"
+      }
+    });
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: `${documentTitle} expires on ${expiryDate}`,
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected document expiry email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 23. Document Expired (DORMANT)
+ * -------------------------------------------------------------------------*/
+
+export async function sendDocumentExpiredEmail({
+  orgId,
+  userId,
+  documentTitle
+}: {
+  orgId: string;
+  userId: string;
+  documentTitle: string;
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("documentExpired")) return;
+
+    const employee = await fetchRecipientProfile({ orgId, userId });
+    const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
+    const appUrl = resolveAppUrl();
+
+    if (employee) {
+      const canSend = await checkEmailPreference(
+        orgId,
+        userId,
+        "announcements"
+      );
+      if (canSend) {
+        const name = firstName(employee.fullName);
+
+        const html = renderEmailTemplate({
+          preheaderText: "Action needed",
+          greeting: `Hey ${name},`,
+          bodyHtml: [
+            p("The following document has expired:"),
+            renderInfoBlock([{ label: "Document", value: documentTitle }]),
+            pLast(
+              "Please upload a renewed version or take the appropriate next steps."
+            )
+          ].join("\n"),
+          ctaButton: {
+            label: "View in Crew Hub",
+            url: `${appUrl}/documents`,
+            style: "cta"
+          }
+        });
+
+        await sendResendEmail({
+          to: [employee.email],
+          subject: `${documentTitle} has expired`,
+          html
+        });
+      }
+    }
+
+    if (hrEmails.length > 0) {
+      const html = renderEmailTemplate({
+        preheaderText: "Action needed",
+        greeting: "Hey there,",
+        bodyHtml: [
+          p("The following document has expired:"),
+          renderInfoBlock([
+            { label: "Document", value: documentTitle },
+            {
+              label: "Employee",
+              value: employee?.fullName || "A team member"
+            }
+          ]),
+          pLast(
+            "Please upload a renewed version or take the appropriate next steps."
+          )
+        ].join("\n"),
+        ctaButton: {
+          label: "View in Crew Hub",
+          url: `${appUrl}/documents`,
+          style: "cta"
+        }
+      });
+
+      await sendResendEmail({
+        to: hrEmails,
+        subject: `${documentTitle} has expired`,
+        html
+      });
+    }
+  } catch (error) {
+    console.error("Unexpected document expired email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 24 & 25. Onboarding Started (ACTIVE) - to Employee + Manager
  * -------------------------------------------------------------------------*/
 
 export async function sendOnboardingStartedEmail({
@@ -912,37 +1593,78 @@ export async function sendOnboardingStartedEmail({
   employeeName: string;
 }): Promise<void> {
   try {
+    if (!isEmailEnabled("onboardingStarted")) return;
+
     const [employee, manager] = await Promise.all([
       fetchRecipientProfile({ orgId, userId }),
       fetchRecipientProfile({ orgId, userId: managerId })
     ]);
+    const appUrl = resolveAppUrl();
 
+    // Template 24: to Employee
     if (employee) {
-      await sendResendEmail({
-        to: [employee.email],
-        subject: "Crew Hub: Welcome aboard! Your onboarding has started",
-        text: [
-          `Hello ${employee.fullName},`,
-          "",
-          "Welcome to the team! Your onboarding checklist is ready. Please complete the assigned tasks at your earliest convenience.",
-          "",
-          "View in Crew Hub > Onboarding to get started."
-        ].join("\n")
-      });
+      const canSend = await checkEmailPreference(
+        orgId,
+        userId,
+        "announcements"
+      );
+      if (canSend) {
+        const name = firstName(employee.fullName);
+        const html = renderEmailTemplate({
+          preheaderText: "Let's get you set up",
+          greeting: `Hey ${name},`,
+          bodyHtml: [
+            pLast(
+              "Welcome to the team. Your onboarding checklist is ready in Crew Hub. It has everything you need to get started: documents to sign, info to fill in, and tasks to complete."
+            )
+          ].join("\n"),
+          ctaButton: {
+            label: "Start Onboarding",
+            url: `${appUrl}/onboarding`,
+            style: "cta"
+          },
+          closingText:
+            "If you have questions along the way, reach out to your manager or the Operations team."
+        });
+
+        await sendResendEmail({
+          to: [employee.email],
+          subject: `Welcome aboard, ${firstName(employee.fullName)}`,
+          html
+        });
+      }
     }
 
+    // Template 25: to Manager
     if (manager) {
-      await sendResendEmail({
-        to: [manager.email],
-        subject: `Crew Hub: Onboarding started for ${employeeName}`,
-        text: [
-          `Hello ${manager.fullName},`,
-          "",
-          `Onboarding for ${employeeName} has started. You can track their progress and assist with any tasks assigned to you.`,
-          "",
-          "View in Crew Hub > Onboarding to monitor progress."
-        ].join("\n")
-      });
+      const canSend = await checkEmailPreference(
+        orgId,
+        managerId,
+        "announcements"
+      );
+      if (canSend) {
+        const managerFirst = firstName(manager.fullName);
+        const html = renderEmailTemplate({
+          preheaderText: "Their checklist is live",
+          greeting: `Hey ${managerFirst},`,
+          bodyHtml: [
+            pLast(
+              `${employeeName}'s onboarding has started. Their checklist is live in Crew Hub. You may have tasks assigned to you as part of their setup.`
+            )
+          ].join("\n"),
+          ctaButton: {
+            label: "View Onboarding",
+            url: `${appUrl}/onboarding`,
+            style: "cta"
+          }
+        });
+
+        await sendResendEmail({
+          to: [manager.email],
+          subject: `Onboarding started for ${employeeName}`,
+          html
+        });
+      }
     }
   } catch (error) {
     console.error("Unexpected onboarding started email failure.", {
@@ -950,6 +1672,10 @@ export async function sendOnboardingStartedEmail({
     });
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * 26. Onboarding Overdue Reminder (DORMANT)
+ * -------------------------------------------------------------------------*/
 
 export async function sendOnboardingTaskOverdueEmail({
   orgId,
@@ -961,34 +1687,65 @@ export async function sendOnboardingTaskOverdueEmail({
   taskName: string;
 }): Promise<void> {
   try {
+    if (!isEmailEnabled("onboardingOverdue")) return;
+
     const employee = await fetchRecipientProfile({ orgId, userId });
     const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
+    const appUrl = resolveAppUrl();
 
     if (employee) {
-      await sendResendEmail({
-        to: [employee.email],
-        subject: `Crew Hub: Onboarding task overdue – ${taskName}`,
-        text: [
-          `Hello ${employee.fullName},`,
-          "",
-          `Your onboarding task "${taskName}" is overdue. Please complete it as soon as possible.`,
-          "",
-          "View in Crew Hub > Onboarding to complete the task."
-        ].join("\n")
-      });
+      const canSend = await checkEmailPreference(
+        orgId,
+        userId,
+        "announcements"
+      );
+      if (canSend) {
+        const name = firstName(employee.fullName);
+        const html = renderEmailTemplate({
+          preheaderText: "Follow up needed",
+          greeting: `Hey ${name},`,
+          bodyHtml: [
+            pLast(
+              `Your onboarding task "${taskName}" is overdue. Please complete it as soon as possible.`
+            )
+          ].join("\n"),
+          ctaButton: {
+            label: "Complete Task",
+            url: `${appUrl}/onboarding`,
+            style: "cta"
+          },
+          closingText:
+            "If you're stuck or need help, reach out to the Operations team."
+        });
+
+        await sendResendEmail({
+          to: [employee.email],
+          subject: `Onboarding task overdue: ${taskName}`,
+          html
+        });
+      }
     }
 
     if (hrEmails.length > 0) {
+      const html = renderEmailTemplate({
+        preheaderText: "Follow up needed",
+        greeting: "Hey there,",
+        bodyHtml: [
+          pLast(
+            `The onboarding task "${taskName}" for ${employee?.fullName || "a new team member"} is overdue and may need follow-up.`
+          )
+        ].join("\n"),
+        ctaButton: {
+          label: "View in Crew Hub",
+          url: `${appUrl}/onboarding`,
+          style: "cta"
+        }
+      });
+
       await sendResendEmail({
         to: hrEmails,
-        subject: `Crew Hub: Onboarding task overdue – ${taskName}`,
-        text: [
-          "Hello,",
-          "",
-          `The onboarding task "${taskName}" for ${employee?.fullName ?? "a new hire"} is overdue and may need follow-up.`,
-          "",
-          "View in Crew Hub > Onboarding to review progress."
-        ].join("\n")
+        subject: `Onboarding task overdue: ${taskName}`,
+        html
       });
     }
   } catch (error) {
@@ -997,6 +1754,10 @@ export async function sendOnboardingTaskOverdueEmail({
     });
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * 27 & 28. Onboarding Completed (DORMANT)
+ * -------------------------------------------------------------------------*/
 
 export async function sendOnboardingCompleteEmail({
   orgId,
@@ -1010,42 +1771,68 @@ export async function sendOnboardingCompleteEmail({
   employeeName: string;
 }): Promise<void> {
   try {
+    if (!isEmailEnabled("onboardingCompleted")) return;
+
     const [employee, manager] = await Promise.all([
       fetchRecipientProfile({ orgId, userId }),
       fetchRecipientProfile({ orgId, userId: managerId })
     ]);
     const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
+    const appUrl = resolveAppUrl();
 
+    // Template 27: to Employee
     if (employee) {
-      await sendResendEmail({
-        to: [employee.email],
-        subject: "Crew Hub: Onboarding complete!",
-        text: [
-          `Hello ${employee.fullName},`,
-          "",
-          "Congratulations! You have completed all your onboarding tasks. Welcome to the team!",
-          "",
-          "View in Crew Hub > Onboarding for a summary."
-        ].join("\n")
-      });
+      const canSend = await checkEmailPreference(
+        orgId,
+        userId,
+        "announcements"
+      );
+      if (canSend) {
+        const name = firstName(employee.fullName);
+        const html = renderEmailTemplate({
+          preheaderText: "You're all set",
+          greeting: `Hey ${name},`,
+          bodyHtml: [
+            pLast(
+              "You've completed your onboarding. Everything is in order. Welcome to the team, for real this time."
+            )
+          ].join("\n"),
+          ctaButton: {
+            label: "View in Crew Hub",
+            url: appUrl,
+            style: "primary"
+          }
+        });
+
+        await sendResendEmail({
+          to: [employee.email],
+          subject: "Onboarding complete!",
+          html
+        });
+      }
     }
 
+    // Template 28: to Manager + admins
     const notifyEmails: string[] = [
       ...(manager ? [manager.email] : []),
       ...hrEmails
     ];
 
     if (notifyEmails.length > 0) {
+      const html = renderEmailTemplate({
+        preheaderText: "All tasks done",
+        greeting: "Hey there,",
+        bodyHtml: [
+          p(
+            `${employeeName} has completed all onboarding tasks. No action needed on your end.`
+          )
+        ].join("\n")
+      });
+
       await sendResendEmail({
         to: notifyEmails,
-        subject: `Crew Hub: Onboarding complete for ${employeeName}`,
-        text: [
-          "Hello,",
-          "",
-          `${employeeName} has completed all onboarding tasks.`,
-          "",
-          "View in Crew Hub > Onboarding to review the summary."
-        ].join("\n")
+        subject: `${employeeName} completed onboarding`,
+        html
       });
     }
   } catch (error) {
@@ -1056,7 +1843,7 @@ export async function sendOnboardingCompleteEmail({
 }
 
 /* ---------------------------------------------------------------------------
- * Scheduling notifications
+ * 29. Schedule Published (ACTIVE)
  * -------------------------------------------------------------------------*/
 
 export async function sendSchedulePublishedEmail({
@@ -1073,22 +1860,40 @@ export async function sendSchedulePublishedEmail({
   year: string;
 }): Promise<void> {
   try {
-    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!isEmailEnabled("schedulePublished")) return;
 
-    if (!recipient) {
-      return;
-    }
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(
+      orgId,
+      userId,
+      "announcements"
+    );
+    if (!canSend) return;
+
+    const name = firstName(recipient.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: "Check your shifts",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        pLast(
+          `The ${scheduleName} schedule for ${month} ${year} has been published. Check your assigned shifts in Crew Hub.`
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View Schedule",
+        url: `${appUrl}/scheduling`,
+        style: "cta"
+      }
+    });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `Crew Hub: ${scheduleName} schedule published for ${month} ${year}`,
-      text: [
-        `Hello ${recipient.fullName},`,
-        "",
-        `The ${scheduleName} schedule for ${month} ${year} has been published. Please review your assigned shifts.`,
-        "",
-        "View in Crew Hub > Scheduling to see your shifts."
-      ].join("\n")
+      subject: `${scheduleName} schedule published for ${month} ${year}`,
+      html
     });
   } catch (error) {
     console.error("Unexpected schedule published email failure.", {
@@ -1096,6 +1901,10 @@ export async function sendSchedulePublishedEmail({
     });
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * 30. Swap Requested (ACTIVE)
+ * -------------------------------------------------------------------------*/
 
 export async function sendSwapRequestedEmail({
   orgId,
@@ -1109,25 +1918,42 @@ export async function sendSwapRequestedEmail({
   shiftDate: string;
 }): Promise<void> {
   try {
+    if (!isEmailEnabled("swapRequested")) return;
+
     const target = await fetchRecipientProfile({
       orgId,
       userId: targetUserId
     });
+    if (!target) return;
 
-    if (!target) {
-      return;
-    }
+    const canSend = await checkEmailPreference(
+      orgId,
+      targetUserId,
+      "approvals"
+    );
+    if (!canSend) return;
+
+    const name = firstName(target.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: `${requesterName} wants to swap a shift with you`,
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p(`${requesterName} has requested to swap a shift with you.`),
+        renderInfoBlock([{ label: "Shift date", value: shiftDate }])
+      ].join("\n"),
+      ctaButton: {
+        label: "Review Swap",
+        url: `${appUrl}/scheduling`,
+        style: "cta"
+      }
+    });
 
     await sendResendEmail({
       to: [target.email],
-      subject: `Crew Hub: Shift swap request from ${requesterName}`,
-      text: [
-        `Hello ${target.fullName},`,
-        "",
-        `${requesterName} has requested to swap shifts with you on ${shiftDate}. Please review and respond.`,
-        "",
-        "View in Crew Hub > Scheduling to accept or decline the swap."
-      ].join("\n")
+      subject: `Shift swap request from ${requesterName}`,
+      html
     });
   } catch (error) {
     console.error("Unexpected swap requested email failure.", {
@@ -1135,6 +1961,10 @@ export async function sendSwapRequestedEmail({
     });
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * 31. Swap Accepted (ACTIVE)
+ * -------------------------------------------------------------------------*/
 
 export async function sendSwapAcceptedEmail({
   orgId,
@@ -1148,25 +1978,43 @@ export async function sendSwapAcceptedEmail({
   shiftDate: string;
 }): Promise<void> {
   try {
+    if (!isEmailEnabled("swapAccepted")) return;
+
     const requester = await fetchRecipientProfile({
       orgId,
       userId: requesterId
     });
+    if (!requester) return;
 
-    if (!requester) {
-      return;
-    }
+    const canSend = await checkEmailPreference(
+      orgId,
+      requesterId,
+      "approvals"
+    );
+    if (!canSend) return;
+
+    const name = firstName(requester.fullName);
+    const appUrl = resolveAppUrl();
+
+    const html = renderEmailTemplate({
+      preheaderText: `${targetName} accepted your swap`,
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        p(`${targetName} accepted your shift swap request.`),
+        renderInfoBlock([{ label: "Shift date", value: shiftDate }]),
+        pLast("The schedule has been updated.")
+      ].join("\n"),
+      ctaButton: {
+        label: "View Schedule",
+        url: `${appUrl}/scheduling`,
+        style: "cta"
+      }
+    });
 
     await sendResendEmail({
       to: [requester.email],
-      subject: `Crew Hub: Shift swap accepted by ${targetName}`,
-      text: [
-        `Hello ${requester.fullName},`,
-        "",
-        `${targetName} has accepted your shift swap request for ${shiftDate}. Your schedule has been updated.`,
-        "",
-        "View in Crew Hub > Scheduling to see your updated shifts."
-      ].join("\n")
+      subject: "Your shift swap was accepted",
+      html
     });
   } catch (error) {
     console.error("Unexpected swap accepted email failure.", {
@@ -1176,7 +2024,7 @@ export async function sendSwapAcceptedEmail({
 }
 
 /* ---------------------------------------------------------------------------
- * Payroll notifications
+ * 32. Payroll Final Approval (ACTIVE)
  * -------------------------------------------------------------------------*/
 
 export async function sendPayrollApprovedEmail({
@@ -1189,6 +2037,8 @@ export async function sendPayrollApprovedEmail({
   runName: string;
 }): Promise<void> {
   try {
+    if (!isEmailEnabled("payrollApproval")) return;
+
     const financeEmails = await fetchEmailsByRole({
       orgId,
       role: "FINANCE_ADMIN"
@@ -1198,26 +2048,80 @@ export async function sendPayrollApprovedEmail({
       role: "SUPER_ADMIN"
     });
     const approver = await fetchRecipientProfile({ orgId, userId });
+    const appUrl = resolveAppUrl();
 
-    const notifyEmails = [...financeEmails, ...adminEmails];
+    const notifyEmails = [...new Set([...financeEmails, ...adminEmails])];
+    if (notifyEmails.length === 0) return;
 
-    if (notifyEmails.length === 0) {
-      return;
-    }
+    const approverName = approver?.fullName || "an admin";
+
+    const html = renderEmailTemplate({
+      preheaderText: "Ready for processing",
+      greeting: "Hey there,",
+      bodyHtml: [
+        pLast(
+          `The payroll run "${runName}" has been approved by ${approverName} and is ready for processing.`
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "View Payroll Run",
+        url: `${appUrl}/payroll`,
+        style: "cta"
+      }
+    });
 
     await sendResendEmail({
       to: notifyEmails,
-      subject: `Crew Hub: Payroll run approved – ${runName}`,
-      text: [
-        "Hello,",
-        "",
-        `The payroll run "${runName}" has been approved${approver ? ` by ${approver.fullName}` : ""} and is ready for processing.`,
-        "",
-        "View in Crew Hub > Payroll to process the run."
-      ].join("\n")
+      subject: `Payroll run approved: ${runName}`,
+      html
     });
   } catch (error) {
     console.error("Unexpected payroll approved email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 33. Password/MFA Reset (ACTIVE, auth - always sends)
+ * -------------------------------------------------------------------------*/
+
+export async function sendResetEmail({
+  recipientEmail,
+  recipientName,
+  resetLink
+}: {
+  recipientEmail: string;
+  recipientName: string;
+  resetLink: string;
+}): Promise<void> {
+  try {
+    const name = firstName(recipientName);
+
+    const html = renderEmailTemplate({
+      preheaderText: "Set up a new authenticator",
+      greeting: `Hey ${name},`,
+      bodyHtml: [
+        pLast(
+          "A login reset was requested for your Crew Hub account. Tap below to set up a new authenticator:"
+        )
+      ].join("\n"),
+      ctaButton: {
+        label: "Reset Login",
+        url: resetLink,
+        style: "cta"
+      },
+      closingText:
+        "If you didn't request this, reach out to the Operations team."
+    });
+
+    await sendResendEmail({
+      to: [recipientEmail],
+      subject: "Reset your Crew Hub login",
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected reset email failure.", {
       error: error instanceof Error ? error.message : String(error)
     });
   }

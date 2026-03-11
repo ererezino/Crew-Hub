@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
+import { sendSwapRequestedEmail } from "../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../lib/notifications/service";
 import { areTimeRangesOverlapping, canViewTeamSchedules } from "../../../../../lib/scheduling";
 import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
@@ -606,6 +607,13 @@ export async function POST(request: Request) {
       body: `${session.profile.full_name} wants to swap their ${shift.shift_date} shift with yours.`,
       link: "/scheduling?tab=swaps"
     });
+
+    sendSwapRequestedEmail({
+      orgId: session.profile.org_id,
+      targetUserId: parsedBody.data.targetId,
+      requesterName: session.profile.full_name,
+      shiftDate: shift.shift_date
+    }).catch((err) => console.error("Email send failed:", err));
   } else {
     const { data: requesterProfile } = await supabase
       .from("profiles")

@@ -837,18 +837,6 @@ export async function POST(request: Request) {
     });
   }
 
-  // Send welcome email with setup link (fire-and-forget)
-  sendWelcomeEmail({
-    recipientEmail: normalizedEmail,
-    recipientName: payload.fullName.trim(),
-    setupLink
-  }).catch((error) => {
-    logger.error("Failed to send welcome email.", {
-      userId: createdUserId,
-      message: error instanceof Error ? error.message : String(error)
-    });
-  });
-
   let managerNameById = new Map<string, string>();
 
   if (parsedInsertedProfile.data.manager_id) {
@@ -868,6 +856,25 @@ export async function POST(request: Request) {
         .map((row) => [row.id, row.full_name])
     );
   }
+
+  // Send welcome email with setup link (fire-and-forget)
+  const resolvedManagerName = parsedInsertedProfile.data.manager_id
+    ? managerNameById.get(parsedInsertedProfile.data.manager_id) || undefined
+    : undefined;
+
+  sendWelcomeEmail({
+    recipientEmail: normalizedEmail,
+    recipientName: payload.fullName.trim(),
+    setupLink,
+    isNewHire: isNewEmployee,
+    department: normalizedDepartment || undefined,
+    managerName: resolvedManagerName
+  }).catch((error) => {
+    logger.error("Failed to send welcome email.", {
+      userId: createdUserId,
+      message: error instanceof Error ? error.message : String(error)
+    });
+  });
 
   const person = mapPersonRow(parsedInsertedProfile.data, managerNameById);
   let onboardingInstanceId: string | null = null;

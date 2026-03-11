@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import { createNotification, createBulkNotifications } from "../../../../lib/notifications/service";
-import { sendDocumentExpiryEmail } from "../../../../lib/notifications/email";
+import { sendDocumentExpiryEmail, sendDocumentExpiredEmail } from "../../../../lib/notifications/email";
 
 /**
  * Daily cron endpoint: warns about documents expiring in 30 days.
@@ -19,6 +19,15 @@ import { sendDocumentExpiryEmail } from "../../../../lib/notifications/email";
 function thirtyDaysFromNowIso(): string {
   const now = new Date();
   now.setUTCDate(now.getUTCDate() + 30);
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(now.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function yesterdayIso(): string {
+  const now = new Date();
+  now.setUTCDate(now.getUTCDate() - 1);
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(now.getUTCDate()).padStart(2, "0");
@@ -45,22 +54,14 @@ export async function GET(request: Request) {
 
   if (docsError) {
     console.error("Failed to fetch expiring documents:", docsError.message);
-    return NextResponse.json({ error: "Failed to fetch documents" }, { status: 500 });
-  }
-
-  if (!documents || documents.length === 0) {
-    return NextResponse.json({
-      message: "No documents expiring in 30 days",
-      expiryDate
-    });
   }
 
   let warningsSent = 0;
 
   // Group documents by org for efficient admin lookup
-  const docsByOrg = new Map<string, typeof documents>();
+  const docsByOrg = new Map<string, NonNullable<typeof documents>>();
 
-  for (const doc of documents) {
+  for (const doc of documents ?? []) {
     const orgId = typeof doc.org_id === "string" ? doc.org_id : null;
     if (!orgId) continue;
 
@@ -148,9 +149,54 @@ export async function GET(request: Request) {
     }
   }
 
+  // ─── Already-expired documents (expired yesterday) ───
+
+  const expiredDate = yesterdayIso();
+  let expiredNotified = 0;
+
+  const { data: expiredDocs, error: expiredError } = await supabase
+    .from("documents")
+    .select("id, org_id, title, owner_user_id, expiry_date")
+    .eq("expiry_date", expiredDate)
+    .is("deleted_at", null);
+
+  if (expiredError) {
+    console.error("Failed to fetch expired documents:", expiredError.message);
+  } else if (expiredDocs && expiredDocs.length > 0) {
+    for (const doc of expiredDocs) {
+      const orgId = typeof doc.org_id === "string" ? doc.org_id : null;
+      const ownerId = typeof doc.owner_user_id === "string" ? doc.owner_user_id : null;
+      const docTitle = typeof doc.title === "string" ? doc.title : "Document";
+
+      if (!orgId) continue;
+
+      // In-app notification to owner
+      if (ownerId) {
+        void createNotification({
+          orgId,
+          userId: ownerId,
+          type: "document_expired",
+          title: "Document has expired",
+          body: `${docTitle} expired on ${expiredDate}. Please renew it immediately.`,
+          link: `/documents/${doc.id}`
+        });
+
+        sendDocumentExpiredEmail({
+          orgId,
+          userId: ownerId,
+          documentTitle: docTitle
+        }).catch(err => console.error('Document expired email send failed:', err));
+      }
+
+      expiredNotified++;
+    }
+  }
+
   return NextResponse.json({
-    message: `Sent warnings for ${warningsSent} expiring document(s)`,
+    message: `Sent warnings for ${warningsSent} expiring document(s), notified ${expiredNotified} expired document(s)`,
     expiryDate,
-    documentsFound: documents.length
+    expiredDate,
+    documentsFound: documents?.length ?? 0,
+    expiredFound: expiredDocs?.length ?? 0
   });
 }

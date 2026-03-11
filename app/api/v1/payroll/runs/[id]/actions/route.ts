@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
+import { sendPayrollApprovedEmail } from "../../../../../../../lib/notifications/email";
 import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { evaluatePayrollApprovalAction } from "../../../../../../../lib/payroll/approval-policy";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
@@ -544,6 +545,12 @@ export async function POST(
           });
         }
       }
+
+      sendPayrollApprovedEmail({
+        orgId: profile.org_id,
+        userId: profile.id,
+        runName: `Payroll ${payPeriodLabel}`
+      }).catch((err) => console.error("Email send failed:", err));
     }
 
     const responseRun: PayrollRunSummary = toPayrollRunSummary(

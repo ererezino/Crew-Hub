@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../../lib/department";
+import { sendSwapAcceptedEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import {
   areTimeRangesOverlapping,
@@ -617,6 +618,13 @@ export async function PUT(
       body: `${session.profile.full_name} accepted your shift swap for ${shift.shift_date}.`,
       link: "/scheduling?tab=swaps"
     });
+
+    sendSwapAcceptedEmail({
+      orgId: session.profile.org_id,
+      requesterId: swap.requester_id,
+      targetName: session.profile.full_name,
+      shiftDate: shift.shift_date
+    }).catch((err) => console.error("Email send failed:", err));
   } else if (action === "reject") {
     void createNotification({
       orgId: session.profile.org_id,

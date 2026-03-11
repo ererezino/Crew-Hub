@@ -5,6 +5,7 @@ import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
 import { formatDateRange } from "../../../../../../../lib/datetime";
 import { areDepartmentsEqual } from "../../../../../../../lib/department";
+import { sendSchedulePublishedEmail } from "../../../../../../../lib/notifications/email";
 import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { isSchedulingManager } from "../../../../../../../lib/scheduling";
 import { isDepartmentScopedTeamLead } from "../../../../../../../lib/roles";
@@ -253,6 +254,20 @@ export async function POST(
     body: `Check out your new work schedule for ${dateRange}.`,
     link: "/scheduling"
   });
+
+  const scheduleStartDate = new Date(parsedPublishedSchedule.data.week_start + "T00:00:00Z");
+  const scheduleMonth = scheduleStartDate.toLocaleString("en-US", { month: "long", timeZone: "UTC" });
+  const scheduleYear = String(scheduleStartDate.getUTCFullYear());
+
+  for (const assignedUserId of assignedUserIds) {
+    sendSchedulePublishedEmail({
+      orgId: session.profile.org_id,
+      userId: assignedUserId,
+      scheduleName: parsedPublishedSchedule.data.name ?? "Work Schedule",
+      month: scheduleMonth,
+      year: scheduleYear
+    }).catch((err) => console.error("Email send failed:", err));
+  }
 
   void logAudit({
     action: "updated",

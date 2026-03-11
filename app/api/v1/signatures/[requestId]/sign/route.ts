@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
+import { sendOnboardingCompleteEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
@@ -498,6 +499,33 @@ export async function POST(
                 })
                 .eq("id", linkedTask.instance_id)
                 .eq("org_id", session.profile.org_id);
+
+              // Send onboarding complete email to employee and manager
+              const { data: instanceRow } = await serviceRoleClient
+                .from("onboarding_instances")
+                .select("employee_id")
+                .eq("id", linkedTask.instance_id)
+                .eq("org_id", session.profile.org_id)
+                .maybeSingle();
+
+              if (instanceRow?.employee_id) {
+                const { data: empProfile } = await serviceRoleClient
+                  .from("profiles")
+                  .select("id, full_name, manager_id")
+                  .eq("id", instanceRow.employee_id)
+                  .eq("org_id", session.profile.org_id)
+                  .is("deleted_at", null)
+                  .maybeSingle();
+
+                if (empProfile) {
+                  sendOnboardingCompleteEmail({
+                    orgId: session.profile.org_id,
+                    userId: empProfile.id,
+                    managerId: typeof empProfile.manager_id === "string" ? empProfile.manager_id : session.profile.id,
+                    employeeName: empProfile.full_name
+                  }).catch((err) => console.error("Email send failed:", err));
+                }
+              }
             }
           }
         }

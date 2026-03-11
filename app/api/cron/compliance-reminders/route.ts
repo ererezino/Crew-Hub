@@ -5,7 +5,7 @@ import {
   createNotification,
   createBulkNotifications
 } from "../../../../lib/notifications/service";
-import { sendComplianceReminderEmail } from "../../../../lib/notifications/email";
+import { sendComplianceReminderEmail, sendComplianceOverdueEmail } from "../../../../lib/notifications/email";
 
 /**
  * Daily cron endpoint: compliance deadline reminders.
@@ -237,6 +237,18 @@ export async function GET(request: Request) {
 
       // Notify
       await notifyDeadline(supabase, row, "overdue");
+
+      // Overdue-specific email to the assigned owner
+      if (row.assigned_to) {
+        sendComplianceOverdueEmail({
+          orgId: row.org_id,
+          userId: row.assigned_to,
+          requirement: row.compliance_items?.requirement ?? "Compliance requirement",
+          dueDate: row.due_date,
+          ownerName: undefined
+        }).catch(err => console.error('Compliance overdue email send failed:', err));
+      }
+
       overdueMarked++;
     }
   }

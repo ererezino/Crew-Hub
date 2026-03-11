@@ -12,6 +12,7 @@ import {
   isIsoDate,
   parseNumeric
 } from "../../../../../lib/time-off";
+import { sendLeaveRequestedEmail } from "../../../../../lib/notifications/email";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
@@ -607,6 +608,19 @@ export async function POST(request: Request) {
         });
       }
     }
+  }
+
+  // Fire-and-forget email notification to manager
+  if (employeeProfile.manager_id) {
+    sendLeaveRequestedEmail({
+      orgId: employeeProfile.org_id,
+      managerId: employeeProfile.manager_id,
+      employeeName: employeeProfile.full_name,
+      leaveType: parsedBody.data.leaveType,
+      startDate: parsedBody.data.startDate,
+      endDate: parsedBody.data.endDate,
+      note: parsedBody.data.reason
+    }).catch(err => console.error('Email send failed:', err));
   }
 
   return jsonResponse<TimeOffRequestMutationResponseData>(201, {

@@ -411,12 +411,14 @@ export async function POST(request: Request) {
         link: "/settings"
       });
 
-      // Send welcome email
+      // Send welcome email (bulk upload treats all as new hires by default)
       try {
         await sendWelcomeEmail({
           recipientEmail: normalizedEmail,
           recipientName: employee.fullName.trim(),
-          loginUrl
+          setupLink: undefined,
+          isNewHire: true,
+          department: normalizedDepartment || undefined
         });
       } catch (emailError) {
         logger.error("Failed to send welcome email during bulk upload.", {

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
 import { formatDateRangeHuman } from "../../../../../../lib/datetime";
-import { sendLeaveStatusEmail } from "../../../../../../lib/notifications/email";
+import { sendLeaveCancelledEmail, sendLeaveStatusEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
@@ -618,6 +618,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       employeeId: existingRequest.employee_id
     }
   }).catch(() => undefined);
+
+  // Fire-and-forget email notification to manager on cancellation
+  if (employeeProfile.manager_id) {
+    sendLeaveCancelledEmail({
+      orgId: session.profile.org_id,
+      managerId: employeeProfile.manager_id,
+      employeeName: employeeProfile.full_name,
+      leaveType: existingRequest.leave_type,
+      startDate: existingRequest.start_date,
+      endDate: existingRequest.end_date
+    }).catch(err => console.error('Email send failed:', err));
+  }
 
   const responseData: TimeOffRequestMutationResponseData = {
     request: toLeaveRequestRecord({

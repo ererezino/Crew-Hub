@@ -3,6 +3,7 @@ import { z } from "zod";
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logger } from "../../../../../lib/logger";
+import { sendExpenseDisbursedEmail } from "../../../../../lib/notifications/email";
 import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
 import { currentMonthKey, isIsoMonth, monthDateRange, parseIntegerAmount } from "../../../../../lib/expenses";
 import { hasRole } from "../../../../../lib/roles";
@@ -653,6 +654,16 @@ export async function POST(request: Request) {
         })
       )
     );
+
+    // Fire-and-forget email notifications for bulk disbursement
+    for (const expense of expenses) {
+      sendExpenseDisbursedEmail({
+        orgId: profile.org_id,
+        userId: expense.employeeId,
+        amount: formatMinorUnits(expense.amount, expense.currency),
+        description: expense.description
+      }).catch(err => console.error('Email send failed:', err));
+    }
   }
 
   const responseData: ExpenseBulkApproveResponseData = {

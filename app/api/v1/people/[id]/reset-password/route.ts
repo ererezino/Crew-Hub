@@ -7,6 +7,7 @@ import { deriveSystemPassword } from "../../../../../../lib/auth/system-password
 import { logAudit } from "../../../../../../lib/audit";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
+import { sendResetEmail } from "../../../../../../lib/notifications/email";
 import type { ApiResponse } from "../../../../../../types/auth";
 
 const paramsSchema = z.object({
@@ -107,7 +108,7 @@ export async function POST(
 
   const { data: existingProfile, error: profileError } = await adminClient
     .from("profiles")
-    .select("id, email")
+    .select("id, email, full_name")
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -255,6 +256,17 @@ export async function POST(
       resetBy: session.profile.id
     }
   });
+
+  // Send reset email (fire-and-forget, no feature flag needed)
+  const recipientName = typeof existingProfile.full_name === "string" && existingProfile.full_name.length > 0
+    ? existingProfile.full_name
+    : "Team Member";
+
+  sendResetEmail({
+    recipientEmail: existingProfile.email,
+    recipientName,
+    resetLink: setupLink
+  }).catch(err => console.error('Reset email send failed:', err));
 
   return jsonResponse<MfaResetResponseData>(200, {
     data: {

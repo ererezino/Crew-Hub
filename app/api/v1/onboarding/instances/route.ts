@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
+import { sendOnboardingStartedEmail } from "../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../lib/notifications/service";
 import { createOnboardingInstance } from "../../../../../lib/onboarding/create-instance";
 import type { UserRole } from "../../../../../lib/navigation";
@@ -446,7 +447,7 @@ export async function POST(request: Request) {
     await Promise.all([
       supabase
         .from("profiles")
-        .select("id, full_name")
+        .select("id, full_name, manager_id")
         .eq("org_id", profile.org_id)
         .is("deleted_at", null)
         .eq("id", payload.employeeId)
@@ -538,6 +539,13 @@ export async function POST(request: Request) {
     body: "A new onboarding plan has been assigned to you.",
     link: `/onboarding/${instance.id}`
   });
+
+  sendOnboardingStartedEmail({
+    orgId: profile.org_id,
+    userId: employeeRow.id,
+    managerId: typeof employeeRow.manager_id === "string" ? employeeRow.manager_id : profile.id,
+    employeeName: employeeRow.full_name
+  }).catch((err) => console.error("Email send failed:", err));
 
   await logAudit({
     action: "created",

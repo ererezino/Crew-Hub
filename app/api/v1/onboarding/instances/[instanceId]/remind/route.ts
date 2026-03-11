@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
 import type { UserRole } from "../../../../../../../lib/navigation";
+import { sendOnboardingTaskOverdueEmail } from "../../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../../lib/notifications/service";
 import { hasRole } from "../../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
@@ -145,6 +146,12 @@ export async function POST(
     link: `/onboarding/${instanceId}`,
     skipIfUnreadDuplicate: true
   });
+
+  sendOnboardingTaskOverdueEmail({
+    orgId: session.profile.org_id,
+    userId: parsedInstance.data.employee_id,
+    taskName: "Onboarding tasks"
+  }).catch((err) => console.error("Email send failed:", err));
 
   await logAudit({
     action: "created",

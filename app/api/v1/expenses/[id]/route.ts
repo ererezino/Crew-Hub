@@ -3,6 +3,11 @@ import { z } from "zod";
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logger } from "../../../../../lib/logger";
+import {
+  sendExpenseApprovedEmail,
+  sendExpenseDisbursedEmail,
+  sendExpenseRejectedEmail
+} from "../../../../../lib/notifications/email";
 import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
 import { parseIntegerAmount } from "../../../../../lib/expenses";
 import { hasRole } from "../../../../../lib/roles";
@@ -587,6 +592,15 @@ export async function PATCH(
       body: `${updatedExpense.employeeName}'s expense was approved by a manager and is ready for finance disbursement.`,
       link: "/expenses/approvals"
     });
+
+    // Fire-and-forget email notification for expense approval
+    sendExpenseApprovedEmail({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      amount: formatMinorUnits(updatedExpense.amount, updatedExpense.currency),
+      description: updatedExpense.description,
+      approverName: session.profile.full_name
+    }).catch(err => console.error('Email send failed:', err));
   }
 
   if (normalizedAction === "approve" && updatedExpense.status === "reimbursed") {
@@ -601,6 +615,14 @@ export async function PATCH(
       body: `Your expense of ${amountText} has been reimbursed. Reference: ${referenceText}.`,
       link: "/expenses"
     });
+
+    // Fire-and-forget email notification for expense disbursement
+    sendExpenseDisbursedEmail({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      amount: amountText,
+      description: updatedExpense.description
+    }).catch(err => console.error('Email send failed:', err));
   }
 
   if (normalizedAction === "reject" && updatedExpense.status === "rejected") {
@@ -612,6 +634,16 @@ export async function PATCH(
       body: `Your expense was rejected.${updatedExpense.rejectionReason ? ` Reason: ${updatedExpense.rejectionReason}` : ""}`,
       link: "/expenses"
     });
+
+    // Fire-and-forget email notification for expense rejection
+    sendExpenseRejectedEmail({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      amount: formatMinorUnits(updatedExpense.amount, updatedExpense.currency),
+      description: updatedExpense.description,
+      reason: updatedExpense.rejectionReason ?? undefined,
+      approverName: session.profile.full_name
+    }).catch(err => console.error('Email send failed:', err));
   }
 
   if (normalizedAction === "reject" && updatedExpense.status === "finance_rejected") {
@@ -628,6 +660,16 @@ export async function PATCH(
       body: `Finance rejected this expense.${updatedExpense.financeRejectionReason ? ` Reason: ${updatedExpense.financeRejectionReason}` : ""}`,
       link: "/expenses"
     });
+
+    // Fire-and-forget email notification for finance rejection
+    sendExpenseRejectedEmail({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      amount: formatMinorUnits(updatedExpense.amount, updatedExpense.currency),
+      description: updatedExpense.description,
+      reason: updatedExpense.financeRejectionReason ?? undefined,
+      approverName: session.profile.full_name
+    }).catch(err => console.error('Email send failed:', err));
   }
 
   const responseData: ExpenseMutationResponseData = {
