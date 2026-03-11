@@ -92,17 +92,17 @@
     },
     "featureBanner": {
       "ownerLabel": "Responsable :",
-      "nextStepLabel": "Prochaine \u00e9tape :"
+      "nextStepLabel": "Prochaine étape :"
     },
     "unsavedDialog": {
-      "title": "Modifications non enregistr\u00e9es",
-      "body": "Vous avez des modifications non enregistr\u00e9es qui seront perdues si vous quittez cette page.",
+      "title": "Modifications non enregistrées",
+      "body": "Vous avez des modifications non enregistrées qui seront perdues si vous quittez cette page.",
       "stay": "Rester sur la page",
       "leave": "Quitter la page"
     },
     "appError": {
       "title": "Une erreur est survenue",
-      "message": "Une erreur inattendue s\u2019est produite. Vous pouvez essayer de recharger la page ou de revenir au tableau de bord.",
+      "message": "Une erreur inattendue s’est produite. Vous pouvez essayer de recharger la page ou de revenir au tableau de bord.",
       "reload": "Recharger la page",
       "returnToDashboard": "Revenir au tableau de bord"
     },
@@ -125,7 +125,6 @@
     "myPay": "Ma paie",
     "documents": "Documents",
     "expenses": "Notes de frais",
-    "timeTracking": "Suivi du temps",
     "learning": "Formation",
     "approvals": "Approbations",
     "crewMembers": "Membres de l'équipe",
@@ -150,7 +149,6 @@
       "myPay": "Relevés de paie, configuration des versements et rémunération en un coup d'œil",
       "documents": "Vos documents, pièces requises et rappels d'expiration",
       "expenses": "Soumettez vos dépenses, téléchargez vos reçus et suivez les remboursements",
-      "timeTracking": "Pointage, feuilles de temps et suivi des heures travaillées",
       "learning": "Formations, certificats et sondages qui vous sont assignés",
       "approvals": "Examinez et traitez les demandes en attente de votre équipe",
       "crewMembers": "Trouvez des collègues, consultez les rôles et ouvrez les profils complets",
@@ -423,10 +421,17 @@
     },
     "teamSetup": {
       "title": "Configuration d'équipe",
-      "description": "Définissez les membres de semaine et de fin de semaine avant de générer les horaires.",
+      "description": "Définissez les membres de l'équipe semaine et de l'équipe week-end avant de générer les horaires.",
       "searchPlaceholder": "Rechercher des membres…",
       "weekday": "Travail semaine",
       "weekend": "Travail week-end",
+      "weekdayCrew": "Équipe semaine",
+      "weekendCrew": "Équipe week-end",
+      "alternateWeekends": "Week-ends alternés",
+      "customerSuccessGroup": "Customer Success",
+      "otherTeamsGroup": "Autres équipes",
+      "showOtherTeams": "Afficher ({count})",
+      "hideOtherTeams": "Masquer",
       "weekendHours": "Heures week-end",
       "saved": "Configuration enregistrée.",
       "saveFailed": "Impossible d'enregistrer la configuration.",
@@ -444,9 +449,11 @@
       "noPublishedDescription": "Publiez des quarts depuis Gérer avant de consulter le calendrier d'équipe.",
       "openShift": "Quart ouvert",
       "publishedSchedule": "Horaire publié",
+      "allPublishedOption": "Tous les horaires publiés",
+      "allPublishedSummary": "Tous les horaires publiés",
       "dragHelper": "Glissez-déposez un quart vers un nouveau jour pour le reprogrammer.",
       "scheduleLabel": "Horaire",
-      "scheduleDateRange": "{name} \u2014 {startDate} au {endDate}"
+      "scheduleDateRange": "{name} — {startDate} au {endDate}"
     },
     "myCalendar": {
       "dayMon": "Lun",
@@ -590,8 +597,7 @@
       "ariaLabel": "Actions rapides",
       "requestTimeOff": "Demander un congé",
       "submitExpense": "Soumettre une dépense",
-      "viewPayslips": "Voir les bulletins de paie",
-      "clockIn": "Pointer"
+      "viewPayslips": "Voir les bulletins de paie"
     },
     "newHire": {
       "welcome": "Bienvenue chez {org}, {firstName}.",
@@ -681,26 +687,26 @@
     "unableToLoad": "Impossible de charger les données du tableau de bord.",
     "setupChecklist": {
       "title": "Configuration de l'organisation",
-      "progress": "{completed}/{total} termin\u00e9(s)",
-      "expand": "D\u00e9velopper",
-      "collapse": "R\u00e9duire",
+      "progress": "{completed}/{total} terminé(s)",
+      "expand": "Développer",
+      "collapse": "Réduire",
       "dismiss": "Masquer la liste"
     },
     "onboarding": {
-      "ariaLabel": "Progression de l'int\u00e9gration",
+      "ariaLabel": "Progression de l'intégration",
       "welcomeTitle": "Bienvenue sur Crew Hub",
-      "tasksRemaining": "Vous avez <numeric>{count}</numeric> t\u00e2ches d'int\u00e9gration restantes.",
-      "completionSummary": "{completed}/{total} termin\u00e9 ({percent} %)",
-      "viewTasks": "Voir les t\u00e2ches"
+      "tasksRemaining": "Vous avez <numeric>{count}</numeric> tâches d'intégration restantes.",
+      "completionSummary": "{completed}/{total} terminé ({percent} %)",
+      "viewTasks": "Voir les tâches"
     },
     "managerOnboarding": {
-      "ariaLabel": "Progression de l'int\u00e9gration des subordonn\u00e9s",
-      "title": "Int\u00e9gration des subordonn\u00e9s directs",
-      "description": "Suivez la progression de l'int\u00e9gration de vos subordonn\u00e9s et d\u00e9bloquez les t\u00e2ches en retard.",
-      "openOnboarding": "Ouvrir l'int\u00e9gration",
-      "daySummary": "Jour {day} \u00b7 {completed}/{total} t\u00e2ches",
-      "managerTasksOverdue": "{count, plural, one {# t\u00e2che responsable en retard} other {# t\u00e2ches responsable en retard}}",
-      "onTrack": "\u00c0 jour"
+      "ariaLabel": "Progression de l'intégration des subordonnés",
+      "title": "Intégration des subordonnés directs",
+      "description": "Suivez la progression de l'intégration de vos subordonnés et débloquez les tâches en retard.",
+      "openOnboarding": "Ouvrir l'intégration",
+      "daySummary": "Jour {day} · {completed}/{total} tâches",
+      "managerTasksOverdue": "{count, plural, one {# tâche responsable en retard} other {# tâches responsable en retard}}",
+      "onTrack": "À jour"
     },
     "decisionCard": {
       "typeLeave": "Demande de congé",
@@ -710,10 +716,10 @@
       "tryAgain": "Réessayer",
       "declineReasonPlaceholder": "Motif du refus (facultatif)",
       "cancel": "Annuler",
-      "declining": "Refus en cours\u2026",
+      "declining": "Refus en cours…",
       "confirmDecline": "Confirmer le refus",
       "decline": "Refuser",
-      "approving": "Approbation en cours\u2026",
+      "approving": "Approbation en cours…",
       "approve": "Approuver"
     },
     "widgetError": {
@@ -767,7 +773,15 @@
       "unableToUpload": "Impossible de téléverser la photo.",
       "unableToRemove": "Impossible de supprimer la photo.",
       "saved": "Paramètres du profil enregistrés.",
-      "unableToUpdate": "Impossible de mettre à jour les paramètres du profil."
+      "unableToUpdate": "Impossible de mettre à jour les paramètres du profil.",
+      "pronounsLabel": "Pronoms",
+      "pronounsPlaceholder": "p. ex. elle, il, iel",
+      "bioLabel": "Bio",
+      "bioPlaceholder": "Une courte introduction sur vous-même",
+      "emergencyContactTitle": "Contact d'urgence",
+      "emergencyContactNameLabel": "Nom",
+      "emergencyContactPhoneLabel": "Téléphone",
+      "emergencyContactRelationshipLabel": "Lien de parenté"
     },
     "notificationSettings": {
       "heading": "Notifications",
@@ -919,6 +933,10 @@
     "toastUpdated": "Annonce mise à jour.",
     "toastPublished": "Annonce publiée.",
     "toastSaveError": "Impossible d'enregistrer l'annonce.",
+    "attachmentsLabel": "Pièces jointes",
+    "attachmentsHint": "PDF, DOCX, PNG, JPEG, GIF, WebP. Max 25 Mo chacun.",
+    "removeAttachment": "Supprimer",
+    "uploadFailed": "Échec du téléversement de la pièce jointe.",
     "dismissAriaLabel": "Fermer la notification",
     "validationTitleRequired": "Le titre est requis",
     "validationTitleTooLong": "Le titre est trop long",
@@ -999,13 +1017,11 @@
     "tab": {
       "allPending": "En attente",
       "timeOff": "Congés",
-      "expenses": "Dépenses",
-      "timesheets": "Feuilles de temps"
+      "expenses": "Dépenses"
     },
     "allCaughtUp": "Aucune approbation en attente. Vous êtes à jour !",
     "pendingRequests": "{count, plural, one {# demande en attente} other {# demandes en attente}}",
-    "pendingExpenses": "{count, plural, one {# dépense en attente} other {# dépenses en attente}}",
-    "pendingTimesheets": "{count, plural, one {# feuille de temps en attente} other {# feuilles de temps en attente}}"
+    "pendingExpenses": "{count, plural, one {# dépense en attente} other {# dépenses en attente}}"
   },
   "analyticsPage": {
     "accessDenied": "Seuls les Admin RH, Admin financier et Super admin peuvent accéder à l'analytique."
@@ -1312,73 +1328,11 @@
     "expiresInDays": "Expire dans {count} jours",
     "valid": "Valide"
   },
-  "timePolicies": {
-    "title": "Politiques horaires",
-    "description": "Consultez les règles de présence pour les seuils d'heures supplémentaires, les pauses et les arrondis.",
-    "unavailable": "Politiques horaires indisponibles",
-    "noPolicies": "Aucune politique configurée",
-    "noPoliciesDescription": "Créez une politique de présence pour appliquer les règles de pauses et d'heures supplémentaires.",
-    "policyCoverage": "Couverture des politiques",
-    "policyCoverageDescription": "{count} politiques de présence configurées pour Crew Hub.",
-    "readOnly": "Lecture seule",
-    "ariaLabel": "Tableau des politiques horaires",
-    "tableAriaLabel": "Politiques de présence",
-    "colPolicy": "Politique",
-    "colCountry": "Pays",
-    "colWeeklyTarget": "Cible hebdo",
-    "colDailyMax": "Max quotidien",
-    "colBreakRule": "Règle de pause",
-    "colRounding": "Arrondi",
-    "colStatus": "Statut",
-    "colUpdated": "Mis à jour",
-    "colActions": "Actions",
-    "allDepartments": "Tous les départements",
-    "global": "Mondial",
-    "breakRule": "Après {hours}h / {minutes}m",
-    "view": "Voir"
-  },
   "errorBoundary": {
     "title": "Une erreur s'est produite",
     "message": "Une erreur inattendue s'est produite. Vous pouvez réessayer ou revenir au tableau de bord.",
     "tryAgain": "Réessayer",
     "returnToDashboard": "Retour au tableau de bord"
-  },
-  "timeAttendance": {
-    "title": "Heures",
-    "description": "Enregistrez les heures de travail, suivez les pointages et consultez la présence hebdomadaire.",
-    "unavailable": "Les données de présence sont indisponibles",
-    "overviewAriaLabel": "Aperçu de la présence",
-    "clockStatus": "Statut du pointage",
-    "onShift": "En poste",
-    "offShift": "Hors poste",
-    "startedAgo": "Commencé {time}",
-    "noActiveEntry": "Aucune entrée active.",
-    "workedToday": "Travaillé aujourd'hui",
-    "breaks": "Pauses : {hours}h",
-    "weekTotal": "Total de la semaine",
-    "overtime": "HS : {hours}h",
-    "pendingTimesheets": "Feuilles de temps en attente",
-    "pendingTimesheetsDescription": "En attente de soumission ou d'approbation.",
-    "currentShift": "Poste actuel",
-    "liveClockState": "État du pointage en direct pour {name}.",
-    "clockedIn": "Pointé(e)",
-    "clockedOut": "Dépointé(e)",
-    "activeTimeEntry": "Entrée de temps active",
-    "activeTimeEntryDescription": "Commencé {time} via {method}.",
-    "inProgress": "En cours",
-    "recentTimeEntries": "Entrées de temps récentes",
-    "recentTimeEntriesDescription": "Les entrées incluent la méthode, les pauses et les heures travaillées.",
-    "noTimeEntries": "Aucune entrée de temps",
-    "noTimeEntriesDescription": "Les pointages apparaîtront ici après le début du suivi de présence.",
-    "recentAriaLabel": "Entrées de temps récentes",
-    "colClockIn": "Pointage d'entrée",
-    "colClockOut": "Pointage de sortie",
-    "colWorked": "Travaillé",
-    "colBreak": "Pause",
-    "colMethod": "Méthode",
-    "colStatus": "Statut",
-    "statusClosed": "Clôturé",
-    "statusOpen": "Ouvert"
   },
   "certificates": {
     "title": "Certificats",
@@ -1447,6 +1401,10 @@
     "openTaskAction": "Ouvrir l'action de la tâche",
     "signNow": "Signer maintenant",
     "completedBy": "Complété par : {name}",
+    "markComplete": "Marquer comme terminé",
+    "completing": "En cours…",
+    "taskCompleteFailed": "Impossible de terminer la tâche. Veuillez réessayer.",
+    "eSignatureOnly": "Les tâches de signature électronique ne peuvent être complétées qu'en signant le document.",
     "openFullView": "Ouvrir la vue complète de l'instance"
   },
   "learning": {
@@ -1737,41 +1695,6 @@
     "creating": "Création en cours…",
     "createCourse": "Créer le cours",
     "courseCreated": "Cours de formation créé."
-  },
-  "timesheetApprovals": {
-    "title": "Approbations des heures",
-    "description": "Examinez les feuilles de temps hebdomadaires soumises par vos subordonnés avant le traitement de la paie.",
-    "unavailable": "Les approbations sont indisponibles",
-    "noSubmitted": "Aucune feuille de temps soumise",
-    "noSubmittedDescription": "Les feuilles de temps soumises par votre équipe apparaîtront ici pour révision.",
-    "openAttendance": "Ouvrir la présence",
-    "tableAriaLabel": "Feuilles de temps soumises",
-    "sectionAriaLabel": "Tableau des approbations de feuilles de temps",
-    "pendingReview": "En attente de révision",
-    "pendingDescription": "{count, plural, one {# feuille de temps soumise nécessite une approbation.} other {# feuilles de temps soumises nécessitent une approbation.}}",
-    "submitted": "Submitted",
-    "colPerson": "Personne",
-    "colCountry": "Pays",
-    "colWeek": "Semaine",
-    "colWorked": "Travaillé",
-    "colOvertime": "Heures sup.",
-    "colStatus": "Statut",
-    "colSubmitted": "Soumise",
-    "colActions": "Actions",
-    "approve": "Approuver",
-    "reject": "Rejeter",
-    "timesheetApproved": "Feuille de temps approuvée.",
-    "unableToApprove": "Impossible d'approuver la feuille de temps.",
-    "timesheetRejected": "Feuille de temps rejetée.",
-    "unableToReject": "Impossible de rejeter la feuille de temps.",
-    "rejectDialogTitle": "Rejeter la feuille de temps ?",
-    "rejectDialogDescription": "Le membre de l'équipe sera notifié avec votre raison.",
-    "reasonLabel": "Raison",
-    "reasonPlaceholder": "Expliquez pourquoi cette feuille de temps est rejetée",
-    "reasonRequired": "La raison du rejet est obligatoire.",
-    "approveDialogTitle": "Approuver la feuille de temps ?",
-    "approveDialogDescription": "Cette feuille de temps sera transmise pour le traitement de la paie.",
-    "weekRange": "{start} à {end}"
   },
   "learningAdmin": {
     "title": "Administration de la formation",
@@ -2324,12 +2247,16 @@
     "crewTagPlaceholder": "nom d'utilisateur",
     "crewTagHint": "Votre nom d'utilisateur Accrue — ex. @zino.doe",
     "saveDetails": "Enregistrer les détails de paiement",
-    "saving": "Enregistrement…",
+    "saving": "Enregistrement...",
     "toastSaved": "Détails de paiement enregistrés. Les modifications s'appliqueront après 48 heures.",
     "toastSaveError": "Impossible de mettre à jour les détails de paiement.",
     "toastAriaLabel": "Notifications de détails de paiement",
     "dismissAriaLabel": "Fermer la notification",
-    "layoutAriaLabel": "Paramètres de détails de paiement"
+    "layoutAriaLabel": "Paramètres de détails de paiement",
+    "crewTagConfirmTitle": "Confirmer le Crew Tag",
+    "crewTagConfirmDescription": "Vous avez saisi {tag}. Les finances utiliseront ce tag pour envoyer les paiements via Accrue. Veuillez confirmer que c'est correct.",
+    "crewTagConfirmButton": "Confirmer et enregistrer",
+    "cancel": "Annuler"
   },
   "documents": {
     "title": "Documents",
@@ -2400,24 +2327,24 @@
     "openFile": "Ouvrir le fichier",
     "dismissAriaLabel": "Fermer la notification",
     "uploadPanel": {
-      "titleNewVersion": "T\u00e9l\u00e9verser une nouvelle version",
-      "titleCreate": "T\u00e9l\u00e9verser un document",
+      "titleNewVersion": "Téléverser une nouvelle version",
+      "titleCreate": "Téléverser un document",
       "descriptionNewVersion": "Joindre un fichier de remplacement et l'enregistrer comme nouvelle version.",
-      "descriptionCreate": "T\u00e9l\u00e9versez dans le stockage Crew Hub avec validation et suivi des versions.",
+      "descriptionCreate": "Téléversez dans le stockage Crew Hub avec validation et suivi des versions.",
       "labelTitle": "Titre",
       "labelDescription": "Description",
-      "labelCategory": "Cat\u00e9gorie",
+      "labelCategory": "Catégorie",
       "labelExpiryDate": "Date d'expiration",
       "labelCountry": "Pays",
-      "labelFileUpload": "T\u00e9l\u00e9versement de fichier",
-      "dropzoneAriaLabel": "S\u00e9lectionner un fichier",
-      "dropzoneTitle": "Glissez-d\u00e9posez un fichier ou cliquez pour parcourir.",
-      "dropzoneHint": "Accept\u00e9s : pdf, docx, doc, xlsx, xls, png, jpg (max 25 Mo)",
-      "progressLabel": "{progress} % t\u00e9l\u00e9vers\u00e9",
+      "labelFileUpload": "Téléversement de fichier",
+      "dropzoneAriaLabel": "Sélectionner un fichier",
+      "dropzoneTitle": "Glissez-déposez un fichier ou cliquez pour parcourir.",
+      "dropzoneHint": "Acceptés : pdf, docx, doc, xlsx, xls, png, jpg (max 25 Mo)",
+      "progressLabel": "{progress} % téléversé",
       "cancel": "Annuler",
-      "uploading": "T\u00e9l\u00e9versement\u2026",
-      "submitNewVersion": "T\u00e9l\u00e9verser la version",
-      "submitCreate": "T\u00e9l\u00e9verser le document"
+      "uploading": "Téléversement…",
+      "submitNewVersion": "Téléverser la version",
+      "submitCreate": "Téléverser le document"
     }
   },
   "analytics": {
@@ -3274,8 +3201,8 @@
       "actionRequired": "Action requise",
       "choiceDescription": "Votre anniversaire tombe sur un jour non ouvré cette année ({date}). Choisissez un jour pour votre congé anniversaire :"
     },
-    "probation": {
-      "notice": "Pendant la période d'essai, seuls les jours personnels non rémunérés sont disponibles pour les demandes de congé."
+    "onboardingNotice": {
+      "notice": "Pendant votre période d'intégration, seuls les jours personnels non rémunérés peuvent être demandés. Une fois l'intégration terminée, tous les types de congés seront disponibles."
     },
     "requests": {
       "title": "Mes demandes",
@@ -3344,7 +3271,11 @@
       "balanceWarning": "Les jours demandés ({requested}) dépassent le solde disponible ({available}).",
       "sickLeaveNote": "Un certificat médical peut être requis pour un arrêt maladie de plus de 2 jours ouvrés consécutifs.",
       "submitting": "Envoi...",
-      "submitRequest": "Soumettre la demande"
+      "submitRequest": "Soumettre la demande",
+      "medicalEvidenceLabel": "Justificatif médical",
+      "sickLeaveUploadNote": "Un justificatif médical est requis pour les congés maladie de plus de 2 jours.",
+      "medicalEvidenceRequired": "Veuillez télécharger un justificatif médical avant de soumettre.",
+      "noPoliciesConfigured": "Aucune politique de congé n'est configurée pour votre pays. Contactez votre administrateur RH."
     },
     "afkPanel": {
       "title": "Enregistrer une absence",
@@ -3745,6 +3676,11 @@
       "manager": "Responsable",
       "managerLabel": "Responsable",
       "noManager": "Aucun responsable",
+      "statusLabel": "Statut",
+      "statusActive": "Actif",
+      "statusOnboarding": "Intégration",
+      "statusOffboarding": "Départ",
+      "statusInactive": "Inactif",
       "saveChanges": "Enregistrer les modifications"
     },
     "inviteDialog": {
@@ -4455,6 +4391,24 @@
       "accountName": "Nom du compte",
       "accountNumber": "Numéro de compte"
     },
+    "vendorPaymentMethod": "Mode de paiement",
+    "vendorBankTransfer": "Virement bancaire",
+    "vendorMobileMoney": "Mobile Money",
+    "vendorCrewTag": "Crew Tag",
+    "vendorInternationalWire": "Virement international",
+    "vendorMobileProvider": "Opérateur",
+    "vendorMobileNumber": "Numéro de téléphone",
+    "vendorCrewTagUsername": "Nom d'utilisateur Crew Tag",
+    "vendorWireBankName": "Nom de la banque",
+    "vendorWireAccountNumber": "Numéro de compte",
+    "vendorWireSwiftBic": "SWIFT / BIC",
+    "vendorWireIban": "IBAN",
+    "vendorWireBankCountry": "Pays de la banque",
+    "vendorWireCurrency": "Devise",
+    "paymentRailLabel": "Canal de paiement",
+    "payoutAccount": "Compte de versement",
+    "noPayoutConfigured": "Aucun mode de paiement configuré. Configurez vos coordonnées de paiement pour recevoir les remboursements.",
+    "setupPayment": "Configurer le paiement",
     "transactionDetails": {
       "title": "Détails de la transaction",
       "reference": "Référence",
@@ -4906,7 +4860,7 @@
     "greeting": "Bonjour {name},",
     "greetingGeneric": "Bonjour,",
     "footer": {
-      "default": "Crew Hub par Accrue\nDes questions\u00a0? Contactez l'équipe des opérations.",
+      "default": "Crew Hub par Accrue\nDes questions ? Contactez l'équipe des opérations.",
       "tagline": "Envoyé depuis Crew Hub avec ❤️"
     },
     "welcome": {
@@ -4914,8 +4868,8 @@
         "preheader": "Votre compte Crew Hub est prêt",
         "subject": "Bienvenue chez Accrue, {name}",
         "body1": "Bienvenue chez Accrue. Nous sommes ravis de vous accueillir.",
-        "body2": "Votre compte Crew Hub est prêt. Crew Hub est l'endroit où vous trouverez tout ce dont vous avez besoin\u00a0: votre équipe, votre paie, vos congés et vos documents. Considérez-le comme votre point de départ.",
-        "body3": "Pour commencer, appuyez sur le bouton ci-dessous pour configurer votre identifiant et votre authentificateur\u00a0:",
+        "body2": "Votre compte Crew Hub est prêt. Crew Hub est l'endroit où vous trouverez tout ce dont vous avez besoin : votre équipe, votre paie, vos congés et vos documents. Considérez-le comme votre point de départ.",
+        "body3": "Pour commencer, appuyez sur le bouton ci-dessous pour configurer votre identifiant et votre authentificateur :",
         "cta": "Configurer votre compte",
         "closing": "Si quelque chose ne va pas ou si vous avez des questions, contactez votre responsable ou l'équipe des opérations.",
         "loginEmail": "E-mail de connexion",
@@ -4926,7 +4880,7 @@
         "preheader": "Configurez votre connexion pour commencer",
         "subject": "Votre compte Crew Hub est prêt",
         "body1": "Nous avons mis en place Crew Hub, une nouvelle plateforme interne pour l'équipe Accrue. C'est là que vous gérerez votre paie, vos congés, vos documents et les informations de votre équipe.",
-        "body2": "Votre compte est prêt. Appuyez ci-dessous pour configurer votre connexion\u00a0:",
+        "body2": "Votre compte est prêt. Appuyez ci-dessous pour configurer votre connexion :",
         "cta": "Commencer",
         "closing": "Tout ce dont vous avez besoin sera au même endroit. Si vous rencontrez des problèmes lors de la configuration, contactez l'équipe des opérations.",
         "loginEmail": "E-mail de connexion"
@@ -4957,7 +4911,7 @@
       "requested": {
         "preheader": "Examiner la demande",
         "subject": "{employeeName} a demandé un congé",
-        "body": "{employeeName} a soumis une demande de congé\u00a0:",
+        "body": "{employeeName} a soumis une demande de congé :",
         "cta": "Examiner la demande",
         "type": "Type",
         "dates": "Dates",
@@ -4966,7 +4920,7 @@
       "cancelled": {
         "preheader": "Aucune action requise",
         "subject": "{employeeName} a annulé son congé",
-        "body": "{employeeName} a annulé sa demande de congé\u00a0:",
+        "body": "{employeeName} a annulé sa demande de congé :",
         "noAction": "Aucune action requise de votre part.",
         "type": "Type",
         "dates": "Dates"
@@ -4993,7 +4947,7 @@
         "manager": {
           "preheader": "Examen requis",
           "subject": "{employeeName} a soumis une note de frais",
-          "body": "{employeeName} a soumis une note de frais pour examen\u00a0:",
+          "body": "{employeeName} a soumis une note de frais pour examen :",
           "cta": "Examiner la note de frais",
           "expense": "Note de frais",
           "amount": "Montant"
@@ -5011,8 +4965,8 @@
         },
         "finance": {
           "preheader": "{amount} pour {employeeName}",
-          "body": "Une note de frais a été approuvée et est prête pour la confirmation de paiement\u00a0:",
-          "subject": "Note de frais approuvée, prête pour confirmation de paiement\u00a0: {description}",
+          "body": "Une note de frais a été approuvée et est prête pour la confirmation de paiement :",
+          "subject": "Note de frais approuvée, prête pour confirmation de paiement : {description}",
           "cta": "Traiter dans Crew Hub",
           "employee": "Employé",
           "expense": "Note de frais",
@@ -5059,7 +5013,7 @@
     },
     "signature": {
       "preheader": "{requestedByName} a besoin de votre signature",
-      "subject": "Demande de signature\u00a0: {requestTitle}",
+      "subject": "Demande de signature : {requestTitle}",
       "body": "{requestedByName} vous a envoyé un document à signer.",
       "cta": "Examiner et signer",
       "document": "Document"
@@ -5076,7 +5030,7 @@
     "compliance": {
       "reminder": {
         "preheader": "Action requise avant le {dueDate}",
-        "subject": "Rappel de conformité\u00a0: {requirement}",
+        "subject": "Rappel de conformité : {requirement}",
         "body": "Ceci est un rappel concernant une échéance de conformité à venir.",
         "closing": "Veuillez vous assurer que cela est terminé à temps. Si vous avez besoin d'aide, contactez l'équipe des opérations.",
         "cta": "Voir dans Crew Hub",
@@ -5085,7 +5039,7 @@
       },
       "overdue": {
         "preheader": "Action immédiate requise",
-        "subject": "Conformité en retard\u00a0: {requirement}",
+        "subject": "Conformité en retard : {requirement}",
         "body": "Une exigence de conformité est maintenant en retard.",
         "closing": "Cela nécessite une attention immédiate. Veuillez faire un suivi directement.",
         "cta": "Voir dans Crew Hub",
@@ -5104,7 +5058,7 @@
       },
       "reminder": {
         "preheader": "La date limite est le {deadline}",
-        "subject": "Rappel\u00a0: auto-évaluation bientôt due pour {cycleName}",
+        "subject": "Rappel : auto-évaluation bientôt due pour {cycleName}",
         "body": "Votre auto-évaluation pour {cycleName} est due le {deadline}. Veuillez vous assurer qu'elle est soumise à temps.",
         "cta": "Compléter l'auto-évaluation"
       },
@@ -5135,7 +5089,7 @@
         "employee": {
           "preheader": "Action requise",
           "subject": "{documentTitle} a expiré",
-          "body": "Le document suivant a expiré\u00a0:",
+          "body": "Le document suivant a expiré :",
           "closing": "Veuillez télécharger une version renouvelée ou prendre les mesures appropriées.",
           "cta": "Voir dans Crew Hub",
           "document": "Document"
@@ -5143,7 +5097,7 @@
         "hr": {
           "preheader": "Action requise",
           "subject": "{documentTitle} a expiré",
-          "body": "Le document suivant a expiré\u00a0:",
+          "body": "Le document suivant a expiré :",
           "closing": "Veuillez télécharger une version renouvelée ou prendre les mesures appropriées.",
           "cta": "Voir dans Crew Hub",
           "document": "Document",
@@ -5156,7 +5110,7 @@
         "employee": {
           "preheader": "Préparons votre intégration",
           "subject": "Bienvenue à bord, {name}",
-          "body": "Bienvenue dans l'équipe. Votre liste d'intégration est prête dans Crew Hub. Elle contient tout ce dont vous avez besoin pour commencer\u00a0: documents à signer, informations à remplir et tâches à accomplir.",
+          "body": "Bienvenue dans l'équipe. Votre liste d'intégration est prête dans Crew Hub. Elle contient tout ce dont vous avez besoin pour commencer : documents à signer, informations à remplir et tâches à accomplir.",
           "cta": "Commencer l'intégration",
           "closing": "Si vous avez des questions en cours de route, contactez votre responsable ou l'équipe des opérations."
         },
@@ -5170,14 +5124,14 @@
       "overdue": {
         "employee": {
           "preheader": "Suivi nécessaire",
-          "subject": "Tâche d'intégration en retard\u00a0: {taskName}",
+          "subject": "Tâche d'intégration en retard : {taskName}",
           "body": "Votre tâche d'intégration « {taskName} » est en retard. Veuillez la compléter dès que possible.",
           "cta": "Compléter la tâche",
           "closing": "Si vous êtes bloqué ou avez besoin d'aide, contactez l'équipe des opérations."
         },
         "hr": {
           "preheader": "Suivi nécessaire",
-          "subject": "Tâche d'intégration en retard\u00a0: {taskName}",
+          "subject": "Tâche d'intégration en retard : {taskName}",
           "body": "La tâche d'intégration « {taskName} » pour {employeeName} est en retard et peut nécessiter un suivi.",
           "cta": "Voir dans Crew Hub"
         }
@@ -5185,7 +5139,7 @@
       "complete": {
         "employee": {
           "preheader": "Tout est en ordre",
-          "subject": "Intégration terminée\u00a0!",
+          "subject": "Intégration terminée !",
           "body": "Vous avez terminé votre intégration. Tout est en ordre. Bienvenue dans l'équipe, pour de vrai cette fois.",
           "cta": "Voir dans Crew Hub"
         },
@@ -5224,7 +5178,7 @@
     "payroll": {
       "approved": {
         "preheader": "Prêt pour le traitement",
-        "subject": "Cycle de paie approuvé\u00a0: {runName}",
+        "subject": "Cycle de paie approuvé : {runName}",
         "body": "Le cycle de paie « {runName} » a été approuvé par {approverName} et est prêt pour le traitement.",
         "cta": "Voir le cycle de paie"
       }
@@ -5232,7 +5186,7 @@
     "reset": {
       "preheader": "Configurer un nouvel authentificateur",
       "subject": "Réinitialiser votre connexion Crew Hub",
-      "body": "Une réinitialisation de connexion a été demandée pour votre compte Crew Hub. Appuyez ci-dessous pour configurer un nouvel authentificateur\u00a0:",
+      "body": "Une réinitialisation de connexion a été demandée pour votre compte Crew Hub. Appuyez ci-dessous pour configurer un nouvel authentificateur :",
       "cta": "Réinitialiser la connexion",
       "closing": "Si vous n'avez pas fait cette demande, contactez l'équipe des opérations."
     },

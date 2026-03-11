@@ -33,6 +33,7 @@ type ShiftEditFormValues = {
 let toastCounter = 0;
 const SHIFT_EDIT_TOAST_SUCCESS = "Shift updated successfully.";
 const SHIFT_EDIT_TOAST_ERROR = "Unable to update shift.";
+const ALL_PUBLISHED_SCHEDULE_ID = "__all_published__";
 
 function formatShiftMoveDate(isoDate: string): string {
   return formatDateShort(isoDate);
@@ -55,6 +56,18 @@ export function SchedulingCalendarClient({
   const schedulesData = schedulesQuery.data;
   const schedules = useMemo(() => schedulesData?.schedules ?? [], [schedulesData]);
   const visibleSchedules = schedules;
+  const publishedSchedules = useMemo(
+    () => visibleSchedules.filter((schedule) => schedule.status === "published"),
+    [visibleSchedules]
+  );
+  const scheduleIdSet = useMemo(
+    () => new Set(visibleSchedules.map((schedule) => schedule.id)),
+    [visibleSchedules]
+  );
+  const publishedScheduleIdSet = useMemo(
+    () => new Set(publishedSchedules.map((schedule) => schedule.id)),
+    [publishedSchedules]
+  );
 
   // Default to the most recent published schedule
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
@@ -65,7 +78,31 @@ export function SchedulingCalendarClient({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const peopleQuery = usePeople({ scope: "all", enabled: canManageShifts });
 
+  const allPublishedRange = useMemo(() => {
+    if (publishedSchedules.length === 0) {
+      return null;
+    }
+
+    const sortedByStart = [...publishedSchedules].sort((left, right) =>
+      left.startDate.localeCompare(right.startDate)
+    );
+    const sortedByEnd = [...publishedSchedules].sort((left, right) =>
+      left.endDate.localeCompare(right.endDate)
+    );
+
+    return {
+      startDate: sortedByStart[0]!.startDate,
+      endDate: sortedByEnd[sortedByEnd.length - 1]!.endDate
+    };
+  }, [publishedSchedules]);
+
+  const showAllPublishedOption = publishedSchedules.length > 1;
+
   const activeSchedule = useMemo(() => {
+    if (selectedScheduleId === ALL_PUBLISHED_SCHEDULE_ID) {
+      return null;
+    }
+
     if (visibleSchedules.length === 0) return null;
     if (selectedScheduleId) {
       return visibleSchedules.find((s) => s.id === selectedScheduleId) ?? visibleSchedules[0]!;
@@ -73,13 +110,49 @@ export function SchedulingCalendarClient({
     return visibleSchedules[0]!;
   }, [visibleSchedules, selectedScheduleId]);
 
+  const activeRange = useMemo(() => {
+    if (selectedScheduleId === ALL_PUBLISHED_SCHEDULE_ID) {
+      return allPublishedRange;
+    }
+
+    if (!activeSchedule) {
+      return null;
+    }
+
+    return {
+      startDate: activeSchedule.startDate,
+      endDate: activeSchedule.endDate
+    };
+  }, [activeSchedule, allPublishedRange, selectedScheduleId]);
+
   const shiftsQuery = useSchedulingShifts(
-    activeSchedule
-      ? { scope: "team", scheduleId: activeSchedule.id }
+    activeRange
+      ? selectedScheduleId === ALL_PUBLISHED_SCHEDULE_ID
+        ? {
+            scope: "team",
+            startDate: activeRange.startDate,
+            endDate: activeRange.endDate,
+            limit: 2000
+          }
+        : {
+            scope: "team",
+            scheduleId: activeSchedule?.id,
+            startDate: activeRange.startDate,
+            endDate: activeRange.endDate,
+            limit: 2000
+          }
       : {}
   );
 
-  const shifts = useMemo(() => shiftsQuery.data?.shifts ?? [], [shiftsQuery.data]);
+  const shifts = useMemo(() => {
+    const rows = shiftsQuery.data?.shifts ?? [];
+
+    if (selectedScheduleId === ALL_PUBLISHED_SCHEDULE_ID) {
+      return rows.filter((shift) => publishedScheduleIdSet.has(shift.scheduleId));
+    }
+
+    return rows;
+  }, [publishedScheduleIdSet, selectedScheduleId, shiftsQuery.data]);
   const isLoading = schedulesQuery.isLoading || shiftsQuery.isLoading;
   const activeScheduleMembers = useMemo(() => {
     const byId = new Map<string, { id: string; fullName: string; department: string | null }>();
@@ -112,7 +185,11 @@ export function SchedulingCalendarClient({
 
     let members = [...byId.values()];
 
-    if (activeSchedule?.department && activeSchedule.department.trim().length > 0) {
+    if (
+      selectedScheduleId !== ALL_PUBLISHED_SCHEDULE_ID &&
+      activeSchedule?.department &&
+      activeSchedule.department.trim().length > 0
+    ) {
       members = members.filter((member) =>
         areDepartmentsEqual(member.department, activeSchedule.department)
       );
@@ -121,15 +198,29 @@ export function SchedulingCalendarClient({
     return members
       .map((member) => ({ id: member.id, fullName: member.fullName }))
       .sort((left, right) => left.fullName.localeCompare(right.fullName));
-  }, [activeSchedule?.department, peopleQuery.people, shifts]);
+  }, [activeSchedule?.department, peopleQuery.people, selectedScheduleId, shifts]);
 
   useEffect(() => {
-    if (!initialScheduleId) {
-      return;
-    }
+    setSelectedScheduleId((current) => {
+      if (current === ALL_PUBLISHED_SCHEDULE_ID && showAllPublishedOption) {
+        return current;
+      }
 
-    setSelectedScheduleId((current) => current ?? initialScheduleId);
-  }, [initialScheduleId]);
+      if (current && scheduleIdSet.has(current)) {
+        return current;
+      }
+
+      if (initialScheduleId && scheduleIdSet.has(initialScheduleId)) {
+        return initialScheduleId;
+      }
+
+      if (showAllPublishedOption) {
+        return ALL_PUBLISHED_SCHEDULE_ID;
+      }
+
+      return visibleSchedules[0]?.id ?? null;
+    });
+  }, [initialScheduleId, scheduleIdSet, showAllPublishedOption, visibleSchedules]);
 
   useEffect(() => {
     if (toasts.length === 0) return;
@@ -148,9 +239,17 @@ export function SchedulingCalendarClient({
       ? t("track.weekend")
       : t("track.weekday")
     : "";
-  const scheduleSummary = activeSchedule
-    ? `${activeSchedule.name ?? t("calendar.publishedSchedule")} · ${scheduleTrackLabel} ${t("track.trackSuffix")}`
-    : "";
+  const scheduleSummary =
+    selectedScheduleId === ALL_PUBLISHED_SCHEDULE_ID
+      ? t("calendar.allPublishedSummary")
+      : activeSchedule
+        ? `${activeSchedule.name ?? t("calendar.publishedSchedule")} · ${scheduleTrackLabel} ${t("track.trackSuffix")}`
+        : "";
+
+  const activeStartDate = activeRange?.startDate ?? new Date().toISOString().slice(0, 10);
+  const activeEndDate = activeRange?.endDate ?? new Date().toISOString().slice(0, 10);
+  const canManageActiveSchedule =
+    canManageShifts && selectedScheduleId !== ALL_PUBLISHED_SCHEDULE_ID;
 
   const handleRequestMove = useCallback((shift: ShiftRecord, targetDate: string) => {
     setPendingMove({ shift, targetDate });
@@ -238,15 +337,20 @@ export function SchedulingCalendarClient({
   return (
     <section className="compensation-layout">
       {/* Schedule selector */}
-      {visibleSchedules.length > 1 ? (
+      {visibleSchedules.length > 1 || showAllPublishedOption ? (
         <div className="schedule-calendar-controls">
           <label className="form-label" htmlFor="schedule-selector">{t("calendar.scheduleLabel")}</label>
           <select
             id="schedule-selector"
             className="form-input"
-            value={activeSchedule?.id ?? ""}
+            value={selectedScheduleId ?? activeSchedule?.id ?? ""}
             onChange={(e) => setSelectedScheduleId(e.target.value)}
           >
+            {showAllPublishedOption ? (
+              <option value={ALL_PUBLISHED_SCHEDULE_ID}>
+                {t("calendar.allPublishedOption")}
+              </option>
+            ) : null}
             {visibleSchedules.map((s) => (
               <option key={s.id} value={s.id}>
                 {t("calendar.scheduleDateRange", { name: s.name ?? t("calendar.scheduleLabel"), startDate: s.startDate, endDate: s.endDate })}
@@ -256,16 +360,16 @@ export function SchedulingCalendarClient({
         </div>
       ) : null}
 
-      {activeSchedule ? (
+      {activeRange ? (
         <>
           <div className="schedule-calendar-title">
             <h3 className="section-title">
-              {formatMonth(activeSchedule.startDate)}
+              {formatMonth(activeStartDate)}
             </h3>
             <p className="settings-card-description">
               {scheduleSummary}
             </p>
-            {canManageShifts ? (
+            {canManageActiveSchedule ? (
               <p className="teamcal-helper-text">
                 {t("calendar.dragHelper")}
               </p>
@@ -273,11 +377,11 @@ export function SchedulingCalendarClient({
           </div>
           <TeamScheduleCalendar
             shifts={shifts}
-            scheduleStartDate={activeSchedule.startDate}
-            scheduleEndDate={activeSchedule.endDate}
-            canManage={canManageShifts}
+            scheduleStartDate={activeStartDate}
+            scheduleEndDate={activeEndDate}
+            canManage={canManageActiveSchedule}
             onRequestMove={handleRequestMove}
-            onShiftSelect={canManageShifts ? setEditingShift : undefined}
+            onShiftSelect={canManageActiveSchedule ? setEditingShift : undefined}
           />
         </>
       ) : (
@@ -319,8 +423,8 @@ export function SchedulingCalendarClient({
           isOpen
           shift={editingShift}
           assignees={activeScheduleMembers}
-          minDate={activeSchedule?.startDate ?? new Date().toISOString().slice(0, 10)}
-          maxDate={activeSchedule?.endDate ?? new Date().toISOString().slice(0, 10)}
+          minDate={activeStartDate}
+          maxDate={activeEndDate}
           isSubmitting={isSavingShiftEdit}
           onClose={() => setEditingShift(null)}
           onSubmit={(values) => {

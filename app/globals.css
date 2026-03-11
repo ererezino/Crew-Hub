@@ -2247,6 +2247,32 @@ html.dark .topbar {
   gap: var(--space-3);
 }
 
+.schedule-team-setup-group {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.schedule-team-setup-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.schedule-team-setup-group-title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.schedule-team-setup-group-toggle {
+  min-height: 2rem;
+  padding: 0.2rem 0.7rem;
+}
+
 .schedule-team-setup-row {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
@@ -2273,6 +2299,13 @@ html.dark .topbar {
 .schedule-team-setup-controls {
   display: grid;
   gap: var(--space-2);
+}
+
+.schedule-team-setup-advanced {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .schedule-team-setup-type-toggle {
@@ -2311,6 +2344,19 @@ html.dark .topbar {
 
 .schedule-team-setup-hours .form-input {
   min-width: 6rem;
+}
+
+.schedule-team-setup-alternate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.schedule-team-setup-alternate input {
+  width: 1rem;
+  height: 1rem;
 }
 
 .schedule-team-setup-actions {
@@ -2574,6 +2620,12 @@ html.dark .topbar {
 
   .schedule-team-setup-row {
     grid-template-columns: 1fr;
+  }
+
+  .schedule-team-setup-advanced {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-2);
   }
 
   .schedule-team-setup-actions {
@@ -10996,6 +11048,20 @@ html.dark .home-quote-text {
   height: 1rem;
   margin-top: var(--space-1);
   color: var(--text-tertiary);
+}
+
+.expenses-type-badge-row {
+  margin-bottom: var(--space-3);
+}
+
+.expenses-payout-display {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-default);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  margin-bottom: var(--space-3);
 }
 
 .expenses-vendor-fields {

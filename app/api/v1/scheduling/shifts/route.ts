@@ -37,7 +37,7 @@ const querySchema = z.object({
     .refine((value) => value.length === 0 || isIsoDate(value), "endDate must be YYYY-MM-DD.")
     .optional(),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
-  limit: z.coerce.number().int().min(1).max(400).default(240)
+  limit: z.coerce.number().int().min(1).max(2000).default(240)
 });
 
 const createShiftSchema = z.object({

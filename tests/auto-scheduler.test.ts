@@ -123,6 +123,28 @@ describe("autoGenerateSchedule", () => {
     expect(new Set(weekendEmployeeDates)).toEqual(new Set(["2026-03-05", "2026-03-06"]));
   });
 
+  it("keeps weekend-rotation workers eligible for weekday assignments", () => {
+    const assignments = autoGenerateSchedule({
+      employees: [
+        {
+          id: "rotation-weekday",
+          fullName: "Rotation Weekday",
+          scheduleType: "weekend_rotation",
+          blockedDates: []
+        }
+      ],
+      slots,
+      startDate: "2026-03-02",
+      endDate: "2026-03-04",
+      scheduleType: "weekday"
+    });
+
+    expect(assignments).toHaveLength(3);
+    expect(new Set(assignments.map((assignment) => assignment.employeeId))).toEqual(
+      new Set(["rotation-weekday"])
+    );
+  });
+
   it("falls back to same-day double assignment when needed for coverage", () => {
     const assignments = autoGenerateSchedule({
       employees: [
@@ -222,5 +244,59 @@ describe("autoGenerateSchedule", () => {
       expect(morningCount).toBe(6);
       expect(eveningCount).toBe(6);
     }
+  });
+
+  it("alternates weekend-rotation workers across weekend anchors", () => {
+    const employees: EmployeeScheduleInfo[] = [
+      {
+        id: "rotation-a",
+        fullName: "Rotation A",
+        scheduleType: "weekend_rotation",
+        blockedDates: []
+      },
+      {
+        id: "rotation-b",
+        fullName: "Rotation B",
+        scheduleType: "weekend_rotation",
+        blockedDates: []
+      },
+      {
+        id: "rotation-c",
+        fullName: "Rotation C",
+        scheduleType: "weekend_rotation",
+        blockedDates: []
+      },
+      {
+        id: "rotation-d",
+        fullName: "Rotation D",
+        scheduleType: "weekend_rotation",
+        blockedDates: []
+      }
+    ];
+
+    const assignments = autoGenerateSchedule({
+      employees,
+      slots,
+      startDate: "2026-03-07",
+      endDate: "2026-03-15",
+      scheduleType: "weekend"
+    });
+
+    const firstWeekendDates = new Set(["2026-03-07", "2026-03-08"]);
+    const secondWeekendDates = new Set(["2026-03-14", "2026-03-15"]);
+
+    const firstWeekendAssignees = new Set(
+      assignments
+        .filter((assignment) => firstWeekendDates.has(assignment.shiftDate))
+        .map((assignment) => assignment.employeeId)
+    );
+    const secondWeekendAssignees = new Set(
+      assignments
+        .filter((assignment) => secondWeekendDates.has(assignment.shiftDate))
+        .map((assignment) => assignment.employeeId)
+    );
+
+    expect(firstWeekendAssignees).toEqual(new Set(["rotation-a", "rotation-c"]));
+    expect(secondWeekendAssignees).toEqual(new Set(["rotation-b", "rotation-d"]));
   });
 });

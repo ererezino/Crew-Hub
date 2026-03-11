@@ -6,11 +6,12 @@ import { useTranslations } from "next-intl";
 import type { WeekendHourOption } from "../../types/scheduling";
 import type { PersonRecord } from "../../types/people";
 
-type TeamSetupType = "weekday" | "weekend_primary";
+type TeamSetupType = "weekday" | "weekend";
 
 type RowDraft = {
   scheduleType: TeamSetupType;
   weekendShiftHours: WeekendHourOption;
+  alternateWeekends: boolean;
 };
 
 type TeamSetupPanelProps = {
@@ -25,6 +26,18 @@ type TeamSetupPanelProps = {
 };
 
 const WEEKEND_HOURS_OPTIONS: WeekendHourOption[] = ["8", "4", "3", "2"];
+const CUSTOMER_SUCCESS_DEPARTMENTS = new Set([
+  "customer success",
+  "customer support"
+]);
+
+function isCustomerSuccessDepartment(department: string | null | undefined): boolean {
+  if (!department) {
+    return false;
+  }
+
+  return CUSTOMER_SUCCESS_DEPARTMENTS.has(department.trim().toLowerCase());
+}
 
 function normalizeTeamSetupType(
   scheduleType: string | null | undefined
@@ -33,10 +46,16 @@ function normalizeTeamSetupType(
     scheduleType === "weekend_primary" ||
     scheduleType === "weekend_rotation"
   ) {
-    return "weekend_primary";
+    return "weekend";
   }
 
   return "weekday";
+}
+
+function normalizeAlternateWeekends(
+  scheduleType: string | null | undefined
+): boolean {
+  return scheduleType === "weekend_rotation";
 }
 
 function normalizeWeekendHours(
@@ -65,25 +84,55 @@ export function TeamSetupPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [draftsById, setDraftsById] = useState<Record<string, RowDraft>>({});
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
+  const [otherTeamsExpanded, setOtherTeamsExpanded] = useState(false);
 
-  const visibleMembers = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-
-    const base = members.filter(
+  const activeMembers = useMemo(() => {
+    return members.filter(
       (member) => member.status === "active" || member.status === "onboarding"
     );
+  }, [members]);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const visibleMembers = useMemo(() => {
+    const prioritized = [...activeMembers].sort((left, right) => {
+      const leftIsCustomerSuccess = isCustomerSuccessDepartment(left.department);
+      const rightIsCustomerSuccess = isCustomerSuccessDepartment(right.department);
+
+      if (leftIsCustomerSuccess !== rightIsCustomerSuccess) {
+        return leftIsCustomerSuccess ? -1 : 1;
+      }
+
+      return left.fullName.localeCompare(right.fullName);
+    });
 
     if (normalizedQuery.length === 0) {
-      return base;
+      return prioritized;
     }
 
-    return base.filter((member) => {
+    return prioritized.filter((member) => {
       const nameMatch = member.fullName.toLowerCase().includes(normalizedQuery);
       const deptMatch =
         member.department?.toLowerCase().includes(normalizedQuery) ?? false;
       return nameMatch || deptMatch;
     });
-  }, [members, searchQuery]);
+  }, [activeMembers, normalizedQuery]);
+
+  const { customerSuccessMembers, otherMembers } = useMemo(() => {
+    const customerSuccess = visibleMembers.filter((member) =>
+      isCustomerSuccessDepartment(member.department)
+    );
+    const others = visibleMembers.filter(
+      (member) => !isCustomerSuccessDepartment(member.department)
+    );
+
+    return {
+      customerSuccessMembers: customerSuccess,
+      otherMembers: others
+    };
+  }, [visibleMembers]);
+
+  const shouldShowOtherTeams = normalizedQuery.length > 0 || otherTeamsExpanded;
 
   const resolveCurrentDraft = (member: PersonRecord): RowDraft => {
     const existing = draftsById[member.id];
@@ -93,7 +142,8 @@ export function TeamSetupPanel({
 
     return {
       scheduleType: normalizeTeamSetupType(member.scheduleType),
-      weekendShiftHours: normalizeWeekendHours(member.weekendShiftHours)
+      weekendShiftHours: normalizeWeekendHours(member.weekendShiftHours),
+      alternateWeekends: normalizeAlternateWeekends(member.scheduleType)
     };
   };
 
@@ -116,16 +166,33 @@ export function TeamSetupPanel({
   const isDirty = (member: PersonRecord, draft: RowDraft): boolean => {
     const baselineType = normalizeTeamSetupType(member.scheduleType);
     const baselineHours = normalizeWeekendHours(member.weekendShiftHours);
+    const baselineAlternateWeekends = normalizeAlternateWeekends(
+      member.scheduleType
+    );
 
     if (draft.scheduleType !== baselineType) {
       return true;
     }
 
-    if (draft.scheduleType === "weekend_primary") {
+    if (draft.scheduleType === "weekend") {
+      if (draft.alternateWeekends !== baselineAlternateWeekends) {
+        return true;
+      }
+
       return draft.weekendShiftHours !== baselineHours;
     }
 
     return false;
+  };
+
+  const resolveScheduleTypeForApi = (
+    draft: RowDraft
+  ): "weekday" | "weekend_primary" | "weekend_rotation" => {
+    if (draft.scheduleType === "weekday") {
+      return "weekday";
+    }
+
+    return draft.alternateWeekends ? "weekend_rotation" : "weekend_primary";
   };
 
   const saveRow = async (member: PersonRecord) => {
@@ -143,9 +210,9 @@ export function TeamSetupPanel({
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          scheduleType: draft.scheduleType,
+          scheduleType: resolveScheduleTypeForApi(draft),
           weekendShiftHours:
-            draft.scheduleType === "weekend_primary"
+            draft.scheduleType === "weekend"
               ? draft.weekendShiftHours
               : null
         })
@@ -191,6 +258,98 @@ export function TeamSetupPanel({
     }
   };
 
+  const renderMemberRow = (member: PersonRecord) => {
+    const draft = resolveCurrentDraft(member);
+    const saving = Boolean(savingById[member.id]);
+    const dirty = isDirty(member, draft);
+    const isWeekendWorker = draft.scheduleType === "weekend";
+
+    return (
+      <article key={member.id} className="schedule-team-setup-row">
+        <div className="schedule-team-setup-member">
+          <h4>{member.fullName}</h4>
+          <p>{member.department ?? t("teamSetup.noDepartment")}</p>
+        </div>
+
+        <div className="schedule-team-setup-controls">
+          <div className="schedule-team-setup-type-toggle">
+            <button
+              type="button"
+              className={draft.scheduleType === "weekday" ? "active" : ""}
+              onClick={() =>
+                updateDraft(member, {
+                  scheduleType: "weekday",
+                  alternateWeekends: false
+                })
+              }
+            >
+              {t("teamSetup.weekdayCrew")}
+            </button>
+            <button
+              type="button"
+              className={isWeekendWorker ? "active" : ""}
+              onClick={() =>
+                updateDraft(member, { scheduleType: "weekend" })
+              }
+            >
+              {t("teamSetup.weekendCrew")}
+            </button>
+          </div>
+
+          {isWeekendWorker ? (
+            <div className="schedule-team-setup-advanced">
+              <label className="schedule-team-setup-hours">
+                <span>{t("teamSetup.weekendHours")}</span>
+                <select
+                  className="form-input"
+                  value={draft.weekendShiftHours}
+                  onChange={(event) =>
+                    updateDraft(member, {
+                      weekendShiftHours:
+                        event.currentTarget.value as WeekendHourOption
+                    })
+                  }
+                >
+                  {WEEKEND_HOURS_OPTIONS.map((hours) => (
+                    <option key={hours} value={hours}>
+                      {t("roster.hoursLabel", { hours })}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="schedule-team-setup-alternate">
+                <input
+                  type="checkbox"
+                  checked={draft.alternateWeekends}
+                  onChange={(event) =>
+                    updateDraft(member, {
+                      alternateWeekends: event.currentTarget.checked
+                    })
+                  }
+                />
+                <span>{t("teamSetup.alternateWeekends")}</span>
+              </label>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="schedule-team-setup-actions">
+          <button
+            type="button"
+            className="button button-primary"
+            disabled={!dirty || saving}
+            onClick={() => {
+              void saveRow(member);
+            }}
+          >
+            {saving ? tc("saving") : tc("save")}
+          </button>
+        </div>
+      </article>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="table-skeleton">
@@ -227,77 +386,43 @@ export function TeamSetupPanel({
         </div>
       ) : (
         <div className="schedule-team-setup-list">
-          {visibleMembers.map((member) => {
-            const draft = resolveCurrentDraft(member);
-            const saving = Boolean(savingById[member.id]);
-            const dirty = isDirty(member, draft);
-            const isWeekendWorker = draft.scheduleType === "weekend_primary";
+          {customerSuccessMembers.length > 0 ? (
+            <section className="schedule-team-setup-group">
+              <div className="schedule-team-setup-group-header">
+                <h4 className="schedule-team-setup-group-title">
+                  {t("teamSetup.customerSuccessGroup")}
+                </h4>
+              </div>
+              {customerSuccessMembers.map((member) => renderMemberRow(member))}
+            </section>
+          ) : null}
 
-            return (
-              <article key={member.id} className="schedule-team-setup-row">
-                <div className="schedule-team-setup-member">
-                  <h4>{member.fullName}</h4>
-                  <p>{member.department ?? t("teamSetup.noDepartment")}</p>
-                </div>
-
-                <div className="schedule-team-setup-controls">
-                  <div className="schedule-team-setup-type-toggle">
-                    <button
-                      type="button"
-                      className={draft.scheduleType === "weekday" ? "active" : ""}
-                      onClick={() => updateDraft(member, { scheduleType: "weekday" })}
-                    >
-                      {t("teamSetup.weekday")}
-                    </button>
-                    <button
-                      type="button"
-                      className={isWeekendWorker ? "active" : ""}
-                      onClick={() =>
-                        updateDraft(member, { scheduleType: "weekend_primary" })
-                      }
-                    >
-                      {t("teamSetup.weekend")}
-                    </button>
-                  </div>
-
-                  {isWeekendWorker ? (
-                    <label className="schedule-team-setup-hours">
-                      <span>{t("teamSetup.weekendHours")}</span>
-                      <select
-                        className="form-input"
-                        value={draft.weekendShiftHours}
-                        onChange={(event) =>
-                          updateDraft(member, {
-                            weekendShiftHours:
-                              event.currentTarget.value as WeekendHourOption
-                          })
-                        }
-                      >
-                        {WEEKEND_HOURS_OPTIONS.map((hours) => (
-                          <option key={hours} value={hours}>
-                            {t("roster.hoursLabel", { hours })}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
-                </div>
-
-                <div className="schedule-team-setup-actions">
+          {otherMembers.length > 0 ? (
+            <section className="schedule-team-setup-group">
+              <div className="schedule-team-setup-group-header">
+                <h4 className="schedule-team-setup-group-title">
+                  {t("teamSetup.otherTeamsGroup")}
+                </h4>
+                {normalizedQuery.length === 0 ? (
                   <button
                     type="button"
-                    className="button button-primary"
-                    disabled={!dirty || saving}
-                    onClick={() => {
-                      void saveRow(member);
-                    }}
+                    className="button button-ghost schedule-team-setup-group-toggle"
+                    onClick={() => setOtherTeamsExpanded((current) => !current)}
                   >
-                    {saving ? tc("saving") : tc("save")}
+                    {otherTeamsExpanded
+                      ? t("teamSetup.hideOtherTeams")
+                      : t("teamSetup.showOtherTeams", {
+                          count: otherMembers.length
+                        })}
                   </button>
-                </div>
-              </article>
-            );
-          })}
+                ) : null}
+              </div>
+
+              {shouldShowOtherTeams
+                ? otherMembers.map((member) => renderMemberRow(member))
+                : null}
+            </section>
+          ) : null}
         </div>
       )}
     </section>

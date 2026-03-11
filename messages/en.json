@@ -125,7 +125,6 @@
     "myPay": "My pay",
     "documents": "Documents",
     "expenses": "Expenses",
-    "timeTracking": "Time tracking",
     "learning": "Learning",
     "approvals": "Approvals",
     "crewMembers": "Crew Members",
@@ -150,7 +149,6 @@
       "myPay": "Pay statements, payout setup, and compensation in one view",
       "documents": "Your documents, required records, and expiry reminders",
       "expenses": "Submit expenses, upload receipts, and track reimbursement",
-      "timeTracking": "Clock in/out, view timesheets, and track hours worked",
       "learning": "Courses, certificates, and surveys assigned to you",
       "approvals": "Review and act on pending team requests",
       "crewMembers": "Find teammates, review roles, and open full profiles",
@@ -423,10 +421,17 @@
     },
     "teamSetup": {
       "title": "Team setup",
-      "description": "Mark which teammates are weekday or weekend workers before generating schedules.",
+      "description": "Mark which teammates are in Weekday Crew or Weekend Crew before generating schedules.",
       "searchPlaceholder": "Search team members…",
       "weekday": "Weekday worker",
       "weekend": "Weekend worker",
+      "weekdayCrew": "Weekday Crew",
+      "weekendCrew": "Weekend Crew",
+      "alternateWeekends": "Alternate weekends",
+      "customerSuccessGroup": "Customer Success",
+      "otherTeamsGroup": "Other teams",
+      "showOtherTeams": "Show ({count})",
+      "hideOtherTeams": "Hide",
       "weekendHours": "Weekend hours",
       "saved": "Team setup saved.",
       "saveFailed": "Unable to save team setup.",
@@ -444,9 +449,11 @@
       "noPublishedDescription": "Publish shifts from Manage before reviewing the team calendar.",
       "openShift": "Open shift",
       "publishedSchedule": "Published schedule",
+      "allPublishedOption": "All published schedules",
+      "allPublishedSummary": "All published schedules",
       "dragHelper": "Drag and drop any shift to a new day to reschedule it.",
       "scheduleLabel": "Schedule",
-      "scheduleDateRange": "{name} \u2014 {startDate} to {endDate}"
+      "scheduleDateRange": "{name} — {startDate} to {endDate}"
     },
     "myCalendar": {
       "dayMon": "Mon",
@@ -590,8 +597,7 @@
       "ariaLabel": "Quick actions",
       "requestTimeOff": "Request time off",
       "submitExpense": "Submit expense",
-      "viewPayslips": "View payslips",
-      "clockIn": "Clock in"
+      "viewPayslips": "View payslips"
     },
     "newHire": {
       "welcome": "Welcome to {org}, {firstName}.",
@@ -698,7 +704,7 @@
       "title": "Direct Report Onboarding",
       "description": "Track onboarding progress for your direct reports and unblock overdue manager tasks.",
       "openOnboarding": "Open onboarding",
-      "daySummary": "Day {day} \u00b7 {completed}/{total} tasks",
+      "daySummary": "Day {day} · {completed}/{total} tasks",
       "managerTasksOverdue": "{count, plural, one {# manager task overdue} other {# manager tasks overdue}}",
       "onTrack": "On track"
     },
@@ -710,10 +716,10 @@
       "tryAgain": "Try again",
       "declineReasonPlaceholder": "Reason for declining (optional)",
       "cancel": "Cancel",
-      "declining": "Declining\u2026",
+      "declining": "Declining…",
       "confirmDecline": "Confirm Decline",
       "decline": "Decline",
-      "approving": "Approving\u2026",
+      "approving": "Approving…",
       "approve": "Approve"
     },
     "widgetError": {
@@ -767,7 +773,15 @@
       "unableToUpload": "Unable to upload photo.",
       "unableToRemove": "Unable to remove photo.",
       "saved": "Profile settings saved.",
-      "unableToUpdate": "Unable to update profile settings."
+      "unableToUpdate": "Unable to update profile settings.",
+      "pronounsLabel": "Pronouns",
+      "pronounsPlaceholder": "e.g. she/her, he/him, they/them",
+      "bioLabel": "Bio",
+      "bioPlaceholder": "A short introduction about yourself",
+      "emergencyContactTitle": "Emergency contact",
+      "emergencyContactNameLabel": "Name",
+      "emergencyContactPhoneLabel": "Phone",
+      "emergencyContactRelationshipLabel": "Relationship"
     },
     "notificationSettings": {
       "heading": "Notifications",
@@ -915,13 +929,11 @@
     "tab": {
       "allPending": "All Pending",
       "timeOff": "Time Off",
-      "expenses": "Expenses",
-      "timesheets": "Timesheets"
+      "expenses": "Expenses"
     },
     "allCaughtUp": "No pending approvals. You're all caught up!",
     "pendingRequests": "{count, plural, one {# pending request} other {# pending requests}}",
-    "pendingExpenses": "{count, plural, one {# pending expense} other {# pending expenses}}",
-    "pendingTimesheets": "{count, plural, one {# pending timesheet} other {# pending timesheets}}"
+    "pendingExpenses": "{count, plural, one {# pending expense} other {# pending expenses}}"
   },
   "analyticsPage": {
     "accessDenied": "Only HR Admin, Finance Admin, and Super Admin can access analytics."
@@ -1228,73 +1240,11 @@
     "expiresInDays": "Expires in {count} days",
     "valid": "Valid"
   },
-  "timePolicies": {
-    "title": "Time Policies",
-    "description": "Review attendance rules for overtime thresholds, breaks, and rounding behavior.",
-    "unavailable": "Time policies are unavailable",
-    "noPolicies": "No policies configured",
-    "noPoliciesDescription": "Create an attendance policy to enforce breaks and overtime rules.",
-    "policyCoverage": "Policy coverage",
-    "policyCoverageDescription": "{count} attendance policies configured for Crew Hub.",
-    "readOnly": "Read-only",
-    "ariaLabel": "Time policies table",
-    "tableAriaLabel": "Attendance policies",
-    "colPolicy": "Policy",
-    "colCountry": "Country",
-    "colWeeklyTarget": "Weekly target",
-    "colDailyMax": "Daily max",
-    "colBreakRule": "Break rule",
-    "colRounding": "Rounding",
-    "colStatus": "Status",
-    "colUpdated": "Updated",
-    "colActions": "Actions",
-    "allDepartments": "All departments",
-    "global": "Global",
-    "breakRule": "After {hours}h / {minutes}m",
-    "view": "View"
-  },
   "errorBoundary": {
     "title": "Something went wrong",
     "message": "An unexpected error occurred. You can try again or return to the dashboard.",
     "tryAgain": "Try again",
     "returnToDashboard": "Return to dashboard"
-  },
-  "timeAttendance": {
-    "title": "Hours",
-    "description": "Log work hours, track clock-ins, and review weekly attendance.",
-    "unavailable": "Attendance data is unavailable",
-    "overviewAriaLabel": "Attendance overview",
-    "clockStatus": "Clock status",
-    "onShift": "On shift",
-    "offShift": "Off shift",
-    "startedAgo": "Started {time}",
-    "noActiveEntry": "No active time entry.",
-    "workedToday": "Worked today",
-    "breaks": "Breaks: {hours}h",
-    "weekTotal": "Week total",
-    "overtime": "OT: {hours}h",
-    "pendingTimesheets": "Pending timesheets",
-    "pendingTimesheetsDescription": "Awaiting submit or approval.",
-    "currentShift": "Current shift",
-    "liveClockState": "Live clock state for {name}.",
-    "clockedIn": "Clocked in",
-    "clockedOut": "Clocked out",
-    "activeTimeEntry": "Active time entry",
-    "activeTimeEntryDescription": "Started {time} via {method}.",
-    "inProgress": "In progress",
-    "recentTimeEntries": "Recent time entries",
-    "recentTimeEntriesDescription": "Entries include method, break totals, and worked hours.",
-    "noTimeEntries": "No time entries yet",
-    "noTimeEntriesDescription": "Clock-ins will appear here after attendance tracking starts.",
-    "recentAriaLabel": "Recent time entries",
-    "colClockIn": "Clock in",
-    "colClockOut": "Clock out",
-    "colWorked": "Worked",
-    "colBreak": "Break",
-    "colMethod": "Method",
-    "colStatus": "Status",
-    "statusClosed": "Closed",
-    "statusOpen": "Open"
   },
   "certificates": {
     "title": "Certificates",
@@ -1363,6 +1313,10 @@
     "openTaskAction": "Open task action",
     "signNow": "Sign now",
     "completedBy": "Completed by: {name}",
+    "markComplete": "Mark complete",
+    "completing": "Completing…",
+    "taskCompleteFailed": "Unable to complete task. Please try again.",
+    "eSignatureOnly": "E-signature tasks can only be completed by signing the document.",
     "openFullView": "Open full instance view"
   },
   "learning": {
@@ -1653,41 +1607,6 @@
     "creating": "Creating…",
     "createCourse": "Create course",
     "courseCreated": "Learning course created."
-  },
-  "timesheetApprovals": {
-    "title": "Hours Approvals",
-    "description": "Review submitted weekly timesheets from your reports before payroll processing.",
-    "unavailable": "Approvals are unavailable",
-    "noSubmitted": "No submitted timesheets",
-    "noSubmittedDescription": "Submitted timesheets from your team will appear here for review.",
-    "openAttendance": "Open attendance",
-    "tableAriaLabel": "Submitted timesheets",
-    "sectionAriaLabel": "Timesheet approvals table",
-    "pendingReview": "Pending review",
-    "pendingDescription": "{count, plural, one {# submitted timesheet requires approval.} other {# submitted timesheets require approval.}}",
-    "submitted": "Submitted",
-    "colPerson": "Person",
-    "colCountry": "Country",
-    "colWeek": "Week",
-    "colWorked": "Worked",
-    "colOvertime": "Overtime",
-    "colStatus": "Status",
-    "colSubmitted": "Submitted",
-    "colActions": "Actions",
-    "approve": "Approve",
-    "reject": "Reject",
-    "timesheetApproved": "Timesheet approved.",
-    "unableToApprove": "Unable to approve timesheet.",
-    "timesheetRejected": "Timesheet rejected.",
-    "unableToReject": "Unable to reject timesheet.",
-    "rejectDialogTitle": "Reject timesheet?",
-    "rejectDialogDescription": "The team member will be notified with your reason.",
-    "reasonLabel": "Reason",
-    "reasonPlaceholder": "Explain why this timesheet is being rejected",
-    "reasonRequired": "Rejection reason is required.",
-    "approveDialogTitle": "Approve timesheet?",
-    "approveDialogDescription": "This timesheet will move forward for payroll processing.",
-    "weekRange": "{start} to {end}"
   },
   "learningAdmin": {
     "title": "Learning Admin",
@@ -2245,7 +2164,11 @@
     "toastSaveError": "Unable to update payment details.",
     "toastAriaLabel": "Payment detail toasts",
     "dismissAriaLabel": "Dismiss toast",
-    "layoutAriaLabel": "Payment detail settings"
+    "layoutAriaLabel": "Payment detail settings",
+    "crewTagConfirmTitle": "Confirm Crew Tag",
+    "crewTagConfirmDescription": "You entered {tag}. Finance will use this to send payments via Accrue. Please confirm this is correct.",
+    "crewTagConfirmButton": "Confirm & save",
+    "cancel": "Cancel"
   },
   "documents": {
     "title": "Documents",
@@ -2483,6 +2406,10 @@
     "toastUpdated": "Announcement updated.",
     "toastPublished": "Announcement published.",
     "toastSaveError": "Unable to save announcement.",
+    "attachmentsLabel": "Attachments",
+    "attachmentsHint": "PDF, DOCX, PNG, JPEG, GIF, WebP. Max 25 MB each.",
+    "removeAttachment": "Remove",
+    "uploadFailed": "Failed to upload attachment.",
     "dismissAriaLabel": "Dismiss notification",
     "validationTitleRequired": "Title is required",
     "validationTitleTooLong": "Title is too long",
@@ -3274,8 +3201,8 @@
       "actionRequired": "Action required",
       "choiceDescription": "Your birthday falls on a non-working day this year ({date}). Choose a day for your birthday leave:"
     },
-    "probation": {
-      "notice": "During probation, only unpaid personal days are available for leave requests."
+    "onboardingNotice": {
+      "notice": "During your onboarding period, only unpaid personal days can be requested. Once onboarding is complete, all leave types become available."
     },
     "requests": {
       "title": "My Requests",
@@ -3344,7 +3271,11 @@
       "balanceWarning": "Requested days ({requested}) exceed available balance ({available}).",
       "sickLeaveNote": "A doctor's note may be required for sick leave exceeding 2 consecutive working days.",
       "submitting": "Submitting...",
-      "submitRequest": "Submit request"
+      "submitRequest": "Submit request",
+      "medicalEvidenceLabel": "Medical evidence",
+      "sickLeaveUploadNote": "Medical documentation is required for sick leave longer than 2 days.",
+      "medicalEvidenceRequired": "Please upload medical evidence before submitting.",
+      "noPoliciesConfigured": "No leave policies are configured for your country. Contact your HR administrator."
     },
     "afkPanel": {
       "title": "Log AFK",
@@ -3745,6 +3676,11 @@
       "manager": "Manager",
       "managerLabel": "Manager",
       "noManager": "No manager",
+      "statusLabel": "Status",
+      "statusActive": "Active",
+      "statusOnboarding": "Onboarding",
+      "statusOffboarding": "Offboarding",
+      "statusInactive": "Inactive",
       "saveChanges": "Save Changes"
     },
     "inviteDialog": {
@@ -4455,6 +4391,24 @@
       "accountName": "Account Name",
       "accountNumber": "Account Number"
     },
+    "vendorPaymentMethod": "Payment method",
+    "vendorBankTransfer": "Bank Transfer",
+    "vendorMobileMoney": "Mobile Money",
+    "vendorCrewTag": "Crew Tag",
+    "vendorInternationalWire": "International Wire",
+    "vendorMobileProvider": "Provider",
+    "vendorMobileNumber": "Phone number",
+    "vendorCrewTagUsername": "Crew Tag username",
+    "vendorWireBankName": "Bank name",
+    "vendorWireAccountNumber": "Account number",
+    "vendorWireSwiftBic": "SWIFT / BIC",
+    "vendorWireIban": "IBAN",
+    "vendorWireBankCountry": "Bank country",
+    "vendorWireCurrency": "Currency",
+    "paymentRailLabel": "Payment rail",
+    "payoutAccount": "Payout account",
+    "noPayoutConfigured": "No payment method configured. Set up your payment details to receive reimbursements.",
+    "setupPayment": "Set up payment details",
     "transactionDetails": {
       "title": "Transaction Details",
       "reference": "Reference",

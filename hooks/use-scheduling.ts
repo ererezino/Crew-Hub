@@ -33,6 +33,7 @@ type ShiftsQuery = {
   scheduleId?: string;
   startDate?: string;
   endDate?: string;
+  limit?: number;
 };
 
 type SwapsQuery = {
@@ -151,15 +152,18 @@ export function useSchedulingSchedules(query: SchedulesQuery = {}): UseFetchStat
 }
 
 export function useSchedulingShifts(query: ShiftsQuery = {}): UseFetchState<SchedulingShiftsResponseData> {
+  const limitValue = query.limit !== undefined ? String(query.limit) : undefined;
+
   const endpoint = useMemo(
     () =>
       buildEndpoint("/api/v1/scheduling/shifts", [
         ["scope", query.scope],
         ["scheduleId", query.scheduleId],
         ["startDate", query.startDate],
-        ["endDate", query.endDate]
+        ["endDate", query.endDate],
+        ["limit", limitValue]
       ]),
-    [query.endDate, query.scheduleId, query.scope, query.startDate]
+    [query.endDate, limitValue, query.scheduleId, query.scope, query.startDate]
   );
 
   return useDataFetch<SchedulingShiftsResponse, SchedulingShiftsResponseData>({

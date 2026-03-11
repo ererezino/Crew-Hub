@@ -58,4 +58,13 @@ describe("Scheduling runtime hardening", () => {
     expect(tabsClient).toContain("userDepartment={userDepartment}");
     expect(tabsClient).not.toContain("viewerDepartment={userDepartment ?? null}");
   });
+
+  it("team calendar supports all-published aggregation for cross-track visibility", () => {
+    const calendarClient = read("app/(shell)/scheduling/calendar/scheduling-calendar-client.tsx");
+
+    expect(calendarClient).toContain('const ALL_PUBLISHED_SCHEDULE_ID = "__all_published__";');
+    expect(calendarClient).toContain('t("calendar.allPublishedOption")');
+    expect(calendarClient).toContain('limit: 2000');
+    expect(calendarClient).toContain("publishedScheduleIdSet.has(shift.scheduleId)");
+  });
 });

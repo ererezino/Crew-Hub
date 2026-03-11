@@ -2,7 +2,7 @@
  * Auto-scheduler: generates draft shift assignments for a date range.
  *
  * Rules:
- *  - Weekday dates: "weekday"/"flexible" employees, plus weekend workers on Thu/Fri support days
+ *  - Weekday dates: "weekday"/"flexible"/"weekend_rotation" employees, plus weekend_primary on Thu/Fri support days
  *  - Weekend dates: "weekend_primary" (full Sat+Sun), "weekend_rotation" (evenly distributed), "flexible"
  *  - If `respectEmployeeScheduleType` is false, selected roster members are all eligible
  *  - Blocked dates (approved leave, holidays) are skipped
@@ -53,6 +53,22 @@ function dateRange(start: string, end: string): string[] {
 function isWeekend(dateStr: string): boolean {
   const day = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
   return day === 0 || day === 6;
+}
+
+function weekendAnchor(dateStr: string): string {
+  const current = new Date(`${dateStr}T00:00:00Z`);
+  const day = current.getUTCDay();
+
+  if (day === 6) {
+    return current.toISOString().slice(0, 10);
+  }
+
+  if (day === 0) {
+    current.setUTCDate(current.getUTCDate() - 1);
+    return current.toISOString().slice(0, 10);
+  }
+
+  return dateStr;
 }
 
 function isThursdayOrFriday(dateStr: string): boolean {
@@ -186,15 +202,15 @@ function isEligibleForDate({
 
   if (
     employee.scheduleType === "weekday" ||
-    employee.scheduleType === "flexible"
+    employee.scheduleType === "flexible" ||
+    employee.scheduleType === "weekend_rotation"
   ) {
     return true;
   }
 
-  // Weekend workers still cover two weekday support days (Thu/Fri).
+  // Primary weekend workers still cover two weekday support days (Thu/Fri).
   if (
-    (employee.scheduleType === "weekend_primary" ||
-      employee.scheduleType === "weekend_rotation") &&
+    employee.scheduleType === "weekend_primary" &&
     isThursdayOrFriday(date)
   ) {
     return true;
@@ -245,6 +261,13 @@ export function autoGenerateSchedule(params: {
     blockedSets.set(emp.id, new Set(emp.blockedDates));
   }
 
+  const weekendRotationIds = employees
+    .filter((employee) => employee.scheduleType === "weekend_rotation")
+    .map((employee) => employee.id)
+    .sort((left, right) => left.localeCompare(right));
+
+  const weekendIndexByAnchor = new Map<string, number>();
+
   // Process each date
   for (const date of dates) {
     const weekend = isWeekend(date);
@@ -270,6 +293,36 @@ export function autoGenerateSchedule(params: {
 
     // Remove blocked employees
     eligible = eligible.filter((e) => !blockedSets.get(e.id)?.has(date));
+
+    if (
+      weekend &&
+      respectEmployeeScheduleType &&
+      scheduleType !== "holiday" &&
+      weekendRotationIds.length > 0
+    ) {
+      const anchor = weekendAnchor(date);
+      const weekendIndex = weekendIndexByAnchor.has(anchor)
+        ? weekendIndexByAnchor.get(anchor)!
+        : weekendIndexByAnchor.size;
+
+      if (!weekendIndexByAnchor.has(anchor)) {
+        weekendIndexByAnchor.set(anchor, weekendIndex);
+      }
+
+      const parity = weekendIndex % 2;
+      const activeRotationIds = weekendRotationIds.filter(
+        (_, index) => index % 2 === parity
+      );
+      const allowedRotationIds =
+        activeRotationIds.length > 0 ? activeRotationIds : weekendRotationIds;
+      const allowedRotationSet = new Set(allowedRotationIds);
+
+      eligible = eligible.filter(
+        (employee) =>
+          employee.scheduleType !== "weekend_rotation" ||
+          allowedRotationSet.has(employee.id)
+      );
+    }
 
     if (eligible.length === 0) {
       continue;

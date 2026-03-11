@@ -492,14 +492,25 @@ export async function POST(request: Request) {
     });
   }
 
+  const normalizedRequestedDepartment = parsedBody.data.department?.trim();
+  const actorDepartment =
+    typeof session.profile.department === "string" &&
+    session.profile.department.trim().length > 0
+      ? session.profile.department.trim()
+      : null;
+
+  const departmentForSchedule = isScopedTeamLead
+    ? actorDepartment
+    : normalizedRequestedDepartment?.length
+      ? normalizedRequestedDepartment
+      : actorDepartment;
+
   const { data: rawRow, error } = await supabase
     .from("schedules")
     .insert({
       org_id: session.profile.org_id,
       name: parsedBody.data.name?.trim() || null,
-      department: isScopedTeamLead
-        ? session.profile.department
-        : parsedBody.data.department?.trim() || null,
+      department: departmentForSchedule,
       start_date: startDate,
       end_date: endDate,
       schedule_track: parsedBody.data.scheduleTrack,
@@ -515,9 +526,7 @@ export async function POST(request: Request) {
     console.error("[SCHEDULE_CREATE] Insert payload:", JSON.stringify({
       org_id: session.profile.org_id,
       name: parsedBody.data.name?.trim() || null,
-      department: isScopedTeamLead
-        ? session.profile.department
-        : parsedBody.data.department?.trim() || null,
+      department: departmentForSchedule,
       start_date: startDate,
       end_date: endDate,
       schedule_track: parsedBody.data.scheduleTrack,
