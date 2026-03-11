@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function MfaSetupPage() {
   const router = useRouter();
@@ -13,6 +13,7 @@ export default function MfaSetupPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -31,6 +32,7 @@ export default function MfaSetupPage() {
     try {
       const res = await fetch("/api/v1/me/mfa", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "enroll" })
       });
@@ -64,6 +66,7 @@ export default function MfaSetupPage() {
     try {
       const res = await fetch("/api/v1/me/mfa", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "verify", factorId, code })
       });
@@ -88,6 +91,48 @@ export default function MfaSetupPage() {
     router.refresh();
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkSession = async () => {
+      try {
+        const response = await fetch("/api/v1/me/mfa", {
+          method: "GET",
+          credentials: "include"
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          if (!cancelled) {
+            setError(
+              payload?.error?.message ??
+                "Your setup session expired. Open a fresh setup link and try again."
+            );
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setError(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setError("Unable to verify your session. Refresh and try again.");
+        }
+      } finally {
+        if (!cancelled) {
+          setSessionChecked(true);
+        }
+      }
+    };
+
+    void checkSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <main className="standalone-page auth-page">
       <section
@@ -109,7 +154,7 @@ export default function MfaSetupPage() {
               className="button button-cta"
               style={{ width: "100%" }}
               onClick={startEnrollment}
-              disabled={loading}
+              disabled={loading || !sessionChecked || !!error}
             >
               {loading ? "Setting up..." : "Set Up Authenticator"}
             </button>

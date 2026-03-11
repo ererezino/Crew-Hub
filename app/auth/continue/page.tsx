@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 
 type CallbackVerifyResponse = {
@@ -23,7 +23,6 @@ function normalizeNextPath(next: string | null): string {
 }
 
 function AuthContinuePageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const code = searchParams.get("code");
@@ -51,6 +50,7 @@ function AuthContinuePageContent() {
     try {
       const response = await fetch("/api/auth/callback/verify", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: code ?? undefined,
@@ -70,8 +70,9 @@ function AuthContinuePageContent() {
         return;
       }
 
-      router.replace(payload.data.redirectTo);
-      router.refresh();
+      // Force a full navigation so session cookies set by the verification
+      // response are committed before MFA setup requests are made.
+      window.location.assign(payload.data.redirectTo);
     } catch {
       setError("Unable to continue setup right now. Please try again.");
     } finally {

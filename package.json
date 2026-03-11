@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed": "npx tsx scripts/seed/seed-foundation.ts",
-    "reset-team": "npx tsx scripts/seed/reset-to-real-team.ts"
+    "reset-team": "npx tsx scripts/seed/reset-to-real-team.ts",
+    "auth:reset-mfa": "npx tsx scripts/auth/reset-mfa.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",

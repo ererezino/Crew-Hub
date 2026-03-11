@@ -57,6 +57,41 @@ describe("auth mutation guard", () => {
     expect(result.allowed).toBe(false);
   });
 
+  it("blocks auth mutations on non-production runtimes when using production Supabase project", () => {
+    const result = resolveAuthMutationPolicy(
+      env({
+        NODE_ENV: "development",
+        AUTH_MUTATION_POLICY: "allow",
+        NEXT_PUBLIC_SUPABASE_URL: "https://xmeruhyybvyosqxfleiu.supabase.co",
+        PRODUCTION_SUPABASE_PROJECT_REF: "xmeruhyybvyosqxfleiu"
+      })
+    );
+
+    expect(result.allowed).toBe(false);
+    expect(getAuthMutationBlockReason(
+      env({
+        NODE_ENV: "development",
+        AUTH_MUTATION_POLICY: "allow",
+        NEXT_PUBLIC_SUPABASE_URL: "https://xmeruhyybvyosqxfleiu.supabase.co",
+        PRODUCTION_SUPABASE_PROJECT_REF: "xmeruhyybvyosqxfleiu"
+      })
+    )).toContain("production Supabase project");
+  });
+
+  it("allows explicit override for shared production project in non-production runtime", () => {
+    const result = resolveAuthMutationPolicy(
+      env({
+        NODE_ENV: "development",
+        AUTH_MUTATION_POLICY: "allow",
+        NEXT_PUBLIC_SUPABASE_URL: "https://xmeruhyybvyosqxfleiu.supabase.co",
+        PRODUCTION_SUPABASE_PROJECT_REF: "xmeruhyybvyosqxfleiu",
+        AUTH_ALLOW_MUTATIONS_AGAINST_PROD_SUPABASE: "true"
+      })
+    );
+
+    expect(result.allowed).toBe(true);
+  });
+
   it("enforces guard in invite/reset/create mutation routes", () => {
     const root = path.resolve(__dirname, "..");
     const files = [
@@ -73,4 +108,3 @@ describe("auth mutation guard", () => {
     }
   });
 });
-
