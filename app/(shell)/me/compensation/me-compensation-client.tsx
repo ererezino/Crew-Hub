@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { CompensationOverview } from "../../../../components/shared/compensation-overview";
 import { CompensationSkeleton } from "../../../../components/shared/compensation-skeleton";
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -11,6 +13,9 @@ type MeCompensationClientProps = {
 };
 
 export function MeCompensationClient({ embedded = false }: MeCompensationClientProps) {
+  const t = useTranslations('compensation');
+  const tCommon = useTranslations('common');
+  const tNav = useTranslations('nav');
   const compensationQuery = useMeCompensation();
 
   const content = (
@@ -20,7 +25,7 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
       {!compensationQuery.isLoading && compensationQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Compensation is unavailable"
+            title={t('unavailable')}
             description={compensationQuery.errorMessage}
           />
           <button
@@ -28,7 +33,7 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
             className="button button-accent"
             onClick={() => compensationQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
@@ -37,8 +42,8 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
       !compensationQuery.errorMessage &&
       !compensationQuery.data ? (
         <EmptyState
-          title="No compensation profile found"
-          description="Compensation details will appear here after records are configured."
+          title={t('noProfile')}
+          description={t('noProfileDescription')}
         />
       ) : null}
 
@@ -57,8 +62,8 @@ export function MeCompensationClient({ embedded = false }: MeCompensationClientP
   return (
     <>
       <PageHeader
-        title="Compensation"
-        description="Manage salary, allowances, and equity for team members."
+        title={tNav('compensation')}
+        description={tNav('description.compensation')}
       />
       {content}
     </>

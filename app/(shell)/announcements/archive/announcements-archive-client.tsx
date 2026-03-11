@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useState } from "react";
 import Link from "next/link";
 
@@ -13,11 +14,17 @@ import { Archive, ArrowLeft } from "lucide-react";
 import type { Announcement } from "../../../../types/announcements";
 import type { ApiResponse } from "../../../../types/auth";
 
+type AppLocale = "en" | "fr";
+
 type ArchiveProps = {
   isSuperAdmin: boolean;
 };
 
 export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
+  const t = useTranslations('announcements');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const { announcements, isLoading, errorMessage, refresh, setAnnouncements } =
     useAnnouncements({ dismissed: true });
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -47,12 +54,12 @@ export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
   return (
     <>
       <PageHeader
-        title="Announcements archive"
-        description="Previously dismissed announcements in chronological order."
+        title={t('archiveTitle')}
+        description={t('archivePageDescription')}
         actions={
           <Link className="button" href="/announcements">
             <ArrowLeft size={14} />
-            Back to announcements
+            {t('backToAnnouncements')}
           </Link>
         }
       />
@@ -69,9 +76,9 @@ export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
 
       {!isLoading && errorMessage ? (
         <EmptyState
-          title="Archive unavailable"
+          title={t('archiveUnavailable')}
           description={errorMessage}
-          ctaLabel="Retry"
+          ctaLabel={tCommon('retry')}
           ctaHref="/announcements/archive"
         />
       ) : null}
@@ -79,21 +86,21 @@ export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
       {!isLoading && !errorMessage && announcements.length === 0 ? (
         <EmptyState
           icon={<Archive size={32} />}
-          title="Archive is empty"
-          description="Dismissed announcements will appear here."
+          title={t('archiveEmpty')}
+          description={t('archiveEmptyDescription')}
         />
       ) : null}
 
       {!isLoading && !errorMessage && announcements.length > 0 ? (
-        <section className="settings-card" aria-label="Archived announcements">
+        <section className="settings-card" aria-label={t('archiveTitle')}>
           <header className="announcements-section-header">
             <div>
-              <h2 className="section-title">Dismissed</h2>
+              <h2 className="section-title">{t('dismissed')}</h2>
               <p className="settings-card-description">
-                All previously dismissed announcements, newest first.
+                {t('dismissedDescription')}
               </p>
             </div>
-            <StatusBadge tone="draft">{announcements.length} archived</StatusBadge>
+            <StatusBadge tone="draft">{t('archivedCount', { count: announcements.length })}</StatusBadge>
           </header>
 
           <ul className="announcement-list">
@@ -106,15 +113,15 @@ export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
                       <p className="announcement-item-meta">
                         <time
                           dateTime={announcement.createdAt}
-                          title={formatDateTimeTooltip(announcement.createdAt)}
+                          title={formatDateTimeTooltip(announcement.createdAt, locale)}
                         >
-                          {formatRelativeTime(announcement.createdAt)}
+                          {formatRelativeTime(announcement.createdAt, locale)}
                         </time>
                         <span aria-hidden="true">•</span>
                         <span>{announcement.creatorName}</span>
                       </p>
                     </div>
-                    <span className="announcement-read-check" title="Dismissed">
+                    <span className="announcement-read-check" title={t('dismissed')}>
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path
                           d="M5 12.5l4.5 4.5L19 7.5"
@@ -125,7 +132,7 @@ export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
                           fill="none"
                         />
                       </svg>
-                      Dismissed
+                      {t('dismissed')}
                     </span>
                   </header>
 
@@ -139,7 +146,7 @@ export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
                         disabled={deletingId === announcement.id}
                         onClick={() => setConfirmDelete(announcement)}
                       >
-                        {deletingId === announcement.id ? "Deleting..." : "Delete"}
+                        {deletingId === announcement.id ? t('deleting') : tCommon('delete')}
                       </button>
                     </div>
                   ) : null}
@@ -152,9 +159,9 @@ export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
 
       <ConfirmDialog
         isOpen={confirmDelete !== null}
-        title="Delete announcement"
-        description={`Permanently delete "${confirmDelete?.title ?? ""}" for everyone? This cannot be undone.`}
-        confirmLabel="Delete"
+        title={t('deleteAnnouncementTitle')}
+        description={t('deleteAnnouncementDescription', { title: confirmDelete?.title ?? "" })}
+        confirmLabel={tCommon('delete')}
         tone="danger"
         isConfirming={deletingId !== null}
         onConfirm={() => { if (confirmDelete) void handleDelete(confirmDelete); }}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -8,6 +9,8 @@ import { PageHeader } from "../../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { formatRelativeTime } from "../../../../../lib/datetime";
+
+type AppLocale = "en" | "fr";
 
 /* ── Types ── */
 
@@ -59,28 +62,23 @@ function toneForPageType(type: PageType) {
   }
 }
 
-function labelForPageType(type: PageType): string {
-  switch (type) {
-    case "document":
-      return "Document";
-    case "runbook":
-      return "Runbook";
-    case "contact_list":
-      return "Contacts";
-    case "reference_list":
-      return "Reference";
-    case "table":
-      return "Table";
-    case "link":
-      return "Link";
-    default:
-      return type;
-  }
-}
+const PAGE_TYPE_LABEL_KEYS: Record<PageType, string> = {
+  document: "typeDocument",
+  runbook: "typeRunbook",
+  contact_list: "typeContacts",
+  reference_list: "typeReference",
+  table: "typeTable",
+  link: "typeLink"
+};
 
 /* ── Component ── */
 
 export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClientProps) {
+  const t = useTranslations('teamHubSection');
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const [section, setSection] = useState<SectionDetail | null>(null);
   const [pages, setPages] = useState<SectionPage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,11 +98,11 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
       ]);
 
       if (!sectionRes.ok) {
-        throw new Error("Failed to load section details.");
+        throw new Error(t('errorLoadSection'));
       }
 
       if (!pagesRes.ok) {
-        throw new Error("Failed to load pages.");
+        throw new Error(t('errorLoadPages'));
       }
 
       const sectionEnvelope = await sectionRes.json();
@@ -113,11 +111,11 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
       setSection(sectionEnvelope.data?.section ?? null);
       setPages(Array.isArray(pagesEnvelope) ? pagesEnvelope : pagesEnvelope.data?.pages ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setError(err instanceof Error ? err.message : tCommon('error.generic'));
     } finally {
       setLoading(false);
     }
-  }, [hubId, sectionId]);
+  }, [hubId, sectionId, t, tCommon]);
 
   useEffect(() => {
     fetchData();
@@ -145,7 +143,7 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
 
         if (!res.ok) {
           const envelope = await res.json().catch(() => null);
-          throw new Error(envelope?.error?.message ?? "Failed to create page.");
+          throw new Error(envelope?.error?.message ?? t('errorCreatePage'));
         }
 
         setIsAddPageOpen(false);
@@ -153,18 +151,18 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
         form.reset();
         fetchData();
       } catch (err) {
-        setAddPageError(err instanceof Error ? err.message : "Failed to create page.");
+        setAddPageError(err instanceof Error ? err.message : t('errorCreatePage'));
       } finally {
         setAddPageBusy(false);
       }
     },
-    [hubId, sectionId, fetchData]
+    [hubId, sectionId, fetchData, t]
   );
 
   if (loading) {
     return (
       <>
-        <PageHeader title="Section" />
+        <PageHeader title={t('loadingTitle')} />
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           {[1, 2, 3, 4].map((n) => (
             <div key={n} className="card" style={{ padding: "var(--space-4)" }}>
@@ -179,11 +177,11 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
   if (error || !section) {
     return (
       <>
-        <PageHeader title="Section" />
+        <PageHeader title={t('loadingTitle')} />
         <EmptyState
-          title="Unable to load section"
-          description={error ?? "Section not found."}
-          ctaLabel="Back to hub"
+          title={t('unavailable')}
+          description={error ?? t('notFound')}
+          ctaLabel={t('backToHub')}
           ctaHref={`/team-hub/${hubId}`}
         />
       </>
@@ -205,7 +203,7 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
                 setIsAddPageOpen(true);
               }}
             >
-              Add Page
+              {t('addPage')}
             </button>
           ) : undefined
         }
@@ -213,14 +211,14 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
 
       <nav style={{ marginBottom: "var(--space-4)" }}>
         <Link href={`/team-hub/${hubId}`} style={{ fontSize: "var(--font-sm)", color: "var(--color-text-muted)" }}>
-          &larr; Back to hub
+          &larr; {t('backToHub')}
         </Link>
       </nav>
 
       {pages.length === 0 ? (
         <EmptyState
-          title="No pages yet"
-          description="This section doesn't have any pages. Add documents, contacts, runbooks, and more."
+          title={t('noPages')}
+          description={t('noPagesDescription')}
           ctaLabel={undefined}
           ctaHref={undefined}
         />
@@ -247,16 +245,16 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
                       ) : null}
                       <h4 style={{ margin: 0, fontWeight: 600 }}>{page.title}</h4>
                       <StatusBadge tone={toneForPageType(page.type)}>
-                        {labelForPageType(page.type)}
+                        {td(PAGE_TYPE_LABEL_KEYS[page.type])}
                       </StatusBadge>
                     </div>
                     {page.updated_at ? (
                       <span style={{ fontSize: "var(--font-xs)", color: "var(--color-text-muted)" }}>
-                        {formatRelativeTime(page.updated_at)}
+                        {formatRelativeTime(page.updated_at, locale)}
                       </span>
                     ) : null}
                   </div>
-                  <ContactTable data={page.structured_data} />
+                  <ContactTable data={page.structured_data} noDataLabel={t('noContacts')} />
                 </article>
               );
             }
@@ -281,7 +279,7 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
                         ) : null}
                         <h4 style={{ margin: 0, fontWeight: 600 }}>{page.title}</h4>
                         <StatusBadge tone={toneForPageType(page.type)}>
-                          {labelForPageType(page.type)}
+                          {td(PAGE_TYPE_LABEL_KEYS[page.type])}
                         </StatusBadge>
                         <span style={{ fontSize: "var(--font-xs)", color: "var(--color-text-muted)" }}>
                           &#8599;
@@ -289,7 +287,7 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
                       </div>
                       {page.updated_at ? (
                         <span style={{ fontSize: "var(--font-xs)", color: "var(--color-text-muted)" }}>
-                          {formatRelativeTime(page.updated_at)}
+                          {formatRelativeTime(page.updated_at, locale)}
                         </span>
                       ) : null}
                     </div>
@@ -315,12 +313,12 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
                       ) : null}
                       <h4 style={{ margin: 0, fontWeight: 600 }}>{page.title}</h4>
                       <StatusBadge tone={toneForPageType(page.type)}>
-                        {labelForPageType(page.type)}
+                        {td(PAGE_TYPE_LABEL_KEYS[page.type])}
                       </StatusBadge>
                     </div>
                     {page.updated_at ? (
                       <span style={{ fontSize: "var(--font-xs)", color: "var(--color-text-muted)" }}>
-                        {formatRelativeTime(page.updated_at)}
+                        {formatRelativeTime(page.updated_at, locale)}
                       </span>
                     ) : null}
                   </div>
@@ -333,8 +331,8 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
 
       <SlidePanel
         isOpen={isAddPageOpen}
-        title="Add Page"
-        description="Create a new page in this section."
+        title={t('addPagePanel')}
+        description={t('addPageDescription')}
         onClose={() => {
           if (!addPageBusy) {
             setAddPageError(null);
@@ -344,48 +342,48 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
       >
         <form onSubmit={handleAddPage} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <label className="field-label">
-            Title
+            {t('titleLabel')}
             <input
               name="title"
               type="text"
               className="input"
               required
               maxLength={300}
-              placeholder="e.g. Onboarding Checklist"
+              placeholder={t('titlePlaceholder')}
               autoFocus
             />
           </label>
 
           <label className="field-label">
-            Type
+            {t('typeLabel')}
             <select name="pageType" className="input" defaultValue="document">
-              <option value="document">Document</option>
-              <option value="runbook">Runbook</option>
-              <option value="contact_list">Contact List</option>
-              <option value="reference_list">Reference List</option>
-              <option value="table">Table</option>
-              <option value="link">Link</option>
+              <option value="document">{t('typeDocument')}</option>
+              <option value="runbook">{t('typeRunbook')}</option>
+              <option value="contact_list">{t('typeContacts')}</option>
+              <option value="reference_list">{t('typeReference')}</option>
+              <option value="table">{t('typeTable')}</option>
+              <option value="link">{t('typeLink')}</option>
             </select>
           </label>
 
           <label className="field-label">
-            Icon (emoji)
+            {t('iconLabel')}
             <input
               name="icon"
               type="text"
               className="input"
               maxLength={4}
-              placeholder="e.g. 📄"
+              placeholder={t('iconPlaceholder')}
             />
           </label>
 
           <label className="field-label">
-            Content
+            {t('contentLabel')}
             <textarea
               name="content"
               className="input"
               rows={5}
-              placeholder="Initial content (optional, can be edited later)"
+              placeholder={t('contentPlaceholder')}
             />
           </label>
 
@@ -400,10 +398,10 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
                 setIsAddPageOpen(false);
               }}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={addPageBusy}>
-              {addPageBusy ? "Adding…" : "Add Page"}
+              {addPageBusy ? t('adding') : t('addPage')}
             </button>
           </div>
         </form>
@@ -414,9 +412,9 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
 
 /* ── Contact Table (inline) ── */
 
-function ContactTable({ data }: { data: Record<string, unknown>[] }) {
+function ContactTable({ data, noDataLabel }: { data: Record<string, unknown>[]; noDataLabel: string }) {
   if (data.length === 0) {
-    return <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-sm)" }}>No contacts.</p>;
+    return <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-sm)" }}>{noDataLabel}</p>;
   }
 
   const columns = Object.keys(data[0]);

@@ -12,8 +12,9 @@ describe("Expense clarification and payment language hardening", () => {
   it("adds manager request-info action and conversation panel in approvals", () => {
     const approvalsClient = read("app/(shell)/expenses/approvals/approvals-client.tsx");
 
-    expect(approvalsClient).toContain("Request info");
-    expect(approvalsClient).toContain("Request more info");
+    expect(approvalsClient).toContain("requestInfoTarget");
+    expect(approvalsClient).toContain("t('actions.requestInfo')");
+    expect(approvalsClient).toContain("t('requestInfoPanel.conversationTitle')");
     expect(approvalsClient).toContain("/api/v1/expenses/${expenseId}/comments");
     expect(approvalsClient).not.toContain("Pending Disbursement");
   });
@@ -39,9 +40,9 @@ describe("Expense clarification and payment language hardening", () => {
   it("shows info-request conversation and reply UI on employee expense details", () => {
     const expensesClient = read("app/(shell)/expenses/expenses-client.tsx");
 
-    expect(expensesClient).toContain("Info Requests");
-    expect(expensesClient).toContain("Send response");
-    expect(expensesClient).toContain("Action needed: manager requested more info.");
+    expect(expensesClient).toContain("t('infoRequests.title')");
+    expect(expensesClient).toContain("t('infoRequests.sendResponse')");
+    expect(expensesClient).toContain("t('infoRequests.actionNeeded')");
     expect(expensesClient).not.toContain("awaiting disbursement");
   });
 

@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
@@ -22,15 +24,17 @@ export default async function PayPage({ searchParams }: PayPageProps) {
   const session = await getAuthenticatedSession();
 
   if (!session?.profile) {
+    const t = await getTranslations('common');
+    const tPay = await getTranslations('pay');
     return (
       <>
         <PageHeader
-          title="Pay"
-          description="Pay statements, payout setup, and compensation in one view."
+          title={tPay('title')}
+          description={tPay('description')}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={t('emptyState.profileUnavailable')}
+          description={t('emptyState.profileUnavailableBody')}
         />
       </>
     );

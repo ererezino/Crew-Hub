@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { DEPARTMENTS } from "../../lib/departments";
@@ -50,14 +51,18 @@ type InviteFormProps = {
 
 type Step = 1 | 2 | 3 | 4;
 
-const roleLabels: Record<AppRole, string> = {
-  EMPLOYEE: "Employee",
-  TEAM_LEAD: "Team Lead",
-  MANAGER: "Manager",
-  HR_ADMIN: "HR Admin",
-  FINANCE_ADMIN: "Finance Admin",
-  SUPER_ADMIN: "Super Admin"
-};
+function getRoleLabels(
+  t: ReturnType<typeof useTranslations>
+): Record<AppRole, string> {
+  return {
+    EMPLOYEE: t("invite.roleEmployee"),
+    TEAM_LEAD: t("invite.roleTeamLead"),
+    MANAGER: t("invite.roleManager"),
+    HR_ADMIN: t("invite.roleHrAdmin"),
+    FINANCE_ADMIN: t("invite.roleFinanceAdmin"),
+    SUPER_ADMIN: t("invite.roleSuperAdmin")
+  };
+}
 
 const initialValues: InviteFormValues = {
   email: "",
@@ -80,14 +85,21 @@ function copyToClipboard(value: string) {
   void navigator.clipboard?.writeText(value);
 }
 
-function stepLabel(step: Step): string {
-  if (step === 1) return "Basic Info";
-  if (step === 2) return "Role & Department";
-  if (step === 3) return "Access Control";
-  return "Review & Confirm";
+function stepLabel(
+  step: Step,
+  t: ReturnType<typeof useTranslations>
+): string {
+  if (step === 1) return t("invite.stepBasicInfo");
+  if (step === 2) return t("invite.stepRoleDepartment");
+  if (step === 3) return t("invite.stepAccessControl");
+  return t("invite.stepReviewConfirm");
 }
 
 export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) {
+  const t = useTranslations("adminUsers");
+  const tCommon = useTranslations("common");
+  const roleLabels = useMemo(() => getRoleLabels(t), [t]);
+
   const [step, setStep] = useState<Step>(1);
   const [values, setValues] = useState<InviteFormValues>(initialValues);
   const [managerSearch, setManagerSearch] = useState("");
@@ -129,21 +141,21 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
     const nextErrors: InviteFormErrors = {};
 
     if (!values.email.trim()) {
-      nextErrors.email = "Email is required.";
+      nextErrors.email = t("invite.emailRequired");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
-      nextErrors.email = "Email must be valid.";
+      nextErrors.email = t("invite.emailInvalid");
     }
 
     if (!values.fullName.trim()) {
-      nextErrors.fullName = "Full name is required.";
+      nextErrors.fullName = t("invite.fullNameRequired");
     }
 
     if (!values.department.trim()) {
-      nextErrors.department = "Department is required.";
+      nextErrors.department = t("invite.departmentRequired");
     }
 
     if (values.roles.length === 0) {
-      nextErrors.roles = "At least one role is required.";
+      nextErrors.roles = t("invite.rolesRequired");
     }
 
     return nextErrors;
@@ -154,8 +166,8 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
   const roleSummary = roleSelection.map((role) => roleLabels[role]).join(", ");
   const managerName =
     values.managerId.trim().length > 0
-      ? people.find((person) => person.id === values.managerId)?.fullName ?? "Unknown manager"
-      : "No manager";
+      ? people.find((person) => person.id === values.managerId)?.fullName ?? t("invite.unknownManager")
+      : t("invite.noManager");
 
   const goNext = () => {
     if (step === 1) {
@@ -274,7 +286,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
 
       if (!response.ok || !responseBody.data?.person) {
         setErrors({
-          form: responseBody.error?.message ?? "Unable to create employee."
+          form: responseBody.error?.message ?? t("invite.errorCreate")
         });
         return;
       }
@@ -287,7 +299,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
       });
     } catch (error) {
       setErrors({
-        form: error instanceof Error ? error.message : "Unable to create employee."
+        form: error instanceof Error ? error.message : t("invite.errorCreate")
       });
     } finally {
       setIsSubmitting(false);
@@ -297,19 +309,20 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
   if (successState) {
     return (
       <section className="settings-card">
-        <h3 className="section-title">Employee created</h3>
+        <h3 className="section-title">{t("invite.employeeCreated")}</h3>
         <p className="settings-card-description">
-          {successState.fullName} ({successState.email}) is ready in Crew Hub.
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- ICU params inferred as undefined */}
+          {(t as any)("invite.employeeReady", { name: successState.fullName, email: successState.email })}
         </p>
         <p className="settings-card-description">
-          A welcome email and secure account setup link have been sent to the employee.
+          {t("invite.welcomeEmailSent")}
         </p>
         <div className="settings-actions">
           <button type="button" className="button button-accent" onClick={resetForm}>
-            Create Another
+            {t("invite.createAnother")}
           </button>
           <Link className="button button-ghost" href={`/people/${successState.userId}`}>
-            View Employee
+            {t("invite.viewEmployee")}
           </Link>
         </div>
       </section>
@@ -319,16 +332,17 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
   return (
     <form className="settings-card" onSubmit={handleCreate} noValidate>
       <header className="admin-users-form-header">
-        <h3 className="section-title">Invite Employee</h3>
+        <h3 className="section-title">{t("invite.title")}</h3>
         <p className="settings-card-description">
-          Step {step} of 4: {stepLabel(step)}
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- ICU params inferred as undefined */}
+          {(t as any)("invite.stepProgress", { step: String(step), total: "4", stepName: stepLabel(step, t) })}
         </p>
       </header>
 
       {step === 1 ? (
         <div className="admin-users-form-grid">
           <label className="form-field" htmlFor="invite-email">
-            <span className="form-label">Email address</span>
+            <span className="form-label">{t("invite.emailLabel")}</span>
             <input
               id="invite-email"
               type="email"
@@ -345,7 +359,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
           </label>
 
           <label className="form-field" htmlFor="invite-full-name">
-            <span className="form-label">Full name</span>
+            <span className="form-label">{t("invite.fullNameLabel")}</span>
             <input
               id="invite-full-name"
               className={errors.fullName ? "form-input form-input-error" : "form-input"}
@@ -361,7 +375,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
           </label>
 
           <label className="form-field" htmlFor="invite-phone">
-            <span className="form-label">Phone number (optional)</span>
+            <span className="form-label">{t("invite.phoneLabel")}</span>
             <input
               id="invite-phone"
               className="form-input"
@@ -376,7 +390,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
           </label>
 
           <fieldset className="form-field">
-            <legend className="form-label">Employee type</legend>
+            <legend className="form-label">{t("invite.employeeTypeLabel")}</legend>
             <label className="settings-checkbox">
               <input
                 type="radio"
@@ -389,7 +403,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
                   }))
                 }
               />
-              <span>New Employee</span>
+              <span>{t("invite.newEmployee")}</span>
             </label>
             <label className="settings-checkbox">
               <input
@@ -403,10 +417,10 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
                   }))
                 }
               />
-              <span>Existing Employee</span>
+              <span>{t("invite.existingEmployee")}</span>
             </label>
             <p className="settings-card-description">
-              New employees will automatically receive onboarding tasks.
+              {t("invite.newEmployeeHint")}
             </p>
           </fieldset>
         </div>
@@ -415,7 +429,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
       {step === 2 ? (
         <div className="admin-users-form-grid">
           <label className="form-field" htmlFor="invite-department">
-            <span className="form-label">Department</span>
+            <span className="form-label">{t("invite.departmentLabel")}</span>
             <select
               id="invite-department"
               className={errors.department ? "form-input form-input-error" : "form-input"}
@@ -428,7 +442,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
                 }))
               }
             >
-              <option value="">Select department</option>
+              <option value="">{t("invite.selectDepartment")}</option>
               {DEPARTMENTS.map((department) => (
                 <option key={department} value={department}>
                   {department}
@@ -439,7 +453,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
           </label>
 
           <label className="form-field" htmlFor="invite-title">
-            <span className="form-label">Job title</span>
+            <span className="form-label">{t("invite.jobTitleLabel")}</span>
             <input
               id="invite-title"
               className="form-input"
@@ -454,7 +468,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
           </label>
 
           <fieldset className="form-field">
-            <legend className="form-label">Role assignment</legend>
+            <legend className="form-label">{t("invite.roleAssignmentLabel")}</legend>
             <div className="admin-users-role-grid">
               {USER_ROLES.map((role) => (
                 <label key={role} className="settings-checkbox">
@@ -472,11 +486,11 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
           </fieldset>
 
           <label className="form-field" htmlFor="invite-manager-search">
-            <span className="form-label">Team Lead / Manager</span>
+            <span className="form-label">{t("invite.managerLabel")}</span>
             <input
               id="invite-manager-search"
               className="form-input"
-              placeholder="Search by name or email"
+              placeholder={t("invite.managerSearchPlaceholder")}
               value={managerSearch}
               onChange={(event) => setManagerSearch(event.currentTarget.value)}
             />
@@ -490,7 +504,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
                 }))
               }
             >
-              <option value="">No manager</option>
+              <option value="">{t("invite.noManager")}</option>
               {managerOptions.map((person) => (
                 <option key={person.id} value={person.id}>
                   {person.fullName} ({person.department ?? ""})
@@ -500,7 +514,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
           </label>
 
           <label className="form-field" htmlFor="invite-employment-type">
-            <span className="form-label">Employment type</span>
+            <span className="form-label">{t("invite.employmentTypeLabel")}</span>
             <select
               id="invite-employment-type"
               className="form-input"
@@ -515,17 +529,17 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
               {EMPLOYMENT_TYPES.map((employmentType) => (
                 <option key={employmentType} value={employmentType}>
                   {employmentType === "full_time"
-                    ? "Full-time"
+                    ? t("invite.employmentFullTime")
                     : employmentType === "part_time"
-                      ? "Part-time"
-                      : "Contractor"}
+                      ? t("invite.employmentPartTime")
+                      : t("invite.employmentContractor")}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="form-field" htmlFor="invite-start-date">
-            <span className="form-label">Start date</span>
+            <span className="form-label">{t("invite.startDateLabel")}</span>
             <input
               id="invite-start-date"
               type="date"
@@ -552,44 +566,44 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
 
       {step === 4 ? (
         <section className="settings-card admin-users-review-card">
-          <h4 className="section-title">Review</h4>
+          <h4 className="section-title">{t("invite.reviewTitle")}</h4>
           <dl className="admin-users-review-grid">
             <div>
-              <dt>Email</dt>
+              <dt>{t("invite.reviewEmail")}</dt>
               <dd>{values.email}</dd>
             </div>
             <div>
-              <dt>Name</dt>
+              <dt>{t("invite.reviewName")}</dt>
               <dd>{values.fullName}</dd>
             </div>
             <div>
-              <dt>Department</dt>
+              <dt>{t("invite.reviewDepartment")}</dt>
               <dd>{values.department}</dd>
             </div>
             <div>
-              <dt>Title</dt>
+              <dt>{t("invite.reviewJobTitle")}</dt>
               <dd>{values.title || "--"}</dd>
             </div>
             <div>
-              <dt>Roles</dt>
+              <dt>{t("invite.reviewRoles")}</dt>
               <dd>{roleSummary}</dd>
             </div>
             <div>
-              <dt>Manager</dt>
+              <dt>{t("invite.reviewManager")}</dt>
               <dd>{managerName}</dd>
             </div>
             <div>
-              <dt>Status</dt>
-              <dd>{values.isNewEmployee ? "Onboarding" : "Active"}</dd>
+              <dt>{t("invite.reviewStatus")}</dt>
+              <dd>{values.isNewEmployee ? t("invite.statusOnboarding") : t("invite.statusActive")}</dd>
             </div>
             <div>
-              <dt>Access tabs selected</dt>
+              <dt>{t("invite.reviewAccessTabs")}</dt>
               <dd>{selectedAccessSet.size}</dd>
             </div>
           </dl>
 
           <p className="settings-card-description">
-            A welcome email and secure account setup link will be sent to the employee.
+            {t("invite.welcomeEmailWillBeSent")}
           </p>
         </section>
       ) : null}
@@ -599,17 +613,17 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
       <div className="settings-actions">
         {step > 1 ? (
           <button type="button" className="button button-ghost" onClick={goBack}>
-            Back
+            {tCommon("back")}
           </button>
         ) : null}
 
         {step < 4 ? (
           <button type="button" className="button button-accent" onClick={goNext}>
-            Next
+            {tCommon("next")}
           </button>
         ) : (
           <button type="submit" className="button button-accent" disabled={isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Employee"}
+            {isSubmitting ? t("invite.creating") : t("invite.createEmployee")}
           </button>
         )}
       </div>

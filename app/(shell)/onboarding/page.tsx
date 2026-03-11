@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
 import { hasRole } from "../../../lib/roles";
@@ -7,10 +9,11 @@ export default async function OnboardingPage() {
   const session = await getAuthenticatedSession();
 
   if (!session?.profile) {
+    const t = await getTranslations('common');
     return (
       <EmptyState
-        title="Profile is unavailable"
-        description="No profile is linked to this account yet."
+        title={t('emptyState.profileUnavailable')}
+        description={t('emptyState.profileUnavailableBody')}
       />
     );
   }
@@ -21,11 +24,12 @@ export default async function OnboardingPage() {
     canViewAll || hasRole(userRoles, "MANAGER");
 
   if (!canViewReports) {
+    const tOnboarding = await getTranslations('onboardingPage');
     return (
       <EmptyState
-        title="Onboarding dashboard is limited to managers and admins"
-        description="Open your personal onboarding page to view your assigned tasks."
-        ctaLabel="Open my onboarding"
+        title={tOnboarding('accessDenied')}
+        description={tOnboarding('accessDeniedBody')}
+        ctaLabel={tOnboarding('openMyOnboarding')}
         ctaHref="/me/onboarding"
       />
     );

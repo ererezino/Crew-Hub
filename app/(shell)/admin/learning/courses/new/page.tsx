@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../../../components/shared/empty-state";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { hasRole } from "../../../../../../lib/roles";
@@ -5,13 +7,16 @@ import { NewLearningCourseClient } from "./new-learning-course-client";
 
 export default async function NewLearningCoursePage() {
   const session = await getAuthenticatedSession();
+  const tPage = await getTranslations("learningPage");
+  const tReports = await getTranslations("learningReports");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <EmptyState
-        title="Profile is unavailable"
-        description="No profile is linked to this account yet."
-        ctaLabel="Back to learning admin"
+        title={tCommon("emptyState.profileUnavailable")}
+        description={tCommon("emptyState.profileUnavailableBody")}
+        ctaLabel={tReports("backToAdmin")}
         ctaHref="/admin/learning"
       />
     );
@@ -24,9 +29,9 @@ export default async function NewLearningCoursePage() {
   if (!canManageLearning) {
     return (
       <EmptyState
-        title="Course creation is restricted"
-        description="Only HR Admin and Super Admin can create learning courses."
-        ctaLabel="Open learning"
+        title={tPage("courseCreationRestricted")}
+        description={tPage("courseCreationRestrictedBody")}
+        ctaLabel={tPage("openLearning")}
         ctaHref="/learning"
       />
     );

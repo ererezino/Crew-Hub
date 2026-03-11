@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -60,7 +61,8 @@ function normalizeNumberAnswer(value: SurveyAnswerValue): string {
 
 function validateAnswers(
   questions: SurveyQuestionDefinition[],
-  answers: SurveyAnswers
+  answers: SurveyAnswers,
+  t: (key: string, params?: Record<string, unknown>) => string
 ): Record<string, string> {
   const errors: Record<string, string> = {};
 
@@ -68,7 +70,7 @@ function validateAnswers(
     const value = answers[question.id] ?? null;
 
     if (question.required && (value === null || value === "")) {
-      errors[question.id] = "This question is required.";
+      errors[question.id] = t("requiredError");
       continue;
     }
 
@@ -78,23 +80,23 @@ function validateAnswers(
 
     if (question.type === "rating") {
       if (typeof value !== "number") {
-        errors[question.id] = "Rating must be a number.";
+        errors[question.id] = t("ratingMustBeNumber");
         continue;
       }
 
       const maxScale = question.scale ?? 10;
 
       if (value < 1 || value > maxScale) {
-        errors[question.id] = `Rating must be between 1 and ${maxScale}.`;
+        errors[question.id] = t("ratingRange", { max: maxScale });
       }
     }
 
     if ((question.type === "select" || question.type === "likert") && typeof value !== "string") {
-      errors[question.id] = "Select a valid option.";
+      errors[question.id] = t("selectValidOption");
     }
 
     if (question.type === "text" && typeof value !== "string") {
-      errors[question.id] = "Response must be text.";
+      errors[question.id] = t("textRequired");
     }
   }
 
@@ -102,6 +104,8 @@ function validateAnswers(
 }
 
 export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
+  const t = useTranslations('surveyDetail');
+  const tCommon = useTranslations('common');
   const detailQuery = useSurveyDetail(surveyId);
   const survey = detailQuery.data?.survey;
 
@@ -123,8 +127,8 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
   }, [survey?.id, survey?.questions]);
 
   const validationErrors = useMemo(
-    () => (survey ? validateAnswers(survey.questions, answers) : {}),
-    [survey, answers]
+    () => (survey ? validateAnswers(survey.questions, answers, t as (key: string, params?: Record<string, unknown>) => string) : {}),
+    [survey, answers, t]
   );
 
   const visibleErrors = useMemo(() => {
@@ -151,7 +155,7 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
     setSubmitError(null);
 
     if (Object.keys(validationErrors).length > 0) {
-      setSubmitError("Complete all required fields before submitting.");
+      setSubmitError(t('completeRequired'));
       return;
     }
 
@@ -169,14 +173,14 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
       const payload = (await response.json()) as SurveyResponseMutationResponse;
 
       if (!response.ok || !payload.data?.response) {
-        setSubmitError(payload.error?.message ?? "Unable to submit survey response.");
+        setSubmitError(payload.error?.message ?? t('unableToSubmit'));
         return;
       }
 
       setSubmitSuccess(true);
       detailQuery.refresh();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to submit survey response.");
+      setSubmitError(error instanceof Error ? error.message : t('unableToSubmit'));
     } finally {
       setIsSubmitting(false);
     }
@@ -185,8 +189,8 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
   return (
     <>
       <PageHeader
-        title={survey?.title && survey.title.length > 0 ? survey.title : "Survey"}
-        description="Share candid feedback to help improve team operations in Crew Hub."
+        title={survey?.title && survey.title.length > 0 ? survey.title : t('fallbackTitle')}
+        description={t('description')}
       />
 
       {detailQuery.isLoading ? surveyDetailSkeleton() : null}
@@ -194,9 +198,9 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
       {!detailQuery.isLoading && detailQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Survey is unavailable"
+            title={t('unavailable')}
             description={detailQuery.errorMessage}
-            ctaLabel="Back to surveys"
+            ctaLabel={t('backToSurveys')}
             ctaHref="/surveys"
           />
           <button
@@ -204,16 +208,16 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
             className="button button-accent"
             onClick={() => detailQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!detailQuery.isLoading && !detailQuery.errorMessage && missingSurvey ? (
         <EmptyState
-          title="Survey not found"
-          description="This survey may have been archived or you may not have access."
-          ctaLabel="Back to surveys"
+          title={t('notFound')}
+          description={t('notFoundDescription')}
+          ctaLabel={t('backToSurveys')}
           ctaHref="/surveys"
         />
       ) : null}
@@ -221,9 +225,9 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
       {!detailQuery.isLoading && !detailQuery.errorMessage && survey?.id ? (
         submitSuccess || detailQuery.data?.hasResponded ? (
           <EmptyState
-            title="Response submitted"
-            description="Thanks for sharing feedback. You can return to your survey queue."
-            ctaLabel="Back to surveys"
+            title={t('responseSubmitted')}
+            description={t('responseSubmittedDescription')}
+            ctaLabel={t('backToSurveys')}
             ctaHref="/surveys"
           />
         ) : (
@@ -233,12 +237,12 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
                 <div>
                   <h2 className="section-title">{survey.title}</h2>
                   <p className="settings-card-description">
-                    {survey.description || "No description provided."}
+                    {survey.description || t('noDescription')}
                   </p>
                 </div>
                 <div className="announcement-item-status">
                   <StatusBadge tone="info">{toSentenceCase(survey.type)}</StatusBadge>
-                  <StatusBadge tone="pending">{survey.questions.length} questions</StatusBadge>
+                  <StatusBadge tone="pending">{t('questionCount', { count: survey.questions.length })}</StatusBadge>
                 </div>
               </header>
             </article>
@@ -323,7 +327,7 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
                           }));
                         }}
                       >
-                        <option value="">Select an option</option>
+                        <option value="">{t('selectOption')}</option>
                         {question.options.map((option) => (
                           <option key={`${question.id}-${option}`} value={option}>
                             {option}
@@ -342,7 +346,7 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
 
             <div className="settings-actions">
               <button type="submit" className="button button-accent" disabled={isSubmitting}>
-                {isSubmitting ? "Submitting..." : "Submit response"}
+                {isSubmitting ? t('submitting') : t('submitResponse')}
               </button>
             </div>
           </form>

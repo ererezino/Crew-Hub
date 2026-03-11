@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
@@ -33,6 +34,7 @@ import { humanizeError } from "@/lib/errors";
 
 /* ── Local types ── */
 
+type AppLocale = "en" | "fr";
 type ViewMode = "table" | "calendar";
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -143,6 +145,10 @@ function complianceSkeleton() {
 /* ── Main component ── */
 
 export function ComplianceClient() {
+  const t = useTranslations('compliance');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
   const initialRange = useMemo(() => defaultDateRange(), []);
   const [draftStartDate, setDraftStartDate] = useState(initialRange.startDate);
   const [draftEndDate, setDraftEndDate] = useState(initialRange.endDate);
@@ -187,16 +193,16 @@ export function ComplianceClient() {
       const response = await fetch("/api/v1/compliance/acknowledgments");
       const json = await response.json();
       if (!response.ok || json.error) {
-        setAckError(json.error?.message ?? "Unable to load acknowledgment data.");
+        setAckError(json.error?.message ?? t('toast.unableToLoadAcknowledgments'));
         return;
       }
       setAckStatuses((json.data as PolicyAckStatus[]) ?? []);
     } catch {
-      setAckError("Unable to load acknowledgment data.");
+      setAckError(t('toast.unableToLoadAcknowledgments'));
     } finally {
       setAckLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void fetchAckStatuses();
@@ -223,7 +229,7 @@ export function ComplianceClient() {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([code, counts]) => ({
         code,
-        label: countryNameFromCode(code),
+        label: countryNameFromCode(code, locale),
         flag: countryFlagFromCode(code),
         total: counts.total,
         overdue: counts.overdue
@@ -387,7 +393,7 @@ export function ComplianceClient() {
 
       if (!response.data) {
         setOptimisticDeadlines(previousDeadlines);
-        showToast("error", response.error?.message ?? "Unable to update deadline.");
+        showToast("error", response.error?.message ?? t('toast.unableToUpdateDeadline'));
         return;
       }
 
@@ -396,7 +402,7 @@ export function ComplianceClient() {
           row.id === selectedDeadline.id ? response.data?.deadline ?? row : row
         )
       );
-      showToast("success", "Compliance deadline updated.");
+      showToast("success", t('toast.deadlineUpdated'));
       closeUpdatePanel();
       complianceQuery.refresh();
     } finally {
@@ -419,16 +425,16 @@ export function ComplianceClient() {
       const json = await response.json();
 
       if (!response.ok || json.error) {
-        showToast("error", json.error?.message ?? "Unable to generate deadlines.");
+        showToast("error", json.error?.message ?? t('toast.unableToGenerate'));
         return;
       }
 
       const { created, skipped } = json.data ?? { created: 0, skipped: 0 };
-      showToast("success", `Generated ${created} deadline(s). ${skipped} already existed.`);
+      showToast("success", t('toast.generated', { created, skipped }));
       setShowGenerateModal(false);
       complianceQuery.refresh();
     } catch {
-      showToast("error", "Unable to generate deadlines.");
+      showToast("error", t('toast.unableToGenerate'));
     } finally {
       setIsGenerating(false);
     }
@@ -458,14 +464,14 @@ export function ComplianceClient() {
       });
       const json = await response.json();
       if (!response.ok || json.error) {
-        showToast("error", json.error?.message ?? "Unable to request acknowledgments.");
+        showToast("error", json.error?.message ?? t('toast.unableToRequestAck'));
         return;
       }
       const count = (json.data as { created: number })?.created ?? 0;
-      showToast("success", `Acknowledgment requested from ${count} employee(s).`);
+      showToast("success", t('toast.ackRequested', { count }));
       void fetchAckStatuses();
     } catch {
-      showToast("error", "Unable to request acknowledgments.");
+      showToast("error", t('toast.unableToRequestAck'));
     } finally {
       setRequestingAckFor(null);
     }
@@ -476,8 +482,8 @@ export function ComplianceClient() {
   return (
     <>
       <PageHeader
-        title="Compliance"
-        description="Statutory filings with due dates, proof, and country tracking."
+        title={t('title')}
+        description={t('description')}
         actions={
           <>
             <button
@@ -485,30 +491,30 @@ export function ComplianceClient() {
               className="button button-accent"
               onClick={() => setShowGenerateModal(true)}
             >
-              Generate {new Date().getFullYear()} deadlines
+              {t('generateDeadlinesButton', { year: new Date().getFullYear() })}
             </button>
             <button
               type="button"
               className={viewMode === "table" ? "button button-primary" : "button button-subtle"}
               onClick={() => setViewMode("table")}
             >
-              Table
+              {t('viewMode.table')}
             </button>
             <button
               type="button"
               className={viewMode === "calendar" ? "button button-primary" : "button button-subtle"}
               onClick={() => setViewMode("calendar")}
             >
-              Calendar
+              {t('viewMode.calendar')}
             </button>
           </>
         }
       />
 
       {/* ── Date range toolbar ── */}
-      <section className="compliance-toolbar" aria-label="Compliance filters">
+      <section className="compliance-toolbar" aria-label={t('title')}>
         <label className="form-field" htmlFor="compliance-start-date">
-          <span className="form-label">Start date</span>
+          <span className="form-label">{t('toolbar.startDate')}</span>
           <input
             id="compliance-start-date"
             className={invalidRange ? "form-input form-input-error numeric" : "form-input numeric"}
@@ -518,7 +524,7 @@ export function ComplianceClient() {
           />
         </label>
         <label className="form-field" htmlFor="compliance-end-date">
-          <span className="form-label">End date</span>
+          <span className="form-label">{t('toolbar.endDate')}</span>
           <input
             id="compliance-end-date"
             className={invalidRange ? "form-input form-input-error numeric" : "form-input numeric"}
@@ -529,20 +535,20 @@ export function ComplianceClient() {
         </label>
         <div className="compliance-toolbar-actions">
           <button type="button" className="button button-accent" disabled={invalidRange} onClick={applyRange}>
-            Apply
+            {t('toolbar.apply')}
           </button>
           <button type="button" className="button button-subtle" onClick={complianceQuery.refresh}>
-            Refresh
+            {t('toolbar.refresh')}
           </button>
         </div>
-        {invalidRange ? <p className="form-field-error">Start date cannot be after end date.</p> : null}
+        {invalidRange ? <p className="form-field-error">{t('toolbar.startAfterEndError')}</p> : null}
       </section>
 
       {complianceQuery.isLoading ? complianceSkeleton() : null}
 
       {!complianceQuery.isLoading && complianceQuery.errorMessage ? (
         <ErrorState
-          title="Compliance data unavailable"
+          title={t('errorTitle')}
           message={complianceQuery.errorMessage}
           onRetry={complianceQuery.refresh}
         />
@@ -552,14 +558,14 @@ export function ComplianceClient() {
         <section className="settings-layout">
 
           {/* ── Summary metric cards — clickable ── */}
-          <section className="compliance-metric-grid" aria-label="Compliance summary">
+          <section className="compliance-metric-grid" aria-label={t('title')}>
             <button
               type="button"
               className={`metric-card compliance-metric-clickable${metricFilter === "overdue" ? " compliance-metric-active" : ""}`}
               style={{ borderColor: "var(--status-error-border)" }}
               onClick={() => toggleMetricFilter("overdue")}
             >
-              <p className="metric-label" style={{ color: "var(--status-error-text)" }}>Overdue</p>
+              <p className="metric-label" style={{ color: "var(--status-error-text)" }}>{t('metrics.overdue')}</p>
               <p className="metric-value numeric" style={{ color: "var(--status-error-text)" }}>
                 {summary.overdueCount}
               </p>
@@ -570,7 +576,7 @@ export function ComplianceClient() {
               style={{ borderColor: "var(--status-warning-border)" }}
               onClick={() => toggleMetricFilter("this_month")}
             >
-              <p className="metric-label" style={{ color: "var(--status-warning-text)" }}>Due this month</p>
+              <p className="metric-label" style={{ color: "var(--status-warning-text)" }}>{t('metrics.dueThisMonth')}</p>
               <p className="metric-value numeric" style={{ color: "var(--status-warning-text)" }}>
                 {summary.dueThisMonthCount}
               </p>
@@ -581,7 +587,7 @@ export function ComplianceClient() {
               style={{ borderColor: "var(--status-info-border)" }}
               onClick={() => toggleMetricFilter("next_30")}
             >
-              <p className="metric-label" style={{ color: "var(--status-info-text)" }}>Due next 30 days</p>
+              <p className="metric-label" style={{ color: "var(--status-info-text)" }}>{t('metrics.dueNext30Days')}</p>
               <p className="metric-value numeric" style={{ color: "var(--status-info-text)" }}>
                 {summary.dueNext30Count}
               </p>
@@ -590,7 +596,7 @@ export function ComplianceClient() {
               className="metric-card"
               style={{ borderColor: "var(--status-success-border)" }}
             >
-              <p className="metric-label" style={{ color: "var(--status-success-text)" }}>On track</p>
+              <p className="metric-label" style={{ color: "var(--status-success-text)" }}>{t('metrics.onTrack')}</p>
               <p className="metric-value numeric" style={{ color: "var(--status-success-text)" }}>
                 {summary.onTrackPct}%
               </p>
@@ -599,13 +605,13 @@ export function ComplianceClient() {
 
           {/* ── Country filter tabs ── */}
           {countryTabs.length > 1 ? (
-            <section className="page-tabs" aria-label="Filter by country">
+            <section className="page-tabs" aria-label={t('table.country')}>
               <button
                 type="button"
                 className={countryFilter === "all" ? "page-tab page-tab-active" : "page-tab"}
                 onClick={() => setCountryFilter("all")}
               >
-                All
+                {t('countryFilter.all')}
               </button>
               {countryTabs.map((tab) => (
                 <button
@@ -623,13 +629,13 @@ export function ComplianceClient() {
             </section>
           ) : null}
 
-          <section className="settings-card compliance-local-guidance" aria-label="Local authority guidance">
+          <section className="settings-card compliance-local-guidance" aria-label={t('localGuidance.title')}>
             <header className="compliance-local-guidance-header">
-              <h2 className="section-title">Local authority guidance</h2>
+              <h2 className="section-title">{t('localGuidance.title')}</h2>
               <p className="settings-card-description">
                 {countryFilter === "all"
-                  ? "Select a country tab to view local filing guidance and official authority links."
-                  : `Reference links for ${countryNameFromCode(countryFilter)} filing obligations.`}
+                  ? t('localGuidance.descriptionAll')
+                  : t('localGuidance.descriptionCountry', { country: countryNameFromCode(countryFilter, locale) })}
               </p>
             </header>
 
@@ -647,14 +653,14 @@ export function ComplianceClient() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Authority site
+                      {t('localGuidance.authoritySite')}
                     </a>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="settings-card-description">
-                No local authority guidance is configured for this country yet.
+                {t('localGuidance.noGuidance')}
               </p>
             )}
           </section>
@@ -663,18 +669,18 @@ export function ComplianceClient() {
           {metricFilter || countryFilter !== "all" ? (
             <div className="compliance-active-filters">
               <span className="settings-card-description">
-                Showing {sortedDeadlines.length} of {sourceDeadlines.length} deadlines
-                {countryFilter !== "all" ? ` in ${countryNameFromCode(countryFilter)}` : ""}
-                {metricFilter === "overdue" ? " (overdue)" : ""}
-                {metricFilter === "this_month" ? " (due this month)" : ""}
-                {metricFilter === "next_30" ? " (due next 30 days)" : ""}
+                {t('activeFilters.showing', { filtered: sortedDeadlines.length, total: sourceDeadlines.length })}
+                {countryFilter !== "all" ? ` ${t('activeFilters.inCountry', { country: countryNameFromCode(countryFilter, locale) })}` : ""}
+                {metricFilter === "overdue" ? ` ${t('activeFilters.overdue')}` : ""}
+                {metricFilter === "this_month" ? ` ${t('activeFilters.dueThisMonth')}` : ""}
+                {metricFilter === "next_30" ? ` ${t('activeFilters.dueNext30')}` : ""}
               </span>
               <button
                 type="button"
                 className="button button-subtle"
                 onClick={() => { setMetricFilter(null); setCountryFilter("all"); }}
               >
-                Clear filters
+                {t('activeFilters.clearFilters')}
               </button>
             </div>
           ) : null}
@@ -682,26 +688,26 @@ export function ComplianceClient() {
           {sortedDeadlines.length === 0 ? (
             <EmptyState
               icon={<ShieldCheck size={32} />}
-              title="No compliance deadlines in this date range"
+              title={t('emptyState.title')}
               description={
                 metricFilter || countryFilter !== "all"
-                  ? "No deadlines match the current filters."
-                  : "Try a wider date range or generate deadlines for the next year."
+                  ? t('emptyState.descriptionFiltered')
+                  : t('emptyState.descriptionDefault')
               }
-              ctaLabel="Clear filters"
+              ctaLabel={t('emptyState.clearFilters')}
               ctaHref="/compliance"
             />
           ) : null}
 
           {/* ── Table view ── */}
           {sortedDeadlines.length > 0 && viewMode === "table" ? (
-            <section className="data-table-container" aria-label="Compliance deadlines table">
+            <section className="data-table-container" aria-label={t('title')}>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Requirement</th>
-                    <th>Authority</th>
-                    <th>Country</th>
+                    <th>{t('table.requirement')}</th>
+                    <th>{t('table.authority')}</th>
+                    <th>{t('table.country')}</th>
                     <th>
                       <button
                         type="button"
@@ -710,13 +716,13 @@ export function ComplianceClient() {
                           setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
                         }
                       >
-                        Due Date
+                        {t('table.dueDate')}
                         <span className="numeric">{sortDirection === "asc" ? " ↑" : " ↓"}</span>
                       </button>
                     </th>
-                    <th>Status</th>
-                    <th>Assigned To</th>
-                    <th>Proof</th>
+                    <th>{t('table.status')}</th>
+                    <th>{t('table.assignedTo')}</th>
+                    <th>{t('table.proof')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -733,12 +739,12 @@ export function ComplianceClient() {
                       <td>
                         <p className="country-chip">
                           <span>{countryFlagFromCode(deadline.countryCode)}</span>
-                          <span>{countryNameFromCode(deadline.countryCode)}</span>
+                          <span>{countryNameFromCode(deadline.countryCode, locale)}</span>
                         </p>
                       </td>
                       <td>
-                        <p className={`numeric ${dueDateToneClass(deadline.urgency)}`} title={formatDateTimeTooltip(deadline.dueDate)}>
-                          {formatRelativeTime(deadline.dueDate)}
+                        <p className={`numeric ${dueDateToneClass(deadline.urgency)}`} title={formatDateTimeTooltip(deadline.dueDate, locale)}>
+                          {formatRelativeTime(deadline.dueDate, locale)}
                         </p>
                         <p className="settings-card-description">{deadline.dueDate}</p>
                       </td>
@@ -747,11 +753,11 @@ export function ComplianceClient() {
                           {labelForComplianceStatus(deadline.status)}
                         </StatusBadge>
                       </td>
-                      <td>{deadline.assignedToName ?? <span className="settings-card-description">Unassigned</span>}</td>
+                      <td>{deadline.assignedToName ?? <span className="settings-card-description">{t('table.unassigned')}</span>}</td>
                       <td>
                         {deadline.proofDocumentId ? (
                           <Link className="table-row-action" href="/documents" onClick={(e) => e.stopPropagation()}>
-                            View
+                            {t('table.view')}
                           </Link>
                         ) : (
                           <span className="settings-card-description">-</span>
@@ -766,13 +772,13 @@ export function ComplianceClient() {
 
           {/* ── Calendar view ── */}
           {sortedDeadlines.length > 0 && viewMode === "calendar" ? (
-            <section className="compliance-calendar" aria-label="Compliance calendar view">
+            <section className="compliance-calendar" aria-label={t('calendarView.ariaLabel')}>
               {calendarGroups.map(([dueDate, rows]) => (
                 <article key={dueDate} className="settings-card">
                   <header className="compliance-calendar-header">
                     <h3 className="section-title">{dueDate}</h3>
-                    <p className="settings-card-description" title={formatDateTimeTooltip(dueDate)}>
-                      {formatRelativeTime(dueDate)}
+                    <p className="settings-card-description" title={formatDateTimeTooltip(dueDate, locale)}>
+                      {formatRelativeTime(dueDate, locale)}
                     </p>
                   </header>
                   <ul className="compliance-calendar-list">
@@ -781,7 +787,7 @@ export function ComplianceClient() {
                         <div>
                           <p>
                             {countryFlagFromCode(deadline.countryCode)}{" "}
-                            {countryNameFromCode(deadline.countryCode)} •{" "}
+                            {countryNameFromCode(deadline.countryCode, locale)} •{" "}
                             <strong>{deadline.requirement}</strong>
                           </p>
                           <p className="settings-card-description">
@@ -797,7 +803,7 @@ export function ComplianceClient() {
                             className="table-row-action"
                             onClick={() => openUpdatePanel(deadline.id)}
                           >
-                            Update
+                            {t('table.update')}
                           </button>
                         </div>
                       </li>
@@ -809,8 +815,8 @@ export function ComplianceClient() {
           ) : null}
 
           {/* ── Acknowledgment Tracking ── */}
-          <section className="ack-tracking-section" aria-label="Policy acknowledgment tracking">
-            <h2 className="ack-tracking-title">Acknowledgment Tracking</h2>
+          <section className="ack-tracking-section" aria-label={t('acknowledgment.title')}>
+            <h2 className="ack-tracking-title">{t('acknowledgment.title')}</h2>
 
             {ackLoading ? (
               <div className="compliance-skeleton" aria-hidden="true">
@@ -821,7 +827,7 @@ export function ComplianceClient() {
 
             {!ackLoading && ackError ? (
               <ErrorState
-                title="Acknowledgments unavailable"
+                title={t('acknowledgment.unavailableTitle')}
                 message={ackError}
                 onRetry={() => void fetchAckStatuses()}
               />
@@ -829,8 +835,8 @@ export function ComplianceClient() {
 
             {!ackLoading && !ackError && ackStatuses.length === 0 ? (
               <EmptyState
-                title="No policies to acknowledge"
-                description="No published policies require acknowledgment yet."
+                title={t('acknowledgment.noPoliciesTitle')}
+                description={t('acknowledgment.noPoliciesDescription')}
                 showIcon={false}
               />
             ) : null}
@@ -873,8 +879,8 @@ export function ComplianceClient() {
                             onClick={() => void requestAcknowledgment(status.policy_id)}
                           >
                             {requestingAckFor === status.policy_id
-                              ? "Requesting..."
-                              : "Request Acknowledgment"}
+                              ? t('acknowledgment.requesting')
+                              : t('acknowledgment.requestAcknowledgment')}
                           </button>
                         </div>
                       </div>
@@ -892,7 +898,7 @@ export function ComplianceClient() {
 
                       {isExpanded && status.pending_employees.length === 0 && status.pending_count === 0 ? (
                         <div className="ack-pending-list">
-                          <p className="settings-card-description">All employees have acknowledged this policy.</p>
+                          <p className="settings-card-description">{t('acknowledgment.allAcknowledged')}</p>
                         </div>
                       ) : null}
                     </article>
@@ -907,8 +913,8 @@ export function ComplianceClient() {
       {/* ── SlidePanel for updating a deadline ── */}
       <SlidePanel
         isOpen={!!selectedDeadline && !!formState}
-        title={selectedDeadline?.requirement ?? "Update Deadline"}
-        description={selectedDeadline ? `${selectedDeadline.authority} • Due ${selectedDeadline.dueDate}` : undefined}
+        title={selectedDeadline?.requirement ?? t('panel.defaultTitle')}
+        description={selectedDeadline ? `${selectedDeadline.authority} • ${t('table.dueDate')} ${selectedDeadline.dueDate}` : undefined}
         onClose={closeUpdatePanel}
       >
         {selectedDeadline && formState ? (
@@ -920,7 +926,7 @@ export function ComplianceClient() {
             ) : null}
 
             <label className="form-field" htmlFor="compliance-status">
-              <span className="form-label">Status</span>
+              <span className="form-label">{t('panel.statusLabel')}</span>
               <select
                 id="compliance-status"
                 className="form-input"
@@ -931,15 +937,15 @@ export function ComplianceClient() {
                   )
                 }
               >
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="overdue">Overdue</option>
+                <option value="pending">{t('panelStatus.pending')}</option>
+                <option value="in_progress">{t('panelStatus.inProgress')}</option>
+                <option value="completed">{t('panelStatus.completed')}</option>
+                <option value="overdue">{t('panelStatus.overdue')}</option>
               </select>
             </label>
 
             <label className="form-field" htmlFor="compliance-assigned-to">
-              <span className="form-label">Assigned to</span>
+              <span className="form-label">{t('panel.assignedToLabel')}</span>
               <select
                 id="compliance-assigned-to"
                 className="form-input"
@@ -950,7 +956,7 @@ export function ComplianceClient() {
                   )
                 }
               >
-                <option value="">Unassigned</option>
+                <option value="">{t('panel.unassigned')}</option>
                 {(complianceQuery.data?.assignees ?? []).map((assignee) => (
                   <option key={assignee.id} value={assignee.id}>
                     {assignee.fullName}
@@ -960,7 +966,7 @@ export function ComplianceClient() {
             </label>
 
             <label className="form-field" htmlFor="compliance-proof-document">
-              <span className="form-label">Proof attachment</span>
+              <span className="form-label">{t('panel.proofAttachment')}</span>
               <select
                 id="compliance-proof-document"
                 className="form-input"
@@ -971,7 +977,7 @@ export function ComplianceClient() {
                   )
                 }
               >
-                <option value="">No proof document</option>
+                <option value="">{t('panel.noProofDocument')}</option>
                 {(complianceQuery.data?.proofDocuments ?? []).map((proof) => (
                   <option key={proof.id} value={proof.id}>
                     {proof.title}
@@ -979,12 +985,12 @@ export function ComplianceClient() {
                 ))}
               </select>
               <Link className="settings-card-description" href="/documents">
-                Upload proof in Documents
+                {t('panel.uploadProofLink')}
               </Link>
             </label>
 
             <label className="form-field" htmlFor="compliance-notes">
-              <span className="form-label">Notes</span>
+              <span className="form-label">{t('panel.notesLabel')}</span>
               <textarea
                 id="compliance-notes"
                 className="form-input"
@@ -1001,7 +1007,7 @@ export function ComplianceClient() {
 
             <footer className="settings-actions">
               <button type="button" className="button button-subtle" onClick={closeUpdatePanel}>
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
@@ -1009,7 +1015,7 @@ export function ComplianceClient() {
                 disabled={isSaving}
                 onClick={() => void submitUpdate()}
               >
-                {isSaving ? "Saving..." : "Save changes"}
+                {isSaving ? tCommon('working') : t('panel.saveChanges')}
               </button>
             </footer>
           </div>
@@ -1018,20 +1024,19 @@ export function ComplianceClient() {
 
       {/* ── Generate deadlines confirmation modal ── */}
       {showGenerateModal ? (
-        <section className="compliance-update-dialog" aria-label="Generate deadlines confirmation">
+        <section className="compliance-update-dialog" aria-label={t('generateModal.title')}>
           <button
             type="button"
             className="compliance-update-backdrop"
-            aria-label="Close modal"
+            aria-label={tCommon('close')}
             onClick={() => setShowGenerateModal(false)}
           />
           <article className="compliance-update-panel">
             <header className="compliance-update-header">
               <div>
-                <h2 className="section-title">Generate Compliance Deadlines</h2>
+                <h2 className="section-title">{t('generateModal.title')}</h2>
                 <p className="settings-card-description">
-                  This will create deadline records for all compliance items for the selected year.
-                  Existing deadlines will not be duplicated.
+                  {t('generateModal.description')}
                 </p>
               </div>
               <button
@@ -1039,12 +1044,12 @@ export function ComplianceClient() {
                 className="button button-subtle"
                 onClick={() => setShowGenerateModal(false)}
               >
-                Close
+                {tCommon('close')}
               </button>
             </header>
 
             <label className="form-field" htmlFor="generate-year">
-              <span className="form-label">Year</span>
+              <span className="form-label">{t('generateModal.yearLabel')}</span>
               <input
                 id="generate-year"
                 type="number"
@@ -1058,7 +1063,7 @@ export function ComplianceClient() {
 
             <footer className="settings-actions">
               <button type="button" className="button button-subtle" onClick={() => setShowGenerateModal(false)}>
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
@@ -1066,7 +1071,7 @@ export function ComplianceClient() {
                 disabled={isGenerating}
                 onClick={() => void handleGenerate()}
               >
-                {isGenerating ? "Generating..." : `Generate ${generateYear} deadlines`}
+                {isGenerating ? t('generateModal.generating') : t('generateModal.generateButton', { year: generateYear })}
               </button>
             </footer>
           </article>
@@ -1075,7 +1080,7 @@ export function ComplianceClient() {
 
       {/* ── Toasts ── */}
       {toasts.length > 0 ? (
-        <section className="toast-region" aria-live="polite" aria-label="Compliance toasts">
+        <section className="toast-region" aria-live="polite" aria-label={t('title')}>
           {toasts.map((toast) => (
             <article key={toast.id} className={`toast-message toast-message-${toast.variant}`}>
               <p>{toast.message}</p>
@@ -1083,9 +1088,9 @@ export function ComplianceClient() {
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss toast"
+                aria-label={t('dismissToast')}
               >
-                Dismiss
+                {t('dismissToast')}
               </button>
             </article>
           ))}

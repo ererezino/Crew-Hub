@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { StatusBadge } from "../shared/status-badge";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
@@ -15,14 +16,16 @@ type UserListTableProps = {
   onDeactivate: (person: PersonRecord) => void;
 };
 
-const roleLabels: Record<AppRole, string> = {
-  EMPLOYEE: "Employee",
-  TEAM_LEAD: "Team Lead",
-  MANAGER: "Manager",
-  HR_ADMIN: "HR Admin",
-  FINANCE_ADMIN: "Finance Admin",
-  SUPER_ADMIN: "Super Admin"
-};
+function getRoleLabel(role: AppRole, t: ReturnType<typeof useTranslations<"adminUsers">>): string {
+  switch (role) {
+    case "EMPLOYEE": return t("directory.roleEmployee");
+    case "TEAM_LEAD": return t("directory.roleTeamLead");
+    case "MANAGER": return t("directory.roleManager");
+    case "HR_ADMIN": return t("directory.roleHrAdmin");
+    case "FINANCE_ADMIN": return t("directory.roleFinanceAdmin");
+    case "SUPER_ADMIN": return t("directory.roleSuperAdmin");
+  }
+}
 
 function toneForProfileStatus(status: PersonRecord["status"]) {
   if (status === "active") return "success" as const;
@@ -36,6 +39,7 @@ export function UserListTable({
   onEdit,
   onDeactivate
 }: UserListTableProps) {
+  const t = useTranslations("adminUsers");
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState<"all" | AppRole>("all");
@@ -73,33 +77,33 @@ export function UserListTable({
   return (
     <section className="settings-card">
       <div>
-        <h3 className="section-title">User Directory</h3>
+        <h3 className="section-title">{t('directory.title')}</h3>
         <p className="settings-card-description">
-          Search and manage all users in your organization.
+          {t('directory.description')}
         </p>
       </div>
 
       <div className="admin-users-filters">
         <label className="form-field" htmlFor="admin-users-search">
-          <span className="form-label">Search</span>
+          <span className="form-label">{t('directory.searchLabel')}</span>
           <input
             id="admin-users-search"
             className="form-input"
-            placeholder="Search by name or email"
+            placeholder={t('directory.searchPlaceholder')}
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.currentTarget.value)}
           />
         </label>
 
         <label className="form-field" htmlFor="admin-users-filter-department">
-          <span className="form-label">Department</span>
+          <span className="form-label">{t('directory.departmentLabel')}</span>
           <select
             id="admin-users-filter-department"
             className="form-input"
             value={departmentFilter}
             onChange={(event) => setDepartmentFilter(event.currentTarget.value)}
           >
-            <option value="all">All departments</option>
+            <option value="all">{t('directory.allDepartments')}</option>
             {departmentOptions.map((department) => (
               <option key={department} value={department}>
                 {department}
@@ -109,17 +113,17 @@ export function UserListTable({
         </label>
 
         <label className="form-field" htmlFor="admin-users-filter-role">
-          <span className="form-label">Role</span>
+          <span className="form-label">{t('directory.roleLabel')}</span>
           <select
             id="admin-users-filter-role"
             className="form-input"
             value={roleFilter}
             onChange={(event) => setRoleFilter(event.currentTarget.value as "all" | AppRole)}
           >
-            <option value="all">All roles</option>
+            <option value="all">{t('directory.allRoles')}</option>
             {USER_ROLES.map((role) => (
               <option key={role} value={role}>
-                {roleLabels[role]}
+                {getRoleLabel(role, t)}
               </option>
             ))}
           </select>
@@ -127,22 +131,22 @@ export function UserListTable({
       </div>
 
       <div className="data-table-container">
-        <table className="data-table" aria-label="Admin users table">
+        <table className="data-table" aria-label={t('directory.tableAriaLabel')}>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Department</th>
-              <th>Role(s)</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th className="table-action-column">Actions</th>
+              <th>{t('directory.colName')}</th>
+              <th>{t('directory.colEmail')}</th>
+              <th>{t('directory.colDepartment')}</th>
+              <th>{t('directory.colRoles')}</th>
+              <th>{t('directory.colStatus')}</th>
+              <th>{t('directory.colCreated')}</th>
+              <th className="table-action-column">{t('directory.colActions')}</th>
             </tr>
           </thead>
           <tbody>
             {filteredPeople.length === 0 ? (
               <tr className="data-table-row">
-                <td colSpan={7}>No users matched your filters.</td>
+                <td colSpan={7}>{t('directory.noResults')}</td>
               </tr>
             ) : (
               filteredPeople.map((person) => (
@@ -154,7 +158,7 @@ export function UserListTable({
                     <div className="people-role-badges">
                       {person.roles.map((role) => (
                         <StatusBadge key={`${person.id}-${role}`} tone="info">
-                          {roleLabels[role]}
+                          {getRoleLabel(role, t)}
                         </StatusBadge>
                       ))}
                     </div>
@@ -179,7 +183,7 @@ export function UserListTable({
                         className="table-row-action"
                         onClick={() => onEdit(person)}
                       >
-                        Edit
+                        {t('directory.edit')}
                       </button>
                       {person.status !== "inactive" ? (
                         <button
@@ -187,7 +191,7 @@ export function UserListTable({
                           className="table-row-action"
                           onClick={() => onDeactivate(person)}
                         >
-                          Deactivate
+                          {t('directory.deactivate')}
                         </button>
                       ) : null}
                     </div>

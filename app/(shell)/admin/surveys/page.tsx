@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
@@ -7,17 +9,20 @@ import { AdminSurveysClient } from "./admin-surveys-client";
 
 export default async function AdminSurveysPage() {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("adminSurveys");
+  const tSurveys = await getTranslations("surveys");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Survey Admin"
-          description="Create and manage pulse and engagement surveys in Crew Hub."
+          title={tSurveys("adminTitle")}
+          description={tSurveys("adminDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );
@@ -31,13 +36,13 @@ export default async function AdminSurveysPage() {
     return (
       <>
         <PageHeader
-          title="Survey Admin"
-          description="Create and manage pulse and engagement surveys in Crew Hub."
+          title={tSurveys("adminTitle")}
+          description={tSurveys("adminDescription")}
         />
         <EmptyState
-          title="Survey admin is restricted"
-          description="Only HR Admin and Super Admin can manage surveys."
-          ctaLabel="Open surveys"
+          title={t("adminRestricted")}
+          description={t("adminRestrictedDescription")}
+          ctaLabel={t("openSurveys")}
           ctaHref="/surveys"
         />
       </>

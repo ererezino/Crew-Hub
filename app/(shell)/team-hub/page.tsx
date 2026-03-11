@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
@@ -6,17 +8,19 @@ import { TeamHubClient } from "./team-hub-client";
 
 export default async function TeamHubPage() {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("teamHub");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Team Hub"
-          description="Your department's knowledge base: guides, contacts, and resources."
+          title={t("title")}
+          description={t("description")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );
@@ -29,7 +33,7 @@ export default async function TeamHubPage() {
     <TeamHubClient
       isAdmin={isAdmin}
       userDepartment={session.profile.department ?? null}
-      userName={session.profile.full_name ?? "A crew member"}
+      userName={session.profile.full_name ?? t("aCrewMember")}
     />
   );
 }

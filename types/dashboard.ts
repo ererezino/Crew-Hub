@@ -209,6 +209,12 @@ export type DashboardResponseData = {
     financeStage: number;
     totalAmount: number;
   } | null;
+  expenseSpendSummary: {
+    monthToDate: number;
+    yearToDate: number;
+    currency: string;
+    mixedCurrency: boolean;
+  } | null;
   expensePipeline: {
     submitted: number;
     pendingManager: number;

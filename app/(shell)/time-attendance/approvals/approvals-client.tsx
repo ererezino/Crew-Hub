@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -14,6 +15,7 @@ import { formatHoursFromMinutes } from "../../../../lib/time-attendance";
 import { toSentenceCase } from "../../../../lib/format-labels";
 import type { TimeAttendanceApprovalMutationResponse } from "../../../../types/time-attendance";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 
 function approvalsSkeleton() {
@@ -45,6 +47,9 @@ function toneForStatus(status: "pending" | "submitted" | "approved" | "rejected"
 }
 
 export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('timesheetApprovals');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
   const queryClient = useQueryClient();
   const approvalsQuery = useTimeAttendanceApprovals({
     status: "submitted"
@@ -82,15 +87,15 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
       const payload = (await response.json()) as TimeAttendanceApprovalMutationResponse;
 
       if (!response.ok || !payload.data) {
-        setActionMessage(payload.error?.message ?? "Unable to approve timesheet.");
+        setActionMessage(payload.error?.message ?? t('unableToApprove'));
         return;
       }
 
-      setActionMessage("Timesheet approved.");
+      setActionMessage(t('timesheetApproved'));
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Unable to approve timesheet.");
+      setActionMessage(error instanceof Error ? error.message : t('unableToApprove'));
     } finally {
       setActiveActionTimesheetId(null);
     }
@@ -109,7 +114,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
     const reason = rejectionReason.trim();
 
     if (reason.length === 0) {
-      setRejectionError("Rejection reason is required.");
+      setRejectionError(t('reasonRequired'));
       return;
     }
 
@@ -127,15 +132,15 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
       const payload = (await response.json()) as TimeAttendanceApprovalMutationResponse;
 
       if (!response.ok || !payload.data) {
-        setActionMessage(payload.error?.message ?? "Unable to reject timesheet.");
+        setActionMessage(payload.error?.message ?? t('unableToReject'));
         return;
       }
 
-      setActionMessage("Timesheet rejected.");
+      setActionMessage(t('timesheetRejected'));
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Unable to reject timesheet.");
+      setActionMessage(error instanceof Error ? error.message : t('unableToReject'));
     } finally {
       setActiveActionTimesheetId(null);
     }
@@ -163,8 +168,8 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
     <>
       {!embedded ? (
         <PageHeader
-          title="Hours Approvals"
-          description="Review submitted weekly timesheets from your reports before payroll processing."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
@@ -173,7 +178,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Approvals are unavailable"
+            title={t('unavailable')}
             description={approvalsQuery.errorMessage}
             ctaHref={embedded ? "/approvals?tab=timesheets" : "/dashboard"}
           />
@@ -182,30 +187,30 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
             className="button button-accent"
             onClick={() => approvalsQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && sortedTimesheets.length === 0 ? (
         <EmptyState
-          title="No submitted timesheets"
-          description="Submitted timesheets from your team will appear here for review."
-          ctaLabel="Open attendance"
+          title={t('noSubmitted')}
+          description={t('noSubmittedDescription')}
+          ctaLabel={t('openAttendance')}
           ctaHref="/time-attendance"
         />
       ) : null}
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && sortedTimesheets.length > 0 ? (
-        <section className="compensation-layout" aria-label="Timesheet approvals table">
+        <section className="compensation-layout" aria-label={t('sectionAriaLabel')}>
           <article className="metric-card">
             <div>
-              <h2 className="section-title">Pending review</h2>
+              <h2 className="section-title">{t('pendingReview')}</h2>
               <p className="settings-card-description">
-                {sortedTimesheets.length} submitted timesheets require approval.
+                {t('pendingDescription', { count: sortedTimesheets.length })}
               </p>
             </div>
-            <StatusBadge tone="pending">Submitted</StatusBadge>
+            <StatusBadge tone="pending">{t('submitted')}</StatusBadge>
           </article>
 
           {actionMessage ? (
@@ -215,11 +220,11 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
           ) : null}
 
           <div className="data-table-container">
-            <table className="data-table" aria-label="Submitted timesheets">
+            <table className="data-table" aria-label={t('tableAriaLabel')}>
               <thead>
                 <tr>
-                  <th>Person</th>
-                  <th>Country</th>
+                  <th>{t('colPerson')}</th>
+                  <th>{t('colCountry')}</th>
                   <th>
                     <button
                       type="button"
@@ -230,15 +235,15 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                         )
                       }
                     >
-                      Week
+                      {t('colWeek')}
                       <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                     </button>
                   </th>
-                  <th>Worked</th>
-                  <th>Overtime</th>
-                  <th>Status</th>
-                  <th>Submitted</th>
-                  <th className="table-action-column">Actions</th>
+                  <th>{t('colWorked')}</th>
+                  <th>{t('colOvertime')}</th>
+                  <th>{t('colStatus')}</th>
+                  <th>{t('colSubmitted')}</th>
+                  <th className="table-action-column">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -255,21 +260,21 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                     <td>
                       <span className="country-chip">
                         <span>{countryFlagFromCode(timesheet.employeeCountryCode)}</span>
-                        <span>{countryNameFromCode(timesheet.employeeCountryCode)}</span>
+                        <span>{countryNameFromCode(timesheet.employeeCountryCode, locale)}</span>
                       </span>
                     </td>
                     <td className="numeric">
-                      {timesheet.weekStart} to {timesheet.weekEnd}
+                      {t('weekRange', { start: timesheet.weekStart, end: timesheet.weekEnd })}
                     </td>
-                    <td className="numeric">{formatHoursFromMinutes(timesheet.totalWorkedMinutes)}h</td>
-                    <td className="numeric">{formatHoursFromMinutes(timesheet.totalOvertimeMinutes)}h</td>
+                    <td className="numeric">{tCommon('hoursValue', { value: formatHoursFromMinutes(timesheet.totalWorkedMinutes) })}</td>
+                    <td className="numeric">{tCommon('hoursValue', { value: formatHoursFromMinutes(timesheet.totalOvertimeMinutes) })}</td>
                     <td>
                       <StatusBadge tone={toneForStatus(timesheet.status)}>{toSentenceCase(timesheet.status)}</StatusBadge>
                     </td>
                     <td>
                       {timesheet.submittedAt ? (
-                        <span title={formatDateTimeTooltip(timesheet.submittedAt)}>
-                          {formatRelativeTime(timesheet.submittedAt)}
+                        <span title={formatDateTimeTooltip(timesheet.submittedAt, locale)}>
+                          {formatRelativeTime(timesheet.submittedAt, locale)}
                         </span>
                       ) : (
                         "--"
@@ -283,7 +288,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                           disabled={activeActionTimesheetId === timesheet.id}
                           onClick={() => openApproveDialog(timesheet.id)}
                         >
-                          Approve
+                          {t('approve')}
                         </button>
                         <button
                           type="button"
@@ -291,7 +296,7 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                           disabled={activeActionTimesheetId === timesheet.id}
                           onClick={() => openRejectDialog(timesheet.id)}
                         >
-                          Reject
+                          {t('reject')}
                         </button>
                       </div>
                     </td>
@@ -312,21 +317,21 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
             className="confirm-dialog modal-dialog modal-dialog-danger"
             role="dialog"
             aria-modal="true"
-            aria-label="Reject timesheet"
+            aria-label={t('rejectDialogTitle')}
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 className="modal-title">Reject timesheet?</h2>
+            <h2 className="modal-title">{t('rejectDialogTitle')}</h2>
             <p className="settings-card-description">
-              The team member will be notified with your reason.
+              {t('rejectDialogDescription')}
             </p>
             <label className="form-label" htmlFor="rejection-reason">
-              Reason
+              {t('reasonLabel')}
             </label>
             <textarea
               id="rejection-reason"
               className="form-textarea"
               rows={3}
-              placeholder="Explain why this timesheet is being rejected"
+              placeholder={t('reasonPlaceholder')}
               value={rejectionReason}
               onChange={(e) => {
                 setRejectionReason(e.target.value);
@@ -342,14 +347,14 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
                 className="button button-subtle"
                 onClick={() => setRejectTimesheetId(null)}
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
                 className="button button-danger"
                 onClick={() => void executeReject()}
               >
-                Reject
+                {t('reject')}
               </button>
             </div>
           </section>
@@ -359,10 +364,10 @@ export function TimeAttendanceApprovalsClient({ embedded = false }: { embedded?:
       <ConfirmDialog
         isOpen={confirmApproveTimesheetId !== null}
         tone="default"
-        title="Approve timesheet?"
-        description="This timesheet will move forward for payroll processing."
-        confirmLabel="Approve"
-        cancelLabel="Cancel"
+        title={t('approveDialogTitle')}
+        description={t('approveDialogDescription')}
+        confirmLabel={t('approve')}
+        cancelLabel={tCommon('cancel')}
         onConfirm={() => void confirmApprove()}
         onCancel={closeApproveDialog}
       />

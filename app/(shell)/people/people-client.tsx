@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -30,6 +31,8 @@ import {
   type ProfileStatus
 } from "../../../types/people";
 import { humanizeError } from "@/lib/errors";
+
+type AppLocale = "en" | "fr";
 
 type PeopleScope = "all" | "reports" | "me";
 type SortDirection = "asc" | "desc";
@@ -89,41 +92,34 @@ type EditPersonFormErrors = {
   form?: string;
 };
 
-const createPersonSchema = z.object({
-  email: z.string().trim().email("Email must be valid."),
-  fullName: z.string().trim().min(1, "Name is required.").max(200, "Name is too long."),
-  roles: z.array(z.enum(USER_ROLES)).min(1, "Select at least one role."),
-  department: z.string().trim().max(100, "Department is too long."),
-  title: z.string().trim().max(200, "Title is too long."),
-  countryCode: z
-    .string()
-    .trim()
-    .max(2, "Country code must be 2 letters.")
-    .refine((value) => value.length === 0 || /^[a-zA-Z]{2}$/.test(value), "Country code must be 2 letters."),
-  timezone: z.string().trim().max(50, "Timezone is too long."),
-  phone: z.string().trim().max(30, "Phone number is too long."),
-  startDate: z
-    .string()
-    .trim()
-    .refine((value) => value.length === 0 || /^\d{4}-\d{2}-\d{2}$/.test(value), "Start date must be YYYY-MM-DD."),
-  managerId: z.string().uuid("Manager must be valid.").nullable(),
-  employmentType: z.enum(EMPLOYMENT_TYPES),
-  primaryCurrency: z
-    .string()
-    .trim()
-    .length(3, "Currency must be a 3-letter code."),
-  status: z.enum(PROFILE_STATUSES),
-  isNewHire: z.boolean()
-});
-
-const roleLabels: Record<AppRole, string> = {
-  EMPLOYEE: "Employee",
-  TEAM_LEAD: "Team Lead",
-  MANAGER: "Manager",
-  HR_ADMIN: "HR Admin",
-  FINANCE_ADMIN: "Finance Admin",
-  SUPER_ADMIN: "Super Admin"
-};
+function createValidationSchema(tv: (key: string) => string) {
+  return z.object({
+    email: z.string().trim().email(tv('validation.emailValid')),
+    fullName: z.string().trim().min(1, tv('validation.nameRequired')).max(200, tv('validation.nameTooLong')),
+    roles: z.array(z.enum(USER_ROLES)).min(1, tv('validation.selectRole')),
+    department: z.string().trim().max(100, tv('validation.departmentTooLong')),
+    title: z.string().trim().max(200, tv('validation.titleTooLong')),
+    countryCode: z
+      .string()
+      .trim()
+      .max(2, tv('validation.countryCode'))
+      .refine((value) => value.length === 0 || /^[a-zA-Z]{2}$/.test(value), tv('validation.countryCode')),
+    timezone: z.string().trim().max(50, tv('validation.timezoneTooLong')),
+    phone: z.string().trim().max(30, tv('validation.phoneTooLong')),
+    startDate: z
+      .string()
+      .trim()
+      .refine((value) => value.length === 0 || /^\d{4}-\d{2}-\d{2}$/.test(value), tv('validation.startDateFormat')),
+    managerId: z.string().uuid(tv('validation.managerValid')).nullable(),
+    employmentType: z.enum(EMPLOYMENT_TYPES),
+    primaryCurrency: z
+      .string()
+      .trim()
+      .length(3, tv('validation.currencyCode')),
+    status: z.enum(PROFILE_STATUSES),
+    isNewHire: z.boolean()
+  });
+}
 
 /** Priority order for roles — higher index = higher priority. */
 const ROLE_PRIORITY: AppRole[] = [
@@ -208,24 +204,8 @@ async function parseJsonResponse<T>(response: Response): Promise<T | null> {
   }
 }
 
-function fallbackInviteErrorMessage(status: number): string {
-  if (status === 401) {
-    return "Your session has expired. Please sign in again.";
-  }
-
-  if (status === 403) {
-    return "You do not have permission to send invites.";
-  }
-
-  if (status === 404) {
-    return "Person not found. Refresh and try again.";
-  }
-
-  return "Unable to send invite.";
-}
-
-function mapSchemaErrors(values: CreatePersonFormValues): CreatePersonFormErrors {
-  const parsed = createPersonSchema.safeParse({
+function mapSchemaErrors(values: CreatePersonFormValues, schema: z.ZodObject<z.ZodRawShape>): CreatePersonFormErrors {
+  const parsed = schema.safeParse({
     email: values.email,
     fullName: values.fullName,
     roles: values.roles,
@@ -358,40 +338,40 @@ function parseCSV(text: string): { headers: string[]; rows: Record<string, strin
   return { headers, rows };
 }
 
-function validateBulkRow(row: Record<string, string>): { errors: string[]; valid: boolean } {
+function validateBulkRow(row: Record<string, string>, tv: (key: string) => string): { errors: string[]; valid: boolean } {
   const errors: string[] = [];
 
   const email = row.email?.trim() ?? "";
   const fullName = row.full_name?.trim() ?? "";
 
   if (!fullName) {
-    errors.push("Full name is required.");
+    errors.push(tv('validation.fullNameRequired'));
   }
 
   if (!email) {
-    errors.push("Email is required.");
+    errors.push(tv('validation.emailRequired'));
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errors.push("Email is not valid.");
+    errors.push(tv('validation.emailInvalid'));
   }
 
   const countryCode = row.country_code?.trim() ?? "";
   if (countryCode && !/^[a-zA-Z]{2}$/.test(countryCode)) {
-    errors.push("Country code must be 2 letters.");
+    errors.push(tv('validation.countryCode'));
   }
 
   const startDate = row.start_date?.trim() ?? "";
   if (startDate && !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
-    errors.push("Start date must be YYYY-MM-DD.");
+    errors.push(tv('validation.startDateFormat'));
   }
 
   const employmentType = row.employment_type?.trim().toLowerCase() ?? "";
   if (employmentType && !["contractor", "full_time", "part_time"].includes(employmentType)) {
-    errors.push("Employment type must be contractor, full_time, or part_time.");
+    errors.push(tv('validation.employmentTypeInvalid'));
   }
 
   const managerEmail = row.manager_email?.trim() ?? "";
   if (managerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(managerEmail)) {
-    errors.push("Manager email is not valid.");
+    errors.push(tv('validation.managerEmailInvalid'));
   }
 
   return { errors, valid: errors.length === 0 };
@@ -428,12 +408,6 @@ function mapCSVRowToEmployee(row: Record<string, string>) {
   };
 }
 
-const PRESENCE_LABELS: Record<PresenceState, string> = {
-  online: "Online",
-  away: "Away",
-  offline: "Offline"
-};
-
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
@@ -442,12 +416,12 @@ function getInitials(name: string): string {
   return (parts[0]?.[0] ?? "?").toUpperCase();
 }
 
-function PresenceDot({ state }: { state: PresenceState }) {
+function PresenceDot({ state, label }: { state: PresenceState; label: string }) {
   return (
     <span
       className={`presence-dot presence-dot-${state}`}
-      title={PRESENCE_LABELS[state]}
-      aria-label={PRESENCE_LABELS[state]}
+      title={label}
+      aria-label={label}
     />
   );
 }
@@ -472,6 +446,45 @@ export function PeopleClient({
   canResetAuthenticator,
   isAdmin = false
 }: PeopleClientProps) {
+  const t = useTranslations('people');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const tcd = tCommon as (key: string, params?: Record<string, unknown>) => string;
+
+  const roleLabels: Record<AppRole, string> = {
+    EMPLOYEE: tcd('role.EMPLOYEE'),
+    TEAM_LEAD: tcd('role.TEAM_LEAD'),
+    MANAGER: tcd('role.MANAGER'),
+    HR_ADMIN: tcd('role.HR_ADMIN'),
+    FINANCE_ADMIN: tcd('role.FINANCE_ADMIN'),
+    SUPER_ADMIN: tcd('role.SUPER_ADMIN')
+  };
+
+  const presenceLabels: Record<PresenceState, string> = {
+    online: t('presence.online'),
+    away: t('presence.away'),
+    offline: t('presence.offline')
+  };
+
+  const createPersonSchema = useMemo(() => createValidationSchema(td), [td]);
+
+  const fallbackInviteErrorMessage = useCallback((status: number): string => {
+    if (status === 401) {
+      return t('toast.sessionExpired');
+    }
+
+    if (status === 403) {
+      return t('toast.noInvitePermission');
+    }
+
+    if (status === 404) {
+      return t('toast.personNotFound');
+    }
+
+    return t('toast.unableToSendInvite');
+  }, [t]);
+
   const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({
     scope: initialScope
   });
@@ -574,7 +587,7 @@ export function PeopleClient({
       }
 
       if (!file.name.endsWith(".csv")) {
-        setBulkError("Please upload a .csv file.");
+        setBulkError(t('bulkValidation.csvRequired'));
         return;
       }
 
@@ -585,12 +598,12 @@ export function PeopleClient({
         const { headers, rows } = parseCSV(text);
 
         if (rows.length === 0) {
-          setBulkError("The CSV file is empty or has no data rows.");
+          setBulkError(t('bulkValidation.csvEmpty'));
           return;
         }
 
         if (!headers.includes("email") || !headers.includes("full_name")) {
-          setBulkError("The CSV must include 'email' and 'full_name' columns.");
+          setBulkError(t('bulkValidation.csvMissingColumns'));
           return;
         }
 
@@ -604,12 +617,12 @@ export function PeopleClient({
         }
 
         const parsedRows: BulkParsedRow[] = rows.map((row) => {
-          const validation = validateBulkRow(row);
+          const validation = validateBulkRow(row, td);
           const email = (row.email ?? "").trim().toLowerCase();
           const duplicateCount = emailCounts.get(email) ?? 0;
 
           if (duplicateCount > 1) {
-            validation.errors.push("Duplicate email within this file.");
+            validation.errors.push(t('validation.duplicateEmail'));
             validation.valid = false;
           }
 
@@ -623,17 +636,17 @@ export function PeopleClient({
         setBulkRows(parsedRows);
         setBulkStep("preview");
       } catch {
-        setBulkError("Failed to read the CSV file.");
+        setBulkError(t('bulkValidation.csvReadFailed'));
       }
     },
-    []
+    [t, td]
   );
 
   const handleBulkImport = useCallback(async () => {
     const validRows = bulkRows.filter((row) => row.valid);
 
     if (validRows.length === 0) {
-      setBulkError("No valid rows to import.");
+      setBulkError(t('bulkValidation.noValidRows'));
       return;
     }
 
@@ -652,7 +665,7 @@ export function PeopleClient({
       const payload = await response.json();
 
       if (!response.ok && !payload.data?.results) {
-        setBulkError(humanizeError(payload.error?.message ?? "Bulk import failed."));
+        setBulkError(humanizeError(payload.error?.message ?? t('bulkValidation.bulkImportFailed')));
         setBulkStep("preview");
         return;
       }
@@ -664,18 +677,18 @@ export function PeopleClient({
       const failed = payload.data.failed ?? 0;
 
       if (created > 0) {
-        addToast("success", `${created} ${created === 1 ? "person" : "people"} imported successfully.`);
+        addToast("success", td('toast.importedSuccess', { count: created }));
         refresh();
       }
 
       if (failed > 0) {
-        addToast("error", `${failed} ${failed === 1 ? "person" : "people"} failed to import.`);
+        addToast("error", td('toast.importedFailed', { count: failed }));
       }
     } catch (error) {
-      setBulkError(error instanceof Error ? error.message : "Bulk import failed.");
+      setBulkError(error instanceof Error ? error.message : t('bulkValidation.bulkImportFailed'));
       setBulkStep("preview");
     }
-  }, [bulkRows, refresh]);
+  }, [bulkRows, refresh, t, td]);
 
   /* ── Edit person handlers ── */
 
@@ -714,7 +727,7 @@ export function PeopleClient({
     if (!editPerson) return;
 
     const errors: EditPersonFormErrors = {};
-    if (editValues.roles.length === 0) errors.roles = "Select at least one role.";
+    if (editValues.roles.length === 0) errors.roles = t('validation.selectRole');
     if (Object.values(errors).some(Boolean)) {
       setEditErrors(errors);
       return;
@@ -739,7 +752,7 @@ export function PeopleClient({
       const payload = (await response.json()) as PeopleUpdateResponse;
 
       if (!response.ok || !payload.data?.person) {
-        setEditErrors({ form: humanizeError(payload.error?.message ?? "Unable to save changes.") });
+        setEditErrors({ form: humanizeError(payload.error?.message ?? t('toast.unableToSaveChanges')) });
         return;
       }
 
@@ -750,13 +763,13 @@ export function PeopleClient({
       );
 
       closeEditPanel();
-      addToast("success", `${updated.fullName} updated.`);
+      addToast("success", td('toast.personUpdated', { name: updated.fullName }));
     } catch (error) {
-      setEditErrors({ form: error instanceof Error ? error.message : "Unable to save changes." });
+      setEditErrors({ form: error instanceof Error ? error.message : t('toast.unableToSaveChanges') });
     } finally {
       setIsEditSaving(false);
     }
-  }, [editPerson, editValues, closeEditPanel, setPeople]);
+  }, [editPerson, editValues, closeEditPanel, setPeople, t, td]);
 
   /* ── Invite handlers ── */
 
@@ -780,32 +793,32 @@ export function PeopleClient({
   const handleCopyInviteLink = useCallback(async () => {
     if (!inviteLink) return;
     if (!navigator?.clipboard?.writeText) {
-      addToast("error", "Clipboard access is not available in this browser.");
+      addToast("error", t('toast.clipboardUnavailable'));
       return;
     }
 
     try {
       await navigator.clipboard.writeText(inviteLink);
-      addToast("success", "Invite link copied to clipboard.");
+      addToast("success", t('toast.inviteLinkCopied'));
     } catch (error) {
-      addToast("error", error instanceof Error ? error.message : "Unable to copy invite link.");
+      addToast("error", error instanceof Error ? error.message : t('toast.unableToCopyInvite'));
     }
-  }, [inviteLink]);
+  }, [inviteLink, t]);
 
   const handleCopyResetSetupLink = useCallback(async () => {
     if (!resetSetupLink) return;
     if (!navigator?.clipboard?.writeText) {
-      addToast("error", "Clipboard access is not available in this browser.");
+      addToast("error", t('toast.clipboardUnavailable'));
       return;
     }
 
     try {
       await navigator.clipboard.writeText(resetSetupLink);
-      addToast("success", "Setup link copied to clipboard.");
+      addToast("success", t('toast.setupLinkCopied'));
     } catch (error) {
-      addToast("error", error instanceof Error ? error.message : "Unable to copy setup link.");
+      addToast("error", error instanceof Error ? error.message : t('toast.unableToCopySetup'));
     }
-  }, [resetSetupLink]);
+  }, [resetSetupLink, t]);
 
   const handleSendInvite = useCallback(async (person: PersonRecord) => {
     setInvitingId(person.id);
@@ -829,15 +842,15 @@ export function PeopleClient({
       addToast(
         "success",
         payload.data.isResend
-          ? `Fresh invite generated for ${person.fullName}.`
-          : `Invite sent to ${person.fullName}.`
+          ? td('toast.freshInviteGenerated', { name: person.fullName })
+          : td('toast.inviteSent', { name: person.fullName })
       );
     } catch (error) {
-      addToast("error", error instanceof Error ? error.message : "Unable to send invite.");
+      addToast("error", error instanceof Error ? error.message : t('toast.unableToSendInvite'));
     } finally {
       setInvitingId(null);
     }
-  }, []);
+  }, [fallbackInviteErrorMessage, t, td]);
 
   /* ── Reset authenticator handler ── */
 
@@ -854,19 +867,19 @@ export function PeopleClient({
       if (!response.ok || !payload?.data?.resetInitiated) {
         addToast(
           "error",
-          humanizeError(payload?.error?.message ?? "Unable to reset authenticator.")
+          humanizeError(payload?.error?.message ?? t('toast.unableToResetAuth'))
         );
         return;
       }
 
       setResetSetupLink(payload.data.setupLink ?? null);
-      addToast("success", `Authenticator reset. Setup link generated for ${person.fullName}.`);
+      addToast("success", td('toast.authenticatorReset', { name: person.fullName }));
     } catch (error) {
-      addToast("error", error instanceof Error ? error.message : "Unable to reset authenticator.");
+      addToast("error", error instanceof Error ? error.message : t('toast.unableToResetAuth'));
     } finally {
       setResettingId(null);
     }
-  }, []);
+  }, [t, td]);
 
   const closeCreatePanel = () => {
     if (isCreating) {
@@ -886,7 +899,7 @@ export function PeopleClient({
     setCreateValues((currentValues) => {
       const resolvedValues =
         typeof nextValues === "function" ? nextValues(currentValues) : nextValues;
-      setCreateErrors(mapSchemaErrors(resolvedValues));
+      setCreateErrors(mapSchemaErrors(resolvedValues, createPersonSchema));
       return resolvedValues;
     });
   };
@@ -908,7 +921,7 @@ export function PeopleClient({
   const handleCreatePerson = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const validationErrors = mapSchemaErrors(createValues);
+    const validationErrors = mapSchemaErrors(createValues, createPersonSchema);
     setCreateErrors(validationErrors);
 
     if (hasValidationErrors(validationErrors)) {
@@ -947,7 +960,7 @@ export function PeopleClient({
       if (!response.ok || !payload.data?.person) {
         setCreateErrors((currentErrors) => ({
           ...currentErrors,
-          form: humanizeError(payload.error?.message ?? "Unable to create person.")
+          form: humanizeError(payload.error?.message ?? t('toast.unableToCreatePerson'))
         }));
         return;
       }
@@ -962,12 +975,12 @@ export function PeopleClient({
       });
 
       closeCreatePanel();
-      addToast("success", "Person created.");
+      addToast("success", t('toast.personCreated'));
       refresh();
     } catch (error) {
       setCreateErrors((currentErrors) => ({
         ...currentErrors,
-        form: error instanceof Error ? error.message : "Unable to create person."
+        form: error instanceof Error ? error.message : t('toast.unableToCreatePerson')
       }));
     } finally {
       setIsCreating(false);
@@ -977,8 +990,8 @@ export function PeopleClient({
   return (
     <>
       <PageHeader
-        title="Crew Members"
-        description="Find teammates, review roles, and open full profiles."
+        title={t('pageTitle')}
+        description={t('pageDescription')}
         actions={
           canCreatePeople ? (
             <>
@@ -987,14 +1000,14 @@ export function PeopleClient({
                 className="button"
                 onClick={() => setIsBulkUploadOpen(true)}
               >
-                Bulk Upload
+                {t('bulkUpload.title')}
               </button>
               <button
                 type="button"
                 className="button button-accent"
                 onClick={() => setIsCreateOpen(true)}
               >
-                Add person
+                {t('createPanel.addPersonButton')}
               </button>
             </>
           ) : null
@@ -1005,9 +1018,9 @@ export function PeopleClient({
 
       {!isLoading && errorMessage ? (
         <EmptyState
-          title="People data is unavailable"
+          title={t('emptyState.unavailable')}
           description={errorMessage}
-          ctaLabel="Retry"
+          ctaLabel={tCommon('retry')}
           ctaHref="/people"
         />
       ) : null}
@@ -1016,10 +1029,10 @@ export function PeopleClient({
         <>
           <EmptyState
             icon={<Users size={32} />}
-            title="No crew members found"
-            description="Add your first team member to start using people workflows."
+            title={t('emptyState.noCrew')}
+            description={t('emptyState.noCrewDescription')}
             {...(canCreatePeople
-              ? { ctaLabel: "Add person", onCtaClick: () => setIsCreateOpen(true) }
+              ? { ctaLabel: t('emptyState.addPerson'), onCtaClick: () => setIsCreateOpen(true) }
               : {})}
           />
           {canCreatePeople ? (
@@ -1028,7 +1041,7 @@ export function PeopleClient({
               className="button button-accent"
               onClick={() => setIsCreateOpen(true)}
             >
-              Add person
+              {t('emptyState.addPerson')}
             </button>
           ) : null}
         </>
@@ -1036,7 +1049,7 @@ export function PeopleClient({
 
       {!isLoading && !errorMessage && sortedPeople.length > 0 ? (
         <div className="data-table-container">
-          <table className="data-table" aria-label="People directory table">
+          <table className="data-table" aria-label={t('table.ariaLabel')}>
             <thead>
               <tr>
                 <th>
@@ -1049,16 +1062,16 @@ export function PeopleClient({
                       )
                     }
                   >
-                    Name {sortDirection === "asc" ? "↑" : "↓"}
+                    {t('table.name')} {sortDirection === "asc" ? "\u2191" : "\u2193"}
                   </button>
                 </th>
-                {isAdmin ? <th>Role</th> : null}
-                <th>Department</th>
-                <th>Country</th>
-                {isAdmin ? <th>Status</th> : null}
-                {canViewAccessState ? <th>Access</th> : null}
-                <th>Joined</th>
-                <th className="table-action-column">Actions</th>
+                {isAdmin ? <th>{t('table.role')}</th> : null}
+                <th>{t('table.department')}</th>
+                <th>{t('table.country')}</th>
+                {isAdmin ? <th>{t('table.status')}</th> : null}
+                {canViewAccessState ? <th>{t('table.access')}</th> : null}
+                <th>{t('table.joined')}</th>
+                <th className="table-action-column">{t('table.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -1082,7 +1095,7 @@ export function PeopleClient({
                         )}
                         {isAdmin && presenceMap.has(person.id) ? (
                           <div className="people-avatar-presence">
-                            <PresenceDot state={presenceMap.get(person.id)!} />
+                            <PresenceDot state={presenceMap.get(person.id)!} label={presenceLabels[presenceMap.get(person.id)!]} />
                           </div>
                         ) : null}
                       </div>
@@ -1113,7 +1126,7 @@ export function PeopleClient({
                             ) : null}
                           </>
                         ) : (
-                          <span className="role-tag role-tag-muted">No role</span>
+                          <span className="role-tag role-tag-muted">{t('table.noRole')}</span>
                         )}
                       </div>
                     </td>
@@ -1123,7 +1136,7 @@ export function PeopleClient({
                     {person.countryCode ? (
                       <span className="country-chip">
                         <span>{countryFlagFromCode(person.countryCode)}</span>
-                        <span>{countryNameFromCode(person.countryCode)}</span>
+                        <span>{countryNameFromCode(person.countryCode, locale)}</span>
                       </span>
                     ) : (
                       "--"
@@ -1132,19 +1145,19 @@ export function PeopleClient({
                   {isAdmin ? (
                     <td>
                       <StatusBadge tone={toneForProfileStatus(person.status)}>
-                        {formatProfileStatus(person.status)}
+                        {formatProfileStatus(person.status, locale)}
                       </StatusBadge>
                     </td>
                   ) : null}
                   {canViewAccessState ? (
                     <td>
                       {person.inviteStatus === "active" ? (
-                        <span className="role-tag role-tag-active" title="Account confirmed and set up">
-                          Active
+                        <span className="role-tag role-tag-active" title={t('table.accountConfirmed')}>
+                          {tcd('status.active')}
                         </span>
                       ) : (
-                        <span className="role-tag role-tag-muted" title="Has not set up their account yet">
-                          Not set up
+                        <span className="role-tag role-tag-muted" title={t('table.notSetUp')}>
+                          {t('table.accessNotSetUp')}
                         </span>
                       )}
                     </td>
@@ -1152,9 +1165,9 @@ export function PeopleClient({
                   <td>
                     <time
                       dateTime={toDateTimeValue(person.startDate || person.createdAt)}
-                      title={formatDateTimeTooltip(toDateTimeValue(person.startDate || person.createdAt))}
+                      title={formatDateTimeTooltip(toDateTimeValue(person.startDate || person.createdAt), locale)}
                     >
-                      {formatRelativeTime(toDateTimeValue(person.startDate || person.createdAt))}
+                      {formatRelativeTime(toDateTimeValue(person.startDate || person.createdAt), locale)}
                     </time>
                   </td>
                   {canManageAnyPersonAction ? (
@@ -1166,7 +1179,7 @@ export function PeopleClient({
                             className="table-row-action"
                             onClick={() => openEditPanel(person)}
                           >
-                            Edit
+                            {t('table.edit')}
                           </button>
                         ) : null}
                         {person.inviteStatus === "active" && canResetAuthenticator ? (
@@ -1176,7 +1189,7 @@ export function PeopleClient({
                             disabled={resettingId === person.id}
                             onClick={() => openResetDialog(person)}
                           >
-                            {resettingId === person.id ? "Resetting..." : "Reset Authenticator"}
+                            {resettingId === person.id ? t('table.resetting') : t('table.resetAuthenticator')}
                           </button>
                         ) : null}
                         {person.inviteStatus !== "active" && canInvitePeople ? (
@@ -1186,7 +1199,7 @@ export function PeopleClient({
                             disabled={invitingId === person.id}
                             onClick={() => setConfirmInvitePerson(person)}
                           >
-                            {invitingId === person.id ? "Sending..." : "Invite"}
+                            {invitingId === person.id ? t('table.sending') : t('table.invite')}
                           </button>
                         ) : null}
                       </div>
@@ -1195,7 +1208,7 @@ export function PeopleClient({
                     <td className="table-row-action-cell">
                       <div className="people-row-actions">
                         <Link className="table-row-action" href={`/people/${person.id}`}>
-                          View
+                          {t('table.view')}
                         </Link>
                       </div>
                     </td>
@@ -1209,13 +1222,13 @@ export function PeopleClient({
 
       <SlidePanel
         isOpen={isCreateOpen}
-        title="Add Person"
-        description="Create a profile and send secure account setup instructions."
+        title={t('createPanel.title')}
+        description={t('createPanel.description')}
         onClose={closeCreatePanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleCreatePerson} noValidate>
           <div className="form-field">
-            <span className="form-label">Employee type</span>
+            <span className="form-label">{t('createPanel.employeeTypeLabel')}</span>
             <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
               <button
                 type="button"
@@ -1223,7 +1236,7 @@ export function PeopleClient({
                 style={{ flex: 1, height: 36 }}
                 onClick={() => updateCreateValues({ ...createValues, isNewHire: true })}
               >
-                New hire
+                {t('createPanel.newHire')}
               </button>
               <button
                 type="button"
@@ -1231,18 +1244,18 @@ export function PeopleClient({
                 style={{ flex: 1, height: 36 }}
                 onClick={() => updateCreateValues({ ...createValues, isNewHire: false })}
               >
-                Existing employee
+                {t('createPanel.existingEmployee')}
               </button>
             </div>
             <p className="form-field-hint">
               {createValues.isNewHire
-                ? "New hires get an onboarding checklist and welcome email."
-                : "Existing team members get a profile only."}
+                ? t('createPanel.newHireHint')
+                : t('createPanel.existingEmployeeHint')}
             </p>
           </div>
 
           <label className="form-field" htmlFor="person-email">
-            <span className="form-label">Email</span>
+            <span className="form-label">{t('createPanel.emailLabel')}</span>
             <input
               id="person-email"
               type="email"
@@ -1260,7 +1273,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-full-name">
-            <span className="form-label">Full name</span>
+            <span className="form-label">{t('createPanel.fullNameLabel')}</span>
             <input
               id="person-full-name"
               className={createErrors.fullName ? "form-input form-input-error" : "form-input"}
@@ -1278,7 +1291,7 @@ export function PeopleClient({
           </label>
 
           <fieldset className="form-field people-role-fieldset">
-            <legend className="form-label">Roles</legend>
+            <legend className="form-label">{t('createPanel.rolesLabel')}</legend>
             <div className="people-role-selection">
               {USER_ROLES.map((role) => (
                 <label key={role} className="settings-checkbox">
@@ -1295,7 +1308,7 @@ export function PeopleClient({
           </fieldset>
 
           <label className="form-field" htmlFor="person-department">
-            <span className="form-label">Department</span>
+            <span className="form-label">{t('createPanel.departmentLabel')}</span>
             <select
               id="person-department"
               className={createErrors.department ? "form-input form-input-error" : "form-input"}
@@ -1307,7 +1320,7 @@ export function PeopleClient({
                 })
               }
             >
-              <option value="">No department</option>
+              <option value="">{t('createPanel.noDepartment')}</option>
               {DEPARTMENTS.map((dept) => (
                 <option key={dept} value={dept}>
                   {dept}
@@ -1320,7 +1333,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-title">
-            <span className="form-label">Title</span>
+            <span className="form-label">{t('createPanel.titleLabel')}</span>
             <input
               id="person-title"
               className={createErrors.title ? "form-input form-input-error" : "form-input"}
@@ -1336,7 +1349,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-country">
-            <span className="form-label">Country code</span>
+            <span className="form-label">{t('createPanel.countryCodeLabel')}</span>
             <input
               id="person-country"
               maxLength={2}
@@ -1358,7 +1371,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-timezone">
-            <span className="form-label">Timezone</span>
+            <span className="form-label">{t('createPanel.timezoneLabel')}</span>
             <input
               id="person-timezone"
               className={createErrors.timezone ? "form-input form-input-error" : "form-input"}
@@ -1376,7 +1389,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-phone">
-            <span className="form-label">Phone</span>
+            <span className="form-label">{t('createPanel.phoneLabel')}</span>
             <input
               id="person-phone"
               className={createErrors.phone ? "form-input form-input-error" : "form-input"}
@@ -1392,7 +1405,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-start-date">
-            <span className="form-label">Start date</span>
+            <span className="form-label">{t('createPanel.startDateLabel')}</span>
             <input
               id="person-start-date"
               type="date"
@@ -1411,7 +1424,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-manager">
-            <span className="form-label">Manager</span>
+            <span className="form-label">{t('createPanel.managerLabel')}</span>
             <select
               id="person-manager"
               className={createErrors.managerId ? "form-input form-input-error" : "form-input"}
@@ -1423,7 +1436,7 @@ export function PeopleClient({
                 })
               }
             >
-              <option value="">No manager</option>
+              <option value="">{t('createPanel.noManager')}</option>
               {managerOptions.map((person) => (
                 <option key={`manager-${person.id}`} value={person.id}>
                   {person.fullName}
@@ -1436,7 +1449,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-employment-type">
-            <span className="form-label">Employment type</span>
+            <span className="form-label">{t('createPanel.employmentTypeLabel')}</span>
             <select
               id="person-employment-type"
               className={
@@ -1452,7 +1465,7 @@ export function PeopleClient({
             >
               {EMPLOYMENT_TYPES.map((employmentType) => (
                 <option key={employmentType} value={employmentType}>
-                  {formatEmploymentType(employmentType)}
+                  {formatEmploymentType(employmentType, locale)}
                 </option>
               ))}
             </select>
@@ -1462,7 +1475,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-primary-currency">
-            <span className="form-label">Primary currency</span>
+            <span className="form-label">{t('createPanel.primaryCurrencyLabel')}</span>
             <input
               id="person-primary-currency"
               maxLength={3}
@@ -1483,7 +1496,7 @@ export function PeopleClient({
           </label>
 
           <label className="form-field" htmlFor="person-status">
-            <span className="form-label">Profile status</span>
+            <span className="form-label">{t('createPanel.profileStatusLabel')}</span>
             <select
               id="person-status"
               className={createErrors.status ? "form-input form-input-error" : "form-input"}
@@ -1497,7 +1510,7 @@ export function PeopleClient({
             >
               {PROFILE_STATUSES.map((status) => (
                 <option key={status} value={status}>
-                  {formatProfileStatus(status)}
+                  {formatProfileStatus(status, locale)}
                 </option>
               ))}
             </select>
@@ -1510,10 +1523,10 @@ export function PeopleClient({
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeCreatePanel} disabled={isCreating}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isCreating}>
-              {isCreating ? "Creating..." : "Create person"}
+              {isCreating ? t('createPanel.creating') : t('createPanel.createPerson')}
             </button>
           </div>
         </form>
@@ -1521,19 +1534,17 @@ export function PeopleClient({
 
       <SlidePanel
         isOpen={isBulkUploadOpen}
-        title="Bulk Upload"
-        description="Import multiple crew members from a CSV file."
+        title={t('bulkUpload.title')}
+        description={t('bulkUpload.description')}
         onClose={closeBulkUploadPanel}
       >
         <div className="slide-panel-form-wrapper">
           {bulkStep === "template" ? (
             <div className="bulk-upload-step">
               <div className="bulk-upload-instructions">
-                <h3 className="form-label">Step 1: Download the CSV template</h3>
+                <h3 className="form-label">{t('bulkUpload.step1Title')}</h3>
                 <p className="form-hint">
-                  Download the template, fill in your employee data, then upload the completed CSV.
-                  Required columns: <strong>full_name</strong> and <strong>email</strong>.
-                  Optional columns: country_code, department, job_title, employment_type, start_date, manager_email, roles.
+                  {t('bulkUpload.step1Description')}
                 </p>
               </div>
               <button
@@ -1541,17 +1552,17 @@ export function PeopleClient({
                 className="button button-accent"
                 onClick={downloadCSVTemplate}
               >
-                Download CSV Template
+                {t('bulkUpload.downloadTemplate')}
               </button>
               <div className="bulk-upload-divider" />
               <div className="bulk-upload-instructions">
-                <h3 className="form-label">Step 2: Upload your completed CSV</h3>
+                <h3 className="form-label">{t('bulkUpload.step2Title')}</h3>
                 <p className="form-hint">
-                  Select the CSV file with your employee data. The file will be validated before import.
+                  {t('bulkUpload.step2Description')}
                 </p>
               </div>
               <label className="form-field" htmlFor="bulk-csv-file">
-                <span className="form-label">CSV file</span>
+                <span className="form-label">{t('bulkUpload.csvFileLabel')}</span>
                 <input
                   ref={bulkFileInputRef}
                   id="bulk-csv-file"
@@ -1568,22 +1579,25 @@ export function PeopleClient({
           {bulkStep === "preview" ? (
             <div className="bulk-upload-step">
               <div className="bulk-upload-instructions">
-                <h3 className="form-label">Preview</h3>
+                <h3 className="form-label">{t('bulkUpload.previewTitle')}</h3>
                 <p className="form-hint">
-                  {bulkFile?.name ?? "CSV"} - {bulkRows.length} row{bulkRows.length === 1 ? "" : "s"} found.{" "}
-                  <strong>{bulkRows.filter((r) => r.valid).length}</strong> valid,{" "}
-                  <strong>{bulkRows.filter((r) => !r.valid).length}</strong> with errors.
+                  {td('bulkUpload.previewSummary', {
+                    fileName: bulkFile?.name ?? "CSV",
+                    totalRows: bulkRows.length,
+                    validCount: bulkRows.filter((r) => r.valid).length,
+                    errorCount: bulkRows.filter((r) => !r.valid).length
+                  })}
                 </p>
               </div>
               <div className="data-table-container">
-                <table className="data-table" aria-label="Bulk upload preview">
+                <table className="data-table" aria-label={t('bulkUpload.previewAriaLabel')}>
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Department</th>
-                      <th>Status</th>
+                      <th>{t('table.name')}</th>
+                      <th>{t('createPanel.emailLabel')}</th>
+                      <th>{t('table.department')}</th>
+                      <th>{t('table.status')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1598,10 +1612,10 @@ export function PeopleClient({
                         <td>{row.data.department || "--"}</td>
                         <td>
                           {row.valid ? (
-                            <StatusBadge tone="success">Valid</StatusBadge>
+                            <StatusBadge tone="success">{t('bulkUpload.statusValid')}</StatusBadge>
                           ) : (
                             <span>
-                              <StatusBadge tone="warning">Error</StatusBadge>
+                              <StatusBadge tone="warning">{tcd('error.generic')}</StatusBadge>
                               <span className="bulk-row-error-text">
                                 {row.errors.join("; ")}
                               </span>
@@ -1628,7 +1642,7 @@ export function PeopleClient({
                     }
                   }}
                 >
-                  Back
+                  {tCommon('back')}
                 </button>
                 <button
                   type="button"
@@ -1636,7 +1650,7 @@ export function PeopleClient({
                   disabled={bulkRows.filter((r) => r.valid).length === 0}
                   onClick={handleBulkImport}
                 >
-                  Import {bulkRows.filter((r) => r.valid).length} employee{bulkRows.filter((r) => r.valid).length === 1 ? "" : "s"}
+                  {td('bulkUpload.importButton', { count: bulkRows.filter((r) => r.valid).length })}
                 </button>
               </div>
             </div>
@@ -1645,9 +1659,9 @@ export function PeopleClient({
           {bulkStep === "importing" ? (
             <div className="bulk-upload-step">
               <div className="bulk-upload-instructions">
-                <h3 className="form-label">Importing...</h3>
+                <h3 className="form-label">{t('bulkUpload.importingTitle')}</h3>
                 <p className="form-hint">
-                  Creating {bulkRows.filter((r) => r.valid).length} crew accounts. This may take a moment.
+                  {td('bulkUpload.importingDescription', { count: bulkRows.filter((r) => r.valid).length })}
                 </p>
               </div>
             </div>
@@ -1656,22 +1670,22 @@ export function PeopleClient({
           {bulkStep === "done" ? (
             <div className="bulk-upload-step">
               <div className="bulk-upload-instructions">
-                <h3 className="form-label">Import Complete</h3>
+                <h3 className="form-label">{t('bulkUpload.doneTitle')}</h3>
                 <p className="form-hint">
-                  {bulkResults.filter((r) => r.status === "created").length} employee{bulkResults.filter((r) => r.status === "created").length === 1 ? "" : "s"} created successfully.
-                  {bulkResults.filter((r) => r.status === "error").length > 0
-                    ? ` ${bulkResults.filter((r) => r.status === "error").length} failed.`
-                    : ""}
+                  {td('bulkUpload.doneSummary', {
+                    createdCount: bulkResults.filter((r) => r.status === "created").length,
+                    failedCount: bulkResults.filter((r) => r.status === "error").length
+                  })}
                 </p>
               </div>
               {bulkResults.length > 0 ? (
                 <div className="data-table-container">
-                  <table className="data-table" aria-label="Bulk import results">
+                  <table className="data-table" aria-label={t('bulkUpload.resultsAriaLabel')}>
                     <thead>
                       <tr>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>Details</th>
+                        <th>{t('createPanel.emailLabel')}</th>
+                        <th>{t('table.status')}</th>
+                        <th>{t('bulkUpload.detailsColumn')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1683,7 +1697,7 @@ export function PeopleClient({
                           <td>{result.email}</td>
                           <td>
                             <StatusBadge tone={result.status === "created" ? "success" : "warning"}>
-                              {result.status === "created" ? "Created" : "Failed"}
+                              {result.status === "created" ? t('bulkUpload.statusCreated') : t('bulkUpload.statusFailed')}
                             </StatusBadge>
                           </td>
                           <td>{result.error ?? "--"}</td>
@@ -1699,7 +1713,7 @@ export function PeopleClient({
                   className="button button-accent"
                   onClick={closeBulkUploadPanel}
                 >
-                  Done
+                  {t('bulkUpload.doneButton')}
                 </button>
               </div>
             </div>
@@ -1710,8 +1724,8 @@ export function PeopleClient({
       {/* ── Edit Person SlidePanel ── */}
       <SlidePanel
         isOpen={isEditOpen}
-        title={editPerson ? `Edit ${editPerson.fullName}` : "Edit Person"}
-        description="Update role, department, and manager for this crew member."
+        title={editPerson ? td('editPanel.title', { name: editPerson.fullName }) : t('editPanel.titleFallback')}
+        description={t('editPanel.description')}
         onClose={closeEditPanel}
       >
         {editPerson ? (
@@ -1739,12 +1753,12 @@ export function PeopleClient({
             </div>
 
             <label className="form-field" htmlFor="edit-person-title">
-              <span className="form-label">Job title</span>
+              <span className="form-label">{t('editPanel.jobTitleLabel')}</span>
               <input
                 id="edit-person-title"
                 className="form-input"
                 maxLength={200}
-                placeholder="e.g. Software Engineer"
+                placeholder={t('editPanel.jobTitlePlaceholder')}
                 value={editValues.title}
                 onChange={(e) => {
                   const val = e.currentTarget.value;
@@ -1754,7 +1768,7 @@ export function PeopleClient({
             </label>
 
             <fieldset className="form-field people-role-fieldset">
-              <legend className="form-label">Roles</legend>
+              <legend className="form-label">{t('createPanel.rolesLabel')}</legend>
               <div className="people-role-selection">
                 {USER_ROLES.map((role) => (
                   <label key={`edit-role-${role}`} className="settings-checkbox">
@@ -1771,7 +1785,7 @@ export function PeopleClient({
             </fieldset>
 
             <label className="form-field" htmlFor="edit-person-department">
-              <span className="form-label">Department</span>
+              <span className="form-label">{t('createPanel.departmentLabel')}</span>
               <select
                 id="edit-person-department"
                 className={editErrors.department ? "form-input form-input-error" : "form-input"}
@@ -1781,7 +1795,7 @@ export function PeopleClient({
                   setEditValues((prev) => ({ ...prev, department: val }));
                 }}
               >
-                <option value="">No department</option>
+                <option value="">{t('createPanel.noDepartment')}</option>
                 {DEPARTMENTS.map((dept) => (
                   <option key={dept} value={dept}>
                     {dept}
@@ -1794,11 +1808,11 @@ export function PeopleClient({
             </label>
 
             <label className="form-field" htmlFor="edit-person-crew-tag">
-              <span className="form-label">Crew Tag</span>
+              <span className="form-label">{t('editPanel.crewTagLabel')}</span>
               <input
                 id="edit-person-crew-tag"
                 className={editErrors.crewTag ? "form-input form-input-error" : "form-input"}
-                placeholder="e.g. john.doe"
+                placeholder={t('editPanel.crewTagPlaceholder')}
                 maxLength={50}
                 value={editValues.crewTag}
                 onChange={(e) => {
@@ -1812,7 +1826,7 @@ export function PeopleClient({
             </label>
 
             <label className="form-field" htmlFor="edit-person-manager">
-              <span className="form-label">Manager</span>
+              <span className="form-label">{t('createPanel.managerLabel')}</span>
               <select
                 id="edit-person-manager"
                 className={editErrors.managerId ? "form-input form-input-error" : "form-input"}
@@ -1822,7 +1836,7 @@ export function PeopleClient({
                   setEditValues((prev) => ({ ...prev, managerId: val }));
                 }}
               >
-                <option value="">No manager</option>
+                <option value="">{t('createPanel.noManager')}</option>
                 {people
                   .filter((p) => p.id !== editPerson.id && p.status === "active")
                   .sort((a, b) => a.fullName.localeCompare(b.fullName))
@@ -1839,10 +1853,10 @@ export function PeopleClient({
 
             <div className="slide-panel-actions">
               <button type="button" className="button" onClick={closeEditPanel} disabled={isEditSaving}>
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button type="submit" className="button button-accent" disabled={isEditSaving}>
-                {isEditSaving ? "Saving..." : "Save Changes"}
+                {isEditSaving ? tCommon('saving') : t('editPanel.saveChanges')}
               </button>
             </div>
           </form>
@@ -1859,29 +1873,31 @@ export function PeopleClient({
             className="confirm-dialog modal-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label="Send Crew Hub invite"
+            aria-label={t('inviteDialog.ariaLabel')}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="modal-title">Send Crew Hub invite</h2>
+            <h2 className="modal-title">{t('inviteDialog.title')}</h2>
             <p className="settings-card-description">
-              Send an invite to {confirmInvitePerson.fullName} ({confirmInvitePerson.email}).
-              They can use the generated setup link below to enroll their authenticator and start using Crew Hub.
+              {td('inviteDialog.description', {
+                name: confirmInvitePerson.fullName,
+                email: confirmInvitePerson.email
+              })}
             </p>
 
             {inviteLink ? (
               <div className="invite-success-banner" role="status">
-                Invite link is ready. Share it directly if email delivery is delayed.
+                {t('inviteDialog.linkReady')}
               </div>
             ) : null}
 
             <div className="invite-link-area">
-              <p className="invite-link-label">Setup link</p>
+              <p className="invite-link-label">{t('inviteDialog.setupLinkLabel')}</p>
               <div className="invite-link-input-row">
                 <input
                   className="form-input"
                   value={inviteLink ?? ""}
                   readOnly
-                  placeholder="Click “Send Invite” to generate a setup link."
+                  placeholder={t('inviteDialog.sendInvitePlaceholder')}
                   onClick={(e) => {
                     if (inviteLink) {
                       (e.target as HTMLInputElement).select();
@@ -1896,12 +1912,11 @@ export function PeopleClient({
                   }}
                   disabled={!inviteLink || invitingId !== null}
                 >
-                  Copy Link
+                  {t('inviteDialog.copyLink')}
                 </button>
               </div>
               <p className="invite-link-note">
-                Setup links are one-time and time-limited. If the user sees an expired link message, click
-                “Send Invite” again to generate a fresh link.
+                {t('inviteDialog.linkNote')}
               </p>
             </div>
 
@@ -1912,7 +1927,7 @@ export function PeopleClient({
                 onClick={closeInviteDialog}
                 disabled={invitingId !== null}
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
@@ -1923,10 +1938,10 @@ export function PeopleClient({
                 disabled={invitingId !== null}
               >
                 {invitingId === confirmInvitePerson.id
-                  ? "Sending..."
+                  ? t('inviteDialog.sending')
                   : inviteLink
-                    ? "Resend Invite"
-                    : "Send Invite"}
+                    ? t('inviteDialog.resendInvite')
+                    : t('inviteDialog.sendInvite')}
               </button>
             </div>
           </section>
@@ -1943,29 +1958,31 @@ export function PeopleClient({
             className="confirm-dialog modal-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label="Reset authenticator"
+            aria-label={t('resetDialog.ariaLabel')}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="modal-title">Reset authenticator</h2>
+            <h2 className="modal-title">{t('resetDialog.title')}</h2>
             <p className="settings-card-description">
-              Reset the authenticator for {confirmResetPerson.fullName} ({confirmResetPerson.email})?
-              They will receive an email with a link to set up a new authenticator. You can also copy the generated setup link below.
+              {td('resetDialog.description', {
+                name: confirmResetPerson.fullName,
+                email: confirmResetPerson.email
+              })}
             </p>
 
             {resetSetupLink ? (
               <div className="invite-success-banner" role="status">
-                New setup link generated. Share it directly if email delivery is delayed.
+                {t('resetDialog.linkReady')}
               </div>
             ) : null}
 
             <div className="invite-link-area">
-              <p className="invite-link-label">Setup link</p>
+              <p className="invite-link-label">{t('resetDialog.setupLinkLabel')}</p>
               <div className="invite-link-input-row">
                 <input
                   className="form-input"
                   value={resetSetupLink ?? ""}
                   readOnly
-                  placeholder="Click “Reset Authenticator” to generate a setup link."
+                  placeholder={t('resetDialog.resetPlaceholder')}
                   onClick={(event) => {
                     if (resetSetupLink) {
                       (event.target as HTMLInputElement).select();
@@ -1980,11 +1997,11 @@ export function PeopleClient({
                   }}
                   disabled={!resetSetupLink || resettingId !== null}
                 >
-                  Copy Link
+                  {t('resetDialog.copyLink')}
                 </button>
               </div>
               <p className="invite-link-note">
-                Setup links are one-time and time-limited. If a link expires, generate a fresh one.
+                {t('resetDialog.linkNote')}
               </p>
             </div>
 
@@ -1995,7 +2012,7 @@ export function PeopleClient({
                 onClick={closeResetDialog}
                 disabled={resettingId !== null}
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
@@ -2005,7 +2022,7 @@ export function PeopleClient({
                 }}
                 disabled={resettingId !== null}
               >
-                {resettingId ? "Resetting..." : resetSetupLink ? "Generate new link" : "Reset Authenticator"}
+                {resettingId ? t('resetDialog.resetting') : resetSetupLink ? t('resetDialog.generateNewLink') : t('resetDialog.resetAuthenticator')}
               </button>
             </div>
           </section>
@@ -2029,7 +2046,7 @@ export function PeopleClient({
               <button
                 type="button"
                 className="toast-dismiss"
-                aria-label="Dismiss notification"
+                aria-label={t('dismissNotification')}
                 onClick={() =>
                   setToasts((currentToasts) =>
                     currentToasts.filter((entry) => entry.id !== toast.id)

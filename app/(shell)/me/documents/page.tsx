@@ -1,15 +1,18 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { MyDocumentsClient } from "./my-documents-client";
 
 export default async function MyDocumentsPage() {
   const session = await getAuthenticatedSession();
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <EmptyState
-        title="Profile is unavailable"
-        description="No profile is linked to this account yet."
+        title={tCommon("emptyState.profileUnavailable")}
+        description={tCommon("emptyState.profileUnavailableBody")}
       />
     );
   }

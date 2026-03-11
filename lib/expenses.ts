@@ -85,7 +85,7 @@ export const EXPENSE_CATEGORY_GUIDANCE: Record<ExpenseCategory, ExpenseCategoryG
   other: {
     summary: "Use this category only when no listed category applies.",
     documentation: "Upload full proof of payment and add a clear business justification.",
-    policyNote: "Finance may request additional clarification before disbursement."
+    policyNote: "Finance may request additional clarification before payment confirmation."
   }
 };
 

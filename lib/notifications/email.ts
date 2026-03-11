@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createTranslator } from "use-intl/core";
+import type { AppLocale } from "@/types/locale";
 import { createSupabaseServiceRoleClient } from "../supabase/service-role";
 import { formatDateRangeHuman } from "../datetime";
 import { formatLeaveTypeLabel } from "../time-off";
@@ -10,6 +12,33 @@ import {
   pLast
 } from "./email-template";
 import { isEmailEnabled } from "./email-config";
+
+import enMessages from "@/messages/en.json";
+import frMessages from "@/messages/fr.json";
+
+const allMessages = { en: enMessages, fr: frMessages } as const;
+
+function resolveLocale(preferred?: string | null): AppLocale {
+  return preferred === "fr" ? "fr" : "en";
+}
+
+function createEmailTranslator(locale: AppLocale) {
+  return createTranslator({
+    locale,
+    messages: allMessages[locale],
+    namespace: "email"
+  });
+}
+
+/** Returns the translated footer + tagline for renderEmailTemplate */
+function emailLocaleOptions(t: ReturnType<typeof createEmailTranslator>, locale: AppLocale) {
+  const td = t as (key: string) => string;
+  return {
+    lang: locale,
+    footerOverride: td("footer.default").replace(/\n/g, "<br>"),
+    tagline: td("footer.tagline")
+  };
+}
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -36,6 +65,7 @@ type ResendPayload = {
 type RecipientProfile = {
   email: string;
   fullName: string;
+  locale: AppLocale;
 };
 
 /* ---------------------------------------------------------------------------
@@ -52,7 +82,7 @@ async function fetchRecipientProfile({
   const serviceClient = createSupabaseServiceRoleClient();
   const { data: row, error } = await serviceClient
     .from("profiles")
-    .select("email, full_name")
+    .select("email, full_name, preferred_locale")
     .eq("org_id", orgId)
     .eq("id", userId)
     .is("deleted_at", null)
@@ -73,7 +103,8 @@ async function fetchRecipientProfile({
 
   return {
     email: row.email,
-    fullName: typeof row.full_name === "string" ? row.full_name : "Crew member"
+    fullName: typeof row.full_name === "string" ? row.full_name : "Crew member",
+    locale: resolveLocale(row.preferred_locale as string | null)
   };
 }
 
@@ -136,8 +167,11 @@ async function sendResendEmail(payload: ResendPayload): Promise<void> {
   }
 }
 
-function firstName(fullName: string): string {
-  return fullName.trim().split(/\s+/)[0] || "there";
+function firstName(fullName: string, locale: AppLocale = "en"): string {
+  const name = fullName.trim().split(/\s+/)[0];
+  if (name) return name;
+  const t = createEmailTranslator(locale);
+  return t("fallbackName");
 }
 
 /* ---------------------------------------------------------------------------
@@ -203,7 +237,8 @@ export async function sendWelcomeEmail({
   setupLink,
   department,
   managerName,
-  isNewHire = true
+  isNewHire = true,
+  locale = "en" as AppLocale
 }: {
   recipientEmail: string;
   recipientName: string;
@@ -211,75 +246,71 @@ export async function sendWelcomeEmail({
   department?: string;
   managerName?: string;
   isNewHire?: boolean;
+  locale?: AppLocale;
 }): Promise<void> {
   try {
-    const name = firstName(recipientName);
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipientName, locale);
     const appUrl = resolveAppUrl();
     const effectiveSetupLink = setupLink || `${appUrl}/login`;
 
     if (isNewHire) {
       // Template 1: New Hire Welcome
       const infoRows: Array<{ label: string; value: string }> = [
-        { label: "Login email", value: recipientEmail }
+        { label: t("welcome.newHire.loginEmail"), value: recipientEmail }
       ];
       if (department) {
-        infoRows.push({ label: "Your team", value: department });
+        infoRows.push({ label: t("welcome.newHire.yourTeam"), value: department });
       }
       if (managerName) {
-        infoRows.push({ label: "Your manager", value: managerName });
+        infoRows.push({ label: t("welcome.newHire.yourManager"), value: managerName });
       }
 
       const html = renderEmailTemplate({
-        preheaderText: "Your Crew Hub account is ready",
-        greeting: `Hey ${name},`,
+        preheaderText: t("welcome.newHire.preheader"),
+        greeting: t("greeting", { name }),
         bodyHtml: [
-          p("Welcome to Accrue. We're glad you're here."),
-          p(
-            "Your Crew Hub account is ready. Crew Hub is where you'll find everything you need: your team, your pay, your time off, and your documents. Think of it as home base."
-          ),
-          pLast(
-            "To get started, tap the button below to set up your login and authenticator:"
-          ),
+          p(t("welcome.newHire.body1")),
+          p(t("welcome.newHire.body2")),
+          pLast(t("welcome.newHire.body3")),
           renderInfoBlock(infoRows)
         ].join("\n"),
         ctaButton: {
-          label: "Set Up Your Account",
+          label: t("welcome.newHire.cta"),
           url: effectiveSetupLink,
           style: "cta"
         },
-        closingText:
-          "If anything feels off or you have questions, reach out to your manager or the Operations team."
+        closingText: t("welcome.newHire.closing"),
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: [recipientEmail],
-        subject: `Welcome to Accrue, ${name}`,
+        subject: t("welcome.newHire.subject", { name }),
         html
       });
     } else {
       // Template 2: Existing Employee Invite
       const html = renderEmailTemplate({
-        preheaderText: "Set up your login to get started",
-        greeting: `Hey ${name},`,
+        preheaderText: t("welcome.invite.preheader"),
+        greeting: t("greeting", { name }),
         bodyHtml: [
-          p(
-            "We've set up Crew Hub, a new internal platform for the Accrue team. It's where you'll manage your pay, time off, documents, and team info going forward."
-          ),
-          pLast("Your account is ready. Tap below to set up your login:"),
-          renderInfoBlock([{ label: "Login email", value: recipientEmail }])
+          p(t("welcome.invite.body1")),
+          pLast(t("welcome.invite.body2")),
+          renderInfoBlock([{ label: t("welcome.invite.loginEmail"), value: recipientEmail }])
         ].join("\n"),
         ctaButton: {
-          label: "Get Started",
+          label: t("welcome.invite.cta"),
           url: effectiveSetupLink,
           style: "cta"
         },
-        closingText:
-          "Everything you need will be in one place. If you run into any issues getting set up, reach out to the Operations team."
+        closingText: t("welcome.invite.closing"),
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: [recipientEmail],
-        subject: "Your Crew Hub account is ready",
+        subject: t("welcome.invite.subject"),
         html
       });
     }
@@ -323,68 +354,70 @@ export async function sendLeaveStatusEmail({
     const canSend = await checkEmailPreference(orgId, userId, "approvals");
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
-    const dateRange = formatDateRangeHuman(startDate, endDate);
-    const resolvedApprover = approverName || "your manager";
+    const dateRange = formatDateRangeHuman(startDate, endDate, locale);
+    const resolvedApprover = approverName || t("fallbackApprover");
 
     if (status === "approved") {
       const infoRows = [
-        { label: "Type", value: formatLeaveTypeLabel(leaveType) },
-        { label: "Dates", value: dateRange },
-        { label: "Approved by", value: resolvedApprover }
+        { label: t("leave.approved.type"), value: formatLeaveTypeLabel(leaveType, locale) },
+        { label: t("leave.approved.dates"), value: dateRange },
+        { label: t("leave.approved.approvedBy"), value: resolvedApprover }
       ];
 
       const html = renderEmailTemplate({
-        preheaderText: "You're all set",
-        greeting: `Hey ${name},`,
+        preheaderText: t("leave.approved.preheader"),
+        greeting: t("greeting", { name }),
         bodyHtml: [
-          p("Your time off request has been approved."),
+          p(t("leave.approved.body")),
           renderInfoBlock(infoRows),
-          pLast("It's on the calendar. Enjoy your time.")
+          pLast(t("leave.approved.closing"))
         ].join("\n"),
         ctaButton: {
-          label: "View in Crew Hub",
+          label: t("leave.approved.cta"),
           url: `${appUrl}/time-off`,
           style: "cta"
-        }
+        },
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: [recipient.email],
-        subject: "Your time off is approved",
+        subject: t("leave.approved.subject"),
         html
       });
     } else {
       const infoRows = [
-        { label: "Type", value: formatLeaveTypeLabel(leaveType) },
-        { label: "Dates", value: dateRange },
-        { label: "Reviewed by", value: resolvedApprover }
+        { label: t("leave.rejected.type"), value: formatLeaveTypeLabel(leaveType, locale) },
+        { label: t("leave.rejected.dates"), value: dateRange },
+        { label: t("leave.rejected.reviewedBy"), value: resolvedApprover }
       ];
       if (rejectionReason?.trim()) {
-        infoRows.push({ label: "Reason", value: rejectionReason.trim() });
+        infoRows.push({ label: t("leave.rejected.reason"), value: rejectionReason.trim() });
       }
 
       const html = renderEmailTemplate({
-        preheaderText: "Your request was reviewed",
-        greeting: `Hey ${name},`,
+        preheaderText: t("leave.rejected.preheader"),
+        greeting: t("greeting", { name }),
         bodyHtml: [
-          p("Your time off request was not approved."),
+          p(t("leave.rejected.body")),
           renderInfoBlock(infoRows),
-          pLast(
-            `If you'd like to discuss or adjust the dates, reach out to ${resolvedApprover} directly.`
-          )
+          pLast(t("leave.rejected.closing", { approver: resolvedApprover }))
         ].join("\n"),
         ctaButton: {
-          label: "View in Crew Hub",
+          label: t("leave.rejected.cta"),
           url: `${appUrl}/time-off`,
           style: "primary"
-        }
+        },
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: [recipient.email],
-        subject: "Update on your time off request",
+        subject: t("leave.rejected.subject"),
         html
       });
     }
@@ -425,35 +458,38 @@ export async function sendLeaveRequestedEmail({
     const canSend = await checkEmailPreference(orgId, managerId, "approvals");
     if (!canSend) return;
 
-    const managerFirst = firstName(manager.fullName);
+    const locale = manager.locale;
+    const t = createEmailTranslator(locale);
+    const managerFirst = firstName(manager.fullName, locale);
     const appUrl = resolveAppUrl();
-    const dateRange = formatDateRangeHuman(startDate, endDate);
+    const dateRange = formatDateRangeHuman(startDate, endDate, locale);
 
     const infoRows: Array<{ label: string; value: string }> = [
-      { label: "Type", value: formatLeaveTypeLabel(leaveType) },
-      { label: "Dates", value: dateRange }
+      { label: t("leave.requested.type"), value: formatLeaveTypeLabel(leaveType, locale) },
+      { label: t("leave.requested.dates"), value: dateRange }
     ];
     if (note?.trim()) {
-      infoRows.push({ label: "Note", value: note.trim() });
+      infoRows.push({ label: t("leave.requested.note"), value: note.trim() });
     }
 
     const html = renderEmailTemplate({
-      preheaderText: "Review their request",
-      greeting: `Hey ${managerFirst},`,
+      preheaderText: t("leave.requested.preheader"),
+      greeting: t("greeting", { name: managerFirst }),
       bodyHtml: [
-        p(`${employeeName} submitted a time off request:`),
+        p(t("leave.requested.body", { employeeName })),
         renderInfoBlock(infoRows)
       ].join("\n"),
       ctaButton: {
-        label: "Review Request",
+        label: t("leave.requested.cta"),
         url: `${appUrl}/time-off`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [manager.email],
-      subject: `${employeeName} requested time off`,
+      subject: t("leave.requested.subject", { employeeName }),
       html
     });
   } catch (error) {
@@ -491,25 +527,28 @@ export async function sendLeaveCancelledEmail({
     const canSend = await checkEmailPreference(orgId, managerId, "approvals");
     if (!canSend) return;
 
-    const managerFirst = firstName(manager.fullName);
-    const dateRange = formatDateRangeHuman(startDate, endDate);
+    const locale = manager.locale;
+    const t = createEmailTranslator(locale);
+    const managerFirst = firstName(manager.fullName, locale);
+    const dateRange = formatDateRangeHuman(startDate, endDate, locale);
 
     const html = renderEmailTemplate({
-      preheaderText: "No action needed",
-      greeting: `Hey ${managerFirst},`,
+      preheaderText: t("leave.cancelled.preheader"),
+      greeting: t("greeting", { name: managerFirst }),
       bodyHtml: [
-        p(`${employeeName} cancelled their time off request:`),
+        p(t("leave.cancelled.body", { employeeName })),
         renderInfoBlock([
-          { label: "Type", value: formatLeaveTypeLabel(leaveType) },
-          { label: "Dates", value: dateRange }
+          { label: t("leave.cancelled.type"), value: formatLeaveTypeLabel(leaveType, locale) },
+          { label: t("leave.cancelled.dates"), value: dateRange }
         ]),
-        p("No action needed on your end.")
-      ].join("\n")
+        p(t("leave.cancelled.noAction"))
+      ].join("\n"),
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [manager.email],
-      subject: `${employeeName} cancelled their time off`,
+      subject: t("leave.cancelled.subject", { employeeName }),
       html
     });
   } catch (error) {
@@ -541,29 +580,29 @@ export async function sendPayslipReadyEmail({
     const canSend = await checkEmailPreference(orgId, userId, "announcements");
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "View your payment statement",
-      greeting: `Hey ${name},`,
+      preheaderText: t("payslip.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        pLast(
-          `Your payslip for ${payPeriod} is now available in Crew Hub.`
-        )
+        pLast(t("payslip.body", { payPeriod }))
       ].join("\n"),
       ctaButton: {
-        label: "View Payslip",
+        label: t("payslip.cta"),
         url: `${appUrl}/payments`,
         style: "cta"
       },
-      closingText:
-        "If anything looks off, reach out to the Operations team."
+      closingText: t("payslip.closing"),
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `Your payslip for ${payPeriod} is ready`,
+      subject: t("payslip.subject", { payPeriod }),
       html
     });
   } catch (error) {
@@ -604,28 +643,31 @@ export async function sendExpenseSubmittedEmail({
     if (employee) {
       const canSend = await checkEmailPreference(orgId, userId, "approvals");
       if (canSend) {
-        const name = firstName(employee.fullName);
+        const locale = employee.locale;
+        const t = createEmailTranslator(locale);
+        const name = firstName(employee.fullName, locale);
         const html = renderEmailTemplate({
-          preheaderText: "We've got it",
-          greeting: `Hey ${name},`,
+          preheaderText: t("expense.submitted.employee.preheader"),
+          greeting: t("greeting", { name }),
           bodyHtml: [
-            p("Your expense claim has been submitted and is pending review."),
+            p(t("expense.submitted.employee.body")),
             renderInfoBlock([
-              { label: "Expense", value: description },
-              { label: "Amount", value: amount }
+              { label: t("expense.submitted.employee.expense"), value: description },
+              { label: t("expense.submitted.employee.amount"), value: amount }
             ]),
-            pLast("You'll get an update once it's reviewed.")
+            pLast(t("expense.submitted.employee.closing"))
           ].join("\n"),
           ctaButton: {
-            label: "View Expense",
+            label: t("expense.submitted.employee.cta"),
             url: `${appUrl}/expenses`,
             style: "cta"
-          }
+          },
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [employee.email],
-          subject: "Your expense was submitted",
+          subject: t("expense.submitted.employee.subject"),
           html
         });
       }
@@ -639,29 +681,31 @@ export async function sendExpenseSubmittedEmail({
         "approvals"
       );
       if (canSend) {
-        const managerFirst = firstName(manager.fullName);
+        const locale = manager.locale;
+        const t = createEmailTranslator(locale);
+        const managerFirst = firstName(manager.fullName, locale);
+        const employeeFallback = employee?.fullName || t("fallbackEmployee");
         const html = renderEmailTemplate({
-          preheaderText: "Review needed",
-          greeting: `Hey ${managerFirst},`,
+          preheaderText: t("expense.submitted.manager.preheader"),
+          greeting: t("greeting", { name: managerFirst }),
           bodyHtml: [
-            p(
-              `${employee?.fullName || "A team member"} submitted an expense for your review:`
-            ),
+            p(t("expense.submitted.manager.body", { employeeName: employeeFallback })),
             renderInfoBlock([
-              { label: "Expense", value: description },
-              { label: "Amount", value: amount }
+              { label: t("expense.submitted.manager.expense"), value: description },
+              { label: t("expense.submitted.manager.amount"), value: amount }
             ])
           ].join("\n"),
           ctaButton: {
-            label: "Review Expense",
+            label: t("expense.submitted.manager.cta"),
             url: `${appUrl}/expenses`,
             style: "cta"
-          }
+          },
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [manager.email],
-          subject: `${employee?.fullName || "A team member"} submitted an expense`,
+          subject: t("expense.submitted.manager.subject", { employeeName: employeeFallback }),
           html
         });
       }
@@ -699,68 +743,74 @@ export async function sendExpenseApprovedEmail({
       role: "FINANCE_ADMIN"
     });
     const appUrl = resolveAppUrl();
-    const resolvedApprover = approverName || "your manager";
 
     // Template 10: to Employee
     if (employee) {
       const canSend = await checkEmailPreference(orgId, userId, "approvals");
       if (canSend) {
-        const name = firstName(employee.fullName);
+        const locale = employee.locale;
+        const t = createEmailTranslator(locale);
+        const name = firstName(employee.fullName, locale);
+        const resolvedApprover = approverName || t("fallbackApprover");
         const html = renderEmailTemplate({
-          preheaderText: "Good news",
-          greeting: `Hey ${name},`,
+          preheaderText: t("expense.approved.employee.preheader"),
+          greeting: t("greeting", { name }),
           bodyHtml: [
-            p("Your expense claim has been approved."),
+            p(t("expense.approved.employee.body")),
             renderInfoBlock([
-              { label: "Expense", value: description },
-              { label: "Amount", value: amount },
-              { label: "Approved by", value: resolvedApprover }
+              { label: t("expense.approved.employee.expense"), value: description },
+              { label: t("expense.approved.employee.amount"), value: amount },
+              { label: t("expense.approved.employee.approvedBy"), value: resolvedApprover }
             ])
           ].join("\n"),
           ctaButton: {
-            label: "View Expense",
+            label: t("expense.approved.employee.cta"),
             url: `${appUrl}/expenses`,
             style: "cta"
-          }
+          },
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [employee.email],
-          subject: "Your expense was approved",
+          subject: t("expense.approved.employee.subject"),
           html
         });
       }
     }
 
-    // Template 11: to Finance
+    // Template 11: to Finance (role-based, default to "en")
     if (financeEmails.length > 0) {
+      const locale: AppLocale = "en";
+      const t = createEmailTranslator(locale);
+      const employeeFallback = employee?.fullName || t("fallbackEmployee");
+      const resolvedApprover = approverName || t("fallbackApprover");
       const html = renderEmailTemplate({
-        preheaderText: `${amount} for ${employee?.fullName || "a team member"}`,
-        greeting: "Hey there,",
+        preheaderText: t("expense.approved.finance.preheader", { amount, employeeName: employeeFallback }),
+        greeting: t("greetingGeneric"),
         bodyHtml: [
-          p(
-            "An expense has been approved and is ready for finance payment confirmation:"
-          ),
+          p(t("expense.approved.finance.body")),
           renderInfoBlock([
             {
-              label: "Employee",
-              value: employee?.fullName || "A team member"
+              label: t("expense.approved.finance.employee"),
+              value: employeeFallback
             },
-            { label: "Expense", value: description },
-            { label: "Amount", value: amount },
-            { label: "Approved by", value: resolvedApprover }
+            { label: t("expense.approved.finance.expense"), value: description },
+            { label: t("expense.approved.finance.amount"), value: amount },
+            { label: t("expense.approved.finance.approvedBy"), value: resolvedApprover }
           ])
         ].join("\n"),
         ctaButton: {
-          label: "Process in Crew Hub",
+          label: t("expense.approved.finance.cta"),
           url: `${appUrl}/expenses`,
           style: "cta"
-        }
+        },
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: financeEmails,
-        subject: `Expense approved, ready for payment confirmation: ${description}`,
+        subject: t("expense.approved.finance.subject", { description }),
         html
       });
     }
@@ -799,39 +849,40 @@ export async function sendExpenseRejectedEmail({
     const canSend = await checkEmailPreference(orgId, userId, "approvals");
     if (!canSend) return;
 
-    const name = firstName(employee.fullName);
+    const locale = employee.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(employee.fullName, locale);
     const appUrl = resolveAppUrl();
-    const resolvedApprover = approverName || "your manager";
+    const resolvedApprover = approverName || t("fallbackApprover");
 
     const infoRows = [
-      { label: "Expense", value: description },
-      { label: "Amount", value: amount },
-      { label: "Reviewed by", value: resolvedApprover }
+      { label: t("expense.rejected.expense"), value: description },
+      { label: t("expense.rejected.amount"), value: amount },
+      { label: t("expense.rejected.reviewedBy"), value: resolvedApprover }
     ];
     if (reason?.trim()) {
-      infoRows.push({ label: "Reason", value: reason.trim() });
+      infoRows.push({ label: t("expense.rejected.reason"), value: reason.trim() });
     }
 
     const html = renderEmailTemplate({
-      preheaderText: "Your expense was reviewed",
-      greeting: `Hey ${name},`,
+      preheaderText: t("expense.rejected.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p("Your expense claim was not approved."),
+        p(t("expense.rejected.body")),
         renderInfoBlock(infoRows),
-        pLast(
-          `If you have questions or want to resubmit with changes, reach out to ${resolvedApprover} directly.`
-        )
+        pLast(t("expense.rejected.closing", { approver: resolvedApprover }))
       ].join("\n"),
       ctaButton: {
-        label: "View Expense",
+        label: t("expense.rejected.cta"),
         url: `${appUrl}/expenses`,
         style: "primary"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [employee.email],
-      subject: "Update on your expense claim",
+      subject: t("expense.rejected.subject"),
       html
     });
   } catch (error) {
@@ -865,32 +916,33 @@ export async function sendExpenseDisbursedEmail({
     const canSend = await checkEmailPreference(orgId, userId, "approvals");
     if (!canSend) return;
 
-    const name = firstName(employee.fullName);
+    const locale = employee.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(employee.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "Payment is on the way",
-      greeting: `Hey ${name},`,
+      preheaderText: t("expense.disbursed.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p("Your expense claim has been reimbursed."),
+        p(t("expense.disbursed.body")),
         renderInfoBlock([
-          { label: "Expense", value: description },
-          { label: "Amount", value: amount }
+          { label: t("expense.disbursed.expense"), value: description },
+          { label: t("expense.disbursed.amount"), value: amount }
         ]),
-        pLast(
-          "The payment should reflect in your account shortly."
-        )
+        pLast(t("expense.disbursed.closing"))
       ].join("\n"),
       ctaButton: {
-        label: "View Expense",
+        label: t("expense.disbursed.cta"),
         url: `${appUrl}/expenses`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [employee.email],
-      subject: "Your expense has been reimbursed",
+      subject: t("expense.disbursed.subject"),
       html
     });
   } catch (error) {
@@ -926,29 +978,32 @@ export async function sendExpenseInfoRequestedEmail({
     const canSend = await checkEmailPreference(orgId, userId, "approvals");
     if (!canSend) return;
 
-    const name = firstName(employee.fullName);
+    const locale = employee.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(employee.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "More details requested",
-      greeting: `Hey ${name},`,
+      preheaderText: t("expense.infoRequested.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p(`${requesterName} requested more information before approving your expense.`),
+        p(t("expense.infoRequested.body", { requesterName })),
         renderInfoBlock([
-          { label: "Expense", value: description },
-          { label: "Request", value: message }
+          { label: t("expense.infoRequested.expense"), value: description },
+          { label: t("expense.infoRequested.request"), value: message }
         ])
       ].join("\n"),
       ctaButton: {
-        label: "Reply in Crew Hub",
+        label: t("expense.infoRequested.cta"),
         url: `${appUrl}/expenses`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [employee.email],
-      subject: "More info requested for your expense",
+      subject: t("expense.infoRequested.subject"),
       html
     });
   } catch (error) {
@@ -984,29 +1039,32 @@ export async function sendExpenseInfoResponseEmail({
     const canSend = await checkEmailPreference(orgId, userId, "approvals");
     if (!canSend) return;
 
-    const name = firstName(reviewer.fullName);
+    const locale = reviewer.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(reviewer.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "Expense response received",
-      greeting: `Hey ${name},`,
+      preheaderText: t("expense.infoResponse.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p(`${responderName} replied to your request for more info.`),
+        p(t("expense.infoResponse.body", { responderName })),
         renderInfoBlock([
-          { label: "Expense", value: description },
-          { label: "Response", value: message }
+          { label: t("expense.infoResponse.expense"), value: description },
+          { label: t("expense.infoResponse.response"), value: message }
         ])
       ].join("\n"),
       ctaButton: {
-        label: "Review expense",
+        label: t("expense.infoResponse.cta"),
         url: `${appUrl}/expenses/approvals`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [reviewer.email],
-      subject: "Expense response received",
+      subject: t("expense.infoResponse.subject"),
       html
     });
   } catch (error) {
@@ -1042,26 +1100,29 @@ export async function sendSignatureRequestEmail({
     const canSend = await checkEmailPreference(orgId, userId, "approvals");
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: `${requestedByName} needs your signature`,
-      greeting: `Hey ${name},`,
+      preheaderText: t("signature.preheader", { requestedByName }),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p(`${requestedByName} has sent you a document to sign.`),
-        renderInfoBlock([{ label: "Document", value: requestTitle }])
+        p(t("signature.body", { requestedByName })),
+        renderInfoBlock([{ label: t("signature.document"), value: requestTitle }])
       ].join("\n"),
       ctaButton: {
-        label: "Review and Sign",
+        label: t("signature.cta"),
         url: signatureUrl || `${appUrl}/signatures`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `Signature request: ${requestTitle}`,
+      subject: t("signature.subject", { requestTitle }),
       html
     });
   } catch (error) {
@@ -1097,33 +1158,33 @@ export async function sendPaymentDetailsUpdatedEmail({
 
     if (recipients.length === 0) return;
 
+    // Role-based email, default to "en"
+    const locale: AppLocale = "en";
+    const t = createEmailTranslator(locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "Review the change",
-      greeting: "Hey there,",
+      preheaderText: t("paymentDetails.preheader"),
+      greeting: t("greetingGeneric"),
       bodyHtml: [
-        p(
-          `${employeeName} (${employeeEmail}) has updated their payment details.`
-        ),
+        p(t("paymentDetails.body", { employeeName, employeeEmail })),
         renderInfoBlock([
-          { label: "Payment method", value: paymentMethod },
-          { label: "Effective", value: changeEffectiveAt }
+          { label: t("paymentDetails.paymentMethod"), value: paymentMethod },
+          { label: t("paymentDetails.effective"), value: changeEffectiveAt }
         ]),
-        pLast(
-          "Please review and confirm the update is correct."
-        )
+        pLast(t("paymentDetails.closing"))
       ].join("\n"),
       ctaButton: {
-        label: "View in Crew Hub",
+        label: t("paymentDetails.cta"),
         url: `${appUrl}/people`,
         style: "primary"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: recipients,
-      subject: `Payment details updated for ${employeeName}`,
+      subject: t("paymentDetails.subject", { employeeName }),
       html
     });
   } catch (error) {
@@ -1161,32 +1222,33 @@ export async function sendComplianceReminderEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: `Action needed by ${dueDate}`,
-      greeting: `Hey ${name},`,
+      preheaderText: t("compliance.reminder.preheader", { dueDate }),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p("This is a reminder about an upcoming compliance deadline."),
+        p(t("compliance.reminder.body")),
         renderInfoBlock([
-          { label: "Requirement", value: requirement },
-          { label: "Due date", value: dueDate }
+          { label: t("compliance.reminder.requirement"), value: requirement },
+          { label: t("compliance.reminder.dueDate"), value: dueDate }
         ]),
-        pLast(
-          "Please make sure this is completed on time. If you need help, reach out to the Operations team."
-        )
+        pLast(t("compliance.reminder.closing"))
       ].join("\n"),
       ctaButton: {
-        label: "View in Crew Hub",
+        label: t("compliance.reminder.cta"),
         url: `${appUrl}/compliance`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `Compliance reminder: ${requirement}`,
+      subject: t("compliance.reminder.subject", { requirement }),
       html
     });
   } catch (error) {
@@ -1219,8 +1281,8 @@ export async function sendComplianceOverdueEmail({
     const owner = await fetchRecipientProfile({ orgId, userId });
     const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
     const appUrl = resolveAppUrl();
-    const resolvedOwner = ownerName || owner?.fullName || "a team member";
 
+    // Owner email (specific person)
     if (owner) {
       const canSend = await checkEmailPreference(
         orgId,
@@ -1228,70 +1290,76 @@ export async function sendComplianceOverdueEmail({
         "announcements"
       );
       if (canSend) {
-        const name = firstName(owner.fullName);
+        const locale = owner.locale;
+        const t = createEmailTranslator(locale);
+        const name = firstName(owner.fullName, locale);
+        const resolvedOwner = ownerName || owner.fullName || t("fallbackEmployee");
 
         const infoRows: Array<{ label: string; value: string }> = [
-          { label: "Requirement", value: requirement }
+          { label: t("compliance.overdue.requirement"), value: requirement }
         ];
         if (dueDate) {
-          infoRows.push({ label: "Was due", value: dueDate });
+          infoRows.push({ label: t("compliance.overdue.wasDue"), value: dueDate });
         }
-        infoRows.push({ label: "Assigned to", value: resolvedOwner });
+        infoRows.push({ label: t("compliance.overdue.assignedTo"), value: resolvedOwner });
 
         const html = renderEmailTemplate({
-          preheaderText: "Immediate action required",
-          greeting: `Hey ${name},`,
+          preheaderText: t("compliance.overdue.preheader"),
+          greeting: t("greeting", { name }),
           bodyHtml: [
-            p("A compliance requirement is now overdue."),
+            p(t("compliance.overdue.body")),
             renderInfoBlock(infoRows),
-            pLast(
-              "This needs immediate attention. Please follow up directly."
-            )
+            pLast(t("compliance.overdue.closing"))
           ].join("\n"),
           ctaButton: {
-            label: "View in Crew Hub",
+            label: t("compliance.overdue.cta"),
             url: `${appUrl}/compliance`,
             style: "cta"
-          }
+          },
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [owner.email],
-          subject: `Compliance overdue: ${requirement}`,
+          subject: t("compliance.overdue.subject", { requirement }),
           html
         });
       }
     }
 
+    // HR email (role-based, default to "en")
     if (hrEmails.length > 0) {
+      const locale: AppLocale = "en";
+      const t = createEmailTranslator(locale);
+      const resolvedOwner = ownerName || owner?.fullName || t("fallbackEmployee");
+
       const infoRows: Array<{ label: string; value: string }> = [
-        { label: "Requirement", value: requirement }
+        { label: t("compliance.overdue.requirement"), value: requirement }
       ];
       if (dueDate) {
-        infoRows.push({ label: "Was due", value: dueDate });
+        infoRows.push({ label: t("compliance.overdue.wasDue"), value: dueDate });
       }
-      infoRows.push({ label: "Assigned to", value: resolvedOwner });
+      infoRows.push({ label: t("compliance.overdue.assignedTo"), value: resolvedOwner });
 
       const html = renderEmailTemplate({
-        preheaderText: "Immediate action required",
-        greeting: "Hey there,",
+        preheaderText: t("compliance.overdue.preheader"),
+        greeting: t("greetingGeneric"),
         bodyHtml: [
-          p("A compliance requirement is now overdue."),
+          p(t("compliance.overdue.body")),
           renderInfoBlock(infoRows),
-          pLast(
-            "This needs immediate attention. Please follow up directly."
-          )
+          pLast(t("compliance.overdue.closing"))
         ].join("\n"),
         ctaButton: {
-          label: "View in Crew Hub",
+          label: t("compliance.overdue.cta"),
           url: `${appUrl}/compliance`,
           style: "cta"
-        }
+        },
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: hrEmails,
-        subject: `Compliance overdue: ${requirement}`,
+        subject: t("compliance.overdue.subject", { requirement }),
         html
       });
     }
@@ -1330,34 +1398,37 @@ export async function sendReviewCycleStartedEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const bodyParts = [
-      p(`The ${cycleName} review cycle is now open.`)
+      p(t("review.cycleStarted.body", { cycleName }))
     ];
     if (selfReviewDeadline) {
       bodyParts.push(
         renderInfoBlock([
-          { label: "Self-review deadline", value: selfReviewDeadline }
+          { label: t("review.cycleStarted.selfReviewDeadline"), value: selfReviewDeadline }
         ])
       );
     }
 
     const html = renderEmailTemplate({
-      preheaderText: "Time to complete your self-review",
-      greeting: `Hey ${name},`,
+      preheaderText: t("review.cycleStarted.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: bodyParts.join("\n"),
       ctaButton: {
-        label: "Start Your Review",
+        label: t("review.cycleStarted.cta"),
         url: `${appUrl}/performance`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `${cycleName} review has started`,
+      subject: t("review.cycleStarted.subject", { cycleName }),
       html
     });
   } catch (error) {
@@ -1395,27 +1466,28 @@ export async function sendReviewReminderEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: `Deadline is ${deadline}`,
-      greeting: `Hey ${name},`,
+      preheaderText: t("review.reminder.preheader", { deadline }),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        pLast(
-          `Your self-review for ${cycleName} is due on ${deadline}. Please make sure it's submitted on time.`
-        )
+        pLast(t("review.reminder.body", { cycleName, deadline }))
       ].join("\n"),
       ctaButton: {
-        label: "Complete Self-Review",
+        label: t("review.reminder.cta"),
         url: `${appUrl}/performance`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `Reminder: self-review due soon for ${cycleName}`,
+      subject: t("review.reminder.subject", { cycleName }),
       html
     });
   } catch (error) {
@@ -1451,27 +1523,28 @@ export async function sendReviewSharedEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "Your manager shared your review",
-      greeting: `Hey ${name},`,
+      preheaderText: t("review.shared.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        pLast(
-          `Your review for ${cycleName} has been shared with you. Take a look when you have a moment.`
-        )
+        pLast(t("review.shared.body", { cycleName }))
       ].join("\n"),
       ctaButton: {
-        label: "View Your Review",
+        label: t("review.shared.cta"),
         url: `${appUrl}/performance`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `Your ${cycleName} review has been shared`,
+      subject: t("review.shared.subject", { cycleName }),
       html
     });
   } catch (error) {
@@ -1509,27 +1582,28 @@ export async function sendReviewAcknowledgedEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "Review acknowledged",
-      greeting: `Hey ${name},`,
+      preheaderText: t("review.acknowledged.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        pLast(
-          `${employeeName} has acknowledged their ${cycleName} review. No action needed on your end.`
-        )
+        pLast(t("review.acknowledged.body", { employeeName, cycleName }))
       ].join("\n"),
       ctaButton: {
-        label: "View in Crew Hub",
+        label: t("review.acknowledged.cta"),
         url: `${appUrl}/performance`,
         style: "primary"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `${employeeName} acknowledged their ${cycleName} review`,
+      subject: t("review.acknowledged.subject", { employeeName, cycleName }),
       html
     });
   } catch (error) {
@@ -1567,32 +1641,33 @@ export async function sendDocumentExpiryEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "Document expiring soon",
-      greeting: `Hey ${name},`,
+      preheaderText: t("document.expiring.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p("A document is expiring soon."),
+        p(t("document.expiring.body")),
         renderInfoBlock([
-          { label: "Document", value: documentTitle },
-          { label: "Expiry date", value: expiryDate }
+          { label: t("document.expiring.document"), value: documentTitle },
+          { label: t("document.expiring.expiryDate"), value: expiryDate }
         ]),
-        pLast(
-          "Please review and take any necessary action before it expires."
-        )
+        pLast(t("document.expiring.closing"))
       ].join("\n"),
       ctaButton: {
-        label: "View Document",
+        label: t("document.expiring.cta"),
         url: `${appUrl}/documents`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `${documentTitle} expires on ${expiryDate}`,
+      subject: t("document.expiring.subject", { documentTitle, expiryDate }),
       html
     });
   } catch (error) {
@@ -1622,6 +1697,7 @@ export async function sendDocumentExpiredEmail({
     const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
     const appUrl = resolveAppUrl();
 
+    // To employee (specific person)
     if (employee) {
       const canSend = await checkEmailPreference(
         orgId,
@@ -1629,60 +1705,64 @@ export async function sendDocumentExpiredEmail({
         "announcements"
       );
       if (canSend) {
-        const name = firstName(employee.fullName);
+        const locale = employee.locale;
+        const t = createEmailTranslator(locale);
+        const name = firstName(employee.fullName, locale);
 
         const html = renderEmailTemplate({
-          preheaderText: "Action needed",
-          greeting: `Hey ${name},`,
+          preheaderText: t("document.expired.employee.preheader"),
+          greeting: t("greeting", { name }),
           bodyHtml: [
-            p("The following document has expired:"),
-            renderInfoBlock([{ label: "Document", value: documentTitle }]),
-            pLast(
-              "Please upload a renewed version or take the appropriate next steps."
-            )
+            p(t("document.expired.employee.body")),
+            renderInfoBlock([{ label: t("document.expired.employee.document"), value: documentTitle }]),
+            pLast(t("document.expired.employee.closing"))
           ].join("\n"),
           ctaButton: {
-            label: "View in Crew Hub",
+            label: t("document.expired.employee.cta"),
             url: `${appUrl}/documents`,
             style: "cta"
-          }
+          },
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [employee.email],
-          subject: `${documentTitle} has expired`,
+          subject: t("document.expired.employee.subject", { documentTitle }),
           html
         });
       }
     }
 
+    // To HR (role-based, default to "en")
     if (hrEmails.length > 0) {
+      const locale: AppLocale = "en";
+      const t = createEmailTranslator(locale);
+
       const html = renderEmailTemplate({
-        preheaderText: "Action needed",
-        greeting: "Hey there,",
+        preheaderText: t("document.expired.hr.preheader"),
+        greeting: t("greetingGeneric"),
         bodyHtml: [
-          p("The following document has expired:"),
+          p(t("document.expired.hr.body")),
           renderInfoBlock([
-            { label: "Document", value: documentTitle },
+            { label: t("document.expired.hr.document"), value: documentTitle },
             {
-              label: "Employee",
-              value: employee?.fullName || "A team member"
+              label: t("document.expired.hr.employee"),
+              value: employee?.fullName || t("fallbackEmployee")
             }
           ]),
-          pLast(
-            "Please upload a renewed version or take the appropriate next steps."
-          )
+          pLast(t("document.expired.hr.closing"))
         ].join("\n"),
         ctaButton: {
-          label: "View in Crew Hub",
+          label: t("document.expired.hr.cta"),
           url: `${appUrl}/documents`,
           style: "cta"
-        }
+        },
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: hrEmails,
-        subject: `${documentTitle} has expired`,
+        subject: t("document.expired.hr.subject", { documentTitle }),
         html
       });
     }
@@ -1725,27 +1805,27 @@ export async function sendOnboardingStartedEmail({
         "announcements"
       );
       if (canSend) {
-        const name = firstName(employee.fullName);
+        const locale = employee.locale;
+        const t = createEmailTranslator(locale);
+        const name = firstName(employee.fullName, locale);
         const html = renderEmailTemplate({
-          preheaderText: "Let's get you set up",
-          greeting: `Hey ${name},`,
+          preheaderText: t("onboarding.started.employee.preheader"),
+          greeting: t("greeting", { name }),
           bodyHtml: [
-            pLast(
-              "Welcome to the team. Your onboarding checklist is ready in Crew Hub. It has everything you need to get started: documents to sign, info to fill in, and tasks to complete."
-            )
+            pLast(t("onboarding.started.employee.body"))
           ].join("\n"),
           ctaButton: {
-            label: "Start Onboarding",
+            label: t("onboarding.started.employee.cta"),
             url: `${appUrl}/onboarding`,
             style: "cta"
           },
-          closingText:
-            "If you have questions along the way, reach out to your manager or the Operations team."
+          closingText: t("onboarding.started.employee.closing"),
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [employee.email],
-          subject: `Welcome aboard, ${firstName(employee.fullName)}`,
+          subject: t("onboarding.started.employee.subject", { name: firstName(employee.fullName, locale) }),
           html
         });
       }
@@ -1759,25 +1839,26 @@ export async function sendOnboardingStartedEmail({
         "announcements"
       );
       if (canSend) {
-        const managerFirst = firstName(manager.fullName);
+        const locale = manager.locale;
+        const t = createEmailTranslator(locale);
+        const managerFirst = firstName(manager.fullName, locale);
         const html = renderEmailTemplate({
-          preheaderText: "Their checklist is live",
-          greeting: `Hey ${managerFirst},`,
+          preheaderText: t("onboarding.started.manager.preheader"),
+          greeting: t("greeting", { name: managerFirst }),
           bodyHtml: [
-            pLast(
-              `${employeeName}'s onboarding has started. Their checklist is live in Crew Hub. You may have tasks assigned to you as part of their setup.`
-            )
+            pLast(t("onboarding.started.manager.body", { employeeName }))
           ].join("\n"),
           ctaButton: {
-            label: "View Onboarding",
+            label: t("onboarding.started.manager.cta"),
             url: `${appUrl}/onboarding`,
             style: "cta"
-          }
+          },
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [manager.email],
-          subject: `Onboarding started for ${employeeName}`,
+          subject: t("onboarding.started.manager.subject", { employeeName }),
           html
         });
       }
@@ -1809,6 +1890,7 @@ export async function sendOnboardingTaskOverdueEmail({
     const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
     const appUrl = resolveAppUrl();
 
+    // To employee (specific person)
     if (employee) {
       const canSend = await checkEmailPreference(
         orgId,
@@ -1816,51 +1898,54 @@ export async function sendOnboardingTaskOverdueEmail({
         "announcements"
       );
       if (canSend) {
-        const name = firstName(employee.fullName);
+        const locale = employee.locale;
+        const t = createEmailTranslator(locale);
+        const name = firstName(employee.fullName, locale);
         const html = renderEmailTemplate({
-          preheaderText: "Follow up needed",
-          greeting: `Hey ${name},`,
+          preheaderText: t("onboarding.overdue.employee.preheader"),
+          greeting: t("greeting", { name }),
           bodyHtml: [
-            pLast(
-              `Your onboarding task "${taskName}" is overdue. Please complete it as soon as possible.`
-            )
+            pLast(t("onboarding.overdue.employee.body", { taskName }))
           ].join("\n"),
           ctaButton: {
-            label: "Complete Task",
+            label: t("onboarding.overdue.employee.cta"),
             url: `${appUrl}/onboarding`,
             style: "cta"
           },
-          closingText:
-            "If you're stuck or need help, reach out to the Operations team."
+          closingText: t("onboarding.overdue.employee.closing"),
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [employee.email],
-          subject: `Onboarding task overdue: ${taskName}`,
+          subject: t("onboarding.overdue.employee.subject", { taskName }),
           html
         });
       }
     }
 
+    // To HR (role-based, default to "en")
     if (hrEmails.length > 0) {
+      const locale: AppLocale = "en";
+      const t = createEmailTranslator(locale);
+
       const html = renderEmailTemplate({
-        preheaderText: "Follow up needed",
-        greeting: "Hey there,",
+        preheaderText: t("onboarding.overdue.hr.preheader"),
+        greeting: t("greetingGeneric"),
         bodyHtml: [
-          pLast(
-            `The onboarding task "${taskName}" for ${employee?.fullName || "a new team member"} is overdue and may need follow-up.`
-          )
+          pLast(t("onboarding.overdue.hr.body", { taskName, employeeName: employee?.fullName || t("fallbackEmployee") }))
         ].join("\n"),
         ctaButton: {
-          label: "View in Crew Hub",
+          label: t("onboarding.overdue.hr.cta"),
           url: `${appUrl}/onboarding`,
           style: "cta"
-        }
+        },
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: hrEmails,
-        subject: `Onboarding task overdue: ${taskName}`,
+        subject: t("onboarding.overdue.hr.subject", { taskName }),
         html
       });
     }
@@ -1904,50 +1989,53 @@ export async function sendOnboardingCompleteEmail({
         "announcements"
       );
       if (canSend) {
-        const name = firstName(employee.fullName);
+        const locale = employee.locale;
+        const t = createEmailTranslator(locale);
+        const name = firstName(employee.fullName, locale);
         const html = renderEmailTemplate({
-          preheaderText: "You're all set",
-          greeting: `Hey ${name},`,
+          preheaderText: t("onboarding.complete.employee.preheader"),
+          greeting: t("greeting", { name }),
           bodyHtml: [
-            pLast(
-              "You've completed your onboarding. Everything is in order. Welcome to the team, for real this time."
-            )
+            pLast(t("onboarding.complete.employee.body"))
           ].join("\n"),
           ctaButton: {
-            label: "View in Crew Hub",
+            label: t("onboarding.complete.employee.cta"),
             url: appUrl,
             style: "primary"
-          }
+          },
+          ...emailLocaleOptions(t, locale)
         });
 
         await sendResendEmail({
           to: [employee.email],
-          subject: "Onboarding complete!",
+          subject: t("onboarding.complete.employee.subject"),
           html
         });
       }
     }
 
-    // Template 28: to Manager + admins
+    // Template 28: to Manager + admins (role-based, default to "en")
     const notifyEmails: string[] = [
       ...(manager ? [manager.email] : []),
       ...hrEmails
     ];
 
     if (notifyEmails.length > 0) {
+      const locale: AppLocale = "en";
+      const t = createEmailTranslator(locale);
+
       const html = renderEmailTemplate({
-        preheaderText: "All tasks done",
-        greeting: "Hey there,",
+        preheaderText: t("onboarding.complete.manager.preheader"),
+        greeting: t("greetingGeneric"),
         bodyHtml: [
-          p(
-            `${employeeName} has completed all onboarding tasks. No action needed on your end.`
-          )
-        ].join("\n")
+          p(t("onboarding.complete.manager.body", { employeeName }))
+        ].join("\n"),
+        ...emailLocaleOptions(t, locale)
       });
 
       await sendResendEmail({
         to: notifyEmails,
-        subject: `${employeeName} completed onboarding`,
+        subject: t("onboarding.complete.manager.subject", { employeeName }),
         html
       });
     }
@@ -1988,27 +2076,28 @@ export async function sendSchedulePublishedEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(recipient.fullName);
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: "Check your shifts",
-      greeting: `Hey ${name},`,
+      preheaderText: t("schedule.published.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        pLast(
-          `The ${scheduleName} schedule for ${month} ${year} has been published. Check your assigned shifts in Crew Hub.`
-        )
+        pLast(t("schedule.published.body", { scheduleName, month, year }))
       ].join("\n"),
       ctaButton: {
-        label: "View Schedule",
+        label: t("schedule.published.cta"),
         url: `${appUrl}/scheduling`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipient.email],
-      subject: `${scheduleName} schedule published for ${month} ${year}`,
+      subject: t("schedule.published.subject", { scheduleName, month, year }),
       html
     });
   } catch (error) {
@@ -2049,26 +2138,29 @@ export async function sendSwapRequestedEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(target.fullName);
+    const locale = target.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(target.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: `${requesterName} wants to swap a shift with you`,
-      greeting: `Hey ${name},`,
+      preheaderText: t("swap.requested.preheader", { requesterName }),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p(`${requesterName} has requested to swap a shift with you.`),
-        renderInfoBlock([{ label: "Shift date", value: shiftDate }])
+        p(t("swap.requested.body", { requesterName })),
+        renderInfoBlock([{ label: t("swap.requested.shiftDate"), value: shiftDate }])
       ].join("\n"),
       ctaButton: {
-        label: "Review Swap",
+        label: t("swap.requested.cta"),
         url: `${appUrl}/scheduling`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [target.email],
-      subject: `Shift swap request from ${requesterName}`,
+      subject: t("swap.requested.subject", { requesterName }),
       html
     });
   } catch (error) {
@@ -2109,27 +2201,30 @@ export async function sendSwapAcceptedEmail({
     );
     if (!canSend) return;
 
-    const name = firstName(requester.fullName);
+    const locale = requester.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(requester.fullName, locale);
     const appUrl = resolveAppUrl();
 
     const html = renderEmailTemplate({
-      preheaderText: `${targetName} accepted your swap`,
-      greeting: `Hey ${name},`,
+      preheaderText: t("swap.accepted.preheader", { targetName }),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        p(`${targetName} accepted your shift swap request.`),
-        renderInfoBlock([{ label: "Shift date", value: shiftDate }]),
-        pLast("The schedule has been updated.")
+        p(t("swap.accepted.body", { targetName })),
+        renderInfoBlock([{ label: t("swap.accepted.shiftDate"), value: shiftDate }]),
+        pLast(t("swap.accepted.closing"))
       ].join("\n"),
       ctaButton: {
-        label: "View Schedule",
+        label: t("swap.accepted.cta"),
         url: `${appUrl}/scheduling`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [requester.email],
-      subject: "Your shift swap was accepted",
+      subject: t("swap.accepted.subject"),
       html
     });
   } catch (error) {
@@ -2169,26 +2264,28 @@ export async function sendPayrollApprovedEmail({
     const notifyEmails = [...new Set([...financeEmails, ...adminEmails])];
     if (notifyEmails.length === 0) return;
 
-    const approverName = approver?.fullName || "an admin";
+    // Role-based email, default to "en"
+    const locale: AppLocale = "en";
+    const t = createEmailTranslator(locale);
+    const approverName = approver?.fullName || t("fallbackApproverAdmin");
 
     const html = renderEmailTemplate({
-      preheaderText: "Ready for processing",
-      greeting: "Hey there,",
+      preheaderText: t("payroll.approved.preheader"),
+      greeting: t("greetingGeneric"),
       bodyHtml: [
-        pLast(
-          `The payroll run "${runName}" has been approved by ${approverName} and is ready for processing.`
-        )
+        pLast(t("payroll.approved.body", { runName, approverName }))
       ].join("\n"),
       ctaButton: {
-        label: "View Payroll Run",
+        label: t("payroll.approved.cta"),
         url: `${appUrl}/payroll`,
         style: "cta"
-      }
+      },
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: notifyEmails,
-      subject: `Payroll run approved: ${runName}`,
+      subject: t("payroll.approved.subject", { runName }),
       html
     });
   } catch (error) {
@@ -2205,35 +2302,36 @@ export async function sendPayrollApprovedEmail({
 export async function sendResetEmail({
   recipientEmail,
   recipientName,
-  resetLink
+  resetLink,
+  locale = "en" as AppLocale
 }: {
   recipientEmail: string;
   recipientName: string;
   resetLink: string;
+  locale?: AppLocale;
 }): Promise<void> {
   try {
-    const name = firstName(recipientName);
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipientName, locale);
 
     const html = renderEmailTemplate({
-      preheaderText: "Set up a new authenticator",
-      greeting: `Hey ${name},`,
+      preheaderText: t("reset.preheader"),
+      greeting: t("greeting", { name }),
       bodyHtml: [
-        pLast(
-          "A login reset was requested for your Crew Hub account. Tap below to set up a new authenticator:"
-        )
+        pLast(t("reset.body"))
       ].join("\n"),
       ctaButton: {
-        label: "Reset Login",
+        label: t("reset.cta"),
         url: resetLink,
         style: "cta"
       },
-      closingText:
-        "If you didn't request this, reach out to the Operations team."
+      closingText: t("reset.closing"),
+      ...emailLocaleOptions(t, locale)
     });
 
     await sendResendEmail({
       to: [recipientEmail],
-      subject: "Reset your Crew Hub login",
+      subject: t("reset.subject"),
       html
     });
   } catch (error) {

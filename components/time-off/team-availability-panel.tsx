@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { formatDateRangeHuman } from "../../lib/datetime";
 import { isIsoDate } from "../../lib/time-off";
@@ -25,6 +26,7 @@ type TeamAvailabilityPanelProps = {
 };
 
 export function TeamAvailabilityPanel({ startDate, endDate }: TeamAvailabilityPanelProps) {
+  const t = useTranslations("timeOff.teamAvailability");
   const [data, setData] = useState<TeamAvailabilityData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export function TeamAvailabilityPanel({ startDate, endDate }: TeamAvailabilityPa
         if (cancelled) return;
 
         if (!response.ok || json.error) {
-          setError(json.error?.message ?? "Unable to load team availability.");
+          setError(json.error?.message ?? t("loadError"));
           setData(null);
         } else {
           setData(json.data);
@@ -58,7 +60,7 @@ export function TeamAvailabilityPanel({ startDate, endDate }: TeamAvailabilityPa
         }
       } catch {
         if (!cancelled) {
-          setError("Unable to load team availability.");
+          setError(t("loadError"));
           setData(null);
         }
       } finally {
@@ -108,17 +110,17 @@ export function TeamAvailabilityPanel({ startDate, endDate }: TeamAvailabilityPa
     <div className="team-availability-panel">
       <div className={`team-availability-indicator team-availability-${severity}`}>
         {severity === "green" ? (
-          <p>No team members are off during these dates</p>
+          <p>{t("noMembersOff")}</p>
         ) : severity === "red" ? (
           <>
             <p className="team-availability-warning">
-              High team overlap &mdash; {data.awayCount} team member{data.awayCount === 1 ? "" : "s"} away
+              {t("highOverlapWithCount", { count: data.awayCount })}
             </p>
             {data.overlapping.map((member) => (
               <div key={`${member.employeeId}-${member.startDate}`} className="team-availability-member">
                 <span className="team-availability-member-name">{member.employeeName}</span>
                 <span className="team-availability-member-detail">
-                  {member.leaveType} &middot; {formatDateRangeHuman(member.startDate, member.endDate)}
+                  {t("memberDetail", { leaveType: member.leaveType, dateRange: formatDateRangeHuman(member.startDate, member.endDate) })}
                 </span>
               </div>
             ))}
@@ -126,13 +128,13 @@ export function TeamAvailabilityPanel({ startDate, endDate }: TeamAvailabilityPa
         ) : (
           <>
             <p>
-              {data.awayCount} team member{data.awayCount === 1 ? "" : "s"} away during these dates
+              {t("membersOffDuringDates", { count: data.awayCount })}
             </p>
             {data.overlapping.map((member) => (
               <div key={`${member.employeeId}-${member.startDate}`} className="team-availability-member">
                 <span className="team-availability-member-name">{member.employeeName}</span>
                 <span className="team-availability-member-detail">
-                  {member.leaveType} &middot; {formatDateRangeHuman(member.startDate, member.endDate)}
+                  {t("memberDetail", { leaveType: member.leaveType, dateRange: formatDateRangeHuman(member.startDate, member.endDate) })}
                 </span>
               </div>
             ))}

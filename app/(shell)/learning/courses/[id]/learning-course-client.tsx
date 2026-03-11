@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
@@ -22,6 +23,8 @@ import type {
 } from "../../../../../types/learning";
 
 // ── Types ──
+
+type AppLocale = "en" | "fr";
 
 type LearningCourseClientProps = {
   courseId: string;
@@ -136,6 +139,19 @@ function toneForModuleStatus(status: LearningModuleStatus["status"]) {
   }
 }
 
+const moduleStatusLabelKeys: Record<string, string> = {
+  completed: "completed",
+  in_progress: "inProgress",
+  locked: "locked"
+};
+
+// Assignment status -> learningCourse translation key (where available)
+const assignmentStatusLabelKeys: Record<string, string> = {
+  in_progress: "inProgress",
+  completed: "completed",
+  failed: "failed"
+};
+
 function learningCourseSkeleton() {
   return (
     <section className="timeoff-skeleton-layout" aria-hidden="true">
@@ -171,6 +187,7 @@ function QuizModule({
   allowRetake: boolean;
   onRetry: () => void;
 }) {
+  const t = useTranslations('learningCourse');
   const [quiz, setQuiz] = useState<QuizState>({
     currentIndex: 0,
     answers: {}
@@ -216,29 +233,29 @@ function QuizModule({
   if (isQuizSubmitted && resolvedQuizResult) {
     return (
       <div className="module-quiz-result">
-        <h3 className="section-title">Quiz Result</h3>
+        <h3 className="section-title">{t('quizResult')}</h3>
         <p className="module-quiz-score">
-          You scored <strong className="numeric">{resolvedQuizResult.score}%</strong>.
+          {t('quizScore', { score: resolvedQuizResult.score })}
           {resolvedQuizResult.passingScore !== null
-            ? ` Pass mark is ${resolvedQuizResult.passingScore}%.`
+            ? ` ${t('quizPassMark', { passingScore: resolvedQuizResult.passingScore })}`
             : ""}
         </p>
 
         {resolvedQuizResult.passed ? (
-          <StatusBadge tone="success">Passed</StatusBadge>
+          <StatusBadge tone="success">{t('passed')}</StatusBadge>
         ) : (
-          <StatusBadge tone="error">Failed</StatusBadge>
+          <StatusBadge tone="error">{t('failed')}</StatusBadge>
         )}
 
         <div className="module-quiz-result-actions">
           {resolvedQuizResult.passed ? (
-            <p className="settings-card-description">Module completed. Continue to the next module.</p>
+            <p className="settings-card-description">{t('quizPassedMessage')}</p>
           ) : canRetake ? (
             <button type="button" className="button" onClick={handleRetry}>
-              Try again
+              {t('tryAgain')}
             </button>
           ) : (
-            <p className="form-submit-error">You did not pass this module.</p>
+            <p className="form-submit-error">{t('quizFailedMessage')}</p>
           )}
         </div>
       </div>
@@ -248,9 +265,9 @@ function QuizModule({
   if (!currentQuestion) {
     return (
       <EmptyState
-        title="No questions"
-        description="This quiz module has no questions configured."
-        ctaLabel="Back to learning"
+        title={t('noQuestions')}
+        description={t('noQuestionsDescription')}
+        ctaLabel={t('backToLearning')}
         ctaHref="/learning"
       />
     );
@@ -259,7 +276,7 @@ function QuizModule({
   return (
     <div className="module-quiz">
       <p className="module-quiz-counter">
-        Question {quiz.currentIndex + 1} of {questions.length}
+        {t('questionCounter', { current: quiz.currentIndex + 1, total: questions.length })}
       </p>
 
       <h3 className="module-quiz-question">{currentQuestion.text}</h3>
@@ -295,10 +312,10 @@ function QuizModule({
           onClick={handleNext}
         >
           {isSubmitting
-            ? "Submitting..."
+            ? t('submitting')
             : isLastQuestion
-              ? "Submit quiz"
-              : "Next question"}
+              ? t('submitQuiz')
+              : t('nextQuestion')}
         </button>
       </div>
     </div>
@@ -316,6 +333,8 @@ function VideoModuleContent({
   onMarkComplete: () => void;
   isCompleting: boolean;
 }) {
+  const t = useTranslations('learningCourse');
+
   return (
     <div className="module-content-block">
       {mod.contentUrl ? (
@@ -329,7 +348,7 @@ function VideoModuleContent({
           />
         </div>
       ) : (
-        <p className="settings-card-description">No video URL configured for this module.</p>
+        <p className="settings-card-description">{t('noVideoUrl')}</p>
       )}
       <button
         type="button"
@@ -337,7 +356,7 @@ function VideoModuleContent({
         disabled={isCompleting}
         onClick={onMarkComplete}
       >
-        {isCompleting ? "Saving..." : "Mark as complete"}
+        {isCompleting ? t('savingProgress') : t('markComplete')}
       </button>
     </div>
   );
@@ -352,6 +371,8 @@ function DocumentModuleContent({
   onMarkComplete: () => void;
   isCompleting: boolean;
 }) {
+  const t = useTranslations('learningCourse');
+
   return (
     <div className="module-content-block">
       {mod.contentUrl ? (
@@ -363,7 +384,7 @@ function DocumentModuleContent({
           />
         </div>
       ) : (
-        <p className="settings-card-description">No document URL configured for this module.</p>
+        <p className="settings-card-description">{t('noDocumentUrl')}</p>
       )}
       <button
         type="button"
@@ -371,7 +392,7 @@ function DocumentModuleContent({
         disabled={isCompleting}
         onClick={onMarkComplete}
       >
-        {isCompleting ? "Saving..." : "Mark as complete"}
+        {isCompleting ? t('savingProgress') : t('markComplete')}
       </button>
     </div>
   );
@@ -386,6 +407,7 @@ function LinkModuleContent({
   onMarkComplete: () => void;
   isCompleting: boolean;
 }) {
+  const t = useTranslations('learningCourse');
   const [hasOpened, setHasOpened] = useState(false);
 
   return (
@@ -393,7 +415,7 @@ function LinkModuleContent({
       {mod.contentUrl ? (
         <>
           <p className="settings-card-description">
-            External resource for this module:
+            {t('externalResource')}
           </p>
           <a
             href={mod.contentUrl}
@@ -402,11 +424,11 @@ function LinkModuleContent({
             className="button"
             onClick={() => setHasOpened(true)}
           >
-            Open resource
+            {t('openResource')}
           </a>
         </>
       ) : (
-        <p className="settings-card-description">No URL configured for this module.</p>
+        <p className="settings-card-description">{t('noUrlConfigured')}</p>
       )}
 
       {hasOpened || !mod.contentUrl ? (
@@ -417,7 +439,7 @@ function LinkModuleContent({
           onClick={onMarkComplete}
           style={{ marginTop: "var(--space-md)" }}
         >
-          {isCompleting ? "Saving..." : "Mark as complete"}
+          {isCompleting ? t('savingProgress') : t('markComplete')}
         </button>
       ) : null}
     </div>
@@ -427,6 +449,11 @@ function LinkModuleContent({
 // ── Main Component ──
 
 export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
+  const t = useTranslations('learningCourse');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const [course, setCourse] = useState<LearningCourseRecord | null>(null);
   const [assignment, setAssignment] = useState<LearningAssignmentRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -463,7 +490,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
         if (!courseResponse.ok || !coursePayload.data?.course) {
           setCourse(null);
           setAssignment(null);
-          setErrorMessage(coursePayload.error?.message ?? "Unable to load course details.");
+          setErrorMessage(coursePayload.error?.message ?? t('loadError'));
           return;
         }
 
@@ -479,7 +506,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
         if (abortController.signal.aborted) return;
         setCourse(null);
         setAssignment(null);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load course details.");
+        setErrorMessage(error instanceof Error ? error.message : t('loadError'));
       } finally {
         if (!abortController.signal.aborted) setIsLoading(false);
       }
@@ -487,7 +514,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
 
     void run();
     return () => { abortController.abort(); };
-  }, [courseId]);
+  }, [courseId, t]);
 
   // Parse modules
   const modules = useMemo(() => {
@@ -551,7 +578,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
         const payload = (await response.json()) as LearningModuleProgressResponse;
 
         if (!response.ok || !payload.data?.assignment) {
-          setModuleError(payload.error?.message ?? "Unable to update module progress.");
+          setModuleError(payload.error?.message ?? t('moduleProgressError'));
           return;
         }
 
@@ -561,10 +588,10 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
           setQuizResult(payload.data.quizResult);
 
           if (payload.data.quizResult.passed) {
-            setSubmitMessage("Quiz passed! Module completed.");
+            setSubmitMessage(t('quizPassedToast'));
           }
         } else if (status === "completed") {
-          setSubmitMessage("Module completed.");
+          setSubmitMessage(t('moduleCompletedToast'));
 
           // Auto-advance to next module
           const currentIndex = modules.findIndex((m) => m.id === moduleId);
@@ -573,16 +600,16 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
             setActiveModuleId(modules[currentIndex + 1].id);
             setSubmitMessage(null);
           } else if (payload.data.assignment.status === "completed") {
-            setSubmitMessage("All modules completed. Course is done!");
+            setSubmitMessage(t('allModulesCompleted'));
           }
         }
       } catch (error) {
-        setModuleError(error instanceof Error ? error.message : "Unable to update module progress.");
+        setModuleError(error instanceof Error ? error.message : t('moduleProgressError'));
       } finally {
         setIsModuleSubmitting(false);
       }
     },
-    [assignment, modules]
+    [assignment, modules, t]
   );
 
   const handleMarkComplete = useCallback(
@@ -605,7 +632,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
       return (
         <div className="module-locked-message">
           <p className="settings-card-description">
-            Complete the previous module to unlock this one.
+            {t('completePrevious')}
           </p>
         </div>
       );
@@ -614,11 +641,11 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
     if (status.status === "completed" && mod.type !== "quiz") {
       return (
         <div className="module-completed-message">
-          <StatusBadge tone="success">Completed</StatusBadge>
+          <StatusBadge tone="success">{t('completed')}</StatusBadge>
           <p className="settings-card-description">
-            This module has been completed.
+            {t('moduleCompleted')}
             {status.completedAt
-              ? ` Completed ${formatRelativeTime(status.completedAt)}.`
+              ? ` ${t('completedAt', { date: formatRelativeTime(status.completedAt, locale) })}`
               : ""}
           </p>
         </div>
@@ -669,7 +696,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
         return (
           <div className="module-content-block">
             <p className="settings-card-description">
-              Module type &quot;{mod.type}&quot; is not yet supported.
+              {t('unsupportedType', { type: mod.type })}
             </p>
             <button
               type="button"
@@ -677,7 +704,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
               disabled={isModuleSubmitting}
               onClick={() => handleMarkComplete(mod.id)}
             >
-              {isModuleSubmitting ? "Saving..." : "Mark as complete"}
+              {isModuleSubmitting ? t('savingProgress') : t('markComplete')}
             </button>
           </div>
         );
@@ -688,8 +715,8 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
   return (
     <>
       <PageHeader
-        title={course?.title ?? "Learning Course"}
-        description="Review course content and keep your assignment progress up to date."
+        title={course?.title ?? t('defaultTitle')}
+        description={t('description')}
       />
 
       {isLoading ? learningCourseSkeleton() : null}
@@ -697,32 +724,32 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
       {!isLoading && errorMessage ? (
         <>
           <EmptyState
-            title="Course data is unavailable"
+            title={t('unavailable')}
             description={errorMessage}
-            ctaLabel="Back to learning"
+            ctaLabel={t('backToLearning')}
             ctaHref="/learning"
           />
         </>
       ) : null}
 
       {!isLoading && !errorMessage && course ? (
-        <section className="compensation-layout" aria-label="Learning course detail">
+        <section className="compensation-layout" aria-label={t('defaultTitle')}>
           {/* ── Metrics ── */}
           <article className="metric-grid">
             <article className="metric-card">
-              <p className="metric-label">Category</p>
-              <p className="metric-value">{course.category ?? "General"}</p>
-              <p className="metric-description">Course category tag.</p>
+              <p className="metric-label">{t('category')}</p>
+              <p className="metric-value">{course.category ?? t('categoryDefault')}</p>
+              <p className="metric-description">{t('categoryHint')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Duration</p>
+              <p className="metric-label">{t('duration')}</p>
               <p className="metric-value numeric">
-                {course.durationMinutes === null ? "--" : `${course.durationMinutes}m`}
+                {course.durationMinutes === null ? "--" : t('durationValue', { minutes: course.durationMinutes })}
               </p>
-              <p className="metric-description">Estimated completion time.</p>
+              <p className="metric-description">{t('durationHint')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Progress</p>
+              <p className="metric-label">{t('progress')}</p>
               <p className="metric-value">
                 {assignment ? (
                   <ProgressRing value={assignment.progressPct} size={48} label={`${assignment.progressPct}%`} />
@@ -732,8 +759,8 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
               </p>
               <p className="metric-description">
                 {assignment
-                  ? `${assignment.progressPct}% complete`
-                  : "Not assigned yet."}
+                  ? t('progressComplete', { pct: assignment.progressPct })
+                  : t('notAssignedYet')}
               </p>
             </article>
           </article>
@@ -743,28 +770,29 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
             <article className="settings-card">
               <header className="announcement-item-header">
                 <div>
-                  <h2 className="section-title">Assignment</h2>
+                  <h2 className="section-title">{t('assignment')}</h2>
                   <p className="settings-card-description">
                     {assignment.dueDate ? (
-                      <>
-                        Due{" "}
-                        <span title={formatDateTimeTooltip(`${assignment.dueDate}T00:00:00.000Z`)}>
-                          {formatRelativeTime(`${assignment.dueDate}T00:00:00.000Z`)}
-                        </span>
-                      </>
+                      <span title={formatDateTimeTooltip(`${assignment.dueDate}T00:00:00.000Z`, locale)}>
+                        {t('dueDate', {
+                          date: formatRelativeTime(`${assignment.dueDate}T00:00:00.000Z`, locale)
+                        })}
+                      </span>
                     ) : (
-                      "No due date set."
+                      t('noDueDate')
                     )}
                     {assignment.status === "completed" && assignment.certificateUrl ? (
                       <>
-                        {" • "}
-                        <Link href="/learning/certificates">View certificate</Link>
+                        {" \u2022 "}
+                        <Link href="/learning/certificates">{t('viewCertificate')}</Link>
                       </>
                     ) : null}
                   </p>
                 </div>
                 <StatusBadge tone={toneForAssignmentStatus(assignment.status)}>
-                  {toSentenceCase(assignment.status)}
+                  {assignmentStatusLabelKeys[assignment.status]
+                    ? td(assignmentStatusLabelKeys[assignment.status])
+                    : toSentenceCase(assignment.status)}
                 </StatusBadge>
               </header>
             </article>
@@ -787,8 +815,8 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
           {isMultiModule && modules.length > 0 ? (
             <article className="module-layout">
               {/* Sidebar */}
-              <nav className="module-sidebar" aria-label="Course modules">
-                <h3 className="module-sidebar-title">Modules</h3>
+              <nav className="module-sidebar" aria-label={t('modules')}>
+                <h3 className="module-sidebar-title">{t('modules')}</h3>
                 <ul className="module-sidebar-list">
                   {modules.map((mod, index) => {
                     const status = moduleStatuses.get(mod.id) ?? { status: "locked" as const };
@@ -809,7 +837,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
                         >
                           <span className="module-sidebar-index">
                             {status.status === "completed"
-                              ? "✓"
+                              ? "\u2713"
                               : status.status === "locked"
                                 ? "-"
                                 : String(index + 1)}
@@ -817,7 +845,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
                           <span className="module-sidebar-label">
                             <span className="module-sidebar-name">{mod.title}</span>
                             <StatusBadge tone={toneForModuleStatus(status.status)}>
-                              {toSentenceCase(status.status)}
+                              {td(moduleStatusLabelKeys[status.status] ?? status.status)}
                             </StatusBadge>
                           </span>
                         </button>
@@ -833,18 +861,18 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
                   <>
                     <h2 className="section-title">{activeModule.title}</h2>
                     <p className="settings-card-description">
-                      {toSentenceCase(activeModule.type)} module
+                      {t('moduleContent', { type: toSentenceCase(activeModule.type) })}
                       {activeModule.durationMinutes
-                        ? ` • ${activeModule.durationMinutes}m`
+                        ? ` ${t('moduleDuration', { minutes: activeModule.durationMinutes })}`
                         : ""}
                     </p>
                     {renderModuleContent(activeModule, activeModuleStatus)}
                   </>
                 ) : (
                   <EmptyState
-                    title="Select a module"
-                    description="Choose a module from the sidebar to view its content."
-                    ctaLabel="Back to learning"
+                    title={t('selectModule')}
+                    description={t('selectModuleDescription')}
+                    ctaLabel={t('backToLearning')}
                     ctaHref="/learning"
                   />
                 )}
@@ -857,10 +885,10 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
             <article className="settings-card">
               <header className="announcement-item-header">
                 <div>
-                  <h2 className="section-title">Course content</h2>
+                  <h2 className="section-title">{t('courseContent')}</h2>
                   <p className="settings-card-description">
-                    {toSentenceCase(course.contentType)} content
-                    {course.durationMinutes ? ` • ${course.durationMinutes}m` : ""}
+                    {t('moduleContent', { type: toSentenceCase(course.contentType) })}
+                    {course.durationMinutes ? ` ${t('moduleDuration', { minutes: course.durationMinutes })}` : ""}
                   </p>
                 </div>
               </header>
@@ -875,9 +903,9 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
             <article className="settings-card">
               <header className="announcement-item-header">
                 <div>
-                  <h2 className="section-title">Course content</h2>
+                  <h2 className="section-title">{t('courseContent')}</h2>
                   <p className="settings-card-description">
-                    {toSentenceCase(course.contentType)} content
+                    {t('moduleContent', { type: toSentenceCase(course.contentType) })}
                   </p>
                 </div>
               </header>
@@ -903,7 +931,7 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
               ) : (
                 <div className="documents-row-actions">
                   <a href={course.contentUrl} target="_blank" rel="noreferrer" className="button button-accent">
-                    Open content
+                    {t('openContent')}
                   </a>
                 </div>
               )}
@@ -914,9 +942,9 @@ export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
           {!assignment ? (
             <article className="settings-card">
               <EmptyState
-                title="Not assigned"
-                description="This course is in the catalog but you do not have an assignment yet."
-                ctaLabel="Back to learning"
+                title={t('notAssignedTitle')}
+                description={t('notAssignedDescription')}
+                ctaLabel={t('backToLearning')}
                 ctaHref="/learning"
               />
             </article>

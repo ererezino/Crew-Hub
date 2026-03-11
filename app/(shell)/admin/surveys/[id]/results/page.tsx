@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
@@ -11,17 +13,20 @@ type SurveyResultsPageProps = {
 
 export default async function SurveyResultsPage({ params }: SurveyResultsPageProps) {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("surveyResults");
+  const tSurveys = await getTranslations("surveys");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Survey Results"
-          description="Review response metrics and export aggregated survey data."
+          title={tSurveys("resultsTitle")}
+          description={tSurveys("resultsDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );
@@ -35,13 +40,13 @@ export default async function SurveyResultsPage({ params }: SurveyResultsPagePro
     return (
       <>
         <PageHeader
-          title="Survey Results"
-          description="Review response metrics and export aggregated survey data."
+          title={tSurveys("resultsTitle")}
+          description={tSurveys("resultsDescription")}
         />
         <EmptyState
-          title="Survey results are restricted"
-          description="Only HR Admin and Super Admin can view survey results."
-          ctaLabel="Open surveys"
+          title={t("resultsRestricted")}
+          description={t("resultsRestrictedDescription")}
+          ctaLabel={t("openSurveys")}
           ctaHref="/surveys"
         />
       </>

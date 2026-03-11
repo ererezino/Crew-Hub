@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { Employee360 } from "../../../../components/people/employee-360";
@@ -21,6 +22,8 @@ import type {
 import { humanizeError } from "@/lib/errors";
 
 /* ── Types ── */
+
+type AppLocale = "en" | "fr";
 
 type PeopleOverviewClientProps = {
   employeeId: string;
@@ -80,9 +83,9 @@ function resolvePrivacy(settings: PrivacySettings | null | undefined): Required<
 
 /* ── Helpers ── */
 
-function formatDate(dateString: string | null): string {
+function formatDate(dateString: string | null, locale?: AppLocale): string {
   if (!dateString) return "--";
-  return formatDateLib(dateString);
+  return formatDateLib(dateString, locale);
 }
 
 function getInitials(name: string): string {
@@ -121,22 +124,6 @@ async function parseJsonResponse<T>(response: Response): Promise<T | null> {
   }
 }
 
-function fallbackInviteErrorMessage(status: number): string {
-  if (status === 401) {
-    return "Your session has expired. Please sign in again.";
-  }
-
-  if (status === 403) {
-    return "You do not have permission to send invites.";
-  }
-
-  if (status === 404) {
-    return "Person not found. Refresh and try again.";
-  }
-
-  return "Unable to send invite.";
-}
-
 /* ── Component ── */
 
 export function PeopleOverviewClient({
@@ -146,6 +133,11 @@ export function PeopleOverviewClient({
   isSuperAdmin,
   canInitiateOffboarding
 }: PeopleOverviewClientProps) {
+  const t = useTranslations('peopleOverview');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const [person, setPerson] = useState<PersonRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -213,7 +205,7 @@ export function PeopleOverviewClient({
 
         if (!response.ok || !payload.data) {
           setPerson(null);
-          setErrorMessage(payload.error?.message ?? "Unable to load profile.");
+          setErrorMessage(payload.error?.message ?? t('errorState.unableToLoad'));
           return;
         }
 
@@ -221,7 +213,7 @@ export function PeopleOverviewClient({
 
         if (!found) {
           setPerson(null);
-          setErrorMessage("Profile not found.");
+          setErrorMessage(t('errorState.notFound'));
           return;
         }
 
@@ -230,7 +222,7 @@ export function PeopleOverviewClient({
       } catch (error) {
         if (abortController.signal.aborted) return;
         setPerson(null);
-        setErrorMessage(error instanceof Error ? error.message : "Unable to load profile.");
+        setErrorMessage(error instanceof Error ? error.message : t('errorState.unableToLoad'));
       } finally {
         if (!abortController.signal.aborted) {
           setIsLoading(false);
@@ -243,7 +235,7 @@ export function PeopleOverviewClient({
     return () => {
       abortController.abort();
     };
-  }, [employeeId, reloadToken]);
+  }, [employeeId, reloadToken, t]);
 
   const refresh = useCallback(() => {
     setReloadToken((v) => v + 1);
@@ -251,13 +243,13 @@ export function PeopleOverviewClient({
 
   // Role labels
   const roleLabels: Record<AppRole, string> = useMemo(() => ({
-    EMPLOYEE: "Employee",
-    TEAM_LEAD: "Team Lead",
-    MANAGER: "Manager",
-    HR_ADMIN: "HR Admin",
-    FINANCE_ADMIN: "Finance Admin",
-    SUPER_ADMIN: "Super Admin"
-  }), []);
+    EMPLOYEE: tCommon('role.employee'),
+    TEAM_LEAD: tCommon('role.teamLead'),
+    MANAGER: tCommon('role.manager'),
+    HR_ADMIN: tCommon('role.hrAdmin'),
+    FINANCE_ADMIN: tCommon('role.financeAdmin'),
+    SUPER_ADMIN: tCommon('role.superAdmin')
+  }), [tCommon]);
 
   // Admin edit handlers
   const openAdminEdit = useCallback(() => {
@@ -311,19 +303,19 @@ export function PeopleOverviewClient({
         const payload = (await response.json()) as PeopleUpdateResponse;
 
         if (!response.ok || !payload.data?.person) {
-          setAdminEditError(humanizeError(payload.error?.message ?? "Unable to save changes."));
+          setAdminEditError(humanizeError(payload.error?.message ?? t('toast.unableToSave')));
           return;
         }
 
         setPerson(payload.data.person);
         setIsAdminEditOpen(false);
       } catch (error) {
-        setAdminEditError(error instanceof Error ? error.message : "Unable to save changes.");
+        setAdminEditError(error instanceof Error ? error.message : t('toast.unableToSave'));
       } finally {
         setIsAdminEditSaving(false);
       }
     },
-    [person, adminEditValues]
+    [person, adminEditValues, t]
   );
 
   // Invite handler
@@ -347,9 +339,16 @@ export function PeopleOverviewClient({
       }>>(response);
 
       if (!response.ok || !payload?.data?.inviteSent) {
+        const fallbackMsg = response.status === 401
+          ? t('toast.sessionExpired')
+          : response.status === 403
+            ? t('toast.noInvitePermission')
+            : response.status === 404
+              ? t('toast.personNotFound')
+              : t('toast.unableToSendInvite');
         setInviteMessage({
           type: "error",
-          text: humanizeError(payload?.error?.message ?? fallbackInviteErrorMessage(response.status))
+          text: humanizeError(payload?.error?.message ?? fallbackMsg)
         });
         return;
       }
@@ -360,18 +359,18 @@ export function PeopleOverviewClient({
       setInviteMessage({
         type: "success",
         text: payload.data.isResend
-          ? `Invite resent to ${person.email}. Copy the link below to share it manually.`
-          : `Invite sent to ${person.email}. Copy the link below to share it manually.`
+          ? t('toast.inviteResent', { email: person.email })
+          : t('toast.inviteSent', { email: person.email })
       });
     } catch (error) {
       setInviteMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Unable to send invite."
+        text: error instanceof Error ? error.message : t('toast.unableToSendInvite')
       });
     } finally {
       setIsInviting(false);
     }
-  }, [person]);
+  }, [person, t]);
 
   // Avatar upload handler
   const handleAvatarUpload = useCallback(
@@ -393,7 +392,7 @@ export function PeopleOverviewClient({
         const payload = (await response.json()) as ApiResponse<{ avatarUrl: string }>;
 
         if (!response.ok || !payload.data) {
-          setAvatarError(payload.error?.message ?? "Unable to upload avatar.");
+          setAvatarError(payload.error?.message ?? t('toast.unableToUploadAvatar'));
           return;
         }
 
@@ -401,12 +400,12 @@ export function PeopleOverviewClient({
           prev ? { ...prev, avatarUrl: payload.data!.avatarUrl } : prev
         );
       } catch (error) {
-        setAvatarError(error instanceof Error ? error.message : "Unable to upload avatar.");
+        setAvatarError(error instanceof Error ? error.message : t('toast.unableToUploadAvatar'));
       } finally {
         setIsUploadingAvatar(false);
       }
     },
-    [person]
+    [person, t]
   );
 
   const handleFileChange = useCallback(
@@ -435,17 +434,17 @@ export function PeopleOverviewClient({
       const payload = (await response.json()) as ApiResponse<{ avatarUrl: null }>;
 
       if (!response.ok || !payload.data) {
-        setAvatarError(payload.error?.message ?? "Unable to remove avatar.");
+        setAvatarError(payload.error?.message ?? t('toast.unableToRemoveAvatar'));
         return;
       }
 
       setPerson((prev) => (prev ? { ...prev, avatarUrl: null } : prev));
     } catch (error) {
-      setAvatarError(error instanceof Error ? error.message : "Unable to remove avatar.");
+      setAvatarError(error instanceof Error ? error.message : t('toast.unableToRemoveAvatar'));
     } finally {
       setIsUploadingAvatar(false);
     }
-  }, [person]);
+  }, [person, t]);
 
   // Open edit panel
   const openEdit = useCallback(() => {
@@ -504,19 +503,19 @@ export function PeopleOverviewClient({
         const payload = (await response.json()) as PeopleUpdateResponse;
 
         if (!response.ok || !payload.data) {
-          setSaveError(payload.error?.message ?? "Unable to save profile.");
+          setSaveError(payload.error?.message ?? t('toast.unableToSaveProfile'));
           return;
         }
 
         setPerson(payload.data.person);
         setIsEditOpen(false);
       } catch (error) {
-        setSaveError(error instanceof Error ? error.message : "Unable to save profile.");
+        setSaveError(error instanceof Error ? error.message : t('toast.unableToSaveProfile'));
       } finally {
         setIsSaving(false);
       }
     },
-    [person, editValues, privacyValues]
+    [person, editValues, privacyValues, t]
   );
 
   // Disable / enable account handler
@@ -536,7 +535,9 @@ export function PeopleOverviewClient({
       const payload = (await response.json()) as PeopleUpdateResponse;
 
       if (!response.ok || !payload.data) {
-        const msg = payload.error?.message ?? `Unable to ${newStatus === "inactive" ? "disable" : "enable"} account.`;
+        const msg = payload.error?.message ?? (newStatus === "inactive"
+          ? t('toast.unableToDisable')
+          : t('toast.unableToEnable'));
         alert(msg);
         return;
       }
@@ -544,11 +545,11 @@ export function PeopleOverviewClient({
       setConfirmDisableOpen(false);
       refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Something went wrong.");
+      alert(error instanceof Error ? error.message : tCommon('error.generic'));
     } finally {
       setIsTogglingStatus(false);
     }
-  }, [person, refresh]);
+  }, [person, refresh, t, tCommon]);
 
   // Offboarding handler
   const handleOffboard = useCallback(
@@ -573,19 +574,19 @@ export function PeopleOverviewClient({
         const payload = (await response.json()) as ApiResponse<{ profileId: string; instanceId: string | null; status: string }>;
 
         if (!response.ok || !payload.data) {
-          setOffboardError(payload.error?.message ?? "Unable to initiate offboarding.");
+          setOffboardError(payload.error?.message ?? t('toast.unableToOffboard'));
           return;
         }
 
         setIsOffboardModalOpen(false);
         refresh();
       } catch (error) {
-        setOffboardError(error instanceof Error ? error.message : "Unable to initiate offboarding.");
+        setOffboardError(error instanceof Error ? error.message : t('toast.unableToOffboard'));
       } finally {
         setIsSubmittingOffboard(false);
       }
     },
-    [person, offboardLastDay, offboardReason, offboardConfirmName, refresh]
+    [person, offboardLastDay, offboardReason, offboardConfirmName, refresh, t]
   );
 
   const offboardNameMatches = person
@@ -596,7 +597,7 @@ export function PeopleOverviewClient({
 
   if (isLoading) {
     return (
-      <section className="profile-overview-section" aria-label="Profile overview">
+      <section className="profile-overview-section" aria-label={t('header.ariaLabel')}>
         <div className="profile-overview-skeleton">
           <div className="skeleton-block skeleton-block-lg" />
           <div className="skeleton-block skeleton-block-md" />
@@ -609,8 +610,8 @@ export function PeopleOverviewClient({
   if (errorMessage || !person) {
     return (
       <ErrorState
-        title="Profile unavailable"
-        message={errorMessage ?? "Could not load profile data."}
+        title={t('errorState.title')}
+        message={errorMessage ?? t('errorState.defaultMessage')}
         onRetry={refresh}
       />
     );
@@ -622,7 +623,7 @@ export function PeopleOverviewClient({
   const canSeeAll = isSelf || isAdmin;
 
   return (
-    <section className="profile-overview-section" aria-label="Profile overview">
+    <section className="profile-overview-section" aria-label={t('header.ariaLabel')}>
       {/* Header with name, avatar, and edit button */}
       <div className="profile-overview-header">
         <div className="profile-overview-identity">
@@ -631,7 +632,7 @@ export function PeopleOverviewClient({
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={person.avatarUrl}
-                alt={`${person.fullName} avatar`}
+                alt={t('header.avatarAlt', { name: person.fullName })}
                 className="profile-overview-avatar profile-overview-avatar-img"
               />
             ) : (
@@ -645,7 +646,7 @@ export function PeopleOverviewClient({
                 className="profile-avatar-overlay"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploadingAvatar}
-                aria-label="Change profile photo"
+                aria-label={t('header.changePhoto')}
               >
                 {isUploadingAvatar ? (
                   <span className="profile-avatar-overlay-text">...</span>
@@ -696,12 +697,12 @@ export function PeopleOverviewClient({
               onClick={handleRemoveAvatar}
               disabled={isUploadingAvatar}
             >
-              Remove Photo
+              {t('header.removePhoto')}
             </button>
           ) : null}
           {isSelf ? (
             <button type="button" className="button button-secondary" onClick={openEdit}>
-              Edit Profile
+              {t('header.editProfile')}
             </button>
           ) : null}
           {isAdmin && !isSelf ? (
@@ -711,7 +712,7 @@ export function PeopleOverviewClient({
                 className="button button-secondary"
                 onClick={openAdminEdit}
               >
-                Edit
+                {t('header.edit')}
               </button>
               <button
                 type="button"
@@ -719,7 +720,7 @@ export function PeopleOverviewClient({
                 onClick={() => setInviteConfirmOpen(true)}
                 disabled={isInviting}
               >
-                {isInviting ? "Sending..." : "Send Invite"}
+                {isInviting ? t('header.sendingInvite') : t('header.sendInvite')}
               </button>
             </>
           ) : null}
@@ -739,7 +740,7 @@ export function PeopleOverviewClient({
       {inviteLink ? (
         <div className="invite-link-area">
           <p className="invite-link-label">
-            Invite link — copy and share this link directly with {person.fullName}:
+            {t('inviteLink.label', { name: person.fullName })}
           </p>
           <div className="invite-link-input-row">
             <input
@@ -753,10 +754,10 @@ export function PeopleOverviewClient({
               className="button button-accent"
               onClick={() => {
                 void navigator.clipboard.writeText(inviteLink);
-                setInviteMessage({ type: "success", text: "Invite link copied to clipboard." });
+                setInviteMessage({ type: "success", text: t('inviteLink.copied') });
               }}
             >
-              Copy Link
+              {t('inviteLink.copyLink')}
             </button>
           </div>
         </div>
@@ -766,36 +767,36 @@ export function PeopleOverviewClient({
       <div className="profile-overview-grid">
         {/* Basic Info */}
         <div className="profile-overview-card">
-          <h3 className="profile-overview-card-title">Basic Information</h3>
+          <h3 className="profile-overview-card-title">{t('basicInfo.title')}</h3>
           <dl className="profile-overview-dl">
             {(canSeeAll || privacy.showEmail) ? (
               <>
-                <dt>Email</dt>
+                <dt>{t('basicInfo.email')}</dt>
                 <dd>{person.email}</dd>
               </>
             ) : null}
 
             {(canSeeAll || privacy.showPhone) && person.phone ? (
               <>
-                <dt>Phone</dt>
+                <dt>{t('basicInfo.phone')}</dt>
                 <dd>{person.phone}</dd>
               </>
             ) : null}
 
             {(canSeeAll || privacy.showDepartment) ? (
               <>
-                <dt>Department</dt>
+                <dt>{t('basicInfo.department')}</dt>
                 <dd>{person.department ?? "--"}</dd>
               </>
             ) : null}
 
             {person.countryCode ? (
               <>
-                <dt>Country</dt>
+                <dt>{t('basicInfo.country')}</dt>
                 <dd>
                   <span className="country-chip">
                     <span>{countryFlagFromCode(person.countryCode)}</span>
-                    <span>{countryNameFromCode(person.countryCode)}</span>
+                    <span>{countryNameFromCode(person.countryCode, locale)}</span>
                   </span>
                 </dd>
               </>
@@ -803,24 +804,24 @@ export function PeopleOverviewClient({
 
             {person.timezone ? (
               <>
-                <dt>Timezone</dt>
+                <dt>{t('basicInfo.timezone')}</dt>
                 <dd>{person.timezone}</dd>
               </>
             ) : null}
 
             {person.pronouns ? (
               <>
-                <dt>Pronouns</dt>
+                <dt>{t('basicInfo.pronouns')}</dt>
                 <dd>{person.pronouns}</dd>
               </>
             ) : null}
 
-            <dt>Joined</dt>
-            <dd>{formatDate(person.startDate || person.createdAt)}</dd>
+            <dt>{t('basicInfo.joined')}</dt>
+            <dd>{formatDate(person.startDate || person.createdAt, locale)}</dd>
 
             {person.managerName ? (
               <>
-                <dt>Reports to</dt>
+                <dt>{t('basicInfo.reportsTo')}</dt>
                 <dd>{person.managerName}</dd>
               </>
             ) : null}
@@ -830,12 +831,12 @@ export function PeopleOverviewClient({
         {/* Bio */}
         {(canSeeAll || privacy.showBio) ? (
           <div className="profile-overview-card">
-            <h3 className="profile-overview-card-title">About</h3>
+            <h3 className="profile-overview-card-title">{t('about.title')}</h3>
             {person.bio ? (
               <p className="profile-overview-bio">{person.bio}</p>
             ) : (
               <p className="profile-overview-empty">
-                {isSelf ? "Tell your colleagues a bit about yourself." : "No bio added yet."}
+                {isSelf ? t('about.emptySelf') : t('about.emptyOther')}
               </p>
             )}
           </div>
@@ -844,16 +845,16 @@ export function PeopleOverviewClient({
         {/* Interests */}
         {(canSeeAll || privacy.showInterests) ? (
           <div className="profile-overview-card">
-            <h3 className="profile-overview-card-title">Interests</h3>
+            <h3 className="profile-overview-card-title">{t('interests.title')}</h3>
             <dl className="profile-overview-dl">
-              <dt>Music</dt>
-              <dd>{person.favoriteMusic || (isSelf ? "Not set" : "--")}</dd>
+              <dt>{t('interests.music')}</dt>
+              <dd>{person.favoriteMusic || (isSelf ? t('interests.notSet') : "--")}</dd>
 
-              <dt>Books</dt>
-              <dd>{person.favoriteBooks || (isSelf ? "Not set" : "--")}</dd>
+              <dt>{t('interests.books')}</dt>
+              <dd>{person.favoriteBooks || (isSelf ? t('interests.notSet') : "--")}</dd>
 
-              <dt>Sports</dt>
-              <dd>{person.favoriteSports || (isSelf ? "Not set" : "--")}</dd>
+              <dt>{t('interests.sports')}</dt>
+              <dd>{person.favoriteSports || (isSelf ? t('interests.notSet') : "--")}</dd>
             </dl>
           </div>
         ) : null}
@@ -861,29 +862,29 @@ export function PeopleOverviewClient({
         {/* Emergency Contact (self/admin only) */}
         {canSeeAll ? (
           <div className="profile-overview-card">
-            <h3 className="profile-overview-card-title">Emergency Contact</h3>
+            <h3 className="profile-overview-card-title">{t('emergencyContact.title')}</h3>
             {person.emergencyContactName ? (
               <dl className="profile-overview-dl">
-                <dt>Name</dt>
+                <dt>{t('emergencyContact.name')}</dt>
                 <dd>{person.emergencyContactName}</dd>
 
                 {person.emergencyContactRelationship ? (
                   <>
-                    <dt>Relationship</dt>
+                    <dt>{t('emergencyContact.relationship')}</dt>
                     <dd>{person.emergencyContactRelationship}</dd>
                   </>
                 ) : null}
 
                 {person.emergencyContactPhone ? (
                   <>
-                    <dt>Phone</dt>
+                    <dt>{t('emergencyContact.phone')}</dt>
                     <dd>{person.emergencyContactPhone}</dd>
                   </>
                 ) : null}
               </dl>
             ) : (
               <p className="profile-overview-empty">
-                {isSelf ? "Add an emergency contact for your safety." : "No emergency contact on file."}
+                {isSelf ? t('emergencyContact.emptySelf') : t('emergencyContact.emptyOther')}
               </p>
             )}
           </div>
@@ -891,67 +892,67 @@ export function PeopleOverviewClient({
 
         {/* Work Information (read-only) */}
         <div className="profile-overview-card">
-          <h3 className="profile-overview-card-title">Work Information</h3>
+          <h3 className="profile-overview-card-title">{t('workInfo.title')}</h3>
           <dl className="profile-overview-dl profile-overview-dl-readonly">
-            <dt>Email</dt>
+            <dt>{t('workInfo.email')}</dt>
             <dd>{person.email}</dd>
 
-            <dt>Department</dt>
+            <dt>{t('workInfo.department')}</dt>
             <dd>{person.department ?? "--"}</dd>
 
-            <dt>Job Title</dt>
+            <dt>{t('workInfo.jobTitle')}</dt>
             <dd>{person.title ?? "--"}</dd>
 
             {person.countryCode ? (
               <>
-                <dt>Country</dt>
+                <dt>{t('workInfo.country')}</dt>
                 <dd>
                   <span className="country-chip">
                     <span>{countryFlagFromCode(person.countryCode)}</span>
-                    <span>{countryNameFromCode(person.countryCode)}</span>
+                    <span>{countryNameFromCode(person.countryCode, locale)}</span>
                   </span>
                 </dd>
               </>
             ) : (
               <>
-                <dt>Country</dt>
+                <dt>{t('workInfo.country')}</dt>
                 <dd>--</dd>
               </>
             )}
 
-            <dt>Employment Type</dt>
+            <dt>{t('workInfo.employmentType')}</dt>
             <dd>{formatEmploymentType(person.employmentType)}</dd>
 
             {person.managerName ? (
               <>
-                <dt>Manager</dt>
+                <dt>{t('workInfo.manager')}</dt>
                 <dd>{person.managerName}</dd>
               </>
             ) : null}
 
-            <dt>Roles</dt>
+            <dt>{t('workInfo.roles')}</dt>
             <dd>{person.roles.join(", ")}</dd>
 
-            <dt>Start Date</dt>
-            <dd>{formatDate(person.startDate)}</dd>
+            <dt>{t('workInfo.startDate')}</dt>
+            <dd>{formatDate(person.startDate, locale)}</dd>
           </dl>
         </div>
 
         {/* Privacy Settings (self only) */}
         {isSelf ? (
           <div className="profile-overview-card">
-            <h3 className="profile-overview-card-title">Privacy Settings</h3>
+            <h3 className="profile-overview-card-title">{t('privacy.title')}</h3>
             <p className="profile-overview-privacy-desc">
-              Control what your colleagues can see on your profile.
+              {t('privacy.description')}
             </p>
             <div className="profile-privacy-toggles">
               {(
                 [
-                  { key: "showEmail" as const, label: "Email address" },
-                  { key: "showPhone" as const, label: "Phone number" },
-                  { key: "showDepartment" as const, label: "Department" },
-                  { key: "showBio" as const, label: "Bio" },
-                  { key: "showInterests" as const, label: "Interests" }
+                  { key: "showEmail" as const, label: t('privacy.emailAddress') },
+                  { key: "showPhone" as const, label: t('privacy.phoneNumber') },
+                  { key: "showDepartment" as const, label: t('privacy.department') },
+                  { key: "showBio" as const, label: t('privacy.bio') },
+                  { key: "showInterests" as const, label: t('privacy.interests') }
                 ] as const
               ).map(({ key, label }) => (
                 <label key={key} className="profile-privacy-toggle">
@@ -988,10 +989,10 @@ export function PeopleOverviewClient({
       {person.status === "offboarding" ? (
         <div className="offboarding-banner">
           <div className="offboarding-banner-content">
-            <StatusBadge tone="warning">Offboarding</StatusBadge>
+            <StatusBadge tone="warning">{t('offboarding.badgeLabel')}</StatusBadge>
             <p className="offboarding-banner-text">
-              This person is being offboarded.{person.noticePeriodEndDate
-                ? ` Last working day: ${formatDate(person.noticePeriodEndDate)}.`
+              {t('offboarding.bannerText')}{person.noticePeriodEndDate
+                ? ` ${t('offboarding.lastWorkingDay', { date: formatDate(person.noticePeriodEndDate, locale) })}`
                 : ""}
             </p>
           </div>
@@ -1001,19 +1002,19 @@ export function PeopleOverviewClient({
       {/* Danger Zone -- Super Admin / HR Admin only, non-self, non-offboarding */}
       {(isSuperAdmin || canInitiateOffboarding) && !isSelf && person.status !== "offboarding" ? (
         <div className="danger-zone">
-          <h3 className="danger-zone-title">Danger zone</h3>
+          <h3 className="danger-zone-title">{t('dangerZone.title')}</h3>
 
           {/* Disable / Enable account -- Super Admin only */}
           {isSuperAdmin ? (
             <div className="danger-zone-content">
               <div className="danger-zone-description">
                 <p className="danger-zone-label">
-                  {person.status === "inactive" ? "Enable account" : "Disable account"}
+                  {person.status === "inactive" ? t('dangerZone.enableAccount') : t('dangerZone.disableAccount')}
                 </p>
                 <p className="settings-card-description">
                   {person.status === "inactive"
-                    ? "Re-enable this crew member\u2019s account so they can log in and access Crew Hub again."
-                    : "Disable this crew member\u2019s account. They will no longer be able to log in until the account is re-enabled."}
+                    ? t('dangerZone.enableDescription')
+                    : t('dangerZone.disableDescription')}
                 </p>
               </div>
               <button
@@ -1021,7 +1022,7 @@ export function PeopleOverviewClient({
                 className={person.status === "inactive" ? "button button-accent" : "button button-danger"}
                 onClick={() => setConfirmDisableOpen(true)}
               >
-                {person.status === "inactive" ? "Enable account" : "Disable account"}
+                {person.status === "inactive" ? t('dangerZone.enableAccount') : t('dangerZone.disableAccount')}
               </button>
             </div>
           ) : null}
@@ -1030,9 +1031,9 @@ export function PeopleOverviewClient({
           {canInitiateOffboarding ? (
             <div className="danger-zone-content">
               <div className="danger-zone-description">
-                <p className="danger-zone-label">Initiate offboarding</p>
+                <p className="danger-zone-label">{t('dangerZone.initiateOffboarding')}</p>
                 <p className="settings-card-description">
-                  Begin the offboarding process for this crew member. This will change their status, create offboarding tasks, and notify relevant parties.
+                  {t('dangerZone.offboardingDescription')}
                 </p>
               </div>
               <button
@@ -1046,7 +1047,7 @@ export function PeopleOverviewClient({
                   setIsOffboardModalOpen(true);
                 }}
               >
-                Initiate offboarding
+                {t('dangerZone.initiateOffboarding')}
               </button>
             </div>
           ) : null}
@@ -1060,14 +1061,14 @@ export function PeopleOverviewClient({
             className="modal-dialog modal-dialog-danger"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="modal-title">Initiate offboarding for {person.fullName}</h2>
+            <h2 className="modal-title">{t('offboardModal.title', { name: person.fullName })}</h2>
             <form onSubmit={handleOffboard} noValidate>
               {offboardError ? (
                 <div className="form-error-banner">{offboardError}</div>
               ) : null}
 
               <label className="form-field" htmlFor="offboard-last-day">
-                <span className="form-label">Last working day</span>
+                <span className="form-label">{t('offboardModal.lastWorkingDay')}</span>
                 <input
                   id="offboard-last-day"
                   type="date"
@@ -1080,7 +1081,7 @@ export function PeopleOverviewClient({
               </label>
 
               <label className="form-field" htmlFor="offboard-reason">
-                <span className="form-label">Reason for departure</span>
+                <span className="form-label">{t('offboardModal.reasonLabel')}</span>
                 <select
                   id="offboard-reason"
                   className="form-input"
@@ -1089,17 +1090,17 @@ export function PeopleOverviewClient({
                   onChange={(e) => setOffboardReason(e.currentTarget.value)}
                   disabled={isSubmittingOffboard}
                 >
-                  <option value="">Select a reason</option>
-                  <option value="resignation">Resignation</option>
-                  <option value="redundancy">Redundancy</option>
-                  <option value="performance">Performance</option>
-                  <option value="contract_end">Contract end</option>
-                  <option value="other">Other</option>
+                  <option value="">{t('offboardModal.selectReason')}</option>
+                  <option value="resignation">{t('offboardModal.resignation')}</option>
+                  <option value="redundancy">{t('offboardModal.redundancy')}</option>
+                  <option value="performance">{t('offboardModal.performance')}</option>
+                  <option value="contract_end">{t('offboardModal.contractEnd')}</option>
+                  <option value="other">{t('offboardModal.other')}</option>
                 </select>
               </label>
 
               <label className="form-field" htmlFor="offboard-confirm-name">
-                <span className="form-label">To confirm, type {person.fullName} below</span>
+                <span className="form-label">{t('offboardModal.confirmLabel', { name: person.fullName })}</span>
                 <input
                   id="offboard-confirm-name"
                   className="form-input"
@@ -1117,7 +1118,7 @@ export function PeopleOverviewClient({
                   onClick={() => setIsOffboardModalOpen(false)}
                   disabled={isSubmittingOffboard}
                 >
-                  Cancel
+                  {tCommon('cancel')}
                 </button>
                 <button
                   type="submit"
@@ -1129,7 +1130,7 @@ export function PeopleOverviewClient({
                     !offboardReason
                   }
                 >
-                  {isSubmittingOffboard ? "Processing..." : "Begin offboarding"}
+                  {isSubmittingOffboard ? t('offboardModal.processing') : t('offboardModal.beginOffboarding')}
                 </button>
               </div>
             </form>
@@ -1140,8 +1141,8 @@ export function PeopleOverviewClient({
       {/* Edit Profile Slide Panel */}
       <SlidePanel
         isOpen={isEditOpen}
-        title="Edit Profile"
-        description="Update your personal information, bio, and interests."
+        title={t('editPanel.title')}
+        description={t('editPanel.description')}
         onClose={closeEdit}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSave} noValidate>
@@ -1150,12 +1151,12 @@ export function PeopleOverviewClient({
           ) : null}
 
           <label className="form-field" htmlFor="profile-fullname">
-            <span className="form-label">Display Name</span>
+            <span className="form-label">{t('editPanel.displayName')}</span>
             <input
               id="profile-fullname"
               className="form-input"
               maxLength={200}
-              placeholder="Your full name"
+              placeholder={t('editPanel.displayNamePlaceholder')}
               value={editValues.fullName}
               onChange={(e) =>
                 setEditValues((prev) => ({ ...prev, fullName: e.currentTarget.value }))
@@ -1164,12 +1165,12 @@ export function PeopleOverviewClient({
           </label>
 
           <label className="form-field" htmlFor="profile-pronouns">
-            <span className="form-label">Pronouns</span>
+            <span className="form-label">{t('editPanel.pronouns')}</span>
             <input
               id="profile-pronouns"
               className="form-input"
               maxLength={50}
-              placeholder="e.g. he/him, she/her, they/them"
+              placeholder={t('editPanel.pronounsPlaceholder')}
               value={editValues.pronouns}
               onChange={(e) =>
                 setEditValues((prev) => ({ ...prev, pronouns: e.currentTarget.value }))
@@ -1178,13 +1179,13 @@ export function PeopleOverviewClient({
           </label>
 
           <label className="form-field" htmlFor="profile-phone">
-            <span className="form-label">Phone Number</span>
+            <span className="form-label">{t('editPanel.phoneNumber')}</span>
             <input
               id="profile-phone"
               className="form-input"
               type="tel"
               maxLength={30}
-              placeholder="e.g. +1 555-0100"
+              placeholder={t('editPanel.phonePlaceholder')}
               value={editValues.phone}
               onChange={(e) =>
                 setEditValues((prev) => ({ ...prev, phone: e.currentTarget.value }))
@@ -1193,12 +1194,12 @@ export function PeopleOverviewClient({
           </label>
 
           <label className="form-field" htmlFor="profile-timezone">
-            <span className="form-label">Timezone</span>
+            <span className="form-label">{t('editPanel.timezone')}</span>
             <input
               id="profile-timezone"
               className="form-input"
               maxLength={50}
-              placeholder="e.g. Africa/Lagos"
+              placeholder={t('editPanel.timezonePlaceholder')}
               value={editValues.timezone}
               onChange={(e) =>
                 setEditValues((prev) => ({ ...prev, timezone: e.currentTarget.value }))
@@ -1207,13 +1208,13 @@ export function PeopleOverviewClient({
           </label>
 
           <label className="form-field" htmlFor="profile-bio">
-            <span className="form-label">Bio</span>
+            <span className="form-label">{t('editPanel.bio')}</span>
             <textarea
               id="profile-bio"
               className="form-input"
               rows={4}
               maxLength={500}
-              placeholder="Tell your colleagues about yourself..."
+              placeholder={t('editPanel.bioPlaceholder')}
               value={editValues.bio}
               onChange={(e) =>
                 setEditValues((prev) => ({ ...prev, bio: e.currentTarget.value }))
@@ -1223,15 +1224,15 @@ export function PeopleOverviewClient({
           </label>
 
           <fieldset className="form-fieldset">
-            <legend className="form-fieldset-legend">Emergency Contact</legend>
+            <legend className="form-fieldset-legend">{t('editPanel.emergencyContactLegend')}</legend>
 
             <label className="form-field" htmlFor="profile-ec-name">
-              <span className="form-label">Name</span>
+              <span className="form-label">{t('editPanel.ecName')}</span>
               <input
                 id="profile-ec-name"
                 className="form-input"
                 maxLength={200}
-                placeholder="Emergency contact name"
+                placeholder={t('editPanel.ecNamePlaceholder')}
                 value={editValues.emergencyContactName}
                 onChange={(e) =>
                   setEditValues((prev) => ({
@@ -1243,13 +1244,13 @@ export function PeopleOverviewClient({
             </label>
 
             <label className="form-field" htmlFor="profile-ec-phone">
-              <span className="form-label">Phone</span>
+              <span className="form-label">{t('editPanel.ecPhone')}</span>
               <input
                 id="profile-ec-phone"
                 className="form-input"
                 type="tel"
                 maxLength={30}
-                placeholder="Emergency contact phone"
+                placeholder={t('editPanel.ecPhonePlaceholder')}
                 value={editValues.emergencyContactPhone}
                 onChange={(e) =>
                   setEditValues((prev) => ({
@@ -1261,12 +1262,12 @@ export function PeopleOverviewClient({
             </label>
 
             <label className="form-field" htmlFor="profile-ec-relationship">
-              <span className="form-label">Relationship</span>
+              <span className="form-label">{t('editPanel.ecRelationship')}</span>
               <input
                 id="profile-ec-relationship"
                 className="form-input"
                 maxLength={100}
-                placeholder="e.g. Spouse, Parent, Sibling"
+                placeholder={t('editPanel.ecRelationshipPlaceholder')}
                 value={editValues.emergencyContactRelationship}
                 onChange={(e) =>
                   setEditValues((prev) => ({
@@ -1279,15 +1280,15 @@ export function PeopleOverviewClient({
           </fieldset>
 
           <fieldset className="form-fieldset">
-            <legend className="form-fieldset-legend">Interests</legend>
+            <legend className="form-fieldset-legend">{t('editPanel.interestsLegend')}</legend>
 
             <label className="form-field" htmlFor="profile-music">
-              <span className="form-label">Favorite Music</span>
+              <span className="form-label">{t('editPanel.favoriteMusic')}</span>
               <input
                 id="profile-music"
                 className="form-input"
                 maxLength={200}
-                placeholder="e.g. Jazz, Afrobeats, Classical"
+                placeholder={t('editPanel.musicPlaceholder')}
                 value={editValues.favoriteMusic}
                 onChange={(e) =>
                   setEditValues((prev) => ({
@@ -1299,12 +1300,12 @@ export function PeopleOverviewClient({
             </label>
 
             <label className="form-field" htmlFor="profile-books">
-              <span className="form-label">Favorite Books</span>
+              <span className="form-label">{t('editPanel.favoriteBooks')}</span>
               <input
                 id="profile-books"
                 className="form-input"
                 maxLength={200}
-                placeholder="e.g. Atomic Habits, Deep Work"
+                placeholder={t('editPanel.booksPlaceholder')}
                 value={editValues.favoriteBooks}
                 onChange={(e) =>
                   setEditValues((prev) => ({
@@ -1316,12 +1317,12 @@ export function PeopleOverviewClient({
             </label>
 
             <label className="form-field" htmlFor="profile-sports">
-              <span className="form-label">Favorite Sports</span>
+              <span className="form-label">{t('editPanel.favoriteSports')}</span>
               <input
                 id="profile-sports"
                 className="form-input"
                 maxLength={200}
-                placeholder="e.g. Football, Basketball, Swimming"
+                placeholder={t('editPanel.sportsPlaceholder')}
                 value={editValues.favoriteSports}
                 onChange={(e) =>
                   setEditValues((prev) => ({
@@ -1335,10 +1336,10 @@ export function PeopleOverviewClient({
 
           <div className="slide-panel-actions">
             <button type="button" className="button button-ghost" onClick={closeEdit}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSaving}>
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving ? tCommon('working') : tCommon('save')}
             </button>
           </div>
         </form>
@@ -1347,8 +1348,8 @@ export function PeopleOverviewClient({
       {/* Admin Edit Slide Panel */}
       <SlidePanel
         isOpen={isAdminEditOpen}
-        title={person ? `Edit ${person.fullName}` : "Edit Person"}
-        description="Update role, department, and manager for this crew member."
+        title={person ? t('adminEditPanel.titleWithName', { name: person.fullName }) : t('adminEditPanel.titleDefault')}
+        description={t('adminEditPanel.description')}
         onClose={closeAdminEdit}
       >
         {person ? (
@@ -1356,12 +1357,12 @@ export function PeopleOverviewClient({
             {adminEditError ? <div className="form-error-banner">{adminEditError}</div> : null}
 
             <label className="form-field" htmlFor="admin-edit-title">
-              <span className="form-label">Job title</span>
+              <span className="form-label">{t('adminEditPanel.jobTitle')}</span>
               <input
                 id="admin-edit-title"
                 className="form-input"
                 maxLength={200}
-                placeholder="e.g. Software Engineer"
+                placeholder={t('adminEditPanel.jobTitlePlaceholder')}
                 value={adminEditValues.title}
                 onChange={(e) => {
                   const val = e.currentTarget.value;
@@ -1371,7 +1372,7 @@ export function PeopleOverviewClient({
             </label>
 
             <fieldset className="form-field people-role-fieldset">
-              <legend className="form-label">Roles</legend>
+              <legend className="form-label">{t('adminEditPanel.roles')}</legend>
               <div className="people-role-selection">
                 {USER_ROLES.map((role) => (
                   <label key={`admin-role-${role}`} className="settings-checkbox">
@@ -1387,7 +1388,7 @@ export function PeopleOverviewClient({
             </fieldset>
 
             <label className="form-field" htmlFor="admin-edit-department">
-              <span className="form-label">Department</span>
+              <span className="form-label">{t('adminEditPanel.department')}</span>
               <select
                 id="admin-edit-department"
                 className="form-input"
@@ -1397,7 +1398,7 @@ export function PeopleOverviewClient({
                   setAdminEditValues((prev) => ({ ...prev, department: val }));
                 }}
               >
-                <option value="">No department</option>
+                <option value="">{t('adminEditPanel.noDepartment')}</option>
                 {DEPARTMENTS.map((dept) => (
                   <option key={dept} value={dept}>
                     {dept}
@@ -1407,7 +1408,7 @@ export function PeopleOverviewClient({
             </label>
 
             <label className="form-field" htmlFor="admin-edit-manager">
-              <span className="form-label">Manager</span>
+              <span className="form-label">{t('adminEditPanel.manager')}</span>
               <select
                 id="admin-edit-manager"
                 className="form-input"
@@ -1417,7 +1418,7 @@ export function PeopleOverviewClient({
                   setAdminEditValues((prev) => ({ ...prev, managerId: val }));
                 }}
               >
-                <option value="">No manager</option>
+                <option value="">{t('adminEditPanel.noManager')}</option>
                 {allPeople
                   .filter((p) => p.id !== person.id && p.status === "active")
                   .sort((a, b) => a.fullName.localeCompare(b.fullName))
@@ -1431,10 +1432,10 @@ export function PeopleOverviewClient({
 
             <div className="slide-panel-actions">
               <button type="button" className="button button-ghost" onClick={closeAdminEdit} disabled={isAdminEditSaving}>
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button type="submit" className="button button-accent" disabled={isAdminEditSaving}>
-                {isAdminEditSaving ? "Saving..." : "Save Changes"}
+                {isAdminEditSaving ? tCommon('working') : tCommon('save')}
               </button>
             </div>
           </form>
@@ -1444,13 +1445,13 @@ export function PeopleOverviewClient({
       {/* Invite Confirmation Dialog */}
       <ConfirmDialog
         isOpen={inviteConfirmOpen}
-        title="Send Crew Hub invite"
+        title={t('confirmInvite.title')}
         description={
           person
-            ? `Send an invite email to ${person.fullName} (${person.email})? They will receive a link to set up their Crew Hub account.`
+            ? t('confirmInvite.description', { name: person.fullName, email: person.email })
             : ""
         }
-        confirmLabel="Send Invite"
+        confirmLabel={t('confirmInvite.confirmLabel')}
         isConfirming={isInviting}
         onConfirm={() => void handleSendInvite()}
         onCancel={() => setInviteConfirmOpen(false)}
@@ -1461,15 +1462,15 @@ export function PeopleOverviewClient({
         isOpen={confirmDisableOpen}
         title={
           person?.status === "inactive"
-            ? `Enable account for ${person?.fullName ?? "this person"}`
-            : `Disable account for ${person?.fullName ?? "this person"}`
+            ? t('confirmDisable.enableTitle', { name: person?.fullName ?? t('confirmDisable.thisPerson') })
+            : t('confirmDisable.disableTitle', { name: person?.fullName ?? t('confirmDisable.thisPerson') })
         }
         description={
           person?.status === "inactive"
-            ? `Are you sure you want to re-enable ${person?.fullName ?? "this person"}'s account? They will be able to log in again.`
-            : `Are you sure you want to disable ${person?.fullName ?? "this person"}'s account? They will no longer be able to log in until the account is re-enabled.`
+            ? t('confirmDisable.enableDescription', { name: person?.fullName ?? t('confirmDisable.thisPerson') })
+            : t('confirmDisable.disableDescription', { name: person?.fullName ?? t('confirmDisable.thisPerson') })
         }
-        confirmLabel={person?.status === "inactive" ? "Enable account" : "Disable account"}
+        confirmLabel={person?.status === "inactive" ? t('confirmDisable.enableLabel') : t('confirmDisable.disableLabel')}
         tone={person?.status === "inactive" ? "default" : "danger"}
         isConfirming={isTogglingStatus}
         onConfirm={() => void handleToggleAccountStatus()}

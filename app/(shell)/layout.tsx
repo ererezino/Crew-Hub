@@ -18,6 +18,7 @@ export default async function ShellLayout({ children }: { children: ReactNode })
             }
           : null
       }
+      profileLocale={session?.profile?.preferred_locale}
     >
       {children}
     </AppShell>

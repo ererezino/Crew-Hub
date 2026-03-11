@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -26,6 +27,8 @@ function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
 }
 
 export function TimeOffTabsClient({ requestedTab, userRoles }: TimeOffTabsClientProps) {
+  const tNav = useTranslations('nav');
+  const t = useTranslations('timeOffPage');
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,14 +37,14 @@ export function TimeOffTabsClient({ requestedTab, userRoles }: TimeOffTabsClient
     () => [
       {
         key: "my-requests",
-        label: "My Requests"
+        label: t('tab.myRequests')
       },
       {
         key: "calendar",
-        label: "Calendar"
+        label: t('tab.calendar')
       }
     ],
-    []
+    [t]
   );
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(requestedTab, tabs));
@@ -71,8 +74,8 @@ export function TimeOffTabsClient({ requestedTab, userRoles }: TimeOffTabsClient
   return (
     <>
       <PageHeader
-        title="Time Off"
-        description="Request time off, check balances, and track approval status."
+        title={tNav('timeOff')}
+        description={tNav('description.timeOff')}
       />
 
       <PageTabs

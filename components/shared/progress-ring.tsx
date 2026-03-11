@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 type ProgressRingProps = {
   value: number;
   label: string;
@@ -21,14 +25,16 @@ function clampPercentage(value: number): number {
 }
 
 export function ProgressRing({ value, label, size = 116 }: ProgressRingProps) {
+  const t = useTranslations("common");
   const normalizedValue = clampPercentage(value);
+  const percentText = t("percentValue", { value: normalizedValue });
   const strokeWidth = 8;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference - (normalizedValue / 100) * circumference;
 
   return (
-    <div className="progress-ring" role="img" aria-label={`${label}: ${normalizedValue}%`}>
+    <div className="progress-ring" role="img" aria-label={`${label}: ${percentText}`}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle
           cx={size / 2}
@@ -51,7 +57,7 @@ export function ProgressRing({ value, label, size = 116 }: ProgressRingProps) {
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </svg>
-      <span className="progress-ring-value numeric">{normalizedValue}%</span>
+      <span className="progress-ring-value numeric">{percentText}</span>
       <span className="progress-ring-label">{label}</span>
     </div>
   );

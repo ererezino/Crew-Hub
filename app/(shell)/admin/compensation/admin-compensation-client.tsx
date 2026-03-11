@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 
 import { CompensationSkeleton } from "../../../../components/shared/compensation-skeleton";
@@ -38,6 +39,8 @@ import {
 } from "../../../../types/compensation";
 import { humanizeError } from "@/lib/errors";
 
+type AppLocale = "en" | "fr";
+type TranslatorFn = (key: string) => string;
 type ToastVariant = "success" | "error" | "info";
 type SortDirection = "asc" | "desc";
 type SalaryApprovalAction = "approve" | "revoke";
@@ -347,10 +350,6 @@ function allowanceTaxTone(isTaxable: boolean) {
   return isTaxable ? "warning" : "success";
 }
 
-function allowanceTaxLabel(isTaxable: boolean) {
-  return isTaxable ? "Taxable" : "Non-taxable";
-}
-
 function salarySortValue(effectiveFrom: string): number {
   return Date.parse(`${effectiveFrom}T00:00:00.000Z`);
 }
@@ -387,6 +386,11 @@ export function AdminCompensationClient({
   initialEmployeeId,
   canApprove
 }: AdminCompensationClientProps) {
+  const t = useTranslations('adminCompensation');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(initialEmployeeId);
   const [salarySortDirection, setSalarySortDirection] = useState<SortDirection>("desc");
   const [allowanceSortDirection, setAllowanceSortDirection] = useState<SortDirection>("desc");
@@ -546,7 +550,7 @@ export function AdminCompensationClient({
     event.preventDefault();
 
     if (!selectedEmployee) {
-      showToast("error", "Select an employee before adding salary records.");
+      showToast("error", t('toast.selectEmployeeBeforeSalary'));
       return;
     }
 
@@ -580,17 +584,17 @@ export function AdminCompensationClient({
       const payload = (await response.json()) as CompensationMutationResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to create salary record.");
+        showToast("error", payload.error?.message ?? t('toast.unableToCreateSalary'));
         return;
       }
 
-      showToast("success", "Salary record created.");
+      showToast("success", t('toast.salaryCreated'));
       resetSalaryPanel();
       compensationQuery.refresh();
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to create salary record."
+        error instanceof Error ? error.message : t('toast.unableToCreateSalary')
       );
     } finally {
       setIsSubmittingSalary(false);
@@ -615,16 +619,16 @@ export function AdminCompensationClient({
       const payload = (await response.json()) as CompensationMutationResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to update salary approval.");
+        showToast("error", payload.error?.message ?? t('toast.unableToUpdateSalaryApproval'));
         return;
       }
 
-      showToast("success", action === "approve" ? "Salary approved." : "Salary approval removed.");
+      showToast("success", action === "approve" ? t('toast.salaryApproved') : t('toast.salaryApprovalRemoved'));
       compensationQuery.refresh();
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to update salary approval."
+        error instanceof Error ? error.message : t('toast.unableToUpdateSalaryApproval')
       );
     } finally {
       setIsUpdatingSalaryApprovalId(null);
@@ -635,7 +639,7 @@ export function AdminCompensationClient({
     event.preventDefault();
 
     if (!selectedEmployee) {
-      showToast("error", "Select an employee before managing allowances.");
+      showToast("error", t('toast.selectEmployeeBeforeAllowance'));
       return;
     }
 
@@ -675,15 +679,15 @@ export function AdminCompensationClient({
       const payload = (await response.json()) as CompensationMutationResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to save allowance.");
+        showToast("error", payload.error?.message ?? t('toast.unableToSaveAllowance'));
         return;
       }
 
-      showToast("success", editingAllowanceId ? "Allowance updated." : "Allowance created.");
+      showToast("success", editingAllowanceId ? t('toast.allowanceUpdated') : t('toast.allowanceCreated'));
       resetAllowancePanel();
       compensationQuery.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to save allowance.");
+      showToast("error", error instanceof Error ? error.message : t('toast.unableToSaveAllowance'));
     } finally {
       setIsSubmittingAllowance(false);
     }
@@ -691,9 +695,9 @@ export function AdminCompensationClient({
 
   const handleAllowanceDelete = async (allowanceId: string) => {
     const confirmed = await confirm({
-      title: "Delete allowance?",
-      description: "This removes the allowance record and logs the action in the audit trail.",
-      confirmLabel: "Delete allowance",
+      title: t('confirmDelete.allowanceTitle'),
+      description: t('confirmDelete.allowanceDescription'),
+      confirmLabel: t('confirmDelete.allowanceConfirmLabel'),
       tone: "danger"
     });
 
@@ -711,14 +715,14 @@ export function AdminCompensationClient({
       const payload = (await response.json()) as CompensationMutationResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to delete allowance.");
+        showToast("error", payload.error?.message ?? t('toast.unableToDeleteAllowance'));
         return;
       }
 
-      showToast("success", "Allowance deleted.");
+      showToast("success", t('toast.allowanceDeleted'));
       compensationQuery.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to delete allowance.");
+      showToast("error", error instanceof Error ? error.message : t('toast.unableToDeleteAllowance'));
     } finally {
       setIsDeletingAllowanceId(null);
     }
@@ -728,7 +732,7 @@ export function AdminCompensationClient({
     event.preventDefault();
 
     if (!selectedEmployee) {
-      showToast("error", "Select an employee before managing equity grants.");
+      showToast("error", t('toast.selectEmployeeBeforeEquity'));
       return;
     }
 
@@ -775,17 +779,17 @@ export function AdminCompensationClient({
       const payload = (await response.json()) as CompensationMutationResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to save equity grant.");
+        showToast("error", payload.error?.message ?? t('toast.unableToSaveEquity'));
         return;
       }
 
-      showToast("success", editingEquityGrantId ? "Equity grant updated." : "Equity grant created.");
+      showToast("success", editingEquityGrantId ? t('toast.equityUpdated') : t('toast.equityCreated'));
       resetEquityPanel();
       compensationQuery.refresh();
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to save equity grant."
+        error instanceof Error ? error.message : t('toast.unableToSaveEquity')
       );
     } finally {
       setIsSubmittingEquity(false);
@@ -819,16 +823,16 @@ export function AdminCompensationClient({
       const payload = (await response.json()) as CompensationMutationResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to update equity approval.");
+        showToast("error", payload.error?.message ?? t('toast.unableToUpdateEquityApproval'));
         return;
       }
 
-      showToast("success", approve ? "Equity grant approved." : "Equity approval removed.");
+      showToast("success", approve ? t('toast.equityApproved') : t('toast.equityApprovalRemoved'));
       compensationQuery.refresh();
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to update equity approval."
+        error instanceof Error ? error.message : t('toast.unableToUpdateEquityApproval')
       );
     } finally {
       setIsUpdatingEquityApprovalId(null);
@@ -838,20 +842,20 @@ export function AdminCompensationClient({
   return (
     <>
       <PageHeader
-        title="Compensation Admin"
-        description="Manage salary, allowances, and equity for team members."
+        title={t('pageTitle')}
+        description={t('pageDescription')}
       />
 
-      <section className="compensation-admin-employee-card" aria-label="Employee selector">
+      <section className="compensation-admin-employee-card" aria-label={t('employeeSelector.ariaLabel')}>
         <label className="form-field" htmlFor="compensation-employee-selector">
-          <span className="form-label">Employee</span>
+          <span className="form-label">{t('employeeSelector.label')}</span>
           <select
             id="compensation-employee-selector"
             className="form-input"
             value={selectedEmployeeId ?? ""}
             onChange={(event) => setSelectedEmployeeId(event.currentTarget.value || null)}
           >
-            <option value="">Select an employee</option>
+            <option value="">{t('employeeSelector.placeholder')}</option>
             {(compensationQuery.data?.employees ?? []).map((employee) => (
               <option key={employee.id} value={employee.id}>
                 {employee.fullName}
@@ -864,7 +868,7 @@ export function AdminCompensationClient({
             className="button"
             href={`/people/${selectedEmployeeId}?tab=compensation`}
           >
-            Open profile tab
+            {t('employeeSelector.openProfileTab')}
           </Link>
         ) : null}
       </section>
@@ -874,7 +878,7 @@ export function AdminCompensationClient({
       {!compensationQuery.isLoading && compensationQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Compensation admin data is unavailable"
+            title={t('emptyState.errorTitle')}
             description={compensationQuery.errorMessage}
           />
           <button
@@ -882,7 +886,7 @@ export function AdminCompensationClient({
             className="button button-accent"
             onClick={() => compensationQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
@@ -892,20 +896,20 @@ export function AdminCompensationClient({
       compensationQuery.data &&
       compensationQuery.data.employees.length === 0 ? (
         <EmptyState
-          title="No crew members found"
-          description="Seed or create profile data before managing compensation records."
+          title={t('emptyState.noCrewTitle')}
+          description={t('emptyState.noCrewDescription')}
         />
       ) : null}
 
       {!compensationQuery.isLoading &&
       !compensationQuery.errorMessage &&
       selectedEmployee ? (
-        <section className="compensation-layout" aria-label="Compensation admin sections">
-          <article className="metric-card" aria-label="Selected employee summary">
+        <section className="compensation-layout" aria-label={t('summary.ariaLabel')}>
+          <article className="metric-card" aria-label={t('summary.employeeAriaLabel')}>
             <div>
               <h2 className="section-title">{selectedEmployee.fullName}</h2>
               <p className="settings-card-description">
-                {selectedEmployee.title ?? "No title"} • {selectedEmployee.department ?? ""}
+                {selectedEmployee.title ?? t('summary.noTitle')} • {selectedEmployee.department ?? ""}
               </p>
             </div>
             <div className="compensation-summary-meta">
@@ -915,9 +919,9 @@ export function AdminCompensationClient({
             </div>
           </article>
 
-          <section className="compensation-section" aria-label="Salary management">
+          <section className="compensation-section" aria-label={t('salary.ariaLabel')}>
             <div className="timeoff-section-header">
-              <h2 className="section-title">Salary records</h2>
+              <h2 className="section-title">{t('salary.sectionTitle')}</h2>
               <button
                 type="button"
                 className="button button-accent"
@@ -931,7 +935,7 @@ export function AdminCompensationClient({
                   setIsSalaryPanelOpen(true);
                 }}
               >
-                Add salary record
+                {t('salary.addButton')}
               </button>
             </div>
 
@@ -939,7 +943,7 @@ export function AdminCompensationClient({
               <article className="compensation-salary-card">
                 <header className="compensation-salary-header">
                   <div>
-                    <p className="metric-label">Current base salary</p>
+                    <p className="metric-label">{t('salary.currentBaseSalary')}</p>
                     <p className="compensation-salary-value">
                       <CurrencyDisplay
                         amount={currentSalary.baseSalaryAmount}
@@ -948,27 +952,27 @@ export function AdminCompensationClient({
                     </p>
                   </div>
                   <StatusBadge tone={salaryApprovalTone(currentSalary.approvedBy)}>
-                    {currentSalary.approvedBy ? "Approved" : "Pending approval"}
+                    {currentSalary.approvedBy ? t('salary.approved') : t('salary.pendingApproval')}
                   </StatusBadge>
                 </header>
 
                 <dl className="compensation-salary-meta">
                   <div>
-                    <dt>Frequency</dt>
+                    <dt>{t('salary.frequency')}</dt>
                     <dd>{formatPayFrequencyLabel(currentSalary.payFrequency)}</dd>
                   </div>
                   <div>
-                    <dt>Employment</dt>
+                    <dt>{t('salary.employment')}</dt>
                     <dd>{formatEmploymentTypeLabel(currentSalary.employmentType)}</dd>
                   </div>
                   <div>
-                    <dt>Effective</dt>
+                    <dt>{t('salary.effective')}</dt>
                     <dd>
                       <time
                         dateTime={currentSalary.effectiveFrom}
-                        title={formatDateTimeTooltip(currentSalary.effectiveFrom)}
+                        title={formatDateTimeTooltip(currentSalary.effectiveFrom, locale)}
                       >
-                        {formatRelativeTime(currentSalary.effectiveFrom)}
+                        {formatRelativeTime(currentSalary.effectiveFrom, locale)}
                       </time>
                     </dd>
                   </div>
@@ -976,14 +980,14 @@ export function AdminCompensationClient({
               </article>
             ) : (
               <EmptyState
-                title="No salary records"
-                description="Create the first salary record for this crew member."
+                title={t('emptyState.noSalaryTitle')}
+                description={t('emptyState.noSalaryDescription')}
               />
             )}
 
             {salaryRecords.length > 0 ? (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Salary records table">
+                <table className="data-table" aria-label={t('salary.tableAriaLabel')}>
                   <thead>
                     <tr>
                       <th>
@@ -996,16 +1000,16 @@ export function AdminCompensationClient({
                             )
                           }
                         >
-                          Effective
+                          {t('salary.effective')}
                           <span className="numeric">
-                            {salarySortDirection === "desc" ? "↓" : "↑"}
+                            {salarySortDirection === "desc" ? "\u2193" : "\u2191"}
                           </span>
                         </button>
                       </th>
-                      <th>Amount</th>
-                      <th>Frequency</th>
-                      <th>Status</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('salary.amount')}</th>
+                      <th>{t('salary.frequency')}</th>
+                      <th>{tCommon('status.label')}</th>
+                      <th className="table-action-column">{t('salary.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1014,9 +1018,9 @@ export function AdminCompensationClient({
                         <td>
                           <time
                             dateTime={record.effectiveFrom}
-                            title={formatDateTimeTooltip(record.effectiveFrom)}
+                            title={formatDateTimeTooltip(record.effectiveFrom, locale)}
                           >
-                            {formatRelativeTime(record.effectiveFrom)}
+                            {formatRelativeTime(record.effectiveFrom, locale)}
                           </time>
                         </td>
                         <td>
@@ -1025,7 +1029,7 @@ export function AdminCompensationClient({
                         <td>{formatPayFrequencyLabel(record.payFrequency)}</td>
                         <td>
                           <StatusBadge tone={salaryApprovalTone(record.approvedBy)}>
-                            {record.approvedBy ? "Approved" : "Pending"}
+                            {record.approvedBy ? t('salary.approved') : t('salary.pending')}
                           </StatusBadge>
                         </td>
                         <td className="table-row-action-cell">
@@ -1043,10 +1047,10 @@ export function AdminCompensationClient({
                                 disabled={isUpdatingSalaryApprovalId === record.id}
                               >
                                 {isUpdatingSalaryApprovalId === record.id
-                                  ? "Saving..."
+                                  ? tCommon('working')
                                   : record.approvedBy
-                                    ? "Revoke"
-                                    : "Approve"}
+                                    ? t('salary.revoke')
+                                    : t('salary.approve')}
                               </button>
                             ) : null}
                             <button
@@ -1058,10 +1062,10 @@ export function AdminCompensationClient({
                                 }
 
                                 void navigator.clipboard.writeText(record.id);
-                                showToast("info", "Salary record ID copied.");
+                                showToast("info", t('toast.salaryIdCopied'));
                               }}
                             >
-                              Copy ID
+                              {t('salary.copyId')}
                             </button>
                           </div>
                         </td>
@@ -1073,9 +1077,9 @@ export function AdminCompensationClient({
             ) : null}
           </section>
 
-          <section className="compensation-section" aria-label="Allowance management">
+          <section className="compensation-section" aria-label={t('allowance.ariaLabel')}>
             <div className="timeoff-section-header">
-              <h2 className="section-title">Allowances</h2>
+              <h2 className="section-title">{t('allowance.sectionTitle')}</h2>
               <button
                 type="button"
                 className="button button-accent"
@@ -1089,22 +1093,22 @@ export function AdminCompensationClient({
                   setIsAllowancePanelOpen(true);
                 }}
               >
-                Add allowance
+                {t('allowance.addButton')}
               </button>
             </div>
 
             {allowances.length === 0 ? (
               <EmptyState
-                title="No allowances"
-                description="Create allowances for this crew member to track recurring compensation."
+                title={t('emptyState.noAllowanceTitle')}
+                description={t('emptyState.noAllowanceDescription')}
               />
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Allowances table">
+                <table className="data-table" aria-label={t('allowance.tableAriaLabel')}>
                   <thead>
                     <tr>
-                      <th>Label</th>
-                      <th>Type</th>
+                      <th>{t('allowance.label')}</th>
+                      <th>{t('allowance.type')}</th>
                       <th>
                         <button
                           type="button"
@@ -1115,15 +1119,15 @@ export function AdminCompensationClient({
                             )
                           }
                         >
-                          Amount
+                          {t('allowance.amount')}
                           <span className="numeric">
-                            {allowanceSortDirection === "desc" ? "↓" : "↑"}
+                            {allowanceSortDirection === "desc" ? "\u2193" : "\u2191"}
                           </span>
                         </button>
                       </th>
-                      <th>Tax</th>
-                      <th>Effective</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('allowance.tax')}</th>
+                      <th>{t('allowance.effective')}</th>
+                      <th className="table-action-column">{t('allowance.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1136,15 +1140,15 @@ export function AdminCompensationClient({
                         </td>
                         <td>
                           <StatusBadge tone={allowanceTaxTone(allowance.isTaxable)}>
-                            {allowanceTaxLabel(allowance.isTaxable)}
+                            {allowance.isTaxable ? t('allowance.taxable') : t('allowance.nonTaxable')}
                           </StatusBadge>
                         </td>
                         <td>
                           <time
                             dateTime={allowance.effectiveFrom}
-                            title={formatDateTimeTooltip(allowance.effectiveFrom)}
+                            title={formatDateTimeTooltip(allowance.effectiveFrom, locale)}
                           >
-                            {formatRelativeTime(allowance.effectiveFrom)}
+                            {formatRelativeTime(allowance.effectiveFrom, locale)}
                           </time>
                         </td>
                         <td className="table-row-action-cell">
@@ -1159,7 +1163,7 @@ export function AdminCompensationClient({
                                 setIsAllowancePanelOpen(true);
                               }}
                             >
-                              Edit
+                              {t('allowance.edit')}
                             </button>
                             <button
                               type="button"
@@ -1167,7 +1171,7 @@ export function AdminCompensationClient({
                               onClick={() => handleAllowanceDelete(allowance.id)}
                               disabled={isDeletingAllowanceId === allowance.id}
                             >
-                              {isDeletingAllowanceId === allowance.id ? "Deleting..." : "Delete"}
+                              {isDeletingAllowanceId === allowance.id ? t('allowance.deleting') : tCommon('delete')}
                             </button>
                           </div>
                         </td>
@@ -1179,9 +1183,9 @@ export function AdminCompensationClient({
             )}
           </section>
 
-          <section className="compensation-section" aria-label="Equity management">
+          <section className="compensation-section" aria-label={t('equity.ariaLabel')}>
             <div className="timeoff-section-header">
-              <h2 className="section-title">Equity grants</h2>
+              <h2 className="section-title">{t('equity.sectionTitle')}</h2>
               <button
                 type="button"
                 className="button button-accent"
@@ -1192,18 +1196,18 @@ export function AdminCompensationClient({
                   setIsEquityPanelOpen(true);
                 }}
               >
-                Add equity grant
+                {t('equity.addButton')}
               </button>
             </div>
 
             {equityGrants.length === 0 ? (
               <EmptyState
-                title="No equity grants"
-                description="Create equity grants to track vesting schedules for this crew member."
+                title={t('emptyState.noEquityTitle')}
+                description={t('emptyState.noEquityDescription')}
               />
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Equity grants table">
+                <table className="data-table" aria-label={t('equity.tableAriaLabel')}>
                   <thead>
                     <tr>
                       <th>
@@ -1216,18 +1220,18 @@ export function AdminCompensationClient({
                             )
                           }
                         >
-                          Grant date
+                          {t('equity.grantDate')}
                           <span className="numeric">
-                            {equitySortDirection === "desc" ? "↓" : "↑"}
+                            {equitySortDirection === "desc" ? "\u2193" : "\u2191"}
                           </span>
                         </button>
                       </th>
-                      <th>Grant</th>
-                      <th>Shares</th>
-                      <th>Status</th>
-                      <th>Vesting</th>
-                      <th>Approval</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('equity.grant')}</th>
+                      <th>{t('equity.shares')}</th>
+                      <th>{tCommon('status.label')}</th>
+                      <th>{t('equity.vesting')}</th>
+                      <th>{t('equity.approval')}</th>
+                      <th className="table-action-column">{t('equity.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1239,9 +1243,9 @@ export function AdminCompensationClient({
                           <td>
                             <time
                               dateTime={grant.grantDate}
-                              title={formatDateTimeTooltip(grant.grantDate)}
+                              title={formatDateTimeTooltip(grant.grantDate, locale)}
                             >
-                              {formatRelativeTime(grant.grantDate)}
+                              {formatRelativeTime(grant.grantDate, locale)}
                             </time>
                           </td>
                           <td>{grant.grantType}</td>
@@ -1263,7 +1267,7 @@ export function AdminCompensationClient({
                           </td>
                           <td>
                             <StatusBadge tone={salaryApprovalTone(grant.approvedBy)}>
-                              {grant.approvedBy ? "Approved" : "Pending"}
+                              {grant.approvedBy ? t('equity.approved') : t('equity.pending')}
                             </StatusBadge>
                           </td>
                           <td className="table-row-action-cell">
@@ -1278,7 +1282,7 @@ export function AdminCompensationClient({
                                   setIsEquityPanelOpen(true);
                                 }}
                               >
-                                Edit
+                                {t('equity.edit')}
                               </button>
                               {canApprove ? (
                                 <button
@@ -1288,10 +1292,10 @@ export function AdminCompensationClient({
                                   disabled={isUpdatingEquityApprovalId === grant.id}
                                 >
                                   {isUpdatingEquityApprovalId === grant.id
-                                    ? "Saving..."
+                                    ? tCommon('working')
                                     : grant.approvedBy
-                                      ? "Revoke"
-                                      : "Approve"}
+                                      ? t('equity.revoke')
+                                      : t('equity.approve')}
                                 </button>
                               ) : null}
                             </div>
@@ -1310,12 +1314,12 @@ export function AdminCompensationClient({
       <SlidePanel
         isOpen={isSalaryPanelOpen}
         onClose={resetSalaryPanel}
-        title="Add salary record"
-        description="Salary updates create new rows to preserve full compensation history."
+        title={t('salaryPanel.title')}
+        description={t('salaryPanel.description')}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSalarySubmit} noValidate>
           <label className="form-field" htmlFor="salary-base-amount">
-            <span className="form-label">Base salary (smallest unit)</span>
+            <span className="form-label">{t('salaryPanel.baseSalaryLabel')}</span>
             <input
               id="salary-base-amount"
               className={
@@ -1339,7 +1343,7 @@ export function AdminCompensationClient({
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="salary-currency">
-              <span className="form-label">Currency</span>
+              <span className="form-label">{t('salaryPanel.currencyLabel')}</span>
               <input
                 id="salary-currency"
                 className={salaryFormErrors.currency ? "form-input form-input-error" : "form-input"}
@@ -1360,7 +1364,7 @@ export function AdminCompensationClient({
             </label>
 
             <label className="form-field" htmlFor="salary-pay-frequency">
-              <span className="form-label">Pay frequency</span>
+              <span className="form-label">{t('salaryPanel.payFrequencyLabel')}</span>
               <select
                 id="salary-pay-frequency"
                 className={
@@ -1391,7 +1395,7 @@ export function AdminCompensationClient({
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="salary-employment-type">
-              <span className="form-label">Employment type</span>
+              <span className="form-label">{t('salaryPanel.employmentTypeLabel')}</span>
               <select
                 id="salary-employment-type"
                 className={
@@ -1420,7 +1424,7 @@ export function AdminCompensationClient({
             </label>
 
             <label className="form-field" htmlFor="salary-effective-from">
-              <span className="form-label">Effective from</span>
+              <span className="form-label">{t('salaryPanel.effectiveFromLabel')}</span>
               <input
                 id="salary-effective-from"
                 type="date"
@@ -1445,7 +1449,7 @@ export function AdminCompensationClient({
           </div>
 
           <label className="form-field" htmlFor="salary-effective-to">
-            <span className="form-label">Effective to (optional)</span>
+            <span className="form-label">{t('salaryPanel.effectiveToLabel')}</span>
             <input
               id="salary-effective-to"
               type="date"
@@ -1484,16 +1488,16 @@ export function AdminCompensationClient({
                   setSalaryFormErrors(validateSalary(nextValues));
                 }}
               />
-              <span>Approve this salary record now (Super Admin only)</span>
+              <span>{t('salaryPanel.approveCheckbox')}</span>
             </label>
           ) : null}
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={resetSalaryPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmittingSalary}>
-              {isSubmittingSalary ? "Saving..." : "Save salary"}
+              {isSubmittingSalary ? tCommon('working') : t('salaryPanel.submitButton')}
             </button>
           </div>
         </form>
@@ -1502,13 +1506,13 @@ export function AdminCompensationClient({
       <SlidePanel
         isOpen={isAllowancePanelOpen}
         onClose={resetAllowancePanel}
-        title={editingAllowanceId ? "Edit allowance" : "Add allowance"}
-        description="Allowances are stored in the smallest currency unit and tracked over time."
+        title={editingAllowanceId ? t('allowancePanel.editTitle') : t('allowancePanel.addTitle')}
+        description={t('allowancePanel.description')}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleAllowanceSubmit} noValidate>
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="allowance-type">
-              <span className="form-label">Type</span>
+              <span className="form-label">{t('allowancePanel.typeLabel')}</span>
               <select
                 id="allowance-type"
                 className={allowanceFormErrors.type ? "form-input form-input-error" : "form-input"}
@@ -1535,7 +1539,7 @@ export function AdminCompensationClient({
             </label>
 
             <label className="form-field" htmlFor="allowance-amount">
-              <span className="form-label">Amount (smallest unit)</span>
+              <span className="form-label">{t('allowancePanel.amountLabel')}</span>
               <input
                 id="allowance-amount"
                 className={allowanceFormErrors.amount ? "form-input form-input-error" : "form-input"}
@@ -1557,7 +1561,7 @@ export function AdminCompensationClient({
           </div>
 
           <label className="form-field" htmlFor="allowance-label">
-            <span className="form-label">Label</span>
+            <span className="form-label">{t('allowancePanel.labelLabel')}</span>
             <input
               id="allowance-label"
               className={allowanceFormErrors.label ? "form-input form-input-error" : "form-input"}
@@ -1579,7 +1583,7 @@ export function AdminCompensationClient({
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="allowance-currency">
-              <span className="form-label">Currency</span>
+              <span className="form-label">{t('allowancePanel.currencyLabel')}</span>
               <input
                 id="allowance-currency"
                 className={
@@ -1602,7 +1606,7 @@ export function AdminCompensationClient({
             </label>
 
             <label className="form-field" htmlFor="allowance-effective-from">
-              <span className="form-label">Effective from</span>
+              <span className="form-label">{t('allowancePanel.effectiveFromLabel')}</span>
               <input
                 id="allowance-effective-from"
                 type="date"
@@ -1628,7 +1632,7 @@ export function AdminCompensationClient({
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="allowance-effective-to">
-              <span className="form-label">Effective to (optional)</span>
+              <span className="form-label">{t('allowancePanel.effectiveToLabel')}</span>
               <input
                 id="allowance-effective-to"
                 type="date"
@@ -1666,20 +1670,20 @@ export function AdminCompensationClient({
                   setAllowanceFormErrors(validateAllowance(nextValues));
                 }}
               />
-              <span>This allowance is taxable</span>
+              <span>{t('allowancePanel.taxableCheckbox')}</span>
             </label>
           </div>
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={resetAllowancePanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button
               type="submit"
               className="button button-accent"
               disabled={isSubmittingAllowance}
             >
-              {isSubmittingAllowance ? "Saving..." : editingAllowanceId ? "Save allowance" : "Add allowance"}
+              {isSubmittingAllowance ? tCommon('working') : editingAllowanceId ? t('allowancePanel.saveButton') : t('allowancePanel.addButton')}
             </button>
           </div>
         </form>
@@ -1688,13 +1692,13 @@ export function AdminCompensationClient({
       <SlidePanel
         isOpen={isEquityPanelOpen}
         onClose={resetEquityPanel}
-        title={editingEquityGrantId ? "Edit equity grant" : "Add equity grant"}
-        description="Track grant details, vesting schedule, and approval status."
+        title={editingEquityGrantId ? t('equityPanel.editTitle') : t('equityPanel.addTitle')}
+        description={t('equityPanel.description')}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleEquitySubmit} noValidate>
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="equity-grant-type">
-              <span className="form-label">Grant type</span>
+              <span className="form-label">{t('equityPanel.grantTypeLabel')}</span>
               <select
                 id="equity-grant-type"
                 className={equityFormErrors.grantType ? "form-input form-input-error" : "form-input"}
@@ -1721,7 +1725,7 @@ export function AdminCompensationClient({
             </label>
 
             <label className="form-field" htmlFor="equity-number-of-shares">
-              <span className="form-label">Number of shares</span>
+              <span className="form-label">{t('equityPanel.numberOfSharesLabel')}</span>
               <input
                 id="equity-number-of-shares"
                 className={
@@ -1746,7 +1750,7 @@ export function AdminCompensationClient({
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="equity-exercise-price">
-              <span className="form-label">Exercise price (cents, optional)</span>
+              <span className="form-label">{t('equityPanel.exercisePriceLabel')}</span>
               <input
                 id="equity-exercise-price"
                 className={
@@ -1769,7 +1773,7 @@ export function AdminCompensationClient({
             </label>
 
             <label className="form-field" htmlFor="equity-status">
-              <span className="form-label">Status</span>
+              <span className="form-label">{t('equityPanel.statusLabel')}</span>
               <select
                 id="equity-status"
                 className={equityFormErrors.status ? "form-input form-input-error" : "form-input"}
@@ -1798,7 +1802,7 @@ export function AdminCompensationClient({
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="equity-grant-date">
-              <span className="form-label">Grant date</span>
+              <span className="form-label">{t('equityPanel.grantDateLabel')}</span>
               <input
                 id="equity-grant-date"
                 type="date"
@@ -1820,7 +1824,7 @@ export function AdminCompensationClient({
             </label>
 
             <label className="form-field" htmlFor="equity-vesting-start-date">
-              <span className="form-label">Vesting start date</span>
+              <span className="form-label">{t('equityPanel.vestingStartDateLabel')}</span>
               <input
                 id="equity-vesting-start-date"
                 type="date"
@@ -1846,7 +1850,7 @@ export function AdminCompensationClient({
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="equity-cliff-months">
-              <span className="form-label">Cliff months</span>
+              <span className="form-label">{t('equityPanel.cliffMonthsLabel')}</span>
               <input
                 id="equity-cliff-months"
                 className={
@@ -1869,7 +1873,7 @@ export function AdminCompensationClient({
             </label>
 
             <label className="form-field" htmlFor="equity-vesting-duration-months">
-              <span className="form-label">Vesting duration months</span>
+              <span className="form-label">{t('equityPanel.vestingDurationMonthsLabel')}</span>
               <input
                 id="equity-vesting-duration-months"
                 className={
@@ -1894,7 +1898,7 @@ export function AdminCompensationClient({
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="equity-board-approval-date">
-              <span className="form-label">Board approval date (optional)</span>
+              <span className="form-label">{t('equityPanel.boardApprovalDateLabel')}</span>
               <input
                 id="equity-board-approval-date"
                 type="date"
@@ -1919,7 +1923,7 @@ export function AdminCompensationClient({
           </div>
 
           <label className="form-field" htmlFor="equity-notes">
-            <span className="form-label">Notes (optional)</span>
+            <span className="form-label">{t('equityPanel.notesLabel')}</span>
             <textarea
               id="equity-notes"
               className={equityFormErrors.notes ? "form-input form-input-error" : "form-input"}
@@ -1956,16 +1960,16 @@ export function AdminCompensationClient({
                   setEquityFormErrors(validateEquity(nextValues));
                 }}
               />
-              <span>Approve this equity grant now (Super Admin only)</span>
+              <span>{t('equityPanel.approveCheckbox')}</span>
             </label>
           ) : null}
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={resetEquityPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmittingEquity}>
-              {isSubmittingEquity ? "Saving..." : editingEquityGrantId ? "Save equity" : "Add equity"}
+              {isSubmittingEquity ? tCommon('working') : editingEquityGrantId ? t('equityPanel.saveButton') : t('equityPanel.addButton')}
             </button>
           </div>
         </form>
@@ -1974,7 +1978,7 @@ export function AdminCompensationClient({
       {confirmDialog}
 
       {toasts.length > 0 ? (
-        <section className="toast-region" aria-live="polite" aria-label="Compensation toasts">
+        <section className="toast-region" aria-live="polite" aria-label={t('toast.ariaLabel')}>
           {toasts.map((toast) => (
             <article
               key={toast.id}
@@ -1985,7 +1989,7 @@ export function AdminCompensationClient({
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss toast"
+                aria-label={t('dismissNotification')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

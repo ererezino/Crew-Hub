@@ -9,6 +9,8 @@ import {
   type KeyboardEvent
 } from "react";
 
+import { useTranslations } from "next-intl";
+
 import type { NavItem } from "../../lib/navigation";
 
 type SearchResult = {
@@ -45,14 +47,6 @@ type IndexedSection = CommandSection & {
 type FlatItem =
   | { kind: "route"; route: NavItem }
   | { kind: "entity"; result: SearchResult };
-
-const ENTITY_TYPE_LABELS: Record<string, string> = {
-  person: "People",
-  document: "Documents",
-  policy: "Policies",
-  expense: "Expenses",
-  leave: "Time Off"
-};
 
 const ENTITY_SEARCH_DEBOUNCE_MS = 250;
 const MIN_ENTITY_QUERY_LENGTH = 2;
@@ -98,7 +92,7 @@ function dedupeRoutes(items: NavItem[]): NavItem[] {
   return [...routeByHref.values()];
 }
 
-function groupEntityResults(results: SearchResult[]): EntitySection[] {
+function groupEntityResults(results: SearchResult[], typeLabels: Record<string, string>): EntitySection[] {
   const groups = new Map<string, SearchResult[]>();
 
   for (const result of results) {
@@ -114,7 +108,7 @@ function groupEntityResults(results: SearchResult[]): EntitySection[] {
 
   for (const [type, items] of groups) {
     sections.push({
-      label: ENTITY_TYPE_LABELS[type] || type,
+      label: typeLabels[type] || type,
       type,
       items
     });
@@ -130,12 +124,23 @@ export function CommandPalette({
   onSelect,
   onNavigate
 }: CommandPaletteProps) {
+  const t = useTranslations("commandPalette");
+  const tNav = useTranslations("nav");
+
   const inputRef = useRef<HTMLInputElement | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [entityResults, setEntityResults] = useState<SearchResult[]>([]);
   const [entityLoading, setEntityLoading] = useState(false);
+
+  const entityTypeLabels = useMemo<Record<string, string>>(() => ({
+    person: t("entityType.person"),
+    document: t("entityType.document"),
+    policy: t("entityType.policy"),
+    expense: t("entityType.expense"),
+    leave: t("entityType.leave"),
+  }), [t]);
 
   const routeMap = useMemo(
     () => new Map(routes.map((route) => [route.href, route])),
@@ -174,21 +179,21 @@ export function CommandPalette({
     const normalizedQuery = normalize(query);
 
     if (normalizedQuery) {
-      return [{ label: "Routes", items: filteredRoutes }];
+      return [{ label: t("sectionRoutes"), items: filteredRoutes }];
     }
 
     return [
-      { label: "Recently visited", items: recentRoutes },
+      { label: t("sectionRecentlyVisited"), items: recentRoutes },
       {
-        label: "All routes",
+        label: t("sectionAllRoutes"),
         items: dedupeRoutes([...recentRoutes, ...filteredRoutes])
       }
     ];
-  }, [filteredRoutes, query, recentRoutes]);
+  }, [filteredRoutes, query, recentRoutes, t]);
 
   const entitySections = useMemo(
-    () => groupEntityResults(entityResults),
-    [entityResults]
+    () => groupEntityResults(entityResults, entityTypeLabels),
+    [entityResults, entityTypeLabels]
   );
 
   const indexedSections = useMemo<IndexedSection[]>(() => {
@@ -368,7 +373,7 @@ export function CommandPalette({
       <button
         className="command-backdrop"
         type="button"
-        aria-label="Close command palette"
+        aria-label={t("closeLabel")}
         onClick={onClose}
       />
 
@@ -389,16 +394,16 @@ export function CommandPalette({
             className="command-input"
             value={query}
             onChange={(event) => handleQueryChange(event.currentTarget.value)}
-            placeholder="Search routes, people, documents, policies..."
+            placeholder={t("placeholder")}
           />
         </label>
 
-        <div className="command-list" role="listbox" aria-label="Command palette results">
+        <div className="command-list" role="listbox" aria-label={t("ariaLabel")}>
           {flatItems.length === 0 && !entityLoading ? (
             <p className="command-empty">
               {normalizedQuery.length >= MIN_ENTITY_QUERY_LENGTH
-                ? "No matching results found."
-                : "No matching routes found."}
+                ? t("noMatchingResults")
+                : t("noMatchingRoutes")}
             </p>
           ) : (
             <>
@@ -422,8 +427,8 @@ export function CommandPalette({
                         onClick={() => onSelect(route)}
                       >
                         <span>
-                          <strong>{route.label}</strong>
-                          <small>{route.description}</small>
+                          <strong>{tNav(route.labelKey as never)}</strong>
+                          <small>{tNav(`description.${route.labelKey}` as never)}</small>
                         </span>
                         <span className="command-item-meta">
                           <code>{route.href}</code>
@@ -436,7 +441,7 @@ export function CommandPalette({
               ))}
 
               {entityLoading && entityResults.length === 0 ? (
-                <p className="command-entity-loading">Searching entities...</p>
+                <p className="command-entity-loading">{t("searchingEntities")}</p>
               ) : null}
 
               {showEntitySection
@@ -492,10 +497,10 @@ export function CommandPalette({
         </div>
 
         <footer className="command-footer">
-          <span>Up/Down to navigate</span>
-          <span>Enter to open</span>
-          <span>Esc to close</span>
-          <span>Cmd/Ctrl + K</span>
+          <span>{t("footer.navigate")}</span>
+          <span>{t("footer.open")}</span>
+          <span>{t("footer.close")}</span>
+          <span>{t("footer.shortcut")}</span>
         </footer>
       </section>
     </div>

@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { LearningCourseClient } from "./learning-course-client";
@@ -8,13 +10,15 @@ export default async function LearningCoursePage({
   params: Promise<{ id: string }>;
 }) {
   const session = await getAuthenticatedSession();
+  const tCourse = await getTranslations("learningCourse");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <EmptyState
-        title="Profile is unavailable"
-        description="No profile is linked to this account yet."
-        ctaLabel="Back to learning"
+        title={tCommon("emptyState.profileUnavailable")}
+        description={tCommon("emptyState.profileUnavailableBody")}
+        ctaLabel={tCourse("backToLearning")}
         ctaHref="/learning"
       />
     );

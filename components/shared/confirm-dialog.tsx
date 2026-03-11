@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect } from "react";
 
 type ConfirmDialogTone = "default" | "danger";
@@ -20,13 +21,19 @@ export function ConfirmDialog({
   isOpen,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   tone = "default",
   isConfirming = false,
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
+  const t = useTranslations("common");
+
+  const resolvedConfirmLabel = confirmLabel ?? t("confirm");
+  const resolvedCancelLabel = cancelLabel ?? t("cancel");
+  const workingLabel = t("working");
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -70,7 +77,7 @@ export function ConfirmDialog({
         {description ? <p className="settings-card-description">{description}</p> : null}
         <div className="modal-actions">
           <button type="button" className="button button-subtle" onClick={onCancel} disabled={isConfirming}>
-            {cancelLabel}
+            {resolvedCancelLabel}
           </button>
           <button
             type="button"
@@ -78,7 +85,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={isConfirming}
           >
-            {isConfirming ? "Working..." : confirmLabel}
+            {isConfirming ? workingLabel : resolvedConfirmLabel}
           </button>
         </div>
       </section>

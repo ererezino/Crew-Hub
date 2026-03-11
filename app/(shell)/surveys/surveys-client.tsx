@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -11,6 +12,8 @@ import { usePendingSurveys } from "../../../hooks/use-surveys";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
 import { MessageSquare } from "lucide-react";
+
+type AppLocale = "en" | "fr";
 
 function toDateTimeValue(value: string | null): string | null {
   if (!value) {
@@ -40,6 +43,9 @@ export function SurveysClient({
   canManageSurveys: boolean;
   embedded?: boolean;
 }) {
+  const t = useTranslations('surveys');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
   const pendingQuery = usePendingSurveys();
 
   const pendingSurveys = useMemo(
@@ -56,12 +62,12 @@ export function SurveysClient({
     <>
       {!embedded ? (
         <PageHeader
-          title="Surveys"
-          description="Share feedback through surveys and track what still needs your response."
+          title={t('listTitle')}
+          description={t('pageDescription')}
           actions={
             canManageSurveys ? (
               <Link href="/admin/surveys" className="button">
-                Survey admin
+                {t('surveyAdmin')}
               </Link>
             ) : null
           }
@@ -71,7 +77,7 @@ export function SurveysClient({
       {!embedded ? (
         <FeatureBanner
           moduleId="surveys"
-          description="Surveys is built but not yet included in the active release."
+          description={t('banner')}
         />
       ) : null}
 
@@ -80,7 +86,7 @@ export function SurveysClient({
       {!pendingQuery.isLoading && pendingQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Surveys are unavailable"
+            title={t('unavailable')}
             description={pendingQuery.errorMessage}
           />
           <button
@@ -88,7 +94,7 @@ export function SurveysClient({
             className="button button-accent"
             onClick={() => pendingQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
@@ -97,11 +103,11 @@ export function SurveysClient({
         pendingSurveys.length === 0 ? (
           <EmptyState
             icon={<MessageSquare size={32} />}
-            title="No surveys pending"
-            description="You are caught up. New surveys will appear here when launched."
+            title={t('noPending')}
+            description={t('noPendingDescription')}
           />
         ) : (
-          <section className="announcements-grid" aria-label="Pending surveys list">
+          <section className="announcements-grid" aria-label={t('noPending')}>
             {pendingSurveys.map((survey) => {
               const dueDateValue = toDateTimeValue(survey.endDate);
               const startDateValue = toDateTimeValue(survey.startDate);
@@ -112,41 +118,41 @@ export function SurveysClient({
                     <div>
                       <h2 className="section-title">{survey.title}</h2>
                       <p className="settings-card-description">
-                        {survey.description || "No description provided."}
+                        {survey.description || t('noDescription')}
                       </p>
                     </div>
                     <div className="announcement-item-status">
-                      <StatusBadge tone="pending">Pending</StatusBadge>
+                      <StatusBadge tone="pending">{tCommon('status.pending')}</StatusBadge>
                       <StatusBadge tone="info">{toSentenceCase(survey.type)}</StatusBadge>
                     </div>
                   </header>
 
                   <dl className="compensation-timeline-list">
                     <div>
-                      <dt className="metric-label">Questions</dt>
+                      <dt className="metric-label">{t('questions')}</dt>
                       <dd className="metric-description numeric">{survey.questions.length}</dd>
                     </div>
                     <div>
-                      <dt className="metric-label">Started</dt>
+                      <dt className="metric-label">{t('started')}</dt>
                       <dd className="metric-description">
                         {startDateValue ? (
-                          <time dateTime={startDateValue} title={formatDateTimeTooltip(startDateValue)}>
-                            {formatRelativeTime(startDateValue)}
+                          <time dateTime={startDateValue} title={formatDateTimeTooltip(startDateValue, locale)}>
+                            {formatRelativeTime(startDateValue, locale)}
                           </time>
                         ) : (
-                          "Starts immediately"
+                          t('startsImmediately')
                         )}
                       </dd>
                     </div>
                     <div>
-                      <dt className="metric-label">Due</dt>
+                      <dt className="metric-label">{t('due')}</dt>
                       <dd className="metric-description">
                         {dueDateValue ? (
-                          <time dateTime={dueDateValue} title={formatDateTimeTooltip(dueDateValue)}>
-                            {formatRelativeTime(dueDateValue)}
+                          <time dateTime={dueDateValue} title={formatDateTimeTooltip(dueDateValue, locale)}>
+                            {formatRelativeTime(dueDateValue, locale)}
                           </time>
                         ) : (
-                          "No deadline"
+                          t('noDeadline')
                         )}
                       </dd>
                     </div>
@@ -154,7 +160,7 @@ export function SurveysClient({
 
                   <div className="documents-row-actions" style={{ opacity: 1, transform: "none", pointerEvents: "auto" }}>
                     <Link href={`/surveys/${survey.id}`} className="button button-accent">
-                      Take survey
+                      {t('takeSurvey')}
                     </Link>
                   </div>
                 </article>

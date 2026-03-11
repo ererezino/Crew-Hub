@@ -25,6 +25,10 @@ export interface EmailTemplateOptions {
   };
   closingText?: string;
   footerOverride?: string;
+  /** ISO 639-1 language code for the <html lang> attribute (defaults to "en") */
+  lang?: string;
+  /** Translated tagline shown below the card (defaults to English) */
+  tagline?: string;
 }
 
 export function renderButton(
@@ -80,7 +84,9 @@ export function renderEmailTemplate(options: EmailTemplateOptions): string {
     bodyHtml,
     ctaButton,
     closingText,
-    footerOverride
+    footerOverride,
+    lang = "en",
+    tagline
   } = options;
 
   const appUrl =
@@ -103,7 +109,7 @@ export function renderEmailTemplate(options: EmailTemplateOptions): string {
   const preheaderPadding = "\u200C\u00A0".repeat(80);
 
   return `<!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="${lang}" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -228,7 +234,7 @@ export function renderEmailTemplate(options: EmailTemplateOptions): string {
           <!-- Tagline below card -->
           <tr>
             <td align="center" style="padding-top:24px;">
-              <p style="margin:0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:12px;font-weight:400;color:#C4CBCF;">Sent from Crew Hub with ❤️</p>
+              <p style="margin:0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:12px;font-weight:400;color:#C4CBCF;">${escapeHtml(tagline || "Sent from Crew Hub with ❤️")}</p>
             </td>
           </tr>
 

@@ -6,7 +6,10 @@ import {
   useMemo,
   useState
 } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
+
+type AppLocale = "en" | "fr";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../../components/shared/error-state";
@@ -17,11 +20,9 @@ import { useConfirmAction } from "../../../../../hooks/use-confirm-action";
 import { usePayrollRunDetail } from "../../../../../hooks/use-payroll-runs";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../../lib/countries";
 import { formatDate, formatDateTimeTooltip } from "../../../../../lib/datetime";
-import { toSentenceCase } from "../../../../../lib/format-labels";
 import {
   getCurrencyTotal,
   getPrimaryCurrency,
-  labelForPayrollRunStatus,
   toneForPayrollRunStatus
 } from "../../../../../lib/payroll/runs";
 import type { GeneratePayslipsResponse } from "../../../../../types/payslips";
@@ -64,12 +65,14 @@ const RUN_STATUS_FLOW: PayrollRunStatus[] = [
   "completed"
 ];
 
-const adjustmentSchema = z.object({
-  adjustmentType: z.enum(["bonus", "deduction", "correction"]),
-  label: z.string().trim().min(1, "Label is required.").max(120, "Label is too long."),
-  amount: z.string().trim().regex(/^-?\d+$/, "Amount must be a whole number."),
-  notes: z.string().max(300, "Notes must be 300 characters or fewer.")
-});
+function createAdjustmentSchema(td: (key: string) => string) {
+  return z.object({
+    adjustmentType: z.enum(["bonus", "deduction", "correction"]),
+    label: z.string().trim().min(1, td("adjustmentValidation.labelRequired")).max(120, td("adjustmentValidation.labelTooLong")),
+    amount: z.string().trim().regex(/^-?\d+$/, td("adjustmentValidation.amountWholeNumber")),
+    notes: z.string().max(300, td("adjustmentValidation.notesTooLong"))
+  });
+}
 
 const INITIAL_ADJUSTMENT_VALUES: AdjustmentFormValues = {
   adjustmentType: "bonus",
@@ -97,15 +100,6 @@ function itemTableSkeleton() {
       ))}
     </section>
   );
-}
-
-function contractorNote() {
-  return "This person is a contractor. Taxes are not withheld by Crew Hub. The contractor is responsible for their own tax obligations.";
-}
-
-function paymentStatusLabel(status: PayrollRunItem["paymentStatus"]): string {
-  void status;
-  return "Disabled in this release";
 }
 
 function paymentStatusTone(
@@ -159,8 +153,9 @@ function summarizeStatusStep(
   });
 }
 
-function getAdjustmentErrors(values: AdjustmentFormValues): AdjustmentFormErrors {
-  const parsed = adjustmentSchema.safeParse(values);
+function getAdjustmentErrors(values: AdjustmentFormValues, td: (key: string) => string): AdjustmentFormErrors {
+  const schema = createAdjustmentSchema(td);
+  const parsed = schema.safeParse(values);
 
   if (!parsed.success) {
     const errors = parsed.error.flatten().fieldErrors;
@@ -176,13 +171,13 @@ function getAdjustmentErrors(values: AdjustmentFormValues): AdjustmentFormErrors
 
   if (!Number.isSafeInteger(integerAmount)) {
     return {
-      amount: "Amount is out of supported range."
+      amount: td("adjustmentValidation.amountOutOfRange")
     };
   }
 
   if (values.adjustmentType === "correction" && integerAmount === 0) {
     return {
-      amount: "Correction amount cannot be zero."
+      amount: td("adjustmentValidation.correctionNotZero")
     };
   }
 
@@ -191,7 +186,7 @@ function getAdjustmentErrors(values: AdjustmentFormValues): AdjustmentFormErrors
     integerAmount <= 0
   ) {
     return {
-      amount: "Bonus and deduction amounts must be greater than zero."
+      amount: td("adjustmentValidation.bonusDeductionPositive")
     };
   }
 
@@ -213,6 +208,11 @@ export function PayrollRunDetailClient({
   canManage: boolean;
   canFinalApprove: boolean;
 }) {
+  const t = useTranslations('payrollRunDetail');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const runQuery = usePayrollRunDetail({ runId, enabled: true });
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
@@ -303,17 +303,17 @@ export function PayrollRunDetailClient({
       const payload = (await response.json()) as CalculatePayrollRunResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to calculate payroll run.");
+        showToast("error", payload.error?.message ?? td("toast.unableToCalculate"));
         return;
       }
 
       showToast(
         "success",
-        `Calculation complete for ${payload.data.employeeCount} people.`
+        td("toast.calculationComplete", { count: payload.data.employeeCount })
       );
       runQuery.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to calculate payroll run.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToCalculate"));
     } finally {
       setIsCalculating(false);
     }
@@ -330,27 +330,23 @@ export function PayrollRunDetailClient({
       const payload = (await response.json()) as GeneratePayslipsResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to generate payment statements.");
+        showToast("error", payload.error?.message ?? td("toast.unableToGenerateStatements"));
         return;
       }
 
       if (payload.data.generatedCount > 0) {
         showToast(
           "success",
-          `Generated ${payload.data.generatedCount} payment statement${
-            payload.data.generatedCount === 1 ? "" : "s"
-          }.`
+          td("toast.statementsGenerated", { count: payload.data.generatedCount })
         );
       } else {
-        showToast("info", "No payment statements were generated.");
+        showToast("info", td("toast.noStatementsGenerated"));
       }
 
       if (payload.data.skippedCount > 0) {
         showToast(
           "info",
-          `${payload.data.skippedCount} statement${
-            payload.data.skippedCount === 1 ? "" : "s"
-          } skipped due to missing data or file upload issues.`
+          td("toast.statementsSkipped", { count: payload.data.skippedCount })
         );
       }
 
@@ -358,7 +354,7 @@ export function PayrollRunDetailClient({
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to generate payment statements."
+        error instanceof Error ? error.message : td("toast.unableToGenerateStatements")
       );
     } finally {
       setIsGeneratingStatements(false);
@@ -386,20 +382,20 @@ export function PayrollRunDetailClient({
       const payload = (await response.json()) as PayrollRunActionResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to update approval state.");
+        showToast("error", payload.error?.message ?? td("toast.unableToUpdateApproval"));
         return false;
       }
 
       if (action === "submit") {
-        showToast("success", "Run submitted for first approval.");
+        showToast("success", td("toast.submittedForApproval"));
       } else if (action === "approve_first") {
-        showToast("success", "First approval complete. Awaiting final approval.");
+        showToast("success", td("toast.firstApprovalComplete"));
       } else if (action === "approve_final") {
-        showToast("success", "Final approval complete. Payroll is now locked.");
+        showToast("success", td("toast.finalApprovalComplete"));
       } else if (action === "reject") {
-        showToast("info", "Run rejected and returned to calculated state.");
+        showToast("info", td("toast.runRejected"));
       } else if (action === "cancel") {
-        showToast("info", "Run cancelled.");
+        showToast("info", td("toast.runCancelled"));
       }
 
       if (action === "approve_final") {
@@ -409,7 +405,7 @@ export function PayrollRunDetailClient({
       runQuery.refresh();
       return true;
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to update approval state.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToUpdateApproval"));
       return false;
     } finally {
       setActiveRunAction(null);
@@ -429,7 +425,7 @@ export function PayrollRunDetailClient({
       return;
     }
 
-    const errors = getAdjustmentErrors(adjustmentValues);
+    const errors = getAdjustmentErrors(adjustmentValues, td);
     setAdjustmentErrors(errors);
 
     if (hasErrors(errors)) {
@@ -458,11 +454,11 @@ export function PayrollRunDetailClient({
       const payload = (await response.json()) as AddPayrollAdjustmentResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to add payroll adjustment.");
+        showToast("error", payload.error?.message ?? td("toast.unableToAddAdjustment"));
         return;
       }
 
-      showToast("success", "Payroll adjustment applied.");
+      showToast("success", td("toast.adjustmentApplied"));
       setAdjustmentItemId(null);
       setAdjustmentValues(INITIAL_ADJUSTMENT_VALUES);
       setAdjustmentErrors({});
@@ -470,7 +466,7 @@ export function PayrollRunDetailClient({
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to add payroll adjustment."
+        error instanceof Error ? error.message : td("toast.unableToAddAdjustment")
       );
     } finally {
       setIsSubmittingAdjustment(false);
@@ -483,12 +479,12 @@ export function PayrollRunDetailClient({
     const trimmedReason = rejectReason.trim();
 
     if (!trimmedReason) {
-      setRejectReasonError("Rejection reason is required.");
+      setRejectReasonError(td("rejectDialog.reasonRequired"));
       return;
     }
 
     if (trimmedReason.length > 500) {
-      setRejectReasonError("Rejection reason must be 500 characters or fewer.");
+      setRejectReasonError(td("rejectDialog.reasonTooLong"));
       return;
     }
 
@@ -504,10 +500,9 @@ export function PayrollRunDetailClient({
 
   const cancelRun = async () => {
     const confirmed = await confirm({
-      title: "Cancel payroll run?",
-      description:
-        "This run will move to cancelled status and cannot continue through approvals.",
-      confirmLabel: "Cancel run",
+      title: td("cancelDialog.title"),
+      description: td("cancelDialog.description"),
+      confirmLabel: td("cancelDialog.confirmLabel"),
       tone: "danger"
     });
 
@@ -521,8 +516,8 @@ export function PayrollRunDetailClient({
   return (
     <>
       <PageHeader
-        title="Payroll Run"
-        description="Review payroll calculations, approvals, and item-level adjustments."
+        title={t('title')}
+        description={t('description')}
         actions={
           canCalculateRun || canGenerateStatements ? (
             <>
@@ -537,7 +532,7 @@ export function PayrollRunDetailClient({
                     activeRunAction !== null
                   }
                 >
-                  {isCalculating ? "Calculating..." : "Calculate run"}
+                  {isCalculating ? t('actions.calculating') : t('actions.calculateRun')}
                 </button>
               ) : null}
 
@@ -552,7 +547,7 @@ export function PayrollRunDetailClient({
                     activeRunAction !== null
                   }
                 >
-                  {isGeneratingStatements ? "Generating..." : "Generate statements"}
+                  {isGeneratingStatements ? t('actions.generating') : t('actions.generateStatements')}
                 </button>
               ) : null}
             </>
@@ -564,7 +559,7 @@ export function PayrollRunDetailClient({
 
       {!runQuery.isLoading && runQuery.errorMessage ? (
         <ErrorState
-          title="Payroll run is unavailable"
+          title={t('errorTitle')}
           message={runQuery.errorMessage}
           onRetry={() => runQuery.refresh()}
         />
@@ -572,115 +567,125 @@ export function PayrollRunDetailClient({
 
       {!runQuery.isLoading && !runQuery.errorMessage && runQuery.data ? (
         <>
-          <section className="payroll-status-timeline" aria-label="Payroll status timeline">
+          <section className="payroll-status-timeline" aria-label={t('title')}>
             {summarizeStatusStep(runQuery.data.run.status).map((step) => (
               <article
                 key={step.step}
                 className={`payroll-status-step payroll-status-step-${step.state}`}
               >
                 <span className="payroll-status-step-dot" />
-                <p className="payroll-status-step-label">{labelForPayrollRunStatus(step.step)}</p>
+                <p className="payroll-status-step-label">{td(`statusTimeline.${step.step}`)}</p>
               </article>
             ))}
           </section>
 
-          <section className="payroll-run-summary-grid" aria-label="Payroll run summary">
+          <section className="payroll-run-summary-grid" aria-label={t('title')}>
             <article className="metric-card">
-              <p className="metric-label">Status</p>
+              <p className="metric-label">{t('metrics.status')}</p>
               <p className="metric-value">
                 <StatusBadge tone={toneForPayrollRunStatus(runQuery.data.run.status)}>
-                  {labelForPayrollRunStatus(runQuery.data.run.status)}
+                  {td(`statusTimeline.${runQuery.data.run.status}`)}
                 </StatusBadge>
               </p>
               <p className="metric-hint">
-                Pay date{" "}
+                {t('metrics.payDate')}{" "}
                 <time
                   dateTime={runQuery.data.run.payDate}
-                  title={formatDateTimeTooltip(runQuery.data.run.payDate)}
+                  title={formatDateTimeTooltip(runQuery.data.run.payDate, locale)}
                 >
-                  {formatDate(runQuery.data.run.payDate)}
+                  {formatDate(runQuery.data.run.payDate, locale)}
                 </time>
               </p>
             </article>
 
             <article className="metric-card">
-              <p className="metric-label">Gross Total</p>
+              <p className="metric-label">{t('metrics.grossTotal')}</p>
               <p className="metric-value">
                 <CurrencyDisplay
                   amount={getCurrencyTotal(runQuery.data.run.totalGross, runCurrency)}
                   currency={runCurrency}
                 />
               </p>
-              <p className="metric-hint">Calculated gross across items</p>
+              <p className="metric-hint">{t('metrics.grossTotalHint')}</p>
             </article>
 
             <article className="metric-card">
-              <p className="metric-label">Net Total</p>
+              <p className="metric-label">{t('metrics.netTotal')}</p>
               <p className="metric-value">
                 <CurrencyDisplay
                   amount={getCurrencyTotal(runQuery.data.run.totalNet, runCurrency)}
                   currency={runCurrency}
                 />
               </p>
-              <p className="metric-hint">All adjustments included</p>
+              <p className="metric-hint">{t('metrics.netTotalHint')}</p>
             </article>
 
             <article className="metric-card">
-              <p className="metric-label">Employees</p>
+              <p className="metric-label">{t('metrics.employees')}</p>
               <p className="metric-value numeric">{runQuery.data.run.employeeCount}</p>
-              <p className="metric-hint">Items currently in this run</p>
+              <p className="metric-hint">{t('metrics.employeesHint')}</p>
             </article>
           </section>
 
-          <section className="settings-card payroll-approval-card" aria-label="Approval workflow">
+          <section className="settings-card payroll-approval-card" aria-label={t('approval.title')}>
             <div className="payroll-approval-header">
-              <h2 className="section-title">Approval workflow</h2>
+              <h2 className="section-title">{t('approval.title')}</h2>
               <StatusBadge tone={toneForPayrollRunStatus(runQuery.data.run.status)}>
-                {labelForPayrollRunStatus(runQuery.data.run.status)}
+                {td(`statusTimeline.${runQuery.data.run.status}`)}
               </StatusBadge>
             </div>
 
             <div className="payroll-approval-steps">
               <article className="payroll-approval-step">
-                <p className="payroll-approval-step-title">Step 1: First approval</p>
+                <p className="payroll-approval-step-title">{t('approval.step1Title')}</p>
                 {runQuery.data.run.firstApprovedAt ? (
                   <>
-                    <StatusBadge tone="success">Approved</StatusBadge>
+                    <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
                     <p className="settings-card-description">
-                      {runQuery.data.run.firstApprovedBy ?? "--"} at{" "}
-                      <time
-                        dateTime={runQuery.data.run.firstApprovedAt}
-                        title={formatDateTimeTooltip(runQuery.data.run.firstApprovedAt)}
-                      >
-                        {new Date(runQuery.data.run.firstApprovedAt).toLocaleString()}
-                      </time>
+                      {t.rich('approval.approvedByAt', {
+                        name: runQuery.data.run.firstApprovedBy ?? "--",
+                        date: formatDate(runQuery.data.run.firstApprovedAt, locale),
+                        time: (chunks) => (
+                          <time
+                            dateTime={runQuery.data?.run.firstApprovedAt ?? ""}
+                            title={formatDateTimeTooltip(runQuery.data?.run.firstApprovedAt ?? "", locale)}
+                          >
+                            {chunks}
+                          </time>
+                        )
+                      })}
                     </p>
                   </>
                 ) : (
                   <StatusBadge tone={isPendingFirst ? "pending" : "draft"}>
-                    {isPendingFirst ? "Awaiting first approval" : "Not approved yet"}
+                    {isPendingFirst ? t('approval.awaitingFirst') : t('approval.notApprovedYet')}
                   </StatusBadge>
                 )}
               </article>
 
               <article className="payroll-approval-step">
-                <p className="payroll-approval-step-title">Step 2: Final approval</p>
+                <p className="payroll-approval-step-title">{t('approval.step2Title')}</p>
                 {runQuery.data.run.finalApprovedAt ? (
                   <>
-                    <StatusBadge tone="success">Approved</StatusBadge>
+                    <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
                     <p className="settings-card-description">
-                      {runQuery.data.run.finalApprovedBy ?? "--"} at{" "}
-                      <time
-                        dateTime={runQuery.data.run.finalApprovedAt}
-                        title={formatDateTimeTooltip(runQuery.data.run.finalApprovedAt)}
-                      >
-                        {new Date(runQuery.data.run.finalApprovedAt).toLocaleString()}
-                      </time>
+                      {t.rich('approval.approvedByAt', {
+                        name: runQuery.data.run.finalApprovedBy ?? "--",
+                        date: formatDate(runQuery.data.run.finalApprovedAt, locale),
+                        time: (chunks) => (
+                          <time
+                            dateTime={runQuery.data?.run.finalApprovedAt ?? ""}
+                            title={formatDateTimeTooltip(runQuery.data?.run.finalApprovedAt ?? "", locale)}
+                          >
+                            {chunks}
+                          </time>
+                        )
+                      })}
                     </p>
                   </>
                 ) : (
                   <StatusBadge tone={isPendingFinal ? "pending" : "draft"}>
-                    {isPendingFinal ? "Awaiting final approval" : "Not approved yet"}
+                    {isPendingFinal ? t('approval.awaitingFinal') : t('approval.notApprovedYet')}
                   </StatusBadge>
                 )}
               </article>
@@ -696,7 +701,7 @@ export function PayrollRunDetailClient({
                     void performRunAction("submit");
                   }}
                 >
-                  {activeRunAction === "submit" ? "Submitting..." : "Submit for approval"}
+                  {activeRunAction === "submit" ? t('actions.submitting') : t('actions.submitForApproval')}
                 </button>
               ) : null}
 
@@ -709,7 +714,7 @@ export function PayrollRunDetailClient({
                     void performRunAction("approve_first");
                   }}
                 >
-                  {activeRunAction === "approve_first" ? "Approving..." : "Approve step 1"}
+                  {activeRunAction === "approve_first" ? t('actions.approving') : t('actions.approveStep1')}
                 </button>
               ) : null}
 
@@ -722,7 +727,7 @@ export function PayrollRunDetailClient({
                     void performRunAction("approve_final");
                   }}
                 >
-                  {activeRunAction === "approve_final" ? "Approving..." : "Approve final"}
+                  {activeRunAction === "approve_final" ? t('actions.approving') : t('actions.approveFinal')}
                 </button>
               ) : null}
 
@@ -737,7 +742,7 @@ export function PayrollRunDetailClient({
                     setIsRejectDialogOpen(true);
                   }}
                 >
-                  Reject
+                  {tCommon('status.rejected')}
                 </button>
               ) : null}
 
@@ -750,14 +755,14 @@ export function PayrollRunDetailClient({
                     void cancelRun();
                   }}
                 >
-                  {activeRunAction === "cancel" ? "Cancelling..." : "Cancel run"}
+                  {activeRunAction === "cancel" ? t('actions.cancelling') : t('actions.cancelRun')}
                 </button>
               ) : null}
             </div>
           </section>
 
           {isApproved ? (
-            <section className="payroll-lock-banner" aria-label="Payroll locked">
+            <section className="payroll-lock-banner" aria-label={t('locked.title')}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
                   d="M7 10V8a5 5 0 0 1 10 0v2M6 10h12v10H6z"
@@ -769,9 +774,9 @@ export function PayrollRunDetailClient({
                 />
               </svg>
               <div>
-                <p className="section-title">Payroll locked</p>
+                <p className="section-title">{t('locked.title')}</p>
                 <p className="settings-card-description">
-                  Final approval completed. Snapshot is immutable and edits are blocked.
+                  {t('locked.description')}
                 </p>
               </div>
             </section>
@@ -780,26 +785,25 @@ export function PayrollRunDetailClient({
           {runQuery.data.flaggedCount > 0 ? (
             <section className="payroll-flag-banner">
               <StatusBadge tone="warning">
-                {runQuery.data.flaggedCount} flagged item
-                {runQuery.data.flaggedCount === 1 ? "" : "s"}
+                {td('flagged.flaggedItems', { count: runQuery.data.flaggedCount })}
               </StatusBadge>
               <p className="settings-card-description">
-                Review flagged rows before moving to approvals.
+                {t('flagged.reviewFlagged')}
               </p>
             </section>
           ) : null}
 
           {sortedItems.length === 0 ? (
             <EmptyState
-              title="No payroll items yet"
-              description="Run calculation to populate crew members in this payroll run."
-              ctaLabel="Back to payroll"
+              title={t('emptyState.title')}
+              description={t('emptyState.description')}
+              ctaLabel={t('emptyState.backToPayroll')}
               ctaHref="/payroll"
             />
           ) : (
-            <section className="data-table-container" aria-label="Payroll run items">
+            <section className="data-table-container" aria-label={t('title')}>
               <p className="settings-card-description">
-                Disbursement execution is disabled in this release. These are non-execution payroll records only.
+                {t('disbursementNotice')}
               </p>
               <table className="data-table">
                 <thead>
@@ -812,18 +816,18 @@ export function PayrollRunDetailClient({
                           setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
                         }
                       >
-                        Name
+                        {t('table.name')}
                         <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       </button>
                     </th>
-                    <th>Dept</th>
-                    <th>Country</th>
-                    <th>Gross</th>
-                    <th>Deductions</th>
-                    <th>Net</th>
-                    <th>Withholding</th>
-                    <th>Disbursement</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t('table.dept')}</th>
+                    <th>{t('table.country')}</th>
+                    <th>{t('table.gross')}</th>
+                    <th>{t('table.deductions')}</th>
+                    <th>{t('table.net')}</th>
+                    <th>{t('table.withholding')}</th>
+                    <th>{t('table.disbursement')}</th>
+                    <th className="table-action-column">{t('table.actionsColumn')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -836,7 +840,7 @@ export function PayrollRunDetailClient({
                           <p>{item.fullName}</p>
                           {item.flagged ? (
                             <p className="settings-card-description">
-                              <StatusBadge tone="warning">Flagged</StatusBadge>
+                              <StatusBadge tone="warning">{td('flagged.flaggedItems', { count: 1 })}</StatusBadge>
                             </p>
                           ) : null}
                         </td>
@@ -844,7 +848,7 @@ export function PayrollRunDetailClient({
                         <td>
                           <p className="country-chip">
                             <span>{countryFlagFromCode(item.countryCode)}</span>
-                            <span>{countryNameFromCode(item.countryCode)}</span>
+                            <span>{countryNameFromCode(item.countryCode, locale)}</span>
                           </p>
                         </td>
                         <td>
@@ -862,21 +866,21 @@ export function PayrollRunDetailClient({
                                 amount={absoluteAmount(item.netVarianceAmount)}
                                 currency={item.payCurrency}
                               />
-                              {" vs previous"}
+                              {" "}{t('breakdown.vsPrevious')}
                             </p>
                           ) : null}
                         </td>
                         <td>
                           {item.withholdingApplied ? (
-                            <StatusBadge tone="success">Withholding applied</StatusBadge>
+                            <StatusBadge tone="success">{t('withholding.applied')}</StatusBadge>
                           ) : (
-                            <StatusBadge tone="info">No withholding</StatusBadge>
+                            <StatusBadge tone="info">{t('withholding.none')}</StatusBadge>
                           )}
                         </td>
                         <td>
                           <span className="payment-status-inline">
                             <StatusBadge tone={paymentStatusTone(item.paymentStatus)}>
-                              {paymentStatusLabel(item.paymentStatus)}
+                              {t('disbursementStatus')}
                             </StatusBadge>
                           </span>
                         </td>
@@ -891,7 +895,7 @@ export function PayrollRunDetailClient({
                                 )
                               }
                             >
-                              {expandedItemId === item.id ? "Collapse" : "Expand"}
+                              {expandedItemId === item.id ? t('table.collapse') : t('table.expand')}
                             </button>
                           </div>
                         </td>
@@ -903,16 +907,16 @@ export function PayrollRunDetailClient({
                             <section className="payroll-item-expanded-content">
                               {item.flagged && item.flagReason ? (
                                 <article className="payroll-item-flag-note">
-                                  <StatusBadge tone="warning">Flag reason</StatusBadge>
+                                  <StatusBadge tone="warning">{t('flagged.flagReason')}</StatusBadge>
                                   <p>{item.flagReason}</p>
                                 </article>
                               ) : null}
 
                               <div className="payroll-item-detail-grid">
                                 <article className="settings-card">
-                                  <h3 className="section-title">Breakdown</h3>
+                                  <h3 className="section-title">{t('breakdown.title')}</h3>
                                   <p>
-                                    Base salary:{" "}
+                                    {t('breakdown.baseSalary')}{" "}
                                     <CurrencyDisplay
                                       amount={item.baseSalaryAmount}
                                       currency={item.payCurrency}
@@ -930,12 +934,12 @@ export function PayrollRunDetailClient({
                                         </li>
                                       ))
                                     ) : (
-                                      <li>No allowances</li>
+                                      <li>{t('breakdown.noAllowances')}</li>
                                     )}
                                   </ul>
                                   {item.withholdingApplied ? (
                                     <div className="payroll-deduction-section">
-                                      <p className="form-label">Deductions</p>
+                                      <p className="form-label">{t('breakdown.deductionsLabel')}</p>
                                       <ul className="payroll-deduction-list">
                                       {item.deductions.map((deduction, deductionIndex) => (
                                         <li key={`${item.id}-deduction-${deductionIndex}`}>
@@ -946,40 +950,39 @@ export function PayrollRunDetailClient({
                                           />
                                         </li>
                                       ))}
-                                      {item.deductions.length === 0 ? <li>No deductions</li> : null}
+                                      {item.deductions.length === 0 ? <li>{t('breakdown.noDeductions')}</li> : null}
                                       </ul>
                                     </div>
                                   ) : (
-                                    <p className="settings-card-description">{contractorNote()}</p>
+                                    <p className="settings-card-description">{t('breakdown.contractorNote')}</p>
                                   )}
                                   <p>
-                                    Disbursement execution:{" "}
+                                    {t('breakdown.disbursementExecution')}{" "}
                                     <StatusBadge tone={paymentStatusTone(item.paymentStatus)}>
-                                      {paymentStatusLabel(item.paymentStatus)}
+                                      {t('disbursementStatus')}
                                     </StatusBadge>
                                   </p>
                                   <p className="settings-card-description">
-                                    No live payout rails are enabled in this release.
+                                    {t('breakdown.noLivePayoutRails')}
                                   </p>
                                   <p>
-                                    Net pay:{" "}
+                                    {t('breakdown.netPay')}{" "}
                                     <CurrencyDisplay amount={item.netAmount} currency={item.payCurrency} />
                                   </p>
                                   {item.previousNetAmount !== null ? (
                                     <>
                                       <p className="settings-card-description">
-                                        Previous period{" "}
+                                        {t('breakdown.previousPeriodNet')}{" "}
                                         {item.previousPayPeriodEnd
-                                          ? `(${formatDate(item.previousPayPeriodEnd)})`
+                                          ? `(${formatDate(item.previousPayPeriodEnd, locale)})`
                                           : ""}{" "}
-                                        net:{" "}
                                         <CurrencyDisplay
                                           amount={item.previousNetAmount}
                                           currency={item.payCurrency}
                                         />
                                       </p>
                                       <p className="payroll-variance-line">
-                                        <span className="numeric">Net change:</span>{" "}
+                                        <span className="numeric">{t('breakdown.netChange')}</span>{" "}
                                         <span
                                           className={`numeric ${
                                             (item.netVarianceAmount ?? 0) > 0
@@ -999,19 +1002,19 @@ export function PayrollRunDetailClient({
                                     </>
                                   ) : (
                                     <p className="settings-card-description">
-                                      No previous payroll period found for comparison.
+                                      {t('breakdown.noPreviousPeriod')}
                                     </p>
                                   )}
                                 </article>
 
                                 <article className="settings-card">
-                                  <h3 className="section-title">Adjustments</h3>
+                                  <h3 className="section-title">{t('adjustments.title')}</h3>
                                   <ul className="payroll-adjustment-list">
                                     {item.adjustments.length > 0 ? (
                                       item.adjustments.map((adjustment) => (
                                         <li key={adjustment.id}>
                                           <span>
-                                            {adjustment.label} ({toSentenceCase(adjustment.type)})
+                                            {adjustment.label} ({td(`adjustments.${adjustment.type}`)})
                                           </span>
                                           <CurrencyDisplay
                                             amount={adjustment.amount}
@@ -1020,7 +1023,7 @@ export function PayrollRunDetailClient({
                                         </li>
                                       ))
                                     ) : (
-                                      <li>No adjustments</li>
+                                      <li>{t('adjustments.noAdjustments')}</li>
                                     )}
                                   </ul>
 
@@ -1028,7 +1031,7 @@ export function PayrollRunDetailClient({
                                     adjustmentItemId === item.id ? (
                                       <form className="settings-form" onSubmit={submitAdjustment} noValidate>
                                         <label className="form-field" htmlFor={`adjustment-type-${item.id}`}>
-                                          <span className="form-label">Type</span>
+                                          <span className="form-label">{t('adjustments.typeLabel')}</span>
                                           <select
                                             id={`adjustment-type-${item.id}`}
                                             className={
@@ -1045,9 +1048,9 @@ export function PayrollRunDetailClient({
                                               }))
                                             }
                                           >
-                                            <option value="bonus">Bonus</option>
-                                            <option value="deduction">Deduction</option>
-                                            <option value="correction">Correction</option>
+                                            <option value="bonus">{t('adjustments.bonus')}</option>
+                                            <option value="deduction">{t('adjustments.deduction')}</option>
+                                            <option value="correction">{t('adjustments.correction')}</option>
                                           </select>
                                           {adjustmentErrors.adjustmentType ? (
                                             <p className="form-field-error">
@@ -1057,7 +1060,7 @@ export function PayrollRunDetailClient({
                                         </label>
 
                                         <label className="form-field" htmlFor={`adjustment-label-${item.id}`}>
-                                          <span className="form-label">Label</span>
+                                          <span className="form-label">{t('adjustments.labelField')}</span>
                                           <input
                                             id={`adjustment-label-${item.id}`}
                                             className={
@@ -1079,7 +1082,7 @@ export function PayrollRunDetailClient({
                                         </label>
 
                                         <label className="form-field" htmlFor={`adjustment-amount-${item.id}`}>
-                                          <span className="form-label">Amount (smallest unit)</span>
+                                          <span className="form-label">{t('adjustments.amountField')}</span>
                                           <input
                                             id={`adjustment-amount-${item.id}`}
                                             className={
@@ -1101,7 +1104,7 @@ export function PayrollRunDetailClient({
                                         </label>
 
                                         <label className="form-field" htmlFor={`adjustment-notes-${item.id}`}>
-                                          <span className="form-label">Notes (optional)</span>
+                                          <span className="form-label">{t('adjustments.notesField')}</span>
                                           <textarea
                                             id={`adjustment-notes-${item.id}`}
                                             className={
@@ -1129,7 +1132,7 @@ export function PayrollRunDetailClient({
                                             className="button"
                                             disabled={isSubmittingAdjustment}
                                           >
-                                            {isSubmittingAdjustment ? "Saving..." : "Apply adjustment"}
+                                            {isSubmittingAdjustment ? t('adjustments.applying') : t('adjustments.applyAdjustment')}
                                           </button>
                                           <button
                                             type="button"
@@ -1140,7 +1143,7 @@ export function PayrollRunDetailClient({
                                               setAdjustmentErrors({});
                                             }}
                                           >
-                                            Cancel
+                                            {tCommon('cancel')}
                                           </button>
                                         </div>
                                       </form>
@@ -1150,12 +1153,12 @@ export function PayrollRunDetailClient({
                                         className="button"
                                         onClick={() => openAdjustmentPanel(item)}
                                       >
-                                        Add adjustment
+                                        {t('adjustments.addAdjustment')}
                                       </button>
                                     )
                                   ) : (
                                     <p className="settings-card-description">
-                                      Adjustments are available only while status is calculated.
+                                      {t('adjustments.unavailable')}
                                     </p>
                                   )}
                                 </article>
@@ -1174,11 +1177,11 @@ export function PayrollRunDetailClient({
       ) : null}
 
       {isRejectDialogOpen ? (
-        <section className="payroll-reject-dialog" aria-label="Reject payroll run dialog">
+        <section className="payroll-reject-dialog" aria-label={t('rejectDialog.title')}>
           <button
             type="button"
             className="payroll-reject-backdrop"
-            aria-label="Close reject dialog"
+            aria-label={tCommon('close')}
             onClick={() => {
               if (activeRunAction) {
                 return;
@@ -1189,14 +1192,14 @@ export function PayrollRunDetailClient({
             }}
           />
           <article className="payroll-reject-panel">
-            <h2 className="section-title">Reject payroll run</h2>
+            <h2 className="section-title">{t('rejectDialog.title')}</h2>
             <p className="settings-card-description">
-              Add a reason. The run will move back to calculated.
+              {t('rejectDialog.description')}
             </p>
 
             <form className="settings-form" onSubmit={submitRejectReason} noValidate>
               <label className="form-field" htmlFor="reject-reason">
-                <span className="form-label">Rejection reason</span>
+                <span className="form-label">{t('rejectDialog.rejectionReason')}</span>
                 <textarea
                   id="reject-reason"
                   className={rejectReasonError ? "form-input form-input-error" : "form-input"}
@@ -1220,7 +1223,7 @@ export function PayrollRunDetailClient({
                   className="button button-danger"
                   disabled={activeRunAction === "reject"}
                 >
-                  {activeRunAction === "reject" ? "Rejecting..." : "Confirm reject"}
+                  {activeRunAction === "reject" ? t('rejectDialog.rejecting') : t('rejectDialog.confirmReject')}
                 </button>
                 <button
                   type="button"
@@ -1231,7 +1234,7 @@ export function PayrollRunDetailClient({
                     setRejectReasonError(null);
                   }}
                 >
-                  Cancel
+                  {tCommon('cancel')}
                 </button>
               </div>
             </form>
@@ -1242,7 +1245,7 @@ export function PayrollRunDetailClient({
       {confirmDialog}
 
       {toasts.length > 0 ? (
-        <section className="toast-region" aria-live="polite" aria-label="Payroll toasts">
+        <section className="toast-region" aria-live="polite" aria-label={t('title')}>
           {toasts.map((toast) => (
             <article key={toast.id} className={`toast-message toast-message-${toast.variant}`}>
               <p>{toast.message}</p>
@@ -1250,7 +1253,7 @@ export function PayrollRunDetailClient({
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss toast"
+                aria-label={t('dismissToast')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

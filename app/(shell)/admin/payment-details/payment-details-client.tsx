@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -11,6 +12,7 @@ import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countr
 import { formatDateTimeTooltip } from "../../../../lib/datetime";
 import { formatHoldCountdown, holdSecondsRemaining, methodLabel } from "../../../../lib/payment-details";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 
 function detailsTableSkeleton() {
@@ -25,6 +27,10 @@ function detailsTableSkeleton() {
 }
 
 export function AdminPaymentDetailsClient() {
+  const t = useTranslations('adminPaymentDetails');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const paymentDetailsQuery = useHrPaymentDetails();
 
   const [nameSortDirection, setNameSortDirection] = useState<SortDirection>("asc");
@@ -62,8 +68,8 @@ export function AdminPaymentDetailsClient() {
   return (
     <>
       <PageHeader
-        title="Payment Details"
-        description="Review masked crew member payment destinations, hold windows, and missing records."
+        title={t('title')}
+        description={t('description')}
       />
 
       {paymentDetailsQuery.isLoading ? detailsTableSkeleton() : null}
@@ -71,7 +77,7 @@ export function AdminPaymentDetailsClient() {
       {!paymentDetailsQuery.isLoading && paymentDetailsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Payment details are unavailable"
+            title={t('unavailable')}
             description={paymentDetailsQuery.errorMessage}
           />
           <button
@@ -79,7 +85,7 @@ export function AdminPaymentDetailsClient() {
             className="button button-accent"
             onClick={() => paymentDetailsQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
@@ -88,31 +94,31 @@ export function AdminPaymentDetailsClient() {
       !paymentDetailsQuery.errorMessage &&
       sortedRows.length === 0 ? (
         <EmptyState
-          title="No employee records found"
-          description="Seed crew data or complete onboarding profiles to populate payment details."
+          title={t('noRecords')}
+          description={t('noRecordsDescription')}
         />
       ) : null}
 
       {!paymentDetailsQuery.isLoading &&
       !paymentDetailsQuery.errorMessage &&
       sortedRows.length > 0 ? (
-        <section className="payment-details-layout" aria-label="Employee payment details table">
+        <section className="payment-details-layout" aria-label={t('ariaLabel')}>
           <article className="payment-details-card">
             <header className="payment-details-card-header">
               <div>
-                <h2 className="section-title">Coverage summary</h2>
+                <h2 className="section-title">{t('coverageSummary')}</h2>
                 <p className="settings-card-description">
-                  {sortedRows.length - missingCount} of {sortedRows.length} employees have primary payment details.
+                  {t('coverageDescription', { covered: sortedRows.length - missingCount, total: sortedRows.length })}
                 </p>
               </div>
               <StatusBadge tone={missingCount > 0 ? "warning" : "success"}>
-                {missingCount > 0 ? `${missingCount} missing` : "All covered"}
+                {missingCount > 0 ? t('missingCount', { count: missingCount }) : t('allCovered')}
               </StatusBadge>
             </header>
           </article>
 
           <div className="data-table-container">
-            <table className="data-table" aria-label="Employee payment details">
+            <table className="data-table" aria-label={t('ariaLabel')}>
               <thead>
                 <tr>
                   <th>
@@ -125,19 +131,19 @@ export function AdminPaymentDetailsClient() {
                         )
                       }
                     >
-                      Employee
+                      {t('colEmployee')}
                       <span className="numeric">
                         {nameSortDirection === "asc" ? "↑" : "↓"}
                       </span>
                     </button>
                   </th>
-                  <th>Method</th>
-                  <th>Destination</th>
-                  <th>Currency</th>
-                  <th>Verification</th>
-                  <th>Hold</th>
-                  <th>Status</th>
-                  <th className="table-action-column">Actions</th>
+                  <th>{t('colMethod')}</th>
+                  <th>{t('colDestination')}</th>
+                  <th>{t('colCurrency')}</th>
+                  <th>{t('colVerification')}</th>
+                  <th>{t('colHold')}</th>
+                  <th>{t('colStatus')}</th>
+                  <th className="table-action-column">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -156,7 +162,7 @@ export function AdminPaymentDetailsClient() {
                           <p className="settings-card-description">{row.email}</p>
                           <p className="settings-card-description country-chip">
                             <span>{countryFlagFromCode(row.countryCode)}</span>
-                            <span>{countryNameFromCode(row.countryCode)}</span>
+                            <span>{countryNameFromCode(row.countryCode, locale)}</span>
                           </p>
                         </div>
                       </td>
@@ -174,7 +180,7 @@ export function AdminPaymentDetailsClient() {
                           "--"
                         ) : (
                           <StatusBadge tone={row.isVerified ? "success" : "pending"}>
-                            {row.isVerified ? "Verified" : "Pending"}
+                            {row.isVerified ? t('verified') : tCommon('status.pending')}
                           </StatusBadge>
                         )}
                       </td>
@@ -182,9 +188,9 @@ export function AdminPaymentDetailsClient() {
                         {row.changeEffectiveAt ? (
                           <span
                             className="numeric"
-                            title={formatDateTimeTooltip(row.changeEffectiveAt)}
+                            title={formatDateTimeTooltip(row.changeEffectiveAt, locale)}
                           >
-                            {holdActive ? formatHoldCountdown(secondsRemaining) : "Active"}
+                            {holdActive ? formatHoldCountdown(secondsRemaining) : t('holdActive')}
                           </span>
                         ) : (
                           "--"
@@ -192,7 +198,7 @@ export function AdminPaymentDetailsClient() {
                       </td>
                       <td>
                         <StatusBadge tone={row.missingDetails ? "warning" : "success"}>
-                          {row.missingDetails ? "Missing" : "On file"}
+                          {row.missingDetails ? t('missing') : t('onFile')}
                         </StatusBadge>
                       </td>
                       <td className="table-row-action-cell">
@@ -201,7 +207,7 @@ export function AdminPaymentDetailsClient() {
                             className="table-row-action"
                             href={`/people/${row.employeeId}?tab=compensation`}
                           >
-                            View profile
+                            {t('viewProfile')}
                           </Link>
                         </div>
                       </td>

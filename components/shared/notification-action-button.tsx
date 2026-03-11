@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import type { NotificationAction } from "../../types/notifications";
 
@@ -17,6 +18,7 @@ export function NotificationActionButton({
   action: NotificationAction;
   onComplete?: () => void;
 }) {
+  const t = useTranslations("notifications");
   const router = useRouter();
   const [state, setState] = useState<ActionState>({ status: "idle" });
   const [reason, setReason] = useState("");
@@ -45,20 +47,20 @@ export function NotificationActionButton({
         });
 
         if (response.ok) {
-          setState({ status: "success", message: `${action.label} done` });
+          setState({ status: "success", message: t("action.done", { label: action.label }) });
           onComplete?.();
         } else {
           const payload = (await response.json().catch(() => null)) as {
             error?: { message?: string };
           } | null;
-          const errorMessage = payload?.error?.message ?? "Action failed";
+          const errorMessage = payload?.error?.message ?? t("action.failed");
           setState({ status: "error", message: errorMessage });
         }
       } catch {
-        setState({ status: "error", message: "Network error" });
+        setState({ status: "error", message: t("action.networkError") });
       }
     },
-    [action, onComplete]
+    [action, onComplete, t]
   );
 
   const handleClick = useCallback(() => {
@@ -112,13 +114,13 @@ export function NotificationActionButton({
         {state.status === "loading" ? (
           <span className="notification-action-spinner" aria-hidden="true" />
         ) : null}
-        {state.status === "awaiting_reason" ? "Confirm" : action.label}
+        {state.status === "awaiting_reason" ? t("action.confirm") : action.label}
       </button>
       {state.status === "awaiting_reason" ? (
         <input
           type="text"
           className="notification-decline-reason"
-          placeholder="Reason for declining..."
+          placeholder={t("action.declinePlaceholder")}
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           onKeyDown={(event) => {

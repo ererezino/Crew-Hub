@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 
 export type AccessChecklistItem = {
   key: string;
@@ -22,6 +23,7 @@ export function AccessChecklist({
   onToggle,
   disabled = false
 }: AccessChecklistProps) {
+  const t = useTranslations("adminUsers");
   const selectedKeySet = useMemo(() => new Set(selectedKeys), [selectedKeys]);
 
   const groupedItems = useMemo(() => {
@@ -39,9 +41,9 @@ export function AccessChecklist({
   return (
     <section className="settings-card">
       <div>
-        <h3 className="section-title">Access Control</h3>
+        <h3 className="section-title">{t('accessChecklist.title')}</h3>
         <p className="settings-card-description">
-          These are the default sections for the selected role(s). Customize as needed.
+          {t('accessChecklist.description')}
         </p>
       </div>
 

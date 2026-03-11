@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
@@ -16,17 +18,19 @@ function canViewExpenseReports(roles: readonly UserRole[]): boolean {
 
 export default async function ExpenseReportsPage() {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("expenseReports");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Expense Reports"
-          description="Monthly analytics by category, crew member, and department."
+          title={t("title")}
+          description={t("pageDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );
@@ -36,13 +40,13 @@ export default async function ExpenseReportsPage() {
     return (
       <>
         <PageHeader
-          title="Expense Reports"
-          description="Monthly analytics by category, crew member, and department."
+          title={t("title")}
+          description={t("pageDescription")}
         />
         <EmptyState
-          title="Access denied"
-          description="Only managers and admin roles can view expense reports."
-          ctaLabel="Open expenses"
+          title={tCommon("emptyState.accessDenied")}
+          description={t("accessDeniedDescription")}
+          ctaLabel={t("openExpenses")}
           ctaHref="/expenses"
         />
       </>

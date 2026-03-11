@@ -1,6 +1,7 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -16,6 +17,8 @@ import {
   type PaymentMethod
 } from "../../../../types/payment-details";
 import { humanizeError } from "@/lib/errors";
+
+type AppLocale = "en" | "fr";
 
 type ToastVariant = "success" | "error" | "info";
 
@@ -222,6 +225,9 @@ function detailsCardSkeleton() {
 }
 
 export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('paymentDetails');
+  const locale = useLocale() as AppLocale;
+
   const paymentDetailsQuery = useMePaymentDetails();
 
   const [formValues, setFormValues] = useState<PaymentDetailsFormValues>(INITIAL_FORM_VALUES);
@@ -265,7 +271,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
   };
 
   const showToast = (variant: ToastVariant, rawMessage: string) => {
-    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
+    const message = variant === "error" ? humanizeError(rawMessage, locale) : rawMessage;
     const toastId = createToastId();
 
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
@@ -360,11 +366,11 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
       const responsePayload = (await response.json()) as MePaymentDetailsMutationResponse;
 
       if (!response.ok || !responsePayload.data) {
-        showToast("error", responsePayload.error?.message ?? "Unable to update payment details.");
+        showToast("error", responsePayload.error?.message ?? t('toastSaveError'));
         return;
       }
 
-      showToast("success", "Payment details saved. Changes will apply after a 48-hour hold.");
+      showToast("success", t('toastSaved'));
 
       setFormValues((currentValues) => ({
         ...currentValues,
@@ -382,7 +388,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to update payment details."
+        error instanceof Error ? error.message : t('toastSaveError')
       );
     } finally {
       setIsSubmitting(false);
@@ -393,8 +399,8 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
     <>
       {!embedded ? (
         <PageHeader
-          title="Payment Details"
-          description="Manage payout destination details for Crew Hub payroll disbursements."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
@@ -403,7 +409,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
       {!paymentDetailsQuery.isLoading && paymentDetailsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Payment details are unavailable"
+            title={t('unavailable')}
             description={paymentDetailsQuery.errorMessage}
           />
           <button
@@ -411,18 +417,18 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
             className="button button-accent"
             onClick={() => paymentDetailsQuery.refresh()}
           >
-            Retry
+            {t('retry')}
           </button>
         </>
       ) : null}
 
       {!paymentDetailsQuery.isLoading && !paymentDetailsQuery.errorMessage ? (
-        <section className="payment-details-layout" aria-label="Payment detail settings">
+        <section className="payment-details-layout" aria-label={t('layoutAriaLabel')}>
           {paymentDetailsQuery.data?.paymentDetail ? (
             <article className="payment-details-card" aria-live="polite">
               <header className="payment-details-card-header">
                 <div>
-                  <h2 className="section-title">Current payout destination</h2>
+                  <h2 className="section-title">{t('currentTitle')}</h2>
                   <p className="settings-card-description">
                     {methodLabel(paymentDetailsQuery.data.paymentDetail.paymentMethod)} •{" "}
                     {paymentDetailsQuery.data.paymentDetail.maskedDestination}
@@ -432,7 +438,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                   <StatusBadge
                     tone={paymentDetailsQuery.data.paymentDetail.isVerified ? "success" : "pending"}
                   >
-                    {paymentDetailsQuery.data.paymentDetail.isVerified ? "Verified" : "Pending verification"}
+                    {paymentDetailsQuery.data.paymentDetail.isVerified ? t('verified') : t('pendingVerification')}
                   </StatusBadge>
                   <StatusBadge tone="info">{paymentDetailsQuery.data.paymentDetail.currency}</StatusBadge>
                 </div>
@@ -440,21 +446,21 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
 
               <dl className="payment-details-meta-grid">
                 <div>
-                  <dt>Method</dt>
+                  <dt>{t('methodDt')}</dt>
                   <dd>{methodLabel(paymentDetailsQuery.data.paymentDetail.paymentMethod)}</dd>
                 </div>
                 <div>
-                  <dt>Masked destination</dt>
+                  <dt>{t('maskedDestinationDt')}</dt>
                   <dd className="numeric">{paymentDetailsQuery.data.paymentDetail.maskedDestination}</dd>
                 </div>
                 <div>
-                  <dt>Last updated</dt>
+                  <dt>{t('lastUpdatedDt')}</dt>
                   <dd>
                     <time
                       dateTime={paymentDetailsQuery.data.paymentDetail.updatedAt}
-                      title={formatDateTimeTooltip(paymentDetailsQuery.data.paymentDetail.updatedAt)}
+                      title={formatDateTimeTooltip(paymentDetailsQuery.data.paymentDetail.updatedAt, locale)}
                     >
-                      {formatRelativeTime(paymentDetailsQuery.data.paymentDetail.updatedAt)}
+                      {formatRelativeTime(paymentDetailsQuery.data.paymentDetail.updatedAt, locale)}
                     </time>
                   </dd>
                 </div>
@@ -462,42 +468,35 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
             </article>
           ) : (
             <EmptyState
-              title="No payment details on file"
-              description="Add your payout destination below. Changes are held for 48 hours before activation."
+              title={t('noDetails')}
+              description={t('noDetailsDescription')}
             />
           )}
 
           {holdActive ? (
             <article className="payment-details-hold-warning" aria-live="polite">
-              <h3 className="section-title">48-hour hold in effect</h3>
+              <h3 className="section-title">{t('holdTitle')}</h3>
               <p className="settings-card-description">
-                Updated details become active in <span className="numeric">{formatHoldCountdown(liveHoldSeconds)}</span>.
+                {t('holdDescription', { countdown: formatHoldCountdown(liveHoldSeconds) })}
               </p>
               {paymentDetailsQuery.data?.holdEndsAt ? (
                 <p className="settings-card-description">
-                  Effective at{" "}
-                  <time
-                    dateTime={paymentDetailsQuery.data.holdEndsAt}
-                    title={formatDateTimeTooltip(paymentDetailsQuery.data.holdEndsAt)}
-                  >
-                    {formatRelativeTime(paymentDetailsQuery.data.holdEndsAt)}
-                  </time>
-                  .
+                  {t('holdEffectiveAt', { date: formatRelativeTime(paymentDetailsQuery.data.holdEndsAt, locale) })}
                 </p>
               ) : null}
             </article>
           ) : null}
 
-          <section className="settings-card" aria-label="Edit payment details">
-            <h2 className="section-title">Edit payment details</h2>
+          <section className="settings-card" aria-label={t('editTitle')}>
+            <h2 className="section-title">{t('editTitle')}</h2>
             <p className="settings-card-description">
-              Crew Hub encrypts sensitive payout fields with AES-256-GCM. Updates always apply after 48 hours.
+              {t('editEncryptionNote')}
             </p>
 
             <form className="settings-form" onSubmit={handleSubmit} noValidate>
               <div className="timeoff-form-grid">
                 <label className="form-field" htmlFor="payment-method">
-                  <span className="form-label">Payment method</span>
+                  <span className="form-label">{t('paymentMethodLabel')}</span>
                   <select
                     id="payment-method"
                     className={
@@ -519,7 +518,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                 </label>
 
                 <label className="form-field" htmlFor="payment-currency">
-                  <span className="form-label">Currency</span>
+                  <span className="form-label">{t('currencyLabel')}</span>
                   <input
                     id="payment-currency"
                     className={formErrors.currency ? "form-input form-input-error" : "form-input"}
@@ -534,7 +533,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
               {formValues.paymentMethod === "bank_transfer" ? (
                 <>
                   <label className="form-field" htmlFor="bank-name">
-                    <span className="form-label">Bank name</span>
+                    <span className="form-label">{t('bankNameLabel')}</span>
                     <input
                       id="bank-name"
                       className={formErrors.bankName ? "form-input form-input-error" : "form-input"}
@@ -547,7 +546,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
 
                   <div className="timeoff-form-grid">
                     <label className="form-field" htmlFor="bank-account-name">
-                      <span className="form-label">Account name</span>
+                      <span className="form-label">{t('accountNameLabel')}</span>
                       <input
                         id="bank-account-name"
                         className={
@@ -563,7 +562,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                     </label>
 
                     <label className="form-field" htmlFor="bank-account-number">
-                      <span className="form-label">Account number</span>
+                      <span className="form-label">{t('accountNumberLabel')}</span>
                       <input
                         id="bank-account-number"
                         className={
@@ -580,7 +579,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                   </div>
 
                   <label className="form-field" htmlFor="bank-routing-number">
-                    <span className="form-label">Routing number (optional)</span>
+                    <span className="form-label">{t('routingNumberLabel')}</span>
                     <input
                       id="bank-routing-number"
                       className={
@@ -601,7 +600,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                 <>
                   <div className="timeoff-form-grid">
                     <label className="form-field" htmlFor="mobile-provider">
-                      <span className="form-label">Provider</span>
+                      <span className="form-label">{t('providerLabel')}</span>
                       <input
                         id="mobile-provider"
                         className={
@@ -617,7 +616,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                     </label>
 
                     <label className="form-field" htmlFor="mobile-number">
-                      <span className="form-label">Mobile money number</span>
+                      <span className="form-label">{t('mobileMoneyNumberLabel')}</span>
                       <input
                         id="mobile-number"
                         className={
@@ -637,7 +636,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
 
               {formValues.paymentMethod === "crew_tag" ? (
                 <label className="form-field" htmlFor="crew-tag">
-                  <span className="form-label">Crew Tag</span>
+                  <span className="form-label">{t('crewTagLabel')}</span>
                   <div className="crewtag-input-wrap">
                     <span className="crewtag-input-prefix" aria-hidden="true">@</span>
                     <input
@@ -645,13 +644,13 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                       className={
                         formErrors.crewTag ? "form-input form-input-error crewtag-input" : "form-input crewtag-input"
                       }
-                      placeholder="username"
+                      placeholder={t('crewTagPlaceholder')}
                       value={formValues.crewTag}
                       onChange={handleChange("crewTag")}
                       onBlur={() => markTouched("crewTag")}
                     />
                   </div>
-                  <p className="form-field-hint">Your Accrue username — e.g. @zino.doe</p>
+                  <p className="form-field-hint">{t('crewTagHint')}</p>
                   {formErrors.crewTag ? (
                     <p className="form-field-error">{formErrors.crewTag}</p>
                   ) : null}
@@ -660,7 +659,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
 
               <div className="settings-actions">
                 <button type="submit" className="button button-accent" disabled={isSubmitting}>
-                  {isSubmitting ? "Saving..." : "Save payment details"}
+                  {isSubmitting ? t('saving') : t('saveDetails')}
                 </button>
               </div>
             </form>
@@ -669,7 +668,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
       ) : null}
 
       {toasts.length > 0 ? (
-        <section className="toast-region" aria-live="polite" aria-label="Payment detail toasts">
+        <section className="toast-region" aria-live="polite" aria-label={t('toastAriaLabel')}>
           {toasts.map((toast) => (
             <article key={toast.id} className={`toast-message toast-message-${toast.variant}`}>
               <p>{toast.message}</p>
@@ -677,7 +676,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss toast"
+                aria-label={t('dismissAriaLabel')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

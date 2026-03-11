@@ -1,6 +1,7 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -10,6 +11,8 @@ type ShellErrorProps = {
 };
 
 export default function ShellError({ error, reset }: ShellErrorProps) {
+  const t = useTranslations('errorBoundary');
+
   useEffect(() => {
     Sentry.captureException(error);
   }, [error]);
@@ -24,9 +27,9 @@ export default function ShellError({ error, reset }: ShellErrorProps) {
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
         </div>
-        <h2 className="app-error-boundary-title">Something went wrong</h2>
+        <h2 className="app-error-boundary-title">{t('title')}</h2>
         <p className="app-error-boundary-message">
-          An unexpected error occurred. You can try again or return to the dashboard.
+          {t('message')}
         </p>
         {process.env.NODE_ENV !== "production" ? (
           <pre className="app-error-boundary-stack">
@@ -37,10 +40,10 @@ export default function ShellError({ error, reset }: ShellErrorProps) {
         ) : null}
         <div className="app-error-boundary-actions">
           <button type="button" className="button" onClick={reset}>
-            Try again
+            {t('tryAgain')}
           </button>
           <Link href="/dashboard" className="button button-accent">
-            Return to dashboard
+            {t('returnToDashboard')}
           </Link>
         </div>
       </div>

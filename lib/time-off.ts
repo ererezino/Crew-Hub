@@ -152,12 +152,37 @@ export function normalizeCountryCode(countryCode: string | null | undefined): st
   return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
 }
 
-export function formatLeaveTypeLabel(leaveType: string): string {
-  return leaveType
+export function formatLeaveTypeLabel(leaveType: string, locale?: "en" | "fr"): string {
+  const normalized = leaveType.trim().toLowerCase();
+  const isFr = locale === "fr";
+
+  if (!normalized) {
+    return isFr ? "Congé" : "Leave";
+  }
+
+  if (normalized === "annual" || normalized === "annual_leave") {
+    return isFr ? "Congé annuel" : "Annual Leave";
+  }
+
+  if (normalized === "sick" || normalized === "sick_leave") {
+    return isFr ? "Congé maladie" : "Sick Leave";
+  }
+
+  if (normalized === "birthday" || normalized === "birthday_leave") {
+    return isFr ? "Congé anniversaire" : "Birthday Leave";
+  }
+
+  const baseLabel = leaveType
     .replace(/_/g, " ")
     .split(" ")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+
+  if (isFr) {
+    return /\bcongé\b/i.test(baseLabel) ? baseLabel : `Congé ${baseLabel.toLowerCase()}`;
+  }
+
+  return /\bleave\b/i.test(baseLabel) ? baseLabel : `${baseLabel} Leave`;
 }
 
 export function parseNumeric(value: number | string): number {

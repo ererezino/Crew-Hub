@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
@@ -33,17 +35,19 @@ export default async function AdminCompensationPage({
   searchParams
 }: AdminCompensationPageProps) {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("adminCompensation");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Compensation Admin"
-          description="Manage salary, allowances, and equity for team members."
+          title={t("pageTitle")}
+          description={t("pageDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );
@@ -53,12 +57,12 @@ export default async function AdminCompensationPage({
     return (
       <>
         <PageHeader
-          title="Compensation Admin"
-          description="Manage salary, allowances, and equity for team members."
+          title={t("pageTitle")}
+          description={t("pageDescription")}
         />
         <EmptyState
-          title="Access denied"
-          description="Only HR Admin, Finance Admin, and Super Admin can manage compensation."
+          title={tCommon("emptyState.accessDenied")}
+          description={t("accessDeniedDescription")}
         />
       </>
     );

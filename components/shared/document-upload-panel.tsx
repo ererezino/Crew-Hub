@@ -8,6 +8,7 @@ import {
   useRef,
   useState
 } from "react";
+import { useTranslations } from "next-intl";
 import { z } from "zod";
 
 import {
@@ -187,6 +188,7 @@ export function DocumentUploadPanel({
   allowPolicyDocuments,
   existingDocument = null
 }: DocumentUploadPanelProps) {
+  const t = useTranslations("documents");
   const [values, setValues] = useState<UploadFormValues>(createInitialValues(existingDocument));
   const [touched, setTouched] = useState<UploadFormTouched>(INITIAL_TOUCHED);
   const [errors, setErrors] = useState<UploadFormErrors>({});
@@ -337,16 +339,16 @@ export function DocumentUploadPanel({
     <SlidePanel
       isOpen={isOpen}
       onClose={handleClose}
-      title={mode === "new_version" ? "Upload new version" : "Upload document"}
+      title={mode === "new_version" ? t("uploadPanel.titleNewVersion") : t("uploadPanel.titleCreate")}
       description={
         mode === "new_version"
-          ? "Attach a replacement file and capture it as the next version."
-          : "Upload to Crew Hub documents storage with validation and version tracking."
+          ? t("uploadPanel.descriptionNewVersion")
+          : t("uploadPanel.descriptionCreate")
       }
     >
       <form className="settings-form" noValidate onSubmit={handleSubmit}>
         <label className="form-field" htmlFor="document-title">
-          <span className="form-label">Title</span>
+          <span className="form-label">{t("uploadPanel.labelTitle")}</span>
           <input
             id="document-title"
             className={errors.title ? "form-input form-input-error" : "form-input"}
@@ -366,7 +368,7 @@ export function DocumentUploadPanel({
         </label>
 
         <label className="form-field" htmlFor="document-description">
-          <span className="form-label">Description</span>
+          <span className="form-label">{t("uploadPanel.labelDescription")}</span>
           <textarea
             id="document-description"
             className={errors.description ? "form-input form-input-error" : "form-input"}
@@ -387,7 +389,7 @@ export function DocumentUploadPanel({
 
         <div className="documents-upload-grid">
           <label className="form-field" htmlFor="document-category">
-            <span className="form-label">Category</span>
+            <span className="form-label">{t("uploadPanel.labelCategory")}</span>
             <select
               id="document-category"
               className={errors.category ? "form-input form-input-error" : "form-input"}
@@ -412,7 +414,7 @@ export function DocumentUploadPanel({
           </label>
 
           <label className="form-field" htmlFor="document-expiry">
-            <span className="form-label">Expiry date</span>
+            <span className="form-label">{t("uploadPanel.labelExpiryDate")}</span>
             <input
               id="document-expiry"
               className={errors.expiryDate ? "form-input form-input-error" : "form-input"}
@@ -433,7 +435,7 @@ export function DocumentUploadPanel({
         </div>
 
         <label className="form-field" htmlFor="document-country">
-          <span className="form-label">Country</span>
+          <span className="form-label">{t("uploadPanel.labelCountry")}</span>
           <select
             id="document-country"
             className={errors.countryCode ? "form-input form-input-error" : "form-input"}
@@ -458,7 +460,7 @@ export function DocumentUploadPanel({
         </label>
 
         <div className="form-field">
-          <span className="form-label">File upload</span>
+          <span className="form-label">{t("uploadPanel.labelFileUpload")}</span>
           <div
             className={isDragging ? "document-dropzone document-dropzone-active" : "document-dropzone"}
             onDragOver={handleDragOver}
@@ -473,13 +475,13 @@ export function DocumentUploadPanel({
                 fileInputRef.current?.click();
               }
             }}
-            aria-label="Select a document file"
+            aria-label={t("uploadPanel.dropzoneAriaLabel")}
           >
             <p className="document-dropzone-title">
-              Drag and drop a file, or click to browse.
+              {t("uploadPanel.dropzoneTitle")}
             </p>
             <p className="document-dropzone-hint">
-              Allowed: pdf, docx, doc, xlsx, xls, png, jpg (max 25MB)
+              {t("uploadPanel.dropzoneHint")}
             </p>
             <input
               ref={fileInputRef}
@@ -507,7 +509,7 @@ export function DocumentUploadPanel({
             <div className="document-upload-progress-track">
               <div className="document-upload-progress-bar" style={{ width: `${progress}%` }} />
             </div>
-            <p className="document-upload-progress-label numeric">{progress}% uploaded</p>
+            <p className="document-upload-progress-label numeric">{t("uploadPanel.progressLabel", { progress })}</p>
           </div>
         ) : null}
 
@@ -519,14 +521,14 @@ export function DocumentUploadPanel({
 
         <div className="slide-panel-actions">
           <button type="button" className="button" onClick={handleClose} disabled={isSubmitting}>
-            Cancel
+            {t("uploadPanel.cancel")}
           </button>
           <button type="submit" className="button button-accent" disabled={isSubmitting}>
             {isSubmitting
-              ? "Uploading..."
+              ? t("uploadPanel.uploading")
               : mode === "new_version"
-                ? "Upload version"
-                : "Upload document"}
+                ? t("uploadPanel.submitNewVersion")
+                : t("uploadPanel.submitCreate")}
           </button>
         </div>
       </form>

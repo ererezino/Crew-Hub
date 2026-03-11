@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -27,6 +28,7 @@ function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
 }
 
 export function PayClient({ requestedTab, userRoles }: PayClientProps) {
+  const t = useTranslations('pay');
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -35,18 +37,18 @@ export function PayClient({ requestedTab, userRoles }: PayClientProps) {
     () => [
       {
         key: "payslips",
-        label: "Payslips"
+        label: t('tab.payslips')
       },
       {
         key: "payment-details",
-        label: "Payment Details"
+        label: t('tab.paymentDetails')
       },
       {
         key: "compensation",
-        label: "Compensation"
+        label: t('tab.compensation')
       }
     ],
-    []
+    [t]
   );
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(requestedTab, tabs));
@@ -76,8 +78,8 @@ export function PayClient({ requestedTab, userRoles }: PayClientProps) {
   return (
     <>
       <PageHeader
-        title="Pay"
-        description="Pay statements, payout setup, and compensation in one view."
+        title={t('title')}
+        description={t('description')}
       />
 
       <PageTabs

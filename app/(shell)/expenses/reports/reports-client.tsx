@@ -1,9 +1,12 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
+import { getCountryOptions } from "../../../../lib/countries";
+import type { AppLocale } from "../../../../i18n/locales";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useExpenseReports } from "../../../../hooks/use-expenses";
 import {
@@ -44,11 +47,15 @@ function ReportsSkeleton() {
 function ExpenseReportBars({
   title,
   rows,
-  currency
+  currency,
+  noDataLabel,
+  itemsLabel
 }: {
   title: string;
   rows: ExpenseReportBucket[];
   currency: string;
+  noDataLabel: string;
+  itemsLabel: string;
 }) {
   const maxAmount = useMemo(
     () => rows.reduce((currentMax, row) => Math.max(currentMax, row.totalAmount), 0),
@@ -62,7 +69,7 @@ function ExpenseReportBars({
       </header>
 
       {rows.length === 0 ? (
-        <p className="settings-card-description">No data for this period.</p>
+        <p className="settings-card-description">{noDataLabel}</p>
       ) : (
         <ul className="expenses-report-bars" aria-label={title}>
           {rows.map((row) => {
@@ -75,7 +82,7 @@ function ExpenseReportBars({
                   <p className="expenses-report-row-title">{row.label}</p>
                   <p className="expenses-report-row-meta">
                     <CurrencyDisplay amount={row.totalAmount} currency={currency} /> |{" "}
-                    <span className="numeric">{row.count}</span> items
+                    <span className="numeric">{row.count}</span> {itemsLabel}
                   </p>
                 </div>
                 <div className="expenses-report-row-bar-track" role="presentation">
@@ -93,9 +100,17 @@ function ExpenseReportBars({
   );
 }
 
-function EmployeeTable({ rows, currency }: { rows: EnhancedEmployeeBucket[]; currency: string }) {
+function EmployeeTable({
+  rows,
+  currency,
+  t
+}: {
+  rows: EnhancedEmployeeBucket[];
+  currency: string;
+  t: (key: string) => string;
+}) {
   if (rows.length === 0) {
-    return <p className="settings-card-description">No employee data for this period.</p>;
+    return <p className="settings-card-description">{t("noEmployeeData")}</p>;
   }
 
   return (
@@ -103,12 +118,12 @@ function EmployeeTable({ rows, currency }: { rows: EnhancedEmployeeBucket[]; cur
       <table className="data-table">
         <thead>
           <tr>
-            <th>Employee</th>
-            <th>Department</th>
-            <th className="numeric">Count</th>
-            <th className="numeric">Total Amount</th>
-            <th className="numeric">Avg Processing</th>
-            <th>Status Distribution</th>
+            <th>{t("colEmployee")}</th>
+            <th>{t("colDepartment")}</th>
+            <th className="numeric">{t("colCount")}</th>
+            <th className="numeric">{t("colTotalAmount")}</th>
+            <th className="numeric">{t("colAvgProcessing")}</th>
+            <th>{t("colStatusDistribution")}</th>
           </tr>
         </thead>
         <tbody>
@@ -142,9 +157,17 @@ function EmployeeTable({ rows, currency }: { rows: EnhancedEmployeeBucket[]; cur
   );
 }
 
-function CategoryTable({ rows, currency }: { rows: EnhancedCategoryBucket[]; currency: string }) {
+function CategoryTable({
+  rows,
+  currency,
+  t
+}: {
+  rows: EnhancedCategoryBucket[];
+  currency: string;
+  t: (key: string) => string;
+}) {
   if (rows.length === 0) {
-    return <p className="settings-card-description">No category data for this period.</p>;
+    return <p className="settings-card-description">{t("noCategoryData")}</p>;
   }
 
   return (
@@ -152,11 +175,11 @@ function CategoryTable({ rows, currency }: { rows: EnhancedCategoryBucket[]; cur
       <table className="data-table">
         <thead>
           <tr>
-            <th>Category</th>
-            <th className="numeric">Count</th>
-            <th className="numeric">Total Amount</th>
-            <th className="numeric">% of Total</th>
-            <th>Most Common Vendor</th>
+            <th>{t("colCategory")}</th>
+            <th className="numeric">{t("colCount")}</th>
+            <th className="numeric">{t("colTotalAmount")}</th>
+            <th className="numeric">{t("colPctTotal")}</th>
+            <th>{t("colMostCommonVendor")}</th>
           </tr>
         </thead>
         <tbody>
@@ -177,9 +200,17 @@ function CategoryTable({ rows, currency }: { rows: EnhancedCategoryBucket[]; cur
   );
 }
 
-function DepartmentTable({ rows, currency }: { rows: EnhancedDepartmentBucket[]; currency: string }) {
+function DepartmentTable({
+  rows,
+  currency,
+  t
+}: {
+  rows: EnhancedDepartmentBucket[];
+  currency: string;
+  t: (key: string) => string;
+}) {
   if (rows.length === 0) {
-    return <p className="settings-card-description">No department data for this period.</p>;
+    return <p className="settings-card-description">{t("noDepartmentData")}</p>;
   }
 
   return (
@@ -187,11 +218,11 @@ function DepartmentTable({ rows, currency }: { rows: EnhancedDepartmentBucket[];
       <table className="data-table">
         <thead>
           <tr>
-            <th>Department</th>
-            <th className="numeric">Count</th>
-            <th className="numeric">Total Amount</th>
-            <th className="numeric">Employees</th>
-            <th>Top Category</th>
+            <th>{t("colDepartment")}</th>
+            <th className="numeric">{t("colCount")}</th>
+            <th className="numeric">{t("colTotalAmount")}</th>
+            <th className="numeric">{t("colEmployees")}</th>
+            <th>{t("colTopCategory")}</th>
           </tr>
         </thead>
         <tbody>
@@ -213,6 +244,12 @@ function DepartmentTable({ rows, currency }: { rows: EnhancedDepartmentBucket[];
 }
 
 export function ExpenseReportsClient() {
+  const t = useTranslations("expenseReports");
+  const locale = useLocale() as AppLocale;
+  const tCommon = useTranslations("common");
+  // Dynamic key lookup for sub-component table headers
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const [month, setMonth] = useState(currentMonthKey());
   const [country, setCountry] = useState("all");
   const [department, setDepartment] = useState("all");
@@ -249,18 +286,18 @@ export function ExpenseReportsClient() {
   return (
     <>
       <PageHeader
-        title="Expense Reports"
-        description="Monthly reporting by category, crew member, and department with CSV export."
+        title={t("title")}
+        description={t("description")}
         actions={
           <button type="button" className="button button-accent" onClick={handleCsvExport}>
-            Export CSV
+            {t("exportCsv")}
           </button>
         }
       />
 
-      <section className="expenses-toolbar expenses-reports-filters" aria-label="Report filters">
+      <section className="expenses-toolbar expenses-reports-filters" aria-label={t("title")}>
         <label className="form-field">
-          <span className="form-label">Month</span>
+          <span className="form-label">{t("filterMonth")}</span>
           <input
             className="form-input numeric"
             type="month"
@@ -270,29 +307,27 @@ export function ExpenseReportsClient() {
         </label>
 
         <label className="form-field">
-          <span className="form-label">Country</span>
+          <span className="form-label">{t("filterCountry")}</span>
           <select
             className="form-input analytics-filter-select"
             value={country}
             onChange={(event) => setCountry(event.currentTarget.value)}
           >
-            <option value="all">All countries</option>
-            <option value="US">United States</option>
-            <option value="GB">United Kingdom</option>
-            <option value="DE">Germany</option>
-            <option value="NG">Nigeria</option>
-            <option value="KE">Kenya</option>
+            <option value="all">{t("allCountries")}</option>
+            {getCountryOptions(locale).map((opt) => (
+              <option key={opt.code} value={opt.code}>{opt.name}</option>
+            ))}
           </select>
         </label>
 
         <label className="form-field">
-          <span className="form-label">Department</span>
+          <span className="form-label">{t("filterDepartment")}</span>
           <select
             className="form-input analytics-filter-select"
             value={department}
             onChange={(event) => setDepartment(event.currentTarget.value)}
           >
-            <option value="all">All departments</option>
+            <option value="all">{t("allDepartments")}</option>
             {uniqueDepartments.map((dept) => (
               <option key={dept} value={dept}>
                 {dept}
@@ -302,13 +337,13 @@ export function ExpenseReportsClient() {
         </label>
 
         <label className="form-field">
-          <span className="form-label">Status</span>
+          <span className="form-label">{t("filterStatus")}</span>
           <select
             className="form-input analytics-filter-select"
             value={status}
             onChange={(event) => setStatus(event.currentTarget.value)}
           >
-            <option value="all">All statuses</option>
+            <option value="all">{t("allStatuses")}</option>
             {EXPENSE_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {getExpenseStatusLabel(s)}
@@ -318,13 +353,13 @@ export function ExpenseReportsClient() {
         </label>
 
         <label className="form-field">
-          <span className="form-label">Category</span>
+          <span className="form-label">{t("filterCategory")}</span>
           <select
             className="form-input analytics-filter-select"
             value={category}
             onChange={(event) => setCategory(event.currentTarget.value)}
           >
-            <option value="all">All categories</option>
+            <option value="all">{t("allCategories")}</option>
             {EXPENSE_CATEGORIES.map((cat) => (
               <option key={cat} value={cat}>
                 {getExpenseCategoryLabel(cat)}
@@ -333,7 +368,7 @@ export function ExpenseReportsClient() {
           </select>
         </label>
 
-        <p className="settings-card-description">Showing {formatMonthLabel(month)} expense data.</p>
+        <p className="settings-card-description">{t("showingMonth", { month: formatMonthLabel(month) })}</p>
       </section>
 
       {reportsQuery.isLoading ? <ReportsSkeleton /> : null}
@@ -341,13 +376,13 @@ export function ExpenseReportsClient() {
       {!reportsQuery.isLoading && reportsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Expense reports are unavailable"
+            title={t("unavailable")}
             description={reportsQuery.errorMessage}
-            ctaLabel="Retry"
+            ctaLabel={tCommon("retry")}
             ctaHref="/expenses/reports"
           />
           <button type="button" className="button button-accent" onClick={() => reportsQuery.refresh()}>
-            Retry
+            {tCommon("retry")}
           </button>
         </>
       ) : null}
@@ -355,73 +390,73 @@ export function ExpenseReportsClient() {
       {!reportsQuery.isLoading && !reportsQuery.errorMessage && reportsQuery.data ? (
         <>
           {/* ── Summary cards ── */}
-          <section className="expenses-metric-grid" aria-label="Expense report summary">
+          <section className="expenses-metric-grid" aria-label={t("summaryAriaLabel")}>
             <article className="metric-card">
-              <p className="metric-label">Total Submitted</p>
+              <p className="metric-label">{t("totalSubmitted")}</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={reportsQuery.data.totals.totalAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
               <p className="metric-hint">
-                <span className="numeric">{reportsQuery.data.totals.expenseCount}</span> expenses
+                <span className="numeric">{reportsQuery.data.totals.expenseCount}</span> {t("expenses")}
               </p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Manager Approved</p>
+              <p className="metric-label">{t("managerApproved")}</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={reportsQuery.data.totals.managerApprovedAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
-              <p className="metric-hint">Awaiting finance review</p>
+              <p className="metric-hint">{t("managerApprovedHint")}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Finance Approved</p>
+              <p className="metric-label">{t("financeApproved")}</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={reportsQuery.data.totals.financeApprovedAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
-              <p className="metric-hint">Approved for reimbursement</p>
+              <p className="metric-hint">{t("financeApprovedHint")}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Reimbursed</p>
+              <p className="metric-label">{t("reimbursed")}</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={reportsQuery.data.totals.reimbursedAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
-              <p className="metric-hint">Paid out this month</p>
+              <p className="metric-hint">{t("reimbursedHint")}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Pending Reimbursement</p>
+              <p className="metric-label">{t("pendingReimbursement")}</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={reportsQuery.data.totals.pendingAmount} currency={reportsQuery.data.primaryCurrency} />
               </p>
-              <p className="metric-hint">Still owed to crew members</p>
+              <p className="metric-hint">{t("pendingReimbursementHint")}</p>
             </article>
           </section>
 
           {/* ── Timing metrics ── */}
-          <section className="expenses-metric-grid expenses-timing-row" aria-label="Processing times">
+          <section className="expenses-metric-grid expenses-timing-row" aria-label={t("timingAriaLabel")}>
             <article className="metric-card">
-              <p className="metric-label">Avg Manager Approval</p>
+              <p className="metric-label">{t("avgManagerApproval")}</p>
               <p className="metric-value numeric">
                 {reportsQuery.data.timings.avgSubmissionToManagerApprovalHours === null
                   ? "-"
                   : `${reportsQuery.data.timings.avgSubmissionToManagerApprovalHours.toFixed(1)}h`}
               </p>
-              <p className="metric-hint">From submission to manager approval</p>
+              <p className="metric-hint">{t("avgManagerApprovalHint")}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Avg Disbursement</p>
+              <p className="metric-label">{t("avgDisbursement")}</p>
               <p className="metric-value numeric">
                 {reportsQuery.data.timings.avgManagerApprovalToDisbursementHours === null
                   ? "-"
                   : `${reportsQuery.data.timings.avgManagerApprovalToDisbursementHours.toFixed(1)}h`}
               </p>
-              <p className="metric-hint">From manager approval to reimbursement</p>
+              <p className="metric-hint">{t("avgDisbursementHint")}</p>
             </article>
           </section>
 
           {reportsQuery.data.totals.expenseCount === 0 ? (
             <EmptyState
-              title="No report data for this month"
-              description="Submitted expenses will appear in these reports once records exist for the selected month."
-              ctaLabel="Open expenses"
+              title={t("noReportData")}
+              description={t("noReportDataDescription")}
+              ctaLabel={t("openExpenses")}
               ctaHref="/expenses"
             />
           ) : (
@@ -430,19 +465,19 @@ export function ExpenseReportsClient() {
               <section className="expenses-report-layout">
                 <article className="settings-card expenses-report-card">
                   <header className="expenses-report-card-header">
-                    <h2 className="section-title">By Status</h2>
+                    <h2 className="section-title">{t("byStatus")}</h2>
                   </header>
                   {reportsQuery.data.statusBreakdown.length === 0 ? (
-                    <p className="settings-card-description">No status data for this period.</p>
+                    <p className="settings-card-description">{t("noStatusData")}</p>
                   ) : (
-                    <ul className="expenses-report-bars" aria-label="Expense status breakdown">
+                    <ul className="expenses-report-bars" aria-label={t("statusBreakdownAriaLabel")}>
                       {reportsQuery.data.statusBreakdown.map((row: ExpenseReportStatusBucket) => (
                         <li key={row.status} className="expenses-report-row">
                           <div className="expenses-report-row-copy">
                             <p className="expenses-report-row-title">{row.label}</p>
                             <p className="expenses-report-row-meta">
                               <CurrencyDisplay amount={row.totalAmount} currency={reportsQuery.data!.primaryCurrency} /> |{" "}
-                              <span className="numeric">{row.count}</span> items
+                              <span className="numeric">{row.count}</span> {t("items")}
                             </p>
                           </div>
                         </li>
@@ -450,48 +485,54 @@ export function ExpenseReportsClient() {
                     </ul>
                   )}
                 </article>
-                <ExpenseReportBars title="By Category" rows={reportsQuery.data.byCategory} currency={reportsQuery.data.primaryCurrency} />
+                <ExpenseReportBars
+                  title={t("byCategory")}
+                  rows={reportsQuery.data.byCategory}
+                  currency={reportsQuery.data.primaryCurrency}
+                  noDataLabel={t("noDataPeriod")}
+                  itemsLabel={t("items")}
+                />
               </section>
 
               {/* ── Tabbed breakdown sections ── */}
-              <section className="settings-card expenses-report-breakdown" aria-label="Detailed breakdowns">
+              <section className="settings-card expenses-report-breakdown" aria-label={t("detailedBreakdowns")}>
                 <header className="expenses-report-card-header">
-                  <h2 className="section-title">Detailed Breakdowns</h2>
+                  <h2 className="section-title">{t("detailedBreakdowns")}</h2>
                 </header>
 
-                <section className="page-tabs" aria-label="Breakdown tabs">
+                <section className="page-tabs" aria-label={t("breakdownAriaLabel")}>
                   <button
                     type="button"
                     className={activeTab === "employee" ? "page-tab page-tab-active" : "page-tab"}
                     onClick={() => setActiveTab("employee")}
                   >
-                    By Employee
+                    {t("byEmployee")}
                   </button>
                   <button
                     type="button"
                     className={activeTab === "category" ? "page-tab page-tab-active" : "page-tab"}
                     onClick={() => setActiveTab("category")}
                   >
-                    By Category
+                    {t("byCategory")}
                   </button>
                   <button
                     type="button"
                     className={activeTab === "department" ? "page-tab page-tab-active" : "page-tab"}
                     onClick={() => setActiveTab("department")}
                   >
-                    By Department
+                    {t("byDepartment")}
                   </button>
                 </section>
 
                 <div className="expenses-report-tab-panel">
                   {activeTab === "employee" && (
-                    <EmployeeTable rows={reportsQuery.data.enhancedByEmployee} currency={reportsQuery.data.primaryCurrency} />
+                    <EmployeeTable rows={reportsQuery.data.enhancedByEmployee} currency={reportsQuery.data.primaryCurrency} t={td} />
                   )}
                   {activeTab === "category" && (
-                    <CategoryTable rows={reportsQuery.data.enhancedByCategory} currency={reportsQuery.data.primaryCurrency} />
+                    <CategoryTable rows={reportsQuery.data.enhancedByCategory} currency={reportsQuery.data.primaryCurrency} t={td} />
                   )}
                   {activeTab === "department" && (
-                    <DepartmentTable rows={reportsQuery.data.enhancedByDepartment} currency={reportsQuery.data.primaryCurrency} />
+                    <DepartmentTable rows={reportsQuery.data.enhancedByDepartment} currency={reportsQuery.data.primaryCurrency} t={td} />
                   )}
                 </div>
               </section>

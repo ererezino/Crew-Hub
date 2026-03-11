@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 type ShortcutEntry = {
   keys: string[];
@@ -12,29 +13,30 @@ type ShortcutGroup = {
   shortcuts: ShortcutEntry[];
 };
 
-const SHORTCUT_GROUPS: ShortcutGroup[] = [
-  {
-    label: "Navigation",
-    shortcuts: [
-      { keys: ["g", "h"], description: "Go to Dashboard" },
-      { keys: ["g", "a"], description: "Go to Approvals" },
-      { keys: ["g", "p"], description: "Go to People" },
-      { keys: ["g", "s"], description: "Go to Scheduling" },
-      { keys: ["g", "t"], description: "Go to Team Hub" }
-    ]
-  },
-  {
-    label: "Actions",
-    shortcuts: [{ keys: ["n"], description: "New (context-sensitive)" }]
-  },
-  {
-    label: "Help",
-    shortcuts: [{ keys: ["?"], description: "Show this dialog" }]
-  }
-];
-
 export function KeyboardShortcutsModal() {
+  const t = useTranslations("shortcuts");
   const [isVisible, setIsVisible] = useState(false);
+
+  const shortcutGroups = useMemo<ShortcutGroup[]>(() => [
+    {
+      label: t("group.navigation"),
+      shortcuts: [
+        { keys: ["g", "h"], description: t("action.goToDashboard") },
+        { keys: ["g", "a"], description: t("action.goToApprovals") },
+        { keys: ["g", "p"], description: t("action.goToPeople") },
+        { keys: ["g", "s"], description: t("action.goToScheduling") },
+        { keys: ["g", "t"], description: t("action.goToTeamHub") }
+      ]
+    },
+    {
+      label: t("group.actions"),
+      shortcuts: [{ keys: ["n"], description: t("action.new") }]
+    },
+    {
+      label: t("group.help"),
+      shortcuts: [{ keys: ["?"], description: t("action.showHelp") }]
+    }
+  ], [t]);
 
   const close = useCallback(() => {
     setIsVisible(false);
@@ -74,16 +76,16 @@ export function KeyboardShortcutsModal() {
         className="keyboard-shortcuts-modal modal-dialog"
         role="dialog"
         aria-modal="true"
-        aria-label="Keyboard shortcuts"
+        aria-label={t("ariaLabel")}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="keyboard-shortcuts-header">
-          <h2 className="modal-title">Keyboard Shortcuts</h2>
+          <h2 className="modal-title">{t("title")}</h2>
           <button
             type="button"
             className="icon-button"
             onClick={close}
-            aria-label="Close"
+            aria-label={t("closeLabel")}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" style={{ width: 18, height: 18 }}>
               <path
@@ -97,7 +99,7 @@ export function KeyboardShortcutsModal() {
         </div>
 
         <div className="keyboard-shortcuts-body">
-          {SHORTCUT_GROUPS.map((group) => (
+          {shortcutGroups.map((group) => (
             <div key={group.label} className="keyboard-shortcuts-group">
               <h3 className="keyboard-shortcuts-group-label">{group.label}</h3>
               <ul className="keyboard-shortcuts-list">
@@ -107,7 +109,7 @@ export function KeyboardShortcutsModal() {
                       {shortcut.keys.map((key, index) => (
                         <span key={index}>
                           {index > 0 ? (
-                            <span className="keyboard-shortcuts-separator">then</span>
+                            <span className="keyboard-shortcuts-separator">{t("separator")}</span>
                           ) : null}
                           <kbd className="keyboard-shortcuts-kbd">{key}</kbd>
                         </span>

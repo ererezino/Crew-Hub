@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
@@ -19,18 +21,21 @@ function canManagePayroll(roles: readonly UserRole[]): boolean {
 
 export default async function PayrollRunCreatePage() {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("payrollPage");
+  const tCommon = await getTranslations("common");
+  const tSettings = await getTranslations("payrollSettings");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Create Payroll Run"
-          description="Define pay period and pay date for a new payroll run."
+          title={t("createTitle")}
+          description={t("createDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
-          ctaLabel="Back to payroll"
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
+          ctaLabel={tSettings("backToPayroll")}
           ctaHref="/payroll"
         />
       </>
@@ -41,12 +46,12 @@ export default async function PayrollRunCreatePage() {
     return (
       <>
         <PageHeader
-          title="Create Payroll Run"
-          description="Define pay period and pay date for a new payroll run."
+          title={t("createTitle")}
+          description={t("createDescription")}
         />
         <EmptyState
-          title="Access denied"
-          description="Only HR Admin, Finance Admin, and Super Admin can view payroll modules."
+          title={tCommon("emptyState.accessDenied")}
+          description={t("accessDeniedModules")}
         />
       </>
     );
@@ -56,13 +61,13 @@ export default async function PayrollRunCreatePage() {
     return (
       <>
         <PageHeader
-          title="Create Payroll Run"
-          description="Define pay period and pay date for a new payroll run."
+          title={t("createTitle")}
+          description={t("createDescription")}
         />
         <EmptyState
-          title="Access denied"
-          description="Only Finance Admin and Super Admin can create payroll runs."
-          ctaLabel="Back to payroll"
+          title={tCommon("emptyState.accessDenied")}
+          description={t("createAccessDenied")}
+          ctaLabel={tSettings("backToPayroll")}
           ctaHref="/payroll"
         />
       </>

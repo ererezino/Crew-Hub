@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
@@ -15,17 +17,19 @@ function canViewAnalytics(roles: readonly UserRole[]): boolean {
 
 export default async function AnalyticsPage() {
   const session = await getAuthenticatedSession();
+  const tNav = await getTranslations('nav');
 
   if (!session?.profile) {
+    const t = await getTranslations('common');
     return (
       <>
         <PageHeader
-          title="Analytics"
-          description="Workforce and operations trends with filters and exports."
+          title={tNav('analytics')}
+          description={tNav('description.analytics')}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={t('emptyState.profileUnavailable')}
+          description={t('emptyState.profileUnavailableBody')}
         />
       </>
     );
@@ -34,15 +38,17 @@ export default async function AnalyticsPage() {
   const userRoles = normalizeUserRoles(session.profile.roles);
 
   if (!canViewAnalytics(userRoles)) {
+    const t = await getTranslations('common');
+    const tAnalytics = await getTranslations('analyticsPage');
     return (
       <>
         <PageHeader
-          title="Analytics"
-          description="Workforce and operations trends with filters and exports."
+          title={tNav('analytics')}
+          description={tNav('description.analytics')}
         />
         <EmptyState
-          title="Access denied"
-          description="Only HR Admin, Finance Admin, and Super Admin can access analytics."
+          title={t('emptyState.accessDenied')}
+          description={tAnalytics('accessDenied')}
         />
       </>
     );

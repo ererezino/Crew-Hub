@@ -225,6 +225,7 @@ export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
   const canViewTeam = canViewTeamSchedules(session.profile.roles);
   const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isManager = isSchedulingManager(session.profile.roles);
   const scope = query.scope === "team" && canViewTeam ? "team" : "mine";
 
   if (isScopedTeamLead && !session.profile.department) {
@@ -312,6 +313,16 @@ export async function GET(request: Request) {
     schedulesQuery = schedulesQuery.in("id", scheduleIdsForMine);
   } else if (scope === "team" && isScopedTeamLead) {
     schedulesQuery = schedulesQuery.ilike("department", session.profile.department as string);
+  } else if (scope === "team" && !isManager) {
+    if (!session.profile.department) {
+      return jsonResponse<SchedulingSchedulesResponseData>(200, {
+        data: { schedules: [] },
+        error: null,
+        meta: buildMeta()
+      });
+    }
+
+    schedulesQuery = schedulesQuery.ilike("department", session.profile.department);
   }
 
   const { data: rawRows, error } = await schedulesQuery;

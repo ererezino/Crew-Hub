@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useMemo } from "react";
 import {
@@ -17,11 +18,13 @@ import { EmptyState } from "../../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../../components/shared/status-badge";
 import { useSurveyResults } from "../../../../../../hooks/use-surveys";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../../../../../lib/datetime";
+import { formatDateTimeTooltip, formatMonth, formatRelativeTime } from "../../../../../../lib/datetime";
 import type {
   SurveyHeatmapData,
   SurveyTrendData
 } from "../../../../../../types/surveys";
+
+type AppLocale = "en" | "fr";
 
 // ── Helpers ──
 
@@ -43,20 +46,11 @@ function heatmapCellClass(score: number | null, isProtected: boolean): string {
   return "heatmap-cell-green";
 }
 
-function trendArrow(direction: "up" | "down" | "flat"): string {
-  switch (direction) {
-    case "up":
-      return "↑ up";
-    case "down":
-      return "↓ down";
-    case "flat":
-      return "→ flat";
-  }
-}
-
 // ── Heatmap Component ──
 
 function SentimentHeatmap({ heatmap }: { heatmap: SurveyHeatmapData }) {
+  const t = useTranslations('surveyResults');
+
   const cellLookup = useMemo(() => {
     const map = new Map<string, { averageScore: number | null; responseCount: number; protected: boolean }>();
 
@@ -71,18 +65,18 @@ function SentimentHeatmap({ heatmap }: { heatmap: SurveyHeatmapData }) {
     <article className="settings-card">
       <header className="announcement-item-header">
         <div>
-          <h2 className="section-title">Sentiment heatmap</h2>
+          <h2 className="section-title">{t('heatmapTitle')}</h2>
           <p className="settings-card-description">
-            Average score by department and question. Cells with insufficient responses show &quot;-&quot;.
+            {t('heatmapDescription')}
           </p>
         </div>
       </header>
 
       <div className="survey-heatmap-container">
-        <table className="survey-heatmap" aria-label="Sentiment heatmap">
+        <table className="survey-heatmap" aria-label={t('heatmapAriaLabel')}>
           <thead>
             <tr>
-              <th>Department</th>
+              <th>{t('department')}</th>
               {heatmap.questions.map((q) => (
                 <th key={q.id} title={q.text}>
                   {q.text.length > 30 ? `${q.text.slice(0, 27)}...` : q.text}
@@ -104,7 +98,7 @@ function SentimentHeatmap({ heatmap }: { heatmap: SurveyHeatmapData }) {
                     <td
                       key={`${dept}-${q.id}`}
                       className={heatmapCellClass(score, isProtected)}
-                      title={isProtected ? `${count} responses (below threshold)` : `${count} responses`}
+                      title={isProtected ? t('responsesBelow', { count }) : t('responsesCount', { count })}
                     >
                       {isProtected || score === null ? "-" : score.toFixed(1)}
                     </td>
@@ -122,6 +116,20 @@ function SentimentHeatmap({ heatmap }: { heatmap: SurveyHeatmapData }) {
 // ── Trend Chart Component ──
 
 function TrendChart({ trend }: { trend: SurveyTrendData }) {
+  const t = useTranslations('surveyResults');
+  const locale = useLocale() as AppLocale;
+
+  const trendDirectionLabel = useMemo(() => {
+    switch (trend.trendDirection) {
+      case "up":
+        return t('trendUp');
+      case "down":
+        return t('trendDown');
+      case "flat":
+        return t('trendFlat');
+    }
+  }, [trend.trendDirection, t]);
+
   // Build chart data: each point is { closedAt, [questionText]: averageScore }
   const { chartData, questionLabels } = useMemo(() => {
     const instanceMap = new Map<string, Record<string, unknown>>();
@@ -134,10 +142,7 @@ function TrendChart({ trend }: { trend: SurveyTrendData }) {
         instanceMap.set(key, {
           closedAt: point.closedAt,
           label: point.closedAt
-            ? new Date(point.closedAt + "T00:00:00.000Z").toLocaleDateString("en-US", {
-                month: "short",
-                year: "numeric"
-              })
+            ? formatMonth(point.closedAt, locale)
             : point.surveyId.slice(0, 8)
         });
       }
@@ -155,16 +160,15 @@ function TrendChart({ trend }: { trend: SurveyTrendData }) {
       chartData: [...instanceMap.values()],
       questionLabels: [...labels]
     };
-  }, [trend.points]);
+  }, [trend.points, locale]);
 
   return (
     <article className="settings-card">
       <header className="announcement-item-header">
         <div>
-          <h2 className="section-title">Score trend</h2>
+          <h2 className="section-title">{t('trendTitle')}</h2>
           <p className="survey-trend-summary">
-            {trend.instanceCount} survey instances, average score trending{" "}
-            <strong>{trendArrow(trend.trendDirection)}</strong>
+            {t('trendSummary', { count: trend.instanceCount, direction: trendDirectionLabel })}
           </p>
         </div>
       </header>
@@ -224,6 +228,10 @@ function surveyResultsSkeleton() {
 // ── Main ──
 
 export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
+  const t = useTranslations('surveyResults');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const resultsQuery = useSurveyResults(surveyId);
   const survey = resultsQuery.data?.survey;
   const isProtected = resultsQuery.data?.protected ?? false;
@@ -231,19 +239,19 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
   return (
     <>
       <PageHeader
-        title={survey?.title?.length ? `${survey.title} Results` : "Survey Results"}
-        description="Review response coverage, question trends, and export data for analysis."
+        title={survey?.title?.length ? t('titleWithName', { title: survey.title }) : t('fallbackTitle')}
+        description={t('description')}
         actions={
           <>
             <Link href="/admin/surveys" className="button">
-              Back to admin
+              {t('backToAdmin')}
             </Link>
             {!isProtected ? (
               <a
                 href={`/api/v1/surveys/${surveyId}/results/export`}
                 className="button button-accent"
               >
-                Export CSV
+                {t('exportCsv')}
               </a>
             ) : null}
           </>
@@ -255,9 +263,9 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
       {!resultsQuery.isLoading && resultsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Survey results are unavailable"
+            title={t('unavailable')}
             description={resultsQuery.errorMessage}
-            ctaLabel="Back to survey admin"
+            ctaLabel={t('backToSurveyAdmin')}
             ctaHref="/admin/surveys"
           />
           <button
@@ -265,50 +273,50 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
             className="button button-accent"
             onClick={() => resultsQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!resultsQuery.isLoading && !resultsQuery.errorMessage && !survey?.id ? (
         <EmptyState
-          title="Survey not found"
-          description="The selected survey was not found or may no longer exist."
-          ctaLabel="Back to survey admin"
+          title={t('notFound')}
+          description={t('notFoundDescription')}
+          ctaLabel={t('backToSurveyAdmin')}
           ctaHref="/admin/surveys"
         />
       ) : null}
 
       {!resultsQuery.isLoading && !resultsQuery.errorMessage && survey?.id ? (
-        <section className="compensation-layout" aria-label="Survey results overview">
+        <section className="compensation-layout" aria-label={t('overviewAriaLabel')}>
           {/* ── Metrics ── */}
           <section className="metric-grid">
             <article className="metric-card">
-              <p className="metric-label">Responses</p>
+              <p className="metric-label">{t('responses')}</p>
               <p className="metric-value numeric">{resultsQuery.data?.totalResponses ?? 0}</p>
-              <p className="metric-description">Total submitted responses.</p>
+              <p className="metric-description">{t('responsesDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Min threshold</p>
+              <p className="metric-label">{t('minThreshold')}</p>
               <p className="metric-value numeric">{resultsQuery.data?.minResponsesForResults ?? 0}</p>
-              <p className="metric-description">Responses required to reveal analytics.</p>
+              <p className="metric-description">{t('minThresholdDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Question count</p>
+              <p className="metric-label">{t('questionCount')}</p>
               <p className="metric-value numeric">{survey.questions.length}</p>
-              <p className="metric-description">Questions configured in this survey.</p>
+              <p className="metric-description">{t('questionCountDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Status</p>
+              <p className="metric-label">{t('status')}</p>
               <p className="metric-value">
                 <StatusBadge tone={resultsQuery.data?.hasMinimumResponses ? "success" : "warning"}>
-                  {isProtected ? "Protected" : resultsQuery.data?.hasMinimumResponses ? "Visible" : "Hidden"}
+                  {isProtected ? t('statusProtected') : resultsQuery.data?.hasMinimumResponses ? t('statusVisible') : t('statusHidden')}
                 </StatusBadge>
               </p>
               <p className="metric-description">
                 {isProtected
-                  ? "Results protected by anonymity."
-                  : "Result visibility based on anonymity threshold."}
+                  ? t('statusProtectedDescription')
+                  : t('statusThresholdDescription')}
               </p>
             </article>
           </section>
@@ -317,20 +325,16 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
           <article className="settings-card">
             <header className="announcement-item-header">
               <div>
-                <h2 className="section-title">Survey metadata</h2>
+                <h2 className="section-title">{t('metadata')}</h2>
                 <p className="settings-card-description">
-                  Type: {survey.type} • Created {formatRelativeTime(survey.createdAt)}
-                  {survey.isAnonymous ? " • Anonymous" : ""}
+                  {t('metadataType', { type: survey.type })} • {t('metadataCreated', { date: formatRelativeTime(survey.createdAt, locale) })}
+                  {survey.isAnonymous ? ` • ${t('anonymous')}` : ""}
                 </p>
               </div>
               <StatusBadge tone="info">{survey.status}</StatusBadge>
             </header>
             <p className="metric-description">
-              Last updated{" "}
-              <time dateTime={survey.updatedAt} title={formatDateTimeTooltip(survey.updatedAt)}>
-                {formatRelativeTime(survey.updatedAt)}
-              </time>
-              .
+              {t('lastUpdated', { date: formatRelativeTime(survey.updatedAt, locale) })}
             </p>
           </article>
 
@@ -338,7 +342,7 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
           {isProtected ? (
             <article className="settings-card">
               <p className="form-submit-error">
-                {resultsQuery.data?.message ?? "Not enough responses to display results."}
+                {resultsQuery.data?.message ?? t('protectedMessage')}
               </p>
             </article>
           ) : null}
@@ -368,7 +372,7 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
                   <div>
                     <h2 className="section-title">{questionResult.questionText}</h2>
                     <p className="settings-card-description">
-                      Responses: <span className="numeric">{questionResult.responseCount}</span>
+                      {t('questionResponses', { count: questionResult.responseCount })}
                     </p>
                   </div>
                   <StatusBadge tone="processing">{questionResult.questionType}</StatusBadge>
@@ -376,17 +380,17 @@ export function SurveyResultsClient({ surveyId }: { surveyId: string }) {
 
                 {questionResult.questionType === "rating" ? (
                   <p className="metric-description">
-                    Average score: <span className="numeric">{questionResult.averageScore ?? "--"}</span>
+                    {t('averageScore', { score: questionResult.averageScore ?? "--" })}
                   </p>
                 ) : null}
 
                 {questionResult.optionBreakdown.length > 0 ? (
                   <div className="data-table-container">
-                    <table className="data-table" aria-label={`Breakdown for ${questionResult.questionText}`}>
+                    <table className="data-table" aria-label={t('breakdownAriaLabel', { question: questionResult.questionText })}>
                       <thead>
                         <tr>
-                          <th>Option</th>
-                          <th>Count</th>
+                          <th>{t('optionColumn')}</th>
+                          <th>{t('countColumn')}</th>
                         </tr>
                       </thead>
                       <tbody>

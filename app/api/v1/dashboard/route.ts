@@ -105,6 +105,7 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     expiringDocuments: null,
     payroll: null,
     pendingExpenseApprovals: null,
+    expenseSpendSummary: null,
     expensePipeline: null,
     headcountByCountry: null,
     headcountByDept: null,
@@ -187,6 +188,7 @@ function applyWidgetVisibility(
   if (!allowedWidgetKeys.has("expense_widget")) {
     response.recentExpenses = [];
     response.pendingExpenseApprovals = null;
+    response.expenseSpendSummary = null;
     response.expensePipeline = null;
   }
 
@@ -903,6 +905,86 @@ async function fetchPendingExpenseApprovals(
   }
 }
 
+async function fetchExpenseSpendSummary(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<{
+  monthToDate: number;
+  yearToDate: number;
+  currency: string;
+  mixedCurrency: boolean;
+}> {
+  try {
+    const now = new Date();
+    const today = toDateString(now);
+    const yearStart = `${now.getUTCFullYear()}-01-01`;
+    const monthStart = `${today.slice(0, 7)}-01`;
+
+    const { data, error } = await supabase
+      .from("expenses")
+      .select("amount, currency, expense_date")
+      .eq("org_id", orgId)
+      .eq("status", "reimbursed")
+      .gte("expense_date", yearStart)
+      .lte("expense_date", today)
+      .is("deleted_at", null);
+
+    if (error || !data || data.length === 0) {
+      return {
+        monthToDate: 0,
+        yearToDate: 0,
+        currency: "USD",
+        mixedCurrency: false
+      };
+    }
+
+    const currencyCounts = new Map<string, number>();
+    for (const row of data) {
+      const currency = typeof row.currency === "string" && row.currency.trim()
+        ? row.currency.trim().toUpperCase()
+        : "USD";
+      currencyCounts.set(currency, (currencyCounts.get(currency) ?? 0) + 1);
+    }
+
+    const primaryCurrency = [...currencyCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
+    const mixedCurrency = currencyCounts.size > 1;
+
+    let yearToDate = 0;
+    let monthToDate = 0;
+
+    for (const row of data) {
+      const currency = typeof row.currency === "string" && row.currency.trim()
+        ? row.currency.trim().toUpperCase()
+        : "USD";
+
+      if (currency !== primaryCurrency) {
+        continue;
+      }
+
+      const amount = typeof row.amount === "number" ? row.amount : 0;
+      yearToDate += amount;
+
+      if (typeof row.expense_date === "string" && row.expense_date >= monthStart) {
+        monthToDate += amount;
+      }
+    }
+
+    return {
+      monthToDate,
+      yearToDate,
+      currency: primaryCurrency,
+      mixedCurrency
+    };
+  } catch {
+    return {
+      monthToDate: 0,
+      yearToDate: 0,
+      currency: "USD",
+      mixedCurrency: false
+    };
+  }
+}
+
 async function fetchExpensePipeline(
   supabase: SupabaseClient,
   orgId: string
@@ -1404,6 +1486,7 @@ export async function GET() {
           pendingApprovals,
           pendingApprovalItems,
           payroll,
+          expenseSpendSummary,
           complianceDeadlines,
           complianceHealth,
           recentAuditLog,
@@ -1418,6 +1501,7 @@ export async function GET() {
           fetchPendingApprovals(supabase, profile.org_id, profile.id, managerReports),
           fetchPendingApprovalItems(supabase, profile.org_id, profile.id, managerReports),
           fetchPayrollStatus(supabase, profile.org_id),
+          fetchExpenseSpendSummary(supabase, profile.org_id),
           fetchComplianceDeadlines(supabase, profile.org_id),
           fetchComplianceHealth(supabase, profile.org_id),
           fetchRecentAuditLog(supabase, profile.org_id),
@@ -1433,6 +1517,7 @@ export async function GET() {
         response.pendingApprovals = pendingApprovals;
         response.pendingApprovalItems = pendingApprovalItems;
         response.payroll = payroll;
+        response.expenseSpendSummary = expenseSpendSummary;
         response.complianceDeadlines = complianceDeadlines;
         response.complianceHealth = complianceHealth;
         response.recentAuditLog = recentAuditLog;

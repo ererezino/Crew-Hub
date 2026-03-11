@@ -27,6 +27,7 @@ export type SessionProfile = {
   start_date: string | null;
   employment_type: string | null;
   status: "active" | "inactive" | "onboarding" | "offboarding";
+  preferred_locale: string;
 };
 
 export type AuthenticatedSession = {
@@ -227,7 +228,7 @@ const getAuthenticatedSessionInternal = cache(
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select(
-        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, start_date, employment_type, status"
+        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, start_date, employment_type, status, preferred_locale"
       )
       .eq("id", user.id)
       .is("deleted_at", null)
@@ -264,7 +265,8 @@ const getAuthenticatedSessionInternal = cache(
       country_code: profileData.country_code,
       start_date: profileData.start_date,
       employment_type: profileData.employment_type,
-      status: profileData.status
+      status: profileData.status,
+      preferred_locale: profileData.preferred_locale ?? "en"
     };
 
     if (!includeOrg) {

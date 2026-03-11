@@ -11,6 +11,8 @@ import {
   useState
 } from "react";
 
+import { useLocale, useTranslations } from "next-intl";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -29,6 +31,8 @@ import type {
 import type { DocumentSignedUrlResponse } from "../../../types/documents";
 import { PenSquare } from "lucide-react";
 import { humanizeError } from "@/lib/errors";
+
+type AppLocale = "en" | "fr";
 
 type SignaturesClientProps = {
   currentUserId: string;
@@ -65,11 +69,13 @@ type ToastMessage = {
   message: string;
 };
 
-const tabs: Array<{ id: SignatureTab; label: string }> = [
-  { id: "pending_action", label: "Needs my signature" },
-  { id: "sent_by_me", label: "Sent by me" },
-  { id: "completed", label: "Completed" }
-];
+const TAB_IDS: SignatureTab[] = ["pending_action", "sent_by_me", "completed"];
+
+const TAB_LABEL_KEYS: Record<SignatureTab, string> = {
+  pending_action: "tabPending",
+  sent_by_me: "tabSentByMe",
+  completed: "tabCompleted"
+};
 
 const INITIAL_FORM_VALUES: CreateFormValues = {
   documentId: "",
@@ -132,34 +138,6 @@ function statusTone(
   return "error";
 }
 
-function statusLabel(status: SignatureRequestRecord["status"]): string {
-  if (status === "partially_signed") {
-    return "Partially signed";
-  }
-
-  return status.replaceAll("_", " ");
-}
-
-function validateCreateForm(values: CreateFormValues): CreateFormErrors {
-  const errors: CreateFormErrors = {};
-
-  if (!values.documentId.trim()) {
-    errors.documentId = "Select a document.";
-  }
-
-  if (!values.title.trim()) {
-    errors.title = "Title is required.";
-  } else if (values.title.trim().length > 200) {
-    errors.title = "Title must be 200 characters or fewer.";
-  }
-
-  if (values.signerUserIds.length === 0) {
-    errors.signerUserIds = "Select at least one signer.";
-  }
-
-  return errors;
-}
-
 function hasCreateFormErrors(errors: CreateFormErrors): boolean {
   return Boolean(errors.documentId || errors.title || errors.signerUserIds);
 }
@@ -168,6 +146,11 @@ export function SignaturesClient({
   currentUserId,
   canManageSignatures
 }: SignaturesClientProps) {
+  const t = useTranslations('signatures');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const signatures = useSignatures({
     scope: canManageSignatures ? "all" : "mine"
   });
@@ -214,6 +197,34 @@ export function SignaturesClient({
   );
   const isSignerOptionsLoading = signerPeople.isLoading;
   const signerOptionsError = signerPeople.errorMessage;
+
+  const statusLabel = (status: SignatureRequestRecord["status"]): string => {
+    if (status === "partially_signed") {
+      return t('statusPartially');
+    }
+
+    return status.replaceAll("_", " ");
+  };
+
+  const validateCreateForm = (values: CreateFormValues): CreateFormErrors => {
+    const errors: CreateFormErrors = {};
+
+    if (!values.documentId.trim()) {
+      errors.documentId = t('documentError');
+    }
+
+    if (!values.title.trim()) {
+      errors.title = t('titleError');
+    } else if (values.title.trim().length > 200) {
+      errors.title = t('titleTooLong');
+    }
+
+    if (values.signerUserIds.length === 0) {
+      errors.signerUserIds = t('signerSelectError');
+    }
+
+    return errors;
+  };
 
   const dismissToast = (toastId: string) => {
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
@@ -300,13 +311,13 @@ export function SignaturesClient({
       const payload = (await response.json()) as DocumentSignedUrlResponse;
 
       if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? "Unable to open document.");
+        showToast("error", payload.error?.message ?? t('toastDocumentError'));
         return;
       }
 
       window.open(payload.data.url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to open document.");
+      showToast("error", error instanceof Error ? error.message : t('toastDocumentError'));
     } finally {
       setIsOpeningByRequestId((currentState) => {
         const nextState = { ...currentState };
@@ -438,15 +449,15 @@ export function SignaturesClient({
       const payload = (await response.json()) as SignSignatureResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to submit signature.");
+        showToast("error", payload.error?.message ?? t('toastSignatureError'));
         return;
       }
 
-      showToast("success", "Signature recorded.");
+      showToast("success", t('toastSignatureRecorded'));
       closeSigningPanel();
       signatures.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to submit signature.");
+      showToast("error", error instanceof Error ? error.message : t('toastSignatureError'));
     } finally {
       setIsSubmittingSignature(false);
     }
@@ -481,17 +492,17 @@ export function SignaturesClient({
       const payload = (await response.json()) as CreateSignatureRequestResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to create signature request.");
+        showToast("error", payload.error?.message ?? t('toastRequestError'));
         return;
       }
 
-      showToast("success", "Signature request sent.");
+      showToast("success", t('toastRequestSent'));
       closeCreatePanel();
       signatures.refresh();
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to create signature request."
+        error instanceof Error ? error.message : t('toastRequestError')
       );
     } finally {
       setIsSubmittingCreate(false);
@@ -501,8 +512,8 @@ export function SignaturesClient({
   return (
     <>
       <PageHeader
-        title="Signatures"
-        description="Request, sign, and track documents with signer timelines."
+        title={t('title')}
+        description={t('description')}
         actions={
           canManageSignatures ? (
             <button
@@ -510,7 +521,7 @@ export function SignaturesClient({
               className="button button-accent"
               onClick={() => setIsPanelOpen(true)}
             >
-              New signature request
+              {t('newRequest')}
             </button>
           ) : null
         }
@@ -518,18 +529,18 @@ export function SignaturesClient({
 
       <FeatureBanner
         moduleId="signatures"
-        description="Signatures is built but not yet included in the active release. Requests here are preview-only."
+        description={t('featureBanner')}
       />
 
-      <section className="page-tabs" aria-label="Signature request filters">
-        {tabs.map((tab) => (
+      <section className="page-tabs" aria-label={t('tabsAriaLabel')}>
+        {TAB_IDS.map((tabId) => (
           <button
-            key={tab.id}
+            key={tabId}
             type="button"
-            className={activeTab === tab.id ? "page-tab page-tab-active" : "page-tab"}
-            onClick={() => setActiveTab(tab.id)}
+            className={activeTab === tabId ? "page-tab page-tab-active" : "page-tab"}
+            onClick={() => setActiveTab(tabId)}
           >
-            {tab.label}
+            {td(TAB_LABEL_KEYS[tabId])}
           </button>
         ))}
       </section>
@@ -538,9 +549,9 @@ export function SignaturesClient({
 
       {!signatures.isLoading && signatures.errorMessage ? (
         <EmptyState
-          title="Signatures are unavailable"
+          title={t('unavailable')}
           description={signatures.errorMessage}
-          ctaLabel="Retry"
+          ctaLabel={t('retry')}
           ctaHref="/signatures"
         />
       ) : null}
@@ -549,11 +560,11 @@ export function SignaturesClient({
         <>
           <EmptyState
             icon={<PenSquare size={32} />}
-            title="No signatures pending"
+            title={t('noPendingTitle')}
             description={
               canManageSignatures
-                ? "Create your first signature request to collect acknowledgements digitally."
-                : "You do not have pending signature requests right now."
+                ? t('noPendingManager')
+                : t('noPendingEmployee')
             }
           />
           {canManageSignatures ? (
@@ -562,7 +573,7 @@ export function SignaturesClient({
               className="button button-accent"
               onClick={() => setIsPanelOpen(true)}
             >
-              New signature request
+              {t('newRequest')}
             </button>
           ) : null}
         </>
@@ -570,13 +581,13 @@ export function SignaturesClient({
 
       {!signatures.isLoading && !signatures.errorMessage && visibleRequests.length > 0 ? (
         <div className="data-table-container">
-          <table className="data-table" aria-label="Signature requests table">
+          <table className="data-table" aria-label={t('tabsAriaLabel')}>
             <thead>
               <tr>
-                <th>Request</th>
-                <th>Document</th>
-                <th>Signers</th>
-                <th>Status</th>
+                <th>{t('thRequest')}</th>
+                <th>{t('thDocument')}</th>
+                <th>{t('thSigners')}</th>
+                <th>{t('thStatus')}</th>
                 <th>
                   <button
                     type="button"
@@ -587,11 +598,11 @@ export function SignaturesClient({
                       )
                     }
                   >
-                    Created {createdSortDirection === "asc" ? "↑" : "↓"}
+                    {t('thCreated')} {createdSortDirection === "asc" ? t('sortAsc') : t('sortDesc')}
                   </button>
                 </th>
-                <th>Updated</th>
-                <th className="table-action-column">Actions</th>
+                <th>{t('thUpdated')}</th>
+                <th className="table-action-column">{t('thActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -610,7 +621,7 @@ export function SignaturesClient({
                       <div className="documents-cell-copy">
                         <p className="documents-cell-title">{requestRow.title}</p>
                         <p className="documents-cell-description">
-                          {requestRow.message || `Requested by ${requestRow.createdByName}`}
+                          {requestRow.message || t('requestedBy', { name: requestRow.createdByName })}
                         </p>
                       </div>
                     </td>
@@ -623,11 +634,11 @@ export function SignaturesClient({
                             .map((signer) => signer.signerName)
                             .join(", ")}
                           {requestRow.signers.length > 2
-                            ? ` +${requestRow.signers.length - 2} more`
+                            ? ` ${t('moreSigners', { count: requestRow.signers.length - 2 })}`
                             : ""}
                         </p>
                         <p className="signature-signers-meta numeric">
-                          {requestRow.pendingSignerCount} pending
+                          {t('pendingCount', { count: requestRow.pendingSignerCount })}
                         </p>
                       </div>
                     </td>
@@ -639,17 +650,17 @@ export function SignaturesClient({
                     <td>
                       <time
                         dateTime={requestRow.createdAt}
-                        title={formatDateTimeTooltip(requestRow.createdAt)}
+                        title={formatDateTimeTooltip(requestRow.createdAt, locale)}
                       >
-                        {formatRelativeTime(requestRow.createdAt)}
+                        {formatRelativeTime(requestRow.createdAt, locale)}
                       </time>
                     </td>
                     <td>
                       <time
                         dateTime={requestRow.updatedAt}
-                        title={formatDateTimeTooltip(requestRow.updatedAt)}
+                        title={formatDateTimeTooltip(requestRow.updatedAt, locale)}
                       >
-                        {formatRelativeTime(requestRow.updatedAt)}
+                        {formatRelativeTime(requestRow.updatedAt, locale)}
                       </time>
                     </td>
                     <td className="table-row-action-cell">
@@ -660,7 +671,7 @@ export function SignaturesClient({
                           onClick={() => void handleOpenDocument(requestRow)}
                           disabled={Boolean(isOpeningByRequestId[requestRow.id])}
                         >
-                          {isOpeningByRequestId[requestRow.id] ? "Opening..." : "Open doc"}
+                          {isOpeningByRequestId[requestRow.id] ? t('opening') : t('openDoc')}
                         </button>
                         {canSign ? (
                           <button
@@ -668,7 +679,7 @@ export function SignaturesClient({
                             className="table-row-action"
                             onClick={() => openSigningPanel(requestRow)}
                           >
-                            Sign
+                            {t('sign')}
                           </button>
                         ) : null}
                       </div>
@@ -684,13 +695,13 @@ export function SignaturesClient({
       {canManageSignatures ? (
         <SlidePanel
           isOpen={isPanelOpen}
-          title="New Signature Request"
-          description="Choose a document and assign signers. They will receive in-app and email notifications."
+          title={t('createPanelTitle')}
+          description={t('createPanelDescription')}
           onClose={closeCreatePanel}
         >
           <form className="slide-panel-form-wrapper" onSubmit={handleCreateSubmit} noValidate>
             <label className="form-field" htmlFor="signature-document-id">
-              <span className="form-label">Document</span>
+              <span className="form-label">{t('documentLabel')}</span>
               <select
                 id="signature-document-id"
                 className={createErrors.documentId ? "form-input form-input-error" : "form-input"}
@@ -712,7 +723,7 @@ export function SignaturesClient({
                 }}
                 disabled={documents.isLoading || isSubmittingCreate}
               >
-                <option value="">Select a document</option>
+                <option value="">{t('selectDocument')}</option>
                 {documents.documents.map((document) => (
                   <option key={document.id} value={document.id}>
                     {document.title}
@@ -725,7 +736,7 @@ export function SignaturesClient({
             </label>
 
             <label className="form-field" htmlFor="signature-request-title">
-              <span className="form-label">Request title</span>
+              <span className="form-label">{t('requestTitleLabel')}</span>
               <input
                 id="signature-request-title"
                 className={createErrors.title ? "form-input form-input-error" : "form-input"}
@@ -742,7 +753,7 @@ export function SignaturesClient({
             </label>
 
             <label className="form-field" htmlFor="signature-request-message">
-              <span className="form-label">Message (optional)</span>
+              <span className="form-label">{t('messageLabel')}</span>
               <textarea
                 id="signature-request-message"
                 className="form-input"
@@ -759,15 +770,15 @@ export function SignaturesClient({
             </label>
 
             <fieldset className="signature-signer-picker">
-              <legend className="form-label">Signers</legend>
+              <legend className="form-label">{t('signersLabel')}</legend>
               {isSignerOptionsLoading ? (
-                <p className="settings-card-description">Loading signer options...</p>
+                <p className="settings-card-description">{t('loadingSigners')}</p>
               ) : null}
               {!isSignerOptionsLoading && signerOptionsError ? (
                 <p className="form-field-error">{signerOptionsError}</p>
               ) : null}
               {!isSignerOptionsLoading && !signerOptionsError && signerOptions.length === 0 ? (
-                <p className="settings-card-description">No active signers are available.</p>
+                <p className="settings-card-description">{t('noSigners')}</p>
               ) : null}
               {!isSignerOptionsLoading && !signerOptionsError && signerOptions.length > 0 ? (
                 <div className="signature-signer-options">
@@ -782,7 +793,7 @@ export function SignaturesClient({
                       <span>
                         {signerOption.fullName}
                         <span className="signature-signer-option-meta">
-                          {signerOption.title || "Team member"}
+                          {signerOption.title || t('teamMember')}
                           {signerOption.department ? ` - ${signerOption.department}` : ""}
                         </span>
                       </span>
@@ -802,10 +813,10 @@ export function SignaturesClient({
                 onClick={closeCreatePanel}
                 disabled={isSubmittingCreate}
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button type="submit" className="button button-accent" disabled={isSubmittingCreate}>
-                {isSubmittingCreate ? "Sending..." : "Send request"}
+                {isSubmittingCreate ? t('sending') : t('sendRequest')}
               </button>
             </div>
           </form>
@@ -816,14 +827,14 @@ export function SignaturesClient({
       {signingRequest ? (
         <SlidePanel
           isOpen={Boolean(signingRequest)}
-          title={`Sign: ${signingRequest.title}`}
-          description={signingRequest.message || `Requested by ${signingRequest.createdByName}`}
+          title={t('signPanelTitle', { title: signingRequest.title })}
+          description={signingRequest.message || t('requestedBy', { name: signingRequest.createdByName })}
           onClose={closeSigningPanel}
         >
           <div className="slide-panel-form-wrapper">
             {/* Document info */}
             <div className="form-field">
-              <span className="form-label">Document</span>
+              <span className="form-label">{t('signPanelDocument')}</span>
               <p className="settings-card-description">{signingRequest.documentTitle}</p>
               <button
                 type="button"
@@ -832,13 +843,13 @@ export function SignaturesClient({
                 onClick={() => void handleOpenDocument(signingRequest)}
                 disabled={Boolean(isOpeningByRequestId[signingRequest.id])}
               >
-                {isOpeningByRequestId[signingRequest.id] ? "Opening..." : "View document"}
+                {isOpeningByRequestId[signingRequest.id] ? t('opening') : t('viewDocument')}
               </button>
             </div>
 
             {/* Signer status */}
             <div className="form-field">
-              <span className="form-label">Signers</span>
+              <span className="form-label">{t('signPanelSigners')}</span>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 {signingRequest.signers.map((signer) => (
                   <div
@@ -867,7 +878,7 @@ export function SignaturesClient({
                 }
                 onClick={() => setSignatureMode("draw")}
               >
-                Draw signature
+                {t('drawSignature')}
               </button>
               <button
                 type="button"
@@ -878,14 +889,14 @@ export function SignaturesClient({
                 }
                 onClick={() => setSignatureMode("type")}
               >
-                Type signature
+                {t('typeSignature')}
               </button>
             </div>
 
             {/* Draw mode */}
             {signatureMode === "draw" ? (
               <>
-                <p className="form-label">Draw your signature</p>
+                <p className="form-label">{t('drawLabel')}</p>
                 <div className="signature-canvas-container">
                   <canvas
                     ref={canvasRef}
@@ -904,19 +915,19 @@ export function SignaturesClient({
                   className="button button-ghost button-sm"
                   onClick={clearCanvas}
                 >
-                  Clear
+                  {t('clear')}
                 </button>
               </>
             ) : (
               <>
                 <label className="form-field" htmlFor="typed-signature-input">
-                  <span className="form-label">Type your full name as your signature</span>
+                  <span className="form-label">{t('typeLabel')}</span>
                   <input
                     id="typed-signature-input"
                     className="form-input"
                     value={typedSignature}
                     onChange={(e) => setTypedSignature(e.currentTarget.value)}
-                    placeholder="Your full name"
+                    placeholder={t('typePlaceholder')}
                     disabled={isSubmittingSignature}
                   />
                 </label>
@@ -938,7 +949,7 @@ export function SignaturesClient({
                 disabled={isSubmittingSignature}
               />
               <label htmlFor="signature-confirm-checkbox">
-                I confirm this is my electronic signature and I agree to the contents of this document.
+                {t('confirmLabel')}
               </label>
             </div>
 
@@ -950,7 +961,7 @@ export function SignaturesClient({
                 onClick={closeSigningPanel}
                 disabled={isSubmittingSignature}
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button
                 type="button"
@@ -958,7 +969,7 @@ export function SignaturesClient({
                 onClick={() => void handleSubmitSignature()}
                 disabled={!canSubmitSignature || isSubmittingSignature}
               >
-                {isSubmittingSignature ? "Submitting..." : "Submit signature"}
+                {isSubmittingSignature ? t('submittingSignature') : t('submitSignature')}
               </button>
             </div>
           </div>
@@ -974,7 +985,7 @@ export function SignaturesClient({
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss notification"
+                aria-label={t('dismissAriaLabel')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

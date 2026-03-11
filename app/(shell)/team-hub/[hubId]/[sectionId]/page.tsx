@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
@@ -13,17 +15,19 @@ type SectionPageProps = {
 
 export default async function SectionPage({ params }: SectionPageProps) {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("teamHubPage");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Section"
-          description="Browse pages in this section."
+          title={t("sectionTitle")}
+          description={t("sectionDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );

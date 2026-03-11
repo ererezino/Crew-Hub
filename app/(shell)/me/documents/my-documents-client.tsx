@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { DocumentUploadPanel } from "../../../../components/shared/document-upload-panel";
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -33,6 +34,8 @@ import type {
   TravelSupportUpdateResponse
 } from "../../../../types/travel-support";
 import { humanizeError } from "@/lib/errors";
+
+type AppLocale = "en" | "fr";
 
 type MyDocumentsClientProps = {
   currentUserId: string;
@@ -76,12 +79,13 @@ const INITIAL_TRAVEL_FORM: TravelRequestFormValues = {
   additionalNotes: ""
 };
 
-const tabs: Array<{ id: MyDocumentsTab; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "id_document", label: "ID Documents" },
-  { id: "tax_form", label: "Tax Forms" },
-  { id: "travel_letters", label: "Travel Letters" }
-];
+const TAB_IDS: MyDocumentsTab[] = ["all", "id_document", "tax_form", "travel_letters"];
+const TAB_KEYS: Record<MyDocumentsTab, string> = {
+  all: "tabs.all",
+  id_document: "tabs.idDocuments",
+  tax_form: "tabs.taxForms",
+  travel_letters: "tabs.travelLetters"
+};
 const ENTITY_COUNTRIES = ["USA", "Nigeria", "Canada", "Ghana", "South Africa"];
 
 function createToastId() {
@@ -92,33 +96,33 @@ function createToastId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function getExpiryStatus(expiryDate: string | null): { tone: StatusTone; label: string } {
+function getExpiryStatus(expiryDate: string | null): { tone: StatusTone; labelKey: string } {
   const remainingDays = daysUntilExpiry(expiryDate);
 
   if (remainingDays === null) {
     return {
       tone: "draft",
-      label: "No expiry"
+      labelKey: "expiryStatus.noExpiry"
     };
   }
 
   if (remainingDays < 0) {
     return {
       tone: "error",
-      label: "Expired"
+      labelKey: "expiryStatus.expired"
     };
   }
 
   if (remainingDays < 30) {
     return {
       tone: "warning",
-      label: "Expiring < 30d"
+      labelKey: "expiryStatus.expiringSoon"
     };
   }
 
   return {
     tone: "success",
-    label: "Active"
+    labelKey: "expiryStatus.active"
   };
 }
 
@@ -134,8 +138,8 @@ function getTravelStatusTone(status: TravelSupportRequest["status"]): StatusTone
   }
 }
 
-function formatTravelDate(dateString: string): string {
-  return formatDateShort(dateString);
+function formatTravelDate(dateString: string, locale?: AppLocale): string {
+  return formatDateShort(dateString, locale);
 }
 
 function MyDocumentsSkeleton() {
@@ -150,6 +154,12 @@ function MyDocumentsSkeleton() {
 }
 
 export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsClientProps) {
+  const t = useTranslations('myDocuments');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const tdCommon = tCommon as (key: string, params?: Record<string, unknown>) => string;
+
   const {
     documents,
     isLoading,
@@ -254,7 +264,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
     showToast(
       "success",
-      versionTarget ? "Document version uploaded." : "Document uploaded."
+      versionTarget ? t('toast.documentVersionUploaded') : t('toast.documentUploaded')
     );
     refresh();
   };
@@ -273,13 +283,13 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
       const payload = (await response.json()) as DocumentSignedUrlResponse;
 
       if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? "Unable to open document.");
+        showToast("error", payload.error?.message ?? t('toast.unableToOpenDocument'));
         return;
       }
 
       window.open(payload.data.url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to open document.");
+      showToast("error", error instanceof Error ? error.message : t('toast.unableToOpenDocument'));
     } finally {
       setIsOpeningFileById((currentState) => {
         const nextState = { ...currentState };
@@ -333,16 +343,16 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         const result = (await response.json()) as TravelSupportCreateResponse;
 
         if (!response.ok || !result.data) {
-          setTravelFormError(result.error?.message ?? "Unable to submit travel letter request.");
+          setTravelFormError(result.error?.message ?? t('toast.unableToSubmitTravel'));
           return;
         }
 
         setIsTravelPanelOpen(false);
-        showToast("success", "Travel support letter request submitted.");
+        showToast("success", t('toast.travelRequestSubmitted'));
         refreshTravel();
       } catch (error) {
         setTravelFormError(
-          error instanceof Error ? error.message : "Unable to submit travel letter request."
+          error instanceof Error ? error.message : t('toast.unableToSubmitTravel')
         );
       } finally {
         setIsSubmittingTravel(false);
@@ -364,7 +374,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         const payload = (await response.json()) as TravelSupportDownloadResponse;
 
         if (!response.ok || !payload.data?.url) {
-          showToast("error", payload.error?.message ?? "Unable to download travel letter.");
+          showToast("error", payload.error?.message ?? t('toast.unableToDownloadLetter'));
           return;
         }
 
@@ -372,7 +382,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
       } catch (error) {
         showToast(
           "error",
-          error instanceof Error ? error.message : "Unable to download travel letter."
+          error instanceof Error ? error.message : t('toast.unableToDownloadLetter')
         );
       } finally {
         setIsDownloadingById((prev) => {
@@ -432,18 +442,18 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         const result = (await response.json()) as TravelSupportUpdateResponse;
 
         if (!response.ok || !result.data) {
-          setApprovalError(result.error?.message ?? "Unable to approve request.");
+          setApprovalError(result.error?.message ?? t('toast.unableToApprove'));
           return;
         }
 
         setApprovalTarget(null);
-        showToast("success", "Travel support letter approved and generated.");
+        showToast("success", t('toast.travelApproved'));
         refreshPending();
         refreshTravel();
         refreshEntities();
       } catch (error) {
         setApprovalError(
-          error instanceof Error ? error.message : "Unable to approve request."
+          error instanceof Error ? error.message : t('toast.unableToApprove')
         );
       } finally {
         setIsApproving(false);
@@ -481,17 +491,17 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         const result = (await response.json()) as TravelSupportUpdateResponse;
 
         if (!response.ok || !result.data) {
-          setRejectionError(result.error?.message ?? "Unable to reject request.");
+          setRejectionError(result.error?.message ?? t('toast.unableToReject'));
           return;
         }
 
         setRejectionTarget(null);
-        showToast("info", "Travel support request rejected.");
+        showToast("info", t('toast.travelRejected'));
         refreshPending();
         refreshTravel();
       } catch (error) {
         setRejectionError(
-          error instanceof Error ? error.message : "Unable to reject request."
+          error instanceof Error ? error.message : t('toast.unableToReject')
         );
       } finally {
         setIsRejecting(false);
@@ -512,8 +522,8 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
   return (
     <>
       <PageHeader
-        title="My Documents"
-        description="Your documents, required records, and expiry reminders."
+        title={t('title')}
+        description={t('description')}
         actions={
           <>
             {showTravelView ? (
@@ -522,7 +532,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                 className="button button-accent"
                 onClick={openTravelPanel}
               >
-                Request Travel Letter
+                {t('actions.requestTravelLetter')}
               </button>
             ) : (
               <>
@@ -531,14 +541,14 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                   className="button"
                   onClick={openTravelPanel}
                 >
-                  Request Travel Letter
+                  {t('actions.requestTravelLetter')}
                 </button>
                 <button
                   type="button"
                   className="button button-accent"
                   onClick={() => setIsPanelOpen(true)}
                 >
-                  Upload document
+                  {t('actions.uploadDocument')}
                 </button>
               </>
             )}
@@ -546,15 +556,15 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         }
       />
 
-      <section className="page-tabs" aria-label="My document filters">
-        {tabs.map((tab) => (
+      <section className="page-tabs" aria-label={t('title')}>
+        {TAB_IDS.map((tabId) => (
           <button
-            key={tab.id}
+            key={tabId}
             type="button"
-            className={activeTab === tab.id ? "page-tab page-tab-active" : "page-tab"}
-            onClick={() => setActiveTab(tab.id)}
+            className={activeTab === tabId ? "page-tab page-tab-active" : "page-tab"}
+            onClick={() => setActiveTab(tabId)}
           >
-            {tab.label}
+            {td(TAB_KEYS[tabId])}
           </button>
         ))}
       </section>
@@ -566,7 +576,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
           {!isLoading && errorMessage ? (
             <ErrorState
-              title="My documents are unavailable"
+              title={t('errorTitle')}
               message={errorMessage}
               onRetry={refresh}
             />
@@ -575,8 +585,8 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
           {!isLoading && !errorMessage && visibleDocuments.length === 0 ? (
             <EmptyState
               icon={<FileText size={32} />}
-              title="No documents here"
-              description="Try another filter or upload a document to populate this list."
+              title={t('emptyState.documentsTitle')}
+              description={t('emptyState.documentsDescription')}
             />
           ) : null}
 
@@ -590,13 +600,13 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                     <article key={`${document.id}-mobile`} className="my-document-card">
                       <header className="my-document-card-header">
                         <h2 className="section-title">{document.title}</h2>
-                        <StatusBadge tone={expiryStatus.tone}>{expiryStatus.label}</StatusBadge>
+                        <StatusBadge tone={expiryStatus.tone}>{td(expiryStatus.labelKey)}</StatusBadge>
                       </header>
                       <p className="settings-card-description">
                         {getDocumentCategoryLabel(document.category)}
                       </p>
                       <p className="settings-card-description">
-                        {countryFlagFromCode(document.countryCode)} {countryNameFromCode(document.countryCode)}
+                        {countryFlagFromCode(document.countryCode)} {countryNameFromCode(document.countryCode, locale)}
                       </p>
                       <p className="settings-card-description numeric">
                         {formatFileSize(document.sizeBytes)}
@@ -608,7 +618,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                           onClick={() => handleOpenFile(document.id)}
                           disabled={Boolean(isOpeningFileById[document.id])}
                         >
-                          {isOpeningFileById[document.id] ? "Opening..." : "Open"}
+                          {isOpeningFileById[document.id] ? t('actions.opening') : t('actions.open')}
                         </button>
                         <button
                           type="button"
@@ -618,7 +628,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                             setIsPanelOpen(true);
                           }}
                         >
-                          New version
+                          {t('actions.newVersion')}
                         </button>
                       </div>
                     </article>
@@ -627,17 +637,17 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
               </div>
 
               <div className="data-table-container my-documents-desktop-table">
-                <table className="data-table" aria-label="My documents table">
+                <table className="data-table" aria-label={t('title')}>
                   <thead>
                     <tr>
-                      <th>Document</th>
-                      <th>Category</th>
-                      <th>Country</th>
-                      <th>Expiry</th>
-                      <th>Status</th>
-                      <th>Size</th>
-                      <th>Updated</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('table.document')}</th>
+                      <th>{t('table.category')}</th>
+                      <th>{t('table.country')}</th>
+                      <th>{t('table.expiry')}</th>
+                      <th>{t('table.status')}</th>
+                      <th>{t('table.size')}</th>
+                      <th>{t('table.updated')}</th>
+                      <th className="table-action-column">{t('table.actionsColumn')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -650,7 +660,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                             <div className="documents-cell-copy">
                               <p className="documents-cell-title">{document.title}</p>
                               <p className="documents-cell-description">
-                                {document.description || "No description"}
+                                {document.description || t('noDescription')}
                               </p>
                             </div>
                           </td>
@@ -658,31 +668,31 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                           <td>
                             <span className="country-chip">
                               <span>{countryFlagFromCode(document.countryCode)}</span>
-                              <span>{countryNameFromCode(document.countryCode)}</span>
+                              <span>{countryNameFromCode(document.countryCode, locale)}</span>
                             </span>
                           </td>
                           <td>
                             {document.expiryDate ? (
                               <time
                                 dateTime={document.expiryDate}
-                                title={formatDateTimeTooltip(document.expiryDate)}
+                                title={formatDateTimeTooltip(document.expiryDate, locale)}
                               >
-                                {formatRelativeTime(document.expiryDate)}
+                                {formatRelativeTime(document.expiryDate, locale)}
                               </time>
                             ) : (
                               "--"
                             )}
                           </td>
                           <td>
-                            <StatusBadge tone={expiryStatus.tone}>{expiryStatus.label}</StatusBadge>
+                            <StatusBadge tone={expiryStatus.tone}>{td(expiryStatus.labelKey)}</StatusBadge>
                           </td>
                           <td className="numeric">{formatFileSize(document.sizeBytes)}</td>
                           <td>
                             <time
                               dateTime={document.updatedAt}
-                              title={formatDateTimeTooltip(document.updatedAt)}
+                              title={formatDateTimeTooltip(document.updatedAt, locale)}
                             >
-                              {formatRelativeTime(document.updatedAt)}
+                              {formatRelativeTime(document.updatedAt, locale)}
                             </time>
                           </td>
                           <td className="table-row-action-cell">
@@ -693,7 +703,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                                 onClick={() => handleOpenFile(document.id)}
                                 disabled={Boolean(isOpeningFileById[document.id])}
                               >
-                                {isOpeningFileById[document.id] ? "Opening..." : "Open"}
+                                {isOpeningFileById[document.id] ? t('actions.opening') : t('actions.open')}
                               </button>
                               <button
                                 type="button"
@@ -703,7 +713,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                                   setIsPanelOpen(true);
                                 }}
                               >
-                                New version
+                                {t('actions.newVersion')}
                               </button>
                             </div>
                           </td>
@@ -725,7 +735,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
           {!isTravelLoading && travelError ? (
             <ErrorState
-              title="Travel letters unavailable"
+              title={t('travelLetters.errorTitle')}
               message={travelError}
               onRetry={refreshTravel}
             />
@@ -733,8 +743,8 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
           {!isTravelLoading && !travelError && travelRequests.length === 0 ? (
             <EmptyState
-              title="No travel letter requests"
-              description="Request a travel support letter for your next trip. Letters are signed by a co-founder."
+              title={t('travelLetters.emptyTitle')}
+              description={t('travelLetters.emptyDescription')}
             />
           ) : null}
 
@@ -748,7 +758,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                         {req.destinationCountry}
                       </h3>
                       <StatusBadge tone={getTravelStatusTone(req.status)}>
-                        {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                        {tdCommon(`status.${req.status}`)}
                       </StatusBadge>
                     </div>
                     <p className="travel-letter-card-subtitle">
@@ -758,31 +768,31 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
                   <div className="travel-letter-card-details">
                     <div className="travel-letter-card-detail">
-                      <span className="travel-letter-detail-label">Travel dates</span>
+                      <span className="travel-letter-detail-label">{t('travelLetters.travelDates')}</span>
                       <span>
-                        {formatTravelDate(req.travelStartDate)} &ndash;{" "}
-                        {formatTravelDate(req.travelEndDate)}
+                        {formatTravelDate(req.travelStartDate, locale)} &ndash;{" "}
+                        {formatTravelDate(req.travelEndDate, locale)}
                       </span>
                     </div>
                     <div className="travel-letter-card-detail">
-                      <span className="travel-letter-detail-label">Purpose</span>
+                      <span className="travel-letter-detail-label">{t('travelLetters.purpose')}</span>
                       <span>{req.purpose}</span>
                     </div>
                     <div className="travel-letter-card-detail">
-                      <span className="travel-letter-detail-label">Requested</span>
-                      <span>{formatTravelDate(req.createdAt.split("T")[0] ?? req.createdAt)}</span>
+                      <span className="travel-letter-detail-label">{t('travelLetters.requested')}</span>
+                      <span>{formatTravelDate(req.createdAt.split("T")[0] ?? req.createdAt, locale)}</span>
                     </div>
                     {req.approverName ? (
                       <div className="travel-letter-card-detail">
                         <span className="travel-letter-detail-label">
-                          {req.status === "approved" ? "Approved by" : "Reviewed by"}
+                          {req.status === "approved" ? t('travelLetters.approvedBy') : t('travelLetters.reviewedBy')}
                         </span>
                         <span>{req.approverName}</span>
                       </div>
                     ) : null}
                     {req.status === "rejected" && req.rejectionReason ? (
                       <div className="travel-letter-card-detail travel-letter-rejection">
-                        <span className="travel-letter-detail-label">Reason</span>
+                        <span className="travel-letter-detail-label">{t('travelLetters.reason')}</span>
                         <span>{req.rejectionReason}</span>
                       </div>
                     ) : null}
@@ -796,7 +806,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                         onClick={() => handleDownloadTravelLetter(req.id)}
                         disabled={Boolean(isDownloadingById[req.id])}
                       >
-                        {isDownloadingById[req.id] ? "Downloading..." : "Download Letter"}
+                        {isDownloadingById[req.id] ? t('actions.downloading') : t('actions.downloadLetter')}
                       </button>
                     </div>
                   ) : null}
@@ -809,10 +819,10 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
       {/* ── Admin: Pending Approvals ── */}
       {isSuperAdmin && showTravelView && !isPendingLoading && pendingRequests.length > 0 ? (
-        <section className="admin-approvals-section" aria-label="Pending approvals">
-          <h2 className="admin-approvals-heading">Pending Approvals</h2>
+        <section className="admin-approvals-section" aria-label={t('adminApprovals.title')}>
+          <h2 className="admin-approvals-heading">{t('adminApprovals.title')}</h2>
           <p className="admin-approvals-description">
-            Travel support requests awaiting your review.
+            {t('adminApprovals.description')}
           </p>
           <div className="travel-letter-list">
             {pendingRequests.map((req) => (
@@ -822,27 +832,27 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                     <h3 className="travel-letter-card-title">
                       {req.employeeName ?? "Employee"} &rarr; {req.destinationCountry}
                     </h3>
-                    <StatusBadge tone="pending">Pending</StatusBadge>
+                    <StatusBadge tone="pending">{tCommon('status.pending')}</StatusBadge>
                   </div>
                   <p className="travel-letter-card-subtitle">{req.embassyName}</p>
                 </header>
 
                 <div className="travel-letter-card-details">
                   <div className="travel-letter-card-detail">
-                    <span className="travel-letter-detail-label">Travel dates</span>
+                    <span className="travel-letter-detail-label">{t('travelLetters.travelDates')}</span>
                     <span>
-                      {formatTravelDate(req.travelStartDate)} &ndash;{" "}
-                      {formatTravelDate(req.travelEndDate)}
+                      {formatTravelDate(req.travelStartDate, locale)} &ndash;{" "}
+                      {formatTravelDate(req.travelEndDate, locale)}
                     </span>
                   </div>
                   <div className="travel-letter-card-detail">
-                    <span className="travel-letter-detail-label">Purpose</span>
+                    <span className="travel-letter-detail-label">{t('travelLetters.purpose')}</span>
                     <span>{req.purpose}</span>
                   </div>
                   <div className="travel-letter-card-detail">
-                    <span className="travel-letter-detail-label">Requested</span>
+                    <span className="travel-letter-detail-label">{t('travelLetters.requested')}</span>
                     <span>
-                      {formatTravelDate(req.createdAt.split("T")[0] ?? req.createdAt)}
+                      {formatTravelDate(req.createdAt.split("T")[0] ?? req.createdAt, locale)}
                     </span>
                   </div>
                 </div>
@@ -853,14 +863,14 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                     className="button button-success-outline"
                     onClick={() => openApprovePanel(req)}
                   >
-                    Approve
+                    {tCommon('status.approved')}
                   </button>
                   <button
                     type="button"
                     className="button button-danger-outline"
                     onClick={() => openRejectPanel(req)}
                   >
-                    Reject
+                    {tCommon('status.rejected')}
                   </button>
                 </div>
               </article>
@@ -872,10 +882,10 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
       {/* ── Admin: Approve Panel ── */}
       <SlidePanel
         isOpen={approvalTarget !== null}
-        title="Approve Travel Letter"
+        title={t('approvePanel.title')}
         description={
           approvalTarget
-            ? `Approve ${approvalTarget.employeeName ?? "this employee"}'s travel letter for ${approvalTarget.destinationCountry}. Select the issuing entity.`
+            ? t('approvePanel.description', { employeeName: approvalTarget.employeeName ?? "Employee", country: approvalTarget.destinationCountry })
             : ""
         }
         onClose={() => setApprovalTarget(null)}
@@ -886,7 +896,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
           ) : null}
 
           <label className="form-field" htmlFor="entity-country">
-            <span className="form-label">Issuing Entity Country</span>
+            <span className="form-label">{t('approvePanel.issuingEntityCountry')}</span>
             <select
               id="entity-country"
               className="form-input"
@@ -894,7 +904,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
               value={approvalCountry}
               onChange={(e) => handleCountryChange(e.currentTarget.value)}
             >
-              <option value="">Select a country...</option>
+              <option value="">{t('approvePanel.selectCountry')}</option>
               {countryOptions.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -902,19 +912,19 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
           </label>
 
           <label className="form-field" htmlFor="entity-address">
-            <span className="form-label">Entity Address</span>
+            <span className="form-label">{t('approvePanel.entityAddress')}</span>
             <textarea
               id="entity-address"
               className="form-input"
               rows={3}
               required
               maxLength={1000}
-              placeholder="Full address for the letterhead"
+              placeholder={t('approvePanel.entityAddressPlaceholder')}
               value={approvalAddress}
               onChange={(e) => setApprovalAddress(e.currentTarget.value)}
             />
             <span className="form-hint">
-              This address will appear on the letterhead and be saved for future use.
+              {t('approvePanel.entityAddressHint')}
             </span>
           </label>
 
@@ -924,14 +934,14 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
               className="button button-ghost"
               onClick={() => setApprovalTarget(null)}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button
               type="submit"
               className="button button-success"
               disabled={isApproving || !approvalCountry.trim() || !approvalAddress.trim()}
             >
-              {isApproving ? "Approving..." : "Approve & Generate PDF"}
+              {isApproving ? t('approvePanel.approving') : t('approvePanel.approveAndGenerate')}
             </button>
           </div>
         </form>
@@ -940,10 +950,10 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
       {/* ── Admin: Reject Panel ── */}
       <SlidePanel
         isOpen={rejectionTarget !== null}
-        title="Reject Travel Letter"
+        title={t('rejectPanel.title')}
         description={
           rejectionTarget
-            ? `Reject ${rejectionTarget.employeeName ?? "this employee"}'s travel letter request for ${rejectionTarget.destinationCountry}.`
+            ? t('rejectPanel.description', { employeeName: rejectionTarget.employeeName ?? "Employee", country: rejectionTarget.destinationCountry })
             : ""
         }
         onClose={() => setRejectionTarget(null)}
@@ -954,14 +964,14 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
           ) : null}
 
           <label className="form-field" htmlFor="rejection-reason">
-            <span className="form-label">Reason for Rejection</span>
+            <span className="form-label">{t('rejectPanel.reasonLabel')}</span>
             <textarea
               id="rejection-reason"
               className="form-input"
               rows={4}
               required
               maxLength={2000}
-              placeholder="Explain why the request is being rejected"
+              placeholder={t('rejectPanel.reasonPlaceholder')}
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.currentTarget.value)}
             />
@@ -973,14 +983,14 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
               className="button button-ghost"
               onClick={() => setRejectionTarget(null)}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button
               type="submit"
               className="button button-danger"
               disabled={isRejecting || !rejectionReason.trim()}
             >
-              {isRejecting ? "Rejecting..." : "Reject Request"}
+              {isRejecting ? t('rejectPanel.rejecting') : t('rejectPanel.rejectRequest')}
             </button>
           </div>
         </form>
@@ -1004,8 +1014,8 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
       {/* ── Travel Letter Request Panel ── */}
       <SlidePanel
         isOpen={isTravelPanelOpen}
-        title="Request Travel Support Letter"
-        description="Submit a request for a travel support letter. A co-founder will review and sign it."
+        title={t('requestPanel.title')}
+        description={t('requestPanel.description')}
         onClose={closeTravelPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleTravelSubmit} noValidate>
@@ -1014,28 +1024,28 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
           ) : null}
 
           <label className="form-field" htmlFor="travel-destination">
-            <span className="form-label">Destination Country</span>
+            <span className="form-label">{t('requestPanel.destinationCountry')}</span>
             <input
               id="travel-destination"
               className="form-input"
               type="text"
               required
               maxLength={200}
-              placeholder="e.g. United Kingdom"
+              placeholder={t('requestPanel.destinationPlaceholder')}
               value={travelForm.destinationCountry}
               onChange={(e) => handleTravelFormChange("destinationCountry", e.currentTarget.value)}
             />
           </label>
 
           <label className="form-field" htmlFor="travel-embassy">
-            <span className="form-label">Embassy / Organization Name</span>
+            <span className="form-label">{t('requestPanel.embassyName')}</span>
             <input
               id="travel-embassy"
               className="form-input"
               type="text"
               required
               maxLength={500}
-              placeholder="e.g. British High Commission, Abuja"
+              placeholder={t('requestPanel.embassyNamePlaceholder')}
               value={travelForm.embassyName}
               onChange={(e) => handleTravelFormChange("embassyName", e.currentTarget.value)}
             />
@@ -1043,15 +1053,15 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
           <label className="form-field" htmlFor="travel-embassy-address">
             <span className="form-label">
-              Embassy / Organization Address{" "}
-              <span className="form-label-optional">(optional)</span>
+              {t('requestPanel.embassyAddress')}{" "}
+              <span className="form-label-optional">{t('requestPanel.embassyAddressOptional')}</span>
             </span>
             <textarea
               id="travel-embassy-address"
               className="form-input"
               rows={2}
               maxLength={1000}
-              placeholder="Full address of the embassy or organization"
+              placeholder={t('requestPanel.embassyAddressPlaceholder')}
               value={travelForm.embassyAddress}
               onChange={(e) => handleTravelFormChange("embassyAddress", e.currentTarget.value)}
             />
@@ -1059,7 +1069,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
           <div className="form-field-row">
             <label className="form-field" htmlFor="travel-start-date">
-              <span className="form-label">Travel Start Date</span>
+              <span className="form-label">{t('requestPanel.travelStartDate')}</span>
               <input
                 id="travel-start-date"
                 className="form-input"
@@ -1071,7 +1081,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
             </label>
 
             <label className="form-field" htmlFor="travel-end-date">
-              <span className="form-label">Travel End Date</span>
+              <span className="form-label">{t('requestPanel.travelEndDate')}</span>
               <input
                 id="travel-end-date"
                 className="form-input"
@@ -1085,14 +1095,14 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
           </div>
 
           <label className="form-field" htmlFor="travel-purpose">
-            <span className="form-label">Purpose of Travel</span>
+            <span className="form-label">{t('requestPanel.purposeOfTravel')}</span>
             <textarea
               id="travel-purpose"
               className="form-input"
               rows={3}
               required
               maxLength={2000}
-              placeholder="Describe the purpose of your trip"
+              placeholder={t('requestPanel.purposePlaceholder')}
               value={travelForm.purpose}
               onChange={(e) => handleTravelFormChange("purpose", e.currentTarget.value)}
             />
@@ -1100,15 +1110,15 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
           <label className="form-field" htmlFor="travel-notes">
             <span className="form-label">
-              Additional Notes{" "}
-              <span className="form-label-optional">(optional)</span>
+              {t('requestPanel.additionalNotes')}{" "}
+              <span className="form-label-optional">{t('requestPanel.additionalNotesOptional')}</span>
             </span>
             <textarea
               id="travel-notes"
               className="form-input"
               rows={2}
               maxLength={2000}
-              placeholder="Any extra information to include"
+              placeholder={t('requestPanel.additionalNotesPlaceholder')}
               value={travelForm.additionalNotes}
               onChange={(e) => handleTravelFormChange("additionalNotes", e.currentTarget.value)}
             />
@@ -1116,14 +1126,14 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
           <div className="slide-panel-actions">
             <button type="button" className="button button-ghost" onClick={closeTravelPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button
               type="submit"
               className="button button-accent"
               disabled={isSubmittingTravel}
             >
-              {isSubmittingTravel ? "Submitting..." : "Submit Request"}
+              {isSubmittingTravel ? t('requestPanel.submitting') : t('requestPanel.submitRequest')}
             </button>
           </div>
         </form>
@@ -1139,7 +1149,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss notification"
+                aria-label={t('dismissNotification')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

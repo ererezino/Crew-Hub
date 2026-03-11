@@ -39,9 +39,10 @@ describe("People access consistency", () => {
     const clientFile = read("app/(shell)/people/people-client.tsx");
     expect(clientFile).toContain("const [resetSetupLink, setResetSetupLink] = useState<string | null>(null);");
     expect(clientFile).toContain("payload.data.setupLink ?? null");
-    expect(clientFile).toContain('placeholder="Click “Reset Authenticator” to generate a setup link."');
+    expect(clientFile).toContain("resetDialog.resetPlaceholder");
     expect(clientFile).toContain("handleCopyResetSetupLink");
-    expect(clientFile).toContain("Generate new link");
+    expect(clientFile).toContain("resetDialog.generateNewLink");
+    expect(clientFile).toContain("resetDialog.copyLink");
   });
 
   it("server-side people create/reset routes remain super-admin protected", () => {

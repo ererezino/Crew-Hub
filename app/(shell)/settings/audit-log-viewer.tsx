@@ -1,10 +1,13 @@
 "use client";
 
 import { Fragment, type FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { AUDIT_LOG_ACTIONS, type AuditLogAction, type AuditLogsResponse } from "../../../types/settings";
+
+type AppLocale = "en" | "fr";
 
 type AuditFilters = {
   dateFrom: string;
@@ -120,7 +123,7 @@ function diffValues(
   }, []);
 }
 
-function formatRelativeTime(timestamp: string): string {
+function formatRelativeTime(timestamp: string, localeTag: string, justNowText: string): string {
   const date = new Date(timestamp);
   const now = new Date();
   const seconds = Math.round((now.getTime() - date.getTime()) / 1000);
@@ -136,14 +139,19 @@ function formatRelativeTime(timestamp: string): string {
   for (const [unit, amount] of units) {
     if (Math.abs(seconds) >= amount) {
       const value = Math.round(seconds / amount) * -1;
-      return new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(value, unit);
+      return new Intl.RelativeTimeFormat(localeTag, { numeric: "auto" }).format(value, unit);
     }
   }
 
-  return "just now";
+  return justNowText;
 }
 
 export function AuditLogViewer() {
+  const t = useTranslations('settings');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const localeTag = locale === "fr" ? "fr-FR" : "en-US";
+
   const [draftFilters, setDraftFilters] = useState<AuditFilters>(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState<AuditFilters>(initialFilters);
   const [page, setPage] = useState(1);
@@ -193,7 +201,7 @@ export function AuditLogViewer() {
         const payload = (await response.json()) as AuditLogsResponse;
 
         if (!response.ok || !payload.data) {
-          setErrorMessage(payload.error?.message ?? "Unable to load audit logs.");
+          setErrorMessage(payload.error?.message ?? t('audit.unableToLoad'));
           setResponseData(null);
           return;
         }
@@ -205,7 +213,7 @@ export function AuditLogViewer() {
         }
 
         setErrorMessage(
-          error instanceof Error ? error.message : "Unable to load audit logs."
+          error instanceof Error ? error.message : t('audit.unableToLoad')
         );
         setResponseData(null);
       } finally {
@@ -220,7 +228,7 @@ export function AuditLogViewer() {
     return () => {
       abortController.abort();
     };
-  }, [appliedFilters, page]);
+  }, [appliedFilters, page, t]);
 
   const totalPages = useMemo(() => {
     if (!responseData) {
@@ -256,15 +264,15 @@ export function AuditLogViewer() {
   };
 
   return (
-    <section className="settings-card" aria-label="Audit log viewer">
-      <h2 className="section-title">Audit Log</h2>
+    <section className="settings-card" aria-label={t('audit.ariaLabel')}>
+      <h2 className="section-title">{t('audit.heading')}</h2>
       <p className="settings-card-description">
-        Review user actions across Crew Hub with table-level and actor filters.
+        {t('audit.viewerDescription')}
       </p>
 
       <form className="audit-filters" onSubmit={handleFilterSubmit}>
         <label className="form-field">
-          <span className="form-label">Date from</span>
+          <span className="form-label">{t('audit.dateFrom')}</span>
           <input
             className="form-input"
             type="date"
@@ -279,7 +287,7 @@ export function AuditLogViewer() {
         </label>
 
         <label className="form-field">
-          <span className="form-label">Date to</span>
+          <span className="form-label">{t('audit.dateTo')}</span>
           <input
             className="form-input"
             type="date"
@@ -294,7 +302,7 @@ export function AuditLogViewer() {
         </label>
 
         <label className="form-field">
-          <span className="form-label">Actor</span>
+          <span className="form-label">{t('audit.actor')}</span>
           <select
             className="form-input"
             value={draftFilters.actorId}
@@ -305,7 +313,7 @@ export function AuditLogViewer() {
               }))
             }
           >
-            <option value="">All actors</option>
+            <option value="">{t('audit.allActors')}</option>
             {actorOptions.map((actor) => (
               <option key={actor.id} value={actor.id}>
                 {actor.fullName}
@@ -315,7 +323,7 @@ export function AuditLogViewer() {
         </label>
 
         <label className="form-field">
-          <span className="form-label">Action</span>
+          <span className="form-label">{t('audit.action')}</span>
           <select
             className="form-input"
             value={draftFilters.action}
@@ -326,7 +334,7 @@ export function AuditLogViewer() {
               }))
             }
           >
-            <option value="">All actions</option>
+            <option value="">{t('audit.allActions')}</option>
             {actionOptions.map((action) => (
               <option key={action} value={action}>
                 {action}
@@ -336,7 +344,7 @@ export function AuditLogViewer() {
         </label>
 
         <label className="form-field">
-          <span className="form-label">Table</span>
+          <span className="form-label">{t('audit.table')}</span>
           <select
             className="form-input"
             value={draftFilters.tableName}
@@ -347,7 +355,7 @@ export function AuditLogViewer() {
               }))
             }
           >
-            <option value="">All tables</option>
+            <option value="">{t('audit.allTables')}</option>
             {tableOptions.map((tableName) => (
               <option key={tableName} value={tableName}>
                 {tableName}
@@ -357,7 +365,7 @@ export function AuditLogViewer() {
         </label>
 
         <label className="form-field">
-          <span className="form-label">Sort</span>
+          <span className="form-label">{t('audit.sort')}</span>
           <select
             className="form-input"
             value={draftFilters.sort}
@@ -368,17 +376,17 @@ export function AuditLogViewer() {
               }))
             }
           >
-            <option value="desc">Newest first</option>
-            <option value="asc">Oldest first</option>
+            <option value="desc">{t('audit.newestFirst')}</option>
+            <option value="asc">{t('audit.oldestFirst')}</option>
           </select>
         </label>
 
         <div className="audit-filter-actions">
           <button type="submit" className="button button-accent">
-            Apply filters
+            {t('audit.applyFilters')}
           </button>
           <button type="button" className="button" onClick={handleFilterReset}>
-            Reset
+            {t('audit.reset')}
           </button>
         </div>
       </form>
@@ -393,18 +401,18 @@ export function AuditLogViewer() {
 
       {!isLoading && errorMessage ? (
         <EmptyState
-          title="Audit log is unavailable"
+          title={t('audit.unavailable')}
           description={errorMessage}
-          ctaLabel="Retry"
+          ctaLabel={tCommon('retry')}
           ctaHref="/settings"
         />
       ) : null}
 
       {!isLoading && !errorMessage && responseData && responseData.entries.length === 0 ? (
         <EmptyState
-          title="No audit events match your filters"
-          description="Try broadening your date or actor filters to find more entries."
-          ctaLabel="Reset filters"
+          title={t('audit.noMatchTitle')}
+          description={t('audit.noMatchDescription')}
+          ctaLabel={t('audit.resetFilters')}
           ctaHref="/settings"
         />
       ) : null}
@@ -412,15 +420,15 @@ export function AuditLogViewer() {
       {!isLoading && !errorMessage && responseData && responseData.entries.length > 0 ? (
         <>
           <div className="data-table-container">
-            <table className="data-table" aria-label="Audit log table">
+            <table className="data-table" aria-label={t('audit.tableAriaLabel')}>
               <thead>
                 <tr>
-                  <th>Timestamp</th>
-                  <th>Actor</th>
-                  <th>Action</th>
-                  <th>Table</th>
-                  <th>Record</th>
-                  <th className="table-action-column">Diff</th>
+                  <th>{t('audit.colTimestamp')}</th>
+                  <th>{t('audit.colActor')}</th>
+                  <th>{t('audit.colAction')}</th>
+                  <th>{t('audit.colTable')}</th>
+                  <th>{t('audit.colRecord')}</th>
+                  <th className="table-action-column">{t('audit.colDiff')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -433,10 +441,10 @@ export function AuditLogViewer() {
                       <tr className="data-table-row">
                         <td>
                           <time
-                            title={new Date(entry.timestamp).toLocaleString()}
+                            title={new Date(entry.timestamp).toLocaleString(localeTag)}
                             dateTime={entry.timestamp}
                           >
-                            {formatRelativeTime(entry.timestamp)}
+                            {formatRelativeTime(entry.timestamp, localeTag, t('audit.justNow'))}
                           </time>
                         </td>
                         <td>{entry.actorName}</td>
@@ -453,7 +461,7 @@ export function AuditLogViewer() {
                             className="table-row-action"
                             onClick={() => toggleRow(entry.id)}
                           >
-                            {isExpanded ? "Hide" : "Show"} diff
+                            {isExpanded ? t('audit.hideDiff') : t('audit.showDiff')}
                           </button>
                         </td>
                       </tr>
@@ -493,7 +501,7 @@ export function AuditLogViewer() {
                                 })}
                               </ul>
                             ) : (
-                              <p className="audit-diff-empty">No value changes were recorded for this event.</p>
+                              <p className="audit-diff-empty">{t('audit.noDiffChanges')}</p>
                             )}
                           </td>
                         </tr>
@@ -507,7 +515,11 @@ export function AuditLogViewer() {
 
           <footer className="audit-pagination">
             <p className="audit-pagination-summary numeric">
-              {responseData.total} total events • Page {responseData.page} of {totalPages}
+              {t('audit.paginationSummary', {
+                total: responseData.total,
+                page: responseData.page,
+                totalPages
+              })}
             </p>
             <div className="audit-pagination-actions">
               <button
@@ -516,7 +528,7 @@ export function AuditLogViewer() {
                 onClick={() => setPage((previous) => Math.max(1, previous - 1))}
                 disabled={responseData.page <= 1}
               >
-                Previous
+                {t('audit.previous')}
               </button>
               <button
                 type="button"
@@ -528,7 +540,7 @@ export function AuditLogViewer() {
                 }
                 disabled={responseData.page >= totalPages}
               >
-                Next
+                {tCommon('next')}
               </button>
             </div>
           </footer>

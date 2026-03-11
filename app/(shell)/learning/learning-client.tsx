@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -15,6 +16,7 @@ import type {
   LearningAssignmentStatus
 } from "../../../types/learning";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 
 function toneForAssignmentStatus(status: LearningAssignmentStatus) {
@@ -62,6 +64,10 @@ function completionPercent(rows: readonly LearningAssignmentRecord[]): number {
 }
 
 export function LearningClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('learning');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const assignmentsQuery = useLearningMyAssignments();
   const coursesQuery = useLearningCourses();
 
@@ -95,8 +101,8 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
     <>
       {!embedded ? (
         <PageHeader
-          title="Learning"
-          description="Courses, certificates, and surveys assigned to you."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
@@ -105,7 +111,7 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
       {!isLoading && errorMessage ? (
         <>
           <EmptyState
-            title="Learning data is unavailable"
+            title={t('unavailable')}
             description={errorMessage}
           />
           <button
@@ -116,49 +122,49 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
               coursesQuery.refresh();
             }}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!isLoading && !errorMessage ? (
-        <section className="compensation-layout" aria-label="Learning overview">
+        <section className="compensation-layout" aria-label={t('overviewAriaLabel')}>
           <article className="metric-grid">
             <article className="metric-card">
-              <p className="metric-label">Assigned courses</p>
+              <p className="metric-label">{t('assignedCourses')}</p>
               <p className="metric-value numeric">{totalAssigned}</p>
-              <p className="metric-description">Total active learning assignments.</p>
+              <p className="metric-description">{t('assignedCoursesDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">In progress</p>
+              <p className="metric-label">{t('inProgress')}</p>
               <p className="metric-value numeric">{inProgressCount}</p>
-              <p className="metric-description">Courses you started but have not completed.</p>
+              <p className="metric-description">{t('inProgressDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Completed</p>
+              <p className="metric-label">{t('completed')}</p>
               <p className="metric-value numeric">{completedCount}</p>
-              <p className="metric-description">Courses finished with completion tracked.</p>
+              <p className="metric-description">{t('completedDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Overdue</p>
+              <p className="metric-label">{t('overdue')}</p>
               <p className="metric-value numeric">{overdueCount}</p>
-              <p className="metric-description">Assignments past due date.</p>
+              <p className="metric-description">{t('overdueDescription')}</p>
             </article>
           </article>
 
           <article className="metric-card">
             <div>
-              <h2 className="section-title">Completion overview</h2>
+              <h2 className="section-title">{t('completionOverview')}</h2>
               <p className="settings-card-description">
-                {completionPercent(sortedAssignments)}% completion rate across your assignments.
+                {t('completionRate', { pct: completionPercent(sortedAssignments) })}
               </p>
             </div>
             <div className="documents-row-actions">
               <Link href="/learning?tab=certificates" className="button">
-                Certificates
+                {t('certificatesLink')}
               </Link>
               <Link href="/admin/learning" className="button">
-                Learning admin
+                {t('learningAdmin')}
               </Link>
             </div>
           </article>
@@ -166,9 +172,9 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
           <article className="compensation-section">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">My assignments</h2>
+                <h2 className="section-title">{t('myAssignments')}</h2>
                 <p className="settings-card-description">
-                  Due dates include relative labels with the full date on hover.
+                  {t('myAssignmentsDescription')}
                 </p>
               </div>
             </header>
@@ -176,18 +182,18 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
             {sortedAssignments.length === 0 ? (
               <EmptyState
                 icon={<GraduationCap size={32} />}
-                title="No courses assigned"
-                description="Assigned learning will appear here when your manager or HR publishes it to you."
-                ctaLabel="Browse catalog"
+                title={t('noCoursesAssigned')}
+                description={t('noCoursesAssignedDescription')}
+                ctaLabel={t('browseCatalog')}
                 ctaHref="/learning"
               />
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Learning assignments table">
+                <table className="data-table" aria-label={t('assignmentsTableAriaLabel')}>
                   <thead>
                     <tr>
-                      <th>Course</th>
-                      <th>Category</th>
+                      <th>{t('colCourse')}</th>
+                      <th>{t('colCategory')}</th>
                       <th>
                         <button
                           type="button"
@@ -198,27 +204,27 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
                             )
                           }
                         >
-                          Due date
+                          {t('colDueDate')}
                           <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                         </button>
                       </th>
-                      <th>Progress</th>
-                      <th>Status</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('colProgress')}</th>
+                      <th>{t('colStatus')}</th>
+                      <th className="table-action-column">{t('colActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedAssignments.map((assignment) => (
                       <tr key={assignment.id} className="data-table-row">
                         <td>{assignment.courseTitle}</td>
-                        <td>{assignment.courseCategory ?? "General"}</td>
+                        <td>{assignment.courseCategory ?? t('general')}</td>
                         <td>
                           {assignment.dueDate ? (
-                            <span title={formatDateTimeTooltip(`${assignment.dueDate}T00:00:00.000Z`)}>
-                              {formatRelativeTime(`${assignment.dueDate}T00:00:00.000Z`)}
+                            <span title={formatDateTimeTooltip(`${assignment.dueDate}T00:00:00.000Z`, locale)}>
+                              {formatRelativeTime(`${assignment.dueDate}T00:00:00.000Z`, locale)}
                             </span>
                           ) : (
-                            "No due date"
+                            t('noDueDate')
                           )}
                         </td>
                         <td className="numeric">{assignment.progressPct}%</td>
@@ -230,11 +236,11 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
                         <td className="table-row-action-cell">
                           <div className="timeatt-row-actions">
                             <Link href={`/learning/courses/${assignment.courseId}`} className="table-row-action">
-                              Open
+                              {t('open')}
                             </Link>
                             {assignment.status === "completed" ? (
                               <Link href="/learning?tab=certificates" className="table-row-action">
-                                Certificate
+                                {t('certificate')}
                               </Link>
                             ) : null}
                           </div>
@@ -250,9 +256,9 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
           <article className="compensation-section">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">Course catalog</h2>
+                <h2 className="section-title">{t('courseCatalog')}</h2>
                 <p className="settings-card-description">
-                  Published courses available in your workspace.
+                  {t('courseCatalogDescription')}
                 </p>
               </div>
             </header>
@@ -260,29 +266,29 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
             {sortedCourses.length === 0 ? (
               <EmptyState
                 icon={<GraduationCap size={32} />}
-                title="No published courses"
-                description="Courses will appear here once they are published by your learning team."
-                ctaLabel="Refresh catalog"
+                title={t('noPublishedCourses')}
+                description={t('noPublishedCoursesDescription')}
+                ctaLabel={t('refreshCatalog')}
                 ctaHref="/learning"
               />
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Learning catalog table">
+                <table className="data-table" aria-label={t('catalogTableAriaLabel')}>
                   <thead>
                     <tr>
-                      <th>Title</th>
-                      <th>Category</th>
-                      <th>Type</th>
-                      <th>Duration</th>
-                      <th>Status</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('colTitle')}</th>
+                      <th>{t('colCategory')}</th>
+                      <th>{t('colType')}</th>
+                      <th>{t('colDuration')}</th>
+                      <th>{t('colStatus')}</th>
+                      <th className="table-action-column">{t('colActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedCourses.map((course) => (
                       <tr key={course.id} className="data-table-row">
                         <td>{course.title}</td>
-                        <td>{course.category ?? "General"}</td>
+                        <td>{course.category ?? t('general')}</td>
                         <td>
                           <StatusBadge tone="info">{toSentenceCase(course.contentType)}</StatusBadge>
                         </td>
@@ -291,13 +297,13 @@ export function LearningClient({ embedded = false }: { embedded?: boolean }) {
                         </td>
                         <td>
                           <StatusBadge tone={course.isMandatory ? "warning" : "draft"}>
-                            {course.isMandatory ? "Mandatory" : "Optional"}
+                            {course.isMandatory ? t('mandatory') : t('optional')}
                           </StatusBadge>
                         </td>
                         <td className="table-row-action-cell">
                           <div className="timeatt-row-actions">
                             <Link href={`/learning/courses/${course.id}`} className="table-row-action">
-                              Start
+                              {t('start')}
                             </Link>
                           </div>
                         </td>

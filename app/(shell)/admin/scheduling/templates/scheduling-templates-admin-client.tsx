@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "../../../../../components/shared/confirm-dialog";
@@ -10,20 +11,8 @@ import { useSchedulingTemplates } from "../../../../../hooks/use-scheduling";
 import { DEPARTMENTS } from "../../../../../lib/departments";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../../lib/datetime";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
-
-const TEMPLATE_COLORS: { value: string; label: string }[] = [
-  { value: "#2563EB", label: "Blue" },
-  { value: "#7C3AED", label: "Purple" },
-  { value: "#DB2777", label: "Pink" },
-  { value: "#DC2626", label: "Red" },
-  { value: "#EA580C", label: "Orange" },
-  { value: "#D97706", label: "Amber" },
-  { value: "#16A34A", label: "Green" },
-  { value: "#0D9488", label: "Teal" },
-  { value: "#0891B2", label: "Cyan" },
-  { value: "#4B5563", label: "Gray" },
-];
 
 type TemplateFormState = {
   name: string;
@@ -33,6 +22,19 @@ type TemplateFormState = {
   breakMinutes: string;
   color: string;
 };
+
+const TEMPLATE_COLOR_KEYS = [
+  { value: "#2563EB", labelKey: "colorBlue" },
+  { value: "#7C3AED", labelKey: "colorPurple" },
+  { value: "#DB2777", labelKey: "colorPink" },
+  { value: "#DC2626", labelKey: "colorRed" },
+  { value: "#EA580C", labelKey: "colorOrange" },
+  { value: "#D97706", labelKey: "colorAmber" },
+  { value: "#16A34A", labelKey: "colorGreen" },
+  { value: "#0D9488", labelKey: "colorTeal" },
+  { value: "#0891B2", labelKey: "colorCyan" },
+  { value: "#4B5563", labelKey: "colorGray" },
+] as const;
 
 const defaultTemplateForm: TemplateFormState = {
   name: "",
@@ -55,6 +57,10 @@ function templatesSkeleton() {
 }
 
 export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('schedulingTemplates');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const templatesQuery = useSchedulingTemplates();
   const [templateForm, setTemplateForm] = useState<TemplateFormState>(defaultTemplateForm);
   const [formError, setFormError] = useState<string | null>(null);
@@ -110,7 +116,7 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
     setSubmitMessage(null);
 
     if (!templateForm.name.trim() || !templateForm.startTime || !templateForm.endTime) {
-      setFormError("Name, start time, and end time are required.");
+      setFormError(t('errorRequired'));
       return;
     }
 
@@ -143,18 +149,18 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
 
       if (!response.ok) {
         setFormError(
-          payload.error?.message ?? (editingTemplateId ? "Unable to update template." : "Unable to create template.")
+          payload.error?.message ?? (editingTemplateId ? t('errorUpdateFailed') : t('errorCreateFailed'))
         );
         return;
       }
 
       setTemplateForm(defaultTemplateForm);
       setEditingTemplateId(null);
-      setSubmitMessage(editingTemplateId ? "Template updated." : "Shift template created.");
+      setSubmitMessage(editingTemplateId ? t('templateUpdated') : t('templateCreated'));
       templatesQuery.refresh();
     } catch (error) {
       setFormError(
-        error instanceof Error ? error.message : (editingTemplateId ? "Unable to update template." : "Unable to create template.")
+        error instanceof Error ? error.message : (editingTemplateId ? t('errorUpdateFailed') : t('errorCreateFailed'))
       );
     } finally {
       setIsSubmitting(false);
@@ -174,14 +180,14 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
       };
 
       if (!response.ok) {
-        setSubmitMessage(payload.error?.message ?? "Unable to delete template.");
+        setSubmitMessage(payload.error?.message ?? t('errorDeleteFailed'));
         return;
       }
 
-      setSubmitMessage("Template deleted.");
+      setSubmitMessage(t('templateDeleted'));
       templatesQuery.refresh();
     } catch (error) {
-      setSubmitMessage(error instanceof Error ? error.message : "Unable to delete template.");
+      setSubmitMessage(error instanceof Error ? error.message : t('errorDeleteFailed'));
     } finally {
       setIsDeletingTemplate(false);
       setDeleteConfirmTemplateId(null);
@@ -192,8 +198,8 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
     <>
       {!embedded ? (
         <PageHeader
-          title="Templates"
-          description="Manage reusable shift templates for weekly schedule planning."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
@@ -202,7 +208,7 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
       {!templatesQuery.isLoading && templatesQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Template data is unavailable"
+            title={t('unavailable')}
             description={templatesQuery.errorMessage}
           />
           <button
@@ -210,34 +216,34 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
             className="button"
             onClick={() => templatesQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!templatesQuery.isLoading && !templatesQuery.errorMessage ? (
-        <section className="compensation-layout" aria-label="Shift template management">
+        <section className="compensation-layout" aria-label={t('sectionAriaLabel')}>
           <article className="settings-card">
             <header className="announcement-item-header">
               <div>
                 <h2 className="section-title">
-                  {editingTemplateId ? "Edit template" : "Create template"}
+                  {editingTemplateId ? t('editTitle') : t('createTitle')}
                 </h2>
                 <p className="settings-card-description">
                   {editingTemplateId
-                    ? "Update template details. Cancel to discard changes."
-                    : "Templates reduce repetitive shift setup across teams."}
+                    ? t('editDescription')
+                    : t('createDescription')}
                 </p>
               </div>
               {editingTemplateId ? (
                 <button type="button" className="button button-ghost" onClick={cancelEditing}>
-                  Cancel edit
+                  {t('cancelEdit')}
                 </button>
               ) : null}
             </header>
             <form className="settings-form" onSubmit={handleSubmitTemplate}>
               <div>
-                <label className="form-label" htmlFor="template-name">Template name</label>
+                <label className="form-label" htmlFor="template-name">{t('templateNameLabel')}</label>
                 <input
                   id="template-name"
                   className="form-input"
@@ -245,11 +251,11 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                   onChange={(event) =>
                     setTemplateForm((currentValue) => ({ ...currentValue, name: event.target.value }))
                   }
-                  placeholder="Customer Success Early Shift"
+                  placeholder={t('templateNamePlaceholder')}
                 />
               </div>
               <div>
-                <label className="form-label" htmlFor="template-department">Department</label>
+                <label className="form-label" htmlFor="template-department">{t('departmentLabel')}</label>
                 <select
                   id="template-department"
                   className="form-input"
@@ -258,14 +264,14 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                     setTemplateForm((currentValue) => ({ ...currentValue, department: event.target.value }))
                   }
                 >
-                  <option value="">All departments</option>
+                  <option value="">{t('allDepartments')}</option>
                   {DEPARTMENTS.map((dept) => (
                     <option key={dept} value={dept}>{dept}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="form-label" htmlFor="template-start">Start time</label>
+                <label className="form-label" htmlFor="template-start">{t('startTimeLabel')}</label>
                 <input
                   id="template-start"
                   type="time"
@@ -277,7 +283,7 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                 />
               </div>
               <div>
-                <label className="form-label" htmlFor="template-end">End time</label>
+                <label className="form-label" htmlFor="template-end">{t('endTimeLabel')}</label>
                 <input
                   id="template-end"
                   type="time"
@@ -289,7 +295,7 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                 />
               </div>
               <div>
-                <label className="form-label" htmlFor="template-break">Break (minutes)</label>
+                <label className="form-label" htmlFor="template-break">{t('breakLabel')}</label>
                 <input
                   id="template-break"
                   type="number"
@@ -303,16 +309,16 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                 />
               </div>
               <div>
-                <span className="form-label">Color</span>
-                <div className="template-color-picker" role="radiogroup" aria-label="Template color">
-                  {TEMPLATE_COLORS.map((colorOption) => (
+                <span className="form-label">{t('colorLabel')}</span>
+                <div className="template-color-picker" role="radiogroup" aria-label={t('colorAriaLabel')}>
+                  {TEMPLATE_COLOR_KEYS.map((colorOption) => (
                     <button
                       key={colorOption.value}
                       type="button"
                       className={`template-color-swatch${templateForm.color === colorOption.value ? " template-color-swatch-selected" : ""}`}
                       style={{ backgroundColor: colorOption.value }}
-                      title={colorOption.label}
-                      aria-label={colorOption.label}
+                      title={t(colorOption.labelKey)}
+                      aria-label={t(colorOption.labelKey)}
                       aria-checked={templateForm.color === colorOption.value}
                       role="radio"
                       onClick={() =>
@@ -326,8 +332,8 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
               <div className="settings-actions">
                 <button type="submit" className="button button-primary" disabled={isSubmitting}>
                   {isSubmitting
-                    ? (editingTemplateId ? "Saving..." : "Creating...")
-                    : (editingTemplateId ? "Save changes" : "Create template")}
+                    ? (editingTemplateId ? t('savingBtn') : t('creatingBtn'))
+                    : (editingTemplateId ? t('saveChanges') : t('createTemplate'))}
                 </button>
               </div>
             </form>
@@ -336,14 +342,14 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
 
           {sortedTemplates.length === 0 ? (
             <EmptyState
-              title="No shift templates yet"
-              description="Create a template to speed up schedule creation."
-              ctaLabel="Create template"
+              title={t('noTemplates')}
+              description={t('noTemplatesDescription')}
+              ctaLabel={t('createTemplate')}
               ctaHref="/admin/scheduling/templates"
             />
           ) : (
             <div className="data-table-container">
-              <table className="data-table" aria-label="Shift templates table">
+              <table className="data-table" aria-label={t('tableAriaLabel')}>
                 <thead>
                   <tr>
                     <th>
@@ -356,16 +362,16 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                           )
                         }
                       >
-                        Template
+                        {t('colTemplate')}
                         <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       </button>
                     </th>
-                    <th>Department</th>
-                    <th>Hours</th>
-                    <th>Break</th>
-                    <th>Status</th>
-                    <th>Updated</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t('colDepartment')}</th>
+                    <th>{t('colHours')}</th>
+                    <th>{t('colBreak')}</th>
+                    <th>{t('colStatus')}</th>
+                    <th>{t('colUpdated')}</th>
+                    <th className="table-action-column">{t('colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -381,17 +387,17 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                           {template.name}
                         </span>
                       </td>
-                      <td>{template.department ?? "All departments"}</td>
+                      <td>{template.department ?? t('allDepartments')}</td>
                       <td className="numeric">
                         {template.startTime} - {template.endTime}
                       </td>
-                      <td className="numeric">{template.breakMinutes}m</td>
+                      <td className="numeric">{tCommon('minutesValue', { value: template.breakMinutes })}</td>
                       <td>
-                        <StatusBadge tone="success">Active</StatusBadge>
+                        <StatusBadge tone="success">{t('statusActive')}</StatusBadge>
                       </td>
                       <td>
-                        <span title={formatDateTimeTooltip(template.updatedAt)}>
-                          {formatRelativeTime(template.updatedAt)}
+                        <span title={formatDateTimeTooltip(template.updatedAt, locale)}>
+                          {formatRelativeTime(template.updatedAt, locale)}
                         </span>
                       </td>
                       <td className="table-row-action-cell">
@@ -401,14 +407,14 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                             className="table-row-action"
                             onClick={() => startEditingTemplate(template)}
                           >
-                            Edit
+                            {tCommon('edit')}
                           </button>
                           <button
                             type="button"
                             className="table-row-action table-row-action-danger"
                             onClick={() => setDeleteConfirmTemplateId(template.id)}
                           >
-                            Delete
+                            {tCommon('delete')}
                           </button>
                         </div>
                       </td>
@@ -423,9 +429,9 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
 
       <ConfirmDialog
         isOpen={deleteConfirmTemplateId !== null}
-        title="Delete template?"
-        description="This template will be permanently removed. Existing shifts using this template will not be affected."
-        confirmLabel="Delete"
+        title={t('deleteTitle')}
+        description={t('deleteDescription')}
+        confirmLabel={tCommon('delete')}
         tone="danger"
         isConfirming={isDeletingTemplate}
         onConfirm={() => {

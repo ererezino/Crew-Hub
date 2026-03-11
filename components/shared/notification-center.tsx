@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { useAnnouncements } from "../../hooks/use-announcements";
 import { useNotifications } from "../../hooks/use-notifications";
@@ -11,6 +12,7 @@ import { NotificationActionButton } from "./notification-action-button";
 
 const POLL_INTERVAL_MS = 60_000;
 const PREVIEW_LIMIT = 8;
+const BROWSER_PUSH_PREF_KEY = "crewhub-browser-push-enabled";
 
 type FeedItem = {
   id: string;
@@ -24,8 +26,12 @@ type FeedItem = {
 };
 
 export function NotificationCenter() {
+  const t = useTranslations("notifications");
   const [isOpen, setIsOpen] = useState(false);
+  const [browserPushEnabled, setBrowserPushEnabled] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const bootstrappedBrowserAlerts = useRef(false);
+  const browserAlertedNotificationIds = useRef<Set<string>>(new Set());
 
   /* Ephemeral optimistic set — never persisted, resets on mount */
   const [optimisticDismissals, setOptimisticDismissals] = useState<Set<string>>(new Set());
@@ -49,6 +55,25 @@ export function NotificationCenter() {
     return () => window.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncBrowserPushPreference = () => {
+      setBrowserPushEnabled(window.localStorage.getItem(BROWSER_PUSH_PREF_KEY) === "true");
+    };
+
+    syncBrowserPushPreference();
+    window.addEventListener("storage", syncBrowserPushPreference);
+    window.addEventListener("crewhub:browser-push-pref-updated", syncBrowserPushPreference);
+
+    return () => {
+      window.removeEventListener("storage", syncBrowserPushPreference);
+      window.removeEventListener("crewhub:browser-push-pref-updated", syncBrowserPushPreference);
+    };
+  }, []);
+
   /* Poll every 60s */
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -57,6 +82,45 @@ export function NotificationCenter() {
     }, POLL_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
   }, [notifications, refreshAnnouncements]);
+
+  useEffect(() => {
+    const currentNotifications = notifications.data?.notifications ?? [];
+
+    if (!bootstrappedBrowserAlerts.current) {
+      for (const notification of currentNotifications) {
+        browserAlertedNotificationIds.current.add(notification.id);
+      }
+      bootstrappedBrowserAlerts.current = true;
+      return;
+    }
+
+    if (
+      !browserPushEnabled ||
+      typeof window === "undefined" ||
+      !("Notification" in window) ||
+      Notification.permission !== "granted"
+    ) {
+      return;
+    }
+
+    for (const notification of currentNotifications) {
+      if (notification.isRead || browserAlertedNotificationIds.current.has(notification.id)) {
+        continue;
+      }
+
+      const browserNotification = new Notification(notification.title, {
+        body: notification.body
+      });
+
+      browserNotification.onclick = () => {
+        window.focus();
+        window.location.href = notification.link ?? "/notifications";
+        browserNotification.close();
+      };
+
+      browserAlertedNotificationIds.current.add(notification.id);
+    }
+  }, [browserPushEnabled, notifications.data?.notifications]);
 
   /* Build unified feed — only unread, filtered by optimistic dismissals */
   const feedItems: FeedItem[] = useMemo(() => {
@@ -196,7 +260,7 @@ export function NotificationCenter() {
       <button
         className="icon-button notification-trigger"
         type="button"
-        aria-label="Open notifications"
+        aria-label={t("openLabel")}
         onClick={() => setIsOpen((currentValue) => !currentValue)}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -225,9 +289,9 @@ export function NotificationCenter() {
           aria-label="Notifications"
         >
           <div className="notification-dropdown-header">
-            <p className="section-title">Notifications</p>
+            <p className="section-title">{t("title")}</p>
             {totalCount > 0 ? (
-              <span className="pill numeric">{totalCount} new</span>
+              <span className="pill numeric">{t("newBadge", { count: totalCount })}</span>
             ) : null}
           </div>
 
@@ -238,14 +302,14 @@ export function NotificationCenter() {
               disabled={totalCount === 0}
               onClick={() => void handleDismissAll()}
             >
-              Dismiss all
+              {t("dismissAll")}
             </button>
             <Link
               className="table-row-action"
               href="/announcements"
               onClick={() => setIsOpen(false)}
             >
-              View all
+              {t("viewAll")}
             </Link>
           </div>
 
@@ -284,7 +348,7 @@ export function NotificationCenter() {
                         >
                           {item.source === "announcement" ? (
                             <span className="notification-source-label">
-                              Announcement
+                              {t("sourceAnnouncement")}
                             </span>
                           ) : null}
                           <p className="notification-title">{item.title}</p>
@@ -316,14 +380,14 @@ export function NotificationCenter() {
                         className="table-row-action"
                         onClick={() => void handleDismiss(item)}
                       >
-                        Dismiss
+                        {t("dismiss")}
                       </button>
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="notification-footer">
-                  All caught up. No new notifications.
+                  {t("emptyMessage")}
                 </p>
               )}
             </>

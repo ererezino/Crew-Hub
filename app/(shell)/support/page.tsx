@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { PageHeader } from "../../../components/shared/page-header";
 
@@ -51,65 +52,52 @@ const icons = {
   ),
 };
 
-const cards: { icon: ReactNode; title: string; body: ReactNode }[] = [
-  {
-    icon: icons.alertCircle,
-    title: "Report a Bug",
-    body: (
-      <>
-        Spotted something broken or not working right? Ping{" "}
-        <strong>Zino</strong> or <strong>Eniibukun</strong> on Basecamp and
-        we&rsquo;ll get it sorted.
-      </>
-    )
-  },
-  {
-    icon: icons.helpCircle,
-    title: "Feature Questions",
-    body: (
-      <>
-        Some features are marked <em>Pilot</em>, <em>Coming Soon</em>, or{" "}
-        <em>Preview</em>. These labels show the current availability status.
-        Ask your manager or admin if you have questions about what&rsquo;s
-        available.
-      </>
-    )
-  },
-  {
-    icon: icons.lock,
-    title: "Account & Access",
-    body: (
-      <>
-        Need a password reset, role change, or help with access issues? Reach
-        out to Operations directly.
-      </>
-    )
-  },
-  {
-    icon: icons.shieldCheck,
-    title: "Data & Privacy",
-    body: (
-      <>
-        For data export requests, account deletion, or privacy questions, see
-        our{" "}
-        <Link
-          href="/privacy"
-          style={{ color: "var(--color-accent)", textDecoration: "underline" }}
-        >
-          Privacy Policy
-        </Link>
-        .
-      </>
-    )
-  }
-];
+export default async function SupportPage() {
+  const t = await getTranslations('support');
 
-export default function SupportPage() {
+  const cards: { icon: ReactNode; title: string; body: ReactNode }[] = [
+    {
+      icon: icons.alertCircle,
+      title: t("reportBug"),
+      body: t('reportBugBody')
+    },
+    {
+      icon: icons.helpCircle,
+      title: t("featureQuestions"),
+      body: t('featureQuestionsBody')
+    },
+    {
+      icon: icons.lock,
+      title: t("accountAccess"),
+      body: (
+        <>
+          {t('accountAccessBody')} {`Basecamp is monitored for urgent internal access issues.`}
+        </>
+      )
+    },
+    {
+      icon: icons.shieldCheck,
+      title: t("dataPrivacy"),
+      body: (
+        <>
+          {t('dataPrivacyBody')}{" "}
+          <Link
+            href="/privacy"
+            style={{ color: "var(--color-accent)", textDecoration: "underline" }}
+          >
+            {t('privacyPolicy')}
+          </Link>
+          . {"If you need a data export, request it from Settings > Data export."}
+        </>
+      )
+    }
+  ];
+
   return (
     <>
       <PageHeader
-        title="Help & Support"
-        description="How to get help, report bugs, and find answers."
+        title={t('title')}
+        description={t('description')}
       />
 
       <div

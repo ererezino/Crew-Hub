@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
@@ -15,17 +17,19 @@ function canManageCompensationBands(roles: readonly UserRole[]): boolean {
 
 export default async function CompensationBandsPage() {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("compensationBands");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Compensation Bands"
-          description="Define salary ranges, benchmark market data, and monitor out-of-band alerts."
+          title={t("pageTitle")}
+          description={t("pageDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );
@@ -35,12 +39,12 @@ export default async function CompensationBandsPage() {
     return (
       <>
         <PageHeader
-          title="Compensation Bands"
-          description="Define salary ranges, benchmark market data, and monitor out-of-band alerts."
+          title={t("pageTitle")}
+          description={t("pageDescription")}
         />
         <EmptyState
-          title="Access denied"
-          description="Only HR Admin, Finance Admin, and Super Admin can manage compensation bands."
+          title={tCommon("emptyState.accessDenied")}
+          description={t("accessDeniedDescription")}
         />
       </>
     );

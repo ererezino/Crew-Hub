@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 type SupportLinkProps = {
   variant?: "footer" | "inline" | "button";
@@ -9,10 +12,11 @@ type SupportLinkProps = {
  * Support / Help link — navigates to the /support page.
  */
 export function SupportLink({ variant = "footer", isActive = false }: SupportLinkProps) {
+  const t = useTranslations("nav");
   if (variant === "inline") {
     return (
       <Link href="/support" className="link-text">
-        Help & Support
+        {t("support")}
       </Link>
     );
   }
@@ -20,7 +24,7 @@ export function SupportLink({ variant = "footer", isActive = false }: SupportLin
   if (variant === "button") {
     return (
       <Link href="/support" className="button button-ghost">
-        Help & Support
+        {t("support")}
       </Link>
     );
   }
@@ -54,7 +58,7 @@ export function SupportLink({ variant = "footer", isActive = false }: SupportLin
         />
         <circle cx="12" cy="17" r=".5" fill="currentColor" stroke="currentColor" strokeWidth="0.5" />
       </svg>
-      <span className="sidebar-link-text">Help & Support</span>
+      <span className="sidebar-link-text">{t("support")}</span>
     </Link>
   );
 }

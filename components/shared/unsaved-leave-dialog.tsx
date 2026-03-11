@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { confirmUnsavedLeave } from "../../hooks/use-unsaved-guard";
 
@@ -10,6 +11,7 @@ import { confirmUnsavedLeave } from "../../hooks/use-unsaved-guard";
  * and shows a styled confirmation dialog.
  */
 export function UnsavedLeaveDialog() {
+  const t = useTranslations("common.unsavedDialog");
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
@@ -30,11 +32,11 @@ export function UnsavedLeaveDialog() {
   if (!isOpen) return null;
 
   return (
-    <div className="unsaved-dialog-overlay" role="dialog" aria-modal="true" aria-label="Unsaved changes">
+    <div className="unsaved-dialog-overlay" role="dialog" aria-modal="true" aria-label={t("title")}>
       <div className="unsaved-dialog">
-        <h3 className="unsaved-dialog-title">Unsaved changes</h3>
+        <h3 className="unsaved-dialog-title">{t("title")}</h3>
         <p className="unsaved-dialog-body">
-          You have unsaved changes that will be lost if you leave this page.
+          {t("body")}
         </p>
         <div className="unsaved-dialog-actions">
           <button
@@ -43,14 +45,14 @@ export function UnsavedLeaveDialog() {
             onClick={handleStay}
             autoFocus
           >
-            Stay on page
+            {t("stay")}
           </button>
           <button
             type="button"
             className="unsaved-dialog-btn unsaved-dialog-leave"
             onClick={handleLeave}
           >
-            Leave page
+            {t("leave")}
           </button>
         </div>
       </div>

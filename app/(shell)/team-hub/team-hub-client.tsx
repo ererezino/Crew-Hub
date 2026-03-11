@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -82,6 +83,9 @@ function getHubCounts(hub: TeamHub) {
 /* ── Component ── */
 
 export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClientProps) {
+  const t = useTranslations('teamHub');
+  const tCommon = useTranslations('common');
+
   const [hubs, setHubs] = useState<TeamHub[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,18 +103,18 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
       const response = await fetch("/api/v1/team-hubs");
 
       if (!response.ok) {
-        throw new Error("Failed to load team hubs.");
+        throw new Error(t('errorLoadFailed'));
       }
 
       const envelope = await response.json();
       const items: TeamHub[] = Array.isArray(envelope) ? envelope : envelope.data?.hubs ?? [];
       setHubs(items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setError(err instanceof Error ? err.message : t('errorUnexpected'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchHubs();
@@ -172,7 +176,7 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
 
         if (!res.ok) {
           const envelope = await res.json().catch(() => null);
-          throw new Error(envelope?.error?.message ?? "Failed to create hub.");
+          throw new Error(envelope?.error?.message ?? t('errorCreateFailed'));
         }
 
         setIsCreateOpen(false);
@@ -180,20 +184,20 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
         form.reset();
         fetchHubs();
       } catch (err) {
-        setCreateError(err instanceof Error ? err.message : "Failed to create hub.");
+        setCreateError(err instanceof Error ? err.message : t('errorCreateFailed'));
       } finally {
         setCreateBusy(false);
       }
     },
-    [fetchHubs]
+    [fetchHubs, t]
   );
 
   if (loading) {
     return (
       <>
         <PageHeader
-          title="Team Hub"
-          description="Your department's knowledge base: guides, contacts, and resources."
+          title={t('title')}
+          description={t('description')}
         />
         <div className="thub-grid">
           {[1, 2, 3].map((n) => (
@@ -222,13 +226,13 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
     return (
       <>
         <PageHeader
-          title="Team Hub"
-          description="Your department's knowledge base: guides, contacts, and resources."
+          title={t('title')}
+          description={t('description')}
         />
         <EmptyState
-          title="Unable to load hubs"
+          title={t('unavailable')}
           description={error}
-          ctaLabel="Retry"
+          ctaLabel={tCommon('retry')}
           onCtaClick={fetchHubs}
         />
       </>
@@ -239,12 +243,12 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
     return (
       <>
         <PageHeader
-          title="Team Hub"
-          description="Your department's knowledge base: guides, contacts, and resources."
+          title={t('title')}
+          description={t('description')}
         />
         <EmptyState
-          title="No team hubs yet"
-          description="Your organization hasn't set up any team hubs. Contact an admin to get started."
+          title={t('noHubs')}
+          description={t('noHubsDescription')}
         />
       </>
     );
@@ -262,8 +266,8 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
   return (
     <>
       <PageHeader
-        title="Team Hub"
-        description="Your department's knowledge base: guides, contacts, and resources."
+        title={t('title')}
+        description={t('description')}
         actions={
           isAdmin ? (
             <button
@@ -274,7 +278,7 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
                 setIsCreateOpen(true);
               }}
             >
-              Create Hub
+              {t('createHub')}
             </button>
           ) : undefined
         }
@@ -282,7 +286,7 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
 
       <FeatureBanner
         moduleId="team_hub"
-        description="Team Hub is in limited pilot. Access and workflows may evolve as rollout expands."
+        description={t('featureBanner')}
       />
 
       <div className="thub-grid">
@@ -308,7 +312,7 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
                         <NavIcon name={getDeptIcon(hub.department, hub.icon)} size={20} />
                       </span>
                       <span className="thub-card-your-team">
-                        Your team
+                        {t('yourTeam')}
                       </span>
                     </div>
 
@@ -321,11 +325,11 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
                     <div className="thub-card-stats">
                       <span className="thub-card-stat">
                         <NavIcon name="Layers" size={13} />
-                        {counts.sections} {counts.sections === 1 ? "section" : "sections"}
+                        {t('sectionCount', { count: counts.sections })}
                       </span>
                       <span className="thub-card-stat">
                         <NavIcon name="FileText" size={13} />
-                        {counts.pages} {counts.pages === 1 ? "page" : "pages"}
+                        {t('pageCount', { count: counts.pages })}
                       </span>
                     </div>
                   </div>
@@ -344,7 +348,7 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
                   </span>
                   <span className="thub-card-lock-badge">
                     <NavIcon name="Lock" size={12} />
-                    Restricted
+                    {t('restricted')}
                   </span>
                 </div>
 
@@ -356,12 +360,15 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
 
                 <div className="thub-locked-overlay">
                   <p className="thub-locked-text">
-                    Only <strong>{hub.department}</strong> teammates can access this hub.
+                    {t.rich('restrictedMessage', {
+                      department: hub.department ?? "",
+                      strong: (chunks) => <strong>{chunks}</strong>
+                    })}
                   </p>
                   {requested ? (
                     <span className="thub-request-sent">
                       <NavIcon name="CheckCircle" size={13} />
-                      Request sent
+                      {t('requestSent')}
                     </span>
                   ) : (
                     <button
@@ -371,7 +378,7 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
                       disabled={requesting}
                     >
                       <NavIcon name="Send" size={12} />
-                      {requesting ? "Sending…" : "Request access"}
+                      {requesting ? t('sending') : t('requestAccess')}
                     </button>
                   )}
                 </div>
@@ -383,8 +390,8 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
 
       <SlidePanel
         isOpen={isCreateOpen}
-        title="Create Hub"
-        description="Add a new knowledge base for your team."
+        title={t('createHubPanel')}
+        description={t('createHubDescription')}
         onClose={() => {
           if (!createBusy) {
             setCreateError(null);
@@ -394,38 +401,38 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
       >
         <form onSubmit={handleCreateHub} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <label className="field-label">
-            Name
+            {t('nameLabel')}
             <input
               name="name"
               type="text"
               className="input"
               required
               maxLength={200}
-              placeholder="e.g. Engineering Hub"
+              placeholder={t('namePlaceholder')}
               autoFocus
             />
           </label>
 
           <label className="field-label">
-            Department
+            {t('departmentLabel')}
             <input
               name="department"
               type="text"
               className="input"
               maxLength={100}
-              placeholder="e.g. Engineering"
+              placeholder={t('departmentPlaceholder')}
               defaultValue={userDepartment ?? ""}
             />
           </label>
 
           <label className="field-label">
-            Description
+            {t('descriptionLabel')}
             <textarea
               name="description"
               className="input"
               rows={3}
               maxLength={2000}
-              placeholder="What is this hub for?"
+              placeholder={t('descriptionPlaceholder')}
             />
           </label>
 
@@ -440,10 +447,10 @@ export function TeamHubClient({ isAdmin, userDepartment, userName }: TeamHubClie
                 setIsCreateOpen(false);
               }}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={createBusy}>
-              {createBusy ? "Creating…" : "Create Hub"}
+              {createBusy ? t('creating') : t('createHub')}
             </button>
           </div>
         </form>

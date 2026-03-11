@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { PageHeader } from "../../../../../components/shared/page-header";
 import type {
@@ -80,6 +81,7 @@ const DEFAULT_FORM: SurveyFormValues = {
 
 export function NewSurveyClient() {
   const router = useRouter();
+  const t = useTranslations('newSurvey');
 
   const [formValues, setFormValues] = useState<SurveyFormValues>(DEFAULT_FORM);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,33 +92,33 @@ export function NewSurveyClient() {
     const errors: Record<string, string> = {};
 
     if (formValues.title.trim().length === 0) {
-      errors.title = "Survey title is required.";
+      errors.title = t('titleRequired');
     }
 
     const minResponses = Number.parseInt(formValues.minResponsesForResults, 10);
 
     if (!Number.isInteger(minResponses) || minResponses < 1 || minResponses > 100) {
-      errors.minResponsesForResults = "Minimum responses must be between 1 and 100.";
+      errors.minResponsesForResults = t('minResponsesError');
     }
 
     if (formValues.startDate && formValues.endDate && formValues.endDate < formValues.startDate) {
-      errors.endDate = "End date cannot be earlier than start date.";
+      errors.endDate = t('endDateError');
     }
 
     if (formValues.questions.length === 0) {
-      errors.questions = "Add at least one question.";
+      errors.questions = t('questionsRequired');
     }
 
     formValues.questions.forEach((question, index) => {
       if (question.text.trim().length === 0) {
-        errors[`questions.${index}.text`] = "Question text is required.";
+        errors[`questions.${index}.text`] = t('promptRequired');
       }
 
       if (question.type === "rating") {
         const scaleValue = Number.parseInt(question.scale, 10);
 
         if (!Number.isInteger(scaleValue) || scaleValue < 2 || scaleValue > 10) {
-          errors[`questions.${index}.scale`] = "Rating scale must be between 2 and 10.";
+          errors[`questions.${index}.scale`] = t('scaleMaxError');
         }
       }
 
@@ -124,13 +126,13 @@ export function NewSurveyClient() {
         const options = parseCommaSeparated(question.optionsText);
 
         if (options.length === 0) {
-          errors[`questions.${index}.optionsText`] = "Provide at least one option.";
+          errors[`questions.${index}.optionsText`] = t('optionsRequired');
         }
       }
     });
 
     return errors;
-  }, [formValues]);
+  }, [formValues, t]);
 
   const hasValidationErrors = Object.keys(validationErrors).length > 0;
 
@@ -166,7 +168,7 @@ export function NewSurveyClient() {
     setSubmitMessage(null);
 
     if (hasValidationErrors) {
-      setSubmitError("Fix validation errors before creating this survey.");
+      setSubmitError(t('validationError'));
       return;
     }
 
@@ -213,14 +215,14 @@ export function NewSurveyClient() {
       const body = (await response.json()) as SurveyMutationResponse;
 
       if (!response.ok || !body.data?.survey) {
-        setSubmitError(body.error?.message ?? "Unable to create survey.");
+        setSubmitError(body.error?.message ?? t('errorCreate'));
         return;
       }
 
-      setSubmitMessage("Survey created successfully.");
+      setSubmitMessage(t('successCreate'));
       router.push("/admin/surveys");
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to create survey.");
+      setSubmitError(error instanceof Error ? error.message : t('errorCreate'));
     } finally {
       setIsSubmitting(false);
     }
@@ -229,21 +231,21 @@ export function NewSurveyClient() {
   return (
     <>
       <PageHeader
-        title="New Survey"
-        description="Build a question set, configure audience targeting, and save as draft or active."
+        title={t('title')}
+        description={t('description')}
         actions={
           <Link href="/admin/surveys" className="button">
-            Back to survey admin
+            {t('backToAdmin')}
           </Link>
         }
       />
 
       <form className="settings-layout" onSubmit={handleSubmit}>
         <article className="settings-card">
-          <h2 className="section-title">Survey details</h2>
+          <h2 className="section-title">{t('detailsTitle')}</h2>
 
           <label className="form-field">
-            <span className="form-label">Title *</span>
+            <span className="form-label">{t('titleLabel')}</span>
             <input
               type="text"
               className={`form-input ${validationErrors.title ? "form-input-error" : ""}`}
@@ -259,7 +261,7 @@ export function NewSurveyClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Description</span>
+            <span className="form-label">{t('descriptionLabel')}</span>
             <textarea
               className="form-input"
               rows={4}
@@ -275,7 +277,7 @@ export function NewSurveyClient() {
 
           <div className="audit-filters">
             <label className="form-field">
-              <span className="form-label">Type</span>
+              <span className="form-label">{t('typeLabel')}</span>
               <select
                 className="form-input"
                 value={formValues.type}
@@ -286,16 +288,16 @@ export function NewSurveyClient() {
                   }))
                 }
               >
-                <option value="engagement">Engagement</option>
-                <option value="pulse">Pulse</option>
-                <option value="onboarding">Onboarding</option>
-                <option value="exit">Exit</option>
-                <option value="custom">Custom</option>
+                <option value="engagement">{t('typeEngagement')}</option>
+                <option value="pulse">{t('typePulse')}</option>
+                <option value="onboarding">{t('typeOnboarding')}</option>
+                <option value="exit">{t('typeExit')}</option>
+                <option value="custom">{t('typeCustom')}</option>
               </select>
             </label>
 
             <label className="form-field">
-              <span className="form-label">Status</span>
+              <span className="form-label">{t('statusLabel')}</span>
               <select
                 className="form-input"
                 value={formValues.status}
@@ -306,13 +308,13 @@ export function NewSurveyClient() {
                   }))
                 }
               >
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
+                <option value="draft">{t('statusDraft')}</option>
+                <option value="active">{t('statusActive')}</option>
               </select>
             </label>
 
             <label className="form-field">
-              <span className="form-label">Minimum responses *</span>
+              <span className="form-label">{t('minResponsesLabel')}</span>
               <input
                 type="number"
                 min={1}
@@ -336,7 +338,7 @@ export function NewSurveyClient() {
 
           <div className="audit-filters">
             <label className="form-field">
-              <span className="form-label">Start date</span>
+              <span className="form-label">{t('startDateLabel')}</span>
               <input
                 type="date"
                 className="form-input"
@@ -351,7 +353,7 @@ export function NewSurveyClient() {
             </label>
 
             <label className="form-field">
-              <span className="form-label">End date</span>
+              <span className="form-label">{t('endDateLabel')}</span>
               <input
                 type="date"
                 className={`form-input ${validationErrors.endDate ? "form-input-error" : ""}`}
@@ -367,7 +369,7 @@ export function NewSurveyClient() {
             </label>
 
             <label className="form-field">
-              <span className="form-label">Recurrence</span>
+              <span className="form-label">{t('recurrenceLabel')}</span>
               <select
                 className="form-input"
                 value={formValues.recurrence}
@@ -378,10 +380,10 @@ export function NewSurveyClient() {
                   }))
                 }
               >
-                <option value="">No recurrence</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
+                <option value="">{t('recurrenceNone')}</option>
+                <option value="weekly">{t('recurrenceWeekly')}</option>
+                <option value="monthly">{t('recurrenceMonthly')}</option>
+                <option value="quarterly">{t('recurrenceQuarterly')}</option>
               </select>
             </label>
           </div>
@@ -397,23 +399,23 @@ export function NewSurveyClient() {
                 }))
               }
             />
-            <span>Anonymous responses</span>
+            <span>{t('anonymousLabel')}</span>
           </label>
         </article>
 
         <article className="settings-card">
-          <h2 className="section-title">Audience filters</h2>
+          <h2 className="section-title">{t('audienceTitle')}</h2>
           <p className="settings-card-description">
-            Leave filters empty to target all employees. Use comma-separated values.
+            {t('audienceDescription')}
           </p>
 
           <div className="audit-filters">
             <label className="form-field">
-              <span className="form-label">Departments</span>
+              <span className="form-label">{t('departmentsLabel')}</span>
               <input
                 type="text"
                 className="form-input"
-                placeholder="Engineering, Operations"
+                placeholder={t('departmentsPlaceholder')}
                 value={formValues.departments}
                 onChange={(event) =>
                   setFormValues((currentValue) => ({
@@ -425,11 +427,11 @@ export function NewSurveyClient() {
             </label>
 
             <label className="form-field">
-              <span className="form-label">Employment types</span>
+              <span className="form-label">{t('employmentTypesLabel')}</span>
               <input
                 type="text"
                 className="form-input"
-                placeholder="contractor, full_time"
+                placeholder={t('employmentTypesPlaceholder')}
                 value={formValues.employmentTypes}
                 onChange={(event) =>
                   setFormValues((currentValue) => ({
@@ -441,11 +443,11 @@ export function NewSurveyClient() {
             </label>
 
             <label className="form-field">
-              <span className="form-label">Countries</span>
+              <span className="form-label">{t('countriesLabel')}</span>
               <input
                 type="text"
                 className="form-input"
-                placeholder="NG, GH, KE"
+                placeholder={t('countriesPlaceholder')}
                 value={formValues.countries}
                 onChange={(event) =>
                   setFormValues((currentValue) => ({
@@ -461,23 +463,23 @@ export function NewSurveyClient() {
         <article className="settings-card">
           <header className="announcements-section-header">
             <div>
-              <h2 className="section-title">Questions</h2>
+              <h2 className="section-title">{t('questionsTitle')}</h2>
               <p className="settings-card-description">
-                Build rating, text, select, and likert questions.
+                {t('questionsDescription')}
               </p>
             </div>
             <div className="documents-row-actions" style={{ opacity: 1, transform: "none", pointerEvents: "auto" }}>
               <button type="button" className="button" onClick={() => addQuestion("rating")}>
-                Add rating
+                {t('addRating')}
               </button>
               <button type="button" className="button" onClick={() => addQuestion("text")}>
-                Add text
+                {t('addText')}
               </button>
               <button type="button" className="button" onClick={() => addQuestion("select")}>
-                Add select
+                {t('addSelect')}
               </button>
               <button type="button" className="button" onClick={() => addQuestion("likert")}>
-                Add likert
+                {t('addLikert')}
               </button>
             </div>
           </header>
@@ -487,19 +489,19 @@ export function NewSurveyClient() {
           {formValues.questions.map((question, index) => (
             <article key={question.id} className="timeoff-balance-card">
               <header className="announcement-item-header">
-                <h3 className="section-title">Question {index + 1}</h3>
+                <h3 className="section-title">{t('questionNumber', { number: index + 1 })}</h3>
                 <button
                   type="button"
                   className="table-row-action"
                   onClick={() => removeQuestion(index)}
                   disabled={formValues.questions.length <= 1}
                 >
-                  Remove
+                  {t('removeQuestion')}
                 </button>
               </header>
 
               <label className="form-field">
-                <span className="form-label">Prompt *</span>
+                <span className="form-label">{t('promptLabel')}</span>
                 <input
                   type="text"
                   className={`form-input ${validationErrors[`questions.${index}.text`] ? "form-input-error" : ""}`}
@@ -518,7 +520,7 @@ export function NewSurveyClient() {
 
               <div className="audit-filters">
                 <label className="form-field">
-                  <span className="form-label">Type</span>
+                  <span className="form-label">{t('questionTypeLabel')}</span>
                   <select
                     className="form-input"
                     value={question.type}
@@ -541,16 +543,16 @@ export function NewSurveyClient() {
                       })
                     }
                   >
-                    <option value="rating">Rating</option>
-                    <option value="text">Text</option>
-                    <option value="select">Select</option>
-                    <option value="likert">Likert</option>
+                    <option value="rating">{t('questionTypeRating')}</option>
+                    <option value="text">{t('questionTypeText')}</option>
+                    <option value="select">{t('questionTypeSelect')}</option>
+                    <option value="likert">{t('questionTypeLikert')}</option>
                   </select>
                 </label>
 
                 {question.type === "rating" ? (
                   <label className="form-field">
-                    <span className="form-label">Scale max</span>
+                    <span className="form-label">{t('scaleMaxLabel')}</span>
                     <input
                       type="number"
                       min={2}
@@ -583,13 +585,13 @@ export function NewSurveyClient() {
                       }))
                     }
                   />
-                  <span>Required</span>
+                  <span>{t('requiredLabel')}</span>
                 </label>
               </div>
 
               {(question.type === "select" || question.type === "likert") ? (
                 <label className="form-field">
-                  <span className="form-label">Options (comma-separated)</span>
+                  <span className="form-label">{t('optionsLabel')}</span>
                   <input
                     type="text"
                     className={`form-input ${
@@ -617,7 +619,7 @@ export function NewSurveyClient() {
 
         <div className="settings-actions">
           <button type="submit" className="button button-accent" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Create survey"}
+            {isSubmitting ? t('creating') : t('createSurvey')}
           </button>
         </div>
       </form>

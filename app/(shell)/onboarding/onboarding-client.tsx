@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState, type FormEvent } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -23,6 +24,8 @@ import {
   type OnboardingTemplateCreateResponse,
   type OnboardingType
 } from "../../../types/onboarding";
+
+type AppLocale = "en" | "fr";
 
 type OnboardingClientProps = {
   instanceScope: "all" | "reports" | "me";
@@ -161,59 +164,61 @@ function createToastId() {
 }
 
 function validateStartOnboardingForm(
-  values: StartOnboardingFormValues
+  values: StartOnboardingFormValues,
+  td: (key: string, params?: Record<string, unknown>) => string
 ): StartOnboardingFormErrors {
   const errors: StartOnboardingFormErrors = {};
 
   if (values.employeeId.trim().length === 0) {
-    errors.employeeId = "Select an employee.";
+    errors.employeeId = td('startPanel.errors.employeeRequired');
   }
 
   if (values.templateId.trim().length === 0) {
-    errors.templateId = "Select a template.";
+    errors.templateId = td('startPanel.errors.templateRequired');
   }
 
   if (!ONBOARDING_TYPES.includes(values.type)) {
-    errors.type = "Select a valid onboarding type.";
+    errors.type = td('startPanel.errors.invalidType');
   }
 
   if (
     values.startedAt.trim().length > 0 &&
     !/^\d{4}-\d{2}-\d{2}$/.test(values.startedAt.trim())
   ) {
-    errors.startedAt = "Start date must be YYYY-MM-DD.";
+    errors.startedAt = td('startPanel.errors.invalidDate');
   }
 
   return errors;
 }
 
 function validateCreateTemplateForm(
-  values: CreateTemplateFormValues
+  values: CreateTemplateFormValues,
+  td: (key: string, params?: Record<string, unknown>) => string
 ): CreateTemplateFormErrors {
   const errors: CreateTemplateFormErrors = {
     taskErrors: values.tasks.map(() => ({}))
   };
 
   if (values.name.trim().length === 0) {
-    errors.name = "Template name is required.";
+    errors.name = td('createTemplatePanel.errors.nameRequired');
   } else if (values.name.trim().length > 200) {
-    errors.name = "Template name is too long.";
+    errors.name = td('createTemplatePanel.errors.nameTooLong');
   }
 
   if (!ONBOARDING_TYPES.includes(values.type)) {
-    errors.type = "Select a valid onboarding type.";
+    errors.type = td('createTemplatePanel.errors.invalidType');
   }
 
   if (values.countryCode.trim().length > 0 && !/^[a-zA-Z]{2}$/.test(values.countryCode.trim())) {
-    errors.countryCode = "Country code must be 2 letters.";
+    errors.countryCode = td('createTemplatePanel.errors.countryCodeInvalid');
   }
 
   if (values.department.trim().length > 100) {
-    errors.department = "Department is too long.";
+    errors.department = td('createTemplatePanel.errors.departmentTooLong');
   }
 
   if (values.tasks.length === 0) {
-    errors.tasks = "Add at least one task.";
+    errors.tasks = td('createTemplatePanel.errors.noTasks');
     return errors;
   }
 
@@ -221,19 +226,19 @@ function validateCreateTemplateForm(
     const taskErrors: TemplateTaskDraftErrors = {};
 
     if (task.title.trim().length === 0) {
-      taskErrors.title = "Title is required.";
+      taskErrors.title = td('createTemplatePanel.errors.taskTitleRequired');
     } else if (task.title.trim().length > 200) {
-      taskErrors.title = "Title is too long.";
+      taskErrors.title = td('createTemplatePanel.errors.taskTitleTooLong');
     }
 
     if (task.description.trim().length > 1000) {
-      taskErrors.description = "Description is too long.";
+      taskErrors.description = td('createTemplatePanel.errors.taskDescriptionTooLong');
     }
 
     if (task.category.trim().length === 0) {
-      taskErrors.category = "Category is required.";
+      taskErrors.category = td('createTemplatePanel.errors.taskCategoryRequired');
     } else if (task.category.trim().length > 50) {
-      taskErrors.category = "Category is too long.";
+      taskErrors.category = td('createTemplatePanel.errors.taskCategoryTooLong');
     }
 
     if (task.dueOffsetDays.trim().length > 0) {
@@ -241,9 +246,9 @@ function validateCreateTemplateForm(
       const isInteger = Number.isInteger(parsedOffset);
 
       if (!isInteger) {
-        taskErrors.dueOffsetDays = "Due offset must be a whole number.";
+        taskErrors.dueOffsetDays = td('createTemplatePanel.errors.dueOffsetNotInteger');
       } else if (parsedOffset < -365 || parsedOffset > 365) {
-        taskErrors.dueOffsetDays = "Due offset must be between -365 and 365.";
+        taskErrors.dueOffsetDays = td('createTemplatePanel.errors.dueOffsetOutOfRange');
       }
     }
 
@@ -252,19 +257,19 @@ function validateCreateTemplateForm(
         const parsedUrl = new URL(task.actionUrl.trim());
 
         if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-          taskErrors.actionUrl = "Action URL must start with http:// or https://.";
+          taskErrors.actionUrl = td('createTemplatePanel.errors.actionUrlProtocol');
         }
       } catch {
-        taskErrors.actionUrl = "Action URL must be a valid URL.";
+        taskErrors.actionUrl = td('createTemplatePanel.errors.actionUrlInvalid');
       }
     }
 
     if (task.actionLabel.trim().length > 120) {
-      taskErrors.actionLabel = "Action label is too long.";
+      taskErrors.actionLabel = td('createTemplatePanel.errors.actionLabelTooLong');
     }
 
     if (task.completionGuidance.trim().length > 1000) {
-      taskErrors.completionGuidance = "Completion guidance is too long.";
+      taskErrors.completionGuidance = td('createTemplatePanel.errors.completionGuidanceTooLong');
     }
 
     errors.taskErrors[index] = taskErrors;
@@ -315,6 +320,11 @@ export function OnboardingClient({
   canViewTemplates,
   canManageOnboarding
 }: OnboardingClientProps) {
+  const t = useTranslations('onboarding');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const [activeTab, setActiveTab] = useState<OnboardingTab>("active");
   const [sortKey, setSortKey] = useState<InstanceSortKey>("startedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -358,22 +368,22 @@ export function OnboardingClient({
     () =>
       (canViewTemplates
         ? [
-            { id: "active", label: "Active" },
-            { id: "completed", label: "Completed" },
-            { id: "at_risk", label: "At Risk" },
-            { id: "templates", label: "Templates" }
+            { id: "active", label: t('tabs.active') },
+            { id: "completed", label: t('tabs.completed') },
+            { id: "at_risk", label: t('tabs.atRisk') },
+            { id: "templates", label: t('tabs.templates') }
           ]
         : canManageOnboarding
           ? [
-              { id: "active", label: "Active" },
-              { id: "completed", label: "Completed" },
-              { id: "at_risk", label: "At Risk" }
+              { id: "active", label: t('tabs.active') },
+              { id: "completed", label: t('tabs.completed') },
+              { id: "at_risk", label: t('tabs.atRisk') }
             ]
           : [
-              { id: "active", label: "Active" },
-              { id: "completed", label: "Completed" }
+              { id: "active", label: t('tabs.active') },
+              { id: "completed", label: t('tabs.completed') }
             ]) as Array<{ id: OnboardingTab; label: string }>,
-    [canViewTemplates, canManageOnboarding]
+    [canViewTemplates, canManageOnboarding, t]
   );
 
   const activeInstances = useMemo(
@@ -454,7 +464,7 @@ export function OnboardingClient({
     setStartValues((currentValues) => {
       const resolvedValues =
         typeof nextValues === "function" ? nextValues(currentValues) : nextValues;
-      setStartErrors(validateStartOnboardingForm(resolvedValues));
+      setStartErrors(validateStartOnboardingForm(resolvedValues, td));
       return resolvedValues;
     });
   };
@@ -467,7 +477,7 @@ export function OnboardingClient({
     setTemplateValues((currentValues) => {
       const resolvedValues =
         typeof nextValues === "function" ? nextValues(currentValues) : nextValues;
-      setTemplateErrors(validateCreateTemplateForm(resolvedValues));
+      setTemplateErrors(validateCreateTemplateForm(resolvedValues, td));
       return resolvedValues;
     });
     setTemplateFormDirty(true);
@@ -476,7 +486,7 @@ export function OnboardingClient({
   const handleStartOnboarding = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const validationErrors = validateStartOnboardingForm(startValues);
+    const validationErrors = validateStartOnboardingForm(startValues, td);
     setStartErrors(validationErrors);
 
     if (hasStartFormErrors(validationErrors)) {
@@ -508,7 +518,7 @@ export function OnboardingClient({
       if (!response.ok || !payload.data?.instance) {
         setStartErrors((currentErrors) => ({
           ...currentErrors,
-          form: payload.error?.message ?? "Unable to start onboarding."
+          form: payload.error?.message ?? td('toast.startFailed')
         }));
         return;
       }
@@ -517,11 +527,11 @@ export function OnboardingClient({
       setActiveTab("active");
       activeInstancesQuery.refresh();
       completedInstancesQuery.refresh();
-      addToast("success", "Onboarding instance started.");
+      addToast("success", td('toast.onboardingStarted'));
     } catch (error) {
       setStartErrors((currentErrors) => ({
         ...currentErrors,
-        form: error instanceof Error ? error.message : "Unable to start onboarding."
+        form: error instanceof Error ? error.message : td('toast.startFailed')
       }));
     } finally {
       setIsStartingOnboarding(false);
@@ -531,7 +541,7 @@ export function OnboardingClient({
   const handleCreateTemplate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const validationErrors = validateCreateTemplateForm(templateValues);
+    const validationErrors = validateCreateTemplateForm(templateValues, td);
     setTemplateErrors(validationErrors);
 
     if (hasCreateTemplateErrors(validationErrors)) {
@@ -578,7 +588,7 @@ export function OnboardingClient({
       if (!response.ok || !payload.data?.template) {
         setTemplateErrors((currentErrors) => ({
           ...currentErrors,
-          form: payload.error?.message ?? "Unable to create template."
+          form: payload.error?.message ?? td('toast.templateCreateFailed')
         }));
         return;
       }
@@ -587,11 +597,11 @@ export function OnboardingClient({
       setActiveTab("templates");
       setPreviewTemplateId(payload.data.template.id);
       templatesQuery.refresh();
-      addToast("success", "Template created.");
+      addToast("success", td('toast.templateCreated'));
     } catch (error) {
       setTemplateErrors((currentErrors) => ({
         ...currentErrors,
-        form: error instanceof Error ? error.message : "Unable to create template."
+        form: error instanceof Error ? error.message : td('toast.templateCreateFailed')
       }));
     } finally {
       setIsCreatingTemplate(false);
@@ -614,15 +624,15 @@ export function OnboardingClient({
       const payload = (await response.json()) as OnboardingRemindResponse;
 
       if (!response.ok || !payload.data?.sent) {
-        addToast("error", payload.error?.message ?? "Unable to send reminder.");
+        addToast("error", payload.error?.message ?? td('toast.unableToSendReminder'));
         return;
       }
 
-      addToast("success", `Reminder sent to ${instance.employeeName}.`);
+      addToast("success", td('toast.reminderSent', { name: instance.employeeName }));
     } catch (error) {
       addToast(
         "error",
-        error instanceof Error ? error.message : "Unable to send reminder."
+        error instanceof Error ? error.message : td('toast.unableToSendReminder')
       );
     } finally {
       setSendingReminderId(null);
@@ -632,8 +642,8 @@ export function OnboardingClient({
   return (
     <>
       <PageHeader
-        title="Onboarding"
-        description="Launch onboarding plans, track progress, and resolve blockers."
+        title={t('pageTitle')}
+        description={t('pageDescription')}
         actions={
           canManageOnboarding ? (
             <>
@@ -642,21 +652,21 @@ export function OnboardingClient({
                 className="button"
                 onClick={() => setIsTemplatePanelOpen(true)}
               >
-                New template
+                {t('actions.newTemplate')}
               </button>
               <button
                 type="button"
                 className="button button-accent"
                 onClick={() => setIsStartPanelOpen(true)}
               >
-                Start onboarding
+                {t('actions.startOnboarding')}
               </button>
             </>
           ) : null
         }
       />
 
-      <section className="page-tabs" aria-label="Onboarding dashboard tabs">
+      <section className="page-tabs" aria-label={t('tabs.ariaLabel')}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -678,9 +688,9 @@ export function OnboardingClient({
 
           {!activeInstancesQueryForTab.isLoading && activeInstancesQueryForTab.errorMessage ? (
             <EmptyState
-              title="Onboarding data is unavailable"
+              title={t('emptyState.unavailable')}
               description={activeInstancesQueryForTab.errorMessage}
-              ctaLabel="Retry"
+              ctaLabel={tCommon('retry')}
               ctaHref="/onboarding"
             />
           ) : null}
@@ -690,10 +700,10 @@ export function OnboardingClient({
           instancesForTab.length === 0 ? (
             <>
               <EmptyState
-                title={`No ${activeTab} onboarding instances`}
-                description="When onboarding records are created, they will appear in this table."
+                title={td(`emptyState.noInstances_${activeTab}`)}
+                description={t('emptyState.noRecords')}
                 {...(canManageOnboarding
-                  ? { ctaLabel: "Start onboarding", onCtaClick: () => setIsStartPanelOpen(true) }
+                  ? { ctaLabel: t('actions.startOnboarding'), onCtaClick: () => setIsStartPanelOpen(true) }
                   : {})}
               />
             </>
@@ -703,7 +713,7 @@ export function OnboardingClient({
           !activeInstancesQueryForTab.errorMessage &&
           instancesForTab.length > 0 ? (
             <div className="data-table-container">
-              <table className="data-table" aria-label="Onboarding instances table">
+              <table className="data-table" aria-label={t('instancesTable.ariaLabel')}>
                 <thead>
                   <tr>
                     <th>
@@ -712,24 +722,24 @@ export function OnboardingClient({
                         className="table-sort-trigger"
                         onClick={() => handleSort("employee")}
                       >
-                        Employee {sortKey === "employee" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
+                        {t('instancesTable.employee')} {sortKey === "employee" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
                       </button>
                     </th>
-                    <th>Template</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Progress</th>
+                    <th>{t('instancesTable.template')}</th>
+                    <th>{t('instancesTable.type')}</th>
+                    <th>{t('instancesTable.status')}</th>
+                    <th>{t('instancesTable.progress')}</th>
                     <th>
                       <button
                         type="button"
                         className="table-sort-trigger"
                         onClick={() => handleSort("startedAt")}
                       >
-                        Started {sortKey === "startedAt" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
+                        {t('instancesTable.started')} {sortKey === "startedAt" ? (sortDirection === "asc" ? "↑" : "↓") : ""}
                       </button>
                     </th>
-                    <th>Completed</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t('instancesTable.completed')}</th>
+                    <th className="table-action-column">{t('instancesTable.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -751,18 +761,18 @@ export function OnboardingClient({
                       <td>
                         <time
                           dateTime={instance.startedAt}
-                          title={formatDateTimeTooltip(instance.startedAt)}
+                          title={formatDateTimeTooltip(instance.startedAt, locale)}
                         >
-                          {formatRelativeTime(instance.startedAt)}
+                          {formatRelativeTime(instance.startedAt, locale)}
                         </time>
                       </td>
                       <td>
                         {instance.completedAt ? (
                           <time
                             dateTime={instance.completedAt}
-                            title={formatDateTimeTooltip(instance.completedAt)}
+                            title={formatDateTimeTooltip(instance.completedAt, locale)}
                           >
-                            {formatRelativeTime(instance.completedAt)}
+                            {formatRelativeTime(instance.completedAt, locale)}
                           </time>
                         ) : (
                           "--"
@@ -771,7 +781,7 @@ export function OnboardingClient({
                       <td className="table-row-action-cell">
                         <div className="onboarding-row-actions">
                           <Link className="table-row-action" href={`/onboarding/${instance.id}`}>
-                            View
+                            {t('actions.view')}
                           </Link>
                         </div>
                       </td>
@@ -790,9 +800,9 @@ export function OnboardingClient({
 
           {!atRiskQuery.isLoading && atRiskQuery.errorMessage ? (
             <EmptyState
-              title="At-risk data is unavailable"
+              title={t('emptyState.atRiskUnavailable')}
               description={atRiskQuery.errorMessage}
-              ctaLabel="Retry"
+              ctaLabel={tCommon('retry')}
               ctaHref="/onboarding"
             />
           ) : null}
@@ -802,9 +812,9 @@ export function OnboardingClient({
           atRiskQuery.instances.length === 0 ? (
             <>
               <EmptyState
-                title="No at-risk onboarding instances"
-                description="All active onboarding plans are progressing on schedule."
-                ctaLabel="View active"
+                title={t('emptyState.noAtRisk')}
+                description={t('emptyState.noAtRiskDescription')}
+                ctaLabel={t('emptyState.viewActive')}
                 onCtaClick={() => setActiveTab("active")}
               />
             </>
@@ -814,15 +824,15 @@ export function OnboardingClient({
           !atRiskQuery.errorMessage &&
           atRiskQuery.instances.length > 0 ? (
             <div className="data-table-container">
-              <table className="data-table" aria-label="At-risk onboarding instances table">
+              <table className="data-table" aria-label={t('atRiskTable.ariaLabel')}>
                 <thead>
                   <tr>
-                    <th>Employee</th>
-                    <th>Days Inactive</th>
-                    <th>Progress</th>
-                    <th>Stuck Task</th>
-                    <th>Started</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t('atRiskTable.employee')}</th>
+                    <th>{t('atRiskTable.daysInactive')}</th>
+                    <th>{t('atRiskTable.progress')}</th>
+                    <th>{t('atRiskTable.stuckTask')}</th>
+                    <th>{t('atRiskTable.started')}</th>
+                    <th className="table-action-column">{t('atRiskTable.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -839,19 +849,19 @@ export function OnboardingClient({
                                 : ""
                           }
                         >
-                          {instance.daysSinceLastActivity}d
+                          {tCommon('daysValue', { value: instance.daysSinceLastActivity })}
                         </span>
                       </td>
                       <td>
                         <span className="at-risk-progress">
-                          {instance.completedTasks}/{instance.totalTasks} tasks
+                          {t('atRiskTable.taskCount', { completed: instance.completedTasks, total: instance.totalTasks })}
                         </span>
                       </td>
                       <td>
                         {instance.stuckTask ? (
-                          <span title={`${instance.stuckTask.daysPastDue}d overdue`}>
+                          <span title={t('atRiskTable.overdueTooltip', { days: instance.stuckTask.daysPastDue })}>
                             {instance.stuckTask.title}
-                            <span className="at-risk-days-red"> ({instance.stuckTask.daysPastDue}d overdue)</span>
+                            <span className="at-risk-days-red"> {t('atRiskTable.overdue', { days: instance.stuckTask.daysPastDue })}</span>
                           </span>
                         ) : (
                           "--"
@@ -860,9 +870,9 @@ export function OnboardingClient({
                       <td>
                         <time
                           dateTime={instance.startedAt}
-                          title={formatDateTimeTooltip(instance.startedAt)}
+                          title={formatDateTimeTooltip(instance.startedAt, locale)}
                         >
-                          {formatRelativeTime(instance.startedAt)}
+                          {formatRelativeTime(instance.startedAt, locale)}
                         </time>
                       </td>
                       <td className="table-row-action-cell">
@@ -871,7 +881,7 @@ export function OnboardingClient({
                             className="table-row-action"
                             href={`/onboarding/${instance.instanceId}`}
                           >
-                            View
+                            {t('actions.view')}
                           </Link>
                           {canManageOnboarding ? (
                             <button
@@ -881,8 +891,8 @@ export function OnboardingClient({
                               onClick={() => handleSendReminder(instance)}
                             >
                               {sendingReminderId === instance.instanceId
-                                ? "Sending..."
-                                : "Send Reminder"}
+                                ? t('actions.sending')
+                                : t('actions.sendReminder')}
                             </button>
                           ) : null}
                         </div>
@@ -902,9 +912,9 @@ export function OnboardingClient({
 
           {!templatesQuery.isLoading && templatesQuery.errorMessage ? (
             <EmptyState
-              title="Template data is unavailable"
+              title={t('emptyState.templateUnavailable')}
               description={templatesQuery.errorMessage}
-              ctaLabel="Retry"
+              ctaLabel={tCommon('retry')}
               ctaHref="/onboarding"
             />
           ) : null}
@@ -914,10 +924,10 @@ export function OnboardingClient({
           templatesQuery.templates.length === 0 ? (
             <>
               <EmptyState
-                title="No onboarding templates"
-                description="Template records will appear here once created."
+                title={t('emptyState.noTemplates')}
+                description={t('emptyState.noTemplatesDescription')}
                 {...(canManageOnboarding
-                  ? { ctaLabel: "Create template", ctaHref: "/onboarding" }
+                  ? { ctaLabel: t('actions.createTemplate'), ctaHref: "/onboarding" }
                   : {})}
               />
               {canManageOnboarding ? (
@@ -926,7 +936,7 @@ export function OnboardingClient({
                   className="button"
                   onClick={() => setIsTemplatePanelOpen(true)}
                 >
-                  Create template
+                  {t('actions.createTemplate')}
                 </button>
               ) : null}
             </>
@@ -937,16 +947,16 @@ export function OnboardingClient({
           templatesQuery.templates.length > 0 ? (
             <>
               <div className="data-table-container">
-                <table className="data-table" aria-label="Onboarding templates table">
+                <table className="data-table" aria-label={t('templatesTable.ariaLabel')}>
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>Type</th>
-                      <th>Country</th>
-                      <th>Department</th>
-                      <th>Tasks</th>
-                      <th>Updated</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('templatesTable.name')}</th>
+                      <th>{t('templatesTable.type')}</th>
+                      <th>{t('templatesTable.country')}</th>
+                      <th>{t('templatesTable.department')}</th>
+                      <th>{t('templatesTable.tasks')}</th>
+                      <th>{t('templatesTable.updated')}</th>
+                      <th className="table-action-column">{t('templatesTable.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -959,7 +969,7 @@ export function OnboardingClient({
                         <td>
                           <span className="country-chip">
                             <span>{countryFlagFromCode(template.countryCode)}</span>
-                            <span>{countryNameFromCode(template.countryCode)}</span>
+                            <span>{countryNameFromCode(template.countryCode, locale)}</span>
                           </span>
                         </td>
                         <td>{template.department ?? "--"}</td>
@@ -967,9 +977,9 @@ export function OnboardingClient({
                         <td>
                           <time
                             dateTime={template.updatedAt}
-                            title={formatDateTimeTooltip(template.updatedAt)}
+                            title={formatDateTimeTooltip(template.updatedAt, locale)}
                           >
-                            {formatRelativeTime(template.updatedAt)}
+                            {formatRelativeTime(template.updatedAt, locale)}
                           </time>
                         </td>
                         <td className="table-row-action-cell">
@@ -979,7 +989,7 @@ export function OnboardingClient({
                               className="table-row-action"
                               onClick={() => setPreviewTemplateId(template.id)}
                             >
-                              Preview
+                              {t('actions.preview')}
                             </button>
                             {canManageOnboarding ? (
                               <button
@@ -995,7 +1005,7 @@ export function OnboardingClient({
                                   setIsStartPanelOpen(true);
                                 }}
                               >
-                                Start
+                                {t('actions.start')}
                               </button>
                             ) : null}
                           </div>
@@ -1009,9 +1019,9 @@ export function OnboardingClient({
               {templatePreview ? (
                 <section className="onboarding-template-preview">
                   <header className="onboarding-template-preview-header">
-                    <h2 className="section-title">{templatePreview.name} Tasks</h2>
+                    <h2 className="section-title">{t('templatePreview.tasksHeading', { name: templatePreview.name })}</h2>
                     <p className="settings-card-description">
-                      {templatePreview.tasks.length} tasks in template
+                      {t('templatePreview.taskCount', { count: templatePreview.tasks.length })}
                     </p>
                   </header>
                   <ul className="onboarding-template-task-list">
@@ -1022,12 +1032,12 @@ export function OnboardingClient({
                           <p className="settings-card-description">{task.description}</p>
                           {task.actionUrl ? (
                             <p className="settings-card-description">
-                              Action: {task.actionLabel ?? "Open resource"} ({task.actionUrl})
+                              {t('templatePreview.action')}: {task.actionLabel ?? t('actions.openResource')} ({task.actionUrl})
                             </p>
                           ) : null}
                           {task.completionGuidance ? (
                             <p className="settings-card-description">
-                              Completion guidance: {task.completionGuidance}
+                              {t('templatePreview.completionGuidance')}: {task.completionGuidance}
                             </p>
                           ) : null}
                         </div>
@@ -1035,8 +1045,8 @@ export function OnboardingClient({
                           <StatusBadge tone="info">{toSentenceCase(task.category)}</StatusBadge>
                           <span className="numeric">
                             {task.dueOffsetDays === null
-                              ? "No due offset"
-                              : `${task.dueOffsetDays}d`}
+                              ? t('actions.noDueOffset')
+                              : t('templatePreview.dueOffsetDays', { days: task.dueOffsetDays })}
                           </span>
                         </div>
                       </li>
@@ -1051,13 +1061,13 @@ export function OnboardingClient({
 
       <SlidePanel
         isOpen={isStartPanelOpen}
-        title="Start Onboarding"
-        description="Assign a template to a crew member and create tasks."
+        title={t('startPanel.title')}
+        description={t('startPanel.description')}
         onClose={closeStartPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleStartOnboarding} noValidate>
           <label className="form-field" htmlFor="onboarding-employee">
-            <span className="form-label">Employee</span>
+            <span className="form-label">{t('startPanel.employeeLabel')}</span>
             <select
               id="onboarding-employee"
               className={startErrors.employeeId ? "form-input form-input-error" : "form-input"}
@@ -1069,7 +1079,7 @@ export function OnboardingClient({
                 })
               }
             >
-              <option value="">Select employee</option>
+              <option value="">{t('startPanel.selectEmployee')}</option>
               {employeeOptions.map((person) => (
                 <option key={`onboarding-employee-${person.id}`} value={person.id}>
                   {person.fullName}
@@ -1082,7 +1092,7 @@ export function OnboardingClient({
           </label>
 
           <label className="form-field" htmlFor="onboarding-template">
-            <span className="form-label">Template</span>
+            <span className="form-label">{t('startPanel.templateLabel')}</span>
             <select
               id="onboarding-template"
               className={startErrors.templateId ? "form-input form-input-error" : "form-input"}
@@ -1099,7 +1109,7 @@ export function OnboardingClient({
                 });
               }}
             >
-              <option value="">Select template</option>
+              <option value="">{t('startPanel.selectTemplate')}</option>
               {templatesQuery.templates.map((template) => (
                 <option key={`onboarding-template-${template.id}`} value={template.id}>
                   {template.name}
@@ -1112,7 +1122,7 @@ export function OnboardingClient({
           </label>
 
           <label className="form-field" htmlFor="onboarding-type">
-            <span className="form-label">Type</span>
+            <span className="form-label">{t('startPanel.typeLabel')}</span>
             <select
               id="onboarding-type"
               className={startErrors.type ? "form-input form-input-error" : "form-input"}
@@ -1134,7 +1144,7 @@ export function OnboardingClient({
           </label>
 
           <label className="form-field" htmlFor="onboarding-start-date">
-            <span className="form-label">Start date</span>
+            <span className="form-label">{t('startPanel.startDateLabel')}</span>
             <input
               id="onboarding-start-date"
               type="date"
@@ -1161,7 +1171,7 @@ export function OnboardingClient({
               onClick={closeStartPanel}
               disabled={isStartingOnboarding}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button
               type="submit"
@@ -1172,7 +1182,7 @@ export function OnboardingClient({
                 templatesQuery.templates.length === 0
               }
             >
-              {isStartingOnboarding ? "Starting..." : "Start onboarding"}
+              {isStartingOnboarding ? t('startPanel.starting') : t('actions.startOnboarding')}
             </button>
           </div>
         </form>
@@ -1180,13 +1190,13 @@ export function OnboardingClient({
 
       <SlidePanel
         isOpen={isTemplatePanelOpen}
-        title="Create Template"
-        description="Define reusable tasks for onboarding or offboarding."
+        title={t('createTemplatePanel.title')}
+        description={t('createTemplatePanel.description')}
         onClose={closeTemplatePanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleCreateTemplate} noValidate>
           <label className="form-field" htmlFor="template-name">
-            <span className="form-label">Template name</span>
+            <span className="form-label">{t('createTemplatePanel.nameLabel')}</span>
             <input
               id="template-name"
               className={templateErrors.name ? "form-input form-input-error" : "form-input"}
@@ -1202,7 +1212,7 @@ export function OnboardingClient({
           </label>
 
           <label className="form-field" htmlFor="template-type">
-            <span className="form-label">Template type</span>
+            <span className="form-label">{t('createTemplatePanel.typeLabel')}</span>
             <select
               id="template-type"
               className={templateErrors.type ? "form-input form-input-error" : "form-input"}
@@ -1224,7 +1234,7 @@ export function OnboardingClient({
           </label>
 
           <label className="form-field" htmlFor="template-country">
-            <span className="form-label">Country code</span>
+            <span className="form-label">{t('createTemplatePanel.countryCodeLabel')}</span>
             <input
               id="template-country"
               maxLength={2}
@@ -1243,7 +1253,7 @@ export function OnboardingClient({
           </label>
 
           <label className="form-field" htmlFor="template-department">
-            <span className="form-label">Department</span>
+            <span className="form-label">{t('createTemplatePanel.departmentLabel')}</span>
             <input
               id="template-department"
               className={templateErrors.department ? "form-input form-input-error" : "form-input"}
@@ -1262,7 +1272,7 @@ export function OnboardingClient({
 
           <section className="onboarding-template-editor">
             <div className="onboarding-template-editor-header">
-              <h3 className="section-title">Tasks</h3>
+              <h3 className="section-title">{t('createTemplatePanel.tasksHeading')}</h3>
               <button
                 type="button"
                 className="button"
@@ -1273,7 +1283,7 @@ export function OnboardingClient({
                   })
                 }
               >
-                Add task
+                {t('createTemplatePanel.addTask')}
               </button>
             </div>
 
@@ -1285,7 +1295,7 @@ export function OnboardingClient({
               return (
                 <article key={`template-task-${index}`} className="onboarding-template-editor-card">
                   <header className="onboarding-template-editor-card-header">
-                    <p className="section-title">Task {index + 1}</p>
+                    <p className="section-title">{t('createTemplatePanel.taskNumber', { number: index + 1 })}</p>
                     <button
                       type="button"
                       className="table-row-action"
@@ -1297,12 +1307,12 @@ export function OnboardingClient({
                       }
                       disabled={templateValues.tasks.length === 1}
                     >
-                      Remove
+                      {t('createTemplatePanel.removeTask')}
                     </button>
                   </header>
 
                   <label className="form-field" htmlFor={`template-task-title-${index}`}>
-                    <span className="form-label">Title</span>
+                    <span className="form-label">{t('createTemplatePanel.taskTitleLabel')}</span>
                     <input
                       id={`template-task-title-${index}`}
                       className={taskErrors.title ? "form-input form-input-error" : "form-input"}
@@ -1322,7 +1332,7 @@ export function OnboardingClient({
                   </label>
 
                   <label className="form-field" htmlFor={`template-task-description-${index}`}>
-                    <span className="form-label">Description</span>
+                    <span className="form-label">{t('createTemplatePanel.taskDescriptionLabel')}</span>
                     <textarea
                       id={`template-task-description-${index}`}
                       className={taskErrors.description ? "form-input form-input-error" : "form-input"}
@@ -1346,7 +1356,7 @@ export function OnboardingClient({
 
                   <div className="onboarding-template-editor-grid">
                     <label className="form-field" htmlFor={`template-task-category-${index}`}>
-                      <span className="form-label">Category</span>
+                      <span className="form-label">{t('createTemplatePanel.taskCategoryLabel')}</span>
                       <input
                         id={`template-task-category-${index}`}
                         className={taskErrors.category ? "form-input form-input-error" : "form-input"}
@@ -1368,7 +1378,7 @@ export function OnboardingClient({
                     </label>
 
                     <label className="form-field" htmlFor={`template-task-offset-${index}`}>
-                      <span className="form-label">Due offset (days)</span>
+                      <span className="form-label">{t('createTemplatePanel.taskDueOffsetLabel')}</span>
                       <input
                         id={`template-task-offset-${index}`}
                         className={taskErrors.dueOffsetDays ? "form-input form-input-error" : "form-input"}
@@ -1392,7 +1402,7 @@ export function OnboardingClient({
 
                   <div className="onboarding-template-editor-grid">
                     <label className="form-field" htmlFor={`template-task-action_url-${index}`}>
-                      <span className="form-label">Action URL</span>
+                      <span className="form-label">{t('createTemplatePanel.taskActionUrlLabel')}</span>
                       <input
                         id={`template-task-action_url-${index}`}
                         name="action_url"
@@ -1408,7 +1418,7 @@ export function OnboardingClient({
                             )
                           })
                         }
-                        placeholder="https://..."
+                        placeholder={t('createTemplatePanel.actionUrlPlaceholder')}
                       />
                       {taskErrors.actionUrl ? (
                         <p className="form-field-error">{taskErrors.actionUrl}</p>
@@ -1416,7 +1426,7 @@ export function OnboardingClient({
                     </label>
 
                     <label className="form-field" htmlFor={`template-task-action_label-${index}`}>
-                      <span className="form-label">Action label</span>
+                      <span className="form-label">{t('createTemplatePanel.taskActionLabelLabel')}</span>
                       <input
                         id={`template-task-action_label-${index}`}
                         name="action_label"
@@ -1432,7 +1442,7 @@ export function OnboardingClient({
                             )
                           })
                         }
-                        placeholder="Open handbook"
+                        placeholder={t('createTemplatePanel.actionLabelPlaceholder')}
                       />
                       {taskErrors.actionLabel ? (
                         <p className="form-field-error">{taskErrors.actionLabel}</p>
@@ -1441,7 +1451,7 @@ export function OnboardingClient({
                   </div>
 
                   <label className="form-field" htmlFor={`template-task-completion_guidance-${index}`}>
-                    <span className="form-label">Completion guidance</span>
+                    <span className="form-label">{t('createTemplatePanel.taskCompletionGuidanceLabel')}</span>
                     <textarea
                       id={`template-task-completion_guidance-${index}`}
                       name="completion_guidance"
@@ -1458,7 +1468,7 @@ export function OnboardingClient({
                           )
                         })
                       }
-                      placeholder="Explain what completion looks like."
+                      placeholder={t('createTemplatePanel.completionCriteriaPlaceholder')}
                     />
                     {taskErrors.completionGuidance ? (
                       <p className="form-field-error">{taskErrors.completionGuidance}</p>
@@ -1478,14 +1488,14 @@ export function OnboardingClient({
               onClick={closeTemplatePanel}
               disabled={isCreatingTemplate}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button
               type="submit"
               className="button button-accent"
               disabled={isCreatingTemplate}
             >
-              {isCreatingTemplate ? "Creating..." : "Create template"}
+              {isCreatingTemplate ? t('createTemplatePanel.creating') : t('actions.createTemplate')}
             </button>
           </div>
         </form>
@@ -1508,7 +1518,7 @@ export function OnboardingClient({
               <button
                 type="button"
                 className="toast-dismiss"
-                aria-label="Dismiss notification"
+                aria-label={t('dismissNotification')}
                 onClick={() =>
                   setToasts((currentToasts) =>
                     currentToasts.filter((entry) => entry.id !== toast.id)

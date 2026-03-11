@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
@@ -26,23 +27,6 @@ type FormField = keyof CreateRunFormValues;
 type FormErrors = Partial<Record<FormField, string>>;
 type FormTouched = Record<FormField, boolean>;
 
-const createRunFormSchema = z
-  .object({
-    payPeriodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pay period start is required."),
-    payPeriodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pay period end is required."),
-    payDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pay date is required."),
-    notes: z.string().max(500, "Notes must be 500 characters or fewer.")
-  })
-  .superRefine((value, context) => {
-    if (value.payPeriodEnd < value.payPeriodStart) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["payPeriodEnd"],
-        message: "Pay period end cannot be before pay period start."
-      });
-    }
-  });
-
 function initialValues(): CreateRunFormValues {
   const period = currentMonthPeriod();
 
@@ -61,32 +45,35 @@ const INITIAL_TOUCHED: FormTouched = {
   notes: false
 };
 
-function getFormErrors(values: CreateRunFormValues, touched: FormTouched): FormErrors {
-  const parsed = createRunFormSchema.safeParse(values);
-
-  if (parsed.success) {
-    return {};
-  }
-
-  const fieldErrors = parsed.error.flatten().fieldErrors;
-  const errors: FormErrors = {};
-
-  for (const field of Object.keys(touched) as FormField[]) {
-    if (touched[field]) {
-      errors[field] = fieldErrors[field]?.[0];
-    }
-  }
-
-  return errors;
-}
-
 function hasErrors(errors: FormErrors): boolean {
   return Object.values(errors).some((value) => Boolean(value));
 }
 
 export function CreatePayrollRunClient() {
+  const t = useTranslations('payrollCreate');
   const router = useRouter();
   const dashboardQuery = usePayrollRunsDashboard();
+
+  const createRunFormSchema = useMemo(
+    () =>
+      z
+        .object({
+          payPeriodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, t('payPeriodStartRequired')),
+          payPeriodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, t('payPeriodEndRequired')),
+          payDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, t('payDateRequired')),
+          notes: z.string().max(500, t('notesMax'))
+        })
+        .superRefine((value, context) => {
+          if (value.payPeriodEnd < value.payPeriodStart) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["payPeriodEnd"],
+              message: t('payPeriodEndBeforeStart')
+            });
+          }
+        }),
+    [t]
+  );
 
   const [formValues, setFormValues] = useState<CreateRunFormValues>(initialValues);
   const [formTouched, setFormTouched] = useState<FormTouched>(INITIAL_TOUCHED);
@@ -99,6 +86,29 @@ export function CreatePayrollRunClient() {
   const activeContractorCount = useMemo(
     () => dashboardQuery.data?.metrics.activeContractorCount ?? 0,
     [dashboardQuery.data?.metrics.activeContractorCount]
+  );
+
+  const getFormErrors = useMemo(
+    () =>
+      (values: CreateRunFormValues, touched: FormTouched): FormErrors => {
+        const parsed = createRunFormSchema.safeParse(values);
+
+        if (parsed.success) {
+          return {};
+        }
+
+        const fieldErrors = parsed.error.flatten().fieldErrors;
+        const errors: FormErrors = {};
+
+        for (const field of Object.keys(touched) as FormField[]) {
+          if (touched[field]) {
+            errors[field] = fieldErrors[field]?.[0];
+          }
+        }
+
+        return errors;
+      },
+    [createRunFormSchema]
   );
 
   const markTouched = (field: FormField) => {
@@ -162,7 +172,7 @@ export function CreatePayrollRunClient() {
       const responsePayload = (await response.json()) as CreatePayrollRunResponse;
 
       if (!response.ok || !responsePayload.data) {
-        setSubmitError(responsePayload.error?.message ?? "Unable to create payroll run.");
+        setSubmitError(responsePayload.error?.message ?? t('unableToCreate'));
         return;
       }
 
@@ -170,7 +180,7 @@ export function CreatePayrollRunClient() {
       router.push(`/payroll/runs/${responsePayload.data.run.id}`);
       router.refresh();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to create payroll run.");
+      setSubmitError(error instanceof Error ? error.message : t('unableToCreate'));
     } finally {
       setIsSubmitting(false);
     }
@@ -179,8 +189,8 @@ export function CreatePayrollRunClient() {
   return (
     <>
       <PageHeader
-        title="Create Payroll Run"
-        description="Set pay period boundaries and pay date, then calculate contractor payroll."
+        title={t('title')}
+        description={t('description')}
       />
 
       {dashboardQuery.isLoading ? (
@@ -192,32 +202,31 @@ export function CreatePayrollRunClient() {
 
       {!dashboardQuery.isLoading && dashboardQuery.errorMessage ? (
         <ErrorState
-          title="Contractor count unavailable"
+          title={t('unavailable')}
           message={dashboardQuery.errorMessage}
           onRetry={() => dashboardQuery.refresh()}
         />
       ) : null}
 
       {!dashboardQuery.isLoading && !dashboardQuery.errorMessage ? (
-        <section className="settings-layout" aria-label="Create payroll run form">
+        <section className="settings-layout" aria-label={t('formAriaLabel')}>
           <article className="settings-card">
-            <h2 className="section-title">Eligibility snapshot</h2>
+            <h2 className="section-title">{t('eligibilitySnapshot')}</h2>
             <p className="settings-card-description">
-              <span className="numeric">{activeContractorCount}</span> active contractors are
-              currently eligible for calculation.
+              {t('eligibilityDescription', { count: activeContractorCount })}
             </p>
-            <StatusBadge tone="info">Contractor mode: net equals gross</StatusBadge>
+            <StatusBadge tone="info">{t('contractorMode')}</StatusBadge>
           </article>
 
           <form className="settings-card settings-form" onSubmit={handleSubmit} noValidate>
-            <h2 className="section-title">Run details</h2>
+            <h2 className="section-title">{t('runDetails')}</h2>
             <p className="settings-card-description">
-              Crew Hub calculates contractors with no tax withholding in this phase.
+              {t('runDetailsDescription')}
             </p>
 
             <div className="timeoff-form-grid">
               <label className="form-field" htmlFor="pay-period-start">
-                <span className="form-label">Pay period start</span>
+                <span className="form-label">{t('payPeriodStart')}</span>
                 <input
                   id="pay-period-start"
                   type="date"
@@ -234,7 +243,7 @@ export function CreatePayrollRunClient() {
               </label>
 
               <label className="form-field" htmlFor="pay-period-end">
-                <span className="form-label">Pay period end</span>
+                <span className="form-label">{t('payPeriodEnd')}</span>
                 <input
                   id="pay-period-end"
                   type="date"
@@ -250,7 +259,7 @@ export function CreatePayrollRunClient() {
             </div>
 
             <label className="form-field" htmlFor="pay-date">
-              <span className="form-label">Pay date</span>
+              <span className="form-label">{t('payDate')}</span>
               <input
                 id="pay-date"
                 type="date"
@@ -263,7 +272,7 @@ export function CreatePayrollRunClient() {
             </label>
 
             <label className="form-field" htmlFor="run-notes">
-              <span className="form-label">Notes (optional)</span>
+              <span className="form-label">{t('notesLabel')}</span>
               <textarea
                 id="run-notes"
                 className={formErrors.notes ? "form-input form-input-error" : "form-input"}
@@ -283,7 +292,7 @@ export function CreatePayrollRunClient() {
 
             <div className="settings-actions">
               <button type="submit" className="button button-accent" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create payroll run"}
+                {isSubmitting ? t('creating') : t('createRun')}
               </button>
             </div>
           </form>

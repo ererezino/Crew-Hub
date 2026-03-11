@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   UserX
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 
 import type { HealthAlert } from "../../lib/dashboard/health-alerts";
@@ -31,13 +32,15 @@ type HealthAlertsProps = {
 /* ── Component ── */
 
 export function HealthAlerts({ alerts }: HealthAlertsProps) {
+  const t = useTranslations("dashboard");
+
   if (alerts.length === 0) return null;
 
   return (
-    <section className="health-alerts-section" aria-label="Health alerts">
+    <section className="health-alerts-section" aria-label={t("healthAlerts.ariaLabel")}>
       <header className="health-alerts-header">
         <h2 className="home-section-header">
-          Needs Attention
+          {t("healthAlerts.needsAttention")}
           <span className="health-alerts-count-badge numeric">{alerts.length}</span>
         </h2>
       </header>

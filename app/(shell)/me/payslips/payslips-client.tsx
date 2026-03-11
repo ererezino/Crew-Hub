@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { DeltaBadge } from "../../../../components/dashboard/delta-badge";
@@ -15,6 +16,7 @@ import type {
 } from "../../../../types/payslips";
 import { humanizeError } from "@/lib/errors";
 
+type AppLocale = "en" | "fr";
 type ToastVariant = "success" | "error" | "info";
 
 type ToastMessage = {
@@ -31,7 +33,7 @@ function createToastId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function formatPayPeriod(payPeriod: string): string {
+function formatPayPeriod(payPeriod: string, locale: AppLocale): string {
   const [yearValue, monthValue] = payPeriod.split("-");
   const year = Number.parseInt(yearValue ?? "", 10);
   const month = Number.parseInt(monthValue ?? "", 10);
@@ -41,7 +43,7 @@ function formatPayPeriod(payPeriod: string): string {
   }
 
   const isoDate = `${yearValue}-${monthValue}-01`;
-  return formatMonth(isoDate);
+  return formatMonth(isoDate, locale);
 }
 
 function statementCardSkeleton() {
@@ -64,10 +66,6 @@ function metricsSkeleton() {
   );
 }
 
-function statementTypeLabel(statement: PaymentStatementRecord): string {
-  return statement.withholdingApplied ? "Payslip" : "Payment statement";
-}
-
 function signedCurrencyPrefix(value: number | null): string {
   if (value === null || value === 0) {
     return "";
@@ -85,6 +83,10 @@ function absoluteAmount(value: number | null): number {
 }
 
 export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('payslips');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const [selectedYear, setSelectedYear] = useState(new Date().getUTCFullYear());
   const [activeStatementId, setActiveStatementId] = useState<string | null>(null);
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
@@ -127,7 +129,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
   };
 
   const showToast = (variant: ToastVariant, rawMessage: string) => {
-    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
+    const message = variant === "error" ? humanizeError(rawMessage, locale) : rawMessage;
     const toastId = createToastId();
 
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
@@ -169,7 +171,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
       const payload = (await response.json()) as PaymentStatementSignedUrlResponse;
 
       if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? "Unable to open payment statement.");
+        showToast("error", payload.error?.message ?? t('toastOpenError'));
         if (usage === "view") {
           setActiveStatementId(null);
           setViewerPayPeriod(null);
@@ -180,17 +182,17 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
 
       if (usage === "download") {
         window.open(payload.data.url, "_blank", "noopener,noreferrer");
-        showToast("success", "Download link opened in a new tab.");
+        showToast("success", t('toastDownloadOpened'));
         return;
       }
 
       setViewerUrl(payload.data.url);
-      showToast("info", "Payment statement loaded.");
+      showToast("info", t('toastLoaded'));
       payslipsQuery.refresh();
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to open payment statement."
+        error instanceof Error ? error.message : t('toastOpenError')
       );
 
       if (usage === "view") {
@@ -215,14 +217,14 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
     <>
       {!embedded ? (
         <PageHeader
-          title="Payments"
-          description="View and download your monthly payment statements in Crew Hub."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
-      <section className="payslips-toolbar" aria-label="Payments filters">
+      <section className="payslips-toolbar" aria-label={t('title')}>
         <label className="form-field" htmlFor="payslips-year-filter">
-          <span className="form-label">Year</span>
+          <span className="form-label">{t('yearLabel')}</span>
           <select
             id="payslips-year-filter"
             className="form-input"
@@ -248,7 +250,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
       {!payslipsQuery.isLoading && payslipsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Payments are unavailable"
+            title={t('unavailable')}
             description={payslipsQuery.errorMessage}
           />
           <button
@@ -256,41 +258,41 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
             className="button button-accent"
             onClick={() => payslipsQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!payslipsQuery.isLoading && !payslipsQuery.errorMessage ? (
-        <section className="metric-grid" aria-label="Year to date payment summary">
+        <section className="metric-grid" aria-label={t('summaryAriaLabel')}>
           <article className="metric-card">
-            <p className="metric-label">YTD Gross</p>
+            <p className="metric-label">{t('ytdGross')}</p>
             <p className="metric-value">
               <CurrencyDisplay amount={summary.grossAmount} currency={summary.currency} />
             </p>
-            <p className="metric-hint">Total gross for {selectedYear}</p>
+            <p className="metric-hint">{t('ytdGrossHint', { year: selectedYear })}</p>
           </article>
 
           <article className="metric-card">
-            <p className="metric-label">YTD Deductions</p>
+            <p className="metric-label">{t('ytdDeductions')}</p>
             <p className="metric-value">
               <CurrencyDisplay amount={summary.deductionsAmount} currency={summary.currency} />
             </p>
-            <p className="metric-hint">Contractor mode currently returns $0.00</p>
+            <p className="metric-hint">{t('ytdDeductionsHint')}</p>
           </article>
 
           <article className="metric-card">
-            <p className="metric-label">YTD Net</p>
+            <p className="metric-label">{t('ytdNet')}</p>
             <p className="metric-value">
               <CurrencyDisplay amount={summary.netAmount} currency={summary.currency} />
             </p>
-            <p className="metric-hint">Total paid in {selectedYear}</p>
+            <p className="metric-hint">{t('ytdNetHint', { year: selectedYear })}</p>
           </article>
 
           <article className="metric-card">
-            <p className="metric-label">Months Paid</p>
+            <p className="metric-label">{t('monthsPaid')}</p>
             <p className="metric-value numeric">{summary.monthsPaid}</p>
-            <p className="metric-hint">Distinct payment periods this year</p>
+            <p className="metric-hint">{t('monthsPaidHint')}</p>
           </article>
         </section>
       ) : null}
@@ -301,15 +303,15 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
       !payslipsQuery.errorMessage &&
       statements.length === 0 ? (
         <EmptyState
-          title="No payment statements yet."
-          description="Payment statements will appear here once payroll statements are generated."
+          title={t('noStatements')}
+          description={t('noStatementsDescription')}
         />
       ) : null}
 
       {!payslipsQuery.isLoading &&
       !payslipsQuery.errorMessage &&
       statements.length > 0 ? (
-        <section className="payslip-card-grid" aria-label="Payment statements">
+        <section className="payslip-card-grid" aria-label={t('statementsAriaLabel')}>
           {statements.map((statement) => (
             <article
               key={statement.id}
@@ -321,20 +323,14 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
             >
               <header className="payslip-card-header">
                 <div>
-                  <h2 className="section-title">{formatPayPeriod(statement.payPeriod)}</h2>
+                  <h2 className="section-title">{formatPayPeriod(statement.payPeriod, locale)}</h2>
                   <p className="settings-card-description">
-                    Generated{" "}
-                    <time
-                      dateTime={statement.generatedAt}
-                      title={formatDateTimeTooltip(statement.generatedAt)}
-                    >
-                      {formatRelativeTime(statement.generatedAt)}
-                    </time>
+                    {t('generated', { date: formatRelativeTime(statement.generatedAt, locale) })}
                   </p>
                 </div>
 
                 <StatusBadge tone={statement.withholdingApplied ? "processing" : "draft"}>
-                  {statementTypeLabel(statement)}
+                  {statement.withholdingApplied ? t('payslipType') : t('paymentStatementType')}
                 </StatusBadge>
               </header>
 
@@ -344,21 +340,21 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
 
               {statement.previousNetAmount !== null ? (
                 <p className="payslip-variance-copy">
-                  Net pay changed from {formatPayPeriod(statement.previousPayPeriod ?? "")}.
+                  {t('varianceCopy', { period: formatPayPeriod(statement.previousPayPeriod ?? "", locale) })}
                 </p>
               ) : (
-                <p className="payslip-variance-copy">No previous period available for comparison.</p>
+                <p className="payslip-variance-copy">{t('noVariance')}</p>
               )}
 
               <dl className="payslip-card-meta">
                 <div>
-                  <dt>Gross</dt>
+                  <dt>{t('gross')}</dt>
                   <dd>
                     <CurrencyDisplay amount={statement.grossAmount} currency={statement.currency} />
                   </dd>
                 </div>
                 <div>
-                  <dt>Deductions</dt>
+                  <dt>{t('deductions')}</dt>
                   <dd>
                     <CurrencyDisplay
                       amount={statement.deductionsAmount}
@@ -367,22 +363,22 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                   </dd>
                 </div>
                 <div>
-                  <dt>Status</dt>
+                  <dt>{t('statusLabel')}</dt>
                   <dd>
                     {statement.viewedAt ? (
                       <span
                         className="numeric"
-                        title={formatDateTimeTooltip(statement.viewedAt)}
+                        title={formatDateTimeTooltip(statement.viewedAt, locale)}
                       >
-                        Viewed {formatRelativeTime(statement.viewedAt)}
+                        {t('viewedAt', { date: formatRelativeTime(statement.viewedAt, locale) })}
                       </span>
                     ) : (
-                      "Not viewed yet"
+                      t('notViewed')
                     )}
                   </dd>
                 </div>
                 <div>
-                  <dt>Net change</dt>
+                  <dt>{t('netChange')}</dt>
                   <dd className="payslip-variance-value">
                     {statement.previousNetAmount !== null ? (
                       <>
@@ -399,7 +395,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                         </span>
                       </>
                     ) : (
-                      <span className="settings-card-description">No baseline</span>
+                      <span className="settings-card-description">{t('noBaseline')}</span>
                     )}
                   </dd>
                 </div>
@@ -415,8 +411,8 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                   disabled={Boolean(isOpeningById[statement.id])}
                 >
                   {isOpeningById[statement.id] && activeStatementId === statement.id
-                    ? "Opening..."
-                    : "View"}
+                    ? t('opening')
+                    : t('view')}
                 </button>
                 <button
                   type="button"
@@ -427,8 +423,8 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                   disabled={Boolean(isOpeningById[statement.id])}
                 >
                   {isOpeningById[statement.id] && activeStatementId !== statement.id
-                    ? "Preparing..."
-                    : "Download"}
+                    ? t('preparing')
+                    : t('download')}
                 </button>
               </div>
             </article>
@@ -437,14 +433,16 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
       ) : null}
 
       {activeStatementId ? (
-        <section className="settings-card payslip-viewer-card" aria-label="Payment statement viewer">
+        <section className="settings-card payslip-viewer-card" aria-label={t('viewerTitle')}>
           <header className="payslip-viewer-header">
             <div>
               <h2 className="section-title">
-                Statement viewer {viewerPayPeriod ? `- ${formatPayPeriod(viewerPayPeriod)}` : ""}
+                {viewerPayPeriod
+                  ? t('viewerTitleWithPeriod', { period: formatPayPeriod(viewerPayPeriod, locale) })
+                  : t('viewerTitle')}
               </h2>
               <p className="settings-card-description">
-                Inline preview for quick verification and self-service access.
+                {t('viewerDescription')}
               </p>
             </div>
             <button
@@ -456,7 +454,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                 setViewerPayPeriod(null);
               }}
             >
-              Close viewer
+              {t('closeViewer')}
             </button>
           </header>
 
@@ -466,20 +464,20 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
             <iframe
               className="payslip-viewer-frame"
               src={viewerUrl}
-              title="Payment statement PDF viewer"
+              title={t('viewerTitle')}
             />
           ) : null}
 
           {!isViewerLoading && !viewerUrl ? (
             <p className="settings-card-description">
-              Statement preview is unavailable right now. Try opening it again.
+              {t('viewerUnavailable')}
             </p>
           ) : null}
         </section>
       ) : null}
 
       {toasts.length > 0 ? (
-        <section className="toast-region" aria-live="polite" aria-label="Payments toasts">
+        <section className="toast-region" aria-live="polite" aria-label={t('toastAriaLabel')}>
           {toasts.map((toast) => (
             <article key={toast.id} className={`toast-message toast-message-${toast.variant}`}>
               <p>{toast.message}</p>
@@ -487,7 +485,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss toast"
+                aria-label={tCommon('close')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

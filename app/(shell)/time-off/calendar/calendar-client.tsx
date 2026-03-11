@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
@@ -9,7 +10,7 @@ import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useTimeOffCalendar } from "../../../../hooks/use-time-off";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
-import { formatDateRangeHuman, formatDateTimeTooltip } from "../../../../lib/datetime";
+import { formatDateRangeHuman, formatDateTimeTooltip, formatDateWithWeekdayLong } from "../../../../lib/datetime";
 import { formatLeaveStatus } from "../../../../lib/format-labels";
 import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
@@ -21,6 +22,8 @@ import {
   monthToDateRange
 } from "../../../../lib/time-off";
 import type { AfkCalendarRecord, LeaveRequestRecord } from "../../../../types/time-off";
+
+type AppLocale = "en" | "fr";
 
 type CalendarCell = {
   dateKey: string;
@@ -49,7 +52,7 @@ function shiftMonth(month: string, delta: number): string {
   return `${year}-${monthValue}`;
 }
 
-function monthLabel(month: string): string {
+function monthLabel(month: string, locale: AppLocale): string {
   const range = monthToDateRange(month);
 
   if (!range) {
@@ -62,7 +65,8 @@ function monthLabel(month: string): string {
     return month;
   }
 
-  return monthStart.toLocaleString(undefined, {
+  const localeTag = locale === "fr" ? "fr-FR" : "en-US";
+  return monthStart.toLocaleString(localeTag, {
     month: "long",
     year: "numeric",
     timeZone: "UTC"
@@ -133,6 +137,9 @@ export function TimeOffCalendarClient({
   embedded?: boolean;
   userRoles?: UserRole[];
 }) {
+  const t = useTranslations('timeOffCalendar');
+  const locale = useLocale() as AppLocale;
+
   const [activeMonth, setActiveMonth] = useState(getCurrentMonthKey());
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
@@ -250,8 +257,8 @@ export function TimeOffCalendarClient({
       <>
         {!embedded ? (
           <PageHeader
-            title="Time Off Calendar"
-            description="Team leave calendar with monthly view and scoped filters."
+            title={t('title')}
+            description={t('description')}
           />
         ) : null}
         <CalendarSkeleton />
@@ -264,13 +271,13 @@ export function TimeOffCalendarClient({
       <>
         {!embedded ? (
           <PageHeader
-            title="Time Off Calendar"
-            description="Team leave calendar with monthly view and scoped filters."
+            title={t('title')}
+            description={t('description')}
           />
         ) : null}
         <ErrorState
-          title="Calendar data is unavailable"
-          message={calendarQuery.errorMessage ?? "Unable to load team calendar."}
+          title={t('unavailableTitle')}
+          message={calendarQuery.errorMessage ?? t('unavailableMessage')}
         />
       </>
     );
@@ -282,60 +289,60 @@ export function TimeOffCalendarClient({
     <>
       {!embedded ? (
         <PageHeader
-          title="Time Off Calendar"
-          description="Team leave calendar with monthly view and scoped filters."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
-      <section className="settings-card" aria-label="Calendar filters">
+      <section className="settings-card" aria-label={t('filtersAriaLabel')}>
         <header className="timeoff-section-header">
-          <h2 className="section-title">Filters</h2>
+          <h2 className="section-title">{t('filtersTitle')}</h2>
           <div className="timeoff-month-controls">
             <button
               type="button"
               className="button"
               onClick={() => setActiveMonth((currentMonth) => shiftMonth(currentMonth, -1))}
             >
-              Previous
+              {t('previousMonth')}
             </button>
-            <p className="numeric">{monthLabel(activeMonth)}</p>
+            <p className="numeric">{monthLabel(activeMonth, locale)}</p>
             <button
               type="button"
               className="button"
               onClick={() => setActiveMonth((currentMonth) => shiftMonth(currentMonth, 1))}
             >
-              Next
+              {t('nextMonth')}
             </button>
           </div>
         </header>
 
         <div className="timeoff-filter-grid">
           <label className="form-field" htmlFor="timeoff-calendar-country">
-            <span className="form-label">Country</span>
+            <span className="form-label">{t('countryLabel')}</span>
             <select
               id="timeoff-calendar-country"
               className="form-input"
               value={selectedCountryCode}
               onChange={(event) => setSelectedCountryCode(event.currentTarget.value)}
             >
-              <option value="">All countries</option>
+              <option value="">{t('allCountries')}</option>
               {calendarQuery.data.filters.countries.map((countryCode) => (
                 <option key={countryCode} value={countryCode}>
-                  {countryNameFromCode(countryCode)}
+                  {countryNameFromCode(countryCode, locale)}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="form-field" htmlFor="timeoff-calendar-department">
-            <span className="form-label">Department</span>
+            <span className="form-label">{t('departmentLabel')}</span>
             <select
               id="timeoff-calendar-department"
               className="form-input"
               value={selectedDepartment}
               onChange={(event) => setSelectedDepartment(event.currentTarget.value)}
             >
-              <option value="">All departments</option>
+              <option value="">{t('allDepartments')}</option>
               {calendarQuery.data.filters.departments.map((department) => (
                 <option key={department} value={department}>
                   {department}
@@ -346,11 +353,11 @@ export function TimeOffCalendarClient({
         </div>
       </section>
 
-      <section className="settings-card" aria-label="Monthly team calendar">
-        <h2 className="section-title">Monthly View</h2>
+      <section className="settings-card" aria-label={t('calendarAriaLabel')}>
+        <h2 className="section-title">{t('monthlyViewTitle')}</h2>
 
         <div className="timeoff-mini-calendar">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
+          {[t('daySun'), t('dayMon'), t('dayTue'), t('dayWed'), t('dayThu'), t('dayFri'), t('daySat')].map((label) => (
             <p key={label} className="timeoff-calendar-weekday">
               {label}
             </p>
@@ -410,33 +417,33 @@ export function TimeOffCalendarClient({
           <div className="timeoff-calendar-legend">
             <div className="timeoff-calendar-legend-item">
               <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" />
-              <span>Leave</span>
+              <span>{t('legendLeave')}</span>
             </div>
             <div className="timeoff-calendar-legend-item">
               <span className="timeoff-calendar-badge timeoff-calendar-badge-afk" />
-              <span>AFK</span>
+              <span>{t('legendAfk')}</span>
             </div>
             <div className="timeoff-calendar-legend-item">
               <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" />
-              <span>Public holiday</span>
+              <span>{t('legendHoliday')}</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="settings-card" aria-label="Monthly leave and AFK entries">
+      <section className="settings-card" aria-label={t('entriesAriaLabel')}>
         <header className="timeoff-section-header">
-          <h2 className="section-title">Entries This Month</h2>
+          <h2 className="section-title">{t('entriesTitle')}</h2>
           <StatusBadge tone="processing">
-            {monthlyEntryCount} {monthlyEntryCount === 1 ? "entry" : "entries"}
+            {t('entryCount', { count: monthlyEntryCount })}
           </StatusBadge>
         </header>
 
         {monthlyEntryCount === 0 ? (
           <EmptyState
-            title="No leave or AFK entries for this month"
-            description="Adjust month or filters to view more calendar activity."
-            ctaLabel="Open Time Off"
+            title={t('noEntries')}
+            description={t('noEntriesDescription')}
+            ctaLabel={t('noEntriesCta')}
             ctaHref="/time-off"
           />
         ) : (
@@ -450,20 +457,20 @@ export function TimeOffCalendarClient({
                       <p className="settings-card-description">
                         {requestRecord.employeeDepartment ?? ""} •{" "}
                         {countryFlagFromCode(requestRecord.employeeCountryCode)}{" "}
-                        {countryNameFromCode(requestRecord.employeeCountryCode)}
+                        {countryNameFromCode(requestRecord.employeeCountryCode, locale)}
                       </p>
                     </div>
                     <div className="timeoff-calendar-entry-meta">
                       <StatusBadge tone={requestRecord.status === "approved" ? "success" : "pending"}>
-                        {formatLeaveStatus(requestRecord.status)}
+                        {formatLeaveStatus(requestRecord.status, locale)}
                       </StatusBadge>
-                      <p className="settings-card-description">{formatLeaveTypeLabel(requestRecord.leaveType)}</p>
+                      <p className="settings-card-description">{formatLeaveTypeLabel(requestRecord.leaveType, locale)}</p>
                       <p className="settings-card-description">
                         <time
                           dateTime={requestRecord.startDate}
-                          title={formatDateTimeTooltip(requestRecord.startDate)}
+                          title={formatDateTimeTooltip(requestRecord.startDate, locale)}
                         >
-                          {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
+                          {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate, locale)}
                         </time>
                       </p>
                     </div>
@@ -481,18 +488,18 @@ export function TimeOffCalendarClient({
                       <p className="settings-card-description">
                         {afkLog.employeeDepartment ?? ""} •{" "}
                         {countryFlagFromCode(afkLog.employeeCountryCode)}{" "}
-                        {countryNameFromCode(afkLog.employeeCountryCode)}
+                        {countryNameFromCode(afkLog.employeeCountryCode, locale)}
                       </p>
                     </div>
                     <div className="timeoff-calendar-entry-meta">
-                      <StatusBadge tone="info">AFK</StatusBadge>
+                      <StatusBadge tone="info">{t('afkBadge')}</StatusBadge>
                       <p className="settings-card-description">
-                        <time dateTime={afkLog.date} title={formatDateTimeTooltip(afkLog.date)}>
-                          {formatDateRangeHuman(afkLog.date, afkLog.date)}
+                        <time dateTime={afkLog.date} title={formatDateTimeTooltip(afkLog.date, locale)}>
+                          {formatDateRangeHuman(afkLog.date, afkLog.date, locale)}
                         </time>{" "}
                         · {afkLog.startTime}-{afkLog.endTime}
                       </p>
-                      <p className="settings-card-description numeric">{afkLog.durationMinutes} min</p>
+                      <p className="settings-card-description numeric">{t('durationMinutes', { minutes: afkLog.durationMinutes })}</p>
                     </div>
                   </li>
                 ))}
@@ -505,13 +512,8 @@ export function TimeOffCalendarClient({
       {selectedDay ? (
         <SlidePanel
           isOpen={Boolean(selectedDay)}
-          title={new Date(selectedDay + "T00:00:00Z").toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-            timeZone: "UTC"
-          })}
-          description="Who's away or AFK this day"
+          title={formatDateWithWeekdayLong(selectedDay, locale)}
+          description={t('panelDescription')}
           onClose={closePanel}
         >
           {(holidayNamesByDate.get(selectedDay) ?? []).length > 0 ? (
@@ -534,16 +536,16 @@ export function TimeOffCalendarClient({
                     <p className="settings-card-description">
                       {req.employeeDepartment ?? ""} •{" "}
                       {countryFlagFromCode(req.employeeCountryCode)}{" "}
-                      {countryNameFromCode(req.employeeCountryCode)}
+                      {countryNameFromCode(req.employeeCountryCode, locale)}
                     </p>
                   </div>
                   <div className="timeoff-calendar-entry-meta">
                     <StatusBadge tone={req.status === "approved" ? "success" : "pending"}>
-                      {formatLeaveTypeLabel(req.leaveType)}
+                      {formatLeaveTypeLabel(req.leaveType, locale)}
                     </StatusBadge>
                     <p className="settings-card-description">
-                      <time dateTime={req.startDate} title={formatDateTimeTooltip(req.startDate)}>
-                        {formatDateRangeHuman(req.startDate, req.endDate)}
+                      <time dateTime={req.startDate} title={formatDateTimeTooltip(req.startDate, locale)}>
+                        {formatDateRangeHuman(req.startDate, req.endDate, locale)}
                       </time>
                     </p>
                   </div>
@@ -561,14 +563,14 @@ export function TimeOffCalendarClient({
                     <p className="settings-card-description">
                       {afkLog.employeeDepartment ?? ""} •{" "}
                       {countryFlagFromCode(afkLog.employeeCountryCode)}{" "}
-                      {countryNameFromCode(afkLog.employeeCountryCode)}
+                      {countryNameFromCode(afkLog.employeeCountryCode, locale)}
                     </p>
                   </div>
                   <div className="timeoff-calendar-entry-meta">
-                    <StatusBadge tone="info">AFK</StatusBadge>
+                    <StatusBadge tone="info">{t('afkBadge')}</StatusBadge>
                     <p className="settings-card-description">
-                      <time dateTime={afkLog.date} title={formatDateTimeTooltip(afkLog.date)}>
-                        {formatDateRangeHuman(afkLog.date, afkLog.date)}
+                      <time dateTime={afkLog.date} title={formatDateTimeTooltip(afkLog.date, locale)}>
+                        {formatDateRangeHuman(afkLog.date, afkLog.date, locale)}
                       </time>{" "}
                       · {afkLog.startTime}-{afkLog.endTime}
                     </p>
@@ -580,7 +582,7 @@ export function TimeOffCalendarClient({
 
           {(requestsByDate.get(selectedDay) ?? []).length === 0 &&
           (afkByDate.get(selectedDay) ?? []).length === 0 ? (
-            <p className="settings-card-description">No leave or AFK entries on this day.</p>
+            <p className="settings-card-description">{t('noDayEntries')}</p>
           ) : null}
         </SlidePanel>
       ) : null}

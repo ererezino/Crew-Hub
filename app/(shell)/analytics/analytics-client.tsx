@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
@@ -31,6 +32,8 @@ import { hasRole } from "../../../lib/roles";
 import type { UserRole } from "../../../lib/navigation";
 import type { AnalyticsCsvSection } from "../../../types/analytics";
 
+type AppLocale = "en" | "fr";
+
 /* ── Constants ── */
 
 const CHART_PALETTE = [
@@ -42,6 +45,19 @@ const CHART_PALETTE = [
 ] as const;
 
 type DatePreset = "this_month" | "last_3" | "last_6" | "this_year" | "custom";
+
+const EMPLOYMENT_TYPE_KEY: Record<string, string> = {
+  full_time: "employmentFullTime",
+  part_time: "employmentPartTime",
+  contractor: "employmentContractor"
+};
+
+const STATUS_KEY: Record<string, string> = {
+  active: "statusActive",
+  onboarding: "statusOnboarding",
+  inactive: "statusInactive",
+  offboarding: "statusOffboarding"
+};
 
 /* ── Helpers ── */
 
@@ -78,19 +94,18 @@ function presetToRange(preset: DatePreset): { startDate: string; endDate: string
   return { startDate: toLocalDateString(start), endDate };
 }
 
-function formatMonthLabel(month: string): string {
+function formatMonthLabel(month: string, locale: AppLocale): string {
   const [year, monthValue] = month.split("-").map((value) => Number.parseInt(value, 10));
   if (!Number.isFinite(year) || !Number.isFinite(monthValue) || monthValue < 1 || monthValue > 12) {
     return month;
   }
   const date = new Date(Date.UTC(year, monthValue - 1, 1));
-  return date.toLocaleString(undefined, { month: "short", year: "2-digit", timeZone: "UTC" });
+  return date.toLocaleString(locale === "fr" ? "fr-FR" : "en-US", { month: "short", year: "2-digit", timeZone: "UTC" });
 }
 
-function employmentTypeLabel(value: string): string {
-  if (value === "full_time") return "Full time";
-  if (value === "part_time") return "Part time";
-  if (value === "contractor") return "Contractor";
+function employmentTypeLabel(value: string, td: (key: string) => string): string {
+  const key = EMPLOYMENT_TYPE_KEY[value];
+  if (key) return td(key);
   return value;
 }
 
@@ -98,11 +113,9 @@ function leaveTypeLabel(value: string): string {
   return value.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
-function statusLabel(value: string): string {
-  if (value === "active") return "Active";
-  if (value === "onboarding") return "Onboarding";
-  if (value === "inactive") return "Inactive";
-  if (value === "offboarding") return "Offboarding";
+function statusLabel(value: string, td: (key: string) => string): string {
+  const key = STATUS_KEY[value];
+  if (key) return td(key);
   return value;
 }
 
@@ -143,12 +156,16 @@ function SectionHeader({
   title,
   description,
   onExport,
-  exporting
+  exporting,
+  exportingLabel,
+  exportCsvLabel
 }: {
   title: string;
   description: string;
   onExport: () => void;
   exporting: boolean;
+  exportingLabel: string;
+  exportCsvLabel: string;
 }) {
   return (
     <header className="analytics-section-header">
@@ -162,7 +179,7 @@ function SectionHeader({
         onClick={onExport}
         disabled={exporting}
       >
-        {exporting ? "Exporting..." : "Export CSV"}
+        {exporting ? exportingLabel : exportCsvLabel}
       </button>
     </header>
   );
@@ -186,6 +203,10 @@ function StatRow({ items }: { items: Array<{ label: string; value: string | numb
 function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const t = useTranslations('analytics');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
 
   // Initialize from URL params
   const initialPreset = (searchParams.get("preset") as DatePreset) || "last_3";
@@ -274,7 +295,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
   if (query.isPending) {
     return (
       <>
-        <PageHeader title="Analytics" description="Workforce and operations trends with filters and exports." />
+        <PageHeader title={t('title')} description={t('description')} />
         <AnalyticsSkeleton />
       </>
     );
@@ -283,10 +304,10 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
   if (query.isError || !query.data) {
     return (
       <>
-        <PageHeader title="Analytics" description="Workforce and operations trends with filters and exports." />
+        <PageHeader title={t('title')} description={t('description')} />
         <ErrorState
-          title="Analytics unavailable"
-          message={query.error instanceof Error ? query.error.message : "Unable to load analytics."}
+          title={t('unavailable')}
+          message={query.error instanceof Error ? query.error.message : t('loadError')}
           onRetry={() => query.refetch()}
         />
       </>
@@ -308,7 +329,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
   // Prepare chart data
   const peopleByCountry = data.people.byCountry.map((row) => ({
     ...row,
-    label: `${countryFlagFromCode(row.key)} ${countryNameFromCode(row.key)}`
+    label: `${countryFlagFromCode(row.key)} ${countryNameFromCode(row.key, locale)}`
   }));
   const peopleByDepartment = [...data.people.byDepartment].sort((a, b) => b.count - a.count);
 
@@ -320,7 +341,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
 
   const payrollTrend = data.payroll.trend.map((row) => ({
     ...row,
-    label: formatMonthLabel(row.month)
+    label: formatMonthLabel(row.month, locale)
   }));
   const payrollByDept = [...data.payroll.byDepartment].sort((a, b) => b.avgNet - a.avgNet);
 
@@ -330,27 +351,29 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
   }));
   const expensesTrend = data.expenses.trend.map((row) => ({
     ...row,
-    label: formatMonthLabel(row.month)
+    label: formatMonthLabel(row.month, locale)
   }));
+
+  const presetButtons: Array<[DatePreset, string]> = [
+    ["this_month", t('presetThisMonth')],
+    ["last_3", t('presetLast3')],
+    ["last_6", t('presetLast6')],
+    ["this_year", t('presetThisYear')]
+  ];
 
   return (
     <>
       <PageHeader
-        title="Analytics"
-        description="Workforce and operations trends with filters and exports."
-        actions={query.isFetching ? <StatusBadge tone="processing">Refreshing</StatusBadge> : null}
+        title={t('title')}
+        description={t('description')}
+        actions={query.isFetching ? <StatusBadge tone="processing">{t('refreshing')}</StatusBadge> : null}
       />
 
       {/* ── Sticky Filters ── */}
-      <section className="analytics-toolbar analytics-toolbar-sticky" aria-label="Analytics filters">
+      <section className="analytics-toolbar analytics-toolbar-sticky" aria-label={t('filtersAriaLabel')}>
         <div className="analytics-filter-row">
           <div className="analytics-preset-group">
-            {([
-              ["this_month", "This month"],
-              ["last_3", "Last 3 months"],
-              ["last_6", "Last 6 months"],
-              ["this_year", "This year"]
-            ] as const).map(([key, label]) => (
+            {presetButtons.map(([key, label]) => (
               <button
                 key={key}
                 type="button"
@@ -367,12 +390,12 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               className="form-input analytics-filter-select"
               value={country}
               onChange={(e) => applyCountry(e.target.value)}
-              aria-label="Country filter"
+              aria-label={t('countryFilterAria')}
             >
-              <option value="all">All countries</option>
+              <option value="all">{t('allCountries')}</option>
               {countries.map((cc) => (
                 <option key={cc} value={cc}>
-                  {countryFlagFromCode(cc)} {countryNameFromCode(cc)}
+                  {countryFlagFromCode(cc)} {countryNameFromCode(cc, locale)}
                 </option>
               ))}
             </select>
@@ -383,9 +406,9 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               className="form-input analytics-filter-select"
               value={department}
               onChange={(e) => applyDepartment(e.target.value)}
-              aria-label="Department filter"
+              aria-label={t('departmentFilterAria')}
             >
-              <option value="all">All departments</option>
+              <option value="all">{t('allDepartments')}</option>
               {departments.map((dept) => (
                 <option key={dept} value={dept}>{dept}</option>
               ))}
@@ -396,7 +419,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
         {preset === "custom" || draftStartDate !== presetToRange(preset).startDate ? (
           <div className="analytics-filter-row">
             <label className="form-field" htmlFor="analytics-start-date">
-              <span className="form-label">Start date</span>
+              <span className="form-label">{t('startDateLabel')}</span>
               <input
                 id="analytics-start-date"
                 className={invalidRange ? "form-input form-input-error numeric" : "form-input numeric"}
@@ -406,7 +429,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               />
             </label>
             <label className="form-field" htmlFor="analytics-end-date">
-              <span className="form-label">End date</span>
+              <span className="form-label">{t('endDateLabel')}</span>
               <input
                 id="analytics-end-date"
                 className={invalidRange ? "form-input form-input-error numeric" : "form-input numeric"}
@@ -416,61 +439,63 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               />
             </label>
             <button type="button" className="button button-accent" disabled={invalidRange} onClick={applyCustomRange}>
-              Apply
+              {t('apply')}
             </button>
-            {invalidRange && <p className="form-field-error">Start date cannot be after end date.</p>}
+            {invalidRange && <p className="form-field-error">{t('invalidRangeError')}</p>}
           </div>
         ) : null}
       </section>
 
       {noData ? (
         <EmptyState
-          title="No analytics data for this range"
-          description="Try a wider date range or seed data to populate analytics charts."
+          title={t('noDataTitle')}
+          description={t('noDataDescription')}
         />
       ) : (
         <section className="settings-layout">
-          {/* ═══ Section 1: Workforce Overview ═══ */}
+          {/* Section 1: Workforce Overview */}
           <article className="settings-card">
             <SectionHeader
-              title="Workforce Overview"
-              description="Headcount, country and department distribution, employment mix, and turnover."
+              title={t('workforceTitle')}
+              description={t('workforceDescription')}
               onExport={() => exportSection("people")}
               exporting={exportingSection === "people"}
+              exportingLabel={t('exporting')}
+              exportCsvLabel={t('exportCsv')}
             />
             <section className="analytics-metric-grid">
               <article className="metric-card">
-                <p className="metric-label">Total headcount</p>
+                <p className="metric-label">{t('totalHeadcount')}</p>
                 <p className="metric-value numeric">{data.people.metrics.activeHeadcount}</p>
                 {data.people.metrics.newHiresThisMonth > 0 && (
                   <p className="metric-hint metric-hint-positive">
-                    +{data.people.metrics.newHiresThisMonth} this month
+                    {t('newHiresThisMonth', { count: data.people.metrics.newHiresThisMonth })}
                   </p>
                 )}
                 {data.people.metrics.newHiresThisMonth === 0 && (
-                  <p className="metric-hint">Current active people</p>
+                  <p className="metric-hint">{t('currentActivePeople')}</p>
                 )}
               </article>
               <article className="metric-card">
-                <p className="metric-label">New hires</p>
+                <p className="metric-label">{t('newHires')}</p>
                 <p className="metric-value numeric">{data.people.metrics.newHires}</p>
-                <p className="metric-hint">Joined in selected range</p>
+                <p className="metric-hint">{t('newHiresHint')}</p>
               </article>
               <article className="metric-card">
-                <p className="metric-label">Departures</p>
+                <p className="metric-label">{t('departures')}</p>
                 <p className="metric-value numeric">{data.people.metrics.departures}</p>
-                <p className="metric-hint">Left in selected range</p>
+                <p className="metric-hint">{t('departuresHint')}</p>
               </article>
               <article className="metric-card">
-                <p className="metric-label">Average tenure</p>
-                <p className="metric-value numeric">{data.people.metrics.avgTenureMonths} mo</p>
-                <p className="metric-hint">Active people</p>
+                <p className="metric-label">{t('avgTenure')}</p>
+                <p className="metric-value numeric">{t('avgTenureValue', { months: data.people.metrics.avgTenureMonths })}</p>
+                <p className="metric-hint">{t('avgTenureHint')}</p>
               </article>
             </section>
 
             <section className="analytics-chart-grid analytics-chart-grid-two">
               <article className="analytics-chart-card">
-                <h3 className="section-title">Headcount by country</h3>
+                <h3 className="section-title">{t('headcountByCountry')}</h3>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={peopleByCountry}>
                     <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
@@ -483,7 +508,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               </article>
 
               <article className="analytics-chart-card">
-                <h3 className="section-title">Headcount by department</h3>
+                <h3 className="section-title">{t('headcountByDepartment')}</h3>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={peopleByDepartment} layout="vertical">
                     <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
@@ -498,7 +523,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
 
             <StatRow
               items={data.people.employmentType.map((row) => ({
-                label: employmentTypeLabel(row.key),
+                label: employmentTypeLabel(row.key, td),
                 value: row.count
               }))}
             />
@@ -506,42 +531,44 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
             {data.people.statusDistribution.length > 0 && (
               <StatRow
                 items={data.people.statusDistribution.map((row) => ({
-                  label: statusLabel(row.key),
+                  label: statusLabel(row.key, td),
                   value: row.count
                 }))}
               />
             )}
           </article>
 
-          {/* ═══ Section 2: Leave & Attendance ═══ */}
+          {/* Section 2: Leave & Attendance */}
           <article className="settings-card">
             <SectionHeader
-              title="Leave &amp; Attendance"
-              description="Leave utilization, department breakdown, and top leave-takers."
+              title={t('leaveTitle')}
+              description={t('leaveDescription')}
               onExport={() => exportSection("time_off")}
               exporting={exportingSection === "time_off"}
+              exportingLabel={t('exporting')}
+              exportCsvLabel={t('exportCsv')}
             />
             <section className="analytics-metric-grid">
               <article className="metric-card">
-                <p className="metric-label">Leave days taken</p>
-                <p className="metric-value numeric">{formatDays(data.timeOff.metrics.totalDaysTaken)}</p>
-                <p className="metric-hint">Approved days in range</p>
+                <p className="metric-label">{t('leaveDaysTaken')}</p>
+                <p className="metric-value numeric">{formatDays(data.timeOff.metrics.totalDaysTaken, locale)}</p>
+                <p className="metric-hint">{t('leaveDaysHint')}</p>
               </article>
               <article className="metric-card">
-                <p className="metric-label">Most common type</p>
+                <p className="metric-label">{t('mostCommonType')}</p>
                 <p className="metric-value">{data.timeOff.metrics.mostCommonType ? leaveTypeLabel(data.timeOff.metrics.mostCommonType) : "-"}</p>
-                <p className="metric-hint">By total days taken</p>
+                <p className="metric-hint">{t('mostCommonTypeHint')}</p>
               </article>
               <article className="metric-card">
-                <p className="metric-label">Avg balance remaining</p>
-                <p className="metric-value numeric">{formatDays(data.timeOff.metrics.avgLeaveBalance)} days</p>
-                <p className="metric-hint">Annual leave only</p>
+                <p className="metric-label">{t('avgBalanceRemaining')}</p>
+                <p className="metric-value numeric">{t('avgBalanceDays', { days: formatDays(data.timeOff.metrics.avgLeaveBalance, locale) })}</p>
+                <p className="metric-hint">{t('avgBalanceHint')}</p>
               </article>
             </section>
 
             <section className="analytics-chart-grid analytics-chart-grid-two">
               <article className="analytics-chart-card">
-                <h3 className="section-title">Leave days by type</h3>
+                <h3 className="section-title">{t('leaveByType')}</h3>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={timeOffByType}>
                     <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
@@ -554,7 +581,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               </article>
 
               <article className="analytics-chart-card">
-                <h3 className="section-title">Leave utilization by department</h3>
+                <h3 className="section-title">{t('leaveByDept')}</h3>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={leaveByDept} layout="vertical">
                     <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
@@ -569,14 +596,14 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
 
             {data.timeOff.topUsers.length > 0 && (
               <section className="analytics-list-card">
-                <h3 className="section-title">Top 5 leave-takers this period</h3>
+                <h3 className="section-title">{t('topLeaveTakers')}</h3>
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Employee</th>
-                      <th>Department</th>
-                      <th className="numeric">Days</th>
-                      <th>Primary type</th>
+                      <th>{t('thEmployee')}</th>
+                      <th>{t('thDepartment')}</th>
+                      <th className="numeric">{t('thDays')}</th>
+                      <th>{t('thPrimaryType')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -588,7 +615,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
                           </a>
                         </td>
                         <td>{row.department ?? "-"}</td>
-                        <td className="numeric">{formatDays(row.totalDays)}</td>
+                        <td className="numeric">{formatDays(row.totalDays, locale)}</td>
                         <td>{leaveTypeLabel(row.mainType)}</td>
                       </tr>
                     ))}
@@ -598,49 +625,51 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
             )}
           </article>
 
-          {/* ═══ Section 3: Payroll & Compensation (Finance Admin+ only) ═══ */}
+          {/* Section 3: Payroll & Compensation (Finance Admin+ only) */}
           {showPayroll && (
             <article className="settings-card">
               <SectionHeader
-                title="Payroll &amp; Compensation"
-                description="Payroll costs, salary distribution, and compensation band analysis."
+                title={t('payrollTitle')}
+                description={t('payrollDescription')}
                 onExport={() => exportSection("payroll")}
                 exporting={exportingSection === "payroll"}
+                exportingLabel={t('exporting')}
+                exportCsvLabel={t('exportCsv')}
               />
               <section className="analytics-metric-grid">
                 <article className="metric-card">
-                  <p className="metric-label">Gross (last run)</p>
+                  <p className="metric-label">{t('grossLastRun')}</p>
                   <p className="metric-value">
                     <CurrencyDisplay amount={data.payroll.metrics.lastRunGross} currency={data.payroll.metrics.currency} />
                   </p>
-                  <p className="metric-hint">Last completed payroll run</p>
+                  <p className="metric-hint">{t('lastRunHint')}</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Net (last run)</p>
+                  <p className="metric-label">{t('netLastRun')}</p>
                   <p className="metric-value">
                     <CurrencyDisplay amount={data.payroll.metrics.lastRunNet} currency={data.payroll.metrics.currency} />
                   </p>
-                  <p className="metric-hint">Last completed payroll run</p>
+                  <p className="metric-hint">{t('lastRunHint')}</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Avg gross salary</p>
+                  <p className="metric-label">{t('avgGrossSalary')}</p>
                   <p className="metric-value">
                     <CurrencyDisplay amount={data.payroll.metrics.avgGrossSalary} currency={data.payroll.metrics.currency} />
                   </p>
-                  <p className="metric-hint">From compensation records</p>
+                  <p className="metric-hint">{t('avgGrossHint')}</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Total allowances</p>
+                  <p className="metric-label">{t('totalAllowances')}</p>
                   <p className="metric-value">
                     <CurrencyDisplay amount={data.payroll.metrics.totalAllowances} currency={data.payroll.metrics.currency} />
                   </p>
-                  <p className="metric-hint">Monthly allowance cost</p>
+                  <p className="metric-hint">{t('totalAllowancesHint')}</p>
                 </article>
               </section>
 
               <section className="analytics-chart-grid analytics-chart-grid-two">
                 <article className="analytics-chart-card">
-                  <h3 className="section-title">Payroll cost trend</h3>
+                  <h3 className="section-title">{t('payrollCostTrend')}</h3>
                   <ResponsiveContainer width="100%" height={260}>
                     <LineChart data={payrollTrend}>
                       <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
@@ -648,14 +677,14 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
                       <YAxis tick={{ fill: "var(--text-secondary)" }} />
                       <Tooltip />
                       <Legend />
-                      <Line type="monotone" dataKey="totalGross" name="Gross" stroke={CHART_PALETTE[2]} strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="totalNet" name="Net" stroke={CHART_PALETTE[0]} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="totalGross" name={t('legendGross')} stroke={CHART_PALETTE[2]} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="totalNet" name={t('legendNet')} stroke={CHART_PALETTE[0]} strokeWidth={2} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </article>
 
                 <article className="analytics-chart-card">
-                  <h3 className="section-title">Average salary by department</h3>
+                  <h3 className="section-title">{t('avgSalaryByDept')}</h3>
                   <ResponsiveContainer width="100%" height={260}>
                     <BarChart data={payrollByDept} layout="vertical">
                       <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
@@ -670,54 +699,56 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
 
               <StatRow
                 items={[
-                  { label: "Below midpoint", value: `${data.payroll.compensationBands.belowMidpoint} people` },
-                  { label: "At midpoint", value: `${data.payroll.compensationBands.atMidpoint} people` },
-                  { label: "Above midpoint", value: `${data.payroll.compensationBands.aboveMidpoint} people` }
+                  { label: t('belowMidpoint'), value: t('peopleCount', { count: data.payroll.compensationBands.belowMidpoint }) },
+                  { label: t('atMidpoint'), value: t('peopleCount', { count: data.payroll.compensationBands.atMidpoint }) },
+                  { label: t('aboveMidpoint'), value: t('peopleCount', { count: data.payroll.compensationBands.aboveMidpoint }) }
                 ]}
               />
             </article>
           )}
 
-          {/* ═══ Section 4: Expenses ═══ */}
+          {/* Section 4: Expenses */}
           <article className="settings-card">
             <SectionHeader
-              title="Expenses"
-              description="Expense submissions, reimbursements, and processing efficiency."
+              title={t('expensesTitle')}
+              description={t('expensesDescription')}
               onExport={() => exportSection("expenses")}
               exporting={exportingSection === "expenses"}
+              exportingLabel={t('exporting')}
+              exportCsvLabel={t('exportCsv')}
             />
             <section className="analytics-metric-grid">
               <article className="metric-card">
-                <p className="metric-label">Total submitted</p>
+                <p className="metric-label">{t('totalSubmitted')}</p>
                 <p className="metric-value">
                   <CurrencyDisplay amount={data.expenses.metrics.totalAmount} currency={data.expenses.metrics.currency} />
                 </p>
-                <p className="metric-hint">All expenses in range</p>
+                <p className="metric-hint">{t('totalSubmittedHint')}</p>
               </article>
               <article className="metric-card">
-                <p className="metric-label">Total reimbursed</p>
+                <p className="metric-label">{t('totalReimbursed')}</p>
                 <p className="metric-value">
                   <CurrencyDisplay amount={data.expenses.metrics.reimbursedAmount} currency={data.expenses.metrics.currency} />
                 </p>
-                <p className="metric-hint">Reimbursed in range</p>
+                <p className="metric-hint">{t('totalReimbursedHint')}</p>
               </article>
               <article className="metric-card">
-                <p className="metric-label">Pending reimbursement</p>
+                <p className="metric-label">{t('pendingReimbursement')}</p>
                 <p className="metric-value">
                   <CurrencyDisplay amount={data.expenses.metrics.pendingAmount} currency={data.expenses.metrics.currency} />
                 </p>
-                <p className="metric-hint">Owed to crew members</p>
+                <p className="metric-hint">{t('pendingReimbursementHint')}</p>
               </article>
               <article className="metric-card">
-                <p className="metric-label">Avg processing time</p>
-                <p className="metric-value numeric">{data.expenses.metrics.avgProcessingDays} days</p>
-                <p className="metric-hint">Submitted → reimbursed</p>
+                <p className="metric-label">{t('avgProcessingTime')}</p>
+                <p className="metric-value numeric">{t('avgProcessingDays', { days: data.expenses.metrics.avgProcessingDays })}</p>
+                <p className="metric-hint">{t('avgProcessingHint')}</p>
               </article>
             </section>
 
             <section className="analytics-chart-grid analytics-chart-grid-two">
               <article className="analytics-chart-card">
-                <h3 className="section-title">By category</h3>
+                <h3 className="section-title">{t('byCategory')}</h3>
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
                     <Pie
@@ -739,7 +770,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               </article>
 
               <article className="analytics-chart-card">
-                <h3 className="section-title">Expense trend</h3>
+                <h3 className="section-title">{t('expenseTrend')}</h3>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={expensesTrend}>
                     <CartesianGrid stroke="var(--border-subtle)" strokeDasharray="3 3" />
@@ -753,46 +784,48 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
             </section>
           </article>
 
-          {/* ═══ Section 5: People Pipeline (HR Admin+ only) ═══ */}
+          {/* Section 5: People Pipeline (HR Admin+ only) */}
           {showPipeline && (
             <article className="settings-card">
               <SectionHeader
-                title="People Pipeline"
-                description="Onboarding, performance reviews, learning, and compliance status."
+                title={t('pipelineTitle')}
+                description={t('pipelineDescription')}
                 onExport={() => exportSection("pipeline")}
                 exporting={exportingSection === "pipeline"}
+                exportingLabel={t('exporting')}
+                exportCsvLabel={t('exportCsv')}
               />
               <section className="analytics-metric-grid">
                 <article className="metric-card">
-                  <p className="metric-label">Active onboarding</p>
+                  <p className="metric-label">{t('activeOnboarding')}</p>
                   <p className="metric-value numeric">{data.pipeline.onboarding.active}</p>
                   {data.pipeline.onboarding.overdue > 0 && (
                     <p className="metric-hint metric-hint-warning">
-                      {data.pipeline.onboarding.overdue} overdue
+                      {t('overdueCount', { count: data.pipeline.onboarding.overdue })}
                     </p>
                   )}
                   {data.pipeline.onboarding.overdue === 0 && (
-                    <p className="metric-hint">All on track</p>
+                    <p className="metric-hint">{t('allOnTrack')}</p>
                   )}
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Review cycles</p>
-                  <p className="metric-value numeric">{data.pipeline.reviewCycles.active} active</p>
+                  <p className="metric-label">{t('reviewCycles')}</p>
+                  <p className="metric-value numeric">{t('reviewCyclesActive', { count: data.pipeline.reviewCycles.active })}</p>
                   <p className="metric-hint">
-                    {data.pipeline.reviewCycles.completionPct}% completion rate
+                    {t('completionRate', { pct: data.pipeline.reviewCycles.completionPct })}
                   </p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Learning</p>
-                  <p className="metric-value numeric">{data.pipeline.learning.activeCourses} courses</p>
+                  <p className="metric-label">{t('learning')}</p>
+                  <p className="metric-value numeric">{t('learningCourses', { count: data.pipeline.learning.activeCourses })}</p>
                   <p className="metric-hint">
-                    {data.pipeline.learning.completionPct}% completion rate
+                    {t('completionRate', { pct: data.pipeline.learning.completionPct })}
                   </p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Compliance health</p>
+                  <p className="metric-label">{t('complianceHealth')}</p>
                   <p className="metric-value numeric">{data.pipeline.complianceHealth.completedOnTimePct}%</p>
-                  <p className="metric-hint">Deadlines completed on time this month</p>
+                  <p className="metric-hint">{t('complianceHint')}</p>
                 </article>
               </section>
             </article>

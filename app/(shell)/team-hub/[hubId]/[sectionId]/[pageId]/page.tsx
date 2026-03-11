@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
@@ -14,17 +16,19 @@ type PageViewPageProps = {
 
 export default async function PageViewPage({ params }: PageViewPageProps) {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("teamHubPage");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Page"
-          description="View page content."
+          title={t("pageTitle")}
+          description={t("pageDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );

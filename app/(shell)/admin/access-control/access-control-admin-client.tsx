@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 
 import { NavIcon } from "../../../../components/shared/nav-icon";
@@ -9,41 +10,41 @@ import { PageHeader } from "../../../../components/shared/page-header";
 
 type ModuleDef = {
   key: string;
-  label: string;
+  labelKey: string;
   icon: string;
-  category: string;
+  categoryKey: string;
 };
 
 const ALL_MODULES: ModuleDef[] = [
-  { key: "/dashboard", label: "Home", icon: "LayoutDashboard", category: "Core" },
-  { key: "/announcements", label: "Notifications", icon: "Bell", category: "Core" },
-  { key: "/time-off", label: "Time Off", icon: "CalendarOff", category: "My work" },
-  { key: "/me/pay", label: "My Pay", icon: "Wallet", category: "My work" },
-  { key: "/documents", label: "Documents", icon: "FileText", category: "My work" },
-  { key: "/expenses", label: "Expenses", icon: "Receipt", category: "My work" },
-  { key: "/learning", label: "Learning", icon: "GraduationCap", category: "My work" },
-  { key: "/approvals", label: "Approvals", icon: "CheckCircle", category: "Team" },
-  { key: "/people", label: "Crew Members", icon: "Users", category: "Team" },
-  { key: "/scheduling", label: "Scheduling", icon: "Calendar", category: "Team" },
-  { key: "/onboarding", label: "Onboarding", icon: "Rocket", category: "Team" },
-  { key: "/team-hub", label: "Team Hub", icon: "BookOpen", category: "Team" },
-  { key: "/payroll", label: "Payroll", icon: "Calculator", category: "Finance" },
-  { key: "/admin/compensation", label: "Compensation", icon: "Coins", category: "Finance" },
-  { key: "/performance", label: "Performance", icon: "Star", category: "Operations" },
-  { key: "/compliance", label: "Compliance", icon: "ShieldCheck", category: "Operations" },
-  { key: "/analytics", label: "Analytics", icon: "BarChart3", category: "Operations" },
-  { key: "/signatures", label: "Signatures", icon: "PenTool", category: "Operations" }
+  { key: "/dashboard", labelKey: "modHome", icon: "LayoutDashboard", categoryKey: "catCore" },
+  { key: "/announcements", labelKey: "modNotifications", icon: "Bell", categoryKey: "catCore" },
+  { key: "/time-off", labelKey: "modTimeOff", icon: "CalendarOff", categoryKey: "catMyWork" },
+  { key: "/me/pay", labelKey: "modMyPay", icon: "Wallet", categoryKey: "catMyWork" },
+  { key: "/documents", labelKey: "modDocuments", icon: "FileText", categoryKey: "catMyWork" },
+  { key: "/expenses", labelKey: "modExpenses", icon: "Receipt", categoryKey: "catMyWork" },
+  { key: "/learning", labelKey: "modLearning", icon: "GraduationCap", categoryKey: "catMyWork" },
+  { key: "/approvals", labelKey: "modApprovals", icon: "CheckCircle", categoryKey: "catTeam" },
+  { key: "/people", labelKey: "modCrewMembers", icon: "Users", categoryKey: "catTeam" },
+  { key: "/scheduling", labelKey: "modScheduling", icon: "Calendar", categoryKey: "catTeam" },
+  { key: "/onboarding", labelKey: "modOnboarding", icon: "Rocket", categoryKey: "catTeam" },
+  { key: "/team-hub", labelKey: "modTeamHub", icon: "BookOpen", categoryKey: "catTeam" },
+  { key: "/payroll", labelKey: "modPayroll", icon: "Calculator", categoryKey: "catFinance" },
+  { key: "/admin/compensation", labelKey: "modCompensation", icon: "Coins", categoryKey: "catFinance" },
+  { key: "/performance", labelKey: "modPerformance", icon: "Star", categoryKey: "catOperations" },
+  { key: "/compliance", labelKey: "modCompliance", icon: "ShieldCheck", categoryKey: "catOperations" },
+  { key: "/analytics", labelKey: "modAnalytics", icon: "BarChart3", categoryKey: "catOperations" },
+  { key: "/signatures", labelKey: "modSignatures", icon: "PenTool", categoryKey: "catOperations" }
 ];
 
 const MODULE_BY_KEY = new Map(ALL_MODULES.map((m) => [m.key, m]));
-const CATEGORIES = ["Core", "My work", "Team", "Finance", "Operations"] as const;
+const CATEGORY_KEYS = ["catCore", "catMyWork", "catTeam", "catFinance", "catOperations"] as const;
 
 /* ── Role configuration ── */
 
 type RoleDef = {
   role: string;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   icon: string;
   accent: string;
   accentLight: string;
@@ -52,48 +53,48 @@ type RoleDef = {
 const ROLES: RoleDef[] = [
   {
     role: "EMPLOYEE",
-    label: "Employee",
-    description: "Standard access for every crew member",
+    labelKey: "roleEmployee",
+    descriptionKey: "roleEmployeeDesc",
     icon: "User",
     accent: "#16a34a",
     accentLight: "#f0fdf4"
   },
   {
     role: "TEAM_LEAD",
-    label: "Team Lead",
-    description: "Employee access plus team oversight",
+    labelKey: "roleTeamLead",
+    descriptionKey: "roleTeamLeadDesc",
     icon: "UserCheck",
     accent: "#2563eb",
     accentLight: "#eff6ff"
   },
   {
     role: "MANAGER",
-    label: "Manager",
-    description: "Team lead access plus onboarding",
+    labelKey: "roleManager",
+    descriptionKey: "roleManagerDesc",
     icon: "Users",
     accent: "#7c3aed",
     accentLight: "#f5f3ff"
   },
   {
     role: "HR_ADMIN",
-    label: "HR Admin",
-    description: "Full people operations and compliance",
+    labelKey: "roleHrAdmin",
+    descriptionKey: "roleHrAdminDesc",
     icon: "Shield",
     accent: "#ea580c",
     accentLight: "#fff7ed"
   },
   {
     role: "FINANCE_ADMIN",
-    label: "Finance Admin",
-    description: "Payroll, compensation, and financial oversight",
+    labelKey: "roleFinanceAdmin",
+    descriptionKey: "roleFinanceAdminDesc",
     icon: "Coins",
     accent: "#ca8a04",
     accentLight: "#fefce8"
   },
   {
     role: "SUPER_ADMIN",
-    label: "Super Admin",
-    description: "Unrestricted access to every module",
+    labelKey: "roleSuperAdmin",
+    descriptionKey: "roleSuperAdminDesc",
     icon: "Crown",
     accent: "#db2777",
     accentLight: "#fdf2f8"
@@ -132,16 +133,19 @@ const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
 
 /* ── Helpers ── */
 
-function groupByCategory(moduleKeys: string[]): Map<string, ModuleDef[]> {
-  const groups = new Map<string, ModuleDef[]>();
-  for (const cat of CATEGORIES) {
-    groups.set(cat, []);
+function groupByCategory(
+  moduleKeys: string[],
+  tDynamic: (key: string) => string
+): Map<string, { categoryLabel: string; modules: ModuleDef[] }> {
+  const groups = new Map<string, { categoryLabel: string; modules: ModuleDef[] }>();
+  for (const catKey of CATEGORY_KEYS) {
+    groups.set(catKey, { categoryLabel: tDynamic(catKey), modules: [] });
   }
   for (const key of moduleKeys) {
     const mod = MODULE_BY_KEY.get(key);
     if (!mod) continue;
-    const arr = groups.get(mod.category);
-    if (arr) arr.push(mod);
+    const group = groups.get(mod.categoryKey);
+    if (group) group.modules.push(mod);
   }
   return groups;
 }
@@ -149,6 +153,11 @@ function groupByCategory(moduleKeys: string[]): Map<string, ModuleDef[]> {
 /* ── Component ── */
 
 export function AccessControlAdminClient() {
+  const t = useTranslations('accessControl');
+  const tCommon = useTranslations('common');
+  // Dynamic key lookup for data-driven labels (roles, modules, categories)
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   /* role → enabled module keys (starts with defaults, overwritten by API) */
   const [roleModules, setRoleModules] = useState<Record<string, Set<string>>>(() => {
     const initial: Record<string, Set<string>> = {};
@@ -243,18 +252,19 @@ export function AccessControlAdminClient() {
   return (
     <>
       <PageHeader
-        title="Roles & access"
-        description="See what each role can access. Role-based access is enforced automatically."
+        title={t('title')}
+        description={t('description')}
       />
 
       <div className="rac-page">
         {/* ── Role Permission Cards ── */}
         <section className="rac-section">
           <div className="rac-section-header">
-            <h3 className="rac-section-title">Role permissions</h3>
+            <h3 className="rac-section-title">{t('rolePermissions')}</h3>
             <p className="rac-section-subtitle">
-              Every crew member inherits the modules below based on their assigned role.
-              Click <strong>Edit</strong> to add or remove modules.
+              {t.rich('rolePermissionsDescription', {
+                strong: (chunks) => <strong>{chunks}</strong>
+              })}
             </p>
           </div>
 
@@ -263,7 +273,7 @@ export function AccessControlAdminClient() {
               const isEditing = editingRole === roleDef.role;
               const isSuperAdmin = roleDef.role === "SUPER_ADMIN";
               const modules = roleModules[roleDef.role] ?? new Set<string>();
-              const grouped = groupByCategory(Array.from(modules));
+              const grouped = groupByCategory(Array.from(modules), td);
               const totalModules = modules.size;
 
               return (
@@ -285,18 +295,18 @@ export function AccessControlAdminClient() {
                         <NavIcon name={roleDef.icon} size={22} />
                       </div>
                       <div className="rac-card-header-text">
-                        <h4 className="rac-card-name">{roleDef.label}</h4>
-                        <p className="rac-card-desc">{roleDef.description}</p>
+                        <h4 className="rac-card-name">{td(roleDef.labelKey)}</h4>
+                        <p className="rac-card-desc">{td(roleDef.descriptionKey)}</p>
                       </div>
                       {!isSuperAdmin && !isEditing ? (
                         <button
                           type="button"
                           className="rac-edit-btn"
                           onClick={() => startEditing(roleDef.role)}
-                          aria-label={`Edit ${roleDef.label} permissions`}
+                          aria-label={t('editPermissions', { role: td(roleDef.labelKey) })}
                         >
                           <NavIcon name="Pencil" size={14} />
-                          Edit
+                          {t('edit')}
                         </button>
                       ) : null}
                     </div>
@@ -307,19 +317,19 @@ export function AccessControlAdminClient() {
                         {isSuperAdmin ? (
                           <div className="rac-super-admin-badge">
                             <NavIcon name="Crown" size={16} />
-                            <span>Full access to all {ALL_MODULES.length} modules</span>
+                            <span>{t('fullAccess', { count: ALL_MODULES.length })}</span>
                           </div>
                         ) : (
-                          Array.from(grouped.entries()).map(([category, mods]) => {
+                          Array.from(grouped.entries()).map(([categoryKey, { categoryLabel, modules: mods }]) => {
                             if (mods.length === 0) return null;
                             return (
-                              <div key={category} className="rac-module-group">
-                                <span className="rac-module-group-label">{category}</span>
+                              <div key={categoryKey} className="rac-module-group">
+                                <span className="rac-module-group-label">{categoryLabel}</span>
                                 <div className="rac-module-list">
                                   {mods.map((mod) => (
                                     <span key={mod.key} className="rac-module-pill">
                                       <NavIcon name={mod.icon} size={13} />
-                                      {mod.label}
+                                      {td(mod.labelKey)}
                                     </span>
                                   ))}
                                 </div>
@@ -333,11 +343,11 @@ export function AccessControlAdminClient() {
                     {/* Module list — edit mode */}
                     {isEditing ? (
                       <div className="rac-card-edit">
-                        {CATEGORIES.map((category) => {
-                          const catModules = ALL_MODULES.filter((m) => m.category === category);
+                        {CATEGORY_KEYS.map((categoryKey) => {
+                          const catModules = ALL_MODULES.filter((m) => m.categoryKey === categoryKey);
                           return (
-                            <div key={category} className="rac-edit-group">
-                              <span className="rac-module-group-label">{category}</span>
+                            <div key={categoryKey} className="rac-edit-group">
+                              <span className="rac-module-group-label">{td(categoryKey)}</span>
                               <div className="rac-edit-items">
                                 {catModules.map((mod) => {
                                   const checked = editDraft.has(mod.key);
@@ -353,7 +363,7 @@ export function AccessControlAdminClient() {
                                         className="rac-edit-checkbox"
                                       />
                                       <NavIcon name={mod.icon} size={15} />
-                                      <span>{mod.label}</span>
+                                      <span>{td(mod.labelKey)}</span>
                                     </label>
                                   );
                                 })}
@@ -370,14 +380,14 @@ export function AccessControlAdminClient() {
                             disabled={saving}
                           >
                             <NavIcon name="Check" size={14} />
-                            {saving ? "Saving…" : "Save changes"}
+                            {saving ? t('saving') : t('saveChanges')}
                           </button>
                           <button
                             type="button"
                             className="rac-cancel-btn"
                             onClick={cancelEditing}
                           >
-                            Cancel
+                            {tCommon('cancel')}
                           </button>
                         </div>
                       </div>
@@ -387,7 +397,7 @@ export function AccessControlAdminClient() {
                     {!isEditing ? (
                       <div className="rac-card-footer">
                         <span className="rac-module-count">
-                          {isSuperAdmin ? "Unrestricted" : `${totalModules} module${totalModules === 1 ? "" : "s"}`}
+                          {isSuperAdmin ? t('unrestricted') : t('moduleCount', { count: totalModules })}
                         </span>
                       </div>
                     ) : null}
@@ -401,9 +411,9 @@ export function AccessControlAdminClient() {
         {/* ── Per-Person Overrides ── */}
         <section className="rac-section">
           <div className="rac-section-header">
-            <h3 className="rac-section-title">Per-person overrides</h3>
+            <h3 className="rac-section-title">{t('overridesTitle')}</h3>
             <p className="rac-section-subtitle">
-              Grant individual crew members access to modules their role wouldn&apos;t normally allow. Use sparingly.
+              {t('overridesDescription')}
             </p>
           </div>
 
@@ -411,9 +421,9 @@ export function AccessControlAdminClient() {
             <div className="rac-overrides-empty-icon">
               <NavIcon name="ShieldOff" size={28} />
             </div>
-            <p className="rac-overrides-empty-title">No overrides configured</p>
+            <p className="rac-overrides-empty-title">{t('noOverrides')}</p>
             <p className="rac-overrides-empty-desc">
-              To add an override, open a crew member&apos;s profile in Crew Members and adjust their access permissions.
+              {t('noOverridesDescription')}
             </p>
           </div>
         </section>

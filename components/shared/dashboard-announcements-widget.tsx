@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
 import { useAnnouncements } from "../../hooks/use-announcements";
@@ -18,6 +19,7 @@ function AnnouncementSkeleton() {
 }
 
 export function DashboardAnnouncementsWidget() {
+  const t = useTranslations("dashboard.announcementsWidget");
   const { announcements, isLoading, errorMessage } = useAnnouncements({ limit: 20 });
 
   const recentAnnouncements = useMemo(
@@ -35,9 +37,9 @@ export function DashboardAnnouncementsWidget() {
   return (
     <div className="announcement-widget">
       <header className="announcement-widget-header">
-        <h3 className="section-title">Announcements</h3>
+        <h3 className="section-title">{t("title")}</h3>
         <Link href="/announcements" className="announcement-widget-link">
-          View all
+          {t("viewAll")}
         </Link>
       </header>
 
@@ -45,18 +47,18 @@ export function DashboardAnnouncementsWidget() {
 
       {!isLoading && errorMessage ? (
         <EmptyState
-          title="Announcements are unavailable"
+          title={t("unavailable")}
           description={errorMessage}
-          ctaLabel="View all"
+          ctaLabel={t("viewAll")}
           ctaHref="/announcements"
         />
       ) : null}
 
       {!isLoading && !errorMessage && recentAnnouncements.length === 0 ? (
         <EmptyState
-          title="No announcements yet"
-          description="Company updates will appear here once announcements are published."
-          ctaLabel="View all"
+          title={t("emptyTitle")}
+          description={t("emptyDescription")}
+          ctaLabel={t("viewAll")}
           ctaHref="/announcements"
         />
       ) : null}
@@ -84,7 +86,7 @@ export function DashboardAnnouncementsWidget() {
                 </p>
               </div>
               {announcement.isRead ? (
-                <span className="announcement-read-check" title="Read">
+                <span className="announcement-read-check" title={t("read")}>
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       d="M5 12.5l4.5 4.5L19 7.5"
@@ -97,7 +99,7 @@ export function DashboardAnnouncementsWidget() {
                   </svg>
                 </span>
               ) : (
-                <span className="pill">Unread</span>
+                <span className="pill">{t("unread")}</span>
               )}
             </li>
           ))}

@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import type { CompensationSnapshot } from "../../types/compensation";
+import type { AppLocale } from "../../i18n/locales";
 import { countryFlagFromCode, countryNameFromCode } from "../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
 import {
@@ -37,26 +39,34 @@ function approvalTone(approvedBy: string | null) {
   return approvedBy ? "success" : "pending";
 }
 
-function approvalLabel(approvedBy: string | null, approvedByName: string | null) {
+type CompensationTranslator = ReturnType<typeof useTranslations<"compensation">>;
+
+function approvalLabel(
+  approvedBy: string | null,
+  approvedByName: string | null,
+  t: CompensationTranslator
+) {
   if (!approvedBy) {
-    return "Pending approval";
+    return t("pendingApproval");
   }
 
-  return approvedByName ? `Approved by ${approvedByName}` : "Approved";
+  return approvedByName ? t("approvedBy", { name: approvedByName } as Record<string, string>) : t("approved");
 }
 
 function taxableTone(isTaxable: boolean) {
   return isTaxable ? "warning" : "success";
 }
 
-function taxableLabel(isTaxable: boolean) {
-  return isTaxable ? "Taxable" : "Non-taxable";
+function taxableLabel(isTaxable: boolean, t: CompensationTranslator) {
+  return isTaxable ? t("taxable") : t("nonTaxable");
 }
 
 export function CompensationOverview({
   snapshot,
   showEmployeeSummary = false
 }: CompensationOverviewProps) {
+  const locale = useLocale() as AppLocale;
+  const t = useTranslations("compensation");
   const [allowanceSortDirection, setAllowanceSortDirection] =
     useState<SortDirection>("desc");
   const [salarySortDirection, setSalarySortDirection] = useState<SortDirection>("desc");
@@ -98,24 +108,24 @@ export function CompensationOverview({
     const salaryEvents: TimelineEvent[] = snapshot.salaryRecords.map((record) => ({
       id: `salary-${record.id}`,
       timestamp: record.effectiveFrom,
-      label: "Salary record",
-      description: `${formatPayFrequencyLabel(record.payFrequency)} ${record.currency} compensation`,
+      label: t("salaryRecord"),
+      description: t("salaryRecordDescription", { frequency: formatPayFrequencyLabel(record.payFrequency), currency: record.currency }),
       tone: record.approvedBy ? "success" : "pending"
     }));
 
     const allowanceEvents: TimelineEvent[] = snapshot.allowances.map((record) => ({
       id: `allowance-${record.id}`,
       timestamp: record.effectiveFrom,
-      label: "Allowance",
-      description: `${record.label} (${formatAllowanceTypeLabel(record.type)})`,
+      label: t("allowance"),
+      description: t("allowanceDescription", { label: record.label, type: formatAllowanceTypeLabel(record.type) }),
       tone: record.isTaxable ? "warning" : "info"
     }));
 
     const equityEvents: TimelineEvent[] = snapshot.equityGrants.map((record) => ({
       id: `equity-${record.id}`,
       timestamp: record.grantDate,
-      label: "Equity grant",
-      description: `${record.numberOfShares.toLocaleString()} shares (${record.grantType})`,
+      label: t("equityGrant"),
+      description: t("equityGrantDescription", { shares: record.numberOfShares.toLocaleString(), type: record.grantType }),
       tone: toneForEquityStatus(record.status)
     }));
 
@@ -126,39 +136,39 @@ export function CompensationOverview({
         return rightTime - leftTime;
       })
       .slice(0, 12);
-  }, [snapshot.allowances, snapshot.equityGrants, snapshot.salaryRecords]);
+  }, [snapshot.allowances, snapshot.equityGrants, snapshot.salaryRecords, t]);
 
   return (
-    <section className="compensation-layout" aria-label="Compensation overview">
+    <section className="compensation-layout" aria-label={t("compensationOverviewAriaLabel")}>
       {showEmployeeSummary ? (
-        <article className="compensation-summary-card" aria-label="Employee summary">
+        <article className="compensation-summary-card" aria-label={t("employeeSummaryAriaLabel")}>
           <div>
             <h2 className="section-title">{snapshot.employee.fullName}</h2>
             <p className="settings-card-description">
-              {snapshot.employee.title ?? "No title"} • {snapshot.employee.department ?? ""}
+              {snapshot.employee.title ?? t("noTitle")} • {snapshot.employee.department ?? ""}
             </p>
           </div>
           <div className="compensation-summary-meta">
             <p className="country-chip">
               <span>{countryFlagFromCode(snapshot.employee.countryCode)}</span>
-              <span>{countryNameFromCode(snapshot.employee.countryCode)}</span>
+              <span>{countryNameFromCode(snapshot.employee.countryCode, locale)}</span>
             </p>
             <StatusBadge tone="info">{formatEmploymentTypeLabel(snapshot.employee.employmentType)}</StatusBadge>
           </div>
         </article>
       ) : null}
 
-      <section className="compensation-section" aria-label="Salary">
+      <section className="compensation-section" aria-label={t("salaryHeading")}>
         <div className="timeoff-section-header">
-          <h2 className="section-title">Salary</h2>
-          <p className="settings-card-description">Current compensation and historical salary records.</p>
+          <h2 className="section-title">{t("salaryHeading")}</h2>
+          <p className="settings-card-description">{t("salaryDescription")}</p>
         </div>
 
         {currentSalary ? (
           <article className="compensation-salary-card">
             <header className="compensation-salary-header">
               <div>
-                <p className="metric-label">Current base salary</p>
+                <p className="metric-label">{t("currentBaseSalary")}</p>
                 <p className="compensation-salary-value">
                   <CurrencyDisplay
                     amount={currentSalary.baseSalaryAmount}
@@ -167,21 +177,21 @@ export function CompensationOverview({
                 </p>
               </div>
               <StatusBadge tone={approvalTone(currentSalary.approvedBy)}>
-                {approvalLabel(currentSalary.approvedBy, currentSalary.approvedByName)}
+                {approvalLabel(currentSalary.approvedBy, currentSalary.approvedByName, t)}
               </StatusBadge>
             </header>
 
             <dl className="compensation-salary-meta">
               <div>
-                <dt>Frequency</dt>
+                <dt>{t("frequency")}</dt>
                 <dd>{formatPayFrequencyLabel(currentSalary.payFrequency)}</dd>
               </div>
               <div>
-                <dt>Employment</dt>
+                <dt>{t("employment")}</dt>
                 <dd>{formatEmploymentTypeLabel(currentSalary.employmentType)}</dd>
               </div>
               <div>
-                <dt>Effective</dt>
+                <dt>{t("effective")}</dt>
                 <dd>
                   <time
                     dateTime={currentSalary.effectiveFrom}
@@ -195,14 +205,14 @@ export function CompensationOverview({
           </article>
         ) : (
           <EmptyState
-            title="No salary record added yet"
-            description="Compensation admins can add the first one."
+            title={t("noSalaryRecordTitle")}
+            description={t("noSalaryRecordDescription")}
           />
         )}
 
         {sortedSalaryRecords.length > 0 ? (
           <div className="data-table-container">
-            <table className="data-table" aria-label="Salary history table">
+            <table className="data-table" aria-label={t("salaryHistoryTableAriaLabel")}>
               <thead>
                 <tr>
                   <th>
@@ -215,16 +225,16 @@ export function CompensationOverview({
                         )
                       }
                     >
-                      Effective
+                      {t("effective")}
                       <span className="numeric">
                         {salarySortDirection === "desc" ? "↓" : "↑"}
                       </span>
                     </button>
                   </th>
-                  <th>Amount</th>
-                  <th>Frequency</th>
-                  <th>Status</th>
-                  <th className="table-action-column">Actions</th>
+                  <th>{t("amount")}</th>
+                  <th>{t("frequency")}</th>
+                  <th>{t("status")}</th>
+                  <th className="table-action-column">{t("actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -244,7 +254,7 @@ export function CompensationOverview({
                     <td>{formatPayFrequencyLabel(record.payFrequency)}</td>
                     <td>
                       <StatusBadge tone={approvalTone(record.approvedBy)}>
-                        {record.approvedBy ? "Approved" : "Pending"}
+                        {record.approvedBy ? t("approved") : t("pending")}
                       </StatusBadge>
                     </td>
                     <td className="table-row-action-cell">
@@ -260,7 +270,7 @@ export function CompensationOverview({
                             void navigator.clipboard.writeText(record.id);
                           }}
                         >
-                          Copy ID
+                          {t("copyId")}
                         </button>
                       </div>
                     </td>
@@ -272,25 +282,25 @@ export function CompensationOverview({
         ) : null}
       </section>
 
-      <section className="compensation-section" aria-label="Allowances">
+      <section className="compensation-section" aria-label={t("allowancesHeading")}>
         <div className="timeoff-section-header">
-          <h2 className="section-title">Allowances</h2>
-          <p className="settings-card-description">Recurring benefits and cash allowances.</p>
+          <h2 className="section-title">{t("allowancesHeading")}</h2>
+          <p className="settings-card-description">{t("allowancesDescription")}</p>
         </div>
 
         {sortedAllowances.length === 0 ? (
           <EmptyState
-            title="No allowances configured"
-            description="Allowances will appear here once they are added for this crew member."
+            title={t("noAllowancesTitle")}
+            description={t("noAllowancesDescription")}
           />
         ) : (
           <>
             <div className="data-table-container">
-              <table className="data-table" aria-label="Allowances table">
+              <table className="data-table" aria-label={t("allowancesTableAriaLabel")}>
                 <thead>
                   <tr>
-                    <th>Label</th>
-                    <th>Type</th>
+                    <th>{t("label")}</th>
+                    <th>{t("type")}</th>
                     <th>
                       <button
                         type="button"
@@ -301,15 +311,15 @@ export function CompensationOverview({
                           )
                         }
                       >
-                        Amount
+                        {t("amount")}
                         <span className="numeric">
                           {allowanceSortDirection === "desc" ? "↓" : "↑"}
                         </span>
                       </button>
                     </th>
-                    <th>Tax</th>
-                    <th>Effective</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t("tax")}</th>
+                    <th>{t("effective")}</th>
+                    <th className="table-action-column">{t("actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -322,7 +332,7 @@ export function CompensationOverview({
                       </td>
                       <td>
                         <StatusBadge tone={taxableTone(allowance.isTaxable)}>
-                          {taxableLabel(allowance.isTaxable)}
+                          {taxableLabel(allowance.isTaxable, t)}
                         </StatusBadge>
                       </td>
                       <td>
@@ -340,7 +350,7 @@ export function CompensationOverview({
                             className="table-row-action"
                             onClick={() => setActiveAllowanceId(allowance.id)}
                           >
-                            Details
+                            {t("details")}
                           </button>
                         </div>
                       </td>
@@ -352,13 +362,13 @@ export function CompensationOverview({
 
             {activeAllowance ? (
               <article className="compensation-allowance-details" aria-live="polite">
-                <h3 className="section-title">Allowance details</h3>
+                <h3 className="section-title">{t("allowanceDetails")}</h3>
                 <p className="settings-card-description">
-                  {activeAllowance.label} ({formatAllowanceTypeLabel(activeAllowance.type)})
+                  {t("allowanceDescription", { label: activeAllowance.label, type: formatAllowanceTypeLabel(activeAllowance.type) })}
                 </p>
                 <p className="settings-card-description">
-                  Effective {formatRelativeTime(activeAllowance.effectiveFrom)}
-                  {activeAllowance.effectiveTo ? ` through ${formatRelativeTime(activeAllowance.effectiveTo)}` : ""}
+                  {t("effectiveFrom", { date: formatRelativeTime(activeAllowance.effectiveFrom) })}
+                  {activeAllowance.effectiveTo ? ` ${t("through", { date: formatRelativeTime(activeAllowance.effectiveTo) })}` : ""}
                 </p>
               </article>
             ) : null}
@@ -366,16 +376,16 @@ export function CompensationOverview({
         )}
       </section>
 
-      <section className="compensation-section" aria-label="Equity grants">
+      <section className="compensation-section" aria-label={t("equityGrantsAriaLabel")}>
         <div className="timeoff-section-header">
-          <h2 className="section-title">Equity</h2>
-          <p className="settings-card-description">Grant schedule, vesting, and approval state.</p>
+          <h2 className="section-title">{t("equityHeading")}</h2>
+          <p className="settings-card-description">{t("equityDescription")}</p>
         </div>
 
         {snapshot.equityGrants.length === 0 ? (
           <EmptyState
-            title="No equity grants yet"
-            description="Equity grants and vesting progress will appear here when issued."
+            title={t("noEquityGrantsTitle")}
+            description={t("noEquityGrantsDescription")}
           />
         ) : (
           <div className="compensation-equity-grid">
@@ -386,19 +396,19 @@ export function CompensationOverview({
                 <article key={grant.id} className="compensation-equity-card">
                   <header className="compensation-equity-header">
                     <div>
-                      <h3 className="section-title">{grant.grantType} grant</h3>
+                      <h3 className="section-title">{t("grantTypeLabel", { type: grant.grantType })}</h3>
                       <p className="settings-card-description numeric">
-                        {grant.numberOfShares.toLocaleString()} shares
+                        {t("sharesCount", { count: grant.numberOfShares.toLocaleString() })}
                       </p>
                     </div>
                     <StatusBadge tone={toneForEquityStatus(grant.status)}>{grant.status}</StatusBadge>
                   </header>
 
                   <div className="compensation-equity-progress">
-                    <ProgressRing value={vesting.vestedPercent} label="Vested" />
+                    <ProgressRing value={vesting.vestedPercent} label={t("vested")} />
                     <dl className="compensation-equity-meta">
                       <div>
-                        <dt>Grant date</dt>
+                        <dt>{t("grantDate")}</dt>
                         <dd>
                           <time dateTime={grant.grantDate} title={formatDateTimeTooltip(grant.grantDate)}>
                             {formatRelativeTime(grant.grantDate)}
@@ -406,7 +416,7 @@ export function CompensationOverview({
                         </dd>
                       </div>
                       <div>
-                        <dt>Exercise price</dt>
+                        <dt>{t("exercisePrice")}</dt>
                         <dd>
                           {grant.exercisePriceCents === null ? (
                             "--"
@@ -419,8 +429,8 @@ export function CompensationOverview({
                         </dd>
                       </div>
                       <div>
-                        <dt>Approval</dt>
-                        <dd>{approvalLabel(grant.approvedBy, grant.approvedByName)}</dd>
+                        <dt>{t("approval")}</dt>
+                        <dd>{approvalLabel(grant.approvedBy, grant.approvedByName, t)}</dd>
                       </div>
                     </dl>
                   </div>
@@ -437,16 +447,16 @@ export function CompensationOverview({
         )}
       </section>
 
-      <section className="compensation-section" aria-label="Compensation timeline">
+      <section className="compensation-section" aria-label={t("timelineAriaLabel")}>
         <div className="timeoff-section-header">
-          <h2 className="section-title">Timeline</h2>
-          <p className="settings-card-description">Recent salary, allowance, and equity events.</p>
+          <h2 className="section-title">{t("timelineHeading")}</h2>
+          <p className="settings-card-description">{t("timelineDescription")}</p>
         </div>
 
         {timeline.length === 0 ? (
           <EmptyState
-            title="No compensation timeline events"
-            description="Timeline events will appear after compensation changes are recorded."
+            title={t("noTimelineEventsTitle")}
+            description={t("noTimelineEventsDescription")}
           />
         ) : (
           <ol className="compensation-timeline">

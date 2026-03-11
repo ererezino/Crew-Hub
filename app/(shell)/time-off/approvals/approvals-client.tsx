@@ -3,6 +3,7 @@
 import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -19,6 +20,7 @@ import { formatLeaveTypeLabel } from "../../../../lib/time-off";
 import type { LeaveRequestRecord, TimeOffRequestMutationResponse } from "../../../../types/time-off";
 import { humanizeError } from "@/lib/errors";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
 
@@ -35,10 +37,6 @@ type RejectFormValues = {
 type RejectFormErrors = {
   rejectionReason?: string;
 };
-
-const rejectSchema = z.object({
-  rejectionReason: z.string().trim().min(1, "Rejection reason is required").max(2000, "Reason is too long")
-});
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -75,6 +73,10 @@ function toneForStatus(status: LeaveRequestRecord["status"]) {
 }
 
 export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('timeOffApprovals');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const queryClient = useQueryClient();
   const approvalsQuery = useTimeOffApprovals();
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -86,6 +88,10 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
   const [rejectValues, setRejectValues] = useState<RejectFormValues>({ rejectionReason: "" });
   const [rejectErrors, setRejectErrors] = useState<RejectFormErrors>({});
   const [isRejecting, setIsRejecting] = useState(false);
+
+  const rejectSchema = useMemo(() => z.object({
+    rejectionReason: z.string().trim().min(1, t('validationRejectionRequired')).max(2000, t('validationRejectionTooLong'))
+  }), [t]);
 
   const requests = useMemo(() => {
     const rows = approvalsQuery.data?.requests ?? [];
@@ -103,7 +109,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
   };
 
   const showToast = (variant: ToastVariant, rawMessage: string) => {
-    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
+    const message = variant === "error" ? humanizeError(rawMessage, locale) : rawMessage;
     const toastId = createToastId();
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
 
@@ -129,7 +135,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       const payload = (await response.json()) as TimeOffRequestMutationResponse;
 
       if (!response.ok || !payload.data?.request) {
-        showToast("error", payload.error?.message ?? "Unable to approve leave request.");
+        showToast("error", payload.error?.message ?? t('toastApproveError'));
         return;
       }
 
@@ -138,9 +144,9 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       if (contextTarget?.id === requestRecord.id) {
         setContextTarget(null);
       }
-      showToast("success", "Leave request approved.");
+      showToast("success", t('toastApproved'));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to approve leave request.");
+      showToast("error", error instanceof Error ? error.message : t('toastApproveError'));
     } finally {
       setIsMutatingRequestId(null);
     }
@@ -227,16 +233,16 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       const payload = (await response.json()) as TimeOffRequestMutationResponse;
 
       if (!response.ok || !payload.data?.request) {
-        showToast("error", payload.error?.message ?? "Unable to reject leave request.");
+        showToast("error", payload.error?.message ?? t('toastRejectError'));
         return;
       }
 
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       closeRejectPanel();
-      showToast("info", "Leave request rejected.");
+      showToast("info", t('toastRejected'));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to reject leave request.");
+      showToast("error", error instanceof Error ? error.message : t('toastRejectError'));
     } finally {
       setIsRejecting(false);
     }
@@ -246,8 +252,8 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
     <>
       {!embedded ? (
         <PageHeader
-          title="Time Off Approvals"
-          description="Approve or decline team leave requests with full date context and clear decision history."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
@@ -255,7 +261,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
 
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
         <ErrorState
-          title="Approvals are unavailable"
+          title={t('unavailable')}
           message={approvalsQuery.errorMessage}
           onRetry={approvalsQuery.refresh}
         />
@@ -263,21 +269,21 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && requests.length === 0 ? (
         <EmptyState
-          title="No pending approvals"
-          description="Pending leave requests from your team will appear here."
-          ctaLabel="Open Time Off"
+          title={t('noApprovals')}
+          description={t('noApprovalsDescription')}
+          ctaLabel={t('noApprovalsCta')}
           ctaHref="/time-off"
         />
       ) : null}
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && requests.length > 0 ? (
         <div className="data-table-container">
-          <table className="data-table" aria-label="Time off approvals table">
+          <table className="data-table" aria-label={t('tableAriaLabel')}>
             <thead>
               <tr>
-                <th>Employee</th>
-                <th>Country</th>
-                <th>Leave type</th>
+                <th>{t('thEmployee')}</th>
+                <th>{t('thCountry')}</th>
+                <th>{t('thLeaveType')}</th>
                 <th>
                   <button
                     type="button"
@@ -288,13 +294,13 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       )
                     }
                   >
-                    Dates {sortDirection === "asc" ? "↑" : "↓"}
+                    {t('thDates')} {sortDirection === "asc" ? "↑" : "↓"}
                   </button>
                 </th>
-                <th>Days</th>
-                <th>Status</th>
-                <th>Requested</th>
-                <th className="table-action-column">Actions</th>
+                <th>{t('thDays')}</th>
+                <th>{t('thStatus')}</th>
+                <th>{t('thRequested')}</th>
+                <th className="table-action-column">{t('thActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -311,30 +317,30 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                   <td>
                     <span className="country-chip">
                       <span>{countryFlagFromCode(requestRecord.employeeCountryCode)}</span>
-                      <span>{countryNameFromCode(requestRecord.employeeCountryCode)}</span>
+                      <span>{countryNameFromCode(requestRecord.employeeCountryCode, locale)}</span>
                     </span>
                   </td>
-                  <td>{formatLeaveTypeLabel(requestRecord.leaveType)}</td>
+                  <td>{formatLeaveTypeLabel(requestRecord.leaveType, locale)}</td>
                   <td>
                     <time
                       dateTime={requestRecord.startDate}
-                      title={formatDateTimeTooltip(requestRecord.startDate)}
+                      title={formatDateTimeTooltip(requestRecord.startDate, locale)}
                     >
-                      {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
+                      {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate, locale)}
                     </time>
                   </td>
-                  <td className="numeric">{formatDays(requestRecord.totalDays)}</td>
+                  <td className="numeric">{formatDays(requestRecord.totalDays, locale)}</td>
                   <td>
                     <StatusBadge tone={toneForStatus(requestRecord.status)}>
-                      {formatLeaveStatus(requestRecord.status)}
+                      {formatLeaveStatus(requestRecord.status, locale)}
                     </StatusBadge>
                   </td>
                   <td>
                     <time
                       dateTime={requestRecord.createdAt}
-                      title={formatDateTimeTooltip(requestRecord.createdAt)}
+                      title={formatDateTimeTooltip(requestRecord.createdAt, locale)}
                     >
-                      {formatRelativeTime(requestRecord.createdAt)}
+                      {formatRelativeTime(requestRecord.createdAt, locale)}
                     </time>
                   </td>
                   <td className="table-row-action-cell">
@@ -345,7 +351,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                         onClick={() => openContextPanel(requestRecord)}
                         disabled={isMutatingRequestId === requestRecord.id}
                       >
-                        Review
+                        {t('review')}
                       </button>
                       <button
                         type="button"
@@ -353,7 +359,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                         onClick={() => openApproveDialog(requestRecord)}
                         disabled={isMutatingRequestId === requestRecord.id}
                       >
-                        {isMutatingRequestId === requestRecord.id ? "Saving..." : "Approve"}
+                        {isMutatingRequestId === requestRecord.id ? t('saving') : t('approve')}
                       </button>
                       <button
                         type="button"
@@ -361,7 +367,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                         onClick={() => openRejectPanel(requestRecord)}
                         disabled={isMutatingRequestId === requestRecord.id}
                       >
-                        Reject
+                        {t('reject')}
                       </button>
                     </div>
                   </td>
@@ -374,10 +380,10 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
 
       <SlidePanel
         isOpen={Boolean(contextTarget)}
-        title="Review Leave Request"
+        title={t('reviewTitle')}
         description={
           contextTarget
-            ? `Review full context for ${contextTarget.employeeName} before making an approval decision.`
+            ? t('reviewDescription', { name: contextTarget.employeeName })
             : undefined
         }
         onClose={closeContextPanel}
@@ -392,34 +398,34 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
               <p className="settings-card-description">
                 <span className="country-chip">
                   <span>{countryFlagFromCode(contextTarget.employeeCountryCode)}</span>
-                  <span>{countryNameFromCode(contextTarget.employeeCountryCode)}</span>
+                  <span>{countryNameFromCode(contextTarget.employeeCountryCode, locale)}</span>
                 </span>
               </p>
               <p className="settings-card-description">
-                Leave type: {formatLeaveTypeLabel(contextTarget.leaveType)}
+                {t('leaveTypeLabel')} {formatLeaveTypeLabel(contextTarget.leaveType, locale)}
               </p>
               <p className="settings-card-description">
-                Date range: {formatDateRangeHuman(contextTarget.startDate, contextTarget.endDate)}
+                {t('dateRangeLabel')} {formatDateRangeHuman(contextTarget.startDate, contextTarget.endDate, locale)}
               </p>
               <p className="settings-card-description">
-                Total days: <span className="numeric">{formatDays(contextTarget.totalDays)}</span>
+                {t('totalDaysLabel')} <span className="numeric">{formatDays(contextTarget.totalDays, locale)}</span>
               </p>
               <p className="settings-card-description">
-                Submitted:{" "}
+                {t('submittedLabel')}{" "}
                 <time
                   dateTime={contextTarget.createdAt}
-                  title={formatDateTimeTooltip(contextTarget.createdAt)}
+                  title={formatDateTimeTooltip(contextTarget.createdAt, locale)}
                 >
-                  {formatRelativeTime(contextTarget.createdAt)}
+                  {formatRelativeTime(contextTarget.createdAt, locale)}
                 </time>
               </p>
-              <p className="settings-card-description">Reason: {contextTarget.reason}</p>
+              <p className="settings-card-description">{t('reasonLabel')} {contextTarget.reason}</p>
             </article>
 
             <article className="settings-card">
-              <h3 className="section-title">Team calendar context</h3>
+              <h3 className="section-title">{t('teamContextTitle')}</h3>
               <p className="settings-card-description">
-                Review team calendar context before approval to avoid overlapping absences.
+                {t('teamContextDescription')}
               </p>
               <TeamAvailabilityPanel
                 startDate={contextTarget.startDate}
@@ -433,7 +439,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                 className="button"
                 onClick={closeContextPanel}
               >
-                Close
+                {t('closePanel')}
               </button>
               <button
                 type="button"
@@ -444,7 +450,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                 }}
                 disabled={isMutatingRequestId === contextTarget.id}
               >
-                Reject
+                {t('reject')}
               </button>
               <button
                 type="button"
@@ -455,7 +461,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                 }}
                 disabled={isMutatingRequestId === contextTarget.id}
               >
-                {isMutatingRequestId === contextTarget.id ? "Saving..." : "Approve"}
+                {isMutatingRequestId === contextTarget.id ? t('saving') : t('approve')}
               </button>
             </div>
           </div>
@@ -464,13 +470,13 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
 
       <SlidePanel
         isOpen={Boolean(rejectTarget)}
-        title="Reject Leave Request"
-        description={rejectTarget ? `Provide a reason for rejecting ${rejectTarget.employeeName}'s request.` : undefined}
+        title={t('rejectTitle')}
+        description={rejectTarget ? t('rejectDescription', { name: rejectTarget.employeeName }) : undefined}
         onClose={closeRejectPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSubmitReject} noValidate>
           <label className="form-field" htmlFor="timeoff-reject-reason">
-            <span className="form-label">Rejection reason</span>
+            <span className="form-label">{t('rejectionReasonLabel')}</span>
             <textarea
               id="timeoff-reject-reason"
               className={rejectErrors.rejectionReason ? "form-input form-input-error" : "form-input"}
@@ -485,10 +491,10 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeRejectPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isRejecting}>
-              {isRejecting ? "Rejecting..." : "Reject request"}
+              {isRejecting ? t('rejecting') : t('rejectRequest')}
             </button>
           </div>
         </form>
@@ -496,14 +502,14 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
 
       <ConfirmDialog
         isOpen={Boolean(approveTarget)}
-        title="Approve leave request?"
+        title={t('approveConfirmTitle')}
         description={
           approveTarget
-            ? `This will approve ${approveTarget.employeeName}'s leave request and notify them.`
+            ? t('approveConfirmDescription', { name: approveTarget.employeeName })
             : undefined
         }
-        confirmLabel="Approve request"
-        cancelLabel="Cancel"
+        confirmLabel={t('approveConfirmLabel')}
+        cancelLabel={tCommon('cancel')}
         isConfirming={Boolean(isMutatingRequestId)}
         onCancel={closeApproveDialog}
         onConfirm={() => {
@@ -512,7 +518,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       />
 
       {toasts.length > 0 ? (
-        <section className="toast-region" aria-live="polite">
+        <section className="toast-region" aria-label={t('toastAriaLabel')} aria-live="polite">
           {toasts.map((toast) => (
             <article
               key={toast.id}
@@ -524,7 +530,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss notification"
+                aria-label={t('dismissAriaLabel')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

@@ -11,6 +11,7 @@ import {
   useState
 } from "react";
 import { z } from "zod";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ContextualHelp } from "../../../components/shared/contextual-help";
@@ -54,6 +55,8 @@ import type {
 } from "../../../types/expenses";
 import { humanizeError } from "@/lib/errors";
 
+type AppLocale = "en" | "fr";
+
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
 
@@ -94,13 +97,13 @@ const expenseFormSchema = z.object({
     "marketing",
     "other"
   ]),
-  description: z.string().trim().min(1, "Description is required").max(3000, "Description is too long"),
+  description: z.string().trim().min(1, "validation.descriptionRequired").max(3000, "validation.descriptionTooLong"),
   amount: z
     .string()
     .trim()
-    .regex(/^\d+(\.\d{1,2})?$/, "Amount must be a valid number with up to 2 decimals."),
+    .regex(/^\d+(\.\d{1,2})?$/, "validation.amountInvalid"),
   expenseDate: z.iso.date(),
-  currency: z.string().trim().length(3, "Currency must be a 3-letter code.")
+  currency: z.string().trim().length(3, "validation.currencyLength")
 });
 
 const INITIAL_FORM_VALUES: ExpenseFormValues = {
@@ -162,24 +165,6 @@ const categoryOptions: ExpenseCategory[] = [
 
 const uploadAcceptValue = ALLOWED_RECEIPT_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 
-const EXPENSE_CONTEXTUAL_HELP = [
-  {
-    title: "Receipt checklist",
-    description: "Upload PDF, PNG, or JPG receipts/invoices under 10MB so approvals do not stall."
-  },
-  {
-    title: "Approval flow",
-    description:
-      "Crew Hub routes each submission through manager approval before finance payment confirmation."
-  },
-  {
-    title: "Policy reference",
-    description: "Review reimbursement rules and category guidance before submitting.",
-    ctaLabel: "Open policy",
-    ctaHref: "/documents"
-  }
-] as const;
-
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -222,17 +207,17 @@ function hasFormErrors(errors: ExpenseFormErrors): boolean {
   return Object.values(errors).some((error) => Boolean(error));
 }
 
-function validateReceipt(file: File | null): string | undefined {
+function validateReceipt(file: File | null, td: (key: string) => string): string | undefined {
   if (!file) {
-    return "Receipt or invoice is required.";
+    return td("validation.receiptRequired");
   }
 
   if (file.size > MAX_RECEIPT_FILE_BYTES) {
-    return "Receipt/invoice exceeds the 10MB upload limit.";
+    return td("validation.receiptTooLarge");
   }
 
   if (!isAllowedReceiptUpload(file.name, file.type)) {
-    return "Unsupported file type. Allowed: pdf, png, jpg.";
+    return td("validation.receiptUnsupportedType");
   }
 
   return undefined;
@@ -241,43 +226,44 @@ function validateReceipt(file: File | null): string | undefined {
 function getFormErrors(
   values: ExpenseFormValues,
   touched: ExpenseFormTouched,
-  receipt: File | null
+  receipt: File | null,
+  td: (key: string) => string
 ): ExpenseFormErrors {
   const parsed = expenseFormSchema.safeParse(values);
   const errors: ExpenseFormErrors = {};
 
   if (!parsed.success) {
     const fieldErrors = parsed.error.flatten().fieldErrors;
-    errors.category = touched.category ? fieldErrors.category?.[0] : undefined;
-    errors.description = touched.description ? fieldErrors.description?.[0] : undefined;
-    errors.amount = touched.amount ? fieldErrors.amount?.[0] : undefined;
-    errors.expenseDate = touched.expenseDate ? fieldErrors.expenseDate?.[0] : undefined;
-    errors.currency = touched.currency ? fieldErrors.currency?.[0] : undefined;
+    errors.category = touched.category ? (fieldErrors.category?.[0] ? td(fieldErrors.category[0]) : undefined) : undefined;
+    errors.description = touched.description ? (fieldErrors.description?.[0] ? td(fieldErrors.description[0]) : undefined) : undefined;
+    errors.amount = touched.amount ? (fieldErrors.amount?.[0] ? td(fieldErrors.amount[0]) : undefined) : undefined;
+    errors.expenseDate = touched.expenseDate ? (fieldErrors.expenseDate?.[0] ? td(fieldErrors.expenseDate[0]) : undefined) : undefined;
+    errors.currency = touched.currency ? (fieldErrors.currency?.[0] ? td(fieldErrors.currency[0]) : undefined) : undefined;
   }
 
   if (touched.amount && parseMoneyToMinorUnits(values.amount) === null) {
-    errors.amount = "Amount must be a positive value with up to 2 decimals.";
+    errors.amount = td("validation.amountPositive");
   }
 
   if (touched.receipt) {
-    errors.receipt = validateReceipt(receipt);
+    errors.receipt = validateReceipt(receipt, td);
   }
 
   if (values.category === "other" && touched.customCategory && !values.customCategory.trim()) {
-    errors.customCategory = "Please specify the category.";
+    errors.customCategory = td("validation.customCategoryRequired");
   }
 
   if (values.expenseType === "work_expense") {
     if (touched.vendorName && !values.vendorName.trim()) {
-      errors.vendorName = "Vendor name is required for work expenses.";
+      errors.vendorName = td("validation.vendorNameRequired");
     }
 
     if (touched.vendorBankAccountName && !values.vendorBankAccountName.trim()) {
-      errors.vendorBankAccountName = "Bank account name is required.";
+      errors.vendorBankAccountName = td("validation.bankAccountNameRequired");
     }
 
     if (touched.vendorBankAccountNumber && !values.vendorBankAccountNumber.trim()) {
-      errors.vendorBankAccountNumber = "Bank account number is required.";
+      errors.vendorBankAccountNumber = td("validation.bankAccountNumberRequired");
     }
   }
 
@@ -489,12 +475,16 @@ function ExpenseTimelineItem({
   title,
   timestamp,
   description,
-  tone
+  tone,
+  locale,
+  pendingLabel
 }: {
   title: string;
   timestamp: string | null;
   description: string;
   tone: "pending" | "success" | "error" | "info";
+  locale: AppLocale;
+  pendingLabel: string;
 }) {
   return (
     <li className={`expenses-timeline-item expenses-timeline-item-${tone}`}>
@@ -503,8 +493,8 @@ function ExpenseTimelineItem({
         <p className="expenses-timeline-title">{title}</p>
         <p className="expenses-timeline-description">{description}</p>
       </div>
-      <p className="expenses-timeline-time" title={timestamp ? formatDateTimeTooltip(timestamp) : undefined}>
-        {timestamp ? formatRelativeTime(timestamp) : "Pending"}
+      <p className="expenses-timeline-time" title={timestamp ? formatDateTimeTooltip(timestamp, locale) : undefined}>
+        {timestamp ? formatRelativeTime(timestamp, locale) : pendingLabel}
       </p>
     </li>
   );
@@ -519,6 +509,11 @@ export function ExpensesClient({
   canViewReports: boolean;
   showEmployeeColumn: boolean;
 }) {
+  const t = useTranslations('expenses');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const [month, setMonth] = useState(currentMonthKey());
   const expensesQuery = useExpenses({ month });
   const vendorBeneficiaries = useVendorBeneficiaries();
@@ -549,6 +544,23 @@ export function ExpensesClient({
   useUnsavedGuard(expenseFormDirty);
 
   const selectedCategoryGuidance = EXPENSE_CATEGORY_GUIDANCE[formValues.category];
+
+  const contextualHelpItems = [
+    {
+      title: t('contextualHelp.receiptChecklistTitle'),
+      description: t('contextualHelp.receiptChecklistDescription')
+    },
+    {
+      title: t('contextualHelp.approvalFlowTitle'),
+      description: t('contextualHelp.approvalFlowDescription')
+    },
+    {
+      title: t('contextualHelp.policyReferenceTitle'),
+      description: t('contextualHelp.policyReferenceDescription'),
+      ctaLabel: t('contextualHelp.policyReferenceCta'),
+      ctaHref: "/documents"
+    }
+  ] as const;
 
   const summaryCurrency = useMemo(() => {
     const rows = expensesQuery.data?.expenses ?? [];
@@ -627,7 +639,7 @@ export function ExpensesClient({
       setExpenseFormDirty(true);
 
       if (formTouched[field]) {
-        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile));
+        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile, td));
       }
 
       if (submitError) {
@@ -642,7 +654,7 @@ export function ExpensesClient({
     };
 
     setFormTouched(nextTouched);
-    setFormErrors(getFormErrors(formValues, nextTouched, receiptFile));
+    setFormErrors(getFormErrors(formValues, nextTouched, receiptFile, td));
   };
 
   const handleVendorInputChange =
@@ -661,7 +673,7 @@ export function ExpensesClient({
       setExpenseFormDirty(true);
 
       if (formTouched[field]) {
-        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile));
+        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile, td));
       }
 
       if (submitError) {
@@ -677,7 +689,7 @@ export function ExpensesClient({
 
     setReceiptFile(file);
     setFormTouched(nextTouched);
-    setFormErrors(getFormErrors(formValues, nextTouched, file));
+    setFormErrors(getFormErrors(formValues, nextTouched, file, td));
     setSubmitError(null);
     setUploadProgress(0);
   };
@@ -708,7 +720,7 @@ export function ExpensesClient({
     event.preventDefault();
 
     setFormTouched(ALL_TOUCHED);
-    const nextErrors = getFormErrors(formValues, ALL_TOUCHED, receiptFile);
+    const nextErrors = getFormErrors(formValues, ALL_TOUCHED, receiptFile, td);
     setFormErrors(nextErrors);
     setSubmitError(null);
 
@@ -721,7 +733,7 @@ export function ExpensesClient({
     if (amountMinorUnits === null) {
       setFormErrors((currentErrors) => ({
         ...currentErrors,
-        amount: "Amount must be a positive value with up to 2 decimals."
+        amount: td("validation.amountPositive")
       }));
       return;
     }
@@ -753,7 +765,7 @@ export function ExpensesClient({
       const result = await uploadExpenseWithProgress(formData, setUploadProgress);
 
       if (result.status < 200 || result.status > 299 || !result.payload?.data?.expense) {
-        setSubmitError(result.payload?.error?.message ?? "Unable to submit expense.");
+        setSubmitError(result.payload?.error?.message ?? td("toast.unableToSubmit"));
         return;
       }
 
@@ -762,9 +774,9 @@ export function ExpensesClient({
       if (formValues.saveVendor) {
         vendorBeneficiaries.refresh();
       }
-      showToast("success", "Expense submitted.");
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to submit expense.");
+      showToast("success", td("toast.expenseSubmitted"));
+    } catch {
+      setSubmitError(td("toast.unableToSubmit"));
     } finally {
       setIsSubmitting(false);
     }
@@ -784,13 +796,13 @@ export function ExpensesClient({
       const payload = (await response.json()) as ExpenseReceiptSignedUrlResponse;
 
       if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? "Unable to open receipt.");
+        showToast("error", payload.error?.message ?? td("toast.unableToOpenReceipt"));
         return;
       }
 
       window.open(payload.data.url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to open receipt.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToOpenReceipt"));
     } finally {
       setIsOpeningReceiptById((currentMap) => {
         const nextMap = { ...currentMap };
@@ -814,13 +826,13 @@ export function ExpensesClient({
       const payload = (await response.json()) as ExpenseReceiptSignedUrlResponse;
 
       if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? "Payment proof not available.");
+        showToast("error", payload.error?.message ?? td("toast.paymentProofUnavailable"));
         return;
       }
 
       window.open(payload.data.url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to open payment proof.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToOpenPaymentProof"));
     } finally {
       setIsOpeningReceiptById((currentMap) => {
         const nextMap = { ...currentMap };
@@ -844,7 +856,7 @@ export function ExpensesClient({
       const payload = (await response.json()) as ExpenseCommentsResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to load expense conversation.");
+        showToast("error", payload.error?.message ?? td("toast.unableToLoadConversation"));
         return;
       }
 
@@ -857,7 +869,7 @@ export function ExpensesClient({
         [expenseId]: payload.data?.canReply ?? false
       }));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to load expense conversation.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToLoadConversation"));
     } finally {
       setIsLoadingCommentsByExpenseId((current) => ({
         ...current,
@@ -872,7 +884,7 @@ export function ExpensesClient({
     if (!message) {
       setCommentErrorByExpenseId((current) => ({
         ...current,
-        [expense.id]: "Response is required."
+        [expense.id]: td("validation.responseRequired")
       }));
       return;
     }
@@ -880,7 +892,7 @@ export function ExpensesClient({
     if (message.length > 2000) {
       setCommentErrorByExpenseId((current) => ({
         ...current,
-        [expense.id]: "Response is too long."
+        [expense.id]: td("validation.responseTooLong")
       }));
       return;
     }
@@ -911,7 +923,7 @@ export function ExpensesClient({
       if (!response.ok || !payload.data?.comment) {
         setCommentErrorByExpenseId((current) => ({
           ...current,
-          [expense.id]: payload.error?.message ?? "Unable to send response."
+          [expense.id]: payload.error?.message ?? td("toast.unableToSendResponse")
         }));
         return;
       }
@@ -931,11 +943,11 @@ export function ExpensesClient({
       }));
 
       expensesQuery.refresh();
-      showToast("success", "Response sent to approver.");
+      showToast("success", td("toast.responseSent"));
     } catch (error) {
       setCommentErrorByExpenseId((current) => ({
         ...current,
-        [expense.id]: error instanceof Error ? error.message : "Unable to send response."
+        [expense.id]: error instanceof Error ? error.message : td("toast.unableToSendResponse")
       }));
     } finally {
       setIsSubmittingCommentByExpenseId((current) => ({
@@ -968,14 +980,14 @@ export function ExpensesClient({
       const payload = (await response.json()) as UpdateExpenseResponse;
 
       if (!response.ok || !payload.data?.expense) {
-        showToast("error", payload.error?.message ?? "Unable to update expense.");
+        showToast("error", payload.error?.message ?? td("toast.unableToUpdate"));
         return;
       }
 
       expensesQuery.refresh();
-      showToast("success", "Expense cancelled.");
+      showToast("success", td("toast.expenseCancelled"));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to update expense.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToUpdate"));
     } finally {
       setIsMutatingExpenseId(null);
     }
@@ -984,33 +996,33 @@ export function ExpensesClient({
   return (
     <>
       <PageHeader
-        title="Expenses"
-        description="Submit expenses, upload receipts/invoices, and track reimbursement."
+        title={t('pageTitle')}
+        description={t('pageDescription')}
         actions={
           <>
             {canViewReports ? (
               <Link className="button" href="/expenses/reports">
-                Reports
+                {t('actions.reports')}
               </Link>
             ) : null}
             <button type="button" className="button button-accent" onClick={openPanel}>
-              Submit expense
+              {t('actions.submitExpense')}
             </button>
           </>
         }
       />
 
       <ContextualHelp
-        title="Need help before submitting?"
-        description="Quick reminders to keep expense reviews fast and predictable."
-        items={EXPENSE_CONTEXTUAL_HELP}
-        ariaLabel="Expenses contextual help"
+        title={t('contextualHelp.title')}
+        description={t('contextualHelp.description')}
+        items={contextualHelpItems}
+        ariaLabel={t('contextualHelp.ariaLabel')}
       />
 
-      <section className="expenses-toolbar" aria-label="Expenses filters">
+      <section className="expenses-toolbar" aria-label={t('toolbar.ariaLabel')}>
         <div className="expenses-toolbar-copy">
           <label className="form-field">
-            <span className="form-label">Month</span>
+            <span className="form-label">{t('toolbar.monthLabel')}</span>
             <input
               className="form-input numeric"
               type="month"
@@ -1019,15 +1031,15 @@ export function ExpensesClient({
             />
           </label>
           <p className="settings-card-description">
-            Showing {formatMonthLabel(month)} expenses.
+            {t('toolbar.showingMonth', { month: formatMonthLabel(month) })}
           </p>
         </div>
         <div className="expenses-toolbar-actions">
           <p className="settings-card-description">
-            Most claims are reviewed within 3 business days once submitted with a valid receipt/invoice.
+            {t('toolbar.reviewTimeline')}
           </p>
           <Link className="button" href="/documents">
-            View Expense Policy
+            {t('toolbar.viewExpensePolicy')}
           </Link>
         </div>
       </section>
@@ -1037,45 +1049,45 @@ export function ExpensesClient({
       {!expensesQuery.isLoading && expensesQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Expenses are unavailable"
+            title={t('emptyState.errorTitle')}
             description={expensesQuery.errorMessage}
-            ctaLabel="Retry"
+            ctaLabel={tCommon('retry')}
             ctaHref="/expenses"
           />
           <button type="button" className="button button-accent" onClick={() => expensesQuery.refresh()}>
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!expensesQuery.isLoading && !expensesQuery.errorMessage && expensesQuery.data ? (
         <>
-          <section className="expenses-metric-grid" aria-label="Expense metrics">
+          <section className="expenses-metric-grid" aria-label={t('metrics.ariaLabel')}>
             <article className="metric-card">
-              <p className="metric-label">Submitted Amount</p>
+              <p className="metric-label">{t('metrics.submittedAmount')}</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={expensesQuery.data.summary.totalAmount} currency={summaryCurrency} />
               </p>
-              <p className="metric-hint">{expensesQuery.data.summary.totalCount} {expensesQuery.data.summary.totalCount === 1 ? "submission" : "submissions"}</p>
+              <p className="metric-hint">{t('metrics.submissionCount', { count: expensesQuery.data.summary.totalCount })}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Pending Reimbursement</p>
+              <p className="metric-label">{t('metrics.pendingReimbursement')}</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={expensesQuery.data.summary.pendingAmount} currency={summaryCurrency} />
               </p>
               <p className="metric-hint">
-                {expensesQuery.data.summary.pendingCount + expensesQuery.data.summary.managerApprovedCount} pending
+                {t('metrics.pendingCount', { count: expensesQuery.data.summary.pendingCount + expensesQuery.data.summary.managerApprovedCount })}
               </p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Awaiting Finance</p>
+              <p className="metric-label">{t('metrics.awaitingFinance')}</p>
               <p className="metric-value numeric">
                 {expensesQuery.data.summary.managerApprovedCount + expensesQuery.data.summary.approvedCount}
               </p>
-              <p className="metric-hint">Manager-approved and awaiting payment confirmation</p>
+              <p className="metric-hint">{t('metrics.awaitingFinanceHint')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Reimbursed</p>
+              <p className="metric-label">{t('metrics.reimbursed')}</p>
               <p className="metric-value numeric">{expensesQuery.data.summary.reimbursedCount}</p>
               <p className="metric-hint">
                 <CurrencyDisplay amount={expensesQuery.data.summary.reimbursedAmount} currency={summaryCurrency} />
@@ -1086,13 +1098,13 @@ export function ExpensesClient({
           {expenses.length === 0 ? (
             <EmptyState
               icon={<Receipt size={32} />}
-              title="No expenses yet"
-              description="Submit your first work expense to start reimbursement tracking."
-              ctaLabel="Submit expense"
+              title={t('emptyState.title')}
+              description={t('emptyState.description')}
+              ctaLabel={t('actions.submitExpense')}
               ctaHref="/expenses"
             />
           ) : (
-            <section className="data-table-container" aria-label="Expenses table">
+            <section className="data-table-container" aria-label={t('table.ariaLabel')}>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -1106,18 +1118,18 @@ export function ExpensesClient({
                           )
                         }
                       >
-                        Expense date
-                        <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                        {t('table.expenseDate')}
+                        <span className="numeric">{sortDirection === "asc" ? "\u2191" : "\u2193"}</span>
                       </button>
                     </th>
-                    {showEmployeeColumn ? <th>Employee</th> : null}
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th>Country</th>
-                    <th>Status</th>
-                    <th>Submitted</th>
-                    <th className="table-action-column">Actions</th>
+                    {showEmployeeColumn ? <th>{t('table.employee')}</th> : null}
+                    <th>{t('table.category')}</th>
+                    <th>{t('table.description')}</th>
+                    <th>{t('table.amount')}</th>
+                    <th>{t('table.country')}</th>
+                    <th>{t('table.status')}</th>
+                    <th>{t('table.submitted')}</th>
+                    <th className="table-action-column">{t('table.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1131,16 +1143,31 @@ export function ExpensesClient({
                     const isSubmittingComment = isSubmittingCommentByExpenseId[expense.id] ?? false;
 
                     const managerDescription = expense.managerApprovedByName
-                      ? `Approved by ${expense.managerApprovedByName}.`
+                      ? td("timeline.approvedBy", { name: expense.managerApprovedByName })
                       : expense.status === "rejected"
-                        ? `Rejected by ${expense.rejectedByName ?? "Manager"}.${expense.rejectionReason ? ` Reason: ${expense.rejectionReason}` : ""}`
-                        : "Awaiting manager decision.";
+                        ? td("timeline.rejectedByWithReason", {
+                            name: expense.rejectedByName ?? td("timeline.managerFallback"),
+                            reason: expense.rejectionReason
+                              ? td("timeline.reasonSuffix", { reason: expense.rejectionReason })
+                              : ""
+                          })
+                        : td("timeline.awaitingManager");
 
                     const financeDescription = expense.reimbursedAt
-                      ? `Marked paid by ${expense.reimbursedByName ?? "Finance"}${expense.reimbursementReference ? ` (Ref: ${expense.reimbursementReference})` : ""}.`
+                      ? td("timeline.markedPaidBy", {
+                          name: expense.reimbursedByName ?? td("timeline.financeFallback"),
+                          ref: expense.reimbursementReference
+                            ? td("timeline.refSuffix", { ref: expense.reimbursementReference })
+                            : ""
+                        })
                       : expense.financeRejectedAt
-                        ? `Rejected by ${expense.financeRejectedByName ?? "Finance"}.${expense.financeRejectionReason ? ` Reason: ${expense.financeRejectionReason}` : ""}`
-                        : "Awaiting finance payment confirmation.";
+                        ? td("timeline.financeRejectedBy", {
+                            name: expense.financeRejectedByName ?? td("timeline.financeFallback"),
+                            reason: expense.financeRejectionReason
+                              ? td("timeline.reasonSuffix", { reason: expense.financeRejectionReason })
+                              : ""
+                          })
+                        : td("timeline.awaitingFinance");
 
                     return (
                       <Fragment key={expense.id}>
@@ -1148,9 +1175,9 @@ export function ExpensesClient({
                           <td>
                             <time
                               dateTime={expense.expenseDate}
-                              title={formatDateTimeTooltip(expense.expenseDate)}
+                              title={formatDateTimeTooltip(expense.expenseDate, locale)}
                             >
-                              {formatSingleDateHuman(expense.expenseDate)}
+                              {formatSingleDateHuman(expense.expenseDate, locale)}
                             </time>
                           </td>
                           {showEmployeeColumn ? (
@@ -1180,7 +1207,7 @@ export function ExpensesClient({
                           <td>
                             <span className="country-chip">
                               <span>{countryFlagFromCode(expense.employeeCountryCode)}</span>
-                              <span>{countryNameFromCode(expense.employeeCountryCode)}</span>
+                              <span>{countryNameFromCode(expense.employeeCountryCode, locale)}</span>
                             </span>
                           </td>
                           <td>
@@ -1188,18 +1215,18 @@ export function ExpensesClient({
                               {getExpenseStatusLabel(expense.status)}
                             </StatusBadge>
                             {expense.infoRequestState === "requested" ? (
-                              <p className="documents-cell-description">Action needed: manager requested more info.</p>
+                              <p className="documents-cell-description">{t('infoRequests.actionNeeded')}</p>
                             ) : null}
                             {expense.infoRequestState === "responded" ? (
-                              <p className="documents-cell-description">Info response sent to manager.</p>
+                              <p className="documents-cell-description">{t('infoRequests.responseSent')}</p>
                             ) : null}
                           </td>
                           <td>
                             <time
                               dateTime={expense.createdAt}
-                              title={formatDateTimeTooltip(expense.createdAt)}
+                              title={formatDateTimeTooltip(expense.createdAt, locale)}
                             >
-                              {formatRelativeTime(expense.createdAt)}
+                              {formatRelativeTime(expense.createdAt, locale)}
                             </time>
                           </td>
                           <td className="table-row-action-cell">
@@ -1210,7 +1237,7 @@ export function ExpensesClient({
                                 onClick={() => openReceipt(expense)}
                                 disabled={Boolean(isOpeningReceiptById[expense.id])}
                               >
-                                {isOpeningReceiptById[expense.id] ? "Opening..." : "Receipt/Invoice"}
+                                {isOpeningReceiptById[expense.id] ? t('tableActions.opening') : t('tableActions.receiptInvoice')}
                               </button>
 
                               {expense.status === "reimbursed" && expense.reimbursementReceiptPath ? (
@@ -1220,7 +1247,7 @@ export function ExpensesClient({
                                   onClick={() => openPaymentProof(expense)}
                                   disabled={Boolean(isOpeningReceiptById[`proof-${expense.id}`])}
                                 >
-                                  {isOpeningReceiptById[`proof-${expense.id}`] ? "Opening..." : "Payment Proof"}
+                                  {isOpeningReceiptById[`proof-${expense.id}`] ? t('tableActions.opening') : t('tableActions.paymentProof')}
                                 </button>
                               ) : null}
 
@@ -1237,7 +1264,7 @@ export function ExpensesClient({
                                   });
                                 }}
                               >
-                                {isExpanded ? "Hide details" : "Details"}
+                                {isExpanded ? t('tableActions.hideDetails') : t('tableActions.details')}
                               </button>
 
                               {expense.employeeId === currentUserId && expense.status === "pending" ? (
@@ -1247,7 +1274,7 @@ export function ExpensesClient({
                                   onClick={() => mutateExpense({ expense, action: "cancel" })}
                                   disabled={isMutatingExpenseId === expense.id}
                                 >
-                                  {isMutatingExpenseId === expense.id ? "Saving..." : "Cancel"}
+                                  {isMutatingExpenseId === expense.id ? tCommon('working') : tCommon('cancel')}
                                 </button>
                               ) : null}
                             </div>
@@ -1257,16 +1284,18 @@ export function ExpensesClient({
                           <tr className="expenses-detail-row">
                             <td colSpan={showEmployeeColumn ? 10 : 9}>
                               <div className="expenses-detail-card">
-                                <h3 className="section-title">Approval Timeline</h3>
+                                <h3 className="section-title">{t('timeline.approvalTimeline')}</h3>
                                 <ul className="expenses-timeline">
                                   <ExpenseTimelineItem
-                                    title="Submitted"
+                                    title={t('timeline.submitted')}
                                     timestamp={expense.createdAt}
-                                    description={`Submitted by ${expense.employeeName}.`}
+                                    description={td("timeline.submittedBy", { name: expense.employeeName })}
                                     tone="success"
+                                    locale={locale}
+                                    pendingLabel={t('timeline.pending')}
                                   />
                                   <ExpenseTimelineItem
-                                    title="Manager Approval"
+                                    title={t('timeline.managerApproval')}
                                     timestamp={expense.managerApprovedAt}
                                     description={managerDescription}
                                     tone={
@@ -1276,9 +1305,11 @@ export function ExpensesClient({
                                           ? "error"
                                           : "pending"
                                     }
+                                    locale={locale}
+                                    pendingLabel={t('timeline.pending')}
                                   />
                                   <ExpenseTimelineItem
-                                    title="Finance Payment"
+                                    title={t('timeline.financePayment')}
                                     timestamp={expense.reimbursedAt ?? expense.financeRejectedAt}
                                     description={financeDescription}
                                     tone={
@@ -1288,16 +1319,18 @@ export function ExpensesClient({
                                           ? "error"
                                           : "info"
                                     }
+                                    locale={locale}
+                                    pendingLabel={t('timeline.pending')}
                                   />
                                 </ul>
 
                                 <div className="expenses-transaction-details">
-                                  <h3 className="section-title">Info Requests</h3>
+                                  <h3 className="section-title">{t('infoRequests.title')}</h3>
                                   {isLoadingComments ? (
-                                    <p className="settings-card-description">Loading conversation...</p>
+                                    <p className="settings-card-description">{t('infoRequests.loadingConversation')}</p>
                                   ) : commentThread.length === 0 ? (
                                     <p className="settings-card-description">
-                                      No info requests on this expense.
+                                      {t('infoRequests.noRequests')}
                                     </p>
                                   ) : (
                                     <ul className="compensation-history-list">
@@ -1309,16 +1342,16 @@ export function ExpensesClient({
                                               tone={comment.commentType === "request_info" ? "warning" : "info"}
                                             >
                                               {comment.commentType === "request_info"
-                                                ? "Requested info"
-                                                : "Response"}
+                                                ? t('infoRequests.requestedInfo')
+                                                : t('infoRequests.response')}
                                             </StatusBadge>
                                           </div>
                                           <p>{comment.message}</p>
                                           <p
                                             className="compensation-history-item-meta"
-                                            title={formatDateTimeTooltip(comment.createdAt)}
+                                            title={formatDateTimeTooltip(comment.createdAt, locale)}
                                           >
-                                            {formatRelativeTime(comment.createdAt)}
+                                            {formatRelativeTime(comment.createdAt, locale)}
                                           </p>
                                         </li>
                                       ))}
@@ -1328,7 +1361,7 @@ export function ExpensesClient({
                                   {canReplyToInfoRequest ? (
                                     <div className="settings-form" style={{ marginTop: "0.75rem" }}>
                                       <label className="form-field">
-                                        <span className="form-label">Your response</span>
+                                        <span className="form-label">{t('infoRequests.yourResponseLabel')}</span>
                                         <textarea
                                           className={commentError ? "form-input form-input-error" : "form-input"}
                                           rows={3}
@@ -1345,7 +1378,7 @@ export function ExpensesClient({
                                               }));
                                             }
                                           }
-                                          placeholder="Reply with the details requested by your approver."
+                                          placeholder={t('infoRequests.replyPlaceholder')}
                                           disabled={isSubmittingComment}
                                         />
                                         {commentError ? (
@@ -1360,7 +1393,7 @@ export function ExpensesClient({
                                         }}
                                         disabled={isSubmittingComment}
                                       >
-                                        {isSubmittingComment ? "Sending..." : "Send response"}
+                                        {isSubmittingComment ? t('infoRequests.sending') : t('infoRequests.sendResponse')}
                                       </button>
                                     </div>
                                   ) : null}
@@ -1368,15 +1401,15 @@ export function ExpensesClient({
 
                                 {(expense.status === "rejected" || expense.status === "finance_rejected") ? (
                                   <div className="expenses-rejection-details">
-                                    <h3 className="section-title">Rejection Details</h3>
+                                    <h3 className="section-title">{t('rejectionDetails.title')}</h3>
                                     {expense.status === "rejected" && expense.rejectionReason ? (
                                       <p className="expenses-rejection-reason">
-                                        <strong>Reason:</strong> {expense.rejectionReason}
+                                        <strong>{t('rejectionDetails.reasonLabel')}</strong> {expense.rejectionReason}
                                       </p>
                                     ) : null}
                                     {expense.status === "finance_rejected" && expense.financeRejectionReason ? (
                                       <p className="expenses-rejection-reason">
-                                        <strong>Finance reason:</strong> {expense.financeRejectionReason}
+                                        <strong>{t('rejectionDetails.financeReasonLabel')}</strong> {expense.financeRejectionReason}
                                       </p>
                                     ) : null}
                                   </div>
@@ -1384,19 +1417,19 @@ export function ExpensesClient({
 
                                 {expense.vendorName ? (
                                   <div className="expenses-transaction-details">
-                                    <h3 className="section-title">Vendor Details</h3>
+                                    <h3 className="section-title">{t('vendorDetails.title')}</h3>
                                     <dl className="expenses-detail-grid">
-                                      <dt>Vendor</dt>
+                                      <dt>{t('vendorDetails.vendor')}</dt>
                                       <dd>{expense.vendorName}</dd>
                                       {expense.vendorBankAccountName ? (
                                         <>
-                                          <dt>Account Name</dt>
+                                          <dt>{t('vendorDetails.accountName')}</dt>
                                           <dd>{expense.vendorBankAccountName}</dd>
                                         </>
                                       ) : null}
                                       {expense.vendorBankAccountNumber ? (
                                         <>
-                                          <dt>Account Number</dt>
+                                          <dt>{t('vendorDetails.accountNumber')}</dt>
                                           <dd className="numeric">{expense.vendorBankAccountNumber}</dd>
                                         </>
                                       ) : null}
@@ -1406,33 +1439,33 @@ export function ExpensesClient({
 
                                 {expense.status === "reimbursed" ? (
                                   <div className="expenses-transaction-details">
-                                    <h3 className="section-title">Transaction Details</h3>
+                                    <h3 className="section-title">{t('transactionDetails.title')}</h3>
                                     <dl className="expenses-detail-grid">
                                       {expense.reimbursementReference ? (
                                         <>
-                                          <dt>Reference</dt>
+                                          <dt>{t('transactionDetails.reference')}</dt>
                                           <dd className="numeric">{expense.reimbursementReference}</dd>
                                         </>
                                       ) : null}
                                       {expense.reimbursedByName ? (
                                         <>
-                                          <dt>Marked paid by</dt>
+                                          <dt>{t('transactionDetails.markedPaidBy')}</dt>
                                           <dd>{expense.reimbursedByName}</dd>
                                         </>
                                       ) : null}
                                       {expense.reimbursedAt ? (
                                         <>
-                                          <dt>Paid on</dt>
+                                          <dt>{t('transactionDetails.paidOn')}</dt>
                                           <dd>
                                             <time dateTime={expense.reimbursedAt}>
-                                              {formatRelativeTime(expense.reimbursedAt)}
+                                              {formatRelativeTime(expense.reimbursedAt, locale)}
                                             </time>
                                           </dd>
                                         </>
                                       ) : null}
                                       {expense.reimbursementNotes ? (
                                         <>
-                                          <dt>Notes</dt>
+                                          <dt>{t('transactionDetails.notes')}</dt>
                                           <dd>{expense.reimbursementNotes}</dd>
                                         </>
                                       ) : null}
@@ -1446,8 +1479,8 @@ export function ExpensesClient({
                                         disabled={Boolean(isOpeningReceiptById[`proof-${expense.id}`])}
                                       >
                                         {isOpeningReceiptById[`proof-${expense.id}`]
-                                          ? "Opening..."
-                                          : "View Payment Proof"}
+                                          ? t('tableActions.opening')
+                                          : t('transactionDetails.viewPaymentProof')}
                                       </button>
                                     ) : null}
                                   </div>
@@ -1468,13 +1501,13 @@ export function ExpensesClient({
 
       <SlidePanel
         isOpen={isPanelOpen}
-        title="Submit expense"
-        description="Upload a receipt/invoice and submit an expense for approval."
+        title={t('submitPanel.title')}
+        description={t('submitPanel.description')}
         onClose={closePanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSubmitExpense}>
           <div className="form-field">
-            <span className="form-label">Expense type</span>
+            <span className="form-label">{t('submitPanel.expenseTypeLabel')}</span>
             <div className="expenses-type-toggle">
               <button
                 type="button"
@@ -1485,7 +1518,7 @@ export function ExpensesClient({
                 }}
                 disabled={isSubmitting}
               >
-                Work Expense
+                {t('submitPanel.workExpense')}
               </button>
               <button
                 type="button"
@@ -1496,7 +1529,7 @@ export function ExpensesClient({
                 }}
                 disabled={isSubmitting}
               >
-                Personal Reimbursement
+                {t('submitPanel.personalReimbursement')}
               </button>
             </div>
           </div>
@@ -1507,12 +1540,12 @@ export function ExpensesClient({
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6" />
                 <path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
-              <p>Not all expenses qualify for reimbursement. Claims should be pre-approved by your manager before spend.</p>
+              <p>{t('submitPanel.personalReimbursementNote')}</p>
             </div>
           ) : null}
 
           <div className="form-field">
-            <span className="form-label">Category</span>
+            <span className="form-label">{t('submitPanel.categoryLabel')}</span>
             <div className="expenses-category-grid" onBlur={handleFieldBlur("category")}>
               {categoryOptions.map((category) => (
                 <button
@@ -1535,9 +1568,9 @@ export function ExpensesClient({
             {formErrors.category ? <p className="form-field-error">{formErrors.category}</p> : null}
           </div>
 
-          <section className="expenses-guidance-card" aria-label="Category guidance">
+          <section className="expenses-guidance-card" aria-label={t('submitPanel.categoryGuidanceAriaLabel')}>
             <header className="expenses-guidance-header">
-              <h3 className="section-title">Category Guidance</h3>
+              <h3 className="section-title">{t('submitPanel.categoryGuidanceTitle')}</h3>
               <StatusBadge tone="info">{getExpenseCategoryLabel(formValues.category)}</StatusBadge>
             </header>
             <p className="settings-card-description">{selectedCategoryGuidance.summary}</p>
@@ -1545,21 +1578,21 @@ export function ExpensesClient({
             <p className="settings-card-description">{selectedCategoryGuidance.policyNote}</p>
             <div className="expenses-guidance-actions">
               <Link href="/documents" className="button">
-                View Expense Policy
+                {t('toolbar.viewExpensePolicy')}
               </Link>
             </div>
           </section>
 
           {formValues.category === "other" ? (
             <label className="form-field">
-              <span className="form-label">Custom category name</span>
+              <span className="form-label">{t('submitPanel.customCategoryLabel')}</span>
               <input
                 className={formErrors.customCategory ? "form-input form-input-error" : "form-input"}
                 type="text"
                 value={formValues.customCategory}
                 onChange={(e) => setFormValues((prev) => ({ ...prev, customCategory: e.target.value }))}
                 onBlur={handleFieldBlur("customCategory")}
-                placeholder="e.g. Conference fees, Training materials"
+                placeholder={t('submitPanel.customCategoryPlaceholder')}
                 disabled={isSubmitting}
                 maxLength={100}
               />
@@ -1570,14 +1603,14 @@ export function ExpensesClient({
           ) : null}
 
           <label className="form-field">
-            <span className="form-label">Description</span>
+            <span className="form-label">{t('submitPanel.descriptionLabel')}</span>
             <textarea
               className={formErrors.description ? "form-input form-input-error" : "form-input"}
               value={formValues.description}
               onChange={handleFormFieldChange("description")}
               onBlur={handleFieldBlur("description")}
               rows={4}
-              placeholder="Describe what this expense covers."
+              placeholder={t('submitPanel.descriptionPlaceholder')}
               disabled={isSubmitting}
             />
             {formErrors.description ? (
@@ -1587,7 +1620,7 @@ export function ExpensesClient({
 
           <div className="expenses-form-grid expenses-form-grid-3col">
             <label className="form-field">
-              <span className="form-label">Currency</span>
+              <span className="form-label">{t('submitPanel.currencyLabel')}</span>
               <select
                 className={formErrors.currency ? "form-input form-input-error" : "form-input"}
                 value={formValues.currency}
@@ -1595,13 +1628,13 @@ export function ExpensesClient({
                 onBlur={handleFieldBlur("currency")}
                 disabled={isSubmitting}
               >
-                <option value="USD">🇺🇸 USD</option>
-                <option value="NGN">🇳🇬 NGN</option>
-                <option value="GHS">🇬🇭 GHS</option>
-                <option value="KES">🇰🇪 KES</option>
-                <option value="ZAR">🇿🇦 ZAR</option>
-                <option value="XAF">🇨🇲 XAF</option>
-                <option value="CAD">🇨🇦 CAD</option>
+                <option value="USD">{"\ud83c\uddfa\ud83c\uddf8"} USD</option>
+                <option value="NGN">{"\ud83c\uddf3\ud83c\uddec"} NGN</option>
+                <option value="GHS">{"\ud83c\uddec\ud83c\udded"} GHS</option>
+                <option value="KES">{"\ud83c\uddf0\ud83c\uddea"} KES</option>
+                <option value="ZAR">{"\ud83c\uddff\ud83c\udde6"} ZAR</option>
+                <option value="XAF">{"\ud83c\udde8\ud83c\uddf2"} XAF</option>
+                <option value="CAD">{"\ud83c\udde8\ud83c\udde6"} CAD</option>
               </select>
               {formErrors.currency ? (
                 <p className="form-field-error">{formErrors.currency}</p>
@@ -1609,7 +1642,7 @@ export function ExpensesClient({
             </label>
 
             <label className="form-field">
-              <span className="form-label">Amount</span>
+              <span className="form-label">{t('submitPanel.amountLabel')}</span>
               <MoneyInput
                 id="expense-amount-input"
                 value={formValues.amount}
@@ -1623,7 +1656,7 @@ export function ExpensesClient({
             </label>
 
             <label className="form-field">
-              <span className="form-label">Date</span>
+              <span className="form-label">{t('submitPanel.dateLabel')}</span>
               <input
                 className={formErrors.expenseDate ? "form-input form-input-error" : "form-input"}
                 type="date"
@@ -1640,11 +1673,11 @@ export function ExpensesClient({
 
           {formValues.expenseType === "work_expense" ? (
             <div className="expenses-vendor-fields">
-              <h4 className="section-title" style={{ marginBottom: "0.5rem" }}>Vendor Details</h4>
+              <h4 className="section-title" style={{ marginBottom: "0.5rem" }}>{t('vendorDetails.title')}</h4>
 
               {vendorBeneficiaries.vendors.length > 0 ? (
                 <label className="form-field">
-                  <span className="form-label">Select saved vendor</span>
+                  <span className="form-label">{t('submitPanel.selectSavedVendorLabel')}</span>
                   <select
                     className="form-input"
                     value={selectedVendorId}
@@ -1661,7 +1694,7 @@ export function ExpensesClient({
                           saveVendor: false
                         };
                         setFormValues(nextValues);
-                        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile));
+                        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile, td));
                         setExpenseFormDirty(true);
                       } else {
                         setExpenseFormDirty(true);
@@ -1669,7 +1702,7 @@ export function ExpensesClient({
                     }}
                     disabled={isSubmitting}
                   >
-                    <option value="">Choose a saved vendor</option>
+                    <option value="">{t('submitPanel.chooseSavedVendor')}</option>
                     {vendorBeneficiaries.vendors.map((vendor) => (
                       <option key={vendor.id} value={vendor.id}>
                         {vendor.vendorName} - {vendor.bankAccountNumber}
@@ -1680,14 +1713,14 @@ export function ExpensesClient({
               ) : null}
 
               <label className="form-field">
-                <span className="form-label">Vendor name <span className="form-required">*</span></span>
+                <span className="form-label">{t('submitPanel.vendorNameLabel')} <span className="form-required">*</span></span>
                 <input
                   className={formErrors.vendorName ? "form-input form-input-error" : "form-input"}
                   type="text"
                   value={formValues.vendorName}
                   onChange={(e) => handleVendorInputChange("vendorName")(e.target.value)}
                   onBlur={handleFieldBlur("vendorName")}
-                  placeholder="Company or vendor name"
+                  placeholder={t('submitPanel.vendorNamePlaceholder')}
                   disabled={isSubmitting}
                   maxLength={200}
                 />
@@ -1697,14 +1730,14 @@ export function ExpensesClient({
               </label>
 
               <label className="form-field">
-                <span className="form-label">Bank account name <span className="form-required">*</span></span>
+                <span className="form-label">{t('submitPanel.bankAccountNameLabel')} <span className="form-required">*</span></span>
                 <input
                   className={formErrors.vendorBankAccountName ? "form-input form-input-error" : "form-input"}
                   type="text"
                   value={formValues.vendorBankAccountName}
                   onChange={(e) => handleVendorInputChange("vendorBankAccountName")(e.target.value)}
                   onBlur={handleFieldBlur("vendorBankAccountName")}
-                  placeholder="Account holder name"
+                  placeholder={t('submitPanel.bankAccountNamePlaceholder')}
                   disabled={isSubmitting}
                   maxLength={200}
                 />
@@ -1714,14 +1747,14 @@ export function ExpensesClient({
               </label>
 
               <label className="form-field">
-                <span className="form-label">Bank account number <span className="form-required">*</span></span>
+                <span className="form-label">{t('submitPanel.bankAccountNumberLabel')} <span className="form-required">*</span></span>
                 <input
                   className={formErrors.vendorBankAccountNumber ? "form-input form-input-error" : "form-input"}
                   type="text"
                   value={formValues.vendorBankAccountNumber}
                   onChange={(e) => handleVendorInputChange("vendorBankAccountNumber")(e.target.value)}
                   onBlur={handleFieldBlur("vendorBankAccountNumber")}
-                  placeholder="Bank account number"
+                  placeholder={t('submitPanel.bankAccountNumberPlaceholder')}
                   disabled={isSubmitting}
                   maxLength={50}
                 />
@@ -1738,14 +1771,14 @@ export function ExpensesClient({
                     onChange={(e) => setFormValues((prev) => ({ ...prev, saveVendor: e.target.checked }))}
                     disabled={isSubmitting}
                   />
-                  <span>Save this vendor for future expenses</span>
+                  <span>{t('submitPanel.saveVendorLabel')}</span>
                 </label>
               ) : null}
             </div>
           ) : null}
 
           <div className="form-field">
-            <span className="form-label">Receipt/Invoice <span className="form-required">*</span></span>
+            <span className="form-label">{t('submitPanel.receiptLabel')} <span className="form-required">*</span></span>
             <div
               className={isDraggingReceipt ? "document-dropzone document-dropzone-active" : "document-dropzone"}
               onDragOver={handleDragOver}
@@ -1758,10 +1791,10 @@ export function ExpensesClient({
               style={{ cursor: "pointer" }}
             >
               <p className="document-dropzone-title">
-                {receiptFile ? receiptFile.name : "Click or drag and drop a receipt/invoice file"}
+                {receiptFile ? receiptFile.name : t('submitPanel.dropzoneTitle')}
               </p>
               <p className="document-dropzone-hint">
-                PDF, PNG, JPG up to 10MB. Mobile camera capture is supported.
+                {t('submitPanel.dropzoneHint')}
               </p>
               {receiptFile ? (
                 <p className="document-dropzone-hint numeric">{Math.round(receiptFile.size / 1024)} KB</p>
@@ -1774,7 +1807,7 @@ export function ExpensesClient({
                 onClick={() => receiptInputRef.current?.click()}
                 disabled={isSubmitting}
               >
-                Choose file
+                {t('submitPanel.chooseFile')}
               </button>
               <button
                 type="button"
@@ -1782,7 +1815,7 @@ export function ExpensesClient({
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={isSubmitting}
               >
-                Use camera
+                {t('submitPanel.useCamera')}
               </button>
             </div>
             <input
@@ -1806,7 +1839,7 @@ export function ExpensesClient({
           {isSubmitting ? (
             <div className="expenses-upload-progress" aria-live="polite">
               <div className="expenses-upload-spinner" />
-              <span>Uploading...</span>
+              <span>{t('submitPanel.uploading')}</span>
             </div>
           ) : null}
 
@@ -1819,10 +1852,10 @@ export function ExpensesClient({
               onClick={closePanel}
               disabled={isSubmitting}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit expense"}
+              {isSubmitting ? t('submitPanel.submitting') : t('actions.submitExpense')}
             </button>
           </div>
         </form>
@@ -1835,7 +1868,7 @@ export function ExpensesClient({
             <button
               type="button"
               className="toast-dismiss"
-              aria-label="Dismiss notification"
+              aria-label={t('dismissNotification')}
               onClick={() => dismissToast(toast.id)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">

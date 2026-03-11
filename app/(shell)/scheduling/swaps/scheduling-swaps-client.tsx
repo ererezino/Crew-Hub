@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
+import { usePeople } from "../../../../hooks/use-people";
 import { useSchedulingShifts, useSchedulingSwaps } from "../../../../hooks/use-scheduling";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { formatSwapStatus } from "../../../../lib/format-labels";
@@ -55,11 +57,17 @@ export function SchedulingSwapsClient({
   canManageSwaps: boolean;
   embedded?: boolean;
 }) {
+  const t = useTranslations("scheduling");
+  const tc = useTranslations("common");
   const swapsQuery = useSchedulingSwaps({
     scope: canManageSwaps ? "team" : "mine"
   });
   const shiftsQuery = useSchedulingShifts({
     scope: "mine"
+  });
+  const reportsQuery = usePeople({
+    scope: "reports",
+    enabled: canManageSwaps
   });
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [requestForm, setRequestForm] = useState<SwapRequestFormState>({
@@ -71,6 +79,10 @@ export function SchedulingSwapsClient({
   const [isUpdatingSwapId, setIsUpdatingSwapId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ swapId: string; action: SwapAction } | null>(null);
+  const [assignSwapId, setAssignSwapId] = useState<string | null>(null);
+  const [assignTargetId, setAssignTargetId] = useState("");
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignLeaveWarning, setAssignLeaveWarning] = useState<string | null>(null);
 
   const sortedSwaps = useMemo(() => {
     const rows = swapsQuery.data?.swaps ?? [];
@@ -90,13 +102,32 @@ export function SchedulingSwapsClient({
     return rows.filter((shift) => new Date(shift.endTime).getTime() >= now);
   }, [shiftsQuery.data?.shifts]);
 
+  const assignSwap = useMemo(
+    () => sortedSwaps.find((swap) => swap.id === assignSwapId) ?? null,
+    [assignSwapId, sortedSwaps]
+  );
+
+  const assignCandidates = useMemo(() => {
+    if (!assignSwap) {
+      return [];
+    }
+
+    return reportsQuery.people.filter((person) => {
+      if (person.id === assignSwap.requesterId) {
+        return false;
+      }
+
+      return person.status === "active" || person.status === "onboarding";
+    });
+  }, [assignSwap, reportsQuery.people]);
+
   async function handleCreateSwapRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setRequestError(null);
     setFeedbackMessage(null);
 
     if (!requestForm.shiftId) {
-      setRequestError("Select a shift to request a swap.");
+      setRequestError(t("swaps.validationSelectShift"));
       return;
     }
 
@@ -115,11 +146,11 @@ export function SchedulingSwapsClient({
       });
       const payload = (await response.json()) as {
         data: unknown;
-        error: { message?: string } | null;
+        error: { code?: string; message?: string } | null;
       };
 
       if (!response.ok) {
-        setRequestError(payload.error?.message ?? "Unable to create swap request.");
+        setRequestError(payload.error?.message ?? t("swaps.failedCreate"));
         return;
       }
 
@@ -127,19 +158,24 @@ export function SchedulingSwapsClient({
         shiftId: "",
         reason: ""
       });
-      setFeedbackMessage("Swap request submitted.");
+      setFeedbackMessage(t("swaps.submitted"));
       swapsQuery.refresh();
       shiftsQuery.refresh();
     } catch (error) {
-      setRequestError(error instanceof Error ? error.message : "Unable to create swap request.");
+      setRequestError(error instanceof Error ? error.message : t("swaps.failedCreate"));
     } finally {
       setIsSubmittingRequest(false);
     }
   }
 
-  async function handleSwapAction(swapId: string, action: SwapAction) {
+  async function handleSwapAction(
+    swapId: string,
+    action: SwapAction,
+    options?: { targetId?: string; allowLeaveConflict?: boolean }
+  ): Promise<void> {
     setIsUpdatingSwapId(swapId);
     setFeedbackMessage(null);
+    setAssignError(null);
 
     try {
       const response = await fetch(`/api/v1/scheduling/swaps/${swapId}`, {
@@ -148,35 +184,88 @@ export function SchedulingSwapsClient({
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          action
+          action,
+          targetId: options?.targetId,
+          allowLeaveConflict: options?.allowLeaveConflict === true
         })
       });
       const payload = (await response.json()) as {
         data: unknown;
-        error: { message?: string } | null;
+        error: { code?: string; message?: string } | null;
       };
 
       if (!response.ok) {
-        setFeedbackMessage(payload.error?.message ?? "Unable to update swap request.");
+        if (
+          payload.error?.code === "SHIFT_SWAP_TARGET_ON_LEAVE" &&
+          options?.targetId &&
+          options?.allowLeaveConflict !== true
+        ) {
+          setAssignLeaveWarning(
+            payload.error.message ??
+              t("swaps.leaveConflictWarning")
+          );
+          return;
+        }
+
+        if (assignSwapId && assignSwapId === swapId) {
+          setAssignError(payload.error?.message ?? t("swaps.failedUpdate"));
+        } else {
+          setFeedbackMessage(payload.error?.message ?? t("swaps.failedUpdate"));
+        }
         return;
       }
 
-      setFeedbackMessage("Swap request updated.");
+      setFeedbackMessage(t("swaps.updated"));
+      setAssignSwapId(null);
+      setAssignTargetId("");
+      setAssignError(null);
+      setAssignLeaveWarning(null);
       swapsQuery.refresh();
       shiftsQuery.refresh();
     } catch (error) {
-      setFeedbackMessage(error instanceof Error ? error.message : "Unable to update swap request.");
+      if (assignSwapId && assignSwapId === swapId) {
+        setAssignError(error instanceof Error ? error.message : t("swaps.failedUpdate"));
+      } else {
+        setFeedbackMessage(error instanceof Error ? error.message : t("swaps.failedUpdate"));
+      }
     } finally {
       setIsUpdatingSwapId(null);
     }
   }
 
+  const closeAssignDialog = () => {
+    if (isUpdatingSwapId) {
+      return;
+    }
+
+    setAssignSwapId(null);
+    setAssignTargetId("");
+    setAssignError(null);
+    setAssignLeaveWarning(null);
+  };
+
+  const submitAssignApproval = async (allowLeaveConflict: boolean) => {
+    if (!assignSwap) {
+      return;
+    }
+
+    if (!assignTargetId) {
+      setAssignError(t("swaps.validationSelectMember"));
+      return;
+    }
+
+    await handleSwapAction(assignSwap.id, "approve", {
+      targetId: assignTargetId,
+      allowLeaveConflict
+    });
+  };
+
   return (
     <>
       {!embedded ? (
         <PageHeader
-          title="Swap Requests"
-          description="Request, review, and resolve shift swap requests."
+          title={t("swaps.pageTitle")}
+          description={t("swaps.pageDescription")}
         />
       ) : null}
 
@@ -185,7 +274,7 @@ export function SchedulingSwapsClient({
       {!swapsQuery.isLoading && swapsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Shift swaps are unavailable"
+            title={t("swaps.errorTitle")}
             description={swapsQuery.errorMessage}
           />
           <button
@@ -193,25 +282,25 @@ export function SchedulingSwapsClient({
             className="button"
             onClick={() => swapsQuery.refresh()}
           >
-            Retry
+            {tc("retry")}
           </button>
         </>
       ) : null}
 
       {!swapsQuery.isLoading && !swapsQuery.errorMessage ? (
-        <section className="compensation-layout" aria-label="Shift swap management">
+        <section className="compensation-layout" aria-label={t("swaps.ariaSection")}>
           <article className="settings-card">
             <header className="announcement-item-header">
               <div>
-                <h2 className="section-title">Request a swap</h2>
+                <h2 className="section-title">{t("swaps.requestTitle")}</h2>
                 <p className="settings-card-description">
-                  Select one of your upcoming shifts and optionally add context.
+                  {t("swaps.requestDescription")}
                 </p>
               </div>
             </header>
             <form className="settings-form" onSubmit={handleCreateSwapRequest}>
               <div>
-                <label className="form-label" htmlFor="swap-shift-select">My shift</label>
+                <label className="form-label" htmlFor="swap-shift-select">{t("swaps.myShift")}</label>
                 <select
                   id="swap-shift-select"
                   className="form-input"
@@ -223,7 +312,7 @@ export function SchedulingSwapsClient({
                     }))
                   }
                 >
-                  <option value="">Select shift</option>
+                  <option value="">{t("swaps.selectShift")}</option>
                   {swappableShifts.map((shift) => (
                     <option key={shift.id} value={shift.id}>
                       {shift.shiftDate} {formatTimeRangeLabel(shift.startTime, shift.endTime)}
@@ -232,7 +321,7 @@ export function SchedulingSwapsClient({
                 </select>
               </div>
               <div>
-                <label className="form-label" htmlFor="swap-reason">Reason</label>
+                <label className="form-label" htmlFor="swap-reason">{t("swaps.reason")}</label>
                 <textarea
                   id="swap-reason"
                   className="form-input"
@@ -244,13 +333,13 @@ export function SchedulingSwapsClient({
                     }))
                   }
                   rows={3}
-                  placeholder="Need coverage for a client meeting."
+                  placeholder={t("swaps.reasonPlaceholder")}
                 />
               </div>
               {requestError ? <p className="form-field-error">{requestError}</p> : null}
               <div className="settings-actions">
                 <button type="submit" className="button button-primary" disabled={isSubmittingRequest}>
-                  {isSubmittingRequest ? "Submitting..." : "Request swap"}
+                  {isSubmittingRequest ? tc("submitting") : t("swaps.submit")}
                 </button>
               </div>
             </form>
@@ -260,14 +349,14 @@ export function SchedulingSwapsClient({
 
           {sortedSwaps.length === 0 ? (
             <EmptyState
-              title="No swap requests yet"
-              description="Your submitted and received swap requests will appear here."
-              ctaLabel="Open Scheduling"
+              title={t("swaps.emptyTitle")}
+              description={t("swaps.emptyDescription")}
+              ctaLabel={t("openShifts.openScheduling")}
               ctaHref="/scheduling"
             />
           ) : (
             <div className="data-table-container">
-              <table className="data-table" aria-label="Shift swaps table">
+              <table className="data-table" aria-label={t("swaps.ariaTable")}>
                 <thead>
                   <tr>
                     <th>
@@ -280,17 +369,17 @@ export function SchedulingSwapsClient({
                           )
                         }
                       >
-                        Requested
+                        {t("swaps.colRequested")}
                         <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       </button>
                     </th>
-                    <th>Shift</th>
-                    <th>Requester</th>
-                    <th>Target</th>
-                    <th>Reason</th>
-                    <th>Status</th>
-                    <th>Approved by</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t("swaps.colShift")}</th>
+                    <th>{t("swaps.colRequester")}</th>
+                    <th>{t("swaps.colTarget")}</th>
+                    <th>{t("swaps.colReason")}</th>
+                    <th>{t("swaps.colStatus")}</th>
+                    <th>{t("swaps.colApprovedBy")}</th>
+                    <th className="table-action-column">{t("swaps.colActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -302,7 +391,12 @@ export function SchedulingSwapsClient({
                       canManageSwaps &&
                       swap.targetId !== null &&
                       (swap.status === "accepted" || swap.status === "pending");
-                    const canManagerReject = canManageSwaps && swap.status === "pending";
+                    const canManagerAssignAndApprove =
+                      canManageSwaps &&
+                      swap.targetId === null &&
+                      (swap.status === "accepted" || swap.status === "pending");
+                    const canManagerReject =
+                      canManageSwaps && (swap.status === "pending" || swap.status === "accepted");
 
                     return (
                       <tr key={swap.id} className="data-table-row">
@@ -315,7 +409,7 @@ export function SchedulingSwapsClient({
                           {swap.shiftDate} {formatTimeRangeLabel(swap.shiftStartTime, swap.shiftEndTime)}
                         </td>
                         <td>{swap.requesterName}</td>
-                        <td>{swap.targetName ?? "Open to team"}</td>
+                        <td>{swap.targetName ?? t("swaps.openToTeam")}</td>
                         <td title={swap.reason ?? undefined}>
                           {swap.reason
                             ? (swap.reason.length > 40
@@ -338,7 +432,7 @@ export function SchedulingSwapsClient({
                                 onClick={() => setConfirmAction({ swapId: swap.id, action: "cancel" })}
                                 disabled={isUpdatingSwapId === swap.id}
                               >
-                                Cancel
+                                {tc("cancel")}
                               </button>
                             ) : null}
                             {canTargetRespond ? (
@@ -346,10 +440,12 @@ export function SchedulingSwapsClient({
                                 <button
                                   type="button"
                                   className="table-row-action"
-                                  onClick={() => handleSwapAction(swap.id, "accept")}
+                                  onClick={() => {
+                                    void handleSwapAction(swap.id, "accept");
+                                  }}
                                   disabled={isUpdatingSwapId === swap.id}
                                 >
-                                  Accept
+                                  {tc("accept")}
                                 </button>
                                 <button
                                   type="button"
@@ -357,18 +453,35 @@ export function SchedulingSwapsClient({
                                   onClick={() => setConfirmAction({ swapId: swap.id, action: "reject" })}
                                   disabled={isUpdatingSwapId === swap.id}
                                 >
-                                  Reject
+                                  {tc("reject")}
                                 </button>
                               </>
+                            ) : null}
+                            {canManagerAssignAndApprove ? (
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => {
+                                  setAssignSwapId(swap.id);
+                                  setAssignTargetId("");
+                                  setAssignError(null);
+                                  setAssignLeaveWarning(null);
+                                }}
+                                disabled={isUpdatingSwapId === swap.id}
+                              >
+                                {t("swaps.assignApprove")}
+                              </button>
                             ) : null}
                             {canManagerApprove ? (
                               <button
                                 type="button"
                                 className="table-row-action"
-                                onClick={() => handleSwapAction(swap.id, "approve")}
+                                onClick={() => {
+                                  void handleSwapAction(swap.id, "approve");
+                                }}
                                 disabled={isUpdatingSwapId === swap.id}
                               >
-                                Approve
+                                {tc("approve")}
                               </button>
                             ) : null}
                             {canManagerReject ? (
@@ -378,7 +491,7 @@ export function SchedulingSwapsClient({
                                 onClick={() => setConfirmAction({ swapId: swap.id, action: "reject" })}
                                 disabled={isUpdatingSwapId === swap.id}
                               >
-                                Reject
+                                {tc("reject")}
                               </button>
                             ) : null}
                           </div>
@@ -393,19 +506,119 @@ export function SchedulingSwapsClient({
         </section>
       ) : null}
 
+      {assignSwap ? (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            closeAssignDialog();
+          }}
+        >
+          <section
+            className="modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("swaps.assignTitle")}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="modal-title">{t("swaps.assignTitle")}</h2>
+            <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
+              {t("swaps.assignDescription", { requesterName: assignSwap.requesterName, shiftDate: assignSwap.shiftDate })}
+            </p>
+
+            <label className="form-field">
+              <span className="form-label">{t("swaps.replacementLabel")}</span>
+              <select
+                className="form-input"
+                value={assignTargetId}
+                onChange={(event) => {
+                  setAssignTargetId(event.currentTarget.value);
+                  setAssignError(null);
+                  setAssignLeaveWarning(null);
+                }}
+                disabled={reportsQuery.isLoading || isUpdatingSwapId === assignSwap.id}
+              >
+                <option value="">
+                  {reportsQuery.isLoading ? t("swaps.loadingMembers") : t("swaps.selectReplacement")}
+                </option>
+                {assignCandidates.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {assignLeaveWarning ? (
+              <div className="settings-card" style={{ borderColor: "var(--color-error-strong)" }}>
+                <p className="form-field-error" style={{ marginBottom: "var(--space-2)" }}>
+                  {assignLeaveWarning}
+                </p>
+                <p className="settings-card-description" dangerouslySetInnerHTML={{ __html: t("swaps.leaveConflictBody") }} />
+              </div>
+            ) : null}
+
+            {assignError ? <p className="form-field-error">{assignError}</p> : null}
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={closeAssignDialog}
+                disabled={isUpdatingSwapId === assignSwap.id}
+              >
+                {tc("cancel")}
+              </button>
+              {assignLeaveWarning ? (
+                <>
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    onClick={closeAssignDialog}
+                    disabled={isUpdatingSwapId === assignSwap.id}
+                  >
+                    {t("swaps.no")}
+                  </button>
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={() => {
+                      void submitAssignApproval(true);
+                    }}
+                    disabled={isUpdatingSwapId === assignSwap.id}
+                  >
+                    {t("swaps.yesProceed")}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="button button-accent"
+                  onClick={() => {
+                    void submitAssignApproval(false);
+                  }}
+                  disabled={isUpdatingSwapId === assignSwap.id}
+                >
+                  {isUpdatingSwapId === assignSwap.id ? tc("saving") : t("swaps.assignApprove")}
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       <ConfirmDialog
         isOpen={confirmAction !== null}
         title={
           confirmAction?.action === "cancel"
-            ? "Cancel swap request?"
-            : "Reject swap request?"
+            ? t("swaps.confirmCancelTitle")
+            : t("swaps.confirmRejectTitle")
         }
         description={
           confirmAction?.action === "cancel"
-            ? "The swap request will be cancelled and the shift will return to its original state."
-            : "The swap request will be rejected."
+            ? t("swaps.confirmCancelBody")
+            : t("swaps.confirmRejectBody")
         }
-        confirmLabel={confirmAction?.action === "cancel" ? "Cancel request" : "Reject"}
+        confirmLabel={confirmAction?.action === "cancel" ? t("swaps.cancelRequest") : tc("reject")}
         tone="danger"
         isConfirming={isUpdatingSwapId !== null}
         onConfirm={() => {

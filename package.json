@@ -11,7 +11,10 @@
     "test": "vitest run",
     "seed": "npx tsx scripts/seed/seed-foundation.ts",
     "reset-team": "npx tsx scripts/seed/reset-to-real-team.ts",
-    "auth:reset-mfa": "npx tsx scripts/auth/reset-mfa.ts"
+    "auth:reset-mfa": "npx tsx scripts/auth/reset-mfa.ts",
+    "i18n:parity": "node scripts/check-i18n-parity.cjs",
+    "i18n:icu": "node scripts/check-i18n-icu.cjs",
+    "i18n:check": "node scripts/check-i18n-parity.cjs && node scripts/check-i18n-icu.cjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.3.2",
@@ -22,6 +25,7 @@
     "framer-motion": "^12.34.3",
     "lucide-react": "^0.576.0",
     "next": "latest",
+    "next-intl": "^4.8.3",
     "react": "latest",
     "react-dom": "latest",
     "recharts": "^3.7.0",
@@ -34,6 +38,7 @@
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
+    "eslint-plugin-i18next": "^6.1.3",
     "puppeteer": "^24.38.0",
     "tsx": "^4.21.0",
     "typescript": "latest",

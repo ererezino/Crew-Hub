@@ -1,8 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { PageHeader } from "../../../../../../components/shared/page-header";
 import { toSentenceCase } from "../../../../../../lib/format-labels";
@@ -47,73 +48,79 @@ const defaultFormState: NewCourseFormState = {
   isPublished: false
 };
 
-function validateForm(values: NewCourseFormState): NewCourseFormErrors {
-  const errors: NewCourseFormErrors = {};
-
-  if (!values.title.trim()) {
-    errors.title = "Course title is required.";
-  } else if (values.title.trim().length > 200) {
-    errors.title = "Course title is too long.";
-  }
-
-  if (values.description.trim().length > 4000) {
-    errors.description = "Description is too long.";
-  }
-
-  if (values.category.trim().length > 60) {
-    errors.category = "Category is too long.";
-  }
-
-  if (!LEARNING_COURSE_CONTENT_TYPES.includes(values.contentType)) {
-    errors.contentType = "Select a valid content type.";
-  }
-
-  if (values.contentUrl.trim().length > 0) {
-    try {
-      new URL(values.contentUrl.trim());
-    } catch {
-      errors.contentUrl = "Content URL must be valid.";
-    }
-  }
-
-  if (values.durationMinutes.trim().length > 0) {
-    const parsedDuration = Number(values.durationMinutes);
-
-    if (!Number.isInteger(parsedDuration) || parsedDuration < 0 || parsedDuration > 6000) {
-      errors.durationMinutes = "Duration must be a whole number between 0 and 6000.";
-    }
-  }
-
-  if (values.difficulty.trim().length > 0 && !LEARNING_COURSE_DIFFICULTIES.includes(values.difficulty as (typeof LEARNING_COURSE_DIFFICULTIES)[number])) {
-    errors.difficulty = "Select a valid difficulty.";
-  }
-
-  if (values.passingScore.trim().length > 0) {
-    const parsedPassingScore = Number(values.passingScore);
-
-    if (!Number.isInteger(parsedPassingScore) || parsedPassingScore < 0 || parsedPassingScore > 100) {
-      errors.passingScore = "Passing score must be a whole number from 0 to 100.";
-    }
-  }
-
-  if (values.recurrence.trim().length > 0 && !LEARNING_COURSE_RECURRENCES.includes(values.recurrence as (typeof LEARNING_COURSE_RECURRENCES)[number])) {
-    errors.recurrence = "Select a valid recurrence option.";
-  }
-
-  return errors;
-}
-
 function hasErrors(errors: NewCourseFormErrors): boolean {
   return Object.values(errors).some((value) => Boolean(value));
 }
 
 export function NewLearningCourseClient() {
+  const t = useTranslations('newLearningCourse');
+  const tCommon = useTranslations('common');
   const router = useRouter();
 
   const [values, setValues] = useState<NewCourseFormState>(defaultFormState);
   const [errors, setErrors] = useState<NewCourseFormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+
+  const validateForm = useMemo(
+    () =>
+      (formValues: NewCourseFormState): NewCourseFormErrors => {
+        const result: NewCourseFormErrors = {};
+
+        if (!formValues.title.trim()) {
+          result.title = t('errorTitleRequired');
+        } else if (formValues.title.trim().length > 200) {
+          result.title = t('errorTitleTooLong');
+        }
+
+        if (formValues.description.trim().length > 4000) {
+          result.description = t('errorDescriptionTooLong');
+        }
+
+        if (formValues.category.trim().length > 60) {
+          result.category = t('errorCategoryTooLong');
+        }
+
+        if (!LEARNING_COURSE_CONTENT_TYPES.includes(formValues.contentType)) {
+          result.contentType = t('errorContentType');
+        }
+
+        if (formValues.contentUrl.trim().length > 0) {
+          try {
+            new URL(formValues.contentUrl.trim());
+          } catch {
+            result.contentUrl = t('errorContentUrl');
+          }
+        }
+
+        if (formValues.durationMinutes.trim().length > 0) {
+          const parsedDuration = Number(formValues.durationMinutes);
+
+          if (!Number.isInteger(parsedDuration) || parsedDuration < 0 || parsedDuration > 6000) {
+            result.durationMinutes = t('errorDuration');
+          }
+        }
+
+        if (formValues.difficulty.trim().length > 0 && !LEARNING_COURSE_DIFFICULTIES.includes(formValues.difficulty as (typeof LEARNING_COURSE_DIFFICULTIES)[number])) {
+          result.difficulty = t('errorDifficulty');
+        }
+
+        if (formValues.passingScore.trim().length > 0) {
+          const parsedPassingScore = Number(formValues.passingScore);
+
+          if (!Number.isInteger(parsedPassingScore) || parsedPassingScore < 0 || parsedPassingScore > 100) {
+            result.passingScore = t('errorPassingScore');
+          }
+        }
+
+        if (formValues.recurrence.trim().length > 0 && !LEARNING_COURSE_RECURRENCES.includes(formValues.recurrence as (typeof LEARNING_COURSE_RECURRENCES)[number])) {
+          result.recurrence = t('errorRecurrence');
+        }
+
+        return result;
+      },
+    [t]
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -154,18 +161,18 @@ export function NewLearningCourseClient() {
 
       if (!response.ok || !payload.data?.course) {
         setErrors({
-          form: payload.error?.message ?? "Unable to create learning course."
+          form: payload.error?.message ?? t('errorUnableToCreate')
         });
         return;
       }
 
       setValues(defaultFormState);
-      setSubmitMessage("Learning course created.");
+      setSubmitMessage(t('courseCreated'));
       router.push("/admin/learning");
       router.refresh();
     } catch (error) {
       setErrors({
-        form: error instanceof Error ? error.message : "Unable to create learning course."
+        form: error instanceof Error ? error.message : t('errorUnableToCreate')
       });
     } finally {
       setIsSubmitting(false);
@@ -175,48 +182,48 @@ export function NewLearningCourseClient() {
   return (
     <>
       <PageHeader
-        title="New Learning Course"
-        description="Create and publish a course in Crew Hub learning management."
+        title={t('title')}
+        description={t('description')}
       />
 
-      <section className="compensation-layout" aria-label="Create learning course form">
+      <section className="compensation-layout" aria-label={t('formAriaLabel')}>
         <article className="settings-card">
           <form className="settings-form-grid" onSubmit={handleSubmit}>
             <label className="settings-field">
-              <span className="settings-field-label">Title</span>
+              <span className="settings-field-label">{t('labelTitle')}</span>
               <input
                 className="settings-input"
                 value={values.title}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, title: event.target.value }))}
-                placeholder="Information Security Essentials"
+                placeholder={t('placeholderTitle')}
               />
             </label>
             {errors.title ? <p className="form-field-error">{errors.title}</p> : null}
 
             <label className="settings-field">
-              <span className="settings-field-label">Description</span>
+              <span className="settings-field-label">{t('labelDescription')}</span>
               <textarea
                 className="settings-textarea"
                 value={values.description}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, description: event.target.value }))}
-                placeholder="Required annual security refresher for all team members."
+                placeholder={t('placeholderDescription')}
               />
             </label>
             {errors.description ? <p className="form-field-error">{errors.description}</p> : null}
 
             <label className="settings-field">
-              <span className="settings-field-label">Category</span>
+              <span className="settings-field-label">{t('labelCategory')}</span>
               <input
                 className="settings-input"
                 value={values.category}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, category: event.target.value }))}
-                placeholder="security"
+                placeholder={t('placeholderCategory')}
               />
             </label>
             {errors.category ? <p className="form-field-error">{errors.category}</p> : null}
 
             <label className="settings-field">
-              <span className="settings-field-label">Content type</span>
+              <span className="settings-field-label">{t('labelContentType')}</span>
               <select
                 className="settings-input"
                 value={values.contentType}
@@ -237,18 +244,18 @@ export function NewLearningCourseClient() {
             {errors.contentType ? <p className="form-field-error">{errors.contentType}</p> : null}
 
             <label className="settings-field">
-              <span className="settings-field-label">Content URL</span>
+              <span className="settings-field-label">{t('labelContentUrl')}</span>
               <input
                 className="settings-input"
                 value={values.contentUrl}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, contentUrl: event.target.value }))}
-                placeholder="https://example.com/course"
+                placeholder={t('placeholderContentUrl')}
               />
             </label>
             {errors.contentUrl ? <p className="form-field-error">{errors.contentUrl}</p> : null}
 
             <label className="settings-field">
-              <span className="settings-field-label">Duration (minutes)</span>
+              <span className="settings-field-label">{t('labelDuration')}</span>
               <input
                 type="number"
                 min={0}
@@ -256,19 +263,19 @@ export function NewLearningCourseClient() {
                 className="settings-input numeric"
                 value={values.durationMinutes}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, durationMinutes: event.target.value }))}
-                placeholder="60"
+                placeholder={t('placeholderDuration')}
               />
             </label>
             {errors.durationMinutes ? <p className="form-field-error">{errors.durationMinutes}</p> : null}
 
             <label className="settings-field">
-              <span className="settings-field-label">Difficulty</span>
+              <span className="settings-field-label">{t('labelDifficulty')}</span>
               <select
                 className="settings-input"
                 value={values.difficulty}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, difficulty: event.target.value }))}
               >
-                <option value="">Not set</option>
+                <option value="">{t('notSet')}</option>
                 {LEARNING_COURSE_DIFFICULTIES.map((difficulty) => (
                   <option key={difficulty} value={difficulty}>
                     {difficulty}
@@ -279,7 +286,7 @@ export function NewLearningCourseClient() {
             {errors.difficulty ? <p className="form-field-error">{errors.difficulty}</p> : null}
 
             <label className="settings-field">
-              <span className="settings-field-label">Passing score</span>
+              <span className="settings-field-label">{t('labelPassingScore')}</span>
               <input
                 type="number"
                 min={0}
@@ -287,19 +294,19 @@ export function NewLearningCourseClient() {
                 className="settings-input numeric"
                 value={values.passingScore}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, passingScore: event.target.value }))}
-                placeholder="80"
+                placeholder={t('placeholderPassingScore')}
               />
             </label>
             {errors.passingScore ? <p className="form-field-error">{errors.passingScore}</p> : null}
 
             <label className="settings-field">
-              <span className="settings-field-label">Recurrence</span>
+              <span className="settings-field-label">{t('labelRecurrence')}</span>
               <select
                 className="settings-input"
                 value={values.recurrence}
                 onChange={(event) => setValues((currentValue) => ({ ...currentValue, recurrence: event.target.value }))}
               >
-                <option value="">Not recurring</option>
+                <option value="">{t('notRecurring')}</option>
                 {LEARNING_COURSE_RECURRENCES.map((recurrence) => (
                   <option key={recurrence} value={recurrence}>
                     {toSentenceCase(recurrence)}
@@ -317,7 +324,7 @@ export function NewLearningCourseClient() {
                   setValues((currentValue) => ({ ...currentValue, isMandatory: event.target.checked }))
                 }
               />
-              <span>Mandatory course</span>
+              <span>{t('mandatoryCourse')}</span>
             </label>
 
             <label className="settings-checkbox">
@@ -328,7 +335,7 @@ export function NewLearningCourseClient() {
                   setValues((currentValue) => ({ ...currentValue, allowRetake: event.target.checked }))
                 }
               />
-              <span>Allow retakes</span>
+              <span>{t('allowRetakes')}</span>
             </label>
 
             <label className="settings-checkbox">
@@ -339,17 +346,17 @@ export function NewLearningCourseClient() {
                   setValues((currentValue) => ({ ...currentValue, isPublished: event.target.checked }))
                 }
               />
-              <span>Publish immediately</span>
+              <span>{t('publishImmediately')}</span>
             </label>
 
             {errors.form ? <p className="form-field-error">{errors.form}</p> : null}
 
             <div className="settings-actions">
               <Link href="/admin/learning" className="button">
-                Cancel
+                {tCommon('cancel')}
               </Link>
               <button type="submit" className="button button-accent" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create course"}
+                {isSubmitting ? t('creating') : t('createCourse')}
               </button>
             </div>
 

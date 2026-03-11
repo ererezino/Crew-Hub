@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
@@ -21,17 +23,19 @@ function resolveRequestedTab(searchParams: Record<string, string | string[] | un
 
 export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps) {
   const session = await getAuthenticatedSession();
+  const tNav = await getTranslations('nav');
 
   if (!session?.profile) {
+    const t = await getTranslations('common');
     return (
       <>
         <PageHeader
-          title="Approvals"
-          description="Review and act on pending team requests."
+          title={tNav('approvals')}
+          description={tNav('description.approvals')}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={t('emptyState.profileUnavailable')}
+          description={t('emptyState.profileUnavailableBody')}
         />
       </>
     );
@@ -55,15 +59,16 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
     hasRole(roles, "SUPER_ADMIN");
 
   if (!canReviewTimeOff && !canReviewExpenses && !canReviewTimesheets) {
+    const tApprovals = await getTranslations('approvalsPage');
     return (
       <>
         <PageHeader
-          title="Approvals"
-          description="Review and act on pending team requests."
+          title={tNav('approvals')}
+          description={tNav('description.approvals')}
         />
         <EmptyState
-          title="Approvals are restricted"
-          description="Only team leads, managers, and admins can process approvals."
+          title={tApprovals('accessDenied')}
+          description={tApprovals('accessDeniedBody')}
         />
       </>
     );

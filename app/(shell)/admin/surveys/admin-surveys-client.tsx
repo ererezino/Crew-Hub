@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -11,6 +12,7 @@ import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datet
 import { toSentenceCase } from "../../../../lib/format-labels";
 import type { SurveyLaunchResponse, SurveyRecord } from "../../../../types/surveys";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 
 function toDateTimeValue(value: string | null): string | null {
@@ -55,6 +57,10 @@ function adminSurveysSkeleton() {
 }
 
 export function AdminSurveysClient() {
+  const t = useTranslations('adminSurveys');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const adminQuery = useAdminSurveys();
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [launchingSurveyId, setLaunchingSurveyId] = useState<string | null>(null);
@@ -90,14 +96,14 @@ export function AdminSurveysClient() {
       const payload = (await response.json()) as SurveyLaunchResponse;
 
       if (!response.ok || !payload.data?.survey) {
-        setErrorMessage(payload.error?.message ?? "Unable to launch survey.");
+        setErrorMessage(payload.error?.message ?? t('launchError'));
         return;
       }
 
-      setFeedbackMessage("Survey launched successfully.");
+      setFeedbackMessage(t('launchSuccess'));
       adminQuery.refresh();
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to launch survey.");
+      setErrorMessage(error instanceof Error ? error.message : t('launchError'));
     } finally {
       setLaunchingSurveyId(null);
     }
@@ -106,15 +112,15 @@ export function AdminSurveysClient() {
   return (
     <>
       <PageHeader
-        title="Survey Admin"
-        description="Create, launch, and review survey response coverage across the organization."
+        title={t('title')}
+        description={t('description')}
         actions={
           <>
             <Link href="/admin/surveys/new" className="button button-accent">
-              New survey
+              {t('newSurvey')}
             </Link>
             <Link href="/surveys" className="button">
-              Employee view
+              {t('employeeView')}
             </Link>
           </>
         }
@@ -125,8 +131,8 @@ export function AdminSurveysClient() {
       {!adminQuery.isLoading && (adminQuery.errorMessage || errorMessage) ? (
         <>
           <EmptyState
-            title="Survey admin is unavailable"
-            description={errorMessage ?? adminQuery.errorMessage ?? "Unable to load survey admin."}
+            title={t('unavailable')}
+            description={errorMessage ?? adminQuery.errorMessage ?? t('unableToLoad')}
           />
           <button
             type="button"
@@ -136,33 +142,33 @@ export function AdminSurveysClient() {
               adminQuery.refresh();
             }}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!adminQuery.isLoading && !adminQuery.errorMessage && !errorMessage ? (
-        <section className="compensation-layout" aria-label="Survey admin overview">
+        <section className="compensation-layout" aria-label={t('overviewAriaLabel')}>
           <section className="metric-grid">
             <article className="metric-card">
-              <p className="metric-label">Surveys</p>
+              <p className="metric-label">{t('surveys')}</p>
               <p className="metric-value numeric">{surveys.length}</p>
-              <p className="metric-description">Total surveys in this org.</p>
+              <p className="metric-description">{t('surveysDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Active</p>
+              <p className="metric-label">{t('active')}</p>
               <p className="metric-value numeric">{activeCount}</p>
-              <p className="metric-description">Currently collecting responses.</p>
+              <p className="metric-description">{t('activeDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Draft</p>
+              <p className="metric-label">{t('draft')}</p>
               <p className="metric-value numeric">{draftCount}</p>
-              <p className="metric-description">Ready to review and launch.</p>
+              <p className="metric-description">{t('draftDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Responses</p>
+              <p className="metric-label">{t('responses')}</p>
               <p className="metric-value numeric">{totalResponses}</p>
-              <p className="metric-description">All responses captured so far.</p>
+              <p className="metric-description">{t('responsesDescription')}</p>
             </article>
           </section>
 
@@ -170,14 +176,14 @@ export function AdminSurveysClient() {
 
           {surveys.length === 0 ? (
             <EmptyState
-              title="No surveys yet"
-              description="Create your first survey to collect team feedback."
-              ctaLabel="Create survey"
+              title={t('noSurveys')}
+              description={t('noSurveysDescription')}
+              ctaLabel={t('createSurvey')}
               ctaHref="/admin/surveys/new"
             />
           ) : (
             <div className="data-table-container">
-              <table className="data-table" aria-label="Survey admin table">
+              <table className="data-table" aria-label={t('tableAriaLabel')}>
                 <thead>
                   <tr>
                     <th>
@@ -190,17 +196,17 @@ export function AdminSurveysClient() {
                           )
                         }
                       >
-                        Survey
+                        {t('colSurvey')}
                         <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       </button>
                     </th>
-                    <th>Status</th>
-                    <th>Type</th>
-                    <th>Questions</th>
-                    <th>Responses</th>
-                    <th>Window</th>
-                    <th>Updated</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t('colStatus')}</th>
+                    <th>{t('colType')}</th>
+                    <th>{t('colQuestions')}</th>
+                    <th>{t('colResponses')}</th>
+                    <th>{t('colWindow')}</th>
+                    <th>{t('colUpdated')}</th>
+                    <th className="table-action-column">{t('colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -212,7 +218,7 @@ export function AdminSurveysClient() {
                       <tr key={survey.id} className="data-table-row">
                         <td>
                           <p>{survey.title}</p>
-                          <p className="metric-description">{survey.description ?? "No description"}</p>
+                          <p className="metric-description">{survey.description ?? t('noDescription')}</p>
                         </td>
                         <td>
                           <StatusBadge tone={toneForSurveyStatus(survey.status)}>{toSentenceCase(survey.status)}</StatusBadge>
@@ -225,37 +231,37 @@ export function AdminSurveysClient() {
                         <td>
                           {startDate ? (
                             <div>
-                              <time dateTime={startDate} title={formatDateTimeTooltip(startDate)}>
-                                {formatRelativeTime(startDate)}
+                              <time dateTime={startDate} title={formatDateTimeTooltip(startDate, locale)}>
+                                {formatRelativeTime(startDate, locale)}
                               </time>
                               {endDate ? (
                                 <>
                                   {" "}→{" "}
-                                  <time dateTime={endDate} title={formatDateTimeTooltip(endDate)}>
-                                    {formatRelativeTime(endDate)}
+                                  <time dateTime={endDate} title={formatDateTimeTooltip(endDate, locale)}>
+                                    {formatRelativeTime(endDate, locale)}
                                   </time>
                                 </>
                               ) : null}
                             </div>
                           ) : (
-                            <span className="metric-description">No window set</span>
+                            <span className="metric-description">{t('noWindow')}</span>
                           )}
                         </td>
                         <td>
-                          <time dateTime={survey.updatedAt} title={formatDateTimeTooltip(survey.updatedAt)}>
-                            {formatRelativeTime(survey.updatedAt)}
+                          <time dateTime={survey.updatedAt} title={formatDateTimeTooltip(survey.updatedAt, locale)}>
+                            {formatRelativeTime(survey.updatedAt, locale)}
                           </time>
                         </td>
                         <td className="table-row-action-cell">
                           <div className="documents-row-actions">
                             <Link href={`/surveys/${survey.id}`} className="table-row-action">
-                              Preview
+                              {t('preview')}
                             </Link>
                             <Link
                               href={`/admin/surveys/${survey.id}/results`}
                               className="table-row-action"
                             >
-                              Results
+                              {t('results')}
                             </Link>
                             {survey.status === "draft" ? (
                               <button
@@ -264,7 +270,7 @@ export function AdminSurveysClient() {
                                 onClick={() => launchSurvey(survey.id)}
                                 disabled={launchingSurveyId === survey.id}
                               >
-                                {launchingSurveyId === survey.id ? "Launching..." : "Launch"}
+                                {launchingSurveyId === survey.id ? t('launching') : t('launch')}
                               </button>
                             ) : null}
                           </div>

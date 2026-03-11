@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -9,6 +10,7 @@ import { useTimeAttendancePolicies } from "../../../../hooks/use-time-attendance
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { toSentenceCase } from "../../../../lib/format-labels";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 
 function policiesSkeleton() {
@@ -23,6 +25,10 @@ function policiesSkeleton() {
 }
 
 export function TimePoliciesClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('timePolicies');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const policiesQuery = useTimeAttendancePolicies();
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
@@ -39,8 +45,8 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
     <>
       {!embedded ? (
         <PageHeader
-          title="Time Policies"
-          description="Review attendance rules for overtime thresholds, breaks, and rounding behavior."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
@@ -49,7 +55,7 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
       {!policiesQuery.isLoading && policiesQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Time policies are unavailable"
+            title={t('unavailable')}
             description={policiesQuery.errorMessage}
           />
           <button
@@ -57,32 +63,32 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
             className="button button-accent"
             onClick={() => policiesQuery.refresh()}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!policiesQuery.isLoading && !policiesQuery.errorMessage && sortedPolicies.length === 0 ? (
         <EmptyState
-          title="No policies configured"
-          description="Create an attendance policy to enforce breaks and overtime rules."
+          title={t('noPolicies')}
+          description={t('noPoliciesDescription')}
         />
       ) : null}
 
       {!policiesQuery.isLoading && !policiesQuery.errorMessage && sortedPolicies.length > 0 ? (
-        <section className="compensation-layout" aria-label="Time policies table">
+        <section className="compensation-layout" aria-label={t('ariaLabel')}>
           <article className="metric-card">
             <div>
-              <h2 className="section-title">Policy coverage</h2>
+              <h2 className="section-title">{t('policyCoverage')}</h2>
               <p className="settings-card-description">
-                {sortedPolicies.length} attendance policies configured for Crew Hub.
+                {t('policyCoverageDescription', { count: sortedPolicies.length })}
               </p>
             </div>
-            <StatusBadge tone="info">Read-only</StatusBadge>
+            <StatusBadge tone="info">{t('readOnly')}</StatusBadge>
           </article>
 
           <div className="data-table-container">
-            <table className="data-table" aria-label="Attendance policies">
+            <table className="data-table" aria-label={t('tableAriaLabel')}>
               <thead>
                 <tr>
                   <th>
@@ -95,18 +101,18 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
                         )
                       }
                     >
-                      Policy
+                      {t('colPolicy')}
                       <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                     </button>
                   </th>
-                  <th>Country</th>
-                  <th>Weekly target</th>
-                  <th>Daily max</th>
-                  <th>Break rule</th>
-                  <th>Rounding</th>
-                  <th>Status</th>
-                  <th>Updated</th>
-                  <th className="table-action-column">Actions</th>
+                  <th>{t('colCountry')}</th>
+                  <th>{t('colWeeklyTarget')}</th>
+                  <th>{t('colDailyMax')}</th>
+                  <th>{t('colBreakRule')}</th>
+                  <th>{t('colRounding')}</th>
+                  <th>{t('colStatus')}</th>
+                  <th>{t('colUpdated')}</th>
+                  <th className="table-action-column">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -118,31 +124,31 @@ export function TimePoliciesClient({ embedded = false }: { embedded?: boolean })
                         <p className="documents-cell-description">
                           {policy.appliesToDepartments && policy.appliesToDepartments.length > 0
                             ? policy.appliesToDepartments.join(", ")
-                            : "All departments"}
+                            : t('allDepartments')}
                         </p>
                       </div>
                     </td>
-                    <td>{policy.countryCode ?? "Global"}</td>
-                    <td className="numeric">{policy.weeklyHoursTarget.toFixed(2)}h</td>
-                    <td className="numeric">{policy.dailyHoursMax.toFixed(2)}h</td>
+                    <td>{policy.countryCode ?? t('global')}</td>
+                    <td className="numeric">{tCommon('hoursValue', { value: policy.weeklyHoursTarget.toFixed(2) })}</td>
+                    <td className="numeric">{tCommon('hoursValue', { value: policy.dailyHoursMax.toFixed(2) })}</td>
                     <td className="numeric">
-                      After {policy.breakAfterHours.toFixed(2)}h / {policy.breakDurationMinutes}m
+                      {t('breakRule', { hours: policy.breakAfterHours.toFixed(2), minutes: policy.breakDurationMinutes })}
                     </td>
                     <td>{toSentenceCase(policy.roundingRule)}</td>
                     <td>
                       <StatusBadge tone={policy.isActive ? "success" : "draft"}>
-                        {policy.isActive ? "Active" : "Inactive"}
+                        {policy.isActive ? tCommon('status.active') : tCommon('status.inactive')}
                       </StatusBadge>
                     </td>
                     <td>
-                      <span title={formatDateTimeTooltip(policy.updatedAt)}>
-                        {formatRelativeTime(policy.updatedAt)}
+                      <span title={formatDateTimeTooltip(policy.updatedAt, locale)}>
+                        {formatRelativeTime(policy.updatedAt, locale)}
                       </span>
                     </td>
                     <td className="table-row-action-cell">
                       <div className="timeatt-row-actions">
                         <button type="button" className="table-row-action">
-                          View
+                          {t('view')}
                         </button>
                       </div>
                     </td>

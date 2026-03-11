@@ -8,6 +8,7 @@ import {
 } from "react";
 import { z } from "zod";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -28,35 +29,33 @@ import type {
 import type { NotificationRecord } from "../../../types/notifications";
 import { humanizeError } from "@/lib/errors";
 
-const NOTIFICATION_TYPE_LABELS: Record<string, string> = {
-  status_change: "Status Update",
-  leave_submitted: "Leave Request",
-  leave_approved: "Leave Approved",
-  leave_rejected: "Leave Rejected",
-  expense_submitted: "Expense",
-  expense_approved: "Expense Approved",
-  expense_rejected: "Expense Rejected",
-  payroll_approved: "Payroll",
-  timesheet_submitted: "Timesheet",
-  timesheet_approved: "Timesheet Approved",
-  schedule_published: "Schedule",
-  shift_swap_requested: "Shift Swap",
-  shift_swap_accepted: "Shift Swap",
-  shift_swap_rejected: "Shift Swap",
-  course_assigned: "Learning",
-  review_cycle_started: "Performance",
-  review_reminder: "Performance",
-  survey_launched: "Survey",
-  document_expiry_warning: "Document",
-  signature_requested: "Signature",
-  signature_signed: "Signature",
-  signature_completed: "Signature",
-  compliance_policy_acknowledgment: "Compliance"
-};
+type AppLocale = "en" | "fr";
 
-function getNotificationTypeLabel(type: string): string {
-  return NOTIFICATION_TYPE_LABELS[type] ?? "Notification";
-}
+const NOTIFICATION_TYPE_KEYS: Record<string, string> = {
+  status_change: "typeStatusChange",
+  leave_submitted: "typeLeaveSubmitted",
+  leave_approved: "typeLeaveApproved",
+  leave_rejected: "typeLeaveRejected",
+  expense_submitted: "typeExpenseSubmitted",
+  expense_approved: "typeExpenseApproved",
+  expense_rejected: "typeExpenseRejected",
+  payroll_approved: "typePayrollApproved",
+  timesheet_submitted: "typeTimesheetSubmitted",
+  timesheet_approved: "typeTimesheetApproved",
+  schedule_published: "typeSchedulePublished",
+  shift_swap_requested: "typeShiftSwap",
+  shift_swap_accepted: "typeShiftSwap",
+  shift_swap_rejected: "typeShiftSwap",
+  course_assigned: "typeCourseAssigned",
+  review_cycle_started: "typeReviewCycle",
+  review_reminder: "typeReviewCycle",
+  survey_launched: "typeSurvey",
+  document_expiry_warning: "typeDocumentExpiry",
+  signature_requested: "typeSignature",
+  signature_signed: "typeSignature",
+  signature_completed: "typeSignature",
+  compliance_policy_acknowledgment: "typeCompliance"
+};
 
 type AnnouncementsClientProps = {
   canManageAnnouncements: boolean;
@@ -72,13 +71,11 @@ type ToastMessage = {
   variant: ToastVariant;
 };
 
-const announcementFormSchema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(200, "Title is too long"),
-  body: z.string().trim().min(1, "Body is required").max(5000, "Body is too long"),
-  isPinned: z.boolean()
-});
-
-type AnnouncementFormValues = z.infer<typeof announcementFormSchema>;
+type AnnouncementFormValues = {
+  title: string;
+  body: string;
+  isPinned: boolean;
+};
 type AnnouncementFormField = "title" | "body";
 type AnnouncementFormErrors = Partial<Record<AnnouncementFormField, string>>;
 type AnnouncementFormTouched = Record<AnnouncementFormField, boolean>;
@@ -111,24 +108,6 @@ function hasAnyFormError(errors: AnnouncementFormErrors): boolean {
   return Boolean(errors.title || errors.body);
 }
 
-function getValidationErrors(
-  values: AnnouncementFormValues,
-  touched: AnnouncementFormTouched
-): AnnouncementFormErrors {
-  const parsed = announcementFormSchema.safeParse(values);
-
-  if (parsed.success) {
-    return {};
-  }
-
-  const fieldErrors = parsed.error.flatten().fieldErrors;
-
-  return {
-    title: touched.title ? fieldErrors.title?.[0] : undefined,
-    body: touched.body ? fieldErrors.body?.[0] : undefined
-  };
-}
-
 function AnnouncementCard({
   announcement,
   canManageAnnouncements,
@@ -139,7 +118,9 @@ function AnnouncementCard({
   onDismiss,
   onMarkRead,
   onEdit,
-  onDelete
+  onDelete,
+  t,
+  locale
 }: {
   announcement: Announcement;
   canManageAnnouncements: boolean;
@@ -151,6 +132,8 @@ function AnnouncementCard({
   onMarkRead: (announcementId: string) => void;
   onEdit: (announcement: Announcement) => void;
   onDelete: (announcement: Announcement) => void;
+  t: (key: string, params?: Record<string, unknown>) => string;
+  locale: AppLocale;
 }) {
   return (
     <li
@@ -167,20 +150,20 @@ function AnnouncementCard({
             <p className="announcement-item-meta">
               <time
                 dateTime={announcement.createdAt}
-                title={formatDateTimeTooltip(announcement.createdAt)}
+                title={formatDateTimeTooltip(announcement.createdAt, locale)}
               >
-                {formatRelativeTime(announcement.createdAt)}
+                {formatRelativeTime(announcement.createdAt, locale)}
               </time>
-              <span aria-hidden="true">•</span>
+              <span aria-hidden="true">&bull;</span>
               <span>{announcement.creatorName}</span>
             </p>
           </div>
           <div className="announcement-item-status">
             {announcement.isPinned ? (
-              <StatusBadge tone="info">Pinned</StatusBadge>
+              <StatusBadge tone="info">{t('pinned')}</StatusBadge>
             ) : null}
             {announcement.isRead ? (
-              <span className="announcement-read-check" title="Read">
+              <span className="announcement-read-check" title={t('read')}>
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     d="M5 12.5l4.5 4.5L19 7.5"
@@ -191,10 +174,10 @@ function AnnouncementCard({
                     fill="none"
                   />
                 </svg>
-                Read
+                {t('read')}
               </span>
             ) : (
-              <StatusBadge tone="pending">Unread</StatusBadge>
+              <StatusBadge tone="pending">{t('unread')}</StatusBadge>
             )}
           </div>
         </header>
@@ -209,7 +192,7 @@ function AnnouncementCard({
               onClick={() => onMarkRead(announcement.id)}
               disabled={isMarkingRead}
             >
-              {isMarkingRead ? "Marking..." : "Mark read"}
+              {isMarkingRead ? t('markingRead') : t('markRead')}
             </button>
           ) : null}
           {announcement.isRead && !isArchiveView ? (
@@ -219,7 +202,7 @@ function AnnouncementCard({
               onClick={() => onDismiss(announcement.id)}
               disabled={isDismissing}
             >
-              {isDismissing ? "Dismissing..." : "Dismiss"}
+              {isDismissing ? t('dismissing') : t('dismiss')}
             </button>
           ) : null}
           {canManageAnnouncements && !isArchiveView ? (
@@ -228,7 +211,7 @@ function AnnouncementCard({
               className="table-row-action"
               onClick={() => onEdit(announcement)}
             >
-              Edit
+              {t('edit')}
             </button>
           ) : null}
           {isSuperAdmin ? (
@@ -237,7 +220,7 @@ function AnnouncementCard({
               className="table-row-action table-row-action-danger"
               onClick={() => onDelete(announcement)}
             >
-              Delete
+              {t('delete')}
             </button>
           ) : null}
         </div>
@@ -266,6 +249,40 @@ export function AnnouncementsClient({
   isSuperAdmin,
   currentUserName
 }: AnnouncementsClientProps) {
+  const t = useTranslations('announcements');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
+  const announcementFormSchema = useMemo(() => z.object({
+    title: z.string().trim().min(1, t('validationTitleRequired')).max(200, t('validationTitleTooLong')),
+    body: z.string().trim().min(1, t('validationBodyRequired')).max(5000, t('validationBodyTooLong')),
+    isPinned: z.boolean()
+  }), [t]);
+
+  function getValidationErrors(
+    values: AnnouncementFormValues,
+    touched: AnnouncementFormTouched
+  ): AnnouncementFormErrors {
+    const parsed = announcementFormSchema.safeParse(values);
+
+    if (parsed.success) {
+      return {};
+    }
+
+    const fieldErrors = parsed.error.flatten().fieldErrors;
+
+    return {
+      title: touched.title ? fieldErrors.title?.[0] : undefined,
+      body: touched.body ? fieldErrors.body?.[0] : undefined
+    };
+  }
+
+  function getNotificationTypeLabel(type: string): string {
+    const key = NOTIFICATION_TYPE_KEYS[type];
+    return key ? td(key) : td('notificationDefault');
+  }
+
   const {
     announcements,
     isLoading,
@@ -430,7 +447,7 @@ export function AnnouncementsClient({
       const payload = (await response.json()) as AnnouncementReadResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to mark announcement as read.");
+        showToast("error", payload.error?.message ?? t('toastMarkReadError'));
         return;
       }
 
@@ -447,11 +464,11 @@ export function AnnouncementsClient({
       );
 
       window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-      showToast("info", "Announcement marked as read.");
+      showToast("info", t('toastMarkedRead'));
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to mark announcement as read."
+        error instanceof Error ? error.message : t('toastMarkReadError')
       );
     } finally {
       setIsMarkingReadById((currentState) => {
@@ -480,7 +497,7 @@ export function AnnouncementsClient({
       const payload = (await response.json()) as AnnouncementDismissResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to dismiss announcement.");
+        showToast("error", payload.error?.message ?? t('toastDismissError'));
         return;
       }
 
@@ -489,11 +506,11 @@ export function AnnouncementsClient({
       );
 
       window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-      showToast("info", "Announcement dismissed.");
+      showToast("info", t('toastDismissed'));
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to dismiss announcement."
+        error instanceof Error ? error.message : t('toastDismissError')
       );
     } finally {
       setIsDismissingById((currentState) => {
@@ -515,17 +532,17 @@ export function AnnouncementsClient({
       const payload = (await response.json()) as { data: { announcementId: string } | null; error?: { message: string } };
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to delete announcement.");
+        showToast("error", payload.error?.message ?? t('toastDeleteError'));
         return;
       }
 
       setAnnouncements((current) => current.filter((a) => a.id !== announcement.id));
       window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-      showToast("success", "Announcement deleted company-wide.");
+      showToast("success", t('toastDeleted'));
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to delete announcement."
+        error instanceof Error ? error.message : t('toastDeleteError')
       );
     } finally {
       setIsDeletingAnnouncement(false);
@@ -570,7 +587,7 @@ export function AnnouncementsClient({
       const result = (await response.json()) as AnnouncementMutationResponse;
 
       if (!response.ok || !result.data?.announcement) {
-        const message = result.error?.message ?? "Unable to save announcement.";
+        const message = result.error?.message ?? t('toastSaveError');
         setSubmitError(message);
         showToast("error", message);
         return;
@@ -578,12 +595,12 @@ export function AnnouncementsClient({
 
       showToast(
         "success",
-        editingAnnouncementId ? "Announcement updated." : "Announcement published."
+        editingAnnouncementId ? t('toastUpdated') : t('toastPublished')
       );
       closePanel();
       refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to save announcement.";
+      const message = error instanceof Error ? error.message : t('toastSaveError');
       setSubmitError(message);
       showToast("error", message);
     } finally {
@@ -594,17 +611,17 @@ export function AnnouncementsClient({
   return (
     <>
       <PageHeader
-        title="Notifications"
-        description="Company updates, alerts, and messages since your last visit."
+        title={t('title')}
+        description={t('description')}
         actions={
           <div className="page-header-actions">
             <Link className="button" href="/announcements/archive">
               <Archive size={14} />
-              Archive
+              {t('archive')}
             </Link>
             {canManageAnnouncements ? (
               <button type="button" className="button button-accent" onClick={openCreatePanel}>
-                New announcement
+                {t('newAnnouncement')}
               </button>
             ) : null}
           </div>
@@ -615,9 +632,9 @@ export function AnnouncementsClient({
 
       {!isLoading && errorMessage ? (
         <EmptyState
-          title="Notifications are unavailable"
+          title={t('unavailable')}
           description={errorMessage}
-          ctaLabel="Retry"
+          ctaLabel={t('retry')}
           ctaHref="/announcements"
         />
       ) : null}
@@ -626,12 +643,12 @@ export function AnnouncementsClient({
         <>
           <EmptyState
             icon={<Megaphone size={32} />}
-            title="No notifications yet"
-            description="Notifications and announcements will appear here."
+            title={t('noNotificationsTitle')}
+            description={t('noNotificationsDescription')}
           />
           {canManageAnnouncements ? (
             <button type="button" className="button button-accent" onClick={openCreatePanel}>
-              Publish first announcement
+              {t('publishFirst')}
             </button>
           ) : null}
         </>
@@ -639,16 +656,16 @@ export function AnnouncementsClient({
 
       {!isLoading && !errorMessage && unifiedFeed.length > 0 ? (
         <div className="announcements-grid">
-          <section className="settings-card" aria-label="All notifications">
+          <section className="settings-card" aria-label={t('sectionTitle')}>
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">Notifications</h2>
+                <h2 className="section-title">{t('sectionTitle')}</h2>
                 <p className="settings-card-description">
-                  All updates, newest first. Pinned items stay at the top.
+                  {t('sectionDescription')}
                 </p>
               </div>
               {totalUnreadCount > 0 ? (
-                <StatusBadge tone="pending">{totalUnreadCount} unread</StatusBadge>
+                <StatusBadge tone="pending">{t('unreadCount', { count: totalUnreadCount })}</StatusBadge>
               ) : null}
             </header>
 
@@ -668,6 +685,8 @@ export function AnnouncementsClient({
                       onMarkRead={handleMarkRead}
                       onEdit={openEditPanel}
                       onDelete={setConfirmDeleteAnnouncement}
+                      t={td}
+                      locale={locale}
                     />
                   );
                 }
@@ -694,15 +713,15 @@ export function AnnouncementsClient({
                           <p className="announcement-item-meta">
                             <time
                               dateTime={notification.createdAt}
-                              title={formatDateTimeTooltip(notification.createdAt)}
+                              title={formatDateTimeTooltip(notification.createdAt, locale)}
                             >
-                              {formatRelativeTime(notification.createdAt)}
+                              {formatRelativeTime(notification.createdAt, locale)}
                             </time>
                           </p>
                         </div>
                         <div className="announcement-item-status">
                           {notification.isRead ? (
-                            <span className="announcement-read-check" title="Read">
+                            <span className="announcement-read-check" title={t('read')}>
                               <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path
                                   d="M5 12.5l4.5 4.5L19 7.5"
@@ -713,10 +732,10 @@ export function AnnouncementsClient({
                                   fill="none"
                                 />
                               </svg>
-                              Read
+                              {t('read')}
                             </span>
                           ) : (
-                            <StatusBadge tone="pending">Unread</StatusBadge>
+                            <StatusBadge tone="pending">{t('unread')}</StatusBadge>
                           )}
                         </div>
                       </header>
@@ -732,12 +751,12 @@ export function AnnouncementsClient({
                               });
                             }}
                           >
-                            Mark read
+                            {t('markRead')}
                           </button>
                         ) : null}
                         {notification.link ? (
                           <Link href={notification.link} className="table-row-action">
-                            View
+                            {t('view')}
                           </Link>
                         ) : null}
                       </div>
@@ -753,13 +772,13 @@ export function AnnouncementsClient({
       <SlidePanel
         isOpen={isPanelOpen}
         onClose={closePanel}
-        title={editingAnnouncementId ? "Edit announcement" : "Create announcement"}
-        description={`Visible to all Crew Hub users. Publishing as ${currentUserName}.`}
+        title={editingAnnouncementId ? t('editPanelTitle') : t('createPanelTitle')}
+        description={t('panelDescription', { name: currentUserName })}
       >
         <div className="slide-panel-form-wrapper">
           <form className="settings-form" noValidate onSubmit={handleSubmit}>
             <label className="form-field" htmlFor="announcement-title">
-              <span className="form-label">Title</span>
+              <span className="form-label">{t('titleLabel')}</span>
               <input
                 id="announcement-title"
                 name="title"
@@ -780,7 +799,7 @@ export function AnnouncementsClient({
             </label>
 
             <label className="form-field" htmlFor="announcement-body">
-              <span className="form-label">Body</span>
+              <span className="form-label">{t('bodyLabel')}</span>
               <textarea
                 id="announcement-body"
                 name="body"
@@ -809,7 +828,7 @@ export function AnnouncementsClient({
                 onChange={handlePinnedToggle}
                 disabled={isSaving}
               />
-              <span>Pin announcement</span>
+              <span>{t('pinLabel')}</span>
             </label>
 
             {submitError ? (
@@ -820,14 +839,14 @@ export function AnnouncementsClient({
 
             <div className="slide-panel-actions">
               <button type="button" className="button" onClick={closePanel} disabled={isSaving}>
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button type="submit" className="button button-accent" disabled={isSaving}>
                 {isSaving
-                  ? "Saving..."
+                  ? t('saving')
                   : editingAnnouncementId
-                    ? "Save changes"
-                    : "Publish announcement"}
+                    ? t('saveChanges')
+                    : t('publishAnnouncement')}
               </button>
             </div>
           </form>
@@ -836,9 +855,9 @@ export function AnnouncementsClient({
 
       <ConfirmDialog
         isOpen={confirmDeleteAnnouncement !== null}
-        title="Delete announcement company-wide?"
-        description={`This will permanently remove "${confirmDeleteAnnouncement?.title ?? ""}" for everyone in the company. This action cannot be undone.`}
-        confirmLabel="Delete for everyone"
+        title={t('deleteConfirmTitle')}
+        description={t('deleteConfirmDescription', { title: confirmDeleteAnnouncement?.title ?? "" })}
+        confirmLabel={t('deleteConfirmLabel')}
         tone="danger"
         isConfirming={isDeletingAnnouncement}
         onConfirm={() => {
@@ -862,7 +881,7 @@ export function AnnouncementsClient({
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss notification"
+                aria-label={t('dismissAriaLabel')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

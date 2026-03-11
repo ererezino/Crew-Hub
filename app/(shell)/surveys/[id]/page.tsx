@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
@@ -10,18 +12,21 @@ import { SurveyDetailClient } from "./survey-detail-client";
 
 export default async function SurveyDetailPage({ params }: SurveyDetailPageProps) {
   const session = await getAuthenticatedSession();
+  const tSurveys = await getTranslations("surveys");
+  const tDetail = await getTranslations("surveyDetail");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Survey"
-          description="Submit your responses and help improve team experience in Crew Hub."
+          title={tSurveys("title")}
+          description={tSurveys("description")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
-          ctaLabel="Back to surveys"
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
+          ctaLabel={tDetail("backToSurveys")}
           ctaHref="/surveys"
         />
       </>

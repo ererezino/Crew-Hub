@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
@@ -24,18 +26,21 @@ function canManagePayroll(roles: readonly UserRole[]): boolean {
 export default async function PayrollRunDetailPage({ params }: PayrollRunDetailPageProps) {
   const session = await getAuthenticatedSession();
   const { id } = await params;
+  const t = await getTranslations("payrollPage");
+  const tCommon = await getTranslations("common");
+  const tSettings = await getTranslations("payrollSettings");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Payroll Run"
-          description="Review payroll run calculations and crew member payout details."
+          title={t("runTitle")}
+          description={t("runDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
-          ctaLabel="Back to payroll"
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
+          ctaLabel={tSettings("backToPayroll")}
           ctaHref="/payroll"
         />
       </>
@@ -46,12 +51,12 @@ export default async function PayrollRunDetailPage({ params }: PayrollRunDetailP
     return (
       <>
         <PageHeader
-          title="Payroll Run"
-          description="Review payroll run calculations and crew member payout details."
+          title={t("runTitle")}
+          description={t("runDescription")}
         />
         <EmptyState
-          title="Access denied"
-          description="Only HR Admin, Finance Admin, and Super Admin can view payroll runs."
+          title={tCommon("emptyState.accessDenied")}
+          description={t("accessDenied")}
         />
       </>
     );

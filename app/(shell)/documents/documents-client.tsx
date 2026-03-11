@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { DocumentUploadPanel } from "../../../components/shared/document-upload-panel";
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -25,6 +26,8 @@ import {
 import type { CreateSignatureRequestResponse } from "../../../types/esignatures";
 import { FileText } from "lucide-react";
 import { humanizeError } from "@/lib/errors";
+
+type AppLocale = "en" | "fr";
 
 type DocumentsClientProps = {
   currentUserId: string;
@@ -65,13 +68,15 @@ type PolicyAcknowledgeResponse = {
   } | null;
 };
 
-const tabs: Array<{ id: DocumentsTab; label: string }> = [
-  { id: "all", label: "All Documents" },
-  { id: "policy", label: "Policies" },
-  { id: "id_document", label: "ID Documents" },
-  { id: "tax_form", label: "Tax Forms" },
-  { id: "expiring_soon", label: "Expiring Soon" }
-];
+const DOCUMENT_TAB_IDS: DocumentsTab[] = ["all", "policy", "id_document", "tax_form", "expiring_soon"];
+
+const TAB_LABEL_KEYS: Record<DocumentsTab, string> = {
+  all: "tabAll",
+  policy: "tabPolicies",
+  id_document: "tabIdDocuments",
+  tax_form: "tabTaxForms",
+  expiring_soon: "tabExpiringSoon"
+};
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -81,33 +86,33 @@ function createToastId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function getExpiryStatus(expiryDate: string | null): { tone: StatusTone; label: string } {
+function getExpiryStatusKey(expiryDate: string | null): { tone: StatusTone; labelKey: string } {
   const remainingDays = daysUntilExpiry(expiryDate);
 
   if (remainingDays === null) {
     return {
       tone: "draft",
-      label: "No expiry"
+      labelKey: "expiryNoExpiry"
     };
   }
 
   if (remainingDays < 0) {
     return {
       tone: "error",
-      label: "Expired"
+      labelKey: "expiryExpired"
     };
   }
 
   if (remainingDays < 30) {
     return {
       tone: "warning",
-      label: "Expiring < 30d"
+      labelKey: "expiryExpiringSoon"
     };
   }
 
   return {
     tone: "success",
-    label: "Active"
+    labelKey: "expiryActive"
   };
 }
 
@@ -151,6 +156,11 @@ function DocumentsTableSkeleton() {
 }
 
 export function DocumentsClient({ currentUserId, canManageDocuments }: DocumentsClientProps) {
+  const t = useTranslations('documents');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const {
     documents,
     isLoading,
@@ -224,7 +234,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   };
 
   const showToast = (variant: ToastVariant, rawMessage: string) => {
-    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
+    const message = variant === "error" ? humanizeError(rawMessage, locale) : rawMessage;
     const toastId = createToastId();
 
     setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
@@ -266,7 +276,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
 
     showToast(
       "success",
-      versionTarget ? "Document version uploaded." : "Document uploaded."
+      versionTarget ? td('toastVersionUploaded') : td('toastDocumentUploaded')
     );
     refresh();
   };
@@ -291,13 +301,13 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
       const payload = (await response.json()) as DocumentSignedUrlResponse;
 
       if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? "Unable to open document.");
+        showToast("error", payload.error?.message ?? td('toastOpenError'));
         return;
       }
 
       window.open(payload.data.url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to open document.");
+      showToast("error", error instanceof Error ? error.message : td('toastOpenError'));
     } finally {
       setIsOpeningFileById((currentState) => {
         const nextState = { ...currentState };
@@ -325,7 +335,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
       const payload = (await response.json()) as PolicyAcknowledgeResponse;
 
       if (!response.ok || !payload.data?.acknowledged) {
-        showToast("error", payload.error?.message ?? "Unable to acknowledge policy.");
+        showToast("error", payload.error?.message ?? td('toastAckError'));
         return;
       }
 
@@ -351,11 +361,11 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
           : currentPolicy
       );
 
-      showToast("success", "Policy acknowledged.");
+      showToast("success", td('toastAcknowledged'));
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to acknowledge policy."
+        error instanceof Error ? error.message : td('toastAckError')
       );
     } finally {
       setAcknowledgingPolicyId(null);
@@ -365,26 +375,26 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   return (
     <>
       <PageHeader
-        title="Documents"
-        description="Your documents, required records, and expiry reminders."
+        title={t('title')}
+        description={t('description')}
         actions={
           canManageDocuments ? (
             <button type="button" className="button button-accent" onClick={openCreatePanel}>
-              Upload document
+              {t('uploadDocument')}
             </button>
           ) : null
         }
       />
 
-      <section className="page-tabs" aria-label="Document filters">
-        {tabs.map((tab) => (
+      <section className="page-tabs" aria-label={td('filterAriaLabel')}>
+        {DOCUMENT_TAB_IDS.map((tab) => (
           <button
-            key={tab.id}
+            key={tab}
             type="button"
-            className={activeTab === tab.id ? "page-tab page-tab-active" : "page-tab"}
-            onClick={() => setActiveTab(tab.id)}
+            className={activeTab === tab ? "page-tab page-tab-active" : "page-tab"}
+            onClick={() => setActiveTab(tab)}
           >
-            {tab.label}
+            {td(TAB_LABEL_KEYS[tab])}
           </button>
         ))}
       </section>
@@ -393,9 +403,9 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
 
       {!isLoading && errorMessage ? (
         <EmptyState
-          title="Documents are unavailable"
+          title={td('unavailable')}
           description={errorMessage}
-          ctaLabel="Retry"
+          ctaLabel={td('retry')}
           ctaHref="/documents"
         />
       ) : null}
@@ -404,10 +414,10 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         <>
           <EmptyState
             icon={<FileText size={32} />}
-            title="No documents here"
-            description="Upload a document or select a different tab to view more records."
+            title={td('noDocuments')}
+            description={td('noDocumentsDescription')}
             {...(canManageDocuments
-              ? { ctaLabel: "Upload document", onCtaClick: openCreatePanel }
+              ? { ctaLabel: td('uploadDocument'), onCtaClick: openCreatePanel }
               : {})}
           />
         </>
@@ -415,27 +425,27 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
 
       {!isLoading && !errorMessage && filteredDocuments.length > 0 ? (
         <div className="data-table-container">
-          <table className="data-table" aria-label="Documents table">
+          <table className="data-table" aria-label={td('tableAriaLabel')}>
             <thead>
               <tr>
-                <th>Document</th>
-                <th>Category</th>
-                <th>Owner</th>
-                <th>Country</th>
+                <th>{t('thDocument')}</th>
+                <th>{t('thCategory')}</th>
+                <th>{t('thOwner')}</th>
+                <th>{t('thCountry')}</th>
                 <th>
                   <button type="button" className="table-sort-trigger" onClick={toggleSortDirection}>
-                    Expiry {expirySortDirection === "asc" ? "↑" : "↓"}
+                    {t('thExpiry')} {expirySortDirection === "asc" ? "\u2191" : "\u2193"}
                   </button>
                 </th>
-                <th>Status</th>
-                <th>Size</th>
-                <th>Updated</th>
-                <th className="table-action-column">Actions</th>
+                <th>{t('thStatus')}</th>
+                <th>{t('thSize')}</th>
+                <th>{t('thUpdated')}</th>
+                <th className="table-action-column">{t('thActions')}</th>
               </tr>
             </thead>
             <tbody>
               {filteredDocuments.map((document) => {
-                const expiryStatus = getExpiryStatus(document.expiryDate);
+                const expiryStatus = getExpiryStatusKey(document.expiryDate);
                 const canUploadVersion =
                   canManageDocuments || document.ownerUserId === currentUserId;
 
@@ -445,7 +455,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                       <div className="documents-cell-copy">
                         <p className="documents-cell-title">{document.title}</p>
                         <p className="documents-cell-description">
-                          {document.description || "No description"}
+                          {document.description || td('noDescription')}
                         </p>
                       </div>
                     </td>
@@ -454,31 +464,31 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                     <td>
                       <span className="country-chip">
                         <span>{countryFlagFromCode(document.countryCode)}</span>
-                        <span>{countryNameFromCode(document.countryCode)}</span>
+                        <span>{countryNameFromCode(document.countryCode, locale)}</span>
                       </span>
                     </td>
                     <td>
                       {document.expiryDate ? (
                         <time
                           dateTime={document.expiryDate}
-                          title={formatDateTimeTooltip(document.expiryDate)}
+                          title={formatDateTimeTooltip(document.expiryDate, locale)}
                         >
-                          {formatRelativeTime(document.expiryDate)}
+                          {formatRelativeTime(document.expiryDate, locale)}
                         </time>
                       ) : (
                         "--"
                       )}
                     </td>
                     <td>
-                      <StatusBadge tone={expiryStatus.tone}>{expiryStatus.label}</StatusBadge>
+                      <StatusBadge tone={expiryStatus.tone}>{td(expiryStatus.labelKey)}</StatusBadge>
                     </td>
                     <td className="numeric">{formatFileSize(document.sizeBytes)}</td>
                     <td>
                       <time
                         dateTime={document.updatedAt}
-                        title={formatDateTimeTooltip(document.updatedAt)}
+                        title={formatDateTimeTooltip(document.updatedAt, locale)}
                       >
-                        {formatRelativeTime(document.updatedAt)}
+                        {formatRelativeTime(document.updatedAt, locale)}
                       </time>
                     </td>
                     <td className="table-row-action-cell">
@@ -489,7 +499,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                             className="table-row-action"
                             onClick={() => setPolicyDetail(document)}
                           >
-                            View
+                            {t('view')}
                           </button>
                         ) : null}
                         <button
@@ -498,7 +508,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                           onClick={() => handleOpenFile(document.id)}
                           disabled={Boolean(isOpeningFileById[document.id])}
                         >
-                          {isOpeningFileById[document.id] ? "Opening..." : "Open"}
+                          {isOpeningFileById[document.id] ? t('opening') : t('open')}
                         </button>
                         {canUploadVersion ? (
                           <button
@@ -506,7 +516,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                             className="table-row-action"
                             onClick={() => openVersionPanel(document)}
                           >
-                            New version
+                            {t('newVersion')}
                           </button>
                         ) : null}
                         {canManageDocuments ? (
@@ -521,7 +531,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                               setSigReqError(null);
                             }}
                           >
-                            Request signature
+                            {t('requestSignature')}
                           </button>
                         ) : null}
                       </div>
@@ -556,8 +566,8 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
       {sigReqTarget && canManageDocuments ? (
         <SlidePanel
           isOpen={Boolean(sigReqTarget)}
-          title="Request Signature"
-          description="Choose signers for this document. They will receive in-app and email notifications."
+          title={td('sigReqTitle')}
+          description={td('sigReqDescription')}
           onClose={() => setSigReqTarget(null)}
         >
           <form
@@ -565,8 +575,8 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
             onSubmit={async (event: FormEvent<HTMLFormElement>) => {
               event.preventDefault();
               if (!sigReqTarget) return;
-              if (!sigReqTitle.trim()) { setSigReqError("Title is required."); return; }
-              if (sigReqSignerIds.length === 0) { setSigReqError("Select at least one signer."); return; }
+              if (!sigReqTitle.trim()) { setSigReqError(td('sigReqErrorTitle')); return; }
+              if (sigReqSignerIds.length === 0) { setSigReqError(td('sigReqErrorSigners')); return; }
 
               setIsSubmittingSigReq(true);
               setSigReqError(null);
@@ -586,14 +596,14 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                 const payload = (await res.json()) as CreateSignatureRequestResponse;
 
                 if (!res.ok || !payload.data) {
-                  setSigReqError(payload.error?.message ?? "Unable to create signature request.");
+                  setSigReqError(payload.error?.message ?? td('sigReqErrorCreate'));
                   return;
                 }
 
-                showToast("success", "Signature request sent.");
+                showToast("success", td('toastSigReqSent'));
                 setSigReqTarget(null);
               } catch (error) {
-                setSigReqError(error instanceof Error ? error.message : "Unable to create signature request.");
+                setSigReqError(error instanceof Error ? error.message : td('sigReqErrorCreate'));
               } finally {
                 setIsSubmittingSigReq(false);
               }
@@ -605,7 +615,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
             ) : null}
 
             <label className="form-field" htmlFor="sig-req-title">
-              <span className="form-label">Request title</span>
+              <span className="form-label">{t('sigReqTitleLabel')}</span>
               <input
                 id="sig-req-title"
                 className="form-input"
@@ -616,7 +626,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
             </label>
 
             <label className="form-field" htmlFor="sig-req-message">
-              <span className="form-label">Message (optional)</span>
+              <span className="form-label">{t('sigReqMessageLabel')}</span>
               <textarea
                 id="sig-req-message"
                 className="form-input"
@@ -628,11 +638,11 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
             </label>
 
             <fieldset className="signature-signer-picker">
-              <legend className="form-label">Signers</legend>
+              <legend className="form-label">{t('signersLabel')}</legend>
               {isSignerOptionsLoading ? (
-                <p className="settings-card-description">Loading signer options...</p>
+                <p className="settings-card-description">{t('loadingSigners')}</p>
               ) : signerOptions.length === 0 ? (
-                <p className="settings-card-description">No active signers available.</p>
+                <p className="settings-card-description">{t('noSigners')}</p>
               ) : (
                 <div className="signature-signer-options">
                   {signerOptions.map((option) => (
@@ -652,7 +662,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                       <span>
                         {option.fullName}
                         <span className="signature-signer-option-meta">
-                          {option.title || "Team member"}
+                          {option.title || td('signerTeamMember')}
                           {option.department ? ` - ${option.department}` : ""}
                         </span>
                       </span>
@@ -669,10 +679,10 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                 onClick={() => setSigReqTarget(null)}
                 disabled={isSubmittingSigReq}
               >
-                Cancel
+                {tCommon('cancel')}
               </button>
               <button type="submit" className="button button-accent" disabled={isSubmittingSigReq}>
-                {isSubmittingSigReq ? "Sending..." : "Send request"}
+                {isSubmittingSigReq ? t('sending') : t('sendRequest')}
               </button>
             </div>
           </form>
@@ -684,43 +694,43 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         <SlidePanel
           isOpen={Boolean(policyDetail)}
           title={policyDetail.title}
-          description="Policy document details"
+          description={td('policyDetailDescription')}
           onClose={() => setPolicyDetail(null)}
         >
           <div className="slide-panel-form-wrapper">
             <dl className="policy-detail-grid">
-              <dt>Category</dt>
+              <dt>{t('policyCategory')}</dt>
               <dd>{getDocumentCategoryLabel(policyDetail.category)}</dd>
               {policyDetail.countryCode ? (
                 <>
-                  <dt>Country</dt>
-                  <dd>{countryFlagFromCode(policyDetail.countryCode)} {countryNameFromCode(policyDetail.countryCode)}</dd>
+                  <dt>{t('policyCountry')}</dt>
+                  <dd>{countryFlagFromCode(policyDetail.countryCode)} {countryNameFromCode(policyDetail.countryCode, locale)}</dd>
                 </>
               ) : null}
-              <dt>Uploaded by</dt>
+              <dt>{t('policyUploadedBy')}</dt>
               <dd>{policyDetail.createdByName}</dd>
-              <dt>Last updated</dt>
-              <dd>{formatRelativeTime(policyDetail.updatedAt)}</dd>
+              <dt>{t('policyLastUpdated')}</dt>
+              <dd>{formatRelativeTime(policyDetail.updatedAt, locale)}</dd>
               {policyDetail.expiryDate ? (
                 <>
-                  <dt>Expires</dt>
-                  <dd>{formatRelativeTime(policyDetail.expiryDate)}</dd>
+                  <dt>{t('policyExpires')}</dt>
+                  <dd>{formatRelativeTime(policyDetail.expiryDate, locale)}</dd>
                 </>
               ) : null}
             </dl>
             {policyDetail.description ? (
               <section className="policy-detail-body">
-                <h3 className="section-title">Description</h3>
+                <h3 className="section-title">{t('policyDescriptionLabel')}</h3>
                 <p className="policy-detail-text">{policyDetail.description}</p>
               </section>
             ) : null}
             {policyDetail.isPolicy && policyDetail.requiresAcknowledgment ? (
-              <section className="settings-card" aria-label="Policy acknowledgment">
+              <section className="settings-card" aria-label={td('requiresAcknowledgment')}>
                 <div className="documents-row-actions" style={{ justifyContent: "space-between" }}>
                   <StatusBadge tone={policyDetail.acknowledgedAt ? "success" : "pending"}>
                     {policyDetail.acknowledgedAt
-                      ? "Acknowledged"
-                      : "Acknowledgment required"}
+                      ? t('acknowledged')
+                      : t('acknowledgmentRequired')}
                   </StatusBadge>
                   {!policyDetail.acknowledgedAt ? (
                     <button
@@ -732,25 +742,23 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                       disabled={acknowledgingPolicyId === policyDetail.id}
                     >
                       {acknowledgingPolicyId === policyDetail.id
-                        ? "Saving..."
-                        : "I have read and understood this policy"}
+                        ? t('acknowledging')
+                        : t('acknowledgeButton')}
                     </button>
                   ) : null}
                 </div>
                 <p className="settings-card-description">
                   {policyDetail.acknowledgedAt ? (
                     <>
-                      Acknowledged on{" "}
+                      {td('acknowledgedOn', { date: formatRelativeTime(policyDetail.acknowledgedAt, locale) })}{" "}
                       <time
                         dateTime={policyDetail.acknowledgedAt}
-                        title={formatDateTimeTooltip(policyDetail.acknowledgedAt)}
+                        title={formatDateTimeTooltip(policyDetail.acknowledgedAt, locale)}
                       >
-                        {formatRelativeTime(policyDetail.acknowledgedAt)}
                       </time>
-                      .
                     </>
                   ) : (
-                    "This policy requires your acknowledgment."
+                    t('requiresAcknowledgment')
                   )}
                 </p>
               </section>
@@ -761,7 +769,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                 className="button"
                 onClick={() => setPolicyDetail(null)}
               >
-                Close
+                {tCommon('close')}
               </button>
               <button
                 type="button"
@@ -769,7 +777,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                 onClick={() => handleOpenFile(policyDetail.id)}
                 disabled={Boolean(isOpeningFileById[policyDetail.id])}
               >
-                {isOpeningFileById[policyDetail.id] ? "Opening..." : "Open file"}
+                {isOpeningFileById[policyDetail.id] ? t('opening') : t('openFile')}
               </button>
             </div>
           </div>
@@ -785,7 +793,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss notification"
+                aria-label={td('dismissAriaLabel')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

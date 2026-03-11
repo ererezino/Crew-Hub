@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
@@ -24,6 +25,8 @@ function openShiftsSkeleton() {
 }
 
 export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations("scheduling");
+  const tc = useTranslations("common");
   const openShiftsQuery = useOpenShifts();
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [isClaimingShiftId, setIsClaimingShiftId] = useState<string | null>(null);
@@ -58,14 +61,14 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
       };
 
       if (!response.ok) {
-        setFeedbackMessage(payload.error?.message ?? "Unable to claim shift.");
+        setFeedbackMessage(payload.error?.message ?? t("openShifts.failedClaim"));
         return;
       }
 
-      setFeedbackMessage("Shift claimed.");
+      setFeedbackMessage(t("openShifts.toastClaimed"));
       openShiftsQuery.refresh();
     } catch (error) {
-      setFeedbackMessage(error instanceof Error ? error.message : "Unable to claim shift.");
+      setFeedbackMessage(error instanceof Error ? error.message : t("openShifts.failedClaim"));
     } finally {
       setIsClaimingShiftId(null);
     }
@@ -75,8 +78,8 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
     <>
       {!embedded ? (
         <PageHeader
-          title="Open Shifts"
-          description="Claim available shifts published by your managers."
+          title={t("openShifts.pageTitle")}
+          description={t("openShifts.pageDescription")}
         />
       ) : null}
 
@@ -85,7 +88,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
       {!openShiftsQuery.isLoading && openShiftsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Open shifts are unavailable"
+            title={t("openShifts.errorTitle")}
             description={openShiftsQuery.errorMessage}
           />
           <button
@@ -93,36 +96,36 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
             className="button"
             onClick={() => openShiftsQuery.refresh()}
           >
-            Retry
+            {tc("retry")}
           </button>
         </>
       ) : null}
 
       {!openShiftsQuery.isLoading && !openShiftsQuery.errorMessage && sortedShifts.length === 0 ? (
         <EmptyState
-          title="No open shifts available"
-          description="When managers publish open shifts, they appear here."
-          ctaLabel="Open Scheduling"
+          title={t("openShifts.emptyTitle")}
+          description={t("openShifts.emptyDescription")}
+          ctaLabel={t("openShifts.openScheduling")}
           ctaHref="/scheduling"
         />
       ) : null}
 
       {!openShiftsQuery.isLoading && !openShiftsQuery.errorMessage && sortedShifts.length > 0 ? (
-        <section className="compensation-layout" aria-label="Open shifts">
+        <section className="compensation-layout" aria-label={t("openShifts.ariaSection")}>
           <article className="metric-card">
             <div>
-              <h2 className="section-title">Open opportunities</h2>
+              <h2 className="section-title">{t("openShifts.sectionTitle")}</h2>
               <p className="settings-card-description">
-                {sortedShifts.length} shifts are available to claim.
+                {t("openShifts.shiftsAvailable", { count: sortedShifts.length })}
               </p>
             </div>
-            <StatusBadge tone="pending">Open</StatusBadge>
+            <StatusBadge tone="pending">{tc("status.open")}</StatusBadge>
           </article>
 
           {feedbackMessage ? <p className="settings-card-description">{feedbackMessage}</p> : null}
 
           <div className="data-table-container">
-            <table className="data-table" aria-label="Open shifts table">
+            <table className="data-table" aria-label={t("openShifts.ariaTable")}>
               <thead>
                 <tr>
                   <th>
@@ -135,14 +138,14 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
                         )
                       }
                     >
-                      Shift
+                      {t("openShifts.colShift")}
                       <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                     </button>
                   </th>
-                  <th>Schedule</th>
-                  <th>Template</th>
-                  <th>Status</th>
-                  <th className="table-action-column">Actions</th>
+                  <th>{t("openShifts.colSchedule")}</th>
+                  <th>{t("openShifts.colTemplate")}</th>
+                  <th>{t("openShifts.colStatus")}</th>
+                  <th className="table-action-column">{t("openShifts.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -154,7 +157,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
                       </span>{" "}
                       {formatTimeRangeLabel(shift.startTime, shift.endTime)}
                     </td>
-                    <td>{shift.scheduleName ?? "Schedule"}</td>
+                    <td>{shift.scheduleName ?? t("calendar.scheduleLabel")}</td>
                     <td>{shift.templateName ?? "--"}</td>
                     <td>
                       <StatusBadge tone="pending">{formatShiftStatus(shift.status)}</StatusBadge>
@@ -167,7 +170,7 @@ export function SchedulingOpenShiftsClient({ embedded = false }: { embedded?: bo
                           onClick={() => handleClaimShift(shift.id)}
                           disabled={isClaimingShiftId === shift.id}
                         >
-                          {isClaimingShiftId === shift.id ? "Claiming..." : "Claim"}
+                          {isClaimingShiftId === shift.id ? tc("claiming") : t("openShifts.claim")}
                         </button>
                       </div>
                     </td>

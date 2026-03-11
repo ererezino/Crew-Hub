@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 type DecisionCardProps = {
   id: string;
@@ -23,6 +24,7 @@ export function DecisionCard({
   onApprove,
   onDecline,
 }: DecisionCardProps) {
+  const t = useTranslations("dashboard.decisionCard");
   const [status, setStatus] = useState<
     "idle" | "approving" | "declining" | "done" | "error"
   >("idle");
@@ -54,9 +56,9 @@ export function DecisionCard({
   }
 
   const typeLabels: Record<string, string> = {
-    leave: "Leave Request",
-    expense: "Expense Claim",
-    signature: "Document",
+    leave: t("typeLeave"),
+    expense: t("typeExpense"),
+    signature: t("typeDocument"),
   };
 
   return (
@@ -76,13 +78,13 @@ export function DecisionCard({
 
       {status === "error" && (
         <div className="decision-card-error">
-          <p className="decision-card-error-text">Something went wrong. Please try again.</p>
+          <p className="decision-card-error-text">{t("errorMessage")}</p>
           <button
             type="button"
             className="button button-ghost decision-card-btn"
             onClick={() => setStatus("idle")}
           >
-            Try again
+            {t("tryAgain")}
           </button>
         </div>
       )}
@@ -91,7 +93,7 @@ export function DecisionCard({
         <div className="decision-card-decline-input">
           <textarea
             className="decision-card-textarea"
-            placeholder="Reason for declining (optional)"
+            placeholder={t("declineReasonPlaceholder")}
             value={declineReason}
             onChange={(e) => setDeclineReason(e.target.value)}
             rows={2}
@@ -105,14 +107,14 @@ export function DecisionCard({
               }}
               disabled={status === "declining"}
             >
-              Cancel
+              {t("cancel")}
             </button>
             <button
               className="button button-danger decision-card-btn"
               onClick={handleDecline}
               disabled={status === "declining"}
             >
-              {status === "declining" ? "Declining..." : "Confirm Decline"}
+              {status === "declining" ? t("declining") : t("confirmDecline")}
             </button>
           </div>
         </div>
@@ -123,14 +125,14 @@ export function DecisionCard({
             onClick={() => setShowDeclineInput(true)}
             disabled={status === "approving" || status === "error"}
           >
-            Decline
+            {t("decline")}
           </button>
           <button
             className="button button-primary decision-card-btn"
             onClick={handleApprove}
             disabled={status === "approving" || status === "error"}
           >
-            {status === "approving" ? "Approving..." : "Approve"}
+            {status === "approving" ? t("approving") : t("approve")}
           </button>
         </div>
       )}

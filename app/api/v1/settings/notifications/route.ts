@@ -9,7 +9,8 @@ import type { NotificationPreferences } from "../../../../../types/settings";
 const notificationsSchema = z.object({
   emailAnnouncements: z.boolean(),
   emailApprovals: z.boolean(),
-  inAppReminders: z.boolean()
+  inAppReminders: z.boolean(),
+  browserPush: z.boolean().optional().default(false)
 });
 
 function buildMeta() {
@@ -88,7 +89,8 @@ export async function PATCH(request: Request) {
     data: {
       emailAnnouncements: Boolean(data.notification_preferences?.emailAnnouncements),
       emailApprovals: Boolean(data.notification_preferences?.emailApprovals),
-      inAppReminders: Boolean(data.notification_preferences?.inAppReminders)
+      inAppReminders: Boolean(data.notification_preferences?.inAppReminders),
+      browserPush: Boolean(data.notification_preferences?.browserPush)
     },
     error: null,
     meta: buildMeta()

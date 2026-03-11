@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { CalendarClock } from "lucide-react";
 
 import { EmptyState } from "../shared/empty-state";
+import { formatDate } from "../../lib/datetime";
 import type { ShiftRecord } from "../../types/scheduling";
 
 // ---------------------------------------------------------------------------
@@ -35,8 +37,7 @@ function isoToDate(iso: string): Date {
 }
 
 function formatMonthDay(iso: string): string {
-  const d = isoToDate(iso);
-  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return formatDate(iso);
 }
 
 /** Group shifts into week-long rows (Mon–Fri for weekday, Sat–Sun for weekend). */
@@ -188,6 +189,7 @@ export function ScheduleCalendar({
   endDate,
   scheduleTrack
 }: ScheduleCalendarProps) {
+  const t = useTranslations("scheduling");
   const weekRows = useMemo(
     () => buildWeekRows(shifts, startDate, endDate, scheduleTrack),
     [shifts, startDate, endDate, scheduleTrack]
@@ -208,9 +210,9 @@ export function ScheduleCalendar({
     return (
       <EmptyState
         icon={<CalendarClock size={32} />}
-        title="No shifts to display"
-        description="Create and publish a schedule to see the team calendar."
-        ctaLabel="Manage schedules"
+        title={t("calendar.noShiftsTitle")}
+        description={t("calendar.noShiftsDescription")}
+        ctaLabel={t("calendar.manageSchedules")}
         ctaHref="/scheduling?tab=manage"
       />
     );
@@ -225,7 +227,7 @@ export function ScheduleCalendar({
         {/* Header row */}
         <div className="schedule-calendar-header">
           <div className="schedule-calendar-date-col">
-            <span className="schedule-calendar-col-icon">&#128197;</span> Date
+            <span className="schedule-calendar-col-icon">&#128197;</span> {t("calendar.dateColumn")}
           </div>
           {slotKeys.map((key) => (
             <div key={key} className="schedule-calendar-slot-col">
@@ -233,6 +235,7 @@ export function ScheduleCalendar({
             </div>
           ))}
           <div className="schedule-calendar-notes-col">
+            {/* eslint-disable-next-line i18next/no-literal-string */}
             <span className="schedule-calendar-col-icon">Aa</span>
           </div>
         </div>
@@ -266,7 +269,7 @@ export function ScheduleCalendar({
                         {getInitial(shift.employeeName ?? "?")}
                       </span>
                       <span className="schedule-calendar-person-name">
-                        {shift.employeeName ?? "Unassigned"}
+                        {shift.employeeName ?? t("calendar.unassigned")}
                       </span>
                     </div>
                   ))}

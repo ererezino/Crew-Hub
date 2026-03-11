@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { AccessChecklist, type AccessChecklistItem } from "../../../../components/admin/access-checklist";
 import { InviteForm } from "../../../../components/admin/invite-form";
@@ -47,15 +48,6 @@ type EditValues = {
   managerId: string;
   status: ProfileStatus;
   selectedAccessKeys: string[];
-};
-
-const roleLabels: Record<AppRole, string> = {
-  EMPLOYEE: "Employee",
-  TEAM_LEAD: "Team Lead",
-  MANAGER: "Manager",
-  HR_ADMIN: "HR Admin",
-  FINANCE_ADMIN: "Finance Admin",
-  SUPER_ADMIN: "Super Admin"
 };
 
 function fallbackAccessItems(): AccessChecklistItem[] {
@@ -109,6 +101,10 @@ function resolveEffectiveAccessKeysForPerson({
 }
 
 export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
+  const t = useTranslations('adminUsers');
+  const tCommon = useTranslations('common');
+  const td = tCommon as (key: string, params?: Record<string, unknown>) => string;
+
   const [activeTab, setActiveTab] = useState<ActiveTab>("invite");
   const [accessItems, setAccessItems] = useState<AccessChecklistItem[]>(fallbackAccessItems);
   const [navRows, setNavRows] = useState<NavigationAccessConfigRecord[]>([]);
@@ -174,7 +170,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       const payload = (await response.json()) as AdminAccessConfigResponse;
 
       if (!response.ok || !payload.data) {
-        throw new Error(payload.error?.message ?? "Unable to load access config.");
+        throw new Error(payload.error?.message ?? t('errorAccessConfig'));
       }
 
       setNavRows(payload.data.navigation);
@@ -189,7 +185,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
           }))
       );
     } catch (error) {
-      setAccessError(error instanceof Error ? error.message : "Unable to load access config.");
+      setAccessError(error instanceof Error ? error.message : t('errorAccessConfig'));
       setAccessItems(fallbackAccessItems());
       setNavRows([]);
     } finally {
@@ -236,7 +232,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     const payload = (await response.json()) as PeopleUpdateResponse;
 
     if (!response.ok || !payload.data?.person) {
-      setEditError(payload.error?.message ?? "Unable to deactivate user.");
+      setEditError(payload.error?.message ?? t('errorDeactivate'));
       return;
     }
 
@@ -244,7 +240,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     setPeople((currentPeople) =>
       currentPeople.map((row) => (row.id === person.id ? updatedPerson : row))
     );
-    setEditMessage(`${updatedPerson.fullName} is now inactive.`);
+    setEditMessage(t('deactivatedMessage', { name: updatedPerson.fullName }));
   };
 
   const toggleEditRole = (role: AppRole, checked: boolean) => {
@@ -322,7 +318,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       const payload = (await response.json()) as PeopleUpdateResponse;
 
       if (!response.ok || !payload.data?.person) {
-        setEditError(payload.error?.message ?? "Unable to update user.");
+        setEditError(payload.error?.message ?? t('errorUpdate'));
         return;
       }
 
@@ -331,10 +327,10 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
         currentPeople.map((row) => (row.id === updatedPerson.id ? updatedPerson : row))
       );
 
-      setEditMessage("User updated.");
+      setEditMessage(t('userUpdated'));
       await loadAccessConfig();
     } catch (error) {
-      setEditError(error instanceof Error ? error.message : "Unable to update user.");
+      setEditError(error instanceof Error ? error.message : t('errorUpdate'));
     } finally {
       setIsSavingEdit(false);
     }
@@ -356,13 +352,13 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       const payload = (await response.json()) as PeoplePasswordResetResponse;
 
       if (!response.ok || !payload.data?.resetInitiated) {
-        setEditError(payload.error?.message ?? "Unable to reset authenticator.");
+        setEditError(payload.error?.message ?? t('errorResetAuth'));
         return;
       }
 
-      setEditMessage("Authenticator reset. Setup link sent. The user should complete setup from their email.");
+      setEditMessage(t('authenticatorResetMessage'));
     } catch (error) {
-      setEditError(error instanceof Error ? error.message : "Unable to reset authenticator.");
+      setEditError(error instanceof Error ? error.message : t('errorResetAuth'));
     } finally {
       setIsResettingAuthenticator(false);
     }
@@ -371,11 +367,11 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
   return (
     <>
       <PageHeader
-        title="Admin Users"
-        description="Invite, configure, and manage crew accounts."
+        title={t('title')}
+        description={t('description')}
       />
 
-      <div className="page-tabs" role="tablist" aria-label="Admin users tabs">
+      <div className="page-tabs" role="tablist" aria-label={t('tabsAriaLabel')}>
         <button
           type="button"
           className={activeTab === "invite" ? "page-tab page-tab-active" : "page-tab"}
@@ -383,7 +379,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
           role="tab"
           aria-selected={activeTab === "invite"}
         >
-          Invite User
+          {t('tabInvite')}
         </button>
         <button
           type="button"
@@ -392,7 +388,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
           role="tab"
           aria-selected={activeTab === "users"}
         >
-          User List
+          {t('tabUsers')}
         </button>
       </div>
 
@@ -401,7 +397,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       {activeTab === "invite" ? (
         isLoading || isAccessLoading ? (
           <section className="settings-card">
-            <p className="settings-card-description">Loading invite form...</p>
+            <p className="settings-card-description">{t('loadingInvite')}</p>
           </section>
         ) : (
           <InviteForm
@@ -415,11 +411,11 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       {activeTab === "users" ? (
         isLoading ? (
           <section className="settings-card">
-            <p className="settings-card-description">Loading users...</p>
+            <p className="settings-card-description">{t('loadingUsers')}</p>
           </section>
         ) : errorMessage ? (
           <ErrorState
-            title="Unable to load users"
+            title={t('errorLoadUsers')}
             message={errorMessage}
             onRetry={refresh}
           />
@@ -436,14 +432,14 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
 
       <SlidePanel
         isOpen={Boolean(editValues)}
-        title="Edit User"
-        description="Update role assignment, profile status, and tab access."
+        title={t('editTitle')}
+        description={t('editDescription')}
         onClose={closeEditPanel}
       >
         {editValues ? (
           <div className="slide-panel-form-wrapper">
             <label className="form-field" htmlFor="edit-user-name">
-              <span className="form-label">Full name</span>
+              <span className="form-label">{t('fullNameLabel')}</span>
               <input
                 id="edit-user-name"
                 className="form-input"
@@ -459,7 +455,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
             </label>
 
             <fieldset className="form-field">
-              <legend className="form-label">Roles</legend>
+              <legend className="form-label">{t('rolesLabel')}</legend>
               <div className="admin-users-role-grid">
                 {USER_ROLES.map((role) => (
                   <label key={role} className="settings-checkbox">
@@ -469,14 +465,14 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
                       disabled={role === "EMPLOYEE" || role === "SUPER_ADMIN" && editValues.id === currentUserId}
                       onChange={(event) => toggleEditRole(role, event.currentTarget.checked)}
                     />
-                    <span>{roleLabels[role]}</span>
+                    <span>{td('role.' + role)}</span>
                   </label>
                 ))}
               </div>
             </fieldset>
 
             <label className="form-field" htmlFor="edit-user-department">
-              <span className="form-label">Department</span>
+              <span className="form-label">{t('departmentLabel')}</span>
               <select
                 id="edit-user-department"
                 className="form-input"
@@ -492,7 +488,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
                   )
                 }
               >
-                <option value="">No department</option>
+                <option value="">{t('noDepartment')}</option>
                 {DEPARTMENTS.map((department) => (
                   <option key={department} value={department}>
                     {department}
@@ -502,7 +498,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
             </label>
 
             <label className="form-field" htmlFor="edit-user-title">
-              <span className="form-label">Title</span>
+              <span className="form-label">{t('titleLabel')}</span>
               <input
                 id="edit-user-title"
                 className="form-input"
@@ -518,7 +514,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
             </label>
 
             <label className="form-field" htmlFor="edit-user-manager">
-              <span className="form-label">Manager</span>
+              <span className="form-label">{t('managerLabel')}</span>
               <select
                 id="edit-user-manager"
                 className="form-input"
@@ -531,7 +527,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
                   )
                 }
               >
-                <option value="">No manager</option>
+                <option value="">{t('noManager')}</option>
                 {managerOptions.map((person) => (
                   <option key={person.id} value={person.id}>
                     {person.fullName} ({person.department ?? ""})
@@ -541,7 +537,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
             </label>
 
             <label className="form-field" htmlFor="edit-user-status">
-              <span className="form-label">Status</span>
+              <span className="form-label">{t('statusLabel')}</span>
               <select
                 id="edit-user-status"
                 className="form-input"
@@ -557,10 +553,10 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
                   )
                 }
               >
-                <option value="active">active</option>
-                <option value="inactive">inactive</option>
-                <option value="onboarding">onboarding</option>
-                <option value="offboarding">offboarding</option>
+                <option value="active">{t('statusActive')}</option>
+                <option value="inactive">{t('statusInactive')}</option>
+                <option value="onboarding">{t('statusOnboarding')}</option>
+                <option value="offboarding">{t('statusOffboarding')}</option>
               </select>
             </label>
 
@@ -577,7 +573,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
                 onClick={handleSaveEdit}
                 disabled={isSavingEdit}
               >
-                {isSavingEdit ? "Saving..." : "Save changes"}
+                {isSavingEdit ? t('saving') : t('saveChanges')}
               </button>
               <button
                 type="button"
@@ -585,7 +581,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
                 onClick={handleResetAuthenticator}
                 disabled={isResettingAuthenticator}
               >
-                {isResettingAuthenticator ? "Resetting..." : "Reset Authenticator"}
+                {isResettingAuthenticator ? t('resetting') : t('resetAuthenticator')}
               </button>
             </div>
 
@@ -597,9 +593,9 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
 
       <ConfirmDialog
         isOpen={deactivateTarget !== null}
-        title={`Deactivate ${deactivateTarget?.fullName ?? ""}?`}
-        description="They will lose active access until reactivated."
-        confirmLabel="Deactivate"
+        title={t('deactivateTitle', { name: deactivateTarget?.fullName ?? "" })}
+        description={t('deactivateDescription')}
+        confirmLabel={t('deactivateConfirmLabel')}
         tone="danger"
         onConfirm={() => void executeDeactivate()}
         onCancel={() => setDeactivateTarget(null)}

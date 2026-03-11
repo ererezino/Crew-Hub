@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Check, ChevronDown, ChevronUp, X } from "lucide-react";
 
 /* ── Types ── */
@@ -26,6 +27,7 @@ const DISMISS_KEY = "crew_hub_setup_dismissed";
 /* ── Component ── */
 
 export function SetupChecklist() {
+  const t = useTranslations("dashboard");
   const [data, setData] = useState<SetupData | null>(null);
   const [loading, setLoading] = useState(true);
   const [dismissed, setDismissed] = useState(false);
@@ -83,16 +85,16 @@ export function SetupChecklist() {
     <div className="setup-checklist">
       <div className="setup-checklist-header">
         <div className="setup-checklist-header-left">
-          <h3 className="setup-checklist-title">Organization Setup</h3>
+          <h3 className="setup-checklist-title">{t('setupChecklist.title')}</h3>
           <span className="setup-checklist-progress-text">
-            {data.completed_count}/{data.total_count} completed
+            {t('setupChecklist.progress', { completed: data.completed_count, total: data.total_count })}
           </span>
         </div>
         <div className="setup-checklist-header-right">
           <button
             className="setup-checklist-toggle"
             onClick={() => setCollapsed(!collapsed)}
-            title={collapsed ? "Expand" : "Collapse"}
+            title={collapsed ? t('setupChecklist.expand') : t('setupChecklist.collapse')}
             type="button"
           >
             {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
@@ -100,7 +102,7 @@ export function SetupChecklist() {
           <button
             className="setup-checklist-dismiss"
             onClick={handleDismiss}
-            title="Dismiss checklist"
+            title={t('setupChecklist.dismiss')}
             type="button"
           >
             <X size={16} />

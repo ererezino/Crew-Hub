@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 import type { ScheduleTrack } from "../../types/scheduling";
+import { formatDateRange } from "../../lib/datetime";
 
 type ReviewWarning = {
   message: string;
@@ -27,14 +29,6 @@ type ScheduleReviewProps = {
   isGenerating: boolean;
 };
 
-function formatDateRange(start: string, end: string): string {
-  const startDate = new Date(`${start}T00:00:00Z`);
-  const endDate = new Date(`${end}T00:00:00Z`);
-  const opts: Intl.DateTimeFormatOptions = { month: "long", day: "numeric", timeZone: "UTC" };
-  const startLabel = startDate.toLocaleDateString("en-US", opts);
-  const endLabel = endDate.toLocaleDateString("en-US", { ...opts, year: "numeric" });
-  return `${startLabel} \u2013 ${endLabel}`;
-}
 
 export function ScheduleReview({
   track,
@@ -46,6 +40,7 @@ export function ScheduleReview({
   shiftDetails,
   isGenerating
 }: ScheduleReviewProps) {
+  const t = useTranslations("scheduling");
   const [showDetails, setShowDetails] = useState(false);
 
   return (
@@ -53,36 +48,36 @@ export function ScheduleReview({
       {isGenerating ? (
         <div className="schedule-review-generating">
           <div className="schedule-review-spinner" />
-          <p>Generating schedule...</p>
+          <p>{t("review.generating")}</p>
         </div>
       ) : (
         <>
           <div className="schedule-review-summary">
             <div className="schedule-review-row">
-              <span className="schedule-review-label">Track</span>
+              <span className="schedule-review-label">{t("review.labelTrack")}</span>
               <span className="schedule-review-value">
                 <span className={`schedule-track-badge schedule-track-badge-${track}`}>
-                  {track === "weekday" ? "Weekday" : "Weekend"}
+                  {track === "weekday" ? t("track.weekday") : t("track.weekend")}
                 </span>
               </span>
             </div>
             <div className="schedule-review-row">
-              <span className="schedule-review-label">Period</span>
+              <span className="schedule-review-label">{t("review.labelPeriod")}</span>
               <span className="schedule-review-value">{formatDateRange(startDate, endDate)}</span>
             </div>
             <div className="schedule-review-row">
-              <span className="schedule-review-label">Team members</span>
-              <span className="schedule-review-value">{employeeCount} selected</span>
+              <span className="schedule-review-label">{t("review.labelTeamMembers")}</span>
+              <span className="schedule-review-value">{t("review.selectedCount", { count: employeeCount })}</span>
             </div>
             <div className="schedule-review-row">
-              <span className="schedule-review-label">Shifts generated</span>
+              <span className="schedule-review-label">{t("review.labelShiftsGenerated")}</span>
               <span className="schedule-review-value">{estimatedShifts}</span>
             </div>
           </div>
 
           {warnings.length > 0 ? (
             <div className="schedule-review-warnings">
-              <h4 className="schedule-review-warnings-title">Heads up</h4>
+              <h4 className="schedule-review-warnings-title">{t("review.headsUp")}</h4>
               <ul>
                 {warnings.map((w, i) => (
                   <li key={i}>{w.message}</li>
@@ -98,7 +93,7 @@ export function ScheduleReview({
                 className="button button-ghost schedule-review-toggle"
                 onClick={() => setShowDetails(!showDetails)}
               >
-                {showDetails ? "Hide shift details" : "View shift details"}
+                {showDetails ? t("review.hideDetails") : t("review.viewDetails")}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 16, height: 16, transform: showDetails ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }}>
                   <path d="M6 9l6 6 6-6" />
                 </svg>
@@ -109,10 +104,10 @@ export function ScheduleReview({
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Employee</th>
-                        <th>Date</th>
-                        <th>Shift</th>
-                        <th>Time</th>
+                        <th>{t("review.colEmployee")}</th>
+                        <th>{t("review.colDate")}</th>
+                        <th>{t("review.colShift")}</th>
+                        <th>{t("review.colTime")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -127,7 +122,7 @@ export function ScheduleReview({
                       {shiftDetails.length > 100 ? (
                         <tr>
                           <td colSpan={4} style={{ textAlign: "center", color: "#7A8A99" }}>
-                            ...and {shiftDetails.length - 100} more shifts
+                            {t("review.moreShifts", { count: shiftDetails.length - 100 })}
                           </td>
                         </tr>
                       ) : null}

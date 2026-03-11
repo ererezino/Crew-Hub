@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
@@ -7,6 +8,8 @@ import { EmptyState } from "../../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../../../components/shared/slide-panel";
 import { formatRelativeTime } from "../../../../../../lib/datetime";
+
+type AppLocale = "en" | "fr";
 
 /* ── Types ── */
 
@@ -98,6 +101,10 @@ function applyInlineFormatting(text: string): React.ReactNode {
 /* ── Component ── */
 
 export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: PageViewClientProps) {
+  const t = useTranslations('teamHubPage');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const [page, setPage] = useState<TeamHubPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,17 +126,17 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
       const response = await fetch(`/api/v1/team-hubs/pages/${pageId}`);
 
       if (!response.ok) {
-        throw new Error("Failed to load page.");
+        throw new Error(t('errorLoadPage'));
       }
 
       const envelope = await response.json();
       setPage(envelope.data?.page ?? null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setError(err instanceof Error ? err.message : tCommon('error.generic'));
     } finally {
       setLoading(false);
     }
-  }, [pageId]);
+  }, [pageId, t, tCommon]);
 
   useEffect(() => {
     fetchPage();
@@ -149,25 +156,25 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
         });
 
         if (!response.ok) {
-          throw new Error("Failed to save changes.");
+          throw new Error(t('errorSave'));
         }
 
         const updatedEnvelope = await response.json();
         setPage(updatedEnvelope.data?.page ?? page);
         setEditOpen(false);
       } catch (err) {
-        setSaveError(err instanceof Error ? err.message : "Save failed.");
+        setSaveError(err instanceof Error ? err.message : t('errorSaveFailed'));
       } finally {
         setSaving(false);
       }
     },
-    [pageId, editContent]
+    [pageId, editContent, t, page]
   );
 
   if (loading) {
     return (
       <>
-        <PageHeader title="Page" />
+        <PageHeader title={t('loadingTitle')} />
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <div className="skeleton-block" style={{ height: 28, width: "50%" }} />
           <div className="skeleton-block" style={{ height: 16, width: "30%" }} />
@@ -180,11 +187,11 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
   if (error || !page) {
     return (
       <>
-        <PageHeader title="Page" />
+        <PageHeader title={t('loadingTitle')} />
         <EmptyState
-          title="Unable to load page"
-          description={error ?? "Page not found."}
-          ctaLabel="Back to section"
+          title={t('unavailable')}
+          description={error ?? t('notFound')}
+          ctaLabel={t('backToSection')}
           ctaHref={`/team-hub/${hubId}/${sectionId}`}
         />
       </>
@@ -201,12 +208,12 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
             href={`/team-hub/${hubId}/${sectionId}`}
             style={{ fontSize: "var(--font-sm)", color: "var(--color-text-muted)" }}
           >
-            &larr; Back to section
+            &larr; {t('backToSection')}
           </Link>
         </nav>
         <div className="card" style={{ padding: "var(--space-5)", textAlign: "center" }}>
           <p style={{ marginBottom: "var(--space-4)", color: "var(--color-text-secondary)" }}>
-            This page links to an external resource.
+            {t('externalLink')}
           </p>
           <a
             href={page.url}
@@ -214,7 +221,7 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
             rel="noopener noreferrer"
             className="button button-accent"
           >
-            Go to {page.url}
+            {t('goTo', { url: page.url })}
           </a>
         </div>
       </>
@@ -235,7 +242,7 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
                 setEditOpen(true);
               }}
             >
-              Edit
+              {tCommon('edit')}
             </button>
           ) : undefined
         }
@@ -246,7 +253,7 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
           href={`/team-hub/${hubId}/${sectionId}`}
           style={{ fontSize: "var(--font-sm)", color: "var(--color-text-muted)" }}
         >
-          &larr; Back to section
+          &larr; {t('backToSection')}
         </Link>
       </nav>
 
@@ -259,8 +266,8 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
           color: "var(--color-text-muted)"
         }}
       >
-        {page.author_name ? <span>By {page.author_name}</span> : null}
-        {page.updated_at ? <span>Updated {formatRelativeTime(page.updated_at)}</span> : null}
+        {page.author_name ? <span>{t('byAuthor', { name: page.author_name })}</span> : null}
+        {page.updated_at ? <span>{t('updatedAt', { date: formatRelativeTime(page.updated_at, locale) })}</span> : null}
       </div>
 
       {/* Document / Runbook content */}
@@ -272,7 +279,7 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
 
       {/* Contact list as table */}
       {page.type === "contact_list" && page.structured_data ? (
-        <DataTable data={page.structured_data} />
+        <DataTable data={page.structured_data} noDataLabel={t('noData')} />
       ) : null}
 
       {/* Reference list (searchable) */}
@@ -281,35 +288,40 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
           <div style={{ marginBottom: "var(--space-3)" }}>
             <input
               type="search"
-              placeholder="Search references..."
+              placeholder={t('searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input"
               style={{ maxWidth: 400, width: "100%" }}
             />
           </div>
-          <SearchableList data={page.structured_data} query={searchQuery} />
+          <SearchableList
+            data={page.structured_data}
+            query={searchQuery}
+            noMatchLabel={t('noMatchingResults')}
+            noDataLabel={t('noReferences')}
+          />
         </div>
       ) : null}
 
       {/* Table */}
       {page.type === "table" && page.structured_data ? (
-        <DataTable data={page.structured_data} />
+        <DataTable data={page.structured_data} noDataLabel={t('noData')} />
       ) : null}
 
       {/* Fallback for pages with no renderable content */}
       {!page.content && !page.structured_data && page.type !== "link" ? (
         <EmptyState
-          title="No content"
-          description="This page doesn't have any content yet."
+          title={t('noContent')}
+          description={t('noContentDescription')}
         />
       ) : null}
 
       {/* Edit slide panel */}
       <SlidePanel
         isOpen={editOpen}
-        title={`Edit: ${page.title}`}
-        description="Update the page content below."
+        title={t('editPanelTitle', { title: page.title })}
+        description={t('editPanelDescription')}
         onClose={() => setEditOpen(false)}
       >
         <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", height: "100%" }}>
@@ -337,10 +349,10 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
               onClick={() => setEditOpen(false)}
               disabled={saving}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={saving}>
-              {saving ? "Saving..." : "Save"}
+              {saving ? tCommon('saving') : tCommon('save')}
             </button>
           </div>
         </form>
@@ -351,9 +363,9 @@ export function PageViewClient({ hubId, sectionId, pageId, isLeadOrAdmin }: Page
 
 /* ── Data Table ── */
 
-function DataTable({ data }: { data: Record<string, unknown>[] }) {
+function DataTable({ data, noDataLabel }: { data: Record<string, unknown>[]; noDataLabel: string }) {
   if (data.length === 0) {
-    return <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-sm)" }}>No data.</p>;
+    return <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-sm)" }}>{noDataLabel}</p>;
   }
 
   const columns = Object.keys(data[0]);
@@ -405,7 +417,17 @@ function DataTable({ data }: { data: Record<string, unknown>[] }) {
 
 /* ── Searchable List (for reference_list) ── */
 
-function SearchableList({ data, query }: { data: Record<string, unknown>[]; query: string }) {
+function SearchableList({
+  data,
+  query,
+  noMatchLabel,
+  noDataLabel
+}: {
+  data: Record<string, unknown>[];
+  query: string;
+  noMatchLabel: string;
+  noDataLabel: string;
+}) {
   const lowerQuery = query.toLowerCase();
 
   const filtered = query
@@ -421,7 +443,7 @@ function SearchableList({ data, query }: { data: Record<string, unknown>[]; quer
   if (filtered.length === 0) {
     return (
       <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-sm)" }}>
-        {query ? "No matching results." : "No references."}
+        {query ? noMatchLabel : noDataLabel}
       </p>
     );
   }

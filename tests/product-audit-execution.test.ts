@@ -22,8 +22,8 @@ describe("Product audit execution hardening", () => {
   it("decision card exposes explicit error state and retry action", () => {
     const decisionCard = read("components/dashboard/decision-card.tsx");
     expect(decisionCard).toContain('"error"');
-    expect(decisionCard).toContain("Something went wrong. Please try again.");
-    expect(decisionCard).toContain("Try again");
+    expect(decisionCard).toContain('t("errorMessage")');
+    expect(decisionCard).toContain('t("tryAgain")');
   });
 
   it("navigation keeps announcements label aligned with /announcements and non-conflicting shortcut", () => {
@@ -43,7 +43,8 @@ describe("Product audit execution hardening", () => {
 
   it("team hub creation surfaces are no longer marked as coming soon", () => {
     const teamHub = read("app/(shell)/team-hub/team-hub-client.tsx");
-    expect(teamHub).toContain('description="Team Hub is in limited pilot.');
+    expect(teamHub).toContain("<FeatureBanner");
+    expect(teamHub).toContain("description={t('featureBanner')}");
     expect(teamHub.toLowerCase()).not.toContain("content management features are coming soon");
   });
 

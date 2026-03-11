@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../../components/shared/error-state";
@@ -13,6 +14,7 @@ import {
   type NigeriaRuleConfig
 } from "../../../../../lib/payroll/engines/nigeria-calculation";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../../lib/countries";
+import type { AppLocale } from "../../../../../i18n/locales";
 import { todayIsoDate } from "../../../../../lib/datetime";
 
 const COMING_SOON_COUNTRIES = ["GH", "KE", "ZA", "CA"] as const;
@@ -50,6 +52,8 @@ type SaveNigeriaConfigResponse = {
     message: string;
   } | null;
 };
+
+type TranslatorFn = (key: string) => string;
 
 function todayAsDateString(): string {
   return todayIsoDate();
@@ -108,7 +112,8 @@ function parsePercentToRate(value: string): number | null {
 }
 
 function parseConfigFormValues(
-  values: NigeriaConfigFormValues
+  values: NigeriaConfigFormValues,
+  t: TranslatorFn
 ): {
   errors: NigeriaConfigFormErrors;
   config: NigeriaRuleConfig | null;
@@ -116,14 +121,14 @@ function parseConfigFormValues(
   const errors: NigeriaConfigFormErrors = {};
 
   if (!dateStringRegex.test(values.effectiveFrom)) {
-    errors.effectiveFrom = "Effective date is required.";
+    errors.effectiveFrom = t("effectiveDateRequired");
   }
 
   const payeBrackets = values.payeBrackets.map((bracket, index) => {
     const parsedRate = parsePercentToRate(bracket.ratePercent);
 
     if (parsedRate === null) {
-      errors[`payeBrackets.${index}.ratePercent`] = "Rate must be between 0 and 100.";
+      errors[`payeBrackets.${index}.ratePercent`] = t("rateValidation");
     }
 
     return {
@@ -135,7 +140,7 @@ function parseConfigFormValues(
   const craFixedAmount = parseInteger(values.craFixedAmount);
 
   if (craFixedAmount === null) {
-    errors.craFixedAmount = "CRA fixed amount must be a whole number in kobo.";
+    errors.craFixedAmount = t("craFixedError");
   }
 
   const craPercentRate = parsePercentToRate(values.craPercentRate);
@@ -147,31 +152,31 @@ function parseConfigFormValues(
   const nsitfEmployerRate = parsePercentToRate(values.nsitfEmployerRate);
 
   if (craPercentRate === null) {
-    errors.craPercentRate = "CRA 1% rate must be between 0 and 100.";
+    errors.craPercentRate = t("craOneError");
   }
 
   if (craAdditionalRate === null) {
-    errors.craAdditionalRate = "CRA 20% rate must be between 0 and 100.";
+    errors.craAdditionalRate = t("craTwentyError");
   }
 
   if (pensionEmployeeRate === null) {
-    errors.pensionEmployeeRate = "Pension employee rate must be between 0 and 100.";
+    errors.pensionEmployeeRate = t("pensionEmployeeError");
   }
 
   if (pensionEmployerRate === null) {
-    errors.pensionEmployerRate = "Pension employer rate must be between 0 and 100.";
+    errors.pensionEmployerRate = t("pensionEmployerError");
   }
 
   if (nhfRate === null) {
-    errors.nhfRate = "NHF rate must be between 0 and 100.";
+    errors.nhfRate = t("nhfError");
   }
 
   if (nsitfEmployeeRate === null) {
-    errors.nsitfEmployeeRate = "NSITF employee rate must be between 0 and 100.";
+    errors.nsitfEmployeeRate = t("nsitfEmployeeError");
   }
 
   if (nsitfEmployerRate === null) {
-    errors.nsitfEmployerRate = "NSITF employer rate must be between 0 and 100.";
+    errors.nsitfEmployerRate = t("nsitfEmployerError");
   }
 
   if (Object.keys(errors).length > 0) {
@@ -249,6 +254,10 @@ export function DeductionsSettingsClient({
   initialNigeriaConfigError: string | null;
   canEditNigeria: boolean;
 }) {
+  const t = useTranslations('payrollSettings');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const [formValues, setFormValues] = useState<NigeriaConfigFormValues | null>(
     initialNigeriaConfig ? toFormValues(initialNigeriaConfig, todayAsDateString()) : null
   );
@@ -263,8 +272,8 @@ export function DeductionsSettingsClient({
       return null;
     }
 
-    return parseConfigFormValues(formValues);
-  }, [formValues]);
+    return parseConfigFormValues(formValues, t as TranslatorFn);
+  }, [formValues, t]);
 
   const monthlyGrossAmount = parseMajorCurrencyInputToKobo(monthlyGrossInput);
   const monthlyBasicAmount = parseMajorCurrencyInputToKobo(monthlyBasicInput);
@@ -303,7 +312,7 @@ export function DeductionsSettingsClient({
       return;
     }
 
-    const parsed = parseConfigFormValues(formValues);
+    const parsed = parseConfigFormValues(formValues, t as TranslatorFn);
     setFormErrors(parsed.errors);
     setSaveMessage(null);
 
@@ -328,16 +337,16 @@ export function DeductionsSettingsClient({
       const payload = (await response.json()) as SaveNigeriaConfigResponse;
 
       if (!response.ok || !payload.data) {
-        setSaveMessage(payload.error?.message ?? "Unable to save Nigeria withholding rules.");
+        setSaveMessage(payload.error?.message ?? t("saveError"));
         return;
       }
 
       setFormValues(toFormValues(payload.data.config, payload.data.effectiveFrom));
-      setSaveMessage("Nigeria withholding rules saved.");
+      setSaveMessage(t("saveSuccess"));
       setFormErrors({});
     } catch (error) {
       setSaveMessage(
-        error instanceof Error ? error.message : "Unable to save Nigeria withholding rules."
+        error instanceof Error ? error.message : t("saveError")
       );
     } finally {
       setIsSaving(false);
@@ -345,13 +354,11 @@ export function DeductionsSettingsClient({
   };
 
   return (
-    <section className="settings-layout" aria-label="Payroll withholding settings">
+    <section className="settings-layout" aria-label={t("sectionAriaLabel")}>
       <article className="settings-card payroll-withholding-note">
-        <h2 className="section-title">Tax Withholding by Country</h2>
+        <h2 className="section-title">{t("withholdingTitle")}</h2>
         <p className="settings-card-description">
-          All team members are currently classified as contractors. Taxes are not withheld.
-          When employee withholding is enabled for a country, statutory deductions will be
-          calculated automatically.
+          {t("withholdingDescription")}
         </p>
       </article>
 
@@ -359,21 +366,21 @@ export function DeductionsSettingsClient({
         <div className="payroll-country-copy">
           <p className="country-chip">
             <span>{countryFlagFromCode("NG")}</span>
-            <span>{countryNameFromCode("NG")}</span>
+            <span>{countryNameFromCode("NG", locale)}</span>
           </p>
           <p className="settings-card-description">
-            Statutory withholding is active for employee mode and fully configured.
+            {t("nigeriaActive")}
           </p>
         </div>
         <div className="payroll-country-actions">
-          <StatusBadge tone="success">Active</StatusBadge>
+          <StatusBadge tone="success">{tCommon("status.active")}</StatusBadge>
         </div>
       </article>
 
-      <section className="settings-card payroll-country-list" aria-label="Country rollout list">
+      <section className="settings-card payroll-country-list" aria-label={t("countryListAria")}>
         {COMING_SOON_COUNTRIES.map((countryCode) => {
-          const countryName = countryNameFromCode(countryCode);
-          const lockLabel = `${countryName} withholding is coming soon`;
+          const countryName = countryNameFromCode(countryCode, locale);
+          const lockLabel = t("comingSoonLabel", { country: countryName });
 
           return (
             <article key={countryCode} className="payroll-country-item">
@@ -383,13 +390,13 @@ export function DeductionsSettingsClient({
                   <span>{countryName}</span>
                 </p>
                 <p className="settings-card-description">
-                  Statutory withholding configuration is not enabled yet.
+                  {t("withholdingNotEnabled")}
                 </p>
               </div>
 
               <div className="payroll-country-actions">
                 <div className="payroll-coming-soon">
-                  <StatusBadge tone="draft">Coming soon</StatusBadge>
+                  <StatusBadge tone="draft">{t("comingSoon")}</StatusBadge>
                   <svg className="payroll-lock-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path
                       d="M7 10V8a5 5 0 0 1 10 0v2M6 10h12v10H6z"
@@ -408,16 +415,16 @@ export function DeductionsSettingsClient({
         })}
       </section>
 
-      <section className="settings-card" aria-label="Nigeria withholding configuration">
-        <h2 className="section-title">Nigeria Statutory Rules</h2>
+      <section className="settings-card" aria-label={t("nigeriaConfigAria")}>
+        <h2 className="section-title">{t("nigeriaRulesTitle")}</h2>
         <p className="settings-card-description">
-          Configure PAYE brackets, CRA, pension, NHF, and NSITF for payroll mode{" "}
+          {t("nigeriaRulesDescription")}{" "}
           <code>employee_local_withholding</code>.
         </p>
 
         {initialNigeriaConfigError ? (
           <ErrorState
-            title="Nigeria rules unavailable"
+            title={t("nigeriaUnavailable")}
             message={initialNigeriaConfigError}
           />
         ) : null}
@@ -425,7 +432,7 @@ export function DeductionsSettingsClient({
         {!initialNigeriaConfigError && formValues ? (
           <>
             <label className="form-field" htmlFor="nigeria-effective-date">
-              <span className="form-label">Effective from</span>
+              <span className="form-label">{t("effectiveFrom")}</span>
               <input
                 id="nigeria-effective-date"
                 type="date"
@@ -449,9 +456,9 @@ export function DeductionsSettingsClient({
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Bracket</th>
-                    <th>Annual Taxable Range</th>
-                    <th>Rate (%)</th>
+                    <th>{t("thBracket")}</th>
+                    <th>{t("thAnnualTaxableRange")}</th>
+                    <th>{t("thRate")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -465,7 +472,7 @@ export function DeductionsSettingsClient({
                           {bracket.bracketMax !== null ? (
                             <CurrencyDisplay amount={bracket.bracketMax} currency="NGN" />
                           ) : (
-                            "No upper cap"
+                            t("noUpperCap")
                           )}
                         </span>
                       </td>
@@ -501,7 +508,7 @@ export function DeductionsSettingsClient({
 
             <div className="payroll-rules-grid">
               <label className="form-field" htmlFor="cra-fixed-amount">
-                <span className="form-label">CRA Fixed Amount (kobo)</span>
+                <span className="form-label">{t("craFixedAmount")}</span>
                 <input
                   id="cra-fixed-amount"
                   type="text"
@@ -524,7 +531,7 @@ export function DeductionsSettingsClient({
               </label>
 
               <label className="form-field" htmlFor="cra-one-rate">
-                <span className="form-label">CRA 1% Rate</span>
+                <span className="form-label">{t("craOneRate")}</span>
                 <input
                   id="cra-one-rate"
                   type="number"
@@ -550,7 +557,7 @@ export function DeductionsSettingsClient({
               </label>
 
               <label className="form-field" htmlFor="cra-twenty-rate">
-                <span className="form-label">CRA 20% Rate</span>
+                <span className="form-label">{t("craTwentyRate")}</span>
                 <input
                   id="cra-twenty-rate"
                   type="number"
@@ -576,7 +583,7 @@ export function DeductionsSettingsClient({
               </label>
 
               <label className="form-field" htmlFor="pension-employee-rate">
-                <span className="form-label">Pension Employee Rate</span>
+                <span className="form-label">{t("pensionEmployeeRate")}</span>
                 <input
                   id="pension-employee-rate"
                   type="number"
@@ -604,7 +611,7 @@ export function DeductionsSettingsClient({
               </label>
 
               <label className="form-field" htmlFor="pension-employer-rate">
-                <span className="form-label">Pension Employer Rate</span>
+                <span className="form-label">{t("pensionEmployerRate")}</span>
                 <input
                   id="pension-employer-rate"
                   type="number"
@@ -632,7 +639,7 @@ export function DeductionsSettingsClient({
               </label>
 
               <label className="form-field" htmlFor="nhf-rate">
-                <span className="form-label">NHF Rate</span>
+                <span className="form-label">{t("nhfRate")}</span>
                 <input
                   id="nhf-rate"
                   type="number"
@@ -652,7 +659,7 @@ export function DeductionsSettingsClient({
               </label>
 
               <label className="form-field" htmlFor="nsitf-employee-rate">
-                <span className="form-label">NSITF Employee Rate</span>
+                <span className="form-label">{t("nsitfEmployeeRate")}</span>
                 <input
                   id="nsitf-employee-rate"
                   type="number"
@@ -680,7 +687,7 @@ export function DeductionsSettingsClient({
               </label>
 
               <label className="form-field" htmlFor="nsitf-employer-rate">
-                <span className="form-label">NSITF Employer Rate</span>
+                <span className="form-label">{t("nsitfEmployerRate")}</span>
                 <input
                   id="nsitf-employer-rate"
                   type="number"
@@ -719,7 +726,7 @@ export function DeductionsSettingsClient({
                   void onSaveNigeriaSettings();
                 }}
               >
-                {isSaving ? "Saving..." : "Save Nigeria rules"}
+                {isSaving ? t("saving") : t("saveNigeriaRules")}
               </button>
             </div>
 
@@ -731,23 +738,22 @@ export function DeductionsSettingsClient({
 
             {!canEditNigeria ? (
               <p className="settings-card-description">
-                Only Finance Admin and Super Admin can edit Nigeria withholding rules.
+                {t("editPermission")}
               </p>
             ) : null}
           </>
         ) : null}
       </section>
 
-      <section className="settings-card" aria-label="Nigeria withholding preview calculator">
-        <h2 className="section-title">Nigeria Preview Calculator</h2>
+      <section className="settings-card" aria-label={t("previewAriaLabel")}>
+        <h2 className="section-title">{t("previewTitle")}</h2>
         <p className="settings-card-description">
-          Enter monthly gross and monthly basic pay in NGN to preview PAYE, pension, NHF, NSITF,
-          net pay, and employer costs.
+          {t("previewDescription")}
         </p>
 
         <div className="payroll-preview-input-grid">
           <label className="form-field" htmlFor="nigeria-preview-monthly-gross">
-            <span className="form-label">Monthly Gross (NGN)</span>
+            <span className="form-label">{t("monthlyGross")}</span>
             <MoneyInput
               id="nigeria-preview-monthly-gross"
               currency="NGN"
@@ -758,7 +764,7 @@ export function DeductionsSettingsClient({
           </label>
 
           <label className="form-field" htmlFor="nigeria-preview-monthly-basic">
-            <span className="form-label">Monthly Basic (NGN)</span>
+            <span className="form-label">{t("monthlyBasic")}</span>
             <MoneyInput
               id="nigeria-preview-monthly-basic"
               currency="NGN"
@@ -771,9 +777,9 @@ export function DeductionsSettingsClient({
 
         {!previewBreakdown ? (
           <EmptyState
-            title="Preview unavailable"
-            description="Fix Nigeria rule validation errors above to generate a preview."
-            ctaLabel="Back to payroll"
+            title={t("previewUnavailable")}
+            description={t("previewFixErrors")}
+            ctaLabel={t("backToPayroll")}
             ctaHref="/payroll"
           />
         ) : (
@@ -782,74 +788,74 @@ export function DeductionsSettingsClient({
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Metric</th>
-                    <th>Value</th>
+                    <th>{t("thMetric")}</th>
+                    <th>{t("thValue")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[
                     {
-                      label: "Annual Gross",
+                      label: t("annualGross"),
                       value: previewBreakdown.annualGrossAmount
                     },
                     {
-                      label: "CRA (max of fixed or 1%)",
+                      label: t("craFixedOrPercent"),
                       value: previewBreakdown.craFixedOrPercentAmount
                     },
                     {
-                      label: "CRA 20%",
+                      label: t("craTwentyPercent"),
                       value: previewBreakdown.craTwentyPercentAmount
                     },
                     {
-                      label: "CRA Total",
+                      label: t("craTotal"),
                       value: previewBreakdown.craTotalAmount
                     },
                     {
-                      label: "Annual Pension (Employee)",
+                      label: t("annualPensionEmployee"),
                       value: previewBreakdown.annualPensionAmount
                     },
                     {
-                      label: "Taxable Income",
+                      label: t("taxableIncome"),
                       value: previewBreakdown.taxableIncomeAmount
                     },
                     {
-                      label: "Annual PAYE",
+                      label: t("annualPaye"),
                       value: previewBreakdown.annualPayeAmount
                     },
                     {
-                      label: "Monthly PAYE",
+                      label: t("monthlyPaye"),
                       value: previewBreakdown.monthlyPayeAmount
                     },
                     {
-                      label: "Monthly Pension",
+                      label: t("monthlyPension"),
                       value: previewBreakdown.monthlyPensionAmount
                     },
                     {
-                      label: "Monthly NHF",
+                      label: t("monthlyNhf"),
                       value: previewBreakdown.monthlyNhfAmount
                     },
                     {
-                      label: "Monthly NSITF",
+                      label: t("monthlyNsitf"),
                       value: previewBreakdown.monthlyNsitfAmount
                     },
                     {
-                      label: "Total Deductions",
+                      label: t("totalDeductions"),
                       value: previewBreakdown.totalDeductions
                     },
                     {
-                      label: "Net Pay",
+                      label: t("netPay"),
                       value: previewBreakdown.netAmount
                     },
                     {
-                      label: "Employer Pension",
+                      label: t("employerPension"),
                       value: previewBreakdown.monthlyEmployerPensionAmount
                     },
                     {
-                      label: "Employer NSITF",
+                      label: t("employerNsitf"),
                       value: previewBreakdown.monthlyEmployerNsitfAmount
                     },
                     {
-                      label: "Total Employer Contributions",
+                      label: t("totalEmployerContributions"),
                       value: previewBreakdown.totalEmployerContributions
                     }
                   ].map((row, index) => (
@@ -868,11 +874,11 @@ export function DeductionsSettingsClient({
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>PAYE Bracket</th>
-                    <th>Rate</th>
-                    <th>Annual Taxable Portion</th>
-                    <th>Annual PAYE</th>
-                    <th>Monthly PAYE</th>
+                    <th>{t("thPayeBracket")}</th>
+                    <th>{t("thPayeRate")}</th>
+                    <th>{t("thAnnualTaxablePortion")}</th>
+                    <th>{t("thAnnualPaye")}</th>
+                    <th>{t("thMonthlyPaye")}</th>
                   </tr>
                 </thead>
                 <tbody>

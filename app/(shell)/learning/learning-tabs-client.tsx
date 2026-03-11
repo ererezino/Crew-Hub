@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -33,6 +34,8 @@ export function LearningTabsClient({
   userRoles,
   canManageSurveys
 }: LearningTabsClientProps) {
+  const tNav = useTranslations('nav');
+  const t = useTranslations('learningPage');
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,18 +44,18 @@ export function LearningTabsClient({
     () => [
       {
         key: "courses",
-        label: "My Courses"
+        label: t('tab.myCourses')
       },
       {
         key: "certificates",
-        label: "Certificates"
+        label: t('tab.certificates')
       },
       {
         key: "surveys",
-        label: "Surveys"
+        label: t('tab.surveys')
       }
     ],
-    []
+    [t]
   );
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(requestedTab, tabs));
@@ -82,13 +85,13 @@ export function LearningTabsClient({
   return (
     <>
       <PageHeader
-        title="Learning"
-        description="Courses, certificates, and surveys assigned to you."
+        title={tNav('learning')}
+        description={tNav('description.learning')}
       />
 
       <FeatureBanner
         moduleId="learning"
-        description="Learning is built but not yet included in the active release. Courses and certificates here are preview-only."
+        description={t('banner')}
       />
 
       <PageTabs

@@ -4,18 +4,24 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
+import { LOCALE_META, SUPPORTED_LOCALES, type AppLocale } from "../../../i18n/locales";
+import { updateLocale } from "../../../lib/i18n/update-locale";
 import type { UserRole } from "../../../lib/navigation";
 import { type NotificationPreferences, type SettingsTab } from "../../../types/settings";
 import { AuditLogViewer } from "./audit-log-viewer";
 
+const BROWSER_PUSH_PREF_KEY = "crewhub-browser-push-enabled";
+
 type SettingsClientProps = {
   initialTab: SettingsTab;
+  preferredLocale: AppLocale;
   profile: {
     fullName: string;
     avatarUrl: string;
@@ -42,42 +48,21 @@ type OrganizationFormValues = {
   name: string;
 };
 
-const profileSchema = z.object({
-  fullName: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
-  phone: z.string().trim().max(30, "Phone number is too long")
-});
+function makeProfileSchema(msgs: { nameRequired: string; nameTooLong: string; phoneTooLong: string }) {
+  return z.object({
+    fullName: z.string().trim().min(1, msgs.nameRequired).max(200, msgs.nameTooLong),
+    phone: z.string().trim().max(30, msgs.phoneTooLong)
+  });
+}
 
-const organizationSchema = z.object({
-  name: z.string().trim().min(1, "Organization name is required").max(200, "Name is too long")
-});
+function makeOrganizationSchema(msgs: { orgNameRequired: string; nameTooLong: string }) {
+  return z.object({
+    name: z.string().trim().min(1, msgs.orgNameRequired).max(200, msgs.nameTooLong)
+  });
+}
 
-const settingsTabs: PageTab[] = [
-  {
-    key: "profile",
-    label: "Profile"
-  },
-  {
-    key: "notifications",
-    label: "Preferences"
-  },
-  {
-    key: "security",
-    label: "Security"
-  },
-  {
-    key: "organization",
-    label: "Organization",
-    requiredRoles: ["SUPER_ADMIN"]
-  },
-  {
-    key: "audit",
-    label: "Audit Log",
-    requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"]
-  }
-];
-
-function validateProfile(values: ProfileFormValues) {
-  const parsed = profileSchema.safeParse(values);
+function validateProfile(values: ProfileFormValues, schema: ReturnType<typeof makeProfileSchema>) {
+  const parsed = schema.safeParse(values);
 
   if (parsed.success) {
     return {};
@@ -90,8 +75,8 @@ function validateProfile(values: ProfileFormValues) {
   };
 }
 
-function validateOrganization(values: OrganizationFormValues) {
-  const parsed = organizationSchema.safeParse(values);
+function validateOrganization(values: OrganizationFormValues, schema: ReturnType<typeof makeOrganizationSchema>) {
+  const parsed = schema.safeParse(values);
 
   if (parsed.success) {
     return {};
@@ -116,17 +101,39 @@ function getInitials(fullName: string): string {
 
 export function SettingsClient({
   initialTab,
+  preferredLocale,
   profile,
   organization,
   canManageOrganization,
   canViewAudit,
   canViewTimePolicies: _canViewTimePolicies
 }: SettingsClientProps) {
+  const t = useTranslations('settings');
+  const tCommon = useTranslations('common');
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const userRoles = profile.roles;
+
+  const settingsTabs = useMemo<PageTab[]>(() => [
+    { key: "profile", label: t('tab.profile') },
+    { key: "notifications", label: t('tab.preferences') },
+    { key: "security", label: t('tab.security') },
+    { key: "organization", label: t('tab.organization'), requiredRoles: ["SUPER_ADMIN"] },
+    { key: "audit", label: t('tab.auditLog'), requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"] }
+  ], [t]);
+
+  const profileSchema = useMemo(() => makeProfileSchema({
+    nameRequired: t('validation.nameRequired'),
+    nameTooLong: t('validation.nameTooLong'),
+    phoneTooLong: t('validation.phoneTooLong')
+  }), [t]);
+
+  const organizationSchema = useMemo(() => makeOrganizationSchema({
+    orgNameRequired: t('validation.orgNameRequired'),
+    nameTooLong: t('validation.nameTooLong')
+  }), [t]);
 
   const visibleTabs = useMemo(
     () =>
@@ -141,7 +148,7 @@ export function SettingsClient({
 
         return true;
       }),
-    [canManageOrganization, canViewAudit]
+    [settingsTabs, canManageOrganization, canViewAudit]
   );
 
   const fallbackTab = (visibleTabs[0]?.key as SettingsTab | undefined) ?? "profile";
@@ -179,6 +186,13 @@ export function SettingsClient({
   );
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [isNotificationSaving, setIsNotificationSaving] = useState(false);
+  const [browserPushPermission, setBrowserPushPermission] = useState<NotificationPermission | "unsupported">(
+    "unsupported"
+  );
+
+  // Language preference state
+  const [isLocaleSaving, setIsLocaleSaving] = useState(false);
+  const [localeFeedback, setLocaleFeedback] = useState<string | null>(null);
 
   // MFA state
   const [mfaEnrolled, setMfaEnrolled] = useState<boolean | null>(null);
@@ -199,6 +213,35 @@ export function SettingsClient({
     if (activeTab !== "security") return;
     fetchMfaStatus();
   }, [activeTab, fetchMfaStatus]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!("Notification" in window)) {
+      setBrowserPushPermission("unsupported");
+      return;
+    }
+
+    setBrowserPushPermission(Notification.permission);
+    const storedPreference = window.localStorage.getItem(BROWSER_PUSH_PREF_KEY);
+    if (storedPreference === null) {
+      window.localStorage.setItem(
+        BROWSER_PUSH_PREF_KEY,
+        profile.notificationPreferences.browserPush ? "true" : "false"
+      );
+      return;
+    }
+
+    const storedEnabled = storedPreference === "true";
+    if (storedEnabled !== profile.notificationPreferences.browserPush) {
+      setNotificationValues((previous) => ({
+        ...previous,
+        browserPush: storedEnabled
+      }));
+    }
+  }, [profile.notificationPreferences.browserPush]);
 
   const [formDirty, setFormDirty] = useState(false);
   useUnsavedGuard(formDirty);
@@ -243,18 +286,18 @@ export function SettingsClient({
       };
 
       if (!response.ok || !payload.data) {
-        setAvatarError(payload.error?.message ?? "Unable to upload photo.");
+        setAvatarError(payload.error?.message ?? t('profile.unableToUpload'));
         return;
       }
 
       setAvatarUrl(payload.data.avatarUrl);
     } catch {
-      setAvatarError("Unable to upload photo.");
+      setAvatarError(t('profile.unableToUpload'));
     } finally {
       setIsAvatarUploading(false);
       if (event.target) event.target.value = "";
     }
-  }, []);
+  }, [t]);
 
   const handleAvatarRemove = useCallback(async () => {
     setIsAvatarUploading(true);
@@ -264,22 +307,22 @@ export function SettingsClient({
       const response = await fetch("/api/v1/me/avatar", { method: "DELETE" });
 
       if (!response.ok) {
-        setAvatarError("Unable to remove photo.");
+        setAvatarError(t('profile.unableToRemove'));
         return;
       }
 
       setAvatarUrl("");
     } catch {
-      setAvatarError("Unable to remove photo.");
+      setAvatarError(t('profile.unableToRemove'));
     } finally {
       setIsAvatarUploading(false);
     }
-  }, []);
+  }, [t]);
 
   const handleProfileSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const errors = validateProfile(profileValues);
+    const errors = validateProfile(profileValues, profileSchema);
     setProfileErrors(errors);
 
     if (hasErrors(errors)) {
@@ -301,14 +344,14 @@ export function SettingsClient({
       };
 
       if (!response.ok) {
-        setProfileMessage(payload.error?.message ?? "Unable to update profile settings.");
+        setProfileMessage(payload.error?.message ?? t('profile.unableToUpdate'));
         return;
       }
 
-      setProfileMessage("Profile settings saved.");
+      setProfileMessage(t('profile.saved'));
       setFormDirty(false);
     } catch (error) {
-      setProfileMessage(error instanceof Error ? error.message : "Unable to update profile settings.");
+      setProfileMessage(error instanceof Error ? error.message : t('profile.unableToUpdate'));
     } finally {
       setIsProfileSaving(false);
     }
@@ -317,7 +360,7 @@ export function SettingsClient({
   const handleOrganizationSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const errors = validateOrganization(organizationValues);
+    const errors = validateOrganization(organizationValues, organizationSchema);
     setOrganizationErrors(errors);
 
     if (hasErrors(errors)) {
@@ -340,16 +383,16 @@ export function SettingsClient({
 
       if (!response.ok) {
         setOrganizationMessage(
-          payload.error?.message ?? "Unable to update organization settings."
+          payload.error?.message ?? t('organization.unableToUpdate')
         );
         return;
       }
 
-      setOrganizationMessage("Organization settings saved.");
+      setOrganizationMessage(t('organization.saved'));
       setFormDirty(false);
     } catch (error) {
       setOrganizationMessage(
-        error instanceof Error ? error.message : "Unable to update organization settings."
+        error instanceof Error ? error.message : t('organization.unableToUpdate')
       );
     } finally {
       setIsOrganizationSaving(false);
@@ -375,16 +418,23 @@ export function SettingsClient({
 
       if (!response.ok) {
         setNotificationMessage(
-          payload.error?.message ?? "Unable to update notification settings."
+          payload.error?.message ?? t('notificationSettings.unableToUpdate')
         );
         return;
       }
 
-      setNotificationMessage("Notification settings saved.");
+      setNotificationMessage(t('notificationSettings.saved'));
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          BROWSER_PUSH_PREF_KEY,
+          notificationValues.browserPush ? "true" : "false"
+        );
+        window.dispatchEvent(new Event("crewhub:browser-push-pref-updated"));
+      }
       setFormDirty(false);
     } catch (error) {
       setNotificationMessage(
-        error instanceof Error ? error.message : "Unable to update notification settings."
+        error instanceof Error ? error.message : t('notificationSettings.unableToUpdate')
       );
     } finally {
       setIsNotificationSaving(false);
@@ -393,8 +443,66 @@ export function SettingsClient({
 
   const initials = getInitials(profile.fullName);
 
+  const handleBrowserPushToggle = async (nextValue: boolean) => {
+    if (!nextValue) {
+      setNotificationValues((previous) => ({ ...previous, browserPush: false }));
+      setNotificationMessage(null);
+      setFormDirty(true);
+      return;
+    }
+
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setNotificationMessage(t('notificationSettings.browserUnsupported'));
+      setNotificationValues((previous) => ({ ...previous, browserPush: false }));
+      return;
+    }
+
+    if (Notification.permission === "denied") {
+      setNotificationMessage(t('notificationSettings.browserBlocked'));
+      setNotificationValues((previous) => ({ ...previous, browserPush: false }));
+      return;
+    }
+
+    let permission: NotificationPermission = Notification.permission;
+    if (permission === "default") {
+      permission = await Notification.requestPermission();
+      setBrowserPushPermission(permission);
+    }
+
+    if (permission !== "granted") {
+      setNotificationMessage(t('notificationSettings.permissionDenied'));
+      setNotificationValues((previous) => ({ ...previous, browserPush: false }));
+      return;
+    }
+
+    setNotificationValues((previous) => ({ ...previous, browserPush: true }));
+    setNotificationMessage(null);
+    setFormDirty(true);
+  };
+
+  const handleLocaleChange = async (event: ChangeEvent<HTMLSelectElement>) => {
+    const newLocale = event.target.value as AppLocale;
+    if (newLocale === preferredLocale) return;
+
+    setIsLocaleSaving(true);
+    setLocaleFeedback(null);
+
+    const result = await updateLocale(newLocale);
+
+    if (result.ok) {
+      router.refresh();
+    } else if (result.cookieSet) {
+      router.refresh();
+      setLocaleFeedback(t('languagePreference.failedPartial'));
+    } else {
+      setLocaleFeedback(t('languagePreference.failed'));
+    }
+
+    setIsLocaleSaving(false);
+  };
+
   return (
-    <section className="settings-layout" aria-label="Settings tabs">
+    <section className="settings-layout" aria-label={t('ariaLabel')}>
       <PageTabs
         tabs={settingsTabs}
         activeTab={activeTab}
@@ -404,9 +512,9 @@ export function SettingsClient({
 
       <div className="settings-content">
         {activeTab === "profile" ? (
-          <section className="settings-card" aria-label="Profile settings">
-            <h2 className="section-title">Profile</h2>
-            <p className="settings-card-description">Update your personal contact information.</p>
+          <section className="settings-card" aria-label={t('profile.ariaLabel')}>
+            <h2 className="section-title">{t('profile.heading')}</h2>
+            <p className="settings-card-description">{t('profile.profileDescription')}</p>
 
             {/* Avatar upload */}
             <div className="profile-avatar-section">
@@ -439,7 +547,7 @@ export function SettingsClient({
                   disabled={isAvatarUploading}
                   onClick={() => avatarInputRef.current?.click()}
                 >
-                  {isAvatarUploading ? "Uploading..." : "Upload photo"}
+                  {isAvatarUploading ? t('profile.uploading') : t('profile.uploadPhoto')}
                 </button>
                 {avatarUrl ? (
                   <button
@@ -448,17 +556,17 @@ export function SettingsClient({
                     disabled={isAvatarUploading}
                     onClick={() => void handleAvatarRemove()}
                   >
-                    Remove
+                    {t('profile.removePhoto')}
                   </button>
                 ) : null}
-                <p className="settings-card-description">JPG, PNG, or WebP. Max 5 MB.</p>
+                <p className="settings-card-description">{t('profile.photoHint')}</p>
               </div>
               {avatarError ? <p className="form-field-error">{avatarError}</p> : null}
             </div>
 
             <form className="settings-form" onSubmit={handleProfileSubmit} noValidate>
               <label className="form-field" htmlFor="profile-full-name">
-                <span className="form-label">Full name</span>
+                <span className="form-label">{t('profile.fullName')}</span>
                 <input
                   id="profile-full-name"
                   className={
@@ -472,7 +580,7 @@ export function SettingsClient({
                     };
 
                     setProfileValues(nextValues);
-                    setProfileErrors(validateProfile(nextValues));
+                    setProfileErrors(validateProfile(nextValues, profileSchema));
                     setFormDirty(true);
                   }}
                 />
@@ -482,7 +590,7 @@ export function SettingsClient({
               </label>
 
               <label className="form-field" htmlFor="profile-phone">
-                <span className="form-label">Phone</span>
+                <span className="form-label">{t('profile.phone')}</span>
                 <input
                   id="profile-phone"
                   className={profileErrors.phone ? "form-input form-input-error" : "form-input"}
@@ -494,7 +602,7 @@ export function SettingsClient({
                     };
 
                     setProfileValues(nextValues);
-                    setProfileErrors(validateProfile(nextValues));
+                    setProfileErrors(validateProfile(nextValues, profileSchema));
                     setFormDirty(true);
                   }}
                 />
@@ -504,13 +612,13 @@ export function SettingsClient({
               </label>
 
               <label className="form-field" htmlFor="profile-email">
-                <span className="form-label">Email</span>
+                <span className="form-label">{t('profile.email')}</span>
                 <input id="profile-email" className="form-input" value={profile.email} disabled />
               </label>
 
               <div className="settings-actions">
                 <button type="submit" className="button button-accent" disabled={isProfileSaving}>
-                  {isProfileSaving ? "Saving..." : "Save profile"}
+                  {isProfileSaving ? tCommon('saving') : t('profile.saveProfile')}
                 </button>
               </div>
 
@@ -520,10 +628,36 @@ export function SettingsClient({
         ) : null}
 
         {activeTab === "notifications" ? (
-          <section className="settings-card" aria-label="Notification settings">
-            <h2 className="section-title">Notifications</h2>
+          <section className="settings-card" aria-label={t('notificationSettings.ariaLabel')}>
+            {/* ── Language preference ─────────────────────── */}
+            <div className="settings-language-section">
+              <h2 className="section-title">{t('languagePreference.heading')}</h2>
+              <p className="settings-card-description">
+                {t('languagePreference.description')}
+              </p>
+
+              <select
+                className="form-input settings-language-select"
+                value={preferredLocale}
+                onChange={(e) => void handleLocaleChange(e)}
+                disabled={isLocaleSaving}
+              >
+                {SUPPORTED_LOCALES.map((loc) => (
+                  <option key={loc} value={loc}>
+                    {LOCALE_META[loc].nativeName}
+                  </option>
+                ))}
+              </select>
+
+              {localeFeedback ? (
+                <p className="settings-language-feedback">{localeFeedback}</p>
+              ) : null}
+            </div>
+
+            {/* ── Notification preferences ────────────────── */}
+            <h2 className="section-title">{t('notificationSettings.heading')}</h2>
             <p className="settings-card-description">
-              Choose how you receive updates from Crew Hub modules.
+              {t('notificationSettings.notifDescription')}
             </p>
 
             <form className="settings-form" onSubmit={handleNotificationsSubmit}>
@@ -539,7 +673,7 @@ export function SettingsClient({
                     setFormDirty(true);
                   }}
                 />
-                <span>Email announcements</span>
+                <span>{t('notificationSettings.emailAnnouncements')}</span>
               </label>
 
               <label className="settings-checkbox">
@@ -554,7 +688,7 @@ export function SettingsClient({
                     setFormDirty(true);
                   }}
                 />
-                <span>Email approval requests</span>
+                <span>{t('notificationSettings.emailApprovals')}</span>
               </label>
 
               <label className="settings-checkbox">
@@ -569,8 +703,31 @@ export function SettingsClient({
                     setFormDirty(true);
                   }}
                 />
-                <span>In-app reminders</span>
+                <span>{t('notificationSettings.inAppReminders')}</span>
               </label>
+
+              <label className="settings-checkbox">
+                <input
+                  type="checkbox"
+                  checked={notificationValues.browserPush}
+                  onChange={(event) => {
+                    void handleBrowserPushToggle(event.currentTarget.checked);
+                  }}
+                />
+                <span>{t('notificationSettings.browserAlerts')}</span>
+              </label>
+              <p className="settings-card-description">
+                {t('notificationSettings.permissionStatus')}{" "}
+                <strong>
+                  {browserPushPermission === "unsupported"
+                    ? t('notificationSettings.permUnsupported')
+                    : browserPushPermission === "granted"
+                      ? t('notificationSettings.permGranted')
+                      : browserPushPermission === "denied"
+                        ? t('notificationSettings.permBlocked')
+                        : t('notificationSettings.permNotGranted')}
+                </strong>
+              </p>
 
               <div className="settings-actions">
                 <button
@@ -578,7 +735,7 @@ export function SettingsClient({
                   className="button button-accent"
                   disabled={isNotificationSaving}
                 >
-                  {isNotificationSaving ? "Saving..." : "Save notifications"}
+                  {isNotificationSaving ? tCommon('saving') : t('notificationSettings.saveNotifications')}
                 </button>
               </div>
 
@@ -589,15 +746,15 @@ export function SettingsClient({
 
         {activeTab === "organization" ? (
           canManageOrganization ? (
-            <section className="settings-card" aria-label="Organization settings">
-              <h2 className="section-title">Organization</h2>
+            <section className="settings-card" aria-label={t('organization.ariaLabel')}>
+              <h2 className="section-title">{t('organization.heading')}</h2>
               <p className="settings-card-description">
-                Update your organization name. This is displayed across Crew Hub.
+                {t('organization.orgDescription')}
               </p>
 
               <form className="settings-form" onSubmit={handleOrganizationSubmit} noValidate>
                 <label className="form-field" htmlFor="organization-name">
-                  <span className="form-label">Organization name</span>
+                  <span className="form-label">{t('organization.orgName')}</span>
                   <input
                     id="organization-name"
                     className={
@@ -611,7 +768,7 @@ export function SettingsClient({
                       };
 
                       setOrganizationValues(nextValues);
-                      setOrganizationErrors(validateOrganization(nextValues));
+                      setOrganizationErrors(validateOrganization(nextValues, organizationSchema));
                       setFormDirty(true);
                     }}
                   />
@@ -626,7 +783,7 @@ export function SettingsClient({
                     className="button button-accent"
                     disabled={isOrganizationSaving}
                   >
-                    {isOrganizationSaving ? "Saving..." : "Save organization"}
+                    {isOrganizationSaving ? tCommon('saving') : t('organization.saveOrganization')}
                   </button>
                 </div>
 
@@ -637,34 +794,34 @@ export function SettingsClient({
             </section>
           ) : (
             <EmptyState
-              title="Organization settings are restricted"
-              description="Only a Super Admin can edit the organization name."
-              ctaLabel="Back to profile"
+              title={t('organization.restricted')}
+              description={t('organization.restrictedBody')}
+              ctaLabel={t('organization.backToProfile')}
               ctaHref="/settings"
             />
           )
         ) : null}
 
         {activeTab === "security" ? (
-          <section className="settings-card" aria-label="Security settings">
-            <h2 className="section-title">Security</h2>
+          <section className="settings-card" aria-label={t('security.ariaLabel')}>
+            <h2 className="section-title">{t('security.heading')}</h2>
             <p className="settings-card-description">
-              Your account is secured with an authenticator app.
+              {t('security.securityDescription')}
             </p>
 
             <div className="security-action-row">
               <div className="security-action-copy">
-                <p className="form-label">Authenticator</p>
+                <p className="form-label">{t('security.authenticator')}</p>
                 <p className="settings-card-description">
                   {isMfaLoading
-                    ? "Checking authenticator status..."
+                    ? t('security.checkingStatus')
                     : mfaEnrolled
-                      ? "Your authenticator app is your login credential. You use it to generate a 6-digit code every time you sign in."
-                      : "Your authenticator has not been set up yet. You will be prompted to set it up the next time you sign in."}
+                      ? t('security.enrolledDescription')
+                      : t('security.notEnrolledDescription')}
                 </p>
                 {!isMfaLoading && mfaEnrolled ? (
                   <p className="settings-card-description" style={{ marginTop: "var(--space-2)" }}>
-                    Need to reset your authenticator? Contact your admin.
+                    {t('security.resetContact')}
                   </p>
                 ) : null}
               </div>
@@ -672,13 +829,13 @@ export function SettingsClient({
 
             <div className="security-action-row">
               <div className="security-action-copy">
-                <p className="form-label">Support</p>
+                <p className="form-label">{t('security.supportLabel')}</p>
                 <p className="settings-card-description">
-                  Found a bug or need help? Ping Zino or Eniibukun on Basecamp.
+                  {t('security.supportDescription')}
                 </p>
               </div>
               <Link href="/support" className="button">
-                Help & Support
+                {t('security.helpSupport')}
               </Link>
             </div>
 
@@ -690,9 +847,9 @@ export function SettingsClient({
             <AuditLogViewer />
           ) : (
             <EmptyState
-              title="Audit log is restricted"
-              description="Only HR Admin and Super Admin can view audit history."
-              ctaLabel="Back to settings"
+              title={t('audit.restricted')}
+              description={t('audit.restrictedBody')}
+              ctaLabel={t('audit.backToSettings')}
               ctaHref="/settings"
             />
           )

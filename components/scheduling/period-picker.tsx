@@ -1,6 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
+
+import { formatMonth, formatDateRange } from "../../lib/datetime";
 
 type PeriodPickerProps = {
   month: string; // YYYY-MM
@@ -14,39 +17,28 @@ type PeriodPickerProps = {
 };
 
 function formatMonthLabel(yyyymm: string): string {
-  const [year, mon] = yyyymm.split("-").map(Number);
-  const date = new Date(Date.UTC(year!, mon! - 1, 1));
-  return date.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  return formatMonth(yyyymm + "-01");
 }
 
-function computeDateRange(month: string, months: number): { startLabel: string; endLabel: string } {
+function computeRangeLabel(month: string, months: number): string {
   const [yearStr, monthStr] = month.split("-");
   const year = Number(yearStr);
   const mon = Number(monthStr);
 
-  const startDate = new Date(Date.UTC(year, mon - 1, 1));
-  const startLabel = startDate.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
+  const startISO = `${year}-${String(mon).padStart(2, "0")}-01`;
 
   const endMonth = mon + months - 1;
   const endYear = year + Math.floor((endMonth - 1) / 12);
   const endMon = ((endMonth - 1) % 12) + 1;
   const lastDay = new Date(Date.UTC(endYear, endMon, 0)).getUTCDate();
-  const endDate = new Date(Date.UTC(endYear, endMon - 1, lastDay));
-  const endLabel = endDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+  const endISO = `${endYear}-${String(endMon).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-  return { startLabel, endLabel };
+  return formatDateRange(startISO, endISO);
 }
 
-function formatCustomRange(start: string, end: string): { startLabel: string; endLabel: string } {
-  if (!start || !end) return { startLabel: "", endLabel: "" };
-
-  const startDate = new Date(`${start}T00:00:00Z`);
-  const endDate = new Date(`${end}T00:00:00Z`);
-
-  const startLabel = startDate.toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
-  const endLabel = endDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
-
-  return { startLabel, endLabel };
+function formatCustomRangeLabel(start: string, end: string): string {
+  if (!start || !end) return "";
+  return formatDateRange(start, end);
 }
 
 function getDefaultMonth(): string {
@@ -97,13 +89,6 @@ function getDefaultCustomEnd(): string {
   return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
 }
 
-const DURATION_OPTIONS = [
-  { value: 1, label: "1 Month" },
-  { value: 2, label: "2 Months" },
-  { value: 3, label: "3 Months" },
-  { value: 0, label: "Custom" }
-];
-
 export { getDefaultMonth, getDefaultCustomStart, getDefaultCustomEnd };
 
 export function PeriodPicker({
@@ -116,22 +101,31 @@ export function PeriodPicker({
   onCustomStartChange,
   onCustomEndChange
 }: PeriodPickerProps) {
+  const t = useTranslations("scheduling");
+
+  const durationOptions = [
+    { value: 1, label: t("period.oneMonth") },
+    { value: 2, label: t("period.twoMonths") },
+    { value: 3, label: t("period.threeMonths") },
+    { value: 0, label: t("period.custom") }
+  ];
+
   const monthOptions = useMemo(() => getMonthOptions(), []);
   const isCustom = months === 0;
 
-  const range = useMemo(() => {
+  const rangeLabel = useMemo(() => {
     if (isCustom) {
-      return formatCustomRange(customStartDate, customEndDate);
+      return formatCustomRangeLabel(customStartDate, customEndDate);
     }
-    return computeDateRange(month, months);
+    return computeRangeLabel(month, months);
   }, [isCustom, month, months, customStartDate, customEndDate]);
 
   return (
     <div className="schedule-period-picker">
       <div className="schedule-period-field">
-        <label className="form-label">Duration</label>
+        <label className="form-label">{t("period.duration")}</label>
         <div className="schedule-duration-options">
-          {DURATION_OPTIONS.map((opt) => (
+          {durationOptions.map((opt) => (
             <button
               key={opt.value}
               type="button"
@@ -146,7 +140,7 @@ export function PeriodPicker({
 
       {!isCustom ? (
         <div className="schedule-period-field">
-          <label className="form-label" htmlFor="schedule-start-month">Starting month</label>
+          <label className="form-label" htmlFor="schedule-start-month">{t("period.startingMonth")}</label>
           <select
             id="schedule-start-month"
             className="form-input"
@@ -161,7 +155,7 @@ export function PeriodPicker({
       ) : (
         <div className="schedule-period-custom-range">
           <div className="schedule-period-field">
-            <label className="form-label" htmlFor="schedule-custom-start">Start date</label>
+            <label className="form-label" htmlFor="schedule-custom-start">{t("period.startDate")}</label>
             <input
               id="schedule-custom-start"
               type="date"
@@ -171,7 +165,7 @@ export function PeriodPicker({
             />
           </div>
           <div className="schedule-period-field">
-            <label className="form-label" htmlFor="schedule-custom-end">End date</label>
+            <label className="form-label" htmlFor="schedule-custom-end">{t("period.endDate")}</label>
             <input
               id="schedule-custom-end"
               type="date"
@@ -183,9 +177,9 @@ export function PeriodPicker({
         </div>
       )}
 
-      {range.startLabel && range.endLabel ? (
+      {rangeLabel ? (
         <div className="schedule-period-summary">
-          <span className="schedule-period-range">{range.startLabel} &ndash; {range.endLabel}</span>
+          <span className="schedule-period-range">{rangeLabel}</span>
         </div>
       ) : null}
     </div>

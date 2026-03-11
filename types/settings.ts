@@ -14,6 +14,7 @@ export type NotificationPreferences = {
   emailAnnouncements: boolean;
   emailApprovals: boolean;
   inAppReminders: boolean;
+  browserPush: boolean;
 };
 
 export const AUDIT_LOG_ACTIONS = [

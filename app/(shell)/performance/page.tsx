@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
@@ -8,15 +10,17 @@ export default async function PerformancePage() {
   const session = await getAuthenticatedSession();
 
   if (!session?.profile) {
+    const t = await getTranslations('common');
+    const tNav = await getTranslations('nav');
     return (
       <>
         <PageHeader
-          title="Performance"
-          description="Run review cycles, track completion, and calibrate fairly."
+          title={tNav('performance')}
+          description={tNav('description.performance')}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={t('emptyState.profileUnavailable')}
+          description={t('emptyState.profileUnavailableBody')}
         />
       </>
     );

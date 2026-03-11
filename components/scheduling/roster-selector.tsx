@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import type { ScheduleTrack, WeekendHourOption } from "../../types/scheduling";
 
@@ -54,6 +55,8 @@ function getCountryFlag(code: string | null): string {
 }
 
 export function RosterSelector({ employees, track, selected, onChange }: RosterSelectorProps) {
+  const t = useTranslations("scheduling");
+  const tc = useTranslations("common");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Show all employees regardless of track — any team member might need
@@ -115,10 +118,10 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
     <div className="schedule-roster-selector">
       <div className="schedule-roster-header">
         <div className="schedule-roster-count">
-          {selected.size} of {eligible.length} selected
+          {t("roster.selectedCount", { selected: selected.size, total: eligible.length })}
         </div>
         <button type="button" className="button button-ghost" onClick={handleSelectAll}>
-          {allSelected ? "Deselect All" : "Select All"}
+          {allSelected ? tc("deselectAll") : tc("selectAll")}
         </button>
       </div>
 
@@ -126,7 +129,7 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
         <input
           type="text"
           className="form-input schedule-roster-search"
-          placeholder="Search team members..."
+          placeholder={t("roster.searchPlaceholder")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -150,7 +153,7 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
             <div key={emp.id}>
               {isFirstNonCS ? (
                 <div className="schedule-roster-divider">
-                  <span className="schedule-roster-divider-label">Other team members</span>
+                  <span className="schedule-roster-divider-label">{t("roster.otherTeamMembers")}</span>
                 </div>
               ) : null}
               <label className="schedule-roster-row">
@@ -174,9 +177,9 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
                       e.preventDefault();
                       handleCycleWeekendHours(emp.id);
                     }}
-                    title="Click to cycle: 8hr → 4hr → 3hr → 2hr"
+                    title={t("roster.cycleHoursTooltip")}
                   >
-                    {entry?.weekendHours ?? "8"}hr
+                    {t("roster.hoursLabel", { hours: entry?.weekendHours ?? "8" })}
                   </button>
                 ) : null}
               </label>
@@ -187,8 +190,8 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
         {filtered.length === 0 ? (
           <div className="schedule-roster-empty">
             {searchQuery.trim()
-              ? "No team members match your search."
-              : "No active team members found."}
+              ? t("roster.noSearchResults")
+              : t("roster.noActiveMembers")}
           </div>
         ) : null}
       </div>

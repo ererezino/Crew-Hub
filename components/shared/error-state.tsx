@@ -1,4 +1,7 @@
+"use client";
+
 import { AlertCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type ErrorStateProps = {
   title?: string;
@@ -38,27 +41,27 @@ function sanitizeError(
 }
 
 export function ErrorState({
-  title = "Something went wrong",
+  title,
   message,
   error,
   onRetry
 }: ErrorStateProps) {
+  const t = useTranslations("common");
+
+  const resolvedTitle = title ?? t("error.generic");
   const sanitized = sanitizeError(error);
-  const displayMessage =
-    message ??
-    sanitized ??
-    "Try again in a moment. If it keeps happening, reach out to ops.";
+  const displayMessage = message ?? sanitized ?? t("error.genericBody");
 
   return (
     <section className="error-state" aria-live="assertive">
       <div className="error-state-icon">
         <AlertCircle size={40} />
       </div>
-      <h2 className="error-state-title">{title}</h2>
+      <h2 className="error-state-title">{resolvedTitle}</h2>
       <p className="error-state-message">{displayMessage}</p>
       {onRetry ? (
         <button type="button" className="button button-ghost" onClick={onRetry}>
-          Try again
+          {t("tryAgain")}
         </button>
       ) : null}
     </section>

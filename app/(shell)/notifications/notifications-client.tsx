@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -12,6 +13,7 @@ import { useNotifications } from "../../../hooks/use-notifications";
 import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
 
+type AppLocale = "en" | "fr";
 type NotificationFilter = "all" | "unread";
 type SortDirection = "desc" | "asc";
 
@@ -31,6 +33,10 @@ type NotificationsClientProps = {
 };
 
 export function NotificationsClient({ isSuperAdmin = false }: NotificationsClientProps) {
+  const t = useTranslations('notificationsPage');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -71,7 +77,7 @@ export function NotificationsClient({ isSuperAdmin = false }: NotificationsClien
   if (notificationsQuery.errorMessage) {
     return (
       <ErrorState
-        title="Notifications unavailable"
+        title={t('unavailable')}
         message={notificationsQuery.errorMessage}
         onRetry={notificationsQuery.refresh}
       />
@@ -80,21 +86,21 @@ export function NotificationsClient({ isSuperAdmin = false }: NotificationsClien
 
   return (
     <section className="settings-layout">
-      <section className="notifications-toolbar" aria-label="Notifications toolbar">
+      <section className="notifications-toolbar" aria-label={t('toolbarAriaLabel')}>
         <div className="page-header-actions">
           <button
             type="button"
             className={filter === "all" ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setFilter("all")}
           >
-            All
+            {t('filterAll')}
           </button>
           <button
             type="button"
             className={filter === "unread" ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setFilter("unread")}
           >
-            Unread
+            {t('filterUnread')}
           </button>
         </div>
 
@@ -105,27 +111,27 @@ export function NotificationsClient({ isSuperAdmin = false }: NotificationsClien
             disabled={unreadCount === 0}
             onClick={() => void notificationsQuery.markAllRead()}
           >
-            Mark all read
+            {t('markAllRead')}
           </button>
           <button
             type="button"
             className="button button-subtle"
             onClick={notificationsQuery.refresh}
           >
-            Refresh
+            {t('refresh')}
           </button>
         </div>
       </section>
 
       {sortedNotifications.length === 0 ? (
         <EmptyState
-          title="No notifications yet"
-          description="New activity from workflows and approvals will appear here."
+          title={t('noNotifications')}
+          description={t('noNotificationsDescription')}
         />
       ) : null}
 
       {sortedNotifications.length > 0 ? (
-        <section className="data-table-container" aria-label="Notifications table">
+        <section className="data-table-container" aria-label={t('tableAriaLabel')}>
           <table className="data-table">
             <thead>
               <tr>
@@ -137,24 +143,24 @@ export function NotificationsClient({ isSuperAdmin = false }: NotificationsClien
                       setSortDirection((current) => (current === "desc" ? "asc" : "desc"))
                     }
                   >
-                    Date
+                    {t('colDate')}
                     <span className="numeric">{sortDirection === "desc" ? "↓" : "↑"}</span>
                   </button>
                 </th>
-                <th>Title</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th className="table-action-column">Actions</th>
+                <th>{t('colTitle')}</th>
+                <th>{t('colType')}</th>
+                <th>{t('colStatus')}</th>
+                <th className="table-action-column">{t('colActions')}</th>
               </tr>
             </thead>
             <tbody>
               {sortedNotifications.map((notification) => (
                 <tr key={notification.id} className="data-table-row">
                   <td>
-                    <p className="numeric" title={formatDateTimeTooltip(notification.createdAt)}>
-                      {formatRelativeTime(notification.createdAt)}
+                    <p className="numeric" title={formatDateTimeTooltip(notification.createdAt, locale)}>
+                      {formatRelativeTime(notification.createdAt, locale)}
                     </p>
-                    <p className="settings-card-description">{formatSingleDateHuman(notification.createdAt)}</p>
+                    <p className="settings-card-description">{formatSingleDateHuman(notification.createdAt, locale)}</p>
                   </td>
                   <td>
                     <p>{notification.title}</p>
@@ -176,14 +182,14 @@ export function NotificationsClient({ isSuperAdmin = false }: NotificationsClien
                   </td>
                   <td>
                     <StatusBadge tone={notification.isRead ? "success" : "pending"}>
-                      {notification.isRead ? "Read" : "Unread"}
+                      {notification.isRead ? t('statusRead') : t('statusUnread')}
                     </StatusBadge>
                   </td>
                   <td className="table-row-action-cell">
                     <div className="notifications-row-actions">
                       {notification.link ? (
                         <Link className="table-row-action" href={notification.link}>
-                          Open
+                          {t('open')}
                         </Link>
                       ) : null}
                       {!notification.isRead ? (
@@ -192,7 +198,7 @@ export function NotificationsClient({ isSuperAdmin = false }: NotificationsClien
                           className="table-row-action"
                           onClick={() => void notificationsQuery.markRead(notification.id)}
                         >
-                          Mark read
+                          {t('markRead')}
                         </button>
                       ) : null}
                       {isSuperAdmin ? (
@@ -203,7 +209,7 @@ export function NotificationsClient({ isSuperAdmin = false }: NotificationsClien
                             setConfirmDeleteId(notification.id);
                           }}
                         >
-                          Delete
+                          {tCommon('delete')}
                         </button>
                       ) : null}
                     </div>
@@ -217,9 +223,9 @@ export function NotificationsClient({ isSuperAdmin = false }: NotificationsClien
 
       <ConfirmDialog
         isOpen={confirmDeleteId !== null}
-        title="Delete notification company-wide?"
-        description="This will permanently remove this notification for everyone in the company. This action cannot be undone."
-        confirmLabel="Delete for everyone"
+        title={t('deleteConfirmTitle')}
+        description={t('deleteConfirmDescription')}
+        confirmLabel={t('deleteConfirmLabel')}
         tone="danger"
         isConfirming={isDeleting}
         onConfirm={async () => {

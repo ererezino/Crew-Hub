@@ -1,8 +1,11 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useTheme } from "./theme-provider";
 
 export function ThemeToggle() {
+  const t = useTranslations("theme");
   const { isReady, theme, toggleTheme } = useTheme();
 
   return (
@@ -10,8 +13,8 @@ export function ThemeToggle() {
       className="icon-button"
       type="button"
       onClick={toggleTheme}
-      aria-label="Toggle color mode"
-      title="Toggle color mode"
+      aria-label={t("toggleLabel")}
+      title={t("toggleLabel")}
     >
       {isReady && theme === "dark" ? (
         <svg viewBox="0 0 24 24" aria-hidden="true">

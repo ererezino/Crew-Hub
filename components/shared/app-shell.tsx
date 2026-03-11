@@ -1,6 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -32,6 +33,7 @@ import { CommandPalette } from "./command-palette";
 import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { NavIcon } from "./nav-icon";
 import { NotificationCenter } from "./notification-center";
+import { LocaleToggle } from "./locale-toggle";
 import { ThemeToggle } from "./theme-toggle";
 import { SupportLink } from "./support-link";
 import { UnsavedLeaveDialog } from "./unsaved-leave-dialog";
@@ -329,31 +331,6 @@ async function fetchActiveAnnouncementCount(): Promise<number> {
 
 type AvailabilityStatus = "available" | "afk" | "ooo";
 
-const STATUS_OPTIONS: { value: AvailabilityStatus; label: string }[] = [
-  { value: "available", label: "Available" },
-  { value: "afk", label: "Away From Keyboard" },
-  { value: "ooo", label: "Out of office" },
-];
-
-const AFK_DURATION_OPTIONS: { value: number; label: string }[] = [
-  { value: 15, label: "15 min" },
-  { value: 30, label: "30 min" },
-  { value: 45, label: "45 min" },
-  { value: 60, label: "1 hr" },
-  { value: 75, label: "1 hr 15 min" },
-  { value: 90, label: "1 hr 30 min" },
-  { value: 105, label: "1 hr 45 min" },
-  { value: 120, label: "2 hrs" },
-];
-
-const OOO_DAY_OPTIONS: { value: number; label: string }[] = [
-  { value: 1, label: "1 day" },
-  { value: 2, label: "2 days" },
-  { value: 3, label: "3 days" },
-  { value: 4, label: "4 days" },
-  { value: 5, label: "5 days" },
-  { value: -1, label: "Other" },
-];
 
 type UserMenuProps = {
   profile: { fullName: string; email: string; avatarUrl: string | null } | null;
@@ -361,17 +338,9 @@ type UserMenuProps = {
   roles: readonly UserRole[];
 };
 
-function getRoleBadgeLabel(roles: readonly UserRole[]): string {
-  if (hasRole(roles, "SUPER_ADMIN")) return "Super Admin";
-  if (hasRole(roles, "HR_ADMIN") && hasRole(roles, "FINANCE_ADMIN")) return "HR & Finance Admin";
-  if (hasRole(roles, "HR_ADMIN")) return "HR Admin";
-  if (hasRole(roles, "FINANCE_ADMIN")) return "Finance Admin";
-  if (hasRole(roles, "MANAGER")) return "Manager";
-  if (hasRole(roles, "TEAM_LEAD")) return "Team Lead";
-  return "Employee";
-}
-
 function UserMenu({ profile, initials, roles }: UserMenuProps) {
+  const t = useTranslations("appShell");
+  const tCommon = useTranslations("common");
   const [isOpen, setIsOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isStatusPickerOpen, setIsStatusPickerOpen] = useState(false);
@@ -386,6 +355,42 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const statusRef = useRef<HTMLDivElement | null>(null);
   const noteInputRef = useRef<HTMLInputElement | null>(null);
+
+  const statusOptions = useMemo(() => [
+    { value: "available" as const, label: t("status.available") },
+    { value: "afk" as const, label: t("status.afk") },
+    { value: "ooo" as const, label: t("status.ooo") },
+  ], [t]);
+
+  const afkDurationOptions = useMemo(() => [
+    { value: 15, label: t("duration.min15") },
+    { value: 30, label: t("duration.min30") },
+    { value: 45, label: t("duration.min45") },
+    { value: 60, label: t("duration.hr1") },
+    { value: 75, label: t("duration.hr1min15") },
+    { value: 90, label: t("duration.hr1min30") },
+    { value: 105, label: t("duration.hr1min45") },
+    { value: 120, label: t("duration.hr2") },
+  ], [t]);
+
+  const oooDayOptions = useMemo(() => [
+    { value: 1, label: t("duration.day1") },
+    { value: 2, label: t("duration.day2") },
+    { value: 3, label: t("duration.day3") },
+    { value: 4, label: t("duration.day4") },
+    { value: 5, label: t("duration.day5") },
+    { value: -1, label: t("duration.other") },
+  ], [t]);
+
+  const roleBadge = useMemo(() => {
+    if (hasRole(roles, "SUPER_ADMIN")) return t("roleBadge.superAdmin");
+    if (hasRole(roles, "HR_ADMIN") && hasRole(roles, "FINANCE_ADMIN")) return t("roleBadge.hrFinanceAdmin");
+    if (hasRole(roles, "HR_ADMIN")) return t("roleBadge.hrAdmin");
+    if (hasRole(roles, "FINANCE_ADMIN")) return t("roleBadge.financeAdmin");
+    if (hasRole(roles, "MANAGER")) return t("roleBadge.manager");
+    if (hasRole(roles, "TEAM_LEAD")) return t("roleBadge.teamLead");
+    return t("roleBadge.employee");
+  }, [roles, t]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -476,8 +481,6 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
     }
   }, []);
 
-  const roleBadge = getRoleBadgeLabel(roles);
-
   return (
     <div className="user-menu" ref={menuRef}>
       <div ref={statusRef} className="user-menu-status-wrapper">
@@ -485,7 +488,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
           type="button"
           className="user-menu-trigger"
           onClick={() => setIsStatusPickerOpen((v) => !v)}
-          aria-label="Change status"
+          aria-label={t("status.changeLabel")}
         >
           {profile?.avatarUrl ? (
             <Image src={profile.avatarUrl} alt={profile.fullName} width={32} height={32} className="user-menu-avatar-image" />
@@ -498,7 +501,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
         {isStatusPickerOpen ? (
           <div className="status-picker">
             {pendingStatus === null ? (
-              STATUS_OPTIONS.map((opt) => (
+              statusOptions.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
@@ -512,10 +515,10 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
             ) : (
               <div className="status-note-panel">
                 <p className="status-note-heading">
-                  {STATUS_OPTIONS.find((o) => o.value === pendingStatus)?.label ?? "Status"}
+                  {statusOptions.find((o) => o.value === pendingStatus)?.label ?? "Status"}
                 </p>
                 <p className="status-note-label">
-                  Add note &amp; set time <span className="status-note-required">*</span>
+                  {t("status.noteLabel")} <span className="status-note-required">*</span>
                 </p>
                 <input
                   ref={noteInputRef}
@@ -523,8 +526,8 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                   className={`status-note-input${statusNoteError ? " status-note-input-error" : ""}`}
                   placeholder={
                     pendingStatus === "ooo"
-                      ? "e.g. Taking my leave — back next Monday"
-                      : "e.g. Stepping out to fix Gabby's car"
+                      ? t("status.oooPlaceholder")
+                      : t("status.afkPlaceholder")
                   }
                   value={statusNote}
                   maxLength={200}
@@ -541,11 +544,11 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                   }}
                 />
                 {statusNoteError ? (
-                  <p className="status-note-error-text">A note is required.</p>
+                  <p className="status-note-error-text">{t("status.noteRequired")}</p>
                 ) : null}
                 <div className="status-duration-row">
                   <label className="status-duration-label" htmlFor="status-duration-select">
-                    {pendingStatus === "ooo" ? "Days" : "Duration"}
+                    {pendingStatus === "ooo" ? t("status.daysLabel") : t("status.durationLabel")}
                   </label>
                   {pendingStatus === "ooo" ? (
                     showCustomDaysInput ? (
@@ -562,14 +565,16 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                             if (e.key === "Enter") confirmPendingStatus();
                           }}
                         />
-                        <span className="status-custom-days-suffix">days</span>
+                        <span className="status-custom-days-suffix">{t("status.daysSuffix")}</span>
                         <button
                           type="button"
                           className="status-custom-days-back"
                           onClick={() => { setShowCustomDaysInput(false); setStatusCustomDays(""); }}
-                          aria-label="Back to dropdown"
+                          aria-label={t("status.backToDropdown")}
                         >
+                          {/* eslint-disable i18next/no-literal-string -- Decorative close icon, has aria-label */}
                           ✕
+                          {/* eslint-enable i18next/no-literal-string */}
                         </button>
                       </div>
                     ) : (
@@ -587,7 +592,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                           }
                         }}
                       >
-                        {OOO_DAY_OPTIONS.map((opt) => (
+                        {oooDayOptions.map((opt) => (
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                       </select>
@@ -599,7 +604,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                       value={statusDuration}
                       onChange={(e) => setStatusDuration(Number(e.target.value))}
                     >
-                      {AFK_DURATION_OPTIONS.map((opt) => (
+                      {afkDurationOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
                     </select>
@@ -615,14 +620,14 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                       setShowCustomDaysInput(false);
                     }}
                   >
-                    Cancel
+                    {tCommon("cancel")}
                   </button>
                   <button
                     type="button"
                     className="status-note-confirm"
                     onClick={confirmPendingStatus}
                   >
-                    Enter
+                    {tCommon("confirm")}
                   </button>
                 </div>
               </div>
@@ -635,7 +640,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
         type="button"
         className="user-menu-trigger"
         onClick={() => setIsOpen((v) => !v)}
-        aria-label="User menu"
+        aria-label={t("userMenu.label")}
       >
         <svg viewBox="0 0 24 24" className="user-menu-chevron-icon" aria-hidden="true">
           <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -651,7 +656,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
               <span className="user-menu-avatar-lg numeric">{initials}</span>
             )}
             <div className="user-menu-profile-copy">
-              <p className="user-menu-name">{profile?.fullName ?? "User"}</p>
+              <p className="user-menu-name">{profile?.fullName ?? t("userMenu.defaultName")}</p>
               <p className="user-menu-email">{profile?.email ?? ""}</p>
               <span className="user-menu-role-badge">{roleBadge}</span>
             </div>
@@ -668,7 +673,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
               <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.6" fill="none" />
               <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
             </svg>
-            My Profile
+            {t("userMenu.myProfile")}
           </Link>
 
           <Link
@@ -680,7 +685,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
               <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" fill="none" />
               <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
-            Settings
+            {t("userMenu.settings")}
           </Link>
 
           <div className="user-menu-divider" />
@@ -696,7 +701,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
               <polyline points="16,17 21,12 16,7" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
               <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
-            {isSigningOut ? "Signing out…" : "Sign out"}
+            {isSigningOut ? t("userMenu.signingOut") : t("userMenu.signOut")}
           </button>
         </div>
       ) : null}
@@ -711,10 +716,13 @@ type AppShellProps = {
     email: string;
     avatarUrl: string | null;
   } | null;
+  profileLocale?: string | null;
   children: ReactNode;
 };
 
-function AppShellContent({ currentUserRoles, currentUserProfile, children }: AppShellProps) {
+function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, children }: AppShellProps) {
+  const t = useTranslations("appShell");
+  const tNav = useTranslations("nav");
   const pathname = usePathname();
   const router = useRouter();
 
@@ -1014,7 +1022,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
               type="button"
               className="sidebar-expand-btn desktop-only"
               onClick={() => setIsSidebarCollapsed(false)}
-              aria-label="Expand sidebar"
+              aria-label={t("expandSidebar")}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -1030,7 +1038,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
               <Link
                 href="/dashboard"
                 className="sidebar-brand desktop-only"
-                aria-label="Crew Hub home"
+                aria-label={t("crewHubHome")}
                 onClick={() => handleSidebarItemClick("/dashboard")}
               >
                 <span className="sidebar-brand-icon" aria-hidden="true">
@@ -1051,13 +1059,14 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                     priority
                   />
                 </span>
+                {/* eslint-disable-next-line i18next/no-literal-string */}
                 <span className="sidebar-brand-copy">Crew Hub</span>
               </Link>
               <button
                 type="button"
                 className="sidebar-collapse-btn desktop-only"
                 onClick={() => setIsSidebarCollapsed(true)}
-                aria-label="Collapse sidebar"
+                aria-label={t("collapseSidebar")}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" fill="none" />
@@ -1071,7 +1080,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
           <Link
             href="/dashboard"
             className="sidebar-brand mobile-only"
-            aria-label="Crew Hub home"
+            aria-label={t("crewHubHome")}
             onClick={() => handleSidebarItemClick("/dashboard")}
           >
             <span className="sidebar-brand-icon" aria-hidden="true">
@@ -1092,11 +1101,12 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                 priority
               />
             </span>
+            {/* eslint-disable-next-line i18next/no-literal-string */}
             <span className="sidebar-brand-copy">Crew Hub</span>
           </Link>
         </div>
 
-        <nav className="sidebar-nav" aria-label="Primary">
+        <nav className="sidebar-nav" aria-label={t("primaryNav")}>
           {navigationGroups.map(({ group, key, domId }) => {
             const hasHeading = group.label.length > 0;
             const isExpanded = expandedGroupKeys.has(key);
@@ -1112,7 +1122,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                     aria-expanded={isExpanded}
                     aria-controls={domId}
                   >
-                    {group.label}
+                    {group.labelKey ? tNav(`group.${group.labelKey}` as never) : group.label}
                     <svg
                       viewBox="0 0 24 24"
                       className={`sidebar-section-chevron${isExpanded ? " sidebar-section-chevron-open" : ""}`}
@@ -1142,17 +1152,17 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                         >
                           <span className="sidebar-link-indicator" aria-hidden="true" />
                           <NavIcon name={item.icon} size={18} className="sidebar-link-icon" />
-                          <span className="sidebar-link-text">{item.label}</span>
+                          <span className="sidebar-link-text">{tNav(item.labelKey as never)}</span>
                           {item.moduleId && getModuleState(item.moduleId) !== "LIVE" ? (
                             <FeatureBadge moduleId={item.moduleId} />
                           ) : null}
                           {showApprovalsBadge ? (
-                            <span className="sidebar-link-badge numeric" aria-label="Pending approvals">
+                            <span className="sidebar-link-badge numeric" aria-label={t("pendingApprovals")}>
                               {approvalsCountQuery.data?.total ?? 0}
                             </span>
                           ) : null}
                           {showAnnouncementBadge ? (
-                            <span className="sidebar-link-badge numeric" aria-label="Unread announcements">
+                            <span className="sidebar-link-badge numeric" aria-label={t("unreadAnnouncements")}>
                               {announcementCountQuery.data ?? 0}
                             </span>
                           ) : null}
@@ -1183,7 +1193,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
             >
               <span className="sidebar-link-indicator" aria-hidden="true" />
               <NavIcon name="Settings" size={18} className="sidebar-link-icon" />
-              <span className="sidebar-link-text">Settings</span>
+              <span className="sidebar-link-text">{tNav("settings")}</span>
             </Link>
           ) : null}
 
@@ -1220,7 +1230,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
               type="button"
               className="icon-button mobile-only"
               onClick={() => setIsMobileSidebarOpen(true)}
-              aria-label="Open navigation"
+              aria-label={t("openNavigation")}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -1233,9 +1243,9 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
             </button>
 
             <div>
-              <p className="topbar-title">{activeRoute?.label ?? "Crew Hub"}</p>
+              <p className="topbar-title">{activeRoute ? tNav(activeRoute.labelKey as never) : t("brandName")}</p>
               <p className="topbar-subtitle">
-                {activeRoute?.description ?? "Crew Hub workspace"}
+                {activeRoute ? tNav(`description.${activeRoute.labelKey}` as never) : t("defaultSubtitle")}
               </p>
             </div>
           </div>
@@ -1255,11 +1265,12 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
                   strokeLinecap="round"
                 />
               </svg>
-              <span>Search</span>
-              <kbd>Cmd/Ctrl + K</kbd>
+              <span>{t("searchButton")}</span>
+              <kbd>{t("searchShortcut")}</kbd>
             </button>
             <NotificationCenter />
             <ThemeToggle />
+            <LocaleToggle profileLocale={profileLocale} />
             <UserMenu
               profile={currentUserProfile}
               initials={sidebarProfileInitials}
@@ -1278,7 +1289,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
           type="button"
           className="sidebar-scrim mobile-only"
           onClick={() => setIsMobileSidebarOpen(false)}
-          aria-label="Close navigation"
+          aria-label={t("closeNavigation")}
         />
       ) : null}
 
@@ -1298,7 +1309,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, children }: App
   );
 }
 
-export function AppShell({ currentUserRoles, currentUserProfile, children }: AppShellProps) {
+export function AppShell({ currentUserRoles, currentUserProfile, profileLocale, children }: AppShellProps) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -1314,7 +1325,7 @@ export function AppShell({ currentUserRoles, currentUserProfile, children }: App
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppShellContent currentUserRoles={currentUserRoles} currentUserProfile={currentUserProfile}>
+      <AppShellContent currentUserRoles={currentUserRoles} currentUserProfile={currentUserProfile} profileLocale={profileLocale}>
         {children}
       </AppShellContent>
     </QueryClientProvider>

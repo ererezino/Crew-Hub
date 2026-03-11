@@ -10,6 +10,7 @@ import {
 } from "react";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -41,6 +42,7 @@ import type {
 } from "../../../../types/expenses";
 import { humanizeError } from "@/lib/errors";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
 
@@ -73,19 +75,6 @@ type DisburseFormErrors = {
   reimbursementReference?: string;
   paymentProof?: string;
 };
-
-const rejectSchema = z.object({
-  reason: z.string().trim().min(1, "Rejection reason is required").max(2000, "Reason is too long")
-});
-
-const disburseSchema = z.object({
-  reimbursementReference: z
-    .string()
-    .trim()
-    .min(1, "Reimbursement reference is required")
-    .max(120, "Reference is too long"),
-  reimbursementNotes: z.string().trim().max(2000, "Notes are too long")
-});
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -122,6 +111,24 @@ export function ExpenseApprovalsClient({
   canFinanceApprove: boolean;
   embedded?: boolean;
 }) {
+  const t = useTranslations('expenseApprovals');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
+  const rejectSchema = z.object({
+    reason: z.string().trim().min(1, t('validation.rejectionReasonRequired')).max(2000, t('validation.reasonTooLong'))
+  });
+
+  const disburseSchema = z.object({
+    reimbursementReference: z
+      .string()
+      .trim()
+      .min(1, t('validation.reimbursementReferenceRequired'))
+      .max(120, t('validation.referenceTooLong')),
+    reimbursementNotes: z.string().trim().max(2000, t('validation.notesTooLong'))
+  });
+
   const queryClient = useQueryClient();
   const availableStages = useMemo<ExpenseApprovalStage[]>(() => {
     const stages: ExpenseApprovalStage[] = [];
@@ -281,16 +288,16 @@ export function ExpenseApprovalsClient({
       const payload = (await response.json()) as UpdateExpenseResponse;
 
       if (!response.ok || !payload.data?.expense) {
-        showToast("error", payload.error?.message ?? "Unable to approve expense.");
+        showToast("error", payload.error?.message ?? t('toast.approveError'));
         return;
       }
 
       setSelectedIds((current) => current.filter((id) => id !== expense.id));
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
-      showToast("success", "Expense moved to finance payment queue.");
+      showToast("success", t('toast.approveSuccess'));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to approve expense.");
+      showToast("error", error instanceof Error ? error.message : t('toast.approveError'));
     } finally {
       setIsMutatingId(null);
     }
@@ -323,7 +330,7 @@ export function ExpenseApprovalsClient({
       const payload = (await response.json()) as ExpenseCommentsResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to load expense conversation.");
+        showToast("error", payload.error?.message ?? t('toast.loadConversationError'));
         setRequestInfoThread([]);
         return;
       }
@@ -332,7 +339,7 @@ export function ExpenseApprovalsClient({
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to load expense conversation."
+        error instanceof Error ? error.message : t('toast.loadConversationError')
       );
       setRequestInfoThread([]);
     } finally {
@@ -364,12 +371,12 @@ export function ExpenseApprovalsClient({
     setRequestInfoMessage(value);
 
     if (value.trim().length === 0) {
-      setRequestInfoErrors({ message: "Message is required." });
+      setRequestInfoErrors({ message: t('validation.messageRequired') });
       return;
     }
 
     if (value.trim().length > 2000) {
-      setRequestInfoErrors({ message: "Message is too long." });
+      setRequestInfoErrors({ message: t('validation.messageTooLong') });
       return;
     }
 
@@ -385,12 +392,12 @@ export function ExpenseApprovalsClient({
 
     const trimmedMessage = requestInfoMessage.trim();
     if (!trimmedMessage) {
-      setRequestInfoErrors({ message: "Message is required." });
+      setRequestInfoErrors({ message: t('validation.messageRequired') });
       return;
     }
 
     if (trimmedMessage.length > 2000) {
-      setRequestInfoErrors({ message: "Message is too long." });
+      setRequestInfoErrors({ message: t('validation.messageTooLong') });
       return;
     }
 
@@ -412,7 +419,7 @@ export function ExpenseApprovalsClient({
       const payload = (await response.json()) as CreateExpenseCommentResponse;
 
       if (!response.ok || !payload.data?.comment) {
-        showToast("error", payload.error?.message ?? "Unable to request additional info.");
+        showToast("error", payload.error?.message ?? t('toast.requestInfoError'));
         return;
       }
       const createdComment = payload.data.comment;
@@ -422,9 +429,9 @@ export function ExpenseApprovalsClient({
       setRequestInfoErrors({});
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
-      showToast("info", "Info request sent to employee.");
+      showToast("info", t('toast.requestInfoSuccess'));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to request additional info.");
+      showToast("error", error instanceof Error ? error.message : t('toast.requestInfoError'));
     } finally {
       setIsRequestingInfo(false);
       setIsMutatingId(null);
@@ -506,7 +513,7 @@ export function ExpenseApprovalsClient({
     if (!paymentProofFile) {
       setDisburseErrors({
         reimbursementReference: undefined,
-        paymentProof: "Payment proof receipt is required."
+        paymentProof: t('validation.paymentProofRequired')
       });
       return;
     }
@@ -529,7 +536,7 @@ export function ExpenseApprovalsClient({
         showToast(
           "error",
           (uploadPayload as { error?: { message?: string } } | null)?.error?.message ??
-            "Unable to upload payment proof."
+            t('toast.uploadPaymentProofError')
         );
         return;
       }
@@ -538,7 +545,7 @@ export function ExpenseApprovalsClient({
       const receiptPath = uploadResult.data?.path;
 
       if (!receiptPath) {
-        showToast("error", "Unable to upload payment proof.");
+        showToast("error", t('toast.uploadPaymentProofError'));
         return;
       }
 
@@ -559,7 +566,7 @@ export function ExpenseApprovalsClient({
       const payload = (await response.json()) as UpdateExpenseResponse;
 
       if (!response.ok || !payload.data?.expense) {
-        showToast("error", payload.error?.message ?? "Unable to mark expense as paid.");
+        showToast("error", payload.error?.message ?? t('toast.markPaidError'));
         return;
       }
 
@@ -567,9 +574,9 @@ export function ExpenseApprovalsClient({
       setSelectedIds((current) => current.filter((id) => id !== disburseTarget.id));
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
-      showToast("success", "Expense marked as paid.");
+      showToast("success", t('toast.markPaidSuccess'));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to mark expense as paid.");
+      showToast("error", error instanceof Error ? error.message : t('toast.markPaidError'));
     } finally {
       setIsDisbursing(false);
       setIsMutatingId(null);
@@ -578,7 +585,7 @@ export function ExpenseApprovalsClient({
 
   const handleBulkApprove = async () => {
     if (stage !== "manager") {
-      showToast("error", "Bulk processing is only available for manager approvals.");
+      showToast("error", t('toast.bulkOnlyManager'));
       return;
     }
 
@@ -603,7 +610,7 @@ export function ExpenseApprovalsClient({
       const payload = (await response.json()) as ExpenseBulkApproveResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? "Unable to process selected expenses.");
+        showToast("error", payload.error?.message ?? t('toast.bulkApproveError'));
         return;
       }
 
@@ -612,10 +619,10 @@ export function ExpenseApprovalsClient({
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       showToast(
         "success",
-        `Moved ${payload.data.approvedCount} expenses to finance.`
+        t('toast.bulkApproveSuccess', { count: payload.data.approvedCount })
       );
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to process selected expenses.");
+      showToast("error", error instanceof Error ? error.message : t('toast.bulkApproveError'));
     } finally {
       setIsBulkApproving(false);
     }
@@ -718,7 +725,7 @@ export function ExpenseApprovalsClient({
       const payload = (await response.json()) as UpdateExpenseResponse;
 
       if (!response.ok || !payload.data?.expense) {
-        showToast("error", payload.error?.message ?? "Unable to reject expense.");
+        showToast("error", payload.error?.message ?? t('toast.rejectError'));
         return;
       }
 
@@ -728,10 +735,10 @@ export function ExpenseApprovalsClient({
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
       showToast(
         rejectMode === "manager" ? "info" : "error",
-        rejectMode === "manager" ? "Expense rejected." : "Expense finance-rejected."
+        rejectMode === "manager" ? t('toast.rejectSuccess') : t('toast.financeRejectSuccess')
       );
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to reject expense.");
+      showToast("error", error instanceof Error ? error.message : t('toast.rejectError'));
     } finally {
       setIsRejecting(false);
       setIsMutatingId(null);
@@ -752,13 +759,13 @@ export function ExpenseApprovalsClient({
       const payload = (await response.json()) as ExpenseReceiptSignedUrlResponse;
 
       if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? "Unable to open receipt.");
+        showToast("error", payload.error?.message ?? t('toast.openReceiptError'));
         return;
       }
 
       window.open(payload.data.url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to open receipt.");
+      showToast("error", error instanceof Error ? error.message : t('toast.openReceiptError'));
     } finally {
       setIsOpeningReceiptById((current) => {
         const next = { ...current };
@@ -768,11 +775,11 @@ export function ExpenseApprovalsClient({
     }
   };
 
-  const stageTitle = stage === "manager" ? "Pending My Approval" : "Pending Payment";
+  const stageTitle = stage === "manager" ? t('tabs.pendingMyApproval') : t('tabs.pendingPayment');
   const stageDescription =
     stage === "manager"
-      ? "Expenses from your direct reports awaiting manager approval."
-      : "Manager-approved expenses awaiting finance payment confirmation with uploaded payment proof.";
+      ? t('stageDescription.manager')
+      : t('stageDescription.finance');
   const hasActiveFilters =
     employeeFilter.trim().length > 0 ||
     categoryFilter !== "all" ||
@@ -791,8 +798,8 @@ export function ExpenseApprovalsClient({
     <>
       {!embedded ? (
         <PageHeader
-          title="Expense Approvals"
-          description="Process manager-approved expenses, confirm payments, and close the finance queue efficiently."
+          title={t('pageTitle')}
+          description={t('pageDescription')}
           actions={
             canBulkProcess ? (
               <button
@@ -801,7 +808,7 @@ export function ExpenseApprovalsClient({
                 onClick={openBulkApproveConfirm}
                 disabled={selectedIds.length === 0 || isBulkApproving}
               >
-                {isBulkApproving ? "Approving..." : `Bulk approve (${selectedIds.length})`}
+                {isBulkApproving ? tCommon('working') : t('actions.bulkApprove', { count: selectedIds.length })}
               </button>
             ) : null
           }
@@ -809,28 +816,28 @@ export function ExpenseApprovalsClient({
       ) : null}
 
       {availableStages.length > 1 ? (
-        <section className="page-tabs" aria-label="Approval queues">
+        <section className="page-tabs" aria-label={t('tabs.ariaLabel')}>
           <button
             type="button"
             className={stage === "manager" ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setStage("manager")}
           >
-            Pending My Approval
+            {t('tabs.pendingMyApproval')}
           </button>
           <button
             type="button"
             className={stage === "finance" ? "page-tab page-tab-active" : "page-tab"}
             onClick={() => setStage("finance")}
           >
-            Pending Payment
+            {t('tabs.pendingPayment')}
           </button>
         </section>
       ) : null}
 
-      <section className="expenses-toolbar" aria-label="Approvals filters">
+      <section className="expenses-toolbar" aria-label={t('toolbar.ariaLabel')}>
         <div className="expenses-toolbar-copy">
           <label className="form-field">
-            <span className="form-label">Month</span>
+            <span className="form-label">{t('toolbar.month')}</span>
             <input
               className="form-input numeric"
               type="month"
@@ -844,27 +851,27 @@ export function ExpenseApprovalsClient({
         </div>
         <div className="expenses-toolbar-actions">
           <p className="settings-card-description">
-            Filter by employee, category, and date range to prioritize reimbursements faster.
+            {t('toolbar.filterHint')}
           </p>
           <button type="button" className="button" onClick={clearFilters} disabled={!hasActiveFilters}>
-            Clear filters
+            {t('toolbar.clearFilters')}
           </button>
         </div>
       </section>
 
-      <section className="expenses-approvals-filter-bar" aria-label="Approval queue filters">
+      <section className="expenses-approvals-filter-bar" aria-label={t('filters.ariaLabel')}>
         <label className="form-field">
-          <span className="form-label">Employee</span>
+          <span className="form-label">{t('filters.employee')}</span>
           <input
             type="search"
             className="form-input"
             value={employeeFilter}
             onChange={(event) => setEmployeeFilter(event.currentTarget.value)}
-            placeholder="Search by employee or department"
+            placeholder={t('filters.employeePlaceholder')}
           />
         </label>
         <label className="form-field">
-          <span className="form-label">Category</span>
+          <span className="form-label">{t('filters.category')}</span>
           <select
             className="form-input"
             value={categoryFilter}
@@ -872,7 +879,7 @@ export function ExpenseApprovalsClient({
               setCategoryFilter(event.currentTarget.value as ExpenseCategory | "all")
             }
           >
-            <option value="all">All categories</option>
+            <option value="all">{t('filters.allCategories')}</option>
             {EXPENSE_CATEGORIES.map((category) => (
               <option key={category} value={category}>
                 {getExpenseCategoryLabel(category)}
@@ -881,7 +888,7 @@ export function ExpenseApprovalsClient({
           </select>
         </label>
         <label className="form-field">
-          <span className="form-label">From Date</span>
+          <span className="form-label">{t('filters.fromDate')}</span>
           <input
             type="date"
             className="form-input numeric"
@@ -890,7 +897,7 @@ export function ExpenseApprovalsClient({
           />
         </label>
         <label className="form-field">
-          <span className="form-label">To Date</span>
+          <span className="form-label">{t('filters.toDate')}</span>
           <input
             type="date"
             className="form-input numeric"
@@ -905,31 +912,31 @@ export function ExpenseApprovalsClient({
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Expense approvals are unavailable"
+            title={t('emptyState.errorTitle')}
             description={approvalsQuery.errorMessage}
-            ctaLabel="Retry"
+            ctaLabel={tCommon('retry')}
             ctaHref={embedded ? "/approvals?tab=expenses" : "/expenses/approvals"}
           />
           <button type="button" className="button button-accent" onClick={() => approvalsQuery.refresh()}>
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && approvalsQuery.data ? (
         <>
-          <section className="expenses-metric-grid" aria-label="Pending approvals summary">
+          <section className="expenses-metric-grid" aria-label={t('metrics.ariaLabel')}>
             <article className="metric-card">
-              <p className="metric-label">{stage === "manager" ? "Pending Manager Approval" : "Pending Payment"}</p>
+              <p className="metric-label">{stage === "manager" ? t('metrics.pendingManagerApproval') : t('metrics.pendingPayment')}</p>
               <p className="metric-value numeric">{approvalsQuery.data.pendingCount}</p>
               <p className="metric-hint">{stageDescription}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Queue Amount</p>
+              <p className="metric-label">{t('metrics.queueAmount')}</p>
               <p className="metric-value">
                 <CurrencyDisplay amount={approvalsQuery.data.pendingAmount} currency={queueCurrency} />
               </p>
-              <p className="metric-hint">Total amount currently in this queue</p>
+              <p className="metric-hint">{t('metrics.queueAmountHint')}</p>
             </article>
           </section>
 
@@ -937,21 +944,21 @@ export function ExpenseApprovalsClient({
             <EmptyState
               title={
                 hasActiveFilters
-                  ? "No expenses match current filters"
+                  ? t('emptyState.noMatchTitle')
                   : stage === "manager"
-                    ? "No expenses pending manager approval"
-                    : "No expenses pending payment confirmation"
+                    ? t('emptyState.noPendingManagerTitle')
+                    : t('emptyState.noPendingPaymentTitle')
               }
               description={
                 hasActiveFilters
-                  ? "Try clearing one or more filters to view more expense requests."
-                  : "All current expense submissions have been processed for this stage."
+                  ? t('emptyState.noMatchDescription')
+                  : t('emptyState.allProcessedDescription')
               }
-              ctaLabel="Open expenses"
+              ctaLabel={t('emptyState.openExpenses')}
               ctaHref="/expenses"
             />
           ) : (
-            <section className="data-table-container" aria-label="Pending expenses approvals table">
+            <section className="data-table-container" aria-label={t('table.ariaLabel')}>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -962,17 +969,17 @@ export function ExpenseApprovalsClient({
                             type="checkbox"
                             checked={allSelected}
                             onChange={toggleSelectAll}
-                            aria-label={`Select all ${stageTitle.toLowerCase()} expenses`}
+                            aria-label={t('table.selectAllAria', { stage: stageTitle.toLowerCase() })}
                           />
                         </label>
                       ) : null}
                     </th>
-                    <th>Employee</th>
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th>Vendor</th>
-                    <th>Amount</th>
-                    <th>Country</th>
+                    <th>{t('table.employee')}</th>
+                    <th>{t('table.category')}</th>
+                    <th>{t('table.description')}</th>
+                    <th>{t('table.vendor')}</th>
+                    <th>{t('table.amount')}</th>
+                    <th>{t('table.country')}</th>
                     <th>
                       <button
                         type="button"
@@ -981,13 +988,13 @@ export function ExpenseApprovalsClient({
                           setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
                         }
                       >
-                        Expense date
-                        <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                        {t('table.expenseDate')}
+                        <span className="numeric">{sortDirection === "asc" ? "\u2191" : "\u2193"}</span>
                       </button>
                     </th>
-                    <th>Status</th>
-                    <th>Submitted</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t('table.status')}</th>
+                    <th>{t('table.submitted')}</th>
+                    <th className="table-action-column">{t('table.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1000,7 +1007,7 @@ export function ExpenseApprovalsClient({
                               type="checkbox"
                               checked={selectedIds.includes(expense.id)}
                               onChange={() => toggleSelected(expense.id)}
-                              aria-label={`Select expense from ${expense.employeeName}`}
+                              aria-label={t('table.selectExpenseAria', { name: expense.employeeName })}
                             />
                           </label>
                         ) : null}
@@ -1025,13 +1032,13 @@ export function ExpenseApprovalsClient({
                               <p className="documents-cell-description">
                                 {expense.vendorBankAccountName}
                                 {expense.vendorBankAccountNumber
-                                  ? ` ••${expense.vendorBankAccountNumber.slice(-4)}`
+                                  ? ` \u2022\u2022${expense.vendorBankAccountNumber.slice(-4)}`
                                   : ""}
                               </p>
                             ) : null}
                           </div>
                         ) : (
-                          <span className="text-muted">—</span>
+                          <span className="text-muted">{"\u2014"}</span>
                         )}
                       </td>
                       <td>
@@ -1040,15 +1047,15 @@ export function ExpenseApprovalsClient({
                       <td>
                         <span className="country-chip">
                           <span>{countryFlagFromCode(expense.employeeCountryCode)}</span>
-                          <span>{countryNameFromCode(expense.employeeCountryCode)}</span>
+                          <span>{countryNameFromCode(expense.employeeCountryCode, locale)}</span>
                         </span>
                       </td>
                       <td>
                         <time
                           dateTime={expense.expenseDate}
-                          title={formatDateTimeTooltip(expense.expenseDate)}
+                          title={formatDateTimeTooltip(expense.expenseDate, locale)}
                         >
-                          {formatSingleDateHuman(expense.expenseDate)}
+                          {formatSingleDateHuman(expense.expenseDate, locale)}
                         </time>
                       </td>
                       <td>
@@ -1057,24 +1064,23 @@ export function ExpenseApprovalsClient({
                         </StatusBadge>
                         {expense.infoRequestState === "requested" ? (
                           <p className="documents-cell-description">
-                            Info requested
                             {expense.infoRequestUpdatedByName
-                              ? ` by ${expense.infoRequestUpdatedByName}`
-                              : ""}.
+                              ? t('table.infoRequestedBy', { name: expense.infoRequestUpdatedByName })
+                              : t('table.infoRequested')}.
                           </p>
                         ) : null}
                         {expense.infoRequestState === "responded" ? (
                           <p className="documents-cell-description">
-                            Employee replied to info request.
+                            {t('table.employeeReplied')}
                           </p>
                         ) : null}
                       </td>
                       <td>
                         <time
                           dateTime={expense.createdAt}
-                          title={formatDateTimeTooltip(expense.createdAt)}
+                          title={formatDateTimeTooltip(expense.createdAt, locale)}
                         >
-                          {formatRelativeTime(expense.createdAt)}
+                          {formatRelativeTime(expense.createdAt, locale)}
                         </time>
                       </td>
                       <td className="table-row-action-cell">
@@ -1085,7 +1091,7 @@ export function ExpenseApprovalsClient({
                             onClick={() => openReceipt(expense)}
                             disabled={Boolean(isOpeningReceiptById[expense.id])}
                           >
-                            {isOpeningReceiptById[expense.id] ? "Opening..." : "Receipt"}
+                            {isOpeningReceiptById[expense.id] ? t('actions.opening') : t('actions.receipt')}
                           </button>
                           {stage === "manager" ? (
                             <>
@@ -1095,7 +1101,7 @@ export function ExpenseApprovalsClient({
                                 onClick={() => openApproveConfirm(expense)}
                                 disabled={isMutatingId === expense.id}
                               >
-                                {isMutatingId === expense.id ? "Saving..." : "Approve"}
+                                {isMutatingId === expense.id ? tCommon('working') : t('actions.approve')}
                               </button>
                               <button
                                 type="button"
@@ -1103,7 +1109,7 @@ export function ExpenseApprovalsClient({
                                 onClick={() => openRequestInfoPanel(expense)}
                                 disabled={isMutatingId === expense.id}
                               >
-                                Request info
+                                {t('actions.requestInfo')}
                               </button>
                               <button
                                 type="button"
@@ -1111,7 +1117,7 @@ export function ExpenseApprovalsClient({
                                 onClick={() => openRejectPanel(expense, "manager")}
                                 disabled={isMutatingId === expense.id}
                               >
-                                Reject
+                                {t('actions.reject')}
                               </button>
                             </>
                           ) : (
@@ -1122,7 +1128,7 @@ export function ExpenseApprovalsClient({
                                 onClick={() => openDisbursePanel(expense)}
                                 disabled={isMutatingId === expense.id}
                               >
-                                {isMutatingId === expense.id ? "Saving..." : "Mark paid"}
+                                {isMutatingId === expense.id ? tCommon('working') : t('actions.markPaid')}
                               </button>
                               <button
                                 type="button"
@@ -1130,7 +1136,7 @@ export function ExpenseApprovalsClient({
                                 onClick={() => openRejectPanel(expense, "finance")}
                                 disabled={isMutatingId === expense.id}
                               >
-                                Reject
+                                {t('actions.reject')}
                               </button>
                             </>
                           )}
@@ -1147,35 +1153,35 @@ export function ExpenseApprovalsClient({
 
       <SlidePanel
         isOpen={Boolean(rejectTarget)}
-        title={rejectMode === "manager" ? "Reject expense" : "Finance reject expense"}
+        title={rejectMode === "manager" ? t('rejectPanel.title') : t('rejectPanel.financeTitle')}
         description={
           rejectTarget
             ? rejectMode === "manager"
-              ? `Provide a reason for rejecting ${rejectTarget.employeeName}'s expense.`
-              : `Provide a finance rejection reason for ${rejectTarget.employeeName}'s expense.`
+              ? t('rejectPanel.description', { name: rejectTarget.employeeName })
+              : t('rejectPanel.financeDescription', { name: rejectTarget.employeeName })
             : undefined
         }
         onClose={closeRejectPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={submitReject}>
           <label className="form-field">
-            <span className="form-label">Rejection reason</span>
+            <span className="form-label">{t('rejectPanel.reasonLabel')}</span>
             <textarea
               className={rejectErrors.reason ? "form-input form-input-error" : "form-input"}
               rows={4}
               value={rejectValues.reason}
               onChange={handleRejectReasonChange}
-              placeholder="Explain why this expense cannot be approved."
+              placeholder={t('rejectPanel.reasonPlaceholder')}
               disabled={isRejecting}
             />
             {rejectErrors.reason ? <p className="form-field-error">{rejectErrors.reason}</p> : null}
           </label>
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeRejectPanel} disabled={isRejecting}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isRejecting}>
-              {isRejecting ? "Submitting..." : "Submit rejection"}
+              {isRejecting ? tCommon('working') : t('rejectPanel.submitButton')}
             </button>
           </div>
         </form>
@@ -1183,22 +1189,22 @@ export function ExpenseApprovalsClient({
 
       <SlidePanel
         isOpen={Boolean(disburseTarget)}
-        title="Mark expense as paid"
+        title={t('disbursePanel.title')}
         description={
           disburseTarget
-            ? `Record payment confirmation for ${disburseTarget.employeeName}.`
+            ? t('disbursePanel.description', { name: disburseTarget.employeeName })
             : undefined
         }
         onClose={closeDisbursePanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={submitDisbursement}>
           <label className="form-field">
-            <span className="form-label">Reimbursement reference</span>
+            <span className="form-label">{t('disbursePanel.referenceLabel')}</span>
             <input
               className={disburseErrors.reimbursementReference ? "form-input form-input-error" : "form-input"}
               value={disburseValues.reimbursementReference}
               onChange={handleDisburseFieldChange("reimbursementReference")}
-              placeholder="BANK-REF-1234"
+              placeholder={t('disbursePanel.referencePlaceholder')}
               disabled={isDisbursing}
             />
             {disburseErrors.reimbursementReference ? (
@@ -1206,19 +1212,19 @@ export function ExpenseApprovalsClient({
             ) : null}
           </label>
           <label className="form-field">
-            <span className="form-label">Notes</span>
+            <span className="form-label">{t('disbursePanel.notesLabel')}</span>
             <textarea
               className="form-input"
               rows={3}
               value={disburseValues.reimbursementNotes}
               onChange={handleDisburseFieldChange("reimbursementNotes")}
-              placeholder="Optional payment notes."
+              placeholder={t('disbursePanel.notesPlaceholder')}
               disabled={isDisbursing}
             />
           </label>
           <div className="form-field">
-            <span className="form-label">Payment proof receipt</span>
-            <p className="form-hint">Upload a bank transaction receipt or transfer confirmation (PDF, PNG, JPG).</p>
+            <span className="form-label">{t('disbursePanel.paymentProofLabel')}</span>
+            <p className="form-hint">{t('disbursePanel.paymentProofHint')}</p>
             <div className="payment-proof-upload">
               {paymentProofFile ? (
                 <div className="payment-proof-file">
@@ -1233,7 +1239,7 @@ export function ExpenseApprovalsClient({
                       setPaymentProofFile(null);
                       setDisburseErrors((current) => ({
                         ...current,
-                        paymentProof: "Payment proof receipt is required."
+                        paymentProof: t('validation.paymentProofRequired')
                       }));
                       if (paymentProofInputRef.current) {
                         paymentProofInputRef.current.value = "";
@@ -1241,7 +1247,7 @@ export function ExpenseApprovalsClient({
                     }}
                     disabled={isDisbursing}
                   >
-                    Remove
+                    {t('disbursePanel.removeFile')}
                   </button>
                 </div>
               ) : (
@@ -1251,7 +1257,7 @@ export function ExpenseApprovalsClient({
                   onClick={() => paymentProofInputRef.current?.click()}
                   disabled={isDisbursing}
                 >
-                  Choose file
+                  {t('disbursePanel.chooseFile')}
                 </button>
               )}
               <input
@@ -1268,10 +1274,10 @@ export function ExpenseApprovalsClient({
           </div>
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeDisbursePanel} disabled={isDisbursing}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isDisbursing}>
-              {isDisbursing ? "Saving..." : "Confirm payment"}
+              {isDisbursing ? tCommon('working') : t('disbursePanel.submitButton')}
             </button>
           </div>
         </form>
@@ -1279,21 +1285,21 @@ export function ExpenseApprovalsClient({
 
       <SlidePanel
         isOpen={Boolean(requestInfoTarget)}
-        title="Request more info"
+        title={t('requestInfoPanel.title')}
         description={
           requestInfoTarget
-            ? `Ask ${requestInfoTarget.employeeName} for additional details before approval.`
+            ? t('requestInfoPanel.description', { name: requestInfoTarget.employeeName })
             : undefined
         }
         onClose={closeRequestInfoPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={submitRequestInfo}>
-          <section className="settings-card" aria-label="Expense conversation">
-            <h3 className="section-title">Conversation</h3>
+          <section className="settings-card" aria-label={t('requestInfoPanel.conversationAriaLabel')}>
+            <h3 className="section-title">{t('requestInfoPanel.conversationTitle')}</h3>
             {isLoadingRequestInfoThread ? (
-              <p className="settings-card-description">Loading conversation...</p>
+              <p className="settings-card-description">{t('requestInfoPanel.loadingConversation')}</p>
             ) : requestInfoThread.length === 0 ? (
-              <p className="settings-card-description">No prior messages.</p>
+              <p className="settings-card-description">{t('requestInfoPanel.noMessages')}</p>
             ) : (
               <ul className="compensation-history-list">
                 {requestInfoThread.map((comment) => (
@@ -1301,12 +1307,12 @@ export function ExpenseApprovalsClient({
                     <div className="compensation-history-item-title">
                       <span>{comment.authorName}</span>
                       <StatusBadge tone={comment.commentType === "request_info" ? "warning" : "info"}>
-                        {comment.commentType === "request_info" ? "Requested info" : "Response"}
+                        {comment.commentType === "request_info" ? t('requestInfoPanel.requestedInfoBadge') : t('requestInfoPanel.responseBadge')}
                       </StatusBadge>
                     </div>
                     <p>{comment.message}</p>
-                    <p className="compensation-history-item-meta" title={formatDateTimeTooltip(comment.createdAt)}>
-                      {formatRelativeTime(comment.createdAt)}
+                    <p className="compensation-history-item-meta" title={formatDateTimeTooltip(comment.createdAt, locale)}>
+                      {formatRelativeTime(comment.createdAt, locale)}
                     </p>
                   </li>
                 ))}
@@ -1314,13 +1320,13 @@ export function ExpenseApprovalsClient({
             )}
           </section>
           <label className="form-field">
-            <span className="form-label">Message to employee</span>
+            <span className="form-label">{t('requestInfoPanel.messageLabel')}</span>
             <textarea
               className={requestInfoErrors.message ? "form-input form-input-error" : "form-input"}
               rows={4}
               value={requestInfoMessage}
               onChange={handleRequestInfoMessageChange}
-              placeholder="What additional details do you need?"
+              placeholder={t('requestInfoPanel.messagePlaceholder')}
               disabled={isRequestingInfo}
             />
             {requestInfoErrors.message ? (
@@ -1334,10 +1340,10 @@ export function ExpenseApprovalsClient({
               onClick={closeRequestInfoPanel}
               disabled={isRequestingInfo}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isRequestingInfo}>
-              {isRequestingInfo ? "Sending..." : "Send request"}
+              {isRequestingInfo ? t('requestInfoPanel.sending') : t('requestInfoPanel.submitButton')}
             </button>
           </div>
         </form>
@@ -1345,14 +1351,14 @@ export function ExpenseApprovalsClient({
 
       <ConfirmDialog
         isOpen={Boolean(confirmApproveTarget)}
-        title="Approve expense?"
+        title={t('confirmApprove.title')}
         description={
           confirmApproveTarget
-            ? `Approve ${confirmApproveTarget.employeeName}'s expense and move it to finance payment queue.`
+            ? t('confirmApprove.description', { name: confirmApproveTarget.employeeName })
             : undefined
         }
-        confirmLabel="Approve expense"
-        cancelLabel="Cancel"
+        confirmLabel={t('confirmApprove.confirmLabel')}
+        cancelLabel={tCommon('cancel')}
         isConfirming={Boolean(isMutatingId)}
         onCancel={closeApproveConfirm}
         onConfirm={() => {
@@ -1362,10 +1368,10 @@ export function ExpenseApprovalsClient({
 
       <ConfirmDialog
         isOpen={showBulkConfirm}
-        title="Bulk approve expenses?"
-        description={`This will move ${selectedIds.length} selected expenses to finance for payment.`}
-        confirmLabel="Approve selected"
-        cancelLabel="Cancel"
+        title={t('confirmBulkApprove.title')}
+        description={t('confirmBulkApprove.description', { count: selectedIds.length })}
+        confirmLabel={t('confirmBulkApprove.confirmLabel')}
+        cancelLabel={tCommon('cancel')}
         isConfirming={isBulkApproving}
         onCancel={closeBulkApproveConfirm}
         onConfirm={() => {
@@ -1380,7 +1386,7 @@ export function ExpenseApprovalsClient({
             <button
               type="button"
               className="toast-dismiss"
-              aria-label="Dismiss notification"
+              aria-label={t('dismissNotification')}
               onClick={() => dismissToast(toast.id)}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">

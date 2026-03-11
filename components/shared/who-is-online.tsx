@@ -1,28 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 
 import { usePresence, type PresenceEntry, type PresenceState } from "../../hooks/use-presence";
 
-const PRESENCE_LABELS: Record<PresenceState, string> = {
-  online: "Online",
-  away: "Away",
-  offline: "Offline"
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  afk: "AFK",
-  ooo: "OOO"
-};
-
-function PresenceDot({ state }: { state: PresenceState }) {
+function PresenceDot({ state, labels }: { state: PresenceState; labels: Record<PresenceState, string> }) {
   return (
     <span
       className={`presence-dot presence-dot-${state}`}
-      title={PRESENCE_LABELS[state]}
-      aria-label={PRESENCE_LABELS[state]}
+      title={labels[state]}
+      aria-label={labels[state]}
     />
   );
 }
@@ -40,8 +30,20 @@ type WhoIsOnlineProps = {
 };
 
 export function WhoIsOnline({ isSidebarCollapsed }: WhoIsOnlineProps) {
+  const t = useTranslations("presence");
   const { entries, counts, isLoading } = usePresence(true);
   const [isExpanded, setIsExpanded] = useState(true);
+
+  const presenceLabels = useMemo<Record<PresenceState, string>>(() => ({
+    online: t("state.online"),
+    away: t("state.away"),
+    offline: t("state.offline"),
+  }), [t]);
+
+  const statusLabels = useMemo<Record<string, string>>(() => ({
+    afk: t("status.afk"),
+    ooo: t("status.ooo"),
+  }), [t]);
 
   const activeEntries = entries.filter(
     (entry) => entry.presence === "online" || entry.presence === "away"
@@ -56,7 +58,7 @@ export function WhoIsOnline({ isSidebarCollapsed }: WhoIsOnlineProps) {
   /* Collapsed sidebar: just show a small indicator */
   if (isSidebarCollapsed) {
     return (
-      <div className="wio-collapsed" title={`${counts.online} online, ${counts.away} away`}>
+      <div className="wio-collapsed" title={t("collapsedTooltip", { online: counts.online, away: counts.away })}>
         <span className="wio-collapsed-dot" />
         {activeCount > 0 ? (
           <span className="wio-collapsed-count">{activeCount}</span>
@@ -75,7 +77,7 @@ export function WhoIsOnline({ isSidebarCollapsed }: WhoIsOnlineProps) {
       >
         <span className="wio-header-left">
           <span className="wio-header-dot" />
-          <span className="wio-header-label">Who&apos;s Online</span>
+          <span className="wio-header-label">{t("header")}</span>
         </span>
         <span className="wio-header-right">
           <span className="wio-count-badge">{activeCount}</span>
@@ -99,10 +101,10 @@ export function WhoIsOnline({ isSidebarCollapsed }: WhoIsOnlineProps) {
       {isExpanded ? (
         <ul className="wio-list">
           {activeEntries.length === 0 ? (
-            <li className="wio-empty">No one online right now</li>
+            <li className="wio-empty">{t("empty")}</li>
           ) : (
             activeEntries.map((entry) => {
-              const statusLabel = STATUS_LABELS[entry.availabilityStatus];
+              const statusLabel = statusLabels[entry.availabilityStatus];
               const statusTooltip = statusLabel
                 ? entry.statusNote
                   ? `${statusLabel}: ${entry.statusNote}`
@@ -126,7 +128,7 @@ export function WhoIsOnline({ isSidebarCollapsed }: WhoIsOnlineProps) {
                           {getInitials(entry.fullName)}
                         </span>
                       )}
-                      <PresenceDot state={entry.presence} />
+                      <PresenceDot state={entry.presence} labels={presenceLabels} />
                     </span>
                     <span className="wio-entry-info">
                       <span className="wio-name" title={entry.fullName}>

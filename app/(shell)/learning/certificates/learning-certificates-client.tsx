@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -9,6 +10,7 @@ import { useLearningMyAssignments } from "../../../../hooks/use-learning";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import type { LearningCertificateResponse } from "../../../../types/learning";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 
 function certificatesSkeleton() {
@@ -23,6 +25,10 @@ function certificatesSkeleton() {
 }
 
 export function LearningCertificatesClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('certificates');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const assignmentsQuery = useLearningMyAssignments({
     status: "completed"
   });
@@ -57,13 +63,13 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
       const payload = (await response.json()) as LearningCertificateResponse;
 
       if (!response.ok || !payload.data?.url) {
-        setErrorMessage(payload.error?.message ?? "Unable to load certificate URL.");
+        setErrorMessage(payload.error?.message ?? t('unableToLoadUrl'));
         return;
       }
 
       window.open(payload.data.url, "_blank", "noopener,noreferrer");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unable to load certificate URL.");
+      setErrorMessage(error instanceof Error ? error.message : t('unableToLoadUrl'));
     } finally {
       setPendingActionId(null);
     }
@@ -73,8 +79,8 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
     <>
       {!embedded ? (
         <PageHeader
-          title="Certificates"
-          description="View and download completion certificates for your finished courses."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
@@ -83,33 +89,33 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
       {!assignmentsQuery.isLoading && assignmentsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Certificate data is unavailable"
+            title={t('unavailable')}
             description={assignmentsQuery.errorMessage}
-            ctaLabel="Back to learning"
+            ctaLabel={t('backToLearning')}
             ctaHref="/learning"
           />
           <button type="button" className="button button-accent" onClick={() => assignmentsQuery.refresh()}>
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!assignmentsQuery.isLoading && !assignmentsQuery.errorMessage ? (
-        <section className="compensation-layout" aria-label="Learning certificates overview">
+        <section className="compensation-layout" aria-label={t('overviewAriaLabel')}>
           <article className="metric-grid">
             <article className="metric-card">
-              <p className="metric-label">Certificates earned</p>
+              <p className="metric-label">{t('certificatesEarned')}</p>
               <p className="metric-value numeric">{sortedAssignments.length}</p>
-              <p className="metric-description">Completed courses with tracked certificates.</p>
+              <p className="metric-description">{t('certificatesEarnedDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Last completion</p>
+              <p className="metric-label">{t('lastCompletion')}</p>
               <p className="metric-value">
                 {sortedAssignments[0]?.completedAt
-                  ? formatRelativeTime(sortedAssignments[0].completedAt)
+                  ? formatRelativeTime(sortedAssignments[0].completedAt, locale)
                   : "--"}
               </p>
-              <p className="metric-description">Most recent completion date.</p>
+              <p className="metric-description">{t('lastCompletionDescription')}</p>
             </article>
           </article>
 
@@ -117,17 +123,17 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
 
           {sortedAssignments.length === 0 ? (
             <EmptyState
-              title="No certificates yet"
-              description="Complete your assigned courses to generate learning certificates."
-              ctaLabel="Open learning"
+              title={t('noCertificates')}
+              description={t('noCertificatesDescription')}
+              ctaLabel={t('openLearning')}
               ctaHref="/learning"
             />
           ) : (
             <div className="data-table-container">
-              <table className="data-table" aria-label="Learning certificates table">
+              <table className="data-table" aria-label={t('tableAriaLabel')}>
                 <thead>
                   <tr>
-                    <th>Course</th>
+                    <th>{t('colCourse')}</th>
                     <th>
                       <button
                         type="button"
@@ -138,12 +144,12 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
                           )
                         }
                       >
-                        Completed
+                        {t('colCompleted')}
                         <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       </button>
                     </th>
-                    <th>Status</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t('colStatus')}</th>
+                    <th className="table-action-column">{t('colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,15 +158,15 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
                       <td>{assignment.courseTitle}</td>
                       <td>
                         {assignment.completedAt ? (
-                          <span title={formatDateTimeTooltip(assignment.completedAt)}>
-                            {formatRelativeTime(assignment.completedAt)}
+                          <span title={formatDateTimeTooltip(assignment.completedAt, locale)}>
+                            {formatRelativeTime(assignment.completedAt, locale)}
                           </span>
                         ) : (
                           "--"
                         )}
                       </td>
                       <td>
-                        <StatusBadge tone="success">completed</StatusBadge>
+                        <StatusBadge tone="success">{tCommon('status.completed')}</StatusBadge>
                       </td>
                       <td className="table-row-action-cell">
                         <div className="timeatt-row-actions">
@@ -172,7 +178,7 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
                                 disabled={pendingActionId === assignment.id}
                                 onClick={() => void openCertificate({ assignmentId: assignment.id, usage: "view" })}
                               >
-                                View
+                                {t('actionView')}
                               </button>
                               <button
                                 type="button"
@@ -180,11 +186,11 @@ export function LearningCertificatesClient({ embedded = false }: { embedded?: bo
                                 disabled={pendingActionId === assignment.id}
                                 onClick={() => void openCertificate({ assignmentId: assignment.id, usage: "download" })}
                               >
-                                Download
+                                {t('actionDownload')}
                               </button>
                             </>
                           ) : (
-                            <span className="table-row-action">Pending</span>
+                            <span className="table-row-action">{t('statusPending')}</span>
                           )}
                         </div>
                       </td>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -52,17 +53,20 @@ export default async function PeopleProfilePage({
   searchParams
 }: PeopleProfilePageProps) {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("peoplePage");
+  const tPeople = await getTranslations("people");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Crew Members"
-          description="Find teammates, review roles, and open full profiles."
+          title={tPeople("pageTitle")}
+          description={tPeople("pageDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
         />
       </>
     );
@@ -75,13 +79,13 @@ export default async function PeopleProfilePage({
     return (
       <>
         <PageHeader
-          title="Crew Members"
-          description="Find teammates, review roles, and open full profiles."
+          title={tPeople("pageTitle")}
+          description={tPeople("pageDescription")}
         />
         <EmptyState
-          title="Invalid profile id"
-          description="The requested crew profile path is not a valid identifier."
-          ctaLabel="Back to Crew Members"
+          title={t("invalidProfileId")}
+          description={t("invalidProfileIdDescription")}
+          ctaLabel={t("backToCrew")}
           ctaHref="/people"
         />
       </>
@@ -95,12 +99,12 @@ export default async function PeopleProfilePage({
     return (
       <>
         <PageHeader
-          title="Crew Members"
-          description="Find teammates, review roles, and open full profiles."
+          title={tPeople("pageTitle")}
+          description={tPeople("pageDescription")}
         />
         <EmptyState
-          title="Access denied"
-          description="You do not have permission to view this crew profile."
+          title={tCommon("emptyState.accessDenied")}
+          description={t("accessDeniedDescription")}
         />
       </>
     );
@@ -114,11 +118,11 @@ export default async function PeopleProfilePage({
   return (
     <>
       <PageHeader
-        title="Crew Members"
-        description="Find teammates, review roles, and open full profiles."
+        title={tPeople("pageTitle")}
+        description={tPeople("pageDescription")}
       />
 
-      <section className="page-tabs" role="tablist" aria-label="Profile tabs">
+      <section className="page-tabs" role="tablist" aria-label={t("profileTabsAriaLabel")}>
         <Link
           href={`/people/${parsedId.data}?tab=overview`}
           className={
@@ -129,7 +133,7 @@ export default async function PeopleProfilePage({
           role="tab"
           aria-selected={activeTab === "overview"}
         >
-          Overview
+          {t("overviewTab")}
         </Link>
         {hasCompensationAccess ? (
           <Link
@@ -142,7 +146,7 @@ export default async function PeopleProfilePage({
             role="tab"
             aria-selected={activeTab === "compensation"}
           >
-            Compensation
+            {t("compensationTab")}
           </Link>
         ) : null}
       </section>
@@ -172,9 +176,9 @@ export default async function PeopleProfilePage({
           />
         ) : (
           <EmptyState
-            title="Compensation access denied"
-            description="Only HR Admin, Finance Admin, Super Admin, or the profile owner can view compensation."
-            ctaLabel="Back to Crew Members"
+            title={t("compensationAccessDenied")}
+            description={t("compensationAccessDeniedDescription")}
+            ctaLabel={t("backToCrew")}
             ctaHref="/people"
           />
         )

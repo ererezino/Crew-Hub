@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { StatusBadge } from "../shared/status-badge";
 import type { DashboardManagerOnboardingItem } from "../../types/dashboard";
 
@@ -13,20 +16,24 @@ export function OnboardingBanner({
   totalTasks,
   completedTasks
 }: OnboardingBannerProps) {
+  const t = useTranslations("dashboard");
   const remainingTasks = Math.max(0, totalTasks - completedTasks);
   const safeProgress = Number.isFinite(progressPercent)
     ? Math.min(100, Math.max(0, progressPercent))
     : 0;
 
   return (
-    <section className="onboarding-banner" aria-label="Onboarding progress">
+    <section className="onboarding-banner" aria-label={t("onboarding.ariaLabel")}>
       <div className="onboarding-banner-copy">
-        <h2 className="section-title">Welcome to Crew Hub</h2>
+        <h2 className="section-title">{t("onboarding.welcomeTitle")}</h2>
         <p className="settings-card-description">
-          You have <span className="numeric">{remainingTasks}</span> onboarding tasks remaining.
+          {t.rich("onboarding.tasksRemaining", {
+            count: remainingTasks,
+            numeric: (chunks) => <span className="numeric">{chunks}</span>
+          })}
         </p>
         <p className="settings-card-description numeric">
-          {completedTasks}/{totalTasks} complete ({safeProgress.toFixed(0)}%)
+          {t("onboarding.completionSummary", { completed: completedTasks, total: totalTasks, percent: safeProgress.toFixed(0) })}
         </p>
       </div>
 
@@ -38,7 +45,7 @@ export function OnboardingBanner({
           />
         </div>
         <Link href="/me/onboarding" className="button button-accent">
-          View Tasks
+          {t("onboarding.viewTasks")}
         </Link>
       </div>
     </section>
@@ -58,21 +65,23 @@ function progressPercent(tasksCompleted: number, tasksTotal: number): number {
 }
 
 export function ManagerOnboardingWidget({ reports }: ManagerOnboardingWidgetProps) {
+  const t = useTranslations("dashboard");
+
   if (reports.length === 0) {
     return null;
   }
 
   return (
-    <section className="settings-card" aria-label="Manager onboarding progress">
+    <section className="settings-card" aria-label={t("managerOnboarding.ariaLabel")}>
       <header className="announcements-section-header">
         <div>
-          <h2 className="section-title">Direct Report Onboarding</h2>
+          <h2 className="section-title">{t("managerOnboarding.title")}</h2>
           <p className="settings-card-description">
-            Track onboarding progress for your direct reports and unblock overdue manager tasks.
+            {t("managerOnboarding.description")}
           </p>
         </div>
         <Link href="/onboarding" className="button button-subtle">
-          Open onboarding
+          {t("managerOnboarding.openOnboarding")}
         </Link>
       </header>
 
@@ -101,14 +110,14 @@ export function ManagerOnboardingWidget({ reports }: ManagerOnboardingWidgetProp
                   <div className="documents-cell-copy">
                     <p className="documents-cell-title">{report.employeeName}</p>
                     <p className="documents-cell-description numeric">
-                      Day {report.daysSinceStart} · {report.tasksCompleted}/{report.tasksTotal} tasks
+                      {t("managerOnboarding.daySummary", { day: report.daysSinceStart, completed: report.tasksCompleted, total: report.tasksTotal })}
                     </p>
                   </div>
                 </div>
                 <StatusBadge tone={hasOverdue ? "error" : "processing"}>
                   {hasOverdue
-                    ? `${report.overdueManagerTaskCount} manager task${report.overdueManagerTaskCount === 1 ? "" : "s"} overdue`
-                    : "On track"}
+                    ? t("managerOnboarding.managerTasksOverdue", { count: report.overdueManagerTaskCount })
+                    : t("managerOnboarding.onTrack")}
                 </StatusBadge>
               </div>
 

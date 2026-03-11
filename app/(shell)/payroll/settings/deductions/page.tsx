@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
@@ -20,18 +22,21 @@ function canEditNigeriaRules(roles: readonly UserRole[]): boolean {
 
 export default async function PayrollDeductionsSettingsPage() {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("payrollPage");
+  const tSettings = await getTranslations("payrollSettings");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <>
         <PageHeader
-          title="Payroll Settings"
-          description="Manage statutory withholding rollout and deduction configuration."
+          title={t("settingsTitle")}
+          description={t("settingsDescription")}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
-          ctaLabel="Back to payroll"
+          title={tCommon("emptyState.profileUnavailable")}
+          description={tCommon("emptyState.profileUnavailableBody")}
+          ctaLabel={tSettings("backToPayroll")}
           ctaHref="/payroll"
         />
       </>
@@ -42,12 +47,12 @@ export default async function PayrollDeductionsSettingsPage() {
     return (
       <>
         <PageHeader
-          title="Payroll Settings"
-          description="Manage statutory withholding rollout and deduction configuration."
+          title={t("settingsTitle")}
+          description={t("settingsDescription")}
         />
         <EmptyState
-          title="Access denied"
-          description="Only HR Admin, Finance Admin, and Super Admin can view payroll settings."
+          title={tCommon("emptyState.accessDenied")}
+          description={t("settingsAccessDenied")}
         />
       </>
     );
@@ -64,14 +69,14 @@ export default async function PayrollDeductionsSettingsPage() {
     nigeriaConfigError =
       error instanceof Error
         ? error.message
-        : "Unable to load Nigeria withholding configuration.";
+        : tSettings("unableToLoadNigeriaConfig");
   }
 
   return (
     <>
       <PageHeader
-        title="Payroll Settings"
-        description="Configure country-by-country statutory withholding in Crew Hub."
+        title={t("settingsTitle")}
+        description={t("settingsCountryDescription")}
       />
 
       <DeductionsSettingsClient

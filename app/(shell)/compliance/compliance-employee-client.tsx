@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -8,6 +9,8 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
+
+type AppLocale = "en" | "fr";
 
 type EmployeeDocument = {
   id: string;
@@ -28,18 +31,22 @@ function documentTone(daysUntil: number | null): "success" | "error" | "pending"
   return "success";
 }
 
-function documentStatusLabel(daysUntil: number | null): string {
-  if (daysUntil === null) return "No expiry";
-  if (daysUntil < 0) return "Expired";
-  if (daysUntil === 0) return "Expires today";
-  if (daysUntil <= 30) return `Expires in ${daysUntil} days`;
-  return "Valid";
-}
-
 export function ComplianceEmployeeClient({ userId }: { userId: string }) {
+  const t = useTranslations('compliancePage');
+  const tNav = useTranslations('nav');
+  const locale = useLocale() as AppLocale;
+
   const [data, setData] = useState<EmployeeComplianceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  function documentStatusLabel(daysUntil: number | null): string {
+    if (daysUntil === null) return t('noExpiry');
+    if (daysUntil < 0) return t('expired');
+    if (daysUntil === 0) return t('expiresToday');
+    if (daysUntil <= 30) return t('expiresInDays', { count: daysUntil });
+    return t('valid');
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -55,14 +62,14 @@ export function ComplianceEmployeeClient({ userId }: { userId: string }) {
         if (cancelled) return;
 
         if (!response.ok || json.error) {
-          setErrorMessage(json.error?.message ?? "Unable to load compliance data.");
+          setErrorMessage(json.error?.message ?? t('unableToLoad'));
           return;
         }
 
         setData(json.data ?? { documents: [] });
       } catch {
         if (!cancelled) {
-          setErrorMessage("Unable to load compliance data.");
+          setErrorMessage(t('unableToLoad'));
         }
       } finally {
         if (!cancelled) {
@@ -76,15 +83,15 @@ export function ComplianceEmployeeClient({ userId }: { userId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, t]);
 
   const hasDocuments = data && data.documents.length > 0;
 
   return (
     <>
       <PageHeader
-        title="Compliance"
-        description="Statutory filings with due dates, proof, and country tracking."
+        title={tNav('compliance')}
+        description={tNav('description.compliance')}
       />
 
       {isLoading ? (
@@ -98,15 +105,15 @@ export function ComplianceEmployeeClient({ userId }: { userId: string }) {
 
       {!isLoading && errorMessage ? (
         <ErrorState
-          title="Compliance data unavailable"
+          title={t('dataUnavailable')}
           message={errorMessage}
         />
       ) : null}
 
       {!isLoading && !errorMessage && !hasDocuments ? (
         <EmptyState
-          title="Your compliance documents are up to date"
-          description="No compliance documents require your attention."
+          title={t('upToDate')}
+          description={t('upToDateDescription')}
         />
       ) : null}
 
@@ -121,7 +128,7 @@ export function ComplianceEmployeeClient({ userId }: { userId: string }) {
                     <p className="settings-card-description">
                       {toSentenceCase(doc.category)}
                       {doc.expiryDate ? (
-                        <> &middot; Expires {formatRelativeTime(doc.expiryDate)}</>
+                        <> &middot; {t('expires', { date: formatRelativeTime(doc.expiryDate, locale) })}</>
                       ) : null}
                     </p>
                   </div>

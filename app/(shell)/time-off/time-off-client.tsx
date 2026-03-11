@@ -1,7 +1,10 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
+
+type AppLocale = "en" | "fr";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ContextualHelp } from "../../../components/shared/contextual-help";
@@ -17,6 +20,7 @@ import {
   formatDays,
   formatDateRangeHuman,
   formatDateTimeTooltip,
+  formatMonth,
   formatRelativeTime,
   formatSingleDateHuman,
   todayIsoDate
@@ -62,18 +66,20 @@ type RequestFormField = keyof RequestFormValues;
 type RequestFormErrors = Partial<Record<RequestFormField, string>>;
 type RequestFormTouched = Record<RequestFormField, boolean>;
 
-const requestFormSchema = z.object({
-  leaveType: z.string().trim().min(1, "Leave type is required"),
-  startDate: z
-    .string()
-    .min(1, "Start date is required")
-    .refine((value) => isIsoDate(value), "Start date must be in YYYY-MM-DD format"),
-  endDate: z
-    .string()
-    .min(1, "End date is required")
-    .refine((value) => isIsoDate(value), "End date must be in YYYY-MM-DD format"),
-  reason: z.string().trim().min(1, "Reason is required").max(2000, "Reason is too long")
-});
+function buildRequestFormSchema(td: (key: string) => string) {
+  return z.object({
+    leaveType: z.string().trim().min(1, td("validation.leaveTypeRequired")),
+    startDate: z
+      .string()
+      .min(1, td("validation.startDateRequired"))
+      .refine((value) => isIsoDate(value), td("validation.startDateFormat")),
+    endDate: z
+      .string()
+      .min(1, td("validation.endDateRequired"))
+      .refine((value) => isIsoDate(value), td("validation.endDateFormat")),
+    reason: z.string().trim().min(1, td("validation.reasonRequired")).max(2000, td("validation.reasonTooLong"))
+  });
+}
 
 const INITIAL_FORM_VALUES: RequestFormValues = {
   leaveType: "",
@@ -96,30 +102,28 @@ const ALL_FORM_TOUCHED: RequestFormTouched = {
   reason: true
 };
 
-const TIME_OFF_CONTEXTUAL_HELP = [
-  {
-    title: "Working day calculation",
-    description:
-      "Leave days are auto-calculated from working days, excluding weekends and country holidays."
-  },
-  {
-    title: "Approval expectation",
-    description:
-      "Requests are sent to your direct manager first. Add clear reasons to reduce back-and-forth."
-  },
-  {
-    title: "Team coverage",
-    description:
-      "To keep things running smoothly while you\u2019re away, take a quick look at who else is off around the same time.",
-    ctaLabel: "View availability",
-    ctaHref: "/time-off?tab=calendar"
-  },
-  {
-    title: "Use it or lose it",
-    description:
-      "Unused leave days expire on December 31 each year \u2014 so don\u2019t let them go to waste! Whether it\u2019s a beach sunset or a snowy getaway, we\u2019d love for you to take the time you\u2019ve earned."
-  }
-] as const;
+function buildContextualHelpItems(t: (key: string) => string) {
+  return [
+    {
+      title: t("contextualHelp.workingDayTitle"),
+      description: t("contextualHelp.workingDayDescription")
+    },
+    {
+      title: t("contextualHelp.approvalTitle"),
+      description: t("contextualHelp.approvalDescription")
+    },
+    {
+      title: t("contextualHelp.teamCoverageTitle"),
+      description: t("contextualHelp.teamCoverageDescription"),
+      ctaLabel: t("contextualHelp.viewAvailability"),
+      ctaHref: "/time-off?tab=calendar"
+    },
+    {
+      title: t("contextualHelp.useItTitle"),
+      description: t("contextualHelp.useItDescription")
+    }
+  ];
+}
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -133,8 +137,13 @@ function hasFormErrors(errors: RequestFormErrors): boolean {
   return Boolean(errors.leaveType || errors.startDate || errors.endDate || errors.reason);
 }
 
-function getFormErrors(values: RequestFormValues, touched: RequestFormTouched): RequestFormErrors {
-  const parsed = requestFormSchema.safeParse(values);
+function getFormErrors(
+  values: RequestFormValues,
+  touched: RequestFormTouched,
+  schema: z.ZodObject<z.ZodRawShape>,
+  td: (key: string) => string
+): RequestFormErrors {
+  const parsed = schema.safeParse(values);
   const errors: RequestFormErrors = {};
 
   if (!parsed.success) {
@@ -151,7 +160,7 @@ function getFormErrors(values: RequestFormValues, touched: RequestFormTouched): 
     isIsoDate(values.endDate) &&
     values.endDate < values.startDate
   ) {
-    errors.endDate = "End date must be on or after start date.";
+    errors.endDate = td("validation.endDateAfterStart");
   }
 
   return errors;
@@ -207,24 +216,14 @@ function shiftMonth(month: string, delta: number): string {
   return `${year}-${monthValue}`;
 }
 
-function monthLabel(month: string): string {
+function monthLabel(month: string, locale: AppLocale): string {
   const range = monthToDateRange(month);
 
   if (!range) {
     return month;
   }
 
-  const monthStart = isoDateToUtcDate(range.startDate);
-
-  if (!monthStart) {
-    return month;
-  }
-
-  return monthStart.toLocaleString(undefined, {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC"
-  });
+  return formatMonth(range.startDate, locale);
 }
 
 type CalendarCell = {
@@ -296,6 +295,14 @@ function TimeOffSkeleton() {
 }
 
 export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations('timeOff');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
+  const requestFormSchema = useMemo(() => buildRequestFormSchema(td), [td]);
+  const contextualHelpItems = useMemo(() => buildContextualHelpItems(td), [td]);
+
   const [activeMonth, setActiveMonth] = useState(getCurrentMonthKey());
   const [requestSortDirection, setRequestSortDirection] = useState<SortDirection>("desc");
   const [isRequestPanelOpen, setIsRequestPanelOpen] = useState(false);
@@ -365,8 +372,8 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       return null;
     }
 
-    return `Requested days (${calculatedWorkingDays}) exceed available balance (${selectedLeaveBalance.availableDays}).`;
-  }, [calculatedWorkingDays, isSelectedTypeUnlimited, selectedLeaveBalance]);
+    return td("requestPanel.balanceWarning", { requested: calculatedWorkingDays, available: selectedLeaveBalance.availableDays });
+  }, [calculatedWorkingDays, isSelectedTypeUnlimited, selectedLeaveBalance, td]);
 
   const sortedRequests = useMemo(() => {
     const requests = summaryQuery.data?.requests ?? [];
@@ -469,14 +476,14 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       const payload = await response.json();
 
       if (!response.ok) {
-        showToast("error", payload.error?.message ?? "Unable to select birthday leave date.");
+        showToast("error", payload.error?.message ?? td("toast.unableToSelectBirthday"));
         return;
       }
 
       summaryQuery.refresh();
-      showToast("success", "Birthday leave date selected!");
+      showToast("success", td("toast.birthdaySelected"));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to select birthday leave date.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToSelectBirthday"));
     } finally {
       setIsBirthdayChoosing(false);
     }
@@ -511,7 +518,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     event.preventDefault();
 
     if (!afkDate || !afkStartTime || !afkEndTime) {
-      showToast("error", "Date, start time, and end time are required.");
+      showToast("error", td("validation.afkFieldsRequired"));
       return;
     }
 
@@ -532,7 +539,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       const payload = await response.json();
 
       if (!response.ok) {
-        showToast("error", payload.error?.message ?? "Unable to log AFK entry.");
+        showToast("error", payload.error?.message ?? td("toast.unableToLogAfk"));
         return;
       }
 
@@ -540,10 +547,10 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       afkQuery.refresh();
       summaryQuery.refresh();
       showToast("success", afkDurationMinutes > 120
-        ? "AFK logged and auto-reclassified as a personal day request."
-        : "AFK entry logged.");
+        ? td("toast.afkReclassified")
+        : td("toast.afkLogged"));
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to log AFK entry.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToLogAfk"));
     } finally {
       setIsAfkSubmitting(false);
     }
@@ -579,7 +586,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       setFormValues(nextValues);
 
       if (formTouched[field]) {
-        setFormErrors(getFormErrors(nextValues, formTouched));
+        setFormErrors(getFormErrors(nextValues, formTouched, requestFormSchema, td));
       }
 
       if (submitError) {
@@ -594,14 +601,14 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     };
 
     setFormTouched(nextTouched);
-    setFormErrors(getFormErrors(formValues, nextTouched));
+    setFormErrors(getFormErrors(formValues, nextTouched, requestFormSchema, td));
   };
 
   const handleSubmitRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     setFormTouched(ALL_FORM_TOUCHED);
-    const nextErrors = getFormErrors(formValues, ALL_FORM_TOUCHED);
+    const nextErrors = getFormErrors(formValues, ALL_FORM_TOUCHED, requestFormSchema, td);
     setFormErrors(nextErrors);
     setSubmitError(null);
 
@@ -628,7 +635,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       const payload = (await response.json()) as TimeOffRequestMutationResponse;
 
       if (!response.ok || !payload.data?.request) {
-        const message = payload.error?.message ?? "Unable to submit leave request.";
+        const message = payload.error?.message ?? td("toast.unableToSubmitLeave");
         setSubmitError(message);
         showToast("error", message);
         return;
@@ -636,9 +643,9 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
       closeRequestPanel();
       summaryQuery.refresh();
-      showToast("success", "Leave request submitted.");
+      showToast("success", td("toast.leaveRequestSubmitted"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to submit leave request.";
+      const message = error instanceof Error ? error.message : td("toast.unableToSubmitLeave");
       setSubmitError(message);
       showToast("error", message);
     } finally {
@@ -648,10 +655,9 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
   const handleCancelRequest = async (requestRecord: LeaveRequestRecord) => {
     const shouldCancel = await confirm({
-      title: "Cancel leave request?",
-      description:
-        "This request will move to cancelled status and no longer be considered for approval.",
-      confirmLabel: "Cancel request",
+      title: td("cancelDialog.title"),
+      description: td("cancelDialog.description"),
+      confirmLabel: td("cancelDialog.confirmLabel"),
       tone: "danger"
     });
 
@@ -675,16 +681,16 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       const payload = (await response.json()) as TimeOffRequestMutationResponse;
 
       if (!response.ok || !payload.data?.request) {
-        showToast("error", payload.error?.message ?? "Unable to cancel leave request.");
+        showToast("error", payload.error?.message ?? td("toast.unableToCancelLeave"));
         return;
       }
 
       summaryQuery.refresh();
-      showToast("info", "Leave request cancelled.");
+      showToast("info", td("toast.leaveRequestCancelled"));
     } catch (error) {
       showToast(
         "error",
-        error instanceof Error ? error.message : "Unable to cancel leave request."
+        error instanceof Error ? error.message : td("toast.unableToCancelLeave")
       );
     } finally {
       setIsCancellingRequestId(null);
@@ -696,8 +702,8 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       <>
         {!embedded ? (
           <PageHeader
-            title="Time Off"
-            description="Request time off, check balances, and track approval status."
+            title={t('title')}
+            description={t('description')}
           />
         ) : null}
         <TimeOffSkeleton />
@@ -710,13 +716,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
       <>
         {!embedded ? (
           <PageHeader
-            title="Time Off"
-            description="Request time off, check balances, and track approval status."
+            title={t('title')}
+            description={t('description')}
           />
         ) : null}
         <ErrorState
-          title="Time Off data is unavailable"
-          message={summaryQuery.errorMessage ?? "Unable to load time off summary."}
+          title={t('errorTitle')}
+          message={summaryQuery.errorMessage ?? td('errorDefault')}
           onRetry={summaryQuery.refresh}
         />
       </>
@@ -727,19 +733,19 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
     <>
       {!embedded ? (
         <PageHeader
-          title="Time Off"
-          description="Request time off, check balances, and track approval status."
+          title={t('title')}
+          description={t('description')}
         />
       ) : null}
 
       <ContextualHelp
-        title="Plan your leave with confidence"
-        description="A few helpful reminders so you can relax knowing everything is covered."
-        items={TIME_OFF_CONTEXTUAL_HELP}
-        ariaLabel="Time off contextual help"
+        title={t('contextualHelp.title')}
+        description={t('contextualHelp.description')}
+        items={contextualHelpItems}
+        ariaLabel={td('contextualHelp.title')}
       />
 
-      <section className="timeoff-balance-grid" aria-label="Leave balances">
+      <section className="timeoff-balance-grid" aria-label={td('title')}>
         {/* Unlimited leave type cards (e.g. sick leave) */}
         {(summaryQuery.data.policies ?? [])
           .filter((p) => p.isUnlimited)
@@ -752,15 +758,15 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             return (
               <article key={policy.id} className="timeoff-balance-card">
                 <header className="timeoff-balance-card-header">
-                  <h2 className="section-title">{formatLeaveTypeLabel(policy.leaveType)}</h2>
-                  <StatusBadge tone="processing">Unlimited</StatusBadge>
+                  <h2 className="section-title">{formatLeaveTypeLabel(policy.leaveType, locale)}</h2>
+                  <StatusBadge tone="processing">{t('balances.unlimited')}</StatusBadge>
                 </header>
-                <div className="timeoff-balance-metric numeric">Unlimited</div>
+                <div className="timeoff-balance-metric numeric">{t('balances.unlimited')}</div>
                 <p className="settings-card-description">
-                  {usedDays > 0 ? `${formatDays(usedDays)} days used this year` : "No days used this year"}
+                  {usedDays > 0 ? td('balances.daysUsedThisYear', { days: formatDays(usedDays, locale) }) : t('balances.noDaysUsed')}
                 </p>
                 <p className="settings-card-description">
-                  Doctor&apos;s note required after 2 consecutive working days.
+                  {t('balances.doctorsNote')}
                 </p>
               </article>
             );
@@ -769,8 +775,8 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         {/* Standard balance cards */}
         {summaryQuery.data.balances.length === 0 && summaryQuery.data.policies.filter((p) => p.isUnlimited).length === 0 ? (
           <EmptyState
-            title="No leave balances available"
-            description="Leave balances appear here once policies and allocations are configured."
+            title={t('balances.emptyTitle')}
+            description={t('balances.emptyDescription')}
           />
         ) : (
           summaryQuery.data.balances.map((balance) => {
@@ -780,30 +786,30 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             return (
               <article key={balance.id} className="timeoff-balance-card">
                 <header className="timeoff-balance-card-header">
-                  <h2 className="section-title">{formatLeaveTypeLabel(balance.leaveType)}</h2>
+                  <h2 className="section-title">{formatLeaveTypeLabel(balance.leaveType, locale)}</h2>
                   <StatusBadge tone={toneForBalance(balance)}>
-                    {available > 0 ? "Available" : "Depleted"}
+                    {available > 0 ? t('balances.available') : t('balances.depleted')}
                   </StatusBadge>
                 </header>
                 <div className="timeoff-balance-metric numeric">
-                  {formatDays(available)} days
+                  {td('balances.daysLabel', { days: formatDays(available, locale) })}
                 </div>
                 <p className="settings-card-description">
-                  {balance.year} balance &mdash; unused days expire Dec 31
+                  {td('balances.balanceExpiry', { year: balance.year })}
                 </p>
                 <dl className="timeoff-balance-breakdown">
                   <div>
-                    <dt>Allocated</dt>
-                    <dd className="numeric">{formatDays(balance.totalDays)}</dd>
+                    <dt>{t('balances.allocated')}</dt>
+                    <dd className="numeric">{formatDays(balance.totalDays, locale)}</dd>
                   </div>
                   <div>
-                    <dt>Used</dt>
-                    <dd className="numeric">{formatDays(balance.usedDays)}</dd>
+                    <dt>{t('balances.used')}</dt>
+                    <dd className="numeric">{formatDays(balance.usedDays, locale)}</dd>
                   </div>
                   {scheduledDays > 0 ? (
                     <div>
-                      <dt>Scheduled</dt>
-                      <dd className="numeric">{formatDays(scheduledDays)}</dd>
+                      <dt>{t('balances.scheduled')}</dt>
+                      <dd className="numeric">{formatDays(scheduledDays, locale)}</dd>
                     </div>
                   ) : null}
                 </dl>
@@ -815,13 +821,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
       {/* Birthday choice banner */}
       {birthdayChoiceInfo ? (
-        <section className="settings-card" aria-label="Birthday leave selection">
+        <section className="settings-card" aria-label={td('birthdayLeave.title')}>
           <header className="timeoff-section-header">
-            <h2 className="section-title">Birthday Leave</h2>
-            <StatusBadge tone="pending">Action required</StatusBadge>
+            <h2 className="section-title">{t('birthdayLeave.title')}</h2>
+            <StatusBadge tone="pending">{t('birthdayLeave.actionRequired')}</StatusBadge>
           </header>
           <p className="settings-card-description">
-            Your birthday falls on a non-working day this year ({formatSingleDateHuman(birthdayChoiceInfo.birthdayDate)}). Choose a day for your birthday leave:
+            {td('birthdayLeave.choiceDescription', { date: formatSingleDateHuman(birthdayChoiceInfo.birthdayDate, locale) })}
           </p>
           <div className="timeoff-row-actions" style={{ marginTop: "var(--spacing-sm)" }}>
             {birthdayChoiceInfo.options.map((dateOption) => (
@@ -832,7 +838,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                 disabled={isBirthdayChoosing}
                 onClick={() => handleBirthdayChoice(dateOption)}
               >
-                {formatSingleDateHuman(dateOption)}
+                {formatSingleDateHuman(dateOption, locale)}
               </button>
             ))}
           </div>
@@ -841,22 +847,22 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
       {/* Probation notice */}
       {summaryQuery.data.profile.status === "onboarding" ? (
-        <section className="settings-card" aria-label="Probation notice">
+        <section className="settings-card" aria-label={td('probation.notice')}>
           <p className="settings-card-description">
-            During probation, only unpaid personal days are available for leave requests.
+            {t('probation.notice')}
           </p>
         </section>
       ) : null}
 
-      <section className="settings-card" aria-label="My leave requests">
+      <section className="settings-card" aria-label={td('requests.title')}>
         <header className="timeoff-section-header">
-          <h2 className="section-title">My Requests</h2>
+          <h2 className="section-title">{t('requests.title')}</h2>
           <div className="documents-row-actions" style={{ opacity: 1, transform: "none", pointerEvents: "auto" }}>
             <button type="button" className="button button-accent" onClick={openRequestPanel}>
-              Request Time Off
+              {t('requests.requestTimeOff')}
             </button>
             <button type="button" className="button" onClick={openAfkPanel}>
-              Log AFK
+              {t('requests.logAfk')}
             </button>
             <button
               type="button"
@@ -867,7 +873,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                 )
               }
             >
-              Start date {requestSortDirection === "asc" ? "↑" : "↓"}
+              {t('requests.startDateSort')} {requestSortDirection === "asc" ? "↑" : "↓"}
             </button>
           </div>
         </header>
@@ -875,51 +881,51 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         {sortedRequests.length === 0 ? (
           <EmptyState
             icon={<CalendarOff size={32} />}
-            title="No leave requests yet"
-            description="Your submitted leave requests will appear here once you create one."
-            ctaLabel="Request time off"
+            title={t('requests.emptyTitle')}
+            description={t('requests.emptyDescription')}
+            ctaLabel={t('requests.requestTimeOffCta')}
             ctaHref="/time-off"
           />
         ) : (
           <div className="data-table-container">
-            <table className="data-table" aria-label="My leave requests">
+            <table className="data-table" aria-label={td('requests.title')}>
               <thead>
                 <tr>
-                  <th>Leave type</th>
-                  <th>Date range</th>
-                  <th>Days</th>
-                  <th>Status</th>
-                  <th>Approver</th>
-                  <th>Submitted</th>
-                  <th className="table-action-column">Actions</th>
+                  <th>{t('requestTable.leaveType')}</th>
+                  <th>{t('requestTable.dateRange')}</th>
+                  <th>{t('requestTable.days')}</th>
+                  <th>{t('requestTable.status')}</th>
+                  <th>{t('requestTable.approver')}</th>
+                  <th>{t('requestTable.submitted')}</th>
+                  <th className="table-action-column">{t('requestTable.actionsColumn')}</th>
                 </tr>
               </thead>
               <tbody>
                 {sortedRequests.flatMap((requestRecord) => {
                   const rows = [
                     <tr key={requestRecord.id} className="data-table-row">
-                      <td>{formatLeaveTypeLabel(requestRecord.leaveType)}</td>
+                      <td>{formatLeaveTypeLabel(requestRecord.leaveType, locale)}</td>
                       <td>
                         <time
                           dateTime={requestRecord.startDate}
-                          title={formatDateTimeTooltip(requestRecord.startDate)}
+                          title={formatDateTimeTooltip(requestRecord.startDate, locale)}
                         >
-                          {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate)}
+                          {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate, locale)}
                         </time>
                       </td>
-                      <td className="numeric">{formatDays(requestRecord.totalDays)}</td>
+                      <td className="numeric">{formatDays(requestRecord.totalDays, locale)}</td>
                       <td>
                         <StatusBadge tone={toneForRequestStatus(requestRecord.status)}>
-                          {formatLeaveStatus(requestRecord.status)}
+                          {formatLeaveStatus(requestRecord.status, locale)}
                         </StatusBadge>
                       </td>
                       <td>{requestRecord.approverName ?? "--"}</td>
                       <td>
                         <time
                           dateTime={requestRecord.createdAt}
-                          title={formatDateTimeTooltip(requestRecord.createdAt)}
+                          title={formatDateTimeTooltip(requestRecord.createdAt, locale)}
                         >
-                          {formatRelativeTime(requestRecord.createdAt)}
+                          {formatRelativeTime(requestRecord.createdAt, locale)}
                         </time>
                       </td>
                       <td className="table-row-action-cell">
@@ -931,10 +937,10 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                               onClick={() => handleCancelRequest(requestRecord)}
                               disabled={isCancellingRequestId === requestRecord.id}
                             >
-                              {isCancellingRequestId === requestRecord.id ? "Cancelling..." : "Cancel"}
+                              {isCancellingRequestId === requestRecord.id ? t('requests.cancelling') : tCommon('cancel')}
                             </button>
                           ) : (
-                            <span className="settings-card-description">No actions</span>
+                            <span className="settings-card-description">{t('requests.noActions')}</span>
                           )}
                         </div>
                       </td>
@@ -946,7 +952,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                       <tr key={`${requestRecord.id}-rejection`} className="rejection-callout-row">
                         <td colSpan={7}>
                           <div className="rejection-callout rejection-callout-inline">
-                            <p><strong>Reason:</strong> {requestRecord.rejectionReason}</p>
+                            <p><strong>{t('requestPanel.reasonLabel')}:</strong> {requestRecord.rejectionReason}</p>
                           </div>
                         </td>
                       </tr>
@@ -961,32 +967,32 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         )}
       </section>
 
-      <section className="settings-card" aria-label="Monthly mini calendar">
+      <section className="settings-card" aria-label={td('calendar.title')}>
         <header className="timeoff-section-header">
-          <h2 className="section-title">Mini Calendar</h2>
+          <h2 className="section-title">{t('calendar.title')}</h2>
           <div className="timeoff-month-controls">
             <button
               type="button"
               className="button"
               onClick={() => setActiveMonth((currentMonth) => shiftMonth(currentMonth, -1))}
             >
-              Previous
+              {t('calendar.previous')}
             </button>
-            <p className="numeric">{monthLabel(activeMonth)}</p>
+            <p className="numeric">{monthLabel(activeMonth, locale)}</p>
             <button
               type="button"
               className="button"
               onClick={() => setActiveMonth((currentMonth) => shiftMonth(currentMonth, 1))}
             >
-              Next
+              {t('calendar.next')}
             </button>
           </div>
         </header>
 
         <div className="timeoff-mini-calendar">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
-            <p key={label} className="timeoff-calendar-weekday">
-              {label}
+          {(["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const).map((dayKey) => (
+            <p key={dayKey} className="timeoff-calendar-weekday">
+              {t(`weekdays.${dayKey}`)}
             </p>
           ))}
           {calendarCells.map((cell) => {
@@ -1022,30 +1028,30 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
         <div className="timeoff-calendar-legend">
           <div className="timeoff-calendar-legend-item">
             <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" />
-            <span>Leave</span>
+            <span>{t('calendar.legendLeave')}</span>
           </div>
           <div className="timeoff-calendar-legend-item">
             <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" />
-            <span>Public holiday</span>
+            <span>{t('calendar.legendHoliday')}</span>
           </div>
           <div className="timeoff-calendar-legend-item">
             <span className="timeoff-calendar-badge timeoff-calendar-badge-pending" />
-            <span>Pending</span>
+            <span>{t('calendar.legendPending')}</span>
           </div>
         </div>
 
         <div className="timeoff-country-summary">
           <span>{countryFlagFromCode(summaryQuery.data.profile.countryCode)}</span>
-          <span>{countryNameFromCode(summaryQuery.data.profile.countryCode)}</span>
+          <span>{countryNameFromCode(summaryQuery.data.profile.countryCode, locale)}</span>
         </div>
       </section>
 
-      <section className="settings-card" aria-label="AFK log">
+      <section className="settings-card" aria-label={td('afk.title')}>
         <header className="timeoff-section-header">
-          <h2 className="section-title">AFK Log</h2>
+          <h2 className="section-title">{t('afk.title')}</h2>
           {afkQuery.data ? (
             <p className="settings-card-description">
-              {afkQuery.data.weeklyCount} of {afkQuery.data.weeklyLimit} entries this week
+              {td('afk.weeklyUsage', { used: afkQuery.data.weeklyCount, limit: afkQuery.data.weeklyLimit })}
             </p>
           ) : null}
         </header>
@@ -1059,20 +1065,20 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           </div>
         ) : afkQuery.data && afkQuery.data.logs.length > 0 ? (
           <div className="data-table-container">
-            <table className="data-table" aria-label="AFK log entries">
+            <table className="data-table" aria-label={td('afk.title')}>
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Duration</th>
-                  <th>Status</th>
-                  <th>Notes</th>
+                  <th>{t('afkTable.date')}</th>
+                  <th>{t('afkTable.time')}</th>
+                  <th>{t('afkTable.duration')}</th>
+                  <th>{t('afkTable.status')}</th>
+                  <th>{t('afkTable.notes')}</th>
                 </tr>
               </thead>
               <tbody>
                 {afkQuery.data.logs.map((log) => (
                   <tr key={log.id} className="data-table-row">
-                    <td>{formatSingleDateHuman(log.date)}</td>
+                    <td>{formatSingleDateHuman(log.date, locale)}</td>
                     <td className="numeric">{log.startTime} – {log.endTime}</td>
                     <td className="numeric">
                       {log.durationMinutes >= 60
@@ -1081,9 +1087,9 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                     </td>
                     <td>
                       {log.reclassifiedAs ? (
-                        <StatusBadge tone="warning">Reclassified</StatusBadge>
+                        <StatusBadge tone="warning">{t('afk.reclassified')}</StatusBadge>
                       ) : (
-                        <StatusBadge tone="success">Logged</StatusBadge>
+                        <StatusBadge tone="success">{t('afk.logged')}</StatusBadge>
                       )}
                     </td>
                     <td>{log.notes || "--"}</td>
@@ -1094,9 +1100,9 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           </div>
         ) : (
           <EmptyState
-            title="No AFK entries this week"
-            description="Log short absences during working hours here."
-            ctaLabel="Log AFK"
+            title={t('afk.emptyTitle')}
+            description={t('afk.emptyDescription')}
+            ctaLabel={t('afk.logAfkCta')}
             ctaHref="/time-off"
           />
         )}
@@ -1104,13 +1110,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
       <SlidePanel
         isOpen={isRequestPanelOpen}
-        title="Request Time Off"
-        description="Select leave type and dates. Working days exclude weekends and holidays."
+        title={t('requestPanel.title')}
+        description={t('requestPanel.description')}
         onClose={closeRequestPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSubmitRequest} noValidate>
           <label className="form-field" htmlFor="timeoff-leave-type">
-            <span className="form-label">Leave type</span>
+            <span className="form-label">{t('requestPanel.leaveTypeLabel')}</span>
             <select
               id="timeoff-leave-type"
               className={formErrors.leaveType ? "form-input form-input-error" : "form-input"}
@@ -1118,10 +1124,10 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
               onChange={handleFieldChange("leaveType")}
               onBlur={handleFieldBlur("leaveType")}
             >
-              <option value="">Select leave type</option>
+              <option value="">{t('requestPanel.selectLeaveType')}</option>
               {availableLeaveTypes.map((leaveType) => (
                 <option key={leaveType} value={leaveType}>
-                  {formatLeaveTypeLabel(leaveType)}
+                  {formatLeaveTypeLabel(leaveType, locale)}
                 </option>
               ))}
             </select>
@@ -1130,7 +1136,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="timeoff-start-date">
-              <span className="form-label">Start date</span>
+              <span className="form-label">{t('requestPanel.startDate')}</span>
               <input
                 id="timeoff-start-date"
                 type="date"
@@ -1143,7 +1149,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             </label>
 
             <label className="form-field" htmlFor="timeoff-end-date">
-              <span className="form-label">End date</span>
+              <span className="form-label">{t('requestPanel.endDate')}</span>
               <input
                 id="timeoff-end-date"
                 type="date"
@@ -1161,7 +1167,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           ) : null}
 
           <label className="form-field" htmlFor="timeoff-reason">
-            <span className="form-label">Reason</span>
+            <span className="form-label">{t('requestPanel.reasonLabel')}</span>
             <textarea
               id="timeoff-reason"
               rows={4}
@@ -1175,20 +1181,20 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
           <section className="timeoff-request-summary">
             <p>
-              Working days: <span className="numeric">{formatDays(calculatedWorkingDays)}</span>
+              {t('requestPanel.workingDays')}: <span className="numeric">{formatDays(calculatedWorkingDays, locale)}</span>
             </p>
             {isSelectedTypeUnlimited ? (
-              <p className="settings-card-description">This leave type has unlimited balance.</p>
+              <p className="settings-card-description">{t('requestPanel.unlimitedBalance')}</p>
             ) : selectedLeaveBalance ? (
               <p>
-                Available balance:{" "}
-                <span className="numeric">{formatDays(selectedLeaveBalance.availableDays)}</span>
+                {t('requestPanel.availableBalance')}:{" "}
+                <span className="numeric">{formatDays(selectedLeaveBalance.availableDays, locale)}</span>
               </p>
             ) : null}
             {balanceWarning ? <p className="form-field-error">{balanceWarning}</p> : null}
             {formValues.leaveType === "sick_leave" && calculatedWorkingDays > 2 ? (
               <p className="settings-card-description">
-                A doctor&apos;s note may be required for sick leave exceeding 2 consecutive working days.
+                {t('requestPanel.sickLeaveNote')}
               </p>
             ) : null}
           </section>
@@ -1197,10 +1203,10 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeRequestPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit request"}
+              {isSubmitting ? t('requestPanel.submitting') : t('requestPanel.submitRequest')}
             </button>
           </div>
         </form>
@@ -1208,13 +1214,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
       <SlidePanel
         isOpen={isAfkPanelOpen}
-        title="Log AFK"
-        description="Record a short absence during working hours. Maximum 2 entries per week."
+        title={t('afkPanel.title')}
+        description={t('afkPanel.description')}
         onClose={closeAfkPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleSubmitAfk} noValidate>
           <label className="form-field" htmlFor="afk-date">
-            <span className="form-label">Date</span>
+            <span className="form-label">{t('afkPanel.dateLabel')}</span>
             <input
               id="afk-date"
               type="date"
@@ -1226,7 +1232,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
           <div className="timeoff-form-grid">
             <label className="form-field" htmlFor="afk-start-time">
-              <span className="form-label">Start time</span>
+              <span className="form-label">{t('afkPanel.startTime')}</span>
               <input
                 id="afk-start-time"
                 type="time"
@@ -1237,7 +1243,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             </label>
 
             <label className="form-field" htmlFor="afk-end-time">
-              <span className="form-label">End time</span>
+              <span className="form-label">{t('afkPanel.endTime')}</span>
               <input
                 id="afk-end-time"
                 type="time"
@@ -1249,7 +1255,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           </div>
 
           <label className="form-field" htmlFor="afk-notes">
-            <span className="form-label">Notes (optional)</span>
+            <span className="form-label">{t('afkPanel.notesLabel')}</span>
             <textarea
               id="afk-notes"
               rows={3}
@@ -1263,7 +1269,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
           <section className="timeoff-request-summary">
             {afkDurationMinutes > 0 ? (
               <p>
-                Duration:{" "}
+                {t('afkPanel.duration')}:{" "}
                 <span className="numeric">
                   {afkDurationMinutes >= 60
                     ? `${Math.floor(afkDurationMinutes / 60)}h ${afkDurationMinutes % 60}m`
@@ -1273,22 +1279,22 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
             ) : null}
             {afkDurationMinutes > 120 ? (
               <p className="form-field-error">
-                AFK over 2 hours will be automatically reclassified as a personal day request.
+                {t('afkPanel.reclassifyWarning')}
               </p>
             ) : null}
             {afkQuery.data ? (
               <p className="settings-card-description">
-                {afkQuery.data.weeklyCount} of {afkQuery.data.weeklyLimit} AFK entries used this week.
+                {td('afkPanel.weeklyUsage', { used: afkQuery.data.weeklyCount, limit: afkQuery.data.weeklyLimit })}
               </p>
             ) : null}
           </section>
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeAfkPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isAfkSubmitting}>
-              {isAfkSubmitting ? "Logging..." : "Log AFK"}
+              {isAfkSubmitting ? t('afkPanel.logging') : t('afkPanel.logAfkButton')}
             </button>
           </div>
         </form>
@@ -1309,7 +1315,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss notification"
+                aria-label={td('dismissNotification')}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path

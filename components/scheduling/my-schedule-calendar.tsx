@@ -1,9 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { ShiftRecord, ShiftStatus } from "../../types/scheduling";
+import { formatMonth } from "../../lib/datetime";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -26,7 +28,7 @@ type MyScheduleCalendarProps = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// DAY_NAMES moved inside component for i18n
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -144,6 +146,7 @@ function buildCalendarDays(year: number, month: number, shifts: ShiftRecord[]): 
 // ---------------------------------------------------------------------------
 
 export function MyScheduleCalendar({ shifts, onShiftClick }: MyScheduleCalendarProps) {
+  const t = useTranslations("scheduling");
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth()); // 0-indexed
@@ -153,9 +156,13 @@ export function MyScheduleCalendar({ shifts, onShiftClick }: MyScheduleCalendarP
     [viewYear, viewMonth, shifts]
   );
 
+  const dayNames = useMemo(() => [
+    t("myCalendar.dayMon"), t("myCalendar.dayTue"), t("myCalendar.dayWed"),
+    t("myCalendar.dayThu"), t("myCalendar.dayFri"), t("myCalendar.daySat"), t("myCalendar.daySun")
+  ], [t]);
+
   const monthLabel = useMemo(() => {
-    const d = new Date(viewYear, viewMonth, 1);
-    return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    return formatMonth(`${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-01`);
   }, [viewYear, viewMonth]);
 
   const goToPrevMonth = () => {
@@ -187,21 +194,21 @@ export function MyScheduleCalendar({ shifts, onShiftClick }: MyScheduleCalendarP
     <div className="mycal">
       {/* Navigation */}
       <div className="mycal-nav">
-        <button type="button" className="icon-button" onClick={goToPrevMonth} aria-label="Previous month">
+        <button type="button" className="icon-button" onClick={goToPrevMonth} aria-label={t("myCalendar.previousMonth")}>
           <ChevronLeft size={18} />
         </button>
         <h3 className="mycal-month-label">{monthLabel}</h3>
-        <button type="button" className="icon-button" onClick={goToNextMonth} aria-label="Next month">
+        <button type="button" className="icon-button" onClick={goToNextMonth} aria-label={t("myCalendar.nextMonth")}>
           <ChevronRight size={18} />
         </button>
         <button type="button" className="button button-ghost mycal-today-btn" onClick={goToToday}>
-          Today
+          {t("myCalendar.today")}
         </button>
       </div>
 
       {/* Day names */}
       <div className="mycal-grid mycal-day-names">
-        {DAY_NAMES.map((name) => (
+        {dayNames.map((name) => (
           <div key={name} className="mycal-day-name">{name}</div>
         ))}
       </div>
@@ -236,7 +243,7 @@ export function MyScheduleCalendar({ shifts, onShiftClick }: MyScheduleCalendarP
                       {formatTime(shift.startTime)} – {formatTime(shift.endTime)}
                     </span>
                     {shift.status === "swap_requested" ? (
-                      <span className="mycal-shift-badge">Swap pending</span>
+                      <span className="mycal-shift-badge">{t("myCalendar.swapPending")}</span>
                     ) : null}
                   </button>
                 ))}

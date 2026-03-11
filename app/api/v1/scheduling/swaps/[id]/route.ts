@@ -21,7 +21,9 @@ import {
 
 const updateSwapSchema = z.object({
   action: z.enum(["accept", "reject", "cancel", "approve"]),
-  reason: z.string().trim().max(500).optional()
+  reason: z.string().trim().max(500).optional(),
+  targetId: z.string().uuid("targetId must be a valid UUID.").optional(),
+  allowLeaveConflict: z.boolean().optional().default(false)
 });
 
 const swapRowSchema = z.object({
@@ -50,7 +52,8 @@ const shiftRowSchema = z.object({
 
 const profileRowSchema = z.object({
   id: z.string().uuid(),
-  full_name: z.string()
+  full_name: z.string(),
+  department: z.string().nullable().optional()
 });
 
 function buildMeta() {
@@ -194,6 +197,8 @@ export async function PUT(
   }
 
   const action = parsedBody.data.action;
+  const requestedTargetId = parsedBody.data.targetId;
+  const allowLeaveConflict = parsedBody.data.allowLeaveConflict === true;
   const isManager = isSchedulingManager(session.profile.roles);
   const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
   const supabase = await createSupabaseServerClient();
@@ -257,6 +262,22 @@ export async function PUT(
   const swap = parsedSwapRow.data;
   const isRequester = swap.requester_id === session.profile.id;
   const isTarget = swap.target_id === session.profile.id;
+  let effectiveTargetId: string | null = swap.target_id;
+
+  if (requestedTargetId) {
+    if (!isManager || action !== "approve") {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Only managers can assign a replacement during approval."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    effectiveTargetId = requestedTargetId;
+  }
 
   if (swap.status === "cancelled" || swap.status === "rejected") {
     return jsonResponse<null>(409, {
@@ -315,12 +336,23 @@ export async function PUT(
   const shift = parsedShiftRow.data;
   const requiresTargetApproval = action === "accept" || action === "approve";
 
-  if (requiresTargetApproval && !swap.target_id) {
+  if (requiresTargetApproval && !effectiveTargetId) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "SHIFT_SWAP_TARGET_REQUIRED",
         message: "A specific target crew member is required for approval."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (requiresTargetApproval && effectiveTargetId === swap.requester_id) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "SHIFT_SWAP_TARGET_INVALID",
+        message: "Requester cannot be assigned as the replacement."
       },
       meta: buildMeta()
     });
@@ -374,13 +406,18 @@ export async function PUT(
     action === "approve" || ((action === "accept" || action === "reject") && !isTarget);
 
   if (isScopedTeamLead && isManagerDrivenAction) {
-    const { data: requesterProfile, error: requesterProfileError } = await supabase
+    const scopedProfileIds = [swap.requester_id];
+
+    if (effectiveTargetId) {
+      scopedProfileIds.push(effectiveTargetId);
+    }
+
+    const { data: scopedProfiles, error: requesterProfileError } = await supabase
       .from("profiles")
       .select("id, department")
-      .eq("id", swap.requester_id)
       .eq("org_id", session.profile.org_id)
       .is("deleted_at", null)
-      .maybeSingle();
+      .in("id", scopedProfileIds);
 
     if (requesterProfileError) {
       return jsonResponse<null>(500, {
@@ -393,6 +430,10 @@ export async function PUT(
       });
     }
 
+    const requesterProfile = (scopedProfiles ?? []).find(
+      (profileRow) => profileRow.id === swap.requester_id
+    );
+
     if (!requesterProfile?.id) {
       return jsonResponse<null>(404, {
         data: null,
@@ -402,6 +443,34 @@ export async function PUT(
         },
         meta: buildMeta()
       });
+    }
+
+    if (effectiveTargetId) {
+      const targetProfile = (scopedProfiles ?? []).find(
+        (profileRow) => profileRow.id === effectiveTargetId
+      );
+
+      if (!targetProfile?.id) {
+        return jsonResponse<null>(404, {
+          data: null,
+          error: {
+            code: "SHIFT_SWAP_TARGET_NOT_FOUND",
+            message: "Selected replacement was not found."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      if (!areDepartmentsEqual(targetProfile.department, session.profile.department)) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "Team lead can only assign replacements inside their department."
+          },
+          meta: buildMeta()
+        });
+      }
     }
 
     if (!areDepartmentsEqual(requesterProfile.department, session.profile.department)) {
@@ -456,12 +525,75 @@ export async function PUT(
     shiftStatusOverride = "swapped";
   }
 
-  if (shouldTransferShift && swap.target_id) {
+  if (shouldTransferShift && effectiveTargetId) {
+    const { data: targetProfileRow, error: targetProfileError } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("org_id", session.profile.org_id)
+      .eq("id", effectiveTargetId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (targetProfileError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_TARGET_PROFILE_FETCH_FAILED",
+          message: "Unable to load replacement profile."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (!targetProfileRow?.id) {
+      return jsonResponse<null>(404, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_TARGET_NOT_FOUND",
+          message: "Selected replacement was not found."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const { data: leaveRows, error: leaveError } = await supabase
+      .from("leave_requests")
+      .select("id, leave_type, start_date, end_date")
+      .eq("org_id", session.profile.org_id)
+      .eq("employee_id", effectiveTargetId)
+      .eq("status", "approved")
+      .lte("start_date", shift.shift_date)
+      .gte("end_date", shift.shift_date)
+      .is("deleted_at", null)
+      .limit(1);
+
+    if (leaveError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_TARGET_LEAVE_CHECK_FAILED",
+          message: "Unable to validate leave conflicts for selected replacement."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if ((leaveRows ?? []).length > 0 && !allowLeaveConflict) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_TARGET_ON_LEAVE",
+          message: `${targetProfileRow.full_name} is on leave on ${shift.shift_date}. Do you want to proceed anyway?`
+        },
+        meta: buildMeta()
+      });
+    }
+
     const { data: targetShiftsRows, error: targetShiftsError } = await supabase
       .from("shifts")
       .select("id, start_time, end_time")
       .eq("org_id", session.profile.org_id)
-      .eq("employee_id", swap.target_id)
+      .eq("employee_id", effectiveTargetId)
       .eq("shift_date", shift.shift_date)
       .is("deleted_at", null)
       .neq("status", "cancelled")
@@ -509,7 +641,7 @@ export async function PUT(
     const { error: shiftUpdateError } = await supabase
       .from("shifts")
       .update({
-        employee_id: swap.target_id,
+        employee_id: effectiveTargetId,
         status: shiftStatusOverride ?? "swapped",
         notes:
           parsedBody.data.reason?.trim() && parsedBody.data.reason.trim().length > 0
@@ -557,7 +689,8 @@ export async function PUT(
     .update({
       status: nextStatus,
       approved_by: nextApprovedBy,
-      approved_at: nextApprovedAt
+      approved_at: nextApprovedAt,
+      target_id: effectiveTargetId
     })
     .eq("id", swap.id)
     .eq("org_id", session.profile.org_id)
@@ -610,21 +743,37 @@ export async function PUT(
   }
 
   if (action === "accept" || action === "approve") {
+    const acceptedByName =
+      action === "approve" && effectiveTargetId && effectiveTargetId !== session.profile.id
+        ? "your team lead"
+        : session.profile.full_name;
+
     void createNotification({
       orgId: session.profile.org_id,
       userId: swap.requester_id,
       type: "shift_swap_accepted",
       title: "Shift swap accepted",
-      body: `${session.profile.full_name} accepted your shift swap for ${shift.shift_date}.`,
-      link: "/scheduling?tab=swaps"
+      body: `${acceptedByName} accepted your shift swap for ${shift.shift_date}.`,
+      link: "/scheduling"
     });
 
     sendSwapAcceptedEmail({
       orgId: session.profile.org_id,
       requesterId: swap.requester_id,
-      targetName: session.profile.full_name,
+      targetName: acceptedByName,
       shiftDate: shift.shift_date
     }).catch((err) => console.error("Email send failed:", err));
+
+    if (action === "approve" && effectiveTargetId && effectiveTargetId !== swap.requester_id) {
+      void createNotification({
+        orgId: session.profile.org_id,
+        userId: effectiveTargetId,
+        type: "shift_swap_accepted",
+        title: "Shift assigned via swap",
+        body: `A team lead assigned you to cover a shift on ${shift.shift_date}.`,
+        link: "/scheduling"
+      });
+    }
   } else if (action === "reject") {
     void createNotification({
       orgId: session.profile.org_id,
@@ -632,16 +781,16 @@ export async function PUT(
       type: "shift_swap_rejected",
       title: "Shift swap declined",
       body: `${session.profile.full_name} declined your shift swap for ${shift.shift_date}.`,
-      link: "/scheduling?tab=swaps"
+      link: "/scheduling"
     });
-  } else if (action === "cancel" && swap.target_id) {
+  } else if (action === "cancel" && effectiveTargetId) {
     void createNotification({
       orgId: session.profile.org_id,
-      userId: swap.target_id,
+      userId: effectiveTargetId,
       type: "shift_swap_rejected",
       title: "Shift swap cancelled",
       body: `${session.profile.full_name} cancelled their shift swap request for ${shift.shift_date}.`,
-      link: "/scheduling?tab=swaps"
+      link: "/scheduling"
     });
   }
 
@@ -651,11 +800,13 @@ export async function PUT(
     recordId: swap.id,
     oldValue: {
       status: swap.status,
-      approved_by: swap.approved_by
+      approved_by: swap.approved_by,
+      target_id: swap.target_id
     },
     newValue: {
       status: parsedUpdatedSwap.data.status,
-      approved_by: parsedUpdatedSwap.data.approved_by
+      approved_by: parsedUpdatedSwap.data.approved_by,
+      target_id: parsedUpdatedSwap.data.target_id
     }
   });
 

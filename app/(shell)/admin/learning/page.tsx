@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { hasRole } from "../../../../lib/roles";
@@ -5,12 +7,14 @@ import { LearningAdminClient } from "./learning-admin-client";
 
 export default async function LearningAdminPage() {
   const session = await getAuthenticatedSession();
+  const tPage = await getTranslations("learningPage");
+  const tCommon = await getTranslations("common");
 
   if (!session?.profile) {
     return (
       <EmptyState
-        title="Profile is unavailable"
-        description="No profile is linked to this account yet."
+        title={tCommon("emptyState.profileUnavailable")}
+        description={tCommon("emptyState.profileUnavailableBody")}
       />
     );
   }
@@ -22,9 +26,9 @@ export default async function LearningAdminPage() {
   if (!canManageLearning) {
     return (
       <EmptyState
-        title="Learning admin is restricted"
-        description="Only HR Admin and Super Admin can manage learning courses."
-        ctaLabel="Open learning"
+        title={tPage("adminRestricted")}
+        description={tPage("adminRestrictedBody")}
+        ctaLabel={tPage("openLearning")}
         ctaHref="/learning"
       />
     );

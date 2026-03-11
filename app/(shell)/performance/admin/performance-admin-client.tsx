@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
@@ -34,6 +35,9 @@ import type {
   ShareReviewResponse
 } from "../../../../types/performance";
 import { humanizeError } from "@/lib/errors";
+
+type AppLocale = "en" | "fr";
+type TranslatorFn = (key: string) => string;
 
 type AdminTab = "admin" | "calibration";
 type SortDirection = "asc" | "desc";
@@ -83,31 +87,31 @@ function defaultCycleFormValues(): CycleFormValues {
   };
 }
 
-function cycleFormErrors(values: CycleFormValues): Partial<Record<keyof CycleFormValues, string>> {
+function cycleFormErrors(values: CycleFormValues, t: TranslatorFn): Partial<Record<keyof CycleFormValues, string>> {
   const errors: Partial<Record<keyof CycleFormValues, string>> = {};
 
   if (!values.name.trim()) {
-    errors.name = "Cycle name is required.";
+    errors.name = t("validation.cycleNameRequired");
   }
 
   if (!values.startDate) {
-    errors.startDate = "Start date is required.";
+    errors.startDate = t("validation.startDateRequired");
   }
 
   if (!values.endDate) {
-    errors.endDate = "End date is required.";
+    errors.endDate = t("validation.endDateRequired");
   }
 
   if (values.startDate && values.endDate && values.endDate < values.startDate) {
-    errors.endDate = "End date cannot be before start date.";
+    errors.endDate = t("validation.endDateBeforeStart");
   }
 
   if (values.selfReviewDeadline && values.startDate && values.selfReviewDeadline < values.startDate) {
-    errors.selfReviewDeadline = "Self review deadline cannot be before start date.";
+    errors.selfReviewDeadline = t("validation.selfDeadlineBeforeStart");
   }
 
   if (values.managerReviewDeadline && values.startDate && values.managerReviewDeadline < values.startDate) {
-    errors.managerReviewDeadline = "Manager deadline cannot be before start date.";
+    errors.managerReviewDeadline = t("validation.managerDeadlineBeforeStart");
   }
 
   return errors;
@@ -128,24 +132,24 @@ function adminSkeleton() {
   );
 }
 
-function standardTemplateSections(): ReviewSectionDefinition[] {
+function standardTemplateSections(t: TranslatorFn): ReviewSectionDefinition[] {
   return [
     {
       id: "delivery",
-      title: "Delivery",
-      description: "Execution quality and reliability over the review period.",
+      title: t("templateSections.deliveryTitle"),
+      description: t("templateSections.deliveryDescription"),
       questions: [
         {
           id: "delivery-impact-rating",
-          title: "Delivery impact",
-          prompt: "Rate overall delivery impact for the period.",
+          title: t("templateSections.deliveryImpact"),
+          prompt: t("templateSections.deliveryImpactPrompt"),
           type: "rating",
           required: true
         },
         {
           id: "delivery-commentary",
-          title: "Delivery notes",
-          prompt: "Share examples of delivery outcomes.",
+          title: t("templateSections.deliveryNotes"),
+          prompt: t("templateSections.deliveryNotesPrompt"),
           type: "text",
           required: true,
           maxLength: 1200
@@ -154,20 +158,20 @@ function standardTemplateSections(): ReviewSectionDefinition[] {
     },
     {
       id: "collaboration",
-      title: "Collaboration",
-      description: "Cross-functional communication and teamwork.",
+      title: t("templateSections.collaborationTitle"),
+      description: t("templateSections.collaborationDescription"),
       questions: [
         {
           id: "collaboration-rating",
-          title: "Collaboration effectiveness",
-          prompt: "Rate collaboration effectiveness with team and stakeholders.",
+          title: t("templateSections.collaborationEffectiveness"),
+          prompt: t("templateSections.collaborationPrompt"),
           type: "rating",
           required: true
         },
         {
           id: "growth-focus",
-          title: "Growth focus",
-          prompt: "What should this person keep doing or improve next cycle?",
+          title: t("templateSections.growthFocus"),
+          prompt: t("templateSections.growthFocusPrompt"),
           type: "text",
           required: true,
           maxLength: 1200
@@ -185,14 +189,14 @@ function varianceTone(variance: number | null): string {
   return "calibration-variance-mid";
 }
 
-function sharingStatusLabel(status: "unshared" | "shared" | "acknowledged"): string {
+function sharingStatusLabel(status: "unshared" | "shared" | "acknowledged", t: TranslatorFn): string {
   switch (status) {
     case "unshared":
-      return "Not shared";
+      return t("sharingStatus.notShared");
     case "shared":
-      return "Shared";
+      return t("sharingStatus.shared");
     case "acknowledged":
-      return "Acknowledged";
+      return t("sharingStatus.acknowledged");
   }
 }
 
@@ -210,6 +214,11 @@ function sharingStatusTone(status: "unshared" | "shared" | "acknowledged"): "dra
 // ── Calibration Tab Component ──
 
 function CalibrationTab() {
+  const t = useTranslations("performanceAdmin");
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const tCommon = useTranslations("common");
+  const locale = useLocale() as AppLocale;
+
   const cycleIdFilter = "";
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
@@ -284,24 +293,24 @@ function CalibrationTab() {
 
   return (
     <article className="settings-card">
-      <h2 className="section-title">Calibration</h2>
+      <h2 className="section-title">{t("calibration.title")}</h2>
       <p className="settings-card-description">
-        Compare self-review and manager scores across the organisation. Read-only view for HR and admin.
+        {t("calibration.description")}
       </p>
 
       {calibrationQuery.isLoading ? (
         <div className="performance-skeleton-card" aria-hidden="true" />
       ) : calibrationQuery.errorMessage ? (
         <ErrorState
-          title="Calibration unavailable"
+          title={t("calibration.unavailableTitle")}
           message={calibrationQuery.errorMessage}
           onRetry={calibrationQuery.refresh}
         />
       ) : !cycle ? (
         <EmptyState
-          title="No cycle found"
-          description="Create a review cycle to see calibration data."
-          ctaLabel="Back to admin"
+          title={t("calibration.noCycleTitle")}
+          description={t("calibration.noCycleDescription")}
+          ctaLabel={t("calibration.backToAdmin")}
           ctaHref="/performance/admin"
         />
       ) : (
@@ -317,9 +326,9 @@ function CalibrationTab() {
               className="form-input"
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.currentTarget.value)}
-              aria-label="Filter by department"
+              aria-label={t("calibration.filterByDepartment")}
             >
-              <option value="all">All departments</option>
+              <option value="all">{t("calibration.allDepartments")}</option>
               {departments.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
@@ -329,11 +338,11 @@ function CalibrationTab() {
               className="form-input"
               value={countryFilter}
               onChange={(e) => setCountryFilter(e.currentTarget.value)}
-              aria-label="Filter by country"
+              aria-label={t("calibration.filterByCountry")}
             >
-              <option value="all">All countries</option>
+              <option value="all">{t("calibration.allCountries")}</option>
               {countries.map((c) => (
-                <option key={c} value={c}>{countryNameFromCode(c)}</option>
+                <option key={c} value={c}>{countryNameFromCode(c, locale)}</option>
               ))}
             </select>
           </div>
@@ -341,33 +350,32 @@ function CalibrationTab() {
           {summary ? (
             <div className="calibration-summary">
               <p>
-                Cycle completion:{" "}
+                {t("calibration.cycleCompletion")}{" "}
                 <span className="numeric">
-                  {summary.completedAssignments} of {summary.totalAssignments} (
-                  {summary.completionPct}%)
+                  {t('calibration.completionCount', { completed: summary.completedAssignments, total: summary.totalAssignments, pct: summary.completionPct })}
                 </span>
               </p>
               <p>
-                Average self score:{" "}
+                {t("calibration.averageSelfScore")}{" "}
                 <span className="numeric">
-                  {summary.avgSelfScore !== null ? summary.avgSelfScore.toFixed(1) : "N/A"}
+                  {summary.avgSelfScore !== null ? summary.avgSelfScore.toFixed(1) : t("calibration.notAvailable")}
                 </span>
               </p>
               <p>
-                Average manager score:{" "}
+                {t("calibration.averageManagerScore")}{" "}
                 <span className="numeric">
-                  {summary.avgManagerScore !== null ? summary.avgManagerScore.toFixed(1) : "N/A"}
+                  {summary.avgManagerScore !== null ? summary.avgManagerScore.toFixed(1) : t("calibration.notAvailable")}
                 </span>
               </p>
             </div>
           ) : null}
 
-          <section className="data-table-container" aria-label="Calibration data">
+          <section className="data-table-container" aria-label={t("calibration.title")}>
             {sortedRows.length === 0 ? (
               <EmptyState
-                title="No calibration data"
-                description="No completed assignments match the selected filters."
-                ctaLabel="Clear filters"
+                title={t("calibration.noDataTitle")}
+                description={t("calibration.noDataDescription")}
+                ctaLabel={t("calibration.clearFilters")}
                 ctaHref="/performance/admin"
               />
             ) : (
@@ -376,32 +384,32 @@ function CalibrationTab() {
                   <tr>
                     <th>
                       <button type="button" className="table-sort-trigger" onClick={() => toggleSort("employee")}>
-                        Employee{sortArrow("employee")}
+                        {t("calibrationTable.employee")}{sortArrow("employee")}
                       </button>
                     </th>
                     <th>
                       <button type="button" className="table-sort-trigger" onClick={() => toggleSort("department")}>
-                        Department{sortArrow("department")}
+                        {t("calibrationTable.department")}{sortArrow("department")}
                       </button>
                     </th>
-                    <th>Country</th>
-                    <th>Review Type</th>
+                    <th>{t("calibrationTable.country")}</th>
+                    <th>{t("calibrationTable.reviewType")}</th>
                     <th>
                       <button type="button" className="table-sort-trigger" onClick={() => toggleSort("selfScore")}>
-                        Self Score{sortArrow("selfScore")}
+                        {t("calibrationTable.selfScore")}{sortArrow("selfScore")}
                       </button>
                     </th>
                     <th>
                       <button type="button" className="table-sort-trigger" onClick={() => toggleSort("managerScore")}>
-                        Manager Score{sortArrow("managerScore")}
+                        {t("calibrationTable.managerScore")}{sortArrow("managerScore")}
                       </button>
                     </th>
                     <th>
                       <button type="button" className="table-sort-trigger" onClick={() => toggleSort("variance")}>
-                        Variance{sortArrow("variance")}
+                        {t("calibrationTable.variance")}{sortArrow("variance")}
                       </button>
                     </th>
-                    <th>Status</th>
+                    <th>{t("calibrationTable.status")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -412,24 +420,24 @@ function CalibrationTab() {
                       <td>
                         <p className="country-chip">
                           <span>{countryFlagFromCode(row.countryCode)}</span>
-                          <span>{countryNameFromCode(row.countryCode)}</span>
+                          <span>{countryNameFromCode(row.countryCode, locale)}</span>
                         </p>
                       </td>
                       <td>{toSentenceCase(row.reviewType)}</td>
                       <td className="numeric">
-                        {row.selfScore !== null ? row.selfScore.toFixed(1) : "N/A"}
+                        {row.selfScore !== null ? row.selfScore.toFixed(1) : t("calibration.notAvailable")}
                       </td>
                       <td className="numeric">
-                        {row.managerScore !== null ? row.managerScore.toFixed(1) : "N/A"}
+                        {row.managerScore !== null ? row.managerScore.toFixed(1) : t("calibration.notAvailable")}
                       </td>
                       <td className={`numeric ${varianceTone(row.variance)}`}>
                         {row.variance !== null
                           ? `${row.variance > 0 ? "+" : ""}${row.variance.toFixed(1)}`
-                          : "N/A"}
+                          : t("calibration.notAvailable")}
                       </td>
                       <td>
                         <StatusBadge tone={sharingStatusTone(row.status)}>
-                          {sharingStatusLabel(row.status)}
+                          {sharingStatusLabel(row.status, td as TranslatorFn)}
                         </StatusBadge>
                       </td>
                     </tr>
@@ -447,6 +455,11 @@ function CalibrationTab() {
 // ── Main Admin Component ──
 
 export function AdminPerformanceClient() {
+  const t = useTranslations("performanceAdmin");
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const tCommon = useTranslations("common");
+  const locale = useLocale() as AppLocale;
+
   const adminQuery = usePerformanceAdmin();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [activeTab, setActiveTab] = useState<AdminTab>("admin");
@@ -501,21 +514,21 @@ export function AdminPerformanceClient() {
       const body = (await response.json()) as ShareReviewResponse;
 
       if (!response.ok || !body.data) {
-        showToast("error", body.error?.message ?? "Unable to share review.");
+        showToast("error", body.error?.message ?? td("toast.unableToShareReview"));
         return;
       }
 
-      showToast("success", "Review shared successfully.");
+      showToast("success", td("toast.reviewShared"));
       adminQuery.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to share review.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToShareReview"));
     } finally {
       setIsSharingReview(false);
     }
   };
 
   const createCycle = async () => {
-    const validation = cycleFormErrors(cycleForm);
+    const validation = cycleFormErrors(cycleForm, td as TranslatorFn);
     setCycleFormValidation(validation);
 
     if (hasErrors(validation)) {
@@ -546,16 +559,16 @@ export function AdminPerformanceClient() {
       const body = (await response.json()) as CreateReviewCycleApiResponse;
 
       if (!response.ok || !body.data) {
-        showToast("error", body.error?.message ?? "Unable to create review cycle.");
+        showToast("error", body.error?.message ?? td("toast.unableToCreateCycle"));
         return;
       }
 
-      showToast("success", "Review cycle created.");
+      showToast("success", td("toast.cycleCreated"));
       setCycleForm(defaultCycleFormValues());
       setCycleFormValidation({});
       adminQuery.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to create review cycle.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToCreateCycle"));
     } finally {
       setIsCreatingCycle(false);
     }
@@ -566,8 +579,8 @@ export function AdminPerformanceClient() {
 
     try {
       const payload: CreateReviewTemplatePayload = {
-        name: "Standard Performance Template",
-        sections: standardTemplateSections()
+        name: td("standardTemplateName"),
+        sections: standardTemplateSections(td as TranslatorFn)
       };
 
       const response = await fetch("/api/v1/performance/admin/templates", {
@@ -581,14 +594,14 @@ export function AdminPerformanceClient() {
       const body = (await response.json()) as CreateReviewTemplateApiResponse;
 
       if (!response.ok || !body.data) {
-        showToast("error", body.error?.message ?? "Unable to create review template.");
+        showToast("error", body.error?.message ?? td("toast.unableToCreateTemplate"));
         return;
       }
 
-      showToast("success", "Standard review template created.");
+      showToast("success", td("toast.templateCreated"));
       adminQuery.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to create review template.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToCreateTemplate"));
     } finally {
       setIsCreatingTemplate(false);
     }
@@ -600,7 +613,7 @@ export function AdminPerformanceClient() {
     }
 
     if (!selectedCycleId || !selectedTemplateId) {
-      showToast("error", "Select both a cycle and a template before assigning.");
+      showToast("error", td("toast.selectCycleAndTemplate"));
       return;
     }
 
@@ -609,7 +622,7 @@ export function AdminPerformanceClient() {
     );
 
     if (activeDirectory.length === 0) {
-      showToast("error", "No active people with managers are available for assignment.");
+      showToast("error", td("toast.noActivePeople"));
       return;
     }
 
@@ -637,17 +650,17 @@ export function AdminPerformanceClient() {
       const body = (await response.json()) as AssignReviewApiResponse;
 
       if (!response.ok || !body.data) {
-        showToast("error", body.error?.message ?? "Unable to assign review cycle.");
+        showToast("error", body.error?.message ?? td("toast.unableToAssignCycle"));
         return;
       }
 
       showToast(
         "success",
-        `Assigned ${body.data.createdCount} reviews (${body.data.skippedCount} skipped).`
+        td("toast.assignedReviews", { createdCount: body.data.createdCount, skippedCount: body.data.skippedCount })
       );
       adminQuery.refresh();
     } catch (error) {
-      showToast("error", error instanceof Error ? error.message : "Unable to assign review cycle.");
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToAssignCycle"));
     } finally {
       setIsAssigning(false);
     }
@@ -656,30 +669,30 @@ export function AdminPerformanceClient() {
   return (
     <>
       <PageHeader
-        title="Performance Admin"
-        description="Run review cycles, track completion, and calibrate fairly."
+        title={t("title")}
+        description={t("description")}
         actions={
           <Link className="button button-subtle" href="/performance">
-            Back to performance
+            {t("backToPerformance")}
           </Link>
         }
       />
 
       {/* ── Tab Navigation ── */}
-      <section className="page-tabs" aria-label="Admin sections">
+      <section className="page-tabs" aria-label={t("title")}>
         <button
           type="button"
           className={activeTab === "admin" ? "page-tab page-tab-active" : "page-tab"}
           onClick={() => setActiveTab("admin")}
         >
-          Admin
+          {t("tabs.admin")}
         </button>
         <button
           type="button"
           className={activeTab === "calibration" ? "page-tab page-tab-active" : "page-tab"}
           onClick={() => setActiveTab("calibration")}
         >
-          Calibration
+          {t("tabs.calibration")}
         </button>
       </section>
 
@@ -695,7 +708,7 @@ export function AdminPerformanceClient() {
 
           {!adminQuery.isLoading && adminQuery.errorMessage ? (
             <ErrorState
-              title="Performance admin unavailable"
+              title={t("errorTitle")}
               message={adminQuery.errorMessage}
               onRetry={adminQuery.refresh}
             />
@@ -705,35 +718,35 @@ export function AdminPerformanceClient() {
             <section className="settings-layout">
               <section className="performance-admin-metrics">
                 <article className="metric-card">
-                  <p className="metric-label">Total Assignments</p>
+                  <p className="metric-label">{t("metrics.totalAssignments")}</p>
                   <p className="metric-value numeric">{adminQuery.data.metrics.totalAssignments}</p>
-                  <p className="metric-hint">Across all cycles</p>
+                  <p className="metric-hint">{t("metrics.totalAssignmentsHint")}</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Completed</p>
+                  <p className="metric-label">{t("metrics.completed")}</p>
                   <p className="metric-value numeric">{adminQuery.data.metrics.completedAssignments}</p>
-                  <p className="metric-hint">Submitted by employee + manager</p>
+                  <p className="metric-hint">{t("metrics.completedHint")}</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Pending Self</p>
+                  <p className="metric-label">{t("metrics.pendingSelf")}</p>
                   <p className="metric-value numeric">{adminQuery.data.metrics.pendingSelfAssignments}</p>
-                  <p className="metric-hint">Awaiting self review</p>
+                  <p className="metric-hint">{t("metrics.pendingSelfHint")}</p>
                 </article>
                 <article className="metric-card">
-                  <p className="metric-label">Pending Manager</p>
+                  <p className="metric-label">{t("metrics.pendingManager")}</p>
                   <p className="metric-value numeric">{adminQuery.data.metrics.pendingManagerAssignments}</p>
-                  <p className="metric-hint">Awaiting manager review</p>
+                  <p className="metric-hint">{t("metrics.pendingManagerHint")}</p>
                 </article>
               </section>
 
               <article className="settings-card">
-                <h2 className="section-title">Create Cycle</h2>
+                <h2 className="section-title">{t("createCycle.title")}</h2>
                 <p className="settings-card-description">
-                  Set cycle dates and deadlines for the next review period.
+                  {t("createCycle.description")}
                 </p>
                 <div className="performance-admin-form-grid">
                   <label className="form-field" htmlFor="cycle-name">
-                    <span className="form-label">Cycle name</span>
+                    <span className="form-label">{t("createCycle.cycleName")}</span>
                     <input
                       id="cycle-name"
                       className={cycleFormValidation.name ? "form-input form-input-error" : "form-input"}
@@ -743,7 +756,7 @@ export function AdminPerformanceClient() {
                         setCycleForm((current) => ({ ...current, name: nextValue }));
                         setCycleFormValidation((current) => ({
                           ...current,
-                          name: nextValue.trim() ? undefined : "Cycle name is required."
+                          name: nextValue.trim() ? undefined : td("validation.cycleNameRequired")
                         }));
                       }}
                     />
@@ -753,7 +766,7 @@ export function AdminPerformanceClient() {
                   </label>
 
                   <label className="form-field" htmlFor="cycle-type">
-                    <span className="form-label">Cycle type</span>
+                    <span className="form-label">{t("createCycle.cycleType")}</span>
                     <select
                       id="cycle-type"
                       className="form-input"
@@ -765,14 +778,14 @@ export function AdminPerformanceClient() {
                         }))
                       }
                     >
-                      <option value="quarterly">Quarterly</option>
-                      <option value="annual">Annual</option>
-                      <option value="probation">Probation</option>
+                      <option value="quarterly">{t("cycleType.quarterly")}</option>
+                      <option value="annual">{t("cycleType.annual")}</option>
+                      <option value="probation">{t("cycleType.probation")}</option>
                     </select>
                   </label>
 
                   <label className="form-field" htmlFor="cycle-status">
-                    <span className="form-label">Initial status</span>
+                    <span className="form-label">{t("createCycle.initialStatus")}</span>
                     <select
                       id="cycle-status"
                       className="form-input"
@@ -784,15 +797,15 @@ export function AdminPerformanceClient() {
                         }))
                       }
                     >
-                      <option value="draft">Draft</option>
-                      <option value="active">Active</option>
-                      <option value="in_review">In Review</option>
-                      <option value="completed">Completed</option>
+                      <option value="draft">{t("cycleStatus.draft")}</option>
+                      <option value="active">{t("cycleStatus.active")}</option>
+                      <option value="in_review">{t("cycleStatus.inReview")}</option>
+                      <option value="completed">{t("cycleStatus.completed")}</option>
                     </select>
                   </label>
 
                   <label className="form-field" htmlFor="cycle-start-date">
-                    <span className="form-label">Start date</span>
+                    <span className="form-label">{t("createCycle.startDate")}</span>
                     <input
                       id="cycle-start-date"
                       type="date"
@@ -810,7 +823,7 @@ export function AdminPerformanceClient() {
                   </label>
 
                   <label className="form-field" htmlFor="cycle-end-date">
-                    <span className="form-label">End date</span>
+                    <span className="form-label">{t("createCycle.endDate")}</span>
                     <input
                       id="cycle-end-date"
                       type="date"
@@ -826,7 +839,7 @@ export function AdminPerformanceClient() {
                   </label>
 
                   <label className="form-field" htmlFor="cycle-self-deadline">
-                    <span className="form-label">Self review deadline</span>
+                    <span className="form-label">{t("createCycle.selfReviewDeadline")}</span>
                     <input
                       id="cycle-self-deadline"
                       type="date"
@@ -849,7 +862,7 @@ export function AdminPerformanceClient() {
                   </label>
 
                   <label className="form-field" htmlFor="cycle-manager-deadline">
-                    <span className="form-label">Manager review deadline</span>
+                    <span className="form-label">{t("createCycle.managerReviewDeadline")}</span>
                     <input
                       id="cycle-manager-deadline"
                       type="date"
@@ -881,15 +894,15 @@ export function AdminPerformanceClient() {
                       void createCycle();
                     }}
                   >
-                    {isCreatingCycle ? "Creating..." : "Create cycle"}
+                    {isCreatingCycle ? t("createCycle.creating") : t("createCycle.createCycleButton")}
                   </button>
                 </div>
               </article>
 
               <article className="settings-card">
-                <h2 className="section-title">Templates & Assignment</h2>
+                <h2 className="section-title">{t("templates.title")}</h2>
                 <p className="settings-card-description">
-                  Create a standard template, then assign the selected cycle to active people.
+                  {t("templates.description")}
                 </p>
 
                 <div className="performance-template-grid">
@@ -901,18 +914,18 @@ export function AdminPerformanceClient() {
                       void createStandardTemplate();
                     }}
                   >
-                    {isCreatingTemplate ? "Creating template..." : "Create standard template"}
+                    {isCreatingTemplate ? t("templates.creatingTemplate") : t("templates.createStandardTemplate")}
                   </button>
 
                   <label className="form-field" htmlFor="assign-cycle">
-                    <span className="form-label">Cycle</span>
+                    <span className="form-label">{t("templates.cycleLabel")}</span>
                     <select
                       id="assign-cycle"
                       className="form-input"
                       value={selectedCycleId}
                       onChange={(event) => setSelectedCycleId(event.currentTarget.value)}
                     >
-                      <option value="">Select cycle</option>
+                      <option value="">{t("templates.selectCycle")}</option>
                       {adminQuery.data.cycles.map((cycle) => (
                         <option key={cycle.id} value={cycle.id}>
                           {cycle.name} ({toSentenceCase(cycle.type)})
@@ -922,14 +935,14 @@ export function AdminPerformanceClient() {
                   </label>
 
                   <label className="form-field" htmlFor="assign-template">
-                    <span className="form-label">Template</span>
+                    <span className="form-label">{t("templates.templateLabel")}</span>
                     <select
                       id="assign-template"
                       className="form-input"
                       value={selectedTemplateId}
                       onChange={(event) => setSelectedTemplateId(event.currentTarget.value)}
                     >
-                      <option value="">Select template</option>
+                      <option value="">{t("templates.selectTemplate")}</option>
                       {adminQuery.data.templates.map((template) => (
                         <option key={template.id} value={template.id}>
                           {template.name}
@@ -939,7 +952,7 @@ export function AdminPerformanceClient() {
                   </label>
 
                   <label className="form-field" htmlFor="assign-due-date">
-                    <span className="form-label">Due date (optional)</span>
+                    <span className="form-label">{t("templates.dueDateLabel")}</span>
                     <input
                       id="assign-due-date"
                       type="date"
@@ -957,19 +970,19 @@ export function AdminPerformanceClient() {
                       void assignCycle();
                     }}
                   >
-                    {isAssigning ? "Assigning..." : "Assign to active people"}
+                    {isAssigning ? t("templates.assigning") : t("templates.assignToActivePeople")}
                   </button>
                 </div>
               </article>
 
               <article className="settings-card">
-                <h2 className="section-title">Assignment Tracker</h2>
-                <section className="data-table-container" aria-label="Performance assignment tracker">
+                <h2 className="section-title">{t("tracker.title")}</h2>
+                <section className="data-table-container" aria-label={t("tracker.title")}>
                   {sortedAssignments.length === 0 ? (
                     <EmptyState
-                      title="No assignments yet"
-                      description="Create a cycle and assign reviews to start tracking progress."
-                      ctaLabel="Back to performance"
+                      title={t("tracker.emptyTitle")}
+                      description={t("tracker.emptyDescription")}
+                      ctaLabel={t("tracker.backToPerformanceCta")}
                       ctaHref="/performance"
                     />
                   ) : (
@@ -986,16 +999,16 @@ export function AdminPerformanceClient() {
                                 )
                               }
                             >
-                              Employee
+                              {t("table.employee")}
                               <span className="numeric">{assignmentSortDirection === "asc" ? "\u2191" : "\u2193"}</span>
                             </button>
                           </th>
-                          <th>Cycle</th>
-                          <th>Reviewer</th>
-                          <th>Country</th>
-                          <th>Status</th>
-                          <th>Sharing</th>
-                          <th>Updated</th>
+                          <th>{t("table.cycle")}</th>
+                          <th>{t("table.reviewer")}</th>
+                          <th>{t("table.country")}</th>
+                          <th>{t("table.status")}</th>
+                          <th>{t("table.sharing")}</th>
+                          <th>{t("table.updated")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1021,7 +1034,7 @@ export function AdminPerformanceClient() {
                               <td>
                                 <p className="country-chip">
                                   <span>{countryFlagFromCode(assignment.employeeCountryCode)}</span>
-                                  <span>{countryNameFromCode(assignment.employeeCountryCode)}</span>
+                                  <span>{countryNameFromCode(assignment.employeeCountryCode, locale)}</span>
                                 </p>
                               </td>
                               <td>
@@ -1032,9 +1045,9 @@ export function AdminPerformanceClient() {
                               <td>
                                 {assignment.status === "completed" ? (
                                   sharingStatus === "acknowledged" ? (
-                                    <StatusBadge tone="success">Acknowledged</StatusBadge>
+                                    <StatusBadge tone="success">{t("sharingStatus.acknowledged")}</StatusBadge>
                                   ) : sharingStatus === "shared" ? (
-                                    <StatusBadge tone="pending">Awaiting acknowledgment</StatusBadge>
+                                    <StatusBadge tone="pending">{t("sharingStatus.awaitingAcknowledgment")}</StatusBadge>
                                   ) : (
                                     <button
                                       type="button"
@@ -1042,15 +1055,15 @@ export function AdminPerformanceClient() {
                                       disabled={isSharingReview}
                                       onClick={() => { void shareReview(assignment.id); }}
                                     >
-                                      {isSharingReview ? "Sharing..." : "Share review"}
+                                      {isSharingReview ? t("shareReview.sharing") : t("shareReview.shareReviewButton")}
                                     </button>
                                   )
                                 ) : (
                                   <span className="settings-card-description">--</span>
                                 )}
                               </td>
-                              <td title={formatDateTimeTooltip(assignment.updatedAt)}>
-                                {formatRelativeTime(assignment.updatedAt)}
+                              <td title={formatDateTimeTooltip(assignment.updatedAt, locale)}>
+                                {formatRelativeTime(assignment.updatedAt, locale)}
                               </td>
                             </tr>
                           );
@@ -1066,7 +1079,7 @@ export function AdminPerformanceClient() {
       ) : null}
 
       {toasts.length > 0 ? (
-        <section className="toast-region" aria-live="polite" aria-label="Performance admin toasts">
+        <section className="toast-region" aria-live="polite" aria-label={t("title")}>
           {toasts.map((toast) => (
             <article key={toast.id} className={`toast-message toast-message-${toast.variant}`}>
               <p>{toast.message}</p>
@@ -1074,9 +1087,9 @@ export function AdminPerformanceClient() {
                 type="button"
                 className="toast-dismiss"
                 onClick={() => dismissToast(toast.id)}
-                aria-label="Dismiss toast"
+                aria-label={t("dismissToast")}
               >
-                Dismiss
+                {t("dismissToast")}
               </button>
             </article>
           ))}

@@ -1,5 +1,8 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
+import { DEFAULT_LOCALE, type AppLocale } from "../../../i18n/locales";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
 import { hasRole } from "../../../lib/roles";
 import { SETTINGS_TABS, type NotificationPreferences, type SettingsTab } from "../../../types/settings";
@@ -15,7 +18,8 @@ function normalizeNotificationPreferences(
   return {
     emailAnnouncements: Boolean(value?.emailAnnouncements),
     emailApprovals: Boolean(value?.emailApprovals),
-    inAppReminders: Boolean(value?.inAppReminders)
+    inAppReminders: Boolean(value?.inAppReminders),
+    browserPush: Boolean(value?.browserPush)
   };
 }
 
@@ -33,17 +37,19 @@ function resolveTab(searchParams: Record<string, string | string[] | undefined>)
 
 export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   const session = await getAuthenticatedSession({ includeOrg: true });
+  const tSettings = await getTranslations('settings');
 
   if (!session?.profile) {
+    const t = await getTranslations('common');
     return (
       <>
         <PageHeader
-          title="Settings"
-          description="Profile, workspace preferences, and admin controls."
+          title={tSettings('title')}
+          description={tSettings('fallbackDescription')}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={t('emptyState.profileUnavailable')}
+          description={t('emptyState.profileUnavailableBody')}
         />
       </>
     );
@@ -64,12 +70,13 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   return (
     <>
       <PageHeader
-        title="Settings"
-        description="Manage your profile, preferences, and security."
+        title={tSettings('title')}
+        description={tSettings('description')}
       />
 
       <SettingsClient
         initialTab={requestedTab}
+        preferredLocale={(session.profile.preferred_locale ?? DEFAULT_LOCALE) as AppLocale}
         profile={{
           fullName: session.profile.full_name,
           avatarUrl: session.profile.avatar_url ?? "",

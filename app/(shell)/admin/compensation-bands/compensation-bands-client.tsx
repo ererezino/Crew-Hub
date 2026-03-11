@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type FormEvent, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
@@ -17,6 +18,8 @@ import {
 } from "../../../../lib/datetime";
 import { type CompensationBandLocationType } from "../../../../types/compensation-bands";
 import { humanizeError } from "@/lib/errors";
+
+type AppLocale = "en" | "fr";
 
 type SortDirection = "asc" | "desc";
 type ToastVariant = "success" | "error" | "info";
@@ -129,148 +132,6 @@ function parseInteger(value: string): number {
   return Number.parseInt(value.trim(), 10);
 }
 
-function validateBandForm(values: BandFormValues): BandFormErrors {
-  const errors: BandFormErrors = {};
-
-  if (!values.title.trim()) {
-    errors.title = "Title is required.";
-  }
-
-  if (!/^[A-Za-z]{3}$/.test(values.currency.trim())) {
-    errors.currency = "Currency must be a 3-letter code.";
-  }
-
-  if (!isDigits(values.minSalaryAmount)) {
-    errors.minSalaryAmount = "Min salary must be a non-negative integer.";
-  }
-
-  if (!isDigits(values.midSalaryAmount)) {
-    errors.midSalaryAmount = "Mid salary must be a non-negative integer.";
-  }
-
-  if (!isDigits(values.maxSalaryAmount)) {
-    errors.maxSalaryAmount = "Max salary must be a non-negative integer.";
-  }
-
-  if (values.equityMin.trim().length > 0 && !isDigits(values.equityMin)) {
-    errors.equityMin = "Equity min must be a non-negative integer.";
-  }
-
-  if (values.equityMax.trim().length > 0 && !isDigits(values.equityMax)) {
-    errors.equityMax = "Equity max must be a non-negative integer.";
-  }
-
-  if (!isoDatePattern.test(values.effectiveFrom)) {
-    errors.effectiveFrom = "Effective from must be in YYYY-MM-DD format.";
-  }
-
-  if (values.effectiveTo.trim().length > 0 && !isoDatePattern.test(values.effectiveTo)) {
-    errors.effectiveTo = "Effective to must be in YYYY-MM-DD format.";
-  }
-
-  if (values.locationType !== "global" && !values.locationValue.trim()) {
-    errors.locationValue = "Location value is required for this location type.";
-  }
-
-  if (
-    isDigits(values.minSalaryAmount) &&
-    isDigits(values.midSalaryAmount) &&
-    parseInteger(values.midSalaryAmount) < parseInteger(values.minSalaryAmount)
-  ) {
-    errors.midSalaryAmount = "Mid salary must be greater than or equal to min salary.";
-  }
-
-  if (
-    isDigits(values.midSalaryAmount) &&
-    isDigits(values.maxSalaryAmount) &&
-    parseInteger(values.maxSalaryAmount) < parseInteger(values.midSalaryAmount)
-  ) {
-    errors.maxSalaryAmount = "Max salary must be greater than or equal to mid salary.";
-  }
-
-  if (values.effectiveTo.trim().length > 0 && values.effectiveTo < values.effectiveFrom) {
-    errors.effectiveTo = "Effective to must be on or after effective from.";
-  }
-
-  if (
-    values.equityMin.trim().length > 0 &&
-    values.equityMax.trim().length > 0 &&
-    isDigits(values.equityMin) &&
-    isDigits(values.equityMax) &&
-    parseInteger(values.equityMax) < parseInteger(values.equityMin)
-  ) {
-    errors.equityMax = "Equity max must be greater than or equal to equity min.";
-  }
-
-  return errors;
-}
-
-function validateBenchmarkForm(values: BenchmarkFormValues): BenchmarkFormErrors {
-  const errors: BenchmarkFormErrors = {};
-
-  if (!values.source.trim()) {
-    errors.source = "Source is required.";
-  }
-
-  if (!values.title.trim()) {
-    errors.title = "Title is required.";
-  }
-
-  if (!/^[A-Za-z]{3}$/.test(values.currency.trim())) {
-    errors.currency = "Currency must be a 3-letter code.";
-  }
-
-  const percentileFields: Array<keyof BenchmarkFormValues> = ["p25", "p50", "p75", "p90"];
-
-  for (const field of percentileFields) {
-    const fieldValue = values[field].trim();
-
-    if (fieldValue.length > 0 && !isDigits(fieldValue)) {
-      errors[field] = "Percentile values must be non-negative integers.";
-    }
-  }
-
-  if (isDigits(values.p25) && isDigits(values.p50) && parseInteger(values.p25) > parseInteger(values.p50)) {
-    errors.p50 = "P50 must be greater than or equal to P25.";
-  }
-
-  if (isDigits(values.p50) && isDigits(values.p75) && parseInteger(values.p50) > parseInteger(values.p75)) {
-    errors.p75 = "P75 must be greater than or equal to P50.";
-  }
-
-  if (isDigits(values.p75) && isDigits(values.p90) && parseInteger(values.p75) > parseInteger(values.p90)) {
-    errors.p90 = "P90 must be greater than or equal to P75.";
-  }
-
-  return errors;
-}
-
-function validateAssignmentForm(values: AssignmentFormValues): AssignmentFormErrors {
-  const errors: AssignmentFormErrors = {};
-
-  if (!values.employeeId.trim()) {
-    errors.employeeId = "Employee is required.";
-  }
-
-  if (!values.bandId.trim()) {
-    errors.bandId = "Band is required.";
-  }
-
-  if (!isoDatePattern.test(values.effectiveFrom)) {
-    errors.effectiveFrom = "Effective from must be in YYYY-MM-DD format.";
-  }
-
-  if (values.effectiveTo.trim().length > 0 && !isoDatePattern.test(values.effectiveTo)) {
-    errors.effectiveTo = "Effective to must be in YYYY-MM-DD format.";
-  }
-
-  if (values.effectiveTo.trim().length > 0 && values.effectiveTo < values.effectiveFrom) {
-    errors.effectiveTo = "Effective to must be on or after effective from.";
-  }
-
-  return errors;
-}
-
 function hasErrors(errors: Record<string, string | undefined>): boolean {
   return Object.values(errors).some((value) => typeof value === "string" && value.length > 0);
 }
@@ -287,44 +148,6 @@ function alertTone(status: "below_band" | "above_band" | "missing_salary") {
   return "pending" as const;
 }
 
-function alertLabel(status: "below_band" | "above_band" | "missing_salary") {
-  if (status === "below_band") {
-    return "Below band";
-  }
-
-  if (status === "above_band") {
-    return "Above band";
-  }
-
-  return "Missing salary";
-}
-
-function assignmentStatus(
-  effectiveFrom: string,
-  effectiveTo: string | null
-): { label: string; tone: "success" | "info" | "draft" } {
-  const today = todayIsoDate();
-
-  if (effectiveFrom > today) {
-    return {
-      label: "Scheduled",
-      tone: "info"
-    };
-  }
-
-  if (effectiveTo && effectiveTo < today) {
-    return {
-      label: "Historical",
-      tone: "draft"
-    };
-  }
-
-  return {
-    label: "Active",
-    tone: "success"
-  };
-}
-
 function bandTableSkeleton() {
   return (
     <div className="table-skeleton" aria-hidden="true">
@@ -337,6 +160,11 @@ function bandTableSkeleton() {
 }
 
 export function CompensationBandsClient() {
+  const t = useTranslations('compensationBands');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+
   const bandsQuery = useCompensationBands();
 
   const [isBandPanelOpen, setIsBandPanelOpen] = useState(false);
@@ -360,6 +188,186 @@ export function CompensationBandsClient() {
   const [alertSortDirection, setAlertSortDirection] = useState<SortDirection>("asc");
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  function validateBandForm(values: BandFormValues): BandFormErrors {
+    const errors: BandFormErrors = {};
+
+    if (!values.title.trim()) {
+      errors.title = t('bandPanel.validation.titleRequired');
+    }
+
+    if (!/^[A-Za-z]{3}$/.test(values.currency.trim())) {
+      errors.currency = t('bandPanel.validation.currencyFormat');
+    }
+
+    if (!isDigits(values.minSalaryAmount)) {
+      errors.minSalaryAmount = t('bandPanel.validation.minSalaryInteger');
+    }
+
+    if (!isDigits(values.midSalaryAmount)) {
+      errors.midSalaryAmount = t('bandPanel.validation.midSalaryInteger');
+    }
+
+    if (!isDigits(values.maxSalaryAmount)) {
+      errors.maxSalaryAmount = t('bandPanel.validation.maxSalaryInteger');
+    }
+
+    if (values.equityMin.trim().length > 0 && !isDigits(values.equityMin)) {
+      errors.equityMin = t('bandPanel.validation.equityMinInteger');
+    }
+
+    if (values.equityMax.trim().length > 0 && !isDigits(values.equityMax)) {
+      errors.equityMax = t('bandPanel.validation.equityMaxInteger');
+    }
+
+    if (!isoDatePattern.test(values.effectiveFrom)) {
+      errors.effectiveFrom = t('bandPanel.validation.effectiveFromFormat');
+    }
+
+    if (values.effectiveTo.trim().length > 0 && !isoDatePattern.test(values.effectiveTo)) {
+      errors.effectiveTo = t('bandPanel.validation.effectiveToFormat');
+    }
+
+    if (values.locationType !== "global" && !values.locationValue.trim()) {
+      errors.locationValue = t('bandPanel.validation.locationValueRequired');
+    }
+
+    if (
+      isDigits(values.minSalaryAmount) &&
+      isDigits(values.midSalaryAmount) &&
+      parseInteger(values.midSalaryAmount) < parseInteger(values.minSalaryAmount)
+    ) {
+      errors.midSalaryAmount = t('bandPanel.validation.midSalaryMinComparison');
+    }
+
+    if (
+      isDigits(values.midSalaryAmount) &&
+      isDigits(values.maxSalaryAmount) &&
+      parseInteger(values.maxSalaryAmount) < parseInteger(values.midSalaryAmount)
+    ) {
+      errors.maxSalaryAmount = t('bandPanel.validation.maxSalaryMidComparison');
+    }
+
+    if (values.effectiveTo.trim().length > 0 && values.effectiveTo < values.effectiveFrom) {
+      errors.effectiveTo = t('bandPanel.validation.effectiveToAfterFrom');
+    }
+
+    if (
+      values.equityMin.trim().length > 0 &&
+      values.equityMax.trim().length > 0 &&
+      isDigits(values.equityMin) &&
+      isDigits(values.equityMax) &&
+      parseInteger(values.equityMax) < parseInteger(values.equityMin)
+    ) {
+      errors.equityMax = t('bandPanel.validation.equityMaxMinComparison');
+    }
+
+    return errors;
+  }
+
+  function validateBenchmarkForm(values: BenchmarkFormValues): BenchmarkFormErrors {
+    const errors: BenchmarkFormErrors = {};
+
+    if (!values.source.trim()) {
+      errors.source = t('benchmarkPanel.validation.sourceRequired');
+    }
+
+    if (!values.title.trim()) {
+      errors.title = t('benchmarkPanel.validation.titleRequired');
+    }
+
+    if (!/^[A-Za-z]{3}$/.test(values.currency.trim())) {
+      errors.currency = t('benchmarkPanel.validation.currencyFormat');
+    }
+
+    const percentileFields: Array<keyof BenchmarkFormValues> = ["p25", "p50", "p75", "p90"];
+
+    for (const field of percentileFields) {
+      const fieldValue = values[field].trim();
+
+      if (fieldValue.length > 0 && !isDigits(fieldValue)) {
+        errors[field] = t('benchmarkPanel.validation.percentileInteger');
+      }
+    }
+
+    if (isDigits(values.p25) && isDigits(values.p50) && parseInteger(values.p25) > parseInteger(values.p50)) {
+      errors.p50 = t('benchmarkPanel.validation.p50GeP25');
+    }
+
+    if (isDigits(values.p50) && isDigits(values.p75) && parseInteger(values.p50) > parseInteger(values.p75)) {
+      errors.p75 = t('benchmarkPanel.validation.p75GeP50');
+    }
+
+    if (isDigits(values.p75) && isDigits(values.p90) && parseInteger(values.p75) > parseInteger(values.p90)) {
+      errors.p90 = t('benchmarkPanel.validation.p90GeP75');
+    }
+
+    return errors;
+  }
+
+  function validateAssignmentForm(values: AssignmentFormValues): AssignmentFormErrors {
+    const errors: AssignmentFormErrors = {};
+
+    if (!values.employeeId.trim()) {
+      errors.employeeId = t('assignmentPanel.validation.employeeRequired');
+    }
+
+    if (!values.bandId.trim()) {
+      errors.bandId = t('assignmentPanel.validation.bandRequired');
+    }
+
+    if (!isoDatePattern.test(values.effectiveFrom)) {
+      errors.effectiveFrom = t('assignmentPanel.validation.effectiveFromFormat');
+    }
+
+    if (values.effectiveTo.trim().length > 0 && !isoDatePattern.test(values.effectiveTo)) {
+      errors.effectiveTo = t('assignmentPanel.validation.effectiveToFormat');
+    }
+
+    if (values.effectiveTo.trim().length > 0 && values.effectiveTo < values.effectiveFrom) {
+      errors.effectiveTo = t('assignmentPanel.validation.effectiveToAfterFrom');
+    }
+
+    return errors;
+  }
+
+  function alertLabel(status: "below_band" | "above_band" | "missing_salary") {
+    if (status === "below_band") {
+      return t('alerts.belowBand');
+    }
+
+    if (status === "above_band") {
+      return t('alerts.aboveBand');
+    }
+
+    return t('alerts.missingSalary');
+  }
+
+  function assignmentStatus(
+    effectiveFrom: string,
+    effectiveTo: string | null
+  ): { label: string; tone: "success" | "info" | "draft" } {
+    const today = todayIsoDate();
+
+    if (effectiveFrom > today) {
+      return {
+        label: t('bandStatus.scheduled'),
+        tone: "info"
+      };
+    }
+
+    if (effectiveTo && effectiveTo < today) {
+      return {
+        label: t('bandStatus.historical'),
+        tone: "draft"
+      };
+    }
+
+    return {
+      label: t('bandStatus.active'),
+      tone: "success"
+    };
+  }
 
   const showToast = (variant: ToastVariant, rawMessage: string) => {
     const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
@@ -446,7 +454,7 @@ export function CompensationBandsClient() {
     const selectedBand = (bandsQuery.data?.bands ?? []).find((row) => row.id === bandId);
 
     if (!selectedBand) {
-      showToast("error", "Selected band was not found.");
+      showToast("error", t('toast.bandNotFound'));
       return;
     }
 
@@ -503,12 +511,12 @@ export function CompensationBandsClient() {
       : await bandsQuery.createBand(payload);
 
     if (!result.success) {
-      showToast("error", result.errorMessage ?? "Unable to save compensation band.");
+      showToast("error", result.errorMessage ?? t('toast.bandSaveError'));
       setIsSubmittingBand(false);
       return;
     }
 
-    showToast("success", editingBandId ? "Compensation band updated." : "Compensation band created.");
+    showToast("success", editingBandId ? t('toast.bandUpdated') : t('toast.bandCreated'));
     resetBandPanel();
   };
 
@@ -539,12 +547,12 @@ export function CompensationBandsClient() {
     const result = await bandsQuery.createBenchmark(payload);
 
     if (!result.success) {
-      showToast("error", result.errorMessage ?? "Unable to add benchmark data.");
+      showToast("error", result.errorMessage ?? t('toast.benchmarkSaveError'));
       setIsSubmittingBenchmark(false);
       return;
     }
 
-    showToast("success", "Benchmark data added.");
+    showToast("success", t('toast.benchmarkAdded'));
     resetBenchmarkPanel();
   };
 
@@ -571,25 +579,25 @@ export function CompensationBandsClient() {
     });
 
     if (!result.success) {
-      showToast("error", result.errorMessage ?? "Unable to assign employee to band.");
+      showToast("error", result.errorMessage ?? t('toast.assignmentSaveError'));
       setIsSubmittingAssignment(false);
       return;
     }
 
-    showToast("success", "Employee assignment saved.");
+    showToast("success", t('toast.assignmentSaved'));
     resetAssignmentPanel();
   };
 
   return (
     <>
       <PageHeader
-        title="Compensation Bands"
-        description="Define salary ranges, compare with market data, and surface out-of-band compensation alerts."
+        title={t('pageTitle')}
+        description={t('pageDescription')}
       />
 
-      <section className="onboarding-header-actions" aria-label="Compensation band actions">
+      <section className="onboarding-header-actions" aria-label={t('table.ariaLabel')}>
         <button type="button" className="button button-accent" onClick={handleOpenCreateBand}>
-          New band
+          {t('table.newBand')}
         </button>
         <button
           type="button"
@@ -599,7 +607,7 @@ export function CompensationBandsClient() {
             setBenchmarkFormErrors({});
           }}
         >
-          Add benchmark
+          {t('table.addBenchmark')}
         </button>
         <button
           type="button"
@@ -609,7 +617,7 @@ export function CompensationBandsClient() {
             setAssignmentFormErrors({});
           }}
         >
-          Assign employee
+          {t('table.assignEmployee')}
         </button>
       </section>
 
@@ -618,51 +626,53 @@ export function CompensationBandsClient() {
       {!bandsQuery.isLoading && bandsQuery.errorMessage ? (
         <>
           <EmptyState
-            title="Compensation bands are unavailable"
+            title={t('emptyState.errorTitle')}
             description={bandsQuery.errorMessage}
           />
           <button type="button" className="button" onClick={() => bandsQuery.refresh()}>
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!bandsQuery.isLoading && !bandsQuery.errorMessage && bandsQuery.data ? (
-        <section className="compensation-layout" aria-label="Compensation bands overview">
+        <section className="compensation-layout" aria-label={t('table.overviewAriaLabel')}>
           <article className="metric-card">
             <div>
-              <h2 className="section-title">Coverage summary</h2>
+              <h2 className="section-title">{t('table.coverageSummary')}</h2>
               <p className="settings-card-description">
-                {bandsQuery.data.bands.length} bands, {bandsQuery.data.assignments.length} assignments,
-                {" "}
-                {bandsQuery.data.alerts.length} flagged alerts.
+                {t('table.coverageSummaryDescription', {
+                  bandCount: bandsQuery.data.bands.length,
+                  assignmentCount: bandsQuery.data.assignments.length,
+                  alertCount: bandsQuery.data.alerts.length
+                })}
               </p>
             </div>
             <StatusBadge tone={bandsQuery.data.alerts.length > 0 ? "warning" : "success"}>
-              {bandsQuery.data.alerts.length > 0 ? "Action needed" : "Healthy"}
+              {bandsQuery.data.alerts.length > 0 ? t('table.actionNeeded') : t('table.healthy')}
             </StatusBadge>
           </article>
 
           <article className="compensation-section">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">Out-of-band alerts</h2>
+                <h2 className="section-title">{t('alerts.sectionTitle')}</h2>
                 <p className="settings-card-description">
-                  Employees below or above their assigned compensation band midpoint range.
+                  {t('alerts.sectionDescription')}
                 </p>
               </div>
             </header>
 
             {sortedAlerts.length === 0 ? (
               <EmptyState
-                title="No alerts"
-                description="All crew members with assignments are currently within their configured bands."
-                ctaLabel="Review bands"
+                title={t('emptyState.noAlertsTitle')}
+                description={t('emptyState.noAlertsDescription')}
+                ctaLabel={t('emptyState.reviewBands')}
                 ctaHref="/admin/compensation-bands"
               />
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Out-of-band alerts table">
+                <table className="data-table" aria-label={t('alerts.tableAriaLabel')}>
                   <thead>
                     <tr>
                       <th>
@@ -675,16 +685,16 @@ export function CompensationBandsClient() {
                             )
                           }
                         >
-                          Employee
-                          <span className="numeric">{alertSortDirection === "asc" ? "↑" : "↓"}</span>
+                          {t('alerts.columnEmployee')}
+                          <span className="numeric">{alertSortDirection === "asc" ? "\u2191" : "\u2193"}</span>
                         </button>
                       </th>
-                      <th>Band</th>
-                      <th>Current salary</th>
-                      <th>Band range</th>
-                      <th>Compa ratio</th>
-                      <th>Status</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('alerts.columnBand')}</th>
+                      <th>{t('alerts.columnCurrentSalary')}</th>
+                      <th>{t('alerts.columnBandRange')}</th>
+                      <th>{t('alerts.columnCompaRatio')}</th>
+                      <th>{tCommon('status.label')}</th>
+                      <th className="table-action-column">{t('table.columnActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -693,10 +703,10 @@ export function CompensationBandsClient() {
                         <td>
                           <div className="documents-cell-copy">
                             <p className="documents-cell-title">{alert.employeeName}</p>
-                            <p className="documents-cell-description">{alert.employeeTitle ?? "No title"}</p>
+                            <p className="documents-cell-description">{alert.employeeTitle ?? t('table.noTitle')}</p>
                             <p className="documents-cell-description country-chip">
                               <span>{countryFlagFromCode(alert.countryCode)}</span>
-                              <span>{countryNameFromCode(alert.countryCode)}</span>
+                              <span>{countryNameFromCode(alert.countryCode, locale)}</span>
                             </p>
                           </div>
                         </td>
@@ -711,7 +721,7 @@ export function CompensationBandsClient() {
                         <td>
                           <div className="documents-cell-copy">
                             <CurrencyDisplay amount={alert.minSalaryAmount} currency={alert.currency} />
-                            <span className="numeric">to</span>
+                            <span className="numeric">{t('table.rangeTo')}</span>
                             <CurrencyDisplay amount={alert.maxSalaryAmount} currency={alert.currency} />
                           </div>
                         </td>
@@ -724,7 +734,7 @@ export function CompensationBandsClient() {
                         <td className="table-row-action-cell">
                           <div className="comp-bands-row-actions">
                             <Link className="table-row-action" href={`/people/${alert.employeeId}?tab=compensation`}>
-                              View profile
+                              {t('table.viewProfile')}
                             </Link>
                           </div>
                         </td>
@@ -739,23 +749,23 @@ export function CompensationBandsClient() {
           <article className="compensation-section">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">Compensation bands</h2>
+                <h2 className="section-title">{t('table.bandsSectionTitle')}</h2>
                 <p className="settings-card-description">
-                  Salary and equity ranges by role, level, and location.
+                  {t('table.bandsSectionDescription')}
                 </p>
               </div>
             </header>
 
             {sortedBands.length === 0 ? (
               <EmptyState
-                title="No compensation bands"
-                description="Create your first compensation band to begin benchmarking and pay equity reviews."
-                ctaLabel="Create band"
+                title={t('emptyState.noBandsTitle')}
+                description={t('emptyState.noBandsDescription')}
+                ctaLabel={t('emptyState.createBand')}
                 onCtaClick={handleOpenCreateBand}
               />
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Compensation bands table">
+                <table className="data-table" aria-label={t('table.bandsTableAriaLabel')}>
                   <thead>
                     <tr>
                       <th>
@@ -768,17 +778,17 @@ export function CompensationBandsClient() {
                             )
                           }
                         >
-                          Role / level
-                          <span className="numeric">{bandSortDirection === "asc" ? "↑" : "↓"}</span>
+                          {t('table.columnRoleLevel')}
+                          <span className="numeric">{bandSortDirection === "asc" ? "\u2191" : "\u2193"}</span>
                         </button>
                       </th>
-                      <th>Department</th>
-                      <th>Location</th>
-                      <th>Salary range</th>
-                      <th>Equity range</th>
-                      <th>Effective</th>
-                      <th>Assigned</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('table.columnDepartment')}</th>
+                      <th>{t('table.columnLocation')}</th>
+                      <th>{t('table.columnSalaryRange')}</th>
+                      <th>{t('table.columnEquityRange')}</th>
+                      <th>{t('table.columnEffective')}</th>
+                      <th>{t('table.columnAssigned')}</th>
+                      <th className="table-action-column">{t('table.columnActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -791,41 +801,41 @@ export function CompensationBandsClient() {
                           <td>
                             <div className="documents-cell-copy">
                               <p className="documents-cell-title">{band.title}</p>
-                              <p className="documents-cell-description">{band.level ?? "No level"}</p>
+                              <p className="documents-cell-description">{band.level ?? t('table.noLevel')}</p>
                             </div>
                           </td>
                           <td>{band.department ?? "--"}</td>
                           <td>
                             {band.locationType === "global"
-                              ? "Global"
+                              ? t('bandPanel.locationTypeGlobal')
                               : band.locationValue ?? band.locationType}
                           </td>
                           <td>
                             <div className="documents-cell-copy">
                               <CurrencyDisplay amount={band.minSalaryAmount} currency={band.currency} />
-                              <span className="numeric">to</span>
+                              <span className="numeric">{t('table.rangeTo')}</span>
                               <CurrencyDisplay amount={band.maxSalaryAmount} currency={band.currency} />
                               <span className="settings-card-description">
-                                Mid: <CurrencyDisplay amount={band.midSalaryAmount} currency={band.currency} />
+                                {t('table.mid')}: <CurrencyDisplay amount={band.midSalaryAmount} currency={band.currency} />
                               </span>
                             </div>
                           </td>
                           <td className="numeric">
                             {band.equityMin === null && band.equityMax === null
                               ? "--"
-                              : `${band.equityMin ?? 0} to ${band.equityMax ?? 0}`}
+                              : `${band.equityMin ?? 0} ${t('table.rangeTo')} ${band.equityMax ?? 0}`}
                           </td>
                           <td>
                             <div className="documents-cell-copy">
-                              <span title={effectiveFromTimestamp ? formatDateTimeTooltip(effectiveFromTimestamp) : undefined}>
-                                {effectiveFromTimestamp ? formatRelativeTime(effectiveFromTimestamp) : "--"}
+                              <span title={effectiveFromTimestamp ? formatDateTimeTooltip(effectiveFromTimestamp, locale) : undefined}>
+                                {effectiveFromTimestamp ? formatRelativeTime(effectiveFromTimestamp, locale) : "--"}
                               </span>
                               {effectiveToTimestamp ? (
-                                <span className="settings-card-description" title={formatDateTimeTooltip(effectiveToTimestamp)}>
-                                  Ends {formatRelativeTime(effectiveToTimestamp)}
+                                <span className="settings-card-description" title={formatDateTimeTooltip(effectiveToTimestamp, locale)}>
+                                  {t('table.ends', { date: formatRelativeTime(effectiveToTimestamp, locale) })}
                                 </span>
                               ) : (
-                                <span className="settings-card-description">No end date</span>
+                                <span className="settings-card-description">{t('table.noEndDate')}</span>
                               )}
                             </div>
                           </td>
@@ -837,7 +847,7 @@ export function CompensationBandsClient() {
                                 className="table-row-action"
                                 onClick={() => handleOpenEditBand(band.id)}
                               >
-                                Edit
+                                {t('table.edit')}
                               </button>
                             </div>
                           </td>
@@ -853,9 +863,9 @@ export function CompensationBandsClient() {
           <article className="compensation-section">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">Market benchmark data</h2>
+                <h2 className="section-title">{t('table.benchmarkSectionTitle')}</h2>
                 <p className="settings-card-description">
-                  Imported salary survey points used to tune compensation bands.
+                  {t('table.benchmarkSectionDescription')}
                 </p>
               </div>
             </header>
@@ -863,29 +873,29 @@ export function CompensationBandsClient() {
             {sortedBenchmarks.length === 0 ? (
               <>
                 <EmptyState
-                  title="No benchmark data"
-                  description="Add external benchmark records to compare your bands with market pay data."
+                  title={t('emptyState.noBenchmarksTitle')}
+                  description={t('emptyState.noBenchmarksDescription')}
                 />
                 <button
                   type="button"
                   className="button"
                   onClick={() => setIsBenchmarkPanelOpen(true)}
                 >
-                  Add benchmark
+                  {t('table.addBenchmark')}
                 </button>
               </>
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Benchmark data table">
+                <table className="data-table" aria-label={t('table.benchmarkTableAriaLabel')}>
                   <thead>
                     <tr>
-                      <th>Source</th>
-                      <th>Role</th>
-                      <th>Location</th>
-                      <th>P50</th>
-                      <th>P75</th>
-                      <th>Imported</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('table.columnSource')}</th>
+                      <th>{t('table.columnRole')}</th>
+                      <th>{t('table.columnLocation')}</th>
+                      <th>{t('table.columnP50')}</th>
+                      <th>{t('table.columnP75')}</th>
+                      <th>{t('table.columnImported')}</th>
+                      <th className="table-action-column">{t('table.columnActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -895,10 +905,10 @@ export function CompensationBandsClient() {
                         <td>
                           <div className="documents-cell-copy">
                             <p className="documents-cell-title">{benchmark.title}</p>
-                            <p className="documents-cell-description">{benchmark.level ?? "No level"}</p>
+                            <p className="documents-cell-description">{benchmark.level ?? t('table.noLevel')}</p>
                           </div>
                         </td>
-                        <td>{benchmark.location ?? "Global"}</td>
+                        <td>{benchmark.location ?? t('bandPanel.locationTypeGlobal')}</td>
                         <td>
                           {benchmark.p50 === null ? "--" : <CurrencyDisplay amount={benchmark.p50} currency={benchmark.currency} />}
                         </td>
@@ -906,8 +916,8 @@ export function CompensationBandsClient() {
                           {benchmark.p75 === null ? "--" : <CurrencyDisplay amount={benchmark.p75} currency={benchmark.currency} />}
                         </td>
                         <td>
-                          <span title={formatDateTimeTooltip(benchmark.importedAt)}>
-                            {formatRelativeTime(benchmark.importedAt)}
+                          <span title={formatDateTimeTooltip(benchmark.importedAt, locale)}>
+                            {formatRelativeTime(benchmark.importedAt, locale)}
                           </span>
                         </td>
                         <td className="table-row-action-cell">
@@ -933,7 +943,7 @@ export function CompensationBandsClient() {
                                 }));
                               }}
                             >
-                              Create band
+                              {t('emptyState.createBand')}
                             </button>
                           </div>
                         </td>
@@ -948,9 +958,9 @@ export function CompensationBandsClient() {
           <article className="compensation-section">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">Band assignments</h2>
+                <h2 className="section-title">{t('table.assignmentsSectionTitle')}</h2>
                 <p className="settings-card-description">
-                  Employee-to-band mapping used for out-of-band and compa-ratio checks.
+                  {t('table.assignmentsSectionDescription')}
                 </p>
               </div>
             </header>
@@ -958,28 +968,28 @@ export function CompensationBandsClient() {
             {sortedAssignments.length === 0 ? (
               <>
                 <EmptyState
-                  title="No assignments"
-                  description="Assign crew members to bands to enable compa-ratio and out-of-band alerts."
+                  title={t('emptyState.noAssignmentsTitle')}
+                  description={t('emptyState.noAssignmentsDescription')}
                 />
                 <button
                   type="button"
                   className="button"
                   onClick={() => setIsAssignmentPanelOpen(true)}
                 >
-                  Assign employee
+                  {t('table.assignEmployee')}
                 </button>
               </>
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Band assignments table">
+                <table className="data-table" aria-label={t('table.assignmentsTableAriaLabel')}>
                   <thead>
                     <tr>
-                      <th>Employee</th>
-                      <th>Band</th>
-                      <th>Effective window</th>
-                      <th>Status</th>
-                      <th>Assigned</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('alerts.columnEmployee')}</th>
+                      <th>{t('alerts.columnBand')}</th>
+                      <th>{t('table.columnEffectiveWindow')}</th>
+                      <th>{tCommon('status.label')}</th>
+                      <th>{t('table.columnAssigned')}</th>
+                      <th className="table-action-column">{t('table.columnActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -995,11 +1005,11 @@ export function CompensationBandsClient() {
                           <td>{assignment.bandLabel}</td>
                           <td>
                             <div className="documents-cell-copy">
-                              <span title={effectiveFromTimestamp ? formatDateTimeTooltip(effectiveFromTimestamp) : undefined}>
-                                Starts {effectiveFromTimestamp ? formatRelativeTime(effectiveFromTimestamp) : "--"}
+                              <span title={effectiveFromTimestamp ? formatDateTimeTooltip(effectiveFromTimestamp, locale) : undefined}>
+                                {t('table.starts', { date: effectiveFromTimestamp ? formatRelativeTime(effectiveFromTimestamp, locale) : "--" })}
                               </span>
-                              <span className="settings-card-description" title={effectiveToTimestamp ? formatDateTimeTooltip(effectiveToTimestamp) : undefined}>
-                                {effectiveToTimestamp ? `Ends ${formatRelativeTime(effectiveToTimestamp)}` : "No end date"}
+                              <span className="settings-card-description" title={effectiveToTimestamp ? formatDateTimeTooltip(effectiveToTimestamp, locale) : undefined}>
+                                {effectiveToTimestamp ? t('table.ends', { date: formatRelativeTime(effectiveToTimestamp, locale) }) : t('table.noEndDate')}
                               </span>
                             </div>
                           </td>
@@ -1007,7 +1017,7 @@ export function CompensationBandsClient() {
                             <StatusBadge tone={assignmentState.tone}>{assignmentState.label}</StatusBadge>
                           </td>
                           <td>
-                            <span title={formatDateTimeTooltip(assignedTimestamp)}>{formatRelativeTime(assignedTimestamp)}</span>
+                            <span title={formatDateTimeTooltip(assignedTimestamp, locale)}>{formatRelativeTime(assignedTimestamp, locale)}</span>
                           </td>
                           <td className="table-row-action-cell">
                             <div className="comp-bands-row-actions">
@@ -1015,7 +1025,7 @@ export function CompensationBandsClient() {
                                 className="table-row-action"
                                 href={`/people/${assignment.employeeId}?tab=compensation`}
                               >
-                                View profile
+                                {t('table.viewProfile')}
                               </Link>
                             </div>
                           </td>
@@ -1032,13 +1042,13 @@ export function CompensationBandsClient() {
 
       <SlidePanel
         isOpen={isBandPanelOpen}
-        title={editingBandId ? "Edit compensation band" : "Create compensation band"}
-        description="Define salary range, location scope, and effective period."
+        title={editingBandId ? t('bandPanel.editTitle') : t('bandPanel.createTitle')}
+        description={t('bandPanel.description')}
         onClose={resetBandPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleBandSubmit}>
           <label className="form-field">
-            <span className="form-label">Role title</span>
+            <span className="form-label">{t('bandPanel.roleTitle')}</span>
             <input
               className={`form-input ${bandFormErrors.title ? "form-input-error" : ""}`}
               value={bandFormValues.title}
@@ -1053,7 +1063,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Level</span>
+            <span className="form-label">{t('bandPanel.level')}</span>
             <input
               className={`form-input ${bandFormErrors.level ? "form-input-error" : ""}`}
               value={bandFormValues.level}
@@ -1068,7 +1078,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Department</span>
+            <span className="form-label">{t('bandPanel.department')}</span>
             <input
               className={`form-input ${bandFormErrors.department ? "form-input-error" : ""}`}
               value={bandFormValues.department}
@@ -1085,7 +1095,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Location type</span>
+            <span className="form-label">{t('bandPanel.locationType')}</span>
             <select
               className={`form-input ${bandFormErrors.locationType ? "form-input-error" : ""}`}
               value={bandFormValues.locationType}
@@ -1098,10 +1108,10 @@ export function CompensationBandsClient() {
                 }))
               }
             >
-              <option value="global">Global</option>
-              <option value="country">Country</option>
-              <option value="city">City</option>
-              <option value="zone">Zone</option>
+              <option value="global">{t('bandPanel.locationTypeGlobal')}</option>
+              <option value="country">{t('bandPanel.locationTypeCountry')}</option>
+              <option value="city">{t('bandPanel.locationTypeCity')}</option>
+              <option value="zone">{t('bandPanel.locationTypeZone')}</option>
             </select>
             {bandFormErrors.locationType ? (
               <span className="form-field-error">{bandFormErrors.locationType}</span>
@@ -1109,7 +1119,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Location value</span>
+            <span className="form-label">{t('bandPanel.locationValue')}</span>
             <input
               className={`form-input ${bandFormErrors.locationValue ? "form-input-error" : ""}`}
               value={bandFormValues.locationValue}
@@ -1127,7 +1137,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Currency</span>
+            <span className="form-label">{t('bandPanel.currency')}</span>
             <input
               className={`form-input ${bandFormErrors.currency ? "form-input-error" : ""}`}
               value={bandFormValues.currency}
@@ -1144,7 +1154,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Min salary (smallest unit)</span>
+            <span className="form-label">{t('bandPanel.minSalary')}</span>
             <input
               className={`form-input ${bandFormErrors.minSalaryAmount ? "form-input-error" : ""}`}
               value={bandFormValues.minSalaryAmount}
@@ -1161,7 +1171,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Mid salary (smallest unit)</span>
+            <span className="form-label">{t('bandPanel.midSalary')}</span>
             <input
               className={`form-input ${bandFormErrors.midSalaryAmount ? "form-input-error" : ""}`}
               value={bandFormValues.midSalaryAmount}
@@ -1178,7 +1188,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Max salary (smallest unit)</span>
+            <span className="form-label">{t('bandPanel.maxSalary')}</span>
             <input
               className={`form-input ${bandFormErrors.maxSalaryAmount ? "form-input-error" : ""}`}
               value={bandFormValues.maxSalaryAmount}
@@ -1195,7 +1205,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Equity min</span>
+            <span className="form-label">{t('bandPanel.equityMin')}</span>
             <input
               className={`form-input ${bandFormErrors.equityMin ? "form-input-error" : ""}`}
               value={bandFormValues.equityMin}
@@ -1210,7 +1220,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Equity max</span>
+            <span className="form-label">{t('bandPanel.equityMax')}</span>
             <input
               className={`form-input ${bandFormErrors.equityMax ? "form-input-error" : ""}`}
               value={bandFormValues.equityMax}
@@ -1225,7 +1235,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Effective from</span>
+            <span className="form-label">{t('bandPanel.effectiveFrom')}</span>
             <input
               type="date"
               className={`form-input ${bandFormErrors.effectiveFrom ? "form-input-error" : ""}`}
@@ -1243,7 +1253,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Effective to</span>
+            <span className="form-label">{t('bandPanel.effectiveTo')}</span>
             <input
               type="date"
               className={`form-input ${bandFormErrors.effectiveTo ? "form-input-error" : ""}`}
@@ -1262,10 +1272,10 @@ export function CompensationBandsClient() {
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={resetBandPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmittingBand}>
-              {isSubmittingBand ? "Saving..." : editingBandId ? "Update band" : "Create band"}
+              {isSubmittingBand ? tCommon('working') : editingBandId ? t('bandPanel.updateBand') : t('bandPanel.createBand')}
             </button>
           </div>
         </form>
@@ -1273,13 +1283,13 @@ export function CompensationBandsClient() {
 
       <SlidePanel
         isOpen={isBenchmarkPanelOpen}
-        title="Add benchmark data"
-        description="Import market percentiles for role and location comparisons."
+        title={t('benchmarkPanel.title')}
+        description={t('benchmarkPanel.description')}
         onClose={resetBenchmarkPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleBenchmarkSubmit}>
           <label className="form-field">
-            <span className="form-label">Source</span>
+            <span className="form-label">{t('benchmarkPanel.source')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.source ? "form-input-error" : ""}`}
               value={benchmarkFormValues.source}
@@ -1296,7 +1306,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Role title</span>
+            <span className="form-label">{t('benchmarkPanel.roleTitle')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.title ? "form-input-error" : ""}`}
               value={benchmarkFormValues.title}
@@ -1311,7 +1321,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Level</span>
+            <span className="form-label">{t('benchmarkPanel.level')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.level ? "form-input-error" : ""}`}
               value={benchmarkFormValues.level}
@@ -1326,7 +1336,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Location</span>
+            <span className="form-label">{t('benchmarkPanel.location')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.location ? "form-input-error" : ""}`}
               value={benchmarkFormValues.location}
@@ -1343,7 +1353,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Currency</span>
+            <span className="form-label">{t('benchmarkPanel.currency')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.currency ? "form-input-error" : ""}`}
               value={benchmarkFormValues.currency}
@@ -1360,7 +1370,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">P25 (smallest unit)</span>
+            <span className="form-label">{t('benchmarkPanel.p25')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.p25 ? "form-input-error" : ""}`}
               value={benchmarkFormValues.p25}
@@ -1375,7 +1385,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">P50 (smallest unit)</span>
+            <span className="form-label">{t('benchmarkPanel.p50')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.p50 ? "form-input-error" : ""}`}
               value={benchmarkFormValues.p50}
@@ -1390,7 +1400,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">P75 (smallest unit)</span>
+            <span className="form-label">{t('benchmarkPanel.p75')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.p75 ? "form-input-error" : ""}`}
               value={benchmarkFormValues.p75}
@@ -1405,7 +1415,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">P90 (smallest unit)</span>
+            <span className="form-label">{t('benchmarkPanel.p90')}</span>
             <input
               className={`form-input ${benchmarkFormErrors.p90 ? "form-input-error" : ""}`}
               value={benchmarkFormValues.p90}
@@ -1421,10 +1431,10 @@ export function CompensationBandsClient() {
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={resetBenchmarkPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmittingBenchmark}>
-              {isSubmittingBenchmark ? "Saving..." : "Add benchmark"}
+              {isSubmittingBenchmark ? tCommon('working') : t('benchmarkPanel.addBenchmark')}
             </button>
           </div>
         </form>
@@ -1432,13 +1442,13 @@ export function CompensationBandsClient() {
 
       <SlidePanel
         isOpen={isAssignmentPanelOpen}
-        title="Assign employee to band"
-        description="Map an crew member to a salary band for compa-ratio and alert checks."
+        title={t('assignmentPanel.title')}
+        description={t('assignmentPanel.description')}
         onClose={resetAssignmentPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleAssignmentSubmit}>
           <label className="form-field">
-            <span className="form-label">Employee</span>
+            <span className="form-label">{t('assignmentPanel.employee')}</span>
             <select
               className={`form-input ${assignmentFormErrors.employeeId ? "form-input-error" : ""}`}
               value={assignmentFormValues.employeeId}
@@ -1449,7 +1459,7 @@ export function CompensationBandsClient() {
                 }))
               }
             >
-              <option value="">Select employee</option>
+              <option value="">{t('assignmentPanel.selectEmployee')}</option>
               {activeEmployeeOptions.map((employee) => (
                 <option key={employee.id} value={employee.id}>
                   {employee.fullName}
@@ -1462,7 +1472,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Compensation band</span>
+            <span className="form-label">{t('assignmentPanel.compensationBand')}</span>
             <select
               className={`form-input ${assignmentFormErrors.bandId ? "form-input-error" : ""}`}
               value={assignmentFormValues.bandId}
@@ -1473,7 +1483,7 @@ export function CompensationBandsClient() {
                 }))
               }
             >
-              <option value="">Select compensation band</option>
+              <option value="">{t('assignmentPanel.selectBand')}</option>
               {sortedBands.map((band) => (
                 <option key={band.id} value={band.id}>
                   {band.title} {band.level ? `(${band.level})` : ""}
@@ -1486,7 +1496,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Effective from</span>
+            <span className="form-label">{t('assignmentPanel.effectiveFrom')}</span>
             <input
               type="date"
               className={`form-input ${assignmentFormErrors.effectiveFrom ? "form-input-error" : ""}`}
@@ -1504,7 +1514,7 @@ export function CompensationBandsClient() {
           </label>
 
           <label className="form-field">
-            <span className="form-label">Effective to</span>
+            <span className="form-label">{t('assignmentPanel.effectiveTo')}</span>
             <input
               type="date"
               className={`form-input ${assignmentFormErrors.effectiveTo ? "form-input-error" : ""}`}
@@ -1523,17 +1533,17 @@ export function CompensationBandsClient() {
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={resetAssignmentPanel}>
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmittingAssignment}>
-              {isSubmittingAssignment ? "Saving..." : "Assign"}
+              {isSubmittingAssignment ? tCommon('working') : t('assignmentPanel.assign')}
             </button>
           </div>
         </form>
       </SlidePanel>
 
       {toasts.length > 0 ? (
-        <div className="toast-region" aria-live="polite" aria-label="Compensation bands notifications">
+        <div className="toast-region" aria-live="polite" aria-label={t('toast.ariaLabel')}>
           {toasts.map((toast) => (
             <div key={toast.id} className={`toast-message toast-message-${toast.variant}`}>
               <span>{toast.message}</span>

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import {
   type FeatureState,
   type ModuleId,
@@ -47,6 +50,7 @@ export function FeatureBanner({
   actionHref,
   onAction
 }: FeatureBannerProps) {
+  const t = useTranslations("common");
   const resolvedState = state ?? (moduleId ? getModuleState(moduleId) : "LIVE");
 
   // LIVE features don't need a banner
@@ -71,12 +75,12 @@ export function FeatureBanner({
         {text ? <p className="feature-banner-description">{text}</p> : null}
         {owner ? (
           <p className="feature-banner-meta">
-            <strong>Owner:</strong> {owner}
+            <strong>{t("featureBanner.ownerLabel")}</strong> {owner}
           </p>
         ) : null}
         {resolution ? (
           <p className="feature-banner-meta">
-            <strong>Next step:</strong> {resolution}
+            <strong>{t("featureBanner.nextStepLabel")}</strong> {resolution}
           </p>
         ) : null}
       </div>

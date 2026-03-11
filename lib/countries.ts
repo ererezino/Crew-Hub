@@ -1,3 +1,5 @@
+import { DEFAULT_LOCALE, type AppLocale } from "@/i18n/locales";
+
 const countryNameByCode: Record<string, string> = {
   NG: "Nigeria",
   GH: "Ghana",
@@ -49,9 +51,12 @@ export function countryFlagFromCode(countryCode: string | null): string {
     .join("");
 }
 
-export function countryNameFromCode(countryCode: string | null): string {
+export function countryNameFromCode(
+  countryCode: string | null,
+  locale: AppLocale = DEFAULT_LOCALE
+): string {
   if (!countryCode) {
-    return "No country";
+    return locale === "fr" ? "Aucun pays" : "No country";
   }
 
   const normalized = toCountryCode(countryCode);
@@ -60,5 +65,23 @@ export function countryNameFromCode(countryCode: string | null): string {
     return countryCode;
   }
 
-  return countryNameByCode[normalized] ?? normalized;
+  try {
+    const displayNames = new Intl.DisplayNames([locale], { type: "region" });
+    return displayNames.of(normalized) ?? countryNameByCode[normalized] ?? normalized;
+  } catch {
+    // Fallback to static English map if Intl unavailable
+    return countryNameByCode[normalized] ?? normalized;
+  }
+}
+
+export function getCountryOptions(
+  locale: AppLocale = DEFAULT_LOCALE
+): Array<{ code: string; name: string }> {
+  const codes = getCountryCodes();
+  const options = codes.map((code) => ({
+    code,
+    name: countryNameFromCode(code, locale)
+  }));
+  const collator = new Intl.Collator(locale);
+  return options.sort((a, b) => collator.compare(a.name, b.name));
 }

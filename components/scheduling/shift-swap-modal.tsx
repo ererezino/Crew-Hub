@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import type { ShiftRecord } from "../../types/scheduling";
+import { formatDateWithWeekday } from "../../lib/datetime";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,11 +32,7 @@ function isoToDate(iso: string): Date {
 }
 
 function formatDate(iso: string): string {
-  return isoToDate(iso).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  });
+  return formatDateWithWeekday(iso);
 }
 
 function formatTime(iso: string): string {
@@ -101,6 +99,8 @@ export function ShiftSwapModal({
   onClose,
   onSubmit
 }: ShiftSwapModalProps) {
+  const t = useTranslations("scheduling");
+  const tc = useTranslations("common");
   const [scope, setScope] = useState<SwapScope>("day");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -164,7 +164,7 @@ export function ShiftSwapModal({
       );
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to request swap.");
+      setError(err instanceof Error ? err.message : t("swapModal.failedSwap"));
     } finally {
       setIsSubmitting(false);
     }
@@ -178,25 +178,25 @@ export function ShiftSwapModal({
         className="modal-dialog swap-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Request shift swap"
+        aria-label={t("swapModal.ariaLabel")}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <h2 className="modal-title">Request swap</h2>
+        <h2 className="modal-title">{t("swapModal.title")}</h2>
         <p className="settings-card-description">
           {formatDate(anchorShift.shiftDate)} &middot; {formatTime(anchorShift.startTime)} – {formatTime(anchorShift.endTime)}
         </p>
 
         {/* Scope selector */}
         <fieldset className="swap-scope-fieldset">
-          <legend className="swap-scope-legend">What do you want to swap?</legend>
+          <legend className="swap-scope-legend">{t("swapModal.scopeLabel")}</legend>
           <div className="swap-scope-options">
             {([
-              ["day", "This day"],
-              ["week", "This week"],
-              ["month", "This month"],
-              ["custom", "Custom range"]
-            ] as const).map(([value, label]) => (
+              ["day", t("swapModal.scopeDay")],
+              ["week", t("swapModal.scopeWeek")],
+              ["month", t("swapModal.scopeMonth")],
+              ["custom", t("swapModal.scopeCustom")]
+            ] as [SwapScope, string][]).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -213,7 +213,7 @@ export function ShiftSwapModal({
         {scope === "custom" ? (
           <div className="swap-custom-range">
             <label className="form-label">
-              From
+              {t("swapModal.from")}
               <input
                 type="date"
                 className="form-input"
@@ -222,7 +222,7 @@ export function ShiftSwapModal({
               />
             </label>
             <label className="form-label">
-              To
+              {t("swapModal.to")}
               <input
                 type="date"
                 className="form-input"
@@ -237,8 +237,8 @@ export function ShiftSwapModal({
         <div className="swap-affected">
           <p className="swap-affected-count">
             {affected.length === 1
-              ? "1 shift will be swapped"
-              : `${affected.length} shifts will be swapped`}
+              ? t("swapModal.affectedSingular")
+              : t("swapModal.affectedPlural", { count: affected.length })}
           </p>
           {affected.length > 0 && affected.length <= 10 ? (
             <ul className="swap-affected-list">
@@ -251,18 +251,18 @@ export function ShiftSwapModal({
           ) : null}
           {affected.length > 10 ? (
             <p className="swap-affected-overflow">
-              {formatDate(affected[0]!.shiftDate)} through {formatDate(affected[affected.length - 1]!.shiftDate)}
+              {t("swapModal.overflowRange", { startDate: formatDate(affected[0]!.shiftDate), endDate: formatDate(affected[affected.length - 1]!.shiftDate) })}
             </p>
           ) : null}
         </div>
 
         {/* Reason */}
         <label className="form-label">
-          Reason <span className="form-label-optional">(optional)</span>
+          {t("swapModal.reason")} <span className="form-label-optional">{t("swapModal.optional")}</span>
           <textarea
             className="form-input swap-reason"
             rows={2}
-            placeholder="Why do you need to swap?"
+            placeholder={t("swapModal.reasonPlaceholder")}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
@@ -278,7 +278,7 @@ export function ShiftSwapModal({
             onClick={onClose}
             disabled={isSubmitting}
           >
-            Cancel
+            {tc("cancel")}
           </button>
           <button
             type="button"
@@ -286,7 +286,7 @@ export function ShiftSwapModal({
             onClick={handleSubmit}
             disabled={affected.length === 0 || isSubmitting}
           >
-            {isSubmitting ? "Requesting..." : "Request swap"}
+            {isSubmitting ? tc("requesting") : t("swapModal.submit")}
           </button>
         </div>
       </section>

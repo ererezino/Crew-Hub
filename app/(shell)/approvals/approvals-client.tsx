@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
@@ -38,6 +39,8 @@ export function ApprovalsClient({
   canReviewExpenses,
   canReviewTimesheets
 }: ApprovalsClientProps) {
+  const tNav = useTranslations('nav');
+  const t = useTranslations('approvalsPage');
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -94,29 +97,29 @@ export function ApprovalsClient({
     () => [
       {
         key: "all",
-        label: "All Pending",
+        label: t('tab.allPending'),
         badge: totalPendingCount
       },
       {
         key: "time-off",
-        label: "Time Off",
+        label: t('tab.timeOff'),
         badge: timeOffCount,
         requiredRoles: ["MANAGER", "HR_ADMIN", "SUPER_ADMIN"]
       },
       {
         key: "expenses",
-        label: "Expenses",
+        label: t('tab.expenses'),
         badge: expensesCount,
         requiredRoles: ["MANAGER", "FINANCE_ADMIN", "SUPER_ADMIN"]
       },
       {
         key: "timesheets",
-        label: "Timesheets",
+        label: t('tab.timesheets'),
         badge: timesheetsCount,
         requiredRoles: ["TEAM_LEAD", "MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]
       }
     ],
-    [expensesCount, timeOffCount, timesheetsCount, totalPendingCount]
+    [expensesCount, timeOffCount, timesheetsCount, totalPendingCount, t]
   );
 
   const visibleTabs = tabs.filter((tab) => {
@@ -147,8 +150,8 @@ export function ApprovalsClient({
   return (
     <>
       <PageHeader
-        title="Approvals"
-        description="Review and act on pending team requests."
+        title={tNav('approvals')}
+        description={tNav('description.approvals')}
       />
 
       <PageTabs
@@ -170,7 +173,7 @@ export function ApprovalsClient({
             <section className="all-pending-overview">
               {totalPendingCount === 0 ? (
                 <div className="all-pending-empty">
-                  <p className="settings-card-description">No pending approvals. You&apos;re all caught up!</p>
+                  <p className="settings-card-description">{t('allCaughtUp')}</p>
                 </div>
               ) : (
                 <div className="all-pending-items">
@@ -180,8 +183,8 @@ export function ApprovalsClient({
                       className="all-pending-item"
                       onClick={() => handleTabChange("time-off")}
                     >
-                      <span className="all-pending-badge all-pending-badge-timeoff">Time Off</span>
-                      <span className="all-pending-count">{timeOffCount} pending {timeOffCount === 1 ? "request" : "requests"}</span>
+                      <span className="all-pending-badge all-pending-badge-timeoff">{t('tab.timeOff')}</span>
+                      <span className="all-pending-count">{t('pendingRequests', { count: timeOffCount })}</span>
                       <span className="all-pending-arrow">→</span>
                     </button>
                   ) : null}
@@ -191,8 +194,8 @@ export function ApprovalsClient({
                       className="all-pending-item"
                       onClick={() => handleTabChange("expenses")}
                     >
-                      <span className="all-pending-badge all-pending-badge-expenses">Expenses</span>
-                      <span className="all-pending-count">{expensesCount} pending {expensesCount === 1 ? "expense" : "expenses"}</span>
+                      <span className="all-pending-badge all-pending-badge-expenses">{t('tab.expenses')}</span>
+                      <span className="all-pending-count">{t('pendingExpenses', { count: expensesCount })}</span>
                       <span className="all-pending-arrow">→</span>
                     </button>
                   ) : null}
@@ -202,8 +205,8 @@ export function ApprovalsClient({
                       className="all-pending-item"
                       onClick={() => handleTabChange("timesheets")}
                     >
-                      <span className="all-pending-badge all-pending-badge-timesheets">Timesheets</span>
-                      <span className="all-pending-count">{timesheetsCount} pending {timesheetsCount === 1 ? "timesheet" : "timesheets"}</span>
+                      <span className="all-pending-badge all-pending-badge-timesheets">{t('tab.timesheets')}</span>
+                      <span className="all-pending-count">{t('pendingTimesheets', { count: timesheetsCount })}</span>
                       <span className="all-pending-arrow">→</span>
                     </button>
                   ) : null}

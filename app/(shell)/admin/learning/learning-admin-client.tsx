@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -15,6 +16,7 @@ import type {
   LearningCourseRecord
 } from "../../../../types/learning";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 
 type AssignmentFormState = {
@@ -48,6 +50,10 @@ function learningAdminSkeleton() {
 }
 
 export function LearningAdminClient() {
+  const t = useTranslations('learningAdmin');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
   const coursesQuery = useLearningCourses({ includeDraft: true });
   const peopleQuery = usePeople({ scope: "all" });
 
@@ -100,17 +106,17 @@ export function LearningAdminClient() {
     setSubmitMessage(null);
 
     if (!assignmentForm.courseId) {
-      setFormError("Select a course.");
+      setFormError(t('errorSelectCourse'));
       return;
     }
 
     if (assignmentForm.employeeIds.length === 0) {
-      setFormError("Select at least one employee.");
+      setFormError(t('errorSelectEmployee'));
       return;
     }
 
     if (assignmentForm.dueDate.trim().length > 0 && !/^\d{4}-\d{2}-\d{2}$/.test(assignmentForm.dueDate)) {
-      setFormError("Due date must be YYYY-MM-DD.");
+      setFormError(t('errorDueDateFormat'));
       return;
     }
 
@@ -131,18 +137,18 @@ export function LearningAdminClient() {
       const payload = (await response.json()) as LearningAssignmentsBulkMutationResponse;
 
       if (!response.ok || !payload.data?.assignments) {
-        setFormError(payload.error?.message ?? "Unable to assign course.");
+        setFormError(payload.error?.message ?? t('errorUnableToAssign'));
         return;
       }
 
-      setSubmitMessage(`Assigned to ${payload.data.assignments.length} employee(s).`);
+      setSubmitMessage(t('assignedSuccess', { count: payload.data.assignments.length }));
       setAssignmentForm((currentValue) => ({
         ...currentValue,
         employeeIds: []
       }));
       coursesQuery.refresh();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Unable to assign course.");
+      setFormError(error instanceof Error ? error.message : t('errorUnableToAssign'));
     } finally {
       setIsSubmitting(false);
     }
@@ -151,8 +157,8 @@ export function LearningAdminClient() {
   return (
     <>
       <PageHeader
-        title="Learning Admin"
-        description="Create training content, publish courses, and assign learning plans."
+        title={t('title')}
+        description={t('description')}
       />
 
       {isLoading ? learningAdminSkeleton() : null}
@@ -160,7 +166,7 @@ export function LearningAdminClient() {
       {!isLoading && errorMessage ? (
         <>
           <EmptyState
-            title="Learning admin data is unavailable"
+            title={t('unavailable')}
             description={errorMessage}
           />
           <button
@@ -171,44 +177,44 @@ export function LearningAdminClient() {
               peopleQuery.refresh();
             }}
           >
-            Retry
+            {tCommon('retry')}
           </button>
         </>
       ) : null}
 
       {!isLoading && !errorMessage ? (
-        <section className="compensation-layout" aria-label="Learning admin overview">
+        <section className="compensation-layout" aria-label={t('overviewAriaLabel')}>
           <article className="metric-grid">
             <article className="metric-card">
-              <p className="metric-label">Courses</p>
+              <p className="metric-label">{t('courses')}</p>
               <p className="metric-value numeric">{sortedCourses.length}</p>
-              <p className="metric-description">Total learning courses configured.</p>
+              <p className="metric-description">{t('coursesDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Published</p>
+              <p className="metric-label">{t('published')}</p>
               <p className="metric-value numeric">{publishedCount}</p>
-              <p className="metric-description">Visible to employees in the learning catalog.</p>
+              <p className="metric-description">{t('publishedDescription')}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Mandatory</p>
+              <p className="metric-label">{t('mandatory')}</p>
               <p className="metric-value numeric">{mandatoryCount}</p>
-              <p className="metric-description">Courses marked mandatory for completion.</p>
+              <p className="metric-description">{t('mandatoryDescription')}</p>
             </article>
           </article>
 
           <article className="metric-card">
             <div>
-              <h2 className="section-title">Admin actions</h2>
+              <h2 className="section-title">{t('adminActions')}</h2>
               <p className="settings-card-description">
-                Create new courses or review completion reporting.
+                {t('adminActionsDescription')}
               </p>
             </div>
             <div className="documents-row-actions">
               <Link href="/admin/learning/courses/new" className="button button-accent">
-                New course
+                {t('newCourse')}
               </Link>
               <Link href="/admin/learning/reports" className="button">
-                Reports
+                {t('reports')}
               </Link>
             </div>
           </article>
@@ -216,16 +222,16 @@ export function LearningAdminClient() {
           <article className="settings-card">
             <header className="announcement-item-header">
               <div>
-                <h2 className="section-title">Assign course</h2>
+                <h2 className="section-title">{t('assignCourse')}</h2>
                 <p className="settings-card-description">
-                  Assign selected course to one or more employees.
+                  {t('assignCourseDescription')}
                 </p>
               </div>
             </header>
 
             <form className="settings-form-grid" onSubmit={handleAssignCourse}>
               <label className="settings-field">
-                <span className="settings-field-label">Course</span>
+                <span className="settings-field-label">{t('courseLabel')}</span>
                 <select
                   className="settings-input"
                   value={assignmentForm.courseId}
@@ -236,7 +242,7 @@ export function LearningAdminClient() {
                     }))
                   }
                 >
-                  <option value="">Select a course</option>
+                  <option value="">{t('selectCourse')}</option>
                   {sortedCourses.map((course) => (
                     <option key={course.id} value={course.id}>
                       {course.title}
@@ -246,7 +252,7 @@ export function LearningAdminClient() {
               </label>
 
               <label className="settings-field">
-                <span className="settings-field-label">Due date</span>
+                <span className="settings-field-label">{t('dueDateLabel')}</span>
                 <input
                   type="date"
                   className="settings-input"
@@ -261,7 +267,7 @@ export function LearningAdminClient() {
               </label>
 
               <fieldset className="settings-field">
-                <legend className="settings-field-label">Employees</legend>
+                <legend className="settings-field-label">{t('employeesLabel')}</legend>
                 <div className="documents-upload-list" style={{ maxHeight: "220px", overflow: "auto" }}>
                   {peopleQuery.people.map((person) => (
                     <label key={person.id} className="settings-checkbox">
@@ -280,7 +286,7 @@ export function LearningAdminClient() {
 
               <div className="settings-actions">
                 <button type="submit" className="button button-accent" disabled={isSubmitting}>
-                  {isSubmitting ? "Assigning..." : "Assign course"}
+                  {isSubmitting ? t('assigning') : t('assignCourse')}
                 </button>
               </div>
             </form>
@@ -291,23 +297,23 @@ export function LearningAdminClient() {
           <article className="compensation-section">
             <header className="announcements-section-header">
               <div>
-                <h2 className="section-title">Course list</h2>
+                <h2 className="section-title">{t('courseList')}</h2>
                 <p className="settings-card-description">
-                  Published and draft courses, with assignment counts.
+                  {t('courseListDescription')}
                 </p>
               </div>
             </header>
 
             {sortedCourses.length === 0 ? (
               <EmptyState
-                title="No courses yet"
-                description="Create a course to begin assigning learning content."
-                ctaLabel="Create course"
+                title={t('noCourses')}
+                description={t('noCoursesDescription')}
+                ctaLabel={t('createCourse')}
                 ctaHref="/admin/learning/courses/new"
               />
             ) : (
               <div className="data-table-container">
-                <table className="data-table" aria-label="Learning courses admin table">
+                <table className="data-table" aria-label={t('tableAriaLabel')}>
                   <thead>
                     <tr>
                       <th>
@@ -320,16 +326,16 @@ export function LearningAdminClient() {
                             )
                           }
                         >
-                          Title
+                          {t('colTitle')}
                           <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                         </button>
                       </th>
-                      <th>Type</th>
-                      <th>Assignments</th>
-                      <th>Completions</th>
-                      <th>Status</th>
-                      <th>Updated</th>
-                      <th className="table-action-column">Actions</th>
+                      <th>{t('colType')}</th>
+                      <th>{t('colAssignments')}</th>
+                      <th>{t('colCompletions')}</th>
+                      <th>{t('colStatus')}</th>
+                      <th>{t('colUpdated')}</th>
+                      <th className="table-action-column">{t('colActions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -343,12 +349,12 @@ export function LearningAdminClient() {
                         <td className="numeric">{course.completionCount}</td>
                         <td>
                           <StatusBadge tone={course.isPublished ? "success" : "draft"}>
-                            {course.isPublished ? "Published" : "Draft"}
+                            {course.isPublished ? t('statusPublished') : t('statusDraft')}
                           </StatusBadge>
                         </td>
                         <td>
-                          <span title={formatDateTimeTooltip(course.updatedAt)}>
-                            {formatRelativeTime(course.updatedAt)}
+                          <span title={formatDateTimeTooltip(course.updatedAt, locale)}>
+                            {formatRelativeTime(course.updatedAt, locale)}
                           </span>
                         </td>
                         <td className="table-row-action-cell">
@@ -358,10 +364,10 @@ export function LearningAdminClient() {
                               className="table-row-action"
                               onClick={() => prefillCourse(course)}
                             >
-                              Assign
+                              {t('assign')}
                             </button>
                             <Link href={`/learning/courses/${course.id}`} className="table-row-action">
-                              View
+                              {t('view')}
                             </Link>
                           </div>
                         </td>

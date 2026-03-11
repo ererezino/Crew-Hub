@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -33,6 +34,9 @@ type HubHomeClientProps = {
 /* ── Component ── */
 
 export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
+  const t = useTranslations('hubHome');
+  const tCommon = useTranslations('common');
+
   const [hub, setHub] = useState<HubDetail | null>(null);
   const [sections, setSections] = useState<HubSection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,11 +56,11 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
       ]);
 
       if (!hubRes.ok) {
-        throw new Error("Failed to load hub details.");
+        throw new Error(t('failedToLoadHub'));
       }
 
       if (!sectionsRes.ok) {
-        throw new Error("Failed to load hub sections.");
+        throw new Error(t('failedToLoadSections'));
       }
 
       const hubEnvelope = await hubRes.json();
@@ -65,11 +69,11 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
       setHub(hubEnvelope.data?.hub ?? null);
       setSections(Array.isArray(sectionsEnvelope) ? sectionsEnvelope : sectionsEnvelope.data?.sections ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setError(err instanceof Error ? err.message : t('unexpectedError'));
     } finally {
       setLoading(false);
     }
-  }, [hubId]);
+  }, [hubId, t]);
 
   useEffect(() => {
     fetchData();
@@ -96,7 +100,7 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
 
         if (!res.ok) {
           const envelope = await res.json().catch(() => null);
-          throw new Error(envelope?.error?.message ?? "Failed to create section.");
+          throw new Error(envelope?.error?.message ?? t('failedToCreateSection'));
         }
 
         setIsAddSectionOpen(false);
@@ -104,18 +108,18 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
         form.reset();
         fetchData();
       } catch (err) {
-        setAddSectionError(err instanceof Error ? err.message : "Failed to create section.");
+        setAddSectionError(err instanceof Error ? err.message : t('failedToCreateSection'));
       } finally {
         setAddSectionBusy(false);
       }
     },
-    [hubId, fetchData]
+    [hubId, fetchData, t]
   );
 
   if (loading) {
     return (
       <>
-        <PageHeader title="Team Hub" />
+        <PageHeader title={t('title')} />
         <div
           style={{
             display: "grid",
@@ -137,11 +141,11 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
   if (error || !hub) {
     return (
       <>
-        <PageHeader title="Team Hub" />
+        <PageHeader title={t('title')} />
         <EmptyState
-          title="Unable to load hub"
-          description={error ?? "Hub not found."}
-          ctaLabel="Back to Team Hub"
+          title={t('unableToLoad')}
+          description={error ?? t('hubNotFound')}
+          ctaLabel={t('backToTeamHub')}
           ctaHref="/team-hub"
         />
       </>
@@ -163,7 +167,7 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
                 setIsAddSectionOpen(true);
               }}
             >
-              Add Section
+              {t('addSection')}
             </button>
           ) : undefined
         }
@@ -171,14 +175,14 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
 
       <nav style={{ marginBottom: "var(--space-4)" }}>
         <Link href="/team-hub" style={{ fontSize: "var(--font-sm)", color: "var(--color-text-muted)" }}>
-          &larr; All Hubs
+          &larr; {t('allHubs')}
         </Link>
       </nav>
 
       {sections.length === 0 ? (
         <EmptyState
-          title="No sections yet"
-          description="This hub doesn't have any sections. Sections help organize your pages into logical groups."
+          title={t('noSections')}
+          description={t('noSectionsDescription')}
           ctaLabel={undefined}
           ctaHref={undefined}
         />
@@ -214,7 +218,7 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
                     color: "var(--color-text-muted)"
                   }}
                 >
-                  {section.page_count} {section.page_count === 1 ? "page" : "pages"}
+                  {t('pageCount', { count: section.page_count })}
                 </p>
               </article>
             </Link>
@@ -224,8 +228,8 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
 
       <SlidePanel
         isOpen={isAddSectionOpen}
-        title="Add Section"
-        description="Sections organize pages into logical groups."
+        title={t('addSectionPanelTitle')}
+        description={t('addSectionPanelDescription')}
         onClose={() => {
           if (!addSectionBusy) {
             setAddSectionError(null);
@@ -235,37 +239,37 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
       >
         <form onSubmit={handleAddSection} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <label className="field-label">
-            Name
+            {t('nameLabel')}
             <input
               name="name"
               type="text"
               className="input"
               required
               maxLength={200}
-              placeholder="e.g. Getting Started"
+              placeholder={t('namePlaceholder')}
               autoFocus
             />
           </label>
 
           <label className="field-label">
-            Icon (emoji)
+            {t('iconLabel')}
             <input
               name="icon"
               type="text"
               className="input"
               maxLength={4}
-              placeholder="e.g. 📘"
+              placeholder={t('iconPlaceholder')}
             />
           </label>
 
           <label className="field-label">
-            Description
+            {t('descriptionLabel')}
             <textarea
               name="description"
               className="input"
               rows={3}
               maxLength={2000}
-              placeholder="What does this section contain?"
+              placeholder={t('descriptionPlaceholder')}
             />
           </label>
 
@@ -280,10 +284,10 @@ export function HubHomeClient({ hubId, isLeadOrAdmin }: HubHomeClientProps) {
                 setIsAddSectionOpen(false);
               }}
             >
-              Cancel
+              {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={addSectionBusy}>
-              {addSectionBusy ? "Adding…" : "Add Section"}
+              {addSectionBusy ? t('adding') : t('addSection')}
             </button>
           </div>
         </form>

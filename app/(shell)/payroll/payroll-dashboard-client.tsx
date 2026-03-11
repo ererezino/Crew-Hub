@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
 
@@ -18,6 +19,7 @@ import {
   toneForPayrollRunStatus
 } from "../../../lib/payroll/runs";
 
+type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
 
 type PayrollDashboardClientProps = {
@@ -45,15 +47,15 @@ function runsTableSkeleton() {
   );
 }
 
-function formatPeriodLabel(start: string, end: string): string {
+function formatPeriodLabel(start: string, end: string, locale: AppLocale): string {
   const startDate = new Date(`${start}T00:00:00.000Z`);
   const endDate = new Date(`${end}T00:00:00.000Z`);
 
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return `${start} to ${end}`;
+    return `${start} – ${end}`;
   }
 
-  return `${formatDate(startDate)} – ${formatDate(endDate)}`;
+  return `${formatDate(startDate, locale)} – ${formatDate(endDate, locale)}`;
 }
 
 export function PayrollDashboardClient({
@@ -62,6 +64,9 @@ export function PayrollDashboardClient({
   settingsHref,
   headerActions
 }: PayrollDashboardClientProps) {
+  const t = useTranslations('payrollDashboard');
+  const locale = useLocale() as AppLocale;
+
   const runsQuery = usePayrollRunsDashboard();
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -84,21 +89,21 @@ export function PayrollDashboardClient({
   return (
     <>
       <PageHeader
-        title="Payroll"
-        description="Run payroll with staged approvals and clear payout status."
+        title={t('title')}
+        description={t('description')}
         actions={headerActions}
       />
 
       <FeatureBanner
         moduleId="payroll"
-        description="Payroll is in limited pilot. Disbursement is not yet connected to a payment provider."
+        description={t('pilotBanner')}
       />
 
       {runsQuery.isLoading ? runsTableSkeleton() : null}
 
       {!runsQuery.isLoading && runsQuery.errorMessage ? (
         <ErrorState
-          title="Payroll runs are unavailable"
+          title={t('unavailable')}
           message={runsQuery.errorMessage}
           onRetry={() => runsQuery.refresh()}
         />
@@ -106,9 +111,9 @@ export function PayrollDashboardClient({
 
       {!runsQuery.isLoading && !runsQuery.errorMessage && runsQuery.data ? (
         <>
-          <section className="payroll-metric-grid" aria-label="Payroll run metrics">
+          <section className="payroll-metric-grid" aria-label={t('metricsAriaLabel')}>
             <article className="metric-card">
-              <p className="metric-label">Latest Status</p>
+              <p className="metric-label">{t('latestStatus')}</p>
               <p className="metric-value">
                 {runsQuery.data.metrics.latestStatus ? (
                   <StatusBadge tone={toneForPayrollRunStatus(runsQuery.data.metrics.latestStatus)}>
@@ -118,56 +123,56 @@ export function PayrollDashboardClient({
                   "--"
                 )}
               </p>
-              <p className="metric-hint">Most recent payroll run state</p>
+              <p className="metric-hint">{t('latestStatusHint')}</p>
             </article>
 
             <article className="metric-card">
-              <p className="metric-label">Total Cost</p>
+              <p className="metric-label">{t('totalCost')}</p>
               <p className="metric-value">
                 <CurrencyDisplay
                   amount={runsQuery.data.metrics.latestTotalCostAmount}
                   currency={dashboardCurrency}
                 />
               </p>
-              <p className="metric-hint">Latest run net total</p>
+              <p className="metric-hint">{t('totalCostHint')}</p>
             </article>
 
             <article className="metric-card">
-              <p className="metric-label">Contractors</p>
+              <p className="metric-label">{t('contractors')}</p>
               <p className="metric-value numeric">
                 {runsQuery.data.metrics.activeContractorCount}
               </p>
-              <p className="metric-hint">Active contractors eligible for payroll</p>
+              <p className="metric-hint">{t('contractorsHint')}</p>
             </article>
 
             <article className="metric-card">
-              <p className="metric-label">Next Pay Date</p>
+              <p className="metric-label">{t('nextPayDate')}</p>
               <p className="metric-value">
                 {runsQuery.data.metrics.nextPayDate ? (
                   <time
                     className="numeric"
                     dateTime={runsQuery.data.metrics.nextPayDate}
-                    title={formatDateTimeTooltip(runsQuery.data.metrics.nextPayDate)}
+                    title={formatDateTimeTooltip(runsQuery.data.metrics.nextPayDate, locale)}
                   >
-                    {formatRelativeTime(`${runsQuery.data.metrics.nextPayDate}T00:00:00.000Z`)}
+                    {formatRelativeTime(`${runsQuery.data.metrics.nextPayDate}T00:00:00.000Z`, locale)}
                   </time>
                 ) : (
                   "--"
                 )}
               </p>
-              <p className="metric-hint">Upcoming run date</p>
+              <p className="metric-hint">{t('nextPayDateHint')}</p>
             </article>
           </section>
 
           {sortedRuns.length === 0 ? (
             <EmptyState
-              title="Nothing here yet"
-              description="Create a payroll run to get started. Net pay equals gross pay while withholding is disabled."
-              ctaLabel={canManage ? "Create payroll run" : "Open withholding settings"}
+              title={t('noRuns')}
+              description={t('noRunsDescription')}
+              ctaLabel={canManage ? t('createRun') : t('openWithholding')}
               ctaHref={canManage ? createRunHref : settingsHref}
             />
           ) : (
-            <section className="data-table-container" aria-label="Payroll runs table">
+            <section className="data-table-container" aria-label={t('tableAriaLabel')}>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -179,26 +184,26 @@ export function PayrollDashboardClient({
                           setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
                         }
                       >
-                        Period
+                        {t('colPeriod')}
                         <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       </button>
                     </th>
-                    <th>Status</th>
-                    <th>Employees</th>
-                    <th>Gross</th>
-                    <th>Initiator</th>
-                    <th className="table-action-column">Actions</th>
+                    <th>{t('colStatus')}</th>
+                    <th>{t('colEmployees')}</th>
+                    <th>{t('colGross')}</th>
+                    <th>{t('colInitiator')}</th>
+                    <th className="table-action-column">{t('colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedRuns.map((run) => (
                     <tr key={run.id} className="data-table-row">
                       <td>
-                        <p>{formatPeriodLabel(run.payPeriodStart, run.payPeriodEnd)}</p>
+                        <p>{formatPeriodLabel(run.payPeriodStart, run.payPeriodEnd, locale)}</p>
                         <p className="settings-card-description">
-                          Pay date{" "}
-                          <time dateTime={run.payDate} title={formatDateTimeTooltip(run.payDate)}>
-                            {formatDate(run.payDate)}
+                          {t('payDate')}{" "}
+                          <time dateTime={run.payDate} title={formatDateTimeTooltip(run.payDate, locale)}>
+                            {formatDate(run.payDate, locale)}
                           </time>
                         </p>
                       </td>
@@ -218,7 +223,7 @@ export function PayrollDashboardClient({
                       <td className="table-row-action-cell">
                         <div className="payroll-row-actions">
                           <Link className="table-row-action" href={`/payroll/runs/${run.id}`}>
-                            Open run
+                            {t('openRun')}
                           </Link>
                         </div>
                       </td>

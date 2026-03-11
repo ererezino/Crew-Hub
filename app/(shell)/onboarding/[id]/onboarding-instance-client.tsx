@@ -1,5 +1,6 @@
 "use client";
 
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -11,6 +12,8 @@ import { useOnboardingInstanceDetail } from "../../../../hooks/use-onboarding";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { toSentenceCase } from "../../../../lib/format-labels";
 import type { OnboardingTask } from "../../../../types/onboarding";
+
+type AppLocale = "en" | "fr";
 
 type OnboardingInstanceClientProps = {
   instanceId: string;
@@ -60,6 +63,9 @@ function OnboardingDetailsSkeleton() {
 }
 
 export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClientProps) {
+  const t = useTranslations('onboardingInstance');
+  const locale = useLocale() as AppLocale;
+
   const { detail, isLoading, errorMessage } = useOnboardingInstanceDetail(instanceId);
 
   const tasksByCategory = useMemo(
@@ -74,8 +80,8 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
   if (errorMessage || !detail) {
     return (
       <ErrorState
-        title="Onboarding instance is unavailable"
-        message={errorMessage ?? "Unable to load onboarding instance."}
+        title={t('unavailable')}
+        message={errorMessage ?? t('unableToLoad')}
       />
     );
   }
@@ -84,14 +90,14 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
     <>
       <PageHeader
         title={`${detail.instance.employeeName} - ${toSentenceCase(detail.instance.type)}`}
-        description={`Template: ${detail.instance.templateName}`}
+        description={t('template', { name: detail.instance.templateName })}
       />
 
       <section className="onboarding-instance-summary">
-        <ProgressRing value={detail.instance.progressPercent} label="Progress" />
+        <ProgressRing value={detail.instance.progressPercent} label={t('progress')} />
         <div className="onboarding-instance-summary-metrics">
           <article className="onboarding-instance-metric">
-            <p className="onboarding-instance-metric-label">Status</p>
+            <p className="onboarding-instance-metric-label">{t('status')}</p>
             <StatusBadge
               tone={detail.instance.status === "completed" ? "success" : "processing"}
             >
@@ -99,25 +105,25 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
             </StatusBadge>
           </article>
           <article className="onboarding-instance-metric">
-            <p className="onboarding-instance-metric-label">Started</p>
+            <p className="onboarding-instance-metric-label">{t('started')}</p>
             <p className="onboarding-instance-metric-value">
               <time
                 dateTime={detail.instance.startedAt}
-                title={formatDateTimeTooltip(detail.instance.startedAt)}
+                title={formatDateTimeTooltip(detail.instance.startedAt, locale)}
               >
-                {formatRelativeTime(detail.instance.startedAt)}
+                {formatRelativeTime(detail.instance.startedAt, locale)}
               </time>
             </p>
           </article>
           <article className="onboarding-instance-metric">
-            <p className="onboarding-instance-metric-label">Completed</p>
+            <p className="onboarding-instance-metric-label">{t('completed')}</p>
             <p className="onboarding-instance-metric-value">
               {detail.instance.completedAt ? (
                 <time
                   dateTime={detail.instance.completedAt}
-                  title={formatDateTimeTooltip(detail.instance.completedAt)}
+                  title={formatDateTimeTooltip(detail.instance.completedAt, locale)}
                 >
-                  {formatRelativeTime(detail.instance.completedAt)}
+                  {formatRelativeTime(detail.instance.completedAt, locale)}
                 </time>
               ) : (
                 "--"
@@ -125,7 +131,7 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
             </p>
           </article>
           <article className="onboarding-instance-metric">
-            <p className="onboarding-instance-metric-label">Task completion</p>
+            <p className="onboarding-instance-metric-label">{t('taskCompletion')}</p>
             <p className="onboarding-instance-metric-value numeric">
               {detail.instance.completedTasks}/{detail.instance.totalTasks}
             </p>
@@ -135,9 +141,9 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
 
       {tasksByCategory.size === 0 ? (
         <EmptyState
-          title="No onboarding tasks found"
-          description="Tasks will appear here once assigned to this onboarding instance."
-          ctaLabel="Back to onboarding"
+          title={t('noTasks')}
+          description={t('noTasksDescription')}
+          ctaLabel={t('backToOnboarding')}
           ctaHref="/onboarding"
         />
       ) : (
@@ -146,7 +152,7 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
             <article key={category} className="onboarding-category-card">
               <header className="onboarding-category-header">
                 <h2 className="section-title">{category}</h2>
-                <span className="pill numeric">{tasks.length} tasks</span>
+                <span className="pill numeric">{t('taskCount', { count: tasks.length })}</span>
               </header>
               <ul className="onboarding-task-list">
                 {tasks.map((task) => (
@@ -154,28 +160,28 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
                     <div className="onboarding-task-main">
                       <p className="onboarding-task-title">{task.title}</p>
                       <p className="settings-card-description">
-                        {task.description ?? "No description"}
+                        {task.description ?? t('noDescription')}
                       </p>
                     </div>
                     <div className="onboarding-task-meta">
                       <StatusBadge tone={toneForTaskStatus(task.status)}>{toSentenceCase(task.status)}</StatusBadge>
-                      <p className="settings-card-description">Assigned: {task.assignedToName}</p>
+                      <p className="settings-card-description">{t('assigned', { name: task.assignedToName })}</p>
                       <p className="settings-card-description">
-                        Due:{" "}
+                        {t('due')}{" "}
                         {task.dueDate ? (
-                          <time dateTime={task.dueDate} title={formatDateTimeTooltip(task.dueDate)}>
-                            {formatRelativeTime(task.dueDate)}
+                          <time dateTime={task.dueDate} title={formatDateTimeTooltip(task.dueDate, locale)}>
+                            {formatRelativeTime(task.dueDate, locale)}
                           </time>
                         ) : (
                           "--"
                         )}
                       </p>
                       <p className="settings-card-description">
-                        Completed by: {task.completedByName ?? "--"}
+                        {t('completedBy', { name: task.completedByName ?? "--" })}
                       </p>
                       {task.completionGuidance ? (
                         <p className="settings-card-description">
-                          Completion guidance: {task.completionGuidance}
+                          {t('completionGuidance', { text: task.completionGuidance })}
                         </p>
                       ) : null}
                       {task.actionUrl ? (
@@ -185,10 +191,10 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
                           rel="noreferrer"
                           className="button button-sm"
                         >
-                          {task.actionLabel ?? "Open task action"}
+                          {task.actionLabel ?? t('openTaskAction')}
                         </a>
                       ) : null}
-                      <p className="settings-card-description">{task.notes ?? "No notes"}</p>
+                      <p className="settings-card-description">{task.notes ?? t('noNotes')}</p>
                     </div>
                   </li>
                 ))}

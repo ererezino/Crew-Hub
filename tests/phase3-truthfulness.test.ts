@@ -130,7 +130,8 @@ describe("Phase 3 — Product Truthfulness and Launch-Scope Honesty", () => {
       );
       if (!fs.existsSync(detailPath)) return;
       const content = fs.readFileSync(detailPath, "utf-8");
-      expect(content).toContain("Disbursement execution is disabled");
+      expect(content).toContain("t('disbursementNotice')");
+      expect(content).toContain("t('breakdown.disbursementExecution')");
     });
   });
 });

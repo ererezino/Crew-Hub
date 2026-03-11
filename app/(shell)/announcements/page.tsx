@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
@@ -8,15 +10,17 @@ export default async function AnnouncementsPage() {
   const session = await getAuthenticatedSession();
 
   if (!session?.profile) {
+    const t = await getTranslations('common');
+    const tPage = await getTranslations('announcements');
     return (
       <>
         <PageHeader
-          title="Notifications"
-          description="Company updates, alerts, and messages since your last visit."
+          title={tPage('pageTitle')}
+          description={tPage('pageDescription')}
         />
         <EmptyState
-          title="Profile is unavailable"
-          description="No profile is linked to this account yet."
+          title={t('emptyState.profileUnavailable')}
+          description={t('emptyState.profileUnavailableBody')}
         />
       </>
     );
