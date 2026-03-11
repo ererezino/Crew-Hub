@@ -22,19 +22,15 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: "Crew Hub",
   description: "Crew Hub employee operations platform.",
+  themeColor: "#1A2B3C",
   icons: {
     icon: [
-      {
-        url: "/brand/icon-dark.png",
-        type: "image/png",
-        media: "(prefers-color-scheme: light)"
-      },
-      {
-        url: "/brand/icon-light.png",
-        type: "image/png",
-        media: "(prefers-color-scheme: dark)"
-      }
-    ]
+      { url: "/favicon.ico?v=20260311a", sizes: "any" },
+      { url: "/favicon-32x32.png?v=20260311a", type: "image/png", sizes: "32x32" },
+      { url: "/favicon-16x16.png?v=20260311a", type: "image/png", sizes: "16x16" }
+    ],
+    shortcut: ["/favicon.ico?v=20260311a"],
+    apple: [{ url: "/apple-touch-icon.png?v=20260311a", sizes: "180x180", type: "image/png" }]
   }
 };
 
