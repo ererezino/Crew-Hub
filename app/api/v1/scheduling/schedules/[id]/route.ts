@@ -125,13 +125,12 @@ export async function DELETE(
 
   const schedule = parsedSchedule.data;
 
-  /* Only draft schedules can be deleted */
-  if (schedule.status !== "draft") {
+  if (schedule.status === "locked") {
     return jsonResponse<null>(409, {
       data: null,
       error: {
-        code: "SCHEDULE_NOT_DRAFT",
-        message: "Only draft schedules can be deleted. Published or locked schedules cannot be removed."
+        code: "SCHEDULE_LOCKED",
+        message: "Locked schedules cannot be removed."
       },
       meta: buildMeta()
     });
@@ -153,11 +152,105 @@ export async function DELETE(
     });
   }
 
+  const deletedAt = new Date().toISOString();
+
+  const { data: existingShiftRows, error: shiftsFetchError } = await supabase
+    .from("shifts")
+    .select("id")
+    .eq("org_id", session.profile.org_id)
+    .eq("schedule_id", scheduleId)
+    .is("deleted_at", null);
+
+  if (shiftsFetchError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SHIFT_FETCH_FAILED",
+        message: "Unable to load schedule shifts before delete."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const shiftIds = (existingShiftRows ?? [])
+    .map((row) => (typeof row.id === "string" ? row.id : null))
+    .filter((value): value is string => Boolean(value));
+
+  if (shiftIds.length > 0) {
+    const { error: swapsDeleteError } = await supabase
+      .from("shift_swaps")
+      .update({ deleted_at: deletedAt })
+      .eq("org_id", session.profile.org_id)
+      .in("shift_id", shiftIds)
+      .is("deleted_at", null);
+
+    if (swapsDeleteError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "SWAP_DELETE_FAILED",
+          message: "Unable to remove linked shift swaps."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
+  const { error: shiftsDeleteError } = await supabase
+    .from("shifts")
+    .update({ deleted_at: deletedAt })
+    .eq("org_id", session.profile.org_id)
+    .eq("schedule_id", scheduleId)
+    .is("deleted_at", null);
+
+  if (shiftsDeleteError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SHIFT_DELETE_FAILED",
+        message: "Unable to remove linked shifts."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const { error: rosterDeleteError } = await supabase
+    .from("schedule_roster")
+    .delete()
+    .eq("schedule_id", scheduleId);
+
+  if (rosterDeleteError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "ROSTER_DELETE_FAILED",
+        message: "Unable to remove linked roster entries."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const { error: notesDeleteError } = await supabase
+    .from("schedule_day_notes")
+    .delete()
+    .eq("schedule_id", scheduleId);
+
+  if (notesDeleteError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "NOTES_DELETE_FAILED",
+        message: "Unable to remove linked schedule notes."
+      },
+      meta: buildMeta()
+    });
+  }
+
   /* Soft-delete the schedule using service-role client to bypass RLS.
      Authorization is already enforced above (isSchedulingManager + team-lead scoping). */
   const { error: deleteError } = await supabase
     .from("schedules")
-    .update({ deleted_at: new Date().toISOString() })
+    .update({ deleted_at: deletedAt })
     .eq("id", scheduleId)
     .eq("org_id", session.profile.org_id);
 
@@ -182,7 +275,10 @@ export async function DELETE(
       department: schedule.department,
       status: schedule.status
     },
-    newValue: null
+    newValue: {
+      deleted_at: deletedAt,
+      removed_shift_count: shiftIds.length
+    }
   });
 
   return jsonResponse<{ deleted: true }>(200, {

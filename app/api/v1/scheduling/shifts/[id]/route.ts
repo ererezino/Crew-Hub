@@ -7,7 +7,7 @@ import { areDepartmentsEqual } from "../../../../../../lib/department";
 import { isDepartmentScopedTeamLead } from "../../../../../../lib/roles";
 import {
   areTimeRangesOverlapping,
-  combineDateAndTime,
+  combineDateAndTimeRange,
   extractIsoTime,
   isIsoDate,
   isIsoTime,
@@ -94,6 +94,25 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
+function dateWindowForConflictCheck(isoDate: string): string[] {
+  const current = new Date(`${isoDate}T00:00:00Z`);
+
+  if (!Number.isFinite(current.getTime())) {
+    return [isoDate];
+  }
+
+  const prev = new Date(current);
+  prev.setUTCDate(prev.getUTCDate() - 1);
+  const next = new Date(current);
+  next.setUTCDate(next.getUTCDate() + 1);
+
+  return [
+    prev.toISOString().slice(0, 10),
+    current.toISOString().slice(0, 10),
+    next.toISOString().slice(0, 10)
+  ];
+}
+
 async function detectShiftConflicts({
   supabase,
   orgId,
@@ -116,7 +135,7 @@ async function detectShiftConflicts({
     .select("id, start_time, end_time")
     .eq("org_id", orgId)
     .eq("employee_id", employeeId)
-    .eq("shift_date", shiftDate)
+    .in("shift_date", dateWindowForConflictCheck(shiftDate))
     .is("deleted_at", null)
     .neq("status", "cancelled")
     .neq("id", shiftId);
@@ -431,19 +450,25 @@ export async function PUT(
   const nextStartTimeValue = changes.startTime?.trim() || extractIsoTime(existingShift.start_time);
   const nextEndTimeValue = changes.endTime?.trim() || extractIsoTime(existingShift.end_time);
 
-  const nextStartTime = combineDateAndTime(nextShiftDate, nextStartTimeValue);
-  const nextEndTime = combineDateAndTime(nextShiftDate, nextEndTimeValue);
+  const nextShiftRange = combineDateAndTimeRange(
+    nextShiftDate,
+    nextStartTimeValue,
+    nextEndTimeValue
+  );
 
-  if (!nextStartTime || !nextEndTime || nextEndTime <= nextStartTime) {
+  if (!nextShiftRange) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Shift end time must be after start time."
+        message: "Shift end time must be different from start time."
       },
       meta: buildMeta()
     });
   }
+
+  const nextStartTime = nextShiftRange.startTime;
+  const nextEndTime = nextShiftRange.endTime;
 
   if (changes.scheduleId) {
     const { data: scheduleRow, error: scheduleError } = await supabase

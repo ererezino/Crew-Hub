@@ -40,6 +40,54 @@ export function combineDateAndTime(isoDate: string, isoTime: string): string | n
   return `${isoDate}T${isoTime}:00.000Z`;
 }
 
+function addDaysToIsoDate(isoDate: string, days: number): string | null {
+  if (!isIsoDate(isoDate)) {
+    return null;
+  }
+
+  const parsedDate = new Date(`${isoDate}T00:00:00.000Z`);
+
+  if (!Number.isFinite(parsedDate.getTime())) {
+    return null;
+  }
+
+  parsedDate.setUTCDate(parsedDate.getUTCDate() + days);
+  return parsedDate.toISOString().slice(0, 10);
+}
+
+export function combineDateAndTimeRange(
+  isoDate: string,
+  startIsoTime: string,
+  endIsoTime: string
+): { startTime: string; endTime: string } | null {
+  if (startIsoTime === endIsoTime) {
+    return null;
+  }
+
+  const startTime = combineDateAndTime(isoDate, startIsoTime);
+
+  if (!startTime) {
+    return null;
+  }
+
+  const endDate =
+    endIsoTime <= startIsoTime
+      ? addDaysToIsoDate(isoDate, 1)
+      : isoDate;
+
+  if (!endDate) {
+    return null;
+  }
+
+  const endTime = combineDateAndTime(endDate, endIsoTime);
+
+  if (!endTime) {
+    return null;
+  }
+
+  return { startTime, endTime };
+}
+
 export function extractIsoTime(value: string): string {
   const parsedDate = new Date(value);
 
@@ -79,6 +127,7 @@ export function isSchedulingAdmin(userRoles: readonly UserRole[]): boolean {
 
 export function canViewTeamSchedules(userRoles: readonly UserRole[]): boolean {
   return (
+    userRoles.includes("EMPLOYEE") ||
     userRoles.includes("TEAM_LEAD") ||
     userRoles.includes("MANAGER") ||
     userRoles.includes("HR_ADMIN") ||

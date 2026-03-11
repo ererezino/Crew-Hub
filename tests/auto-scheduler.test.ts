@@ -88,4 +88,57 @@ describe("autoGenerateSchedule", () => {
       new Set(["weekend-employee"])
     );
   });
+
+  it("only generates weekend assignments for weekend schedules", () => {
+    const assignments = autoGenerateSchedule({
+      employees: baseEmployees,
+      slots,
+      startDate: "2026-03-06", // Friday
+      endDate: "2026-03-09", // Monday
+      scheduleType: "weekend",
+      respectEmployeeScheduleType: false
+    });
+
+    expect(assignments).toHaveLength(2);
+    expect(new Set(assignments.map((assignment) => assignment.shiftDate))).toEqual(
+      new Set(["2026-03-07", "2026-03-08"])
+    );
+  });
+
+  it("falls back to same-day double assignment when needed for coverage", () => {
+    const assignments = autoGenerateSchedule({
+      employees: [
+        {
+          id: "solo",
+          fullName: "Solo Employee",
+          scheduleType: "weekday",
+          blockedDates: []
+        }
+      ],
+      slots: [
+        {
+          name: "Morning",
+          startTime: "08:00",
+          endTime: "16:00"
+        },
+        {
+          name: "Evening",
+          startTime: "16:00",
+          endTime: "00:00"
+        }
+      ],
+      startDate: "2026-03-02",
+      endDate: "2026-03-02",
+      scheduleType: "weekday",
+      respectEmployeeScheduleType: false
+    });
+
+    expect(assignments).toHaveLength(2);
+    expect(new Set(assignments.map((assignment) => assignment.slotName))).toEqual(
+      new Set(["Morning", "Evening"])
+    );
+    expect(new Set(assignments.map((assignment) => assignment.employeeId))).toEqual(
+      new Set(["solo"])
+    );
+  });
 });

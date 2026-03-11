@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { TeamScheduleCalendar } from "../../../../components/scheduling/team-schedule-calendar";
 import { useSchedulingSchedules, useSchedulingShifts } from "../../../../hooks/use-scheduling";
+import { areDepartmentsEqual } from "../../../../lib/department";
+import { formatDateShort, formatMonth } from "../../../../lib/datetime";
 import type { ShiftRecord } from "../../../../types/scheduling";
 
 type ToastMessage = {
@@ -21,21 +24,34 @@ type PendingMove = {
 let toastCounter = 0;
 
 function formatShiftMoveDate(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00`).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  });
+  return formatDateShort(isoDate);
 }
 
 export function SchedulingCalendarClient({
-  canManageShifts = false
+  canManageShifts = false,
+  initialScheduleId = null,
+  viewerDepartment = null
 }: {
   canManageShifts?: boolean;
+  initialScheduleId?: string | null;
+  viewerDepartment?: string | null;
 }) {
-  const schedulesQuery = useSchedulingSchedules({ scope: "team", status: "published" });
+  const t = useTranslations("scheduling");
+  const tc = useTranslations("common");
+  const includeUnpublishedSchedule = canManageShifts && Boolean(initialScheduleId);
+  const schedulesQuery = useSchedulingSchedules({
+    scope: "team",
+    status: includeUnpublishedSchedule ? undefined : "published"
+  });
   const schedulesData = schedulesQuery.data;
   const schedules = useMemo(() => schedulesData?.schedules ?? [], [schedulesData]);
+  const visibleSchedules = useMemo(() => {
+    if (canManageShifts || !viewerDepartment) {
+      return schedules;
+    }
+
+    return schedules.filter((schedule) => areDepartmentsEqual(schedule.department, viewerDepartment));
+  }, [canManageShifts, schedules, viewerDepartment]);
 
   // Default to the most recent published schedule
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
@@ -44,12 +60,12 @@ export function SchedulingCalendarClient({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const activeSchedule = useMemo(() => {
-    if (schedules.length === 0) return null;
+    if (visibleSchedules.length === 0) return null;
     if (selectedScheduleId) {
-      return schedules.find((s) => s.id === selectedScheduleId) ?? schedules[0]!;
+      return visibleSchedules.find((s) => s.id === selectedScheduleId) ?? visibleSchedules[0]!;
     }
-    return schedules[0]!;
-  }, [schedules, selectedScheduleId]);
+    return visibleSchedules[0]!;
+  }, [visibleSchedules, selectedScheduleId]);
 
   const shiftsQuery = useSchedulingShifts(
     activeSchedule
@@ -59,6 +75,14 @@ export function SchedulingCalendarClient({
 
   const shifts = shiftsQuery.data?.shifts ?? [];
   const isLoading = schedulesQuery.isLoading || shiftsQuery.isLoading;
+
+  useEffect(() => {
+    if (!initialScheduleId) {
+      return;
+    }
+
+    setSelectedScheduleId((current) => current ?? initialScheduleId);
+  }, [initialScheduleId]);
 
   useEffect(() => {
     if (toasts.length === 0) return;
@@ -93,18 +117,18 @@ export function SchedulingCalendarClient({
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error?.message ?? "Unable to move shift.");
+        throw new Error(payload?.error?.message ?? t("shiftMove.toastError"));
       }
 
-      addToast("success", "Shift moved successfully.");
+      addToast("success", t("shiftMove.toastSuccess"));
       shiftsQuery.refresh();
     } catch (error) {
-      addToast("error", error instanceof Error ? error.message : "Unable to move shift.");
+      addToast("error", error instanceof Error ? error.message : t("shiftMove.toastError"));
     } finally {
       setIsMovingShift(false);
       setPendingMove(null);
     }
-  }, [addToast, pendingMove, shiftsQuery]);
+  }, [addToast, pendingMove, shiftsQuery, t]);
 
   if (isLoading) {
     return (
@@ -122,18 +146,18 @@ export function SchedulingCalendarClient({
   return (
     <section className="compensation-layout">
       {/* Schedule selector */}
-      {schedules.length > 1 ? (
+      {visibleSchedules.length > 1 ? (
         <div className="schedule-calendar-controls">
-          <label className="form-label" htmlFor="schedule-selector">Schedule</label>
+          <label className="form-label" htmlFor="schedule-selector">{t("calendar.scheduleLabel")}</label>
           <select
             id="schedule-selector"
             className="form-input"
             value={activeSchedule?.id ?? ""}
             onChange={(e) => setSelectedScheduleId(e.target.value)}
           >
-            {schedules.map((s) => (
+            {visibleSchedules.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name ?? "Schedule"} &mdash; {s.startDate} to {s.endDate}
+                {s.name ?? t("calendar.scheduleLabel")} &mdash; {s.startDate} to {s.endDate}
               </option>
             ))}
           </select>
@@ -144,18 +168,15 @@ export function SchedulingCalendarClient({
         <>
           <div className="schedule-calendar-title">
             <h3 className="section-title">
-              {new Date(activeSchedule.startDate + "T00:00:00").toLocaleDateString("en-US", {
-                month: "long",
-                year: "2-digit"
-              })}
+              {formatMonth(activeSchedule.startDate)}
             </h3>
             <p className="settings-card-description">
-              {activeSchedule.name ?? "Published schedule"} &middot;{" "}
-              {activeSchedule.scheduleTrack === "weekend" ? "Weekend" : "Weekday"} track
+              {activeSchedule.name ?? t("calendar.publishedSchedule")} &middot;{" "}
+              {activeSchedule.scheduleTrack === "weekend" ? t("track.weekend") : t("track.weekday")} {t("track.trackSuffix")}
             </p>
             {canManageShifts ? (
               <p className="teamcal-helper-text">
-                Drag and drop any shift to a new day to reschedule it.
+                {t("calendar.dragHelper")}
               </p>
             ) : null}
           </div>
@@ -181,13 +202,17 @@ export function SchedulingCalendarClient({
 
       <ConfirmDialog
         isOpen={pendingMove !== null}
-        title="Move shift?"
+        title={t("shiftMove.confirmTitle")}
         description={
           pendingMove
-            ? `${pendingMove.shift.employeeName ?? "Crew member"} will move from ${formatShiftMoveDate(pendingMove.shift.shiftDate)} to ${formatShiftMoveDate(pendingMove.targetDate)}.`
+            ? t("shiftMove.confirmBody", {
+                employeeName: pendingMove.shift.employeeName ?? t("shiftMove.crewMember"),
+                fromDate: formatShiftMoveDate(pendingMove.shift.shiftDate),
+                toDate: formatShiftMoveDate(pendingMove.targetDate)
+              })
             : undefined
         }
-        confirmLabel="Confirm move"
+        confirmLabel={t("shiftMove.confirmButton")}
         onConfirm={() => {
           void handleConfirmMove();
         }}
@@ -204,7 +229,7 @@ export function SchedulingCalendarClient({
                 type="button"
                 className="icon-button"
                 onClick={() => setToasts((current) => current.filter((entry) => entry.id !== toast.id))}
-                aria-label="Dismiss"
+                aria-label={tc("dismiss")}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />

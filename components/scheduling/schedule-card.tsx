@@ -1,6 +1,10 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import type { ScheduleRecord } from "../../types/scheduling";
+import { formatDateRange } from "../../lib/datetime";
+import { formatScheduleStatus } from "../../lib/format-labels";
 
 type ScheduleCardProps = {
   schedule: ScheduleRecord;
@@ -10,37 +14,12 @@ type ScheduleCardProps = {
   isPublishing?: boolean;
 };
 
-function formatDateRange(start: string, end: string): string {
-  const startDate = new Date(`${start}T00:00:00Z`);
-  const endDate = new Date(`${end}T00:00:00Z`);
-
-  const startLabel = startDate.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC"
-  });
-  const endLabel = endDate.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC"
-  });
-
-  return `${startLabel} \u2013 ${endLabel}`;
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case "draft": return "Draft";
-    case "published": return "Published";
-    case "locked": return "Locked";
-    default: return status;
-  }
-}
 
 export function ScheduleCard({ schedule, onPublish, onDelete, onViewShifts, isPublishing }: ScheduleCardProps) {
-  const trackLabel = schedule.scheduleTrack === "weekend" ? "Weekend" : "Weekday";
-  const canDelete = schedule.status === "draft";
+  const t = useTranslations("scheduling");
+  const tc = useTranslations("common");
+  const trackLabel = schedule.scheduleTrack === "weekend" ? t("track.weekend") : t("track.weekday");
+  const canDelete = schedule.status !== "locked";
 
   return (
     <article className="schedule-card">
@@ -50,7 +29,7 @@ export function ScheduleCard({ schedule, onPublish, onDelete, onViewShifts, isPu
             {trackLabel}
           </span>
           <span className={`status-badge status-badge-${schedule.status}`}>
-            {statusLabel(schedule.status)}
+            {formatScheduleStatus(schedule.status)}
           </span>
         </div>
       </div>
@@ -61,7 +40,7 @@ export function ScheduleCard({ schedule, onPublish, onDelete, onViewShifts, isPu
 
       <div className="schedule-card-meta">
         <span>{formatDateRange(schedule.startDate, schedule.endDate)}</span>
-        <span>{schedule.shiftCount} {schedule.shiftCount === 1 ? "shift" : "shifts"}</span>
+        <span>{t("card.shiftCount", { count: schedule.shiftCount })}</span>
       </div>
 
       {schedule.department ? (
@@ -74,7 +53,7 @@ export function ScheduleCard({ schedule, onPublish, onDelete, onViewShifts, isPu
           className="button button-ghost"
           onClick={() => onViewShifts(schedule.id)}
         >
-          View Shifts
+          {t("card.viewShifts")}
         </button>
 
         {schedule.status === "draft" ? (
@@ -84,16 +63,16 @@ export function ScheduleCard({ schedule, onPublish, onDelete, onViewShifts, isPu
             onClick={() => onPublish(schedule.id)}
             disabled={isPublishing || schedule.shiftCount === 0}
           >
-            {isPublishing ? "Publishing..." : "Publish"}
+            {isPublishing ? tc("publishing") : tc("publish")}
           </button>
         ) : null}
         <button
           type="button"
           className={`button button-ghost schedule-card-delete ${!canDelete ? "schedule-card-delete-disabled" : ""}`}
           onClick={() => onDelete(schedule.id)}
-          title={canDelete ? "Delete schedule" : "Only draft schedules can be deleted."}
+          title={canDelete ? t("card.deleteSchedule") : t("card.deleteDisabled")}
           disabled={!canDelete}
-          aria-label={canDelete ? "Delete schedule" : "Only draft schedules can be deleted"}
+          aria-label={canDelete ? t("card.deleteSchedule") : t("card.deleteDisabled")}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 16, height: 16 }}>
             <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

@@ -85,6 +85,57 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
+function isWeekendDate(isoDate: string): boolean {
+  return [0, 6].includes(new Date(`${isoDate}T00:00:00Z`).getUTCDay());
+}
+
+function toShiftDateTimes(
+  shiftDate: string,
+  startTime: string,
+  endTime: string
+): { startTime: string; endTime: string } | null {
+  const startDateTime = new Date(`${shiftDate}T${startTime}:00.000Z`);
+  const endDateTime = new Date(`${shiftDate}T${endTime}:00.000Z`);
+
+  if (
+    !Number.isFinite(startDateTime.getTime()) ||
+    !Number.isFinite(endDateTime.getTime())
+  ) {
+    return null;
+  }
+
+  if (endDateTime <= startDateTime) {
+    endDateTime.setUTCDate(endDateTime.getUTCDate() + 1);
+  }
+
+  return {
+    startTime: startDateTime.toISOString(),
+    endTime: endDateTime.toISOString()
+  };
+}
+
+function shouldRequireCoverageOnDate({
+  isoDate,
+  scheduleType,
+  holidayDates
+}: {
+  isoDate: string;
+  scheduleType: "weekday" | "weekend" | "holiday";
+  holidayDates: Set<string>;
+}): boolean {
+  const weekend = isWeekendDate(isoDate);
+
+  if (scheduleType === "weekday") {
+    return !weekend;
+  }
+
+  if (scheduleType === "weekend") {
+    return weekend;
+  }
+
+  return holidayDates.has(isoDate);
+}
+
 type EnrichedAssignment = GeneratedAssignment & {
   employeeName: string;
 };
@@ -242,21 +293,103 @@ export async function POST(
       });
     }
 
-    const shiftRows = assignments.map((a) => ({
-      org_id: session.profile!.org_id,
-      schedule_id: scheduleId,
-      employee_id: a.employeeId,
-      shift_date: a.shiftDate,
-      start_time: `${a.shiftDate}T${a.startTime}:00.000Z`,
-      end_time: `${a.shiftDate}T${a.endTime}:00.000Z`,
-      break_minutes: 0,
-      status: "scheduled" as const,
-      notes: `Auto-generated: ${a.slotName}`
-    }));
+    const now = new Date().toISOString();
+    const { data: existingShiftRows, error: existingShiftFetchError } = await supabase
+      .from("shifts")
+      .select("id")
+      .eq("org_id", session.profile.org_id)
+      .eq("schedule_id", scheduleId)
+      .is("deleted_at", null);
+
+    if (existingShiftFetchError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "EXISTING_SHIFTS_FETCH_FAILED",
+          message: "Unable to load existing schedule shifts."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const existingShiftIds = (existingShiftRows ?? [])
+      .map((row) => (typeof row.id === "string" ? row.id : null))
+      .filter((value): value is string => Boolean(value));
+
+    if (existingShiftIds.length > 0) {
+      const { error: clearSwapsError } = await supabase
+        .from("shift_swaps")
+        .update({ deleted_at: now })
+        .eq("org_id", session.profile.org_id)
+        .in("shift_id", existingShiftIds)
+        .is("deleted_at", null);
+
+      if (clearSwapsError) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "SHIFT_SWAPS_CLEAR_FAILED",
+            message: "Unable to clear existing schedule swap requests."
+          },
+          meta: buildMeta()
+        });
+      }
+    }
+
+    const { error: clearShiftsError } = await supabase
+      .from("shifts")
+      .update({ deleted_at: now })
+      .eq("org_id", session.profile.org_id)
+      .eq("schedule_id", scheduleId)
+      .is("deleted_at", null);
+
+    if (clearShiftsError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "EXISTING_SHIFTS_CLEAR_FAILED",
+          message: "Unable to clear existing schedule shifts."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const shiftRows = assignments.map((a) => {
+      const resolvedTimes = toShiftDateTimes(a.shiftDate, a.startTime, a.endTime);
+
+      return {
+        org_id: session.profile!.org_id,
+        schedule_id: scheduleId,
+        employee_id: a.employeeId,
+        shift_date: a.shiftDate,
+        start_time: resolvedTimes?.startTime ?? null,
+        end_time: resolvedTimes?.endTime ?? null,
+        break_minutes: 0,
+        status: "scheduled" as const,
+        notes: `Auto-generated: ${a.slotName}`
+      };
+    });
+
+    if (shiftRows.some((row) => row.start_time === null || row.end_time === null)) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid shift date/time generated."
+        },
+        meta: buildMeta()
+      });
+    }
 
     const { error: insertError } = await supabase
       .from("shifts")
-      .insert(shiftRows);
+      .insert(
+        shiftRows.map((row) => ({
+          ...row,
+          start_time: row.start_time as string,
+          end_time: row.end_time as string
+        }))
+      );
 
     if (insertError) {
       return jsonResponse<null>(500, {
@@ -395,31 +528,35 @@ export async function POST(
     });
   }
 
-  const { data: rawHolidays, error: holidaysError } = await supabase
-    .from("holiday_calendars")
-    .select("date")
-    .eq("org_id", session.profile.org_id)
-    .is("deleted_at", null)
-    .gte("date", schedule.start_date)
-    .lte("date", schedule.end_date);
+  let holidayDates = new Set<string>();
 
-  if (holidaysError) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "HOLIDAYS_FETCH_FAILED",
-        message: "Unable to load holiday calendar."
-      },
-      meta: buildMeta()
-    });
+  if (scheduleType === "holiday") {
+    const { data: rawHolidays, error: holidaysError } = await supabase
+      .from("holiday_calendars")
+      .select("date")
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .gte("date", schedule.start_date)
+      .lte("date", schedule.end_date);
+
+    if (holidaysError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "HOLIDAYS_FETCH_FAILED",
+          message: "Unable to load holiday calendar."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    holidayDates = new Set(
+      (rawHolidays ?? []).map((h) => {
+        const val = h.date;
+        return typeof val === "string" ? val : "";
+      })
+    );
   }
-
-  const holidayDates = new Set(
-    (rawHolidays ?? []).map((h) => {
-      const val = h.date;
-      return typeof val === "string" ? val : "";
-    })
-  );
 
   const blockedByEmployee = new Map<string, string[]>();
 
@@ -552,6 +689,10 @@ export async function POST(
   })();
 
   for (const date of dates) {
+    if (!shouldRequireCoverageOnDate({ isoDate: date, scheduleType, holidayDates })) {
+      continue;
+    }
+
     for (const slot of typedSlots) {
       const filled = assignments.some(
         (a) => a.shiftDate === date && a.slotName === slot.name

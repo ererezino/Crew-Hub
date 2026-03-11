@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
@@ -18,16 +20,27 @@ function resolveRequestedTab(searchParams: Record<string, string | string[] | un
   return rawTab;
 }
 
+function resolveRequestedScheduleId(searchParams: Record<string, string | string[] | undefined>): string | null {
+  const rawScheduleId = searchParams.scheduleId;
+
+  if (typeof rawScheduleId !== "string" || rawScheduleId.length === 0) {
+    return null;
+  }
+
+  return rawScheduleId;
+}
+
 const CS_DEPARTMENT = "Customer Success";
 
 export default async function SchedulingPage({ searchParams }: SchedulingPageProps) {
   const session = await getAuthenticatedSession();
+  const t = await getTranslations("scheduling");
 
   if (!session?.profile) {
     return (
       <EmptyState
-        title="Profile is unavailable"
-        description="No profile is linked to this account yet."
+        title={t("profileUnavailable")}
+        description={t("profileUnavailableBody")}
       />
     );
   }
@@ -39,12 +52,12 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     return (
       <>
         <PageHeader
-          title="Schedule"
-          description="Build, publish, and manage team shift schedules."
+          title={t("pageTitle")}
+          description={t("pageDescription")}
         />
         <EmptyState
-          title="Scheduling is for Customer Success"
-          description="Scheduling is available for Customer Success crew. If you believe you should have access, contact your manager."
+          title={t("accessDeniedTitle")}
+          description={t("accessDeniedBody")}
         />
       </>
     );
@@ -55,6 +68,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
   return (
     <SchedulingTabsClient
       requestedTab={resolveRequestedTab(resolvedSearchParams)}
+      requestedScheduleId={resolveRequestedScheduleId(resolvedSearchParams)}
       userRoles={session.profile.roles}
       userDepartment={session.profile.department}
       currentUserId={session.profile.id}

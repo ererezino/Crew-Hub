@@ -8,7 +8,7 @@ import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
 import {
   areTimeRangesOverlapping,
   canViewTeamSchedules,
-  combineDateAndTime,
+  combineDateAndTimeRange,
   isIsoDate,
   isIsoTime,
   isSchedulingManager,
@@ -96,6 +96,25 @@ function buildMeta() {
 
 function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
+}
+
+function dateWindowForConflictCheck(isoDate: string): string[] {
+  const current = new Date(`${isoDate}T00:00:00Z`);
+
+  if (!Number.isFinite(current.getTime())) {
+    return [isoDate];
+  }
+
+  const prev = new Date(current);
+  prev.setUTCDate(prev.getUTCDate() - 1);
+  const next = new Date(current);
+  next.setUTCDate(next.getUTCDate() + 1);
+
+  return [
+    prev.toISOString().slice(0, 10),
+    current.toISOString().slice(0, 10),
+    next.toISOString().slice(0, 10)
+  ];
 }
 
 async function mapShiftRows({
@@ -218,7 +237,7 @@ async function detectShiftConflicts({
     .select("id, start_time, end_time")
     .eq("org_id", orgId)
     .eq("employee_id", employeeId)
-    .eq("shift_date", shiftDate)
+    .in("shift_date", dateWindowForConflictCheck(shiftDate))
     .is("deleted_at", null)
     .neq("status", "cancelled");
 
@@ -306,6 +325,7 @@ export async function GET(request: Request) {
   const query = parsedQuery.data;
   const canViewTeam = canViewTeamSchedules(session.profile.roles);
   const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isManager = isSchedulingManager(session.profile.roles);
   const scope =
     query.scope === "team" && canViewTeam
       ? "team"
@@ -354,12 +374,20 @@ export async function GET(request: Request) {
     shiftsQuery = shiftsQuery.lte("shift_date", query.endDate);
   }
 
-  if (scope === "team" && isScopedTeamLead) {
+  if (scope === "team" && (isScopedTeamLead || !isManager)) {
+    if (!session.profile.department) {
+      return jsonResponse<SchedulingShiftsResponseData>(200, {
+        data: { shifts: [] },
+        error: null,
+        meta: buildMeta()
+      });
+    }
+
     const { data: scopedSchedules, error: scopedSchedulesError } = await supabase
       .from("schedules")
       .select("id")
       .eq("org_id", session.profile.org_id)
-      .ilike("department", session.profile.department as string)
+      .ilike("department", session.profile.department)
       .is("deleted_at", null);
 
     if (scopedSchedulesError) {
@@ -491,19 +519,25 @@ export async function POST(request: Request) {
     });
   }
 
-  const shiftStart = combineDateAndTime(parsedBody.data.shiftDate, parsedBody.data.startTime);
-  const shiftEnd = combineDateAndTime(parsedBody.data.shiftDate, parsedBody.data.endTime);
+  const shiftRange = combineDateAndTimeRange(
+    parsedBody.data.shiftDate,
+    parsedBody.data.startTime,
+    parsedBody.data.endTime
+  );
 
-  if (!shiftStart || !shiftEnd || shiftEnd <= shiftStart) {
+  if (!shiftRange) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Shift end time must be after start time."
+        message: "Shift end time must be different from start time."
       },
       meta: buildMeta()
     });
   }
+
+  const shiftStart = shiftRange.startTime;
+  const shiftEnd = shiftRange.endTime;
 
   const supabase = await createSupabaseServerClient();
   const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
@@ -20,6 +21,8 @@ type ToastMessage = {
 let toastCounter = 0;
 
 export function SchedulingManageClient() {
+  const t = useTranslations("scheduling");
+  const tc = useTranslations("common");
   const router = useRouter();
   const { data: schedulesData, isLoading, refresh: refreshSchedules } = useSchedulingSchedules({ scope: "team" });
   const { people } = usePeople();
@@ -85,17 +88,17 @@ export function SchedulingManageClient() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.error?.message ?? "Failed to publish schedule.");
+        throw new Error(data?.error?.message ?? t("manage.failedPublish"));
       }
 
-      addToast("success", "Schedule published successfully.");
+      addToast("success", t("manage.toastPublished"));
       refreshSchedules();
     } catch (err) {
-      addToast("error", err instanceof Error ? err.message : "Failed to publish schedule.");
+      addToast("error", err instanceof Error ? err.message : t("manage.failedPublish"));
     } finally {
       setPublishingId(null);
     }
-  }, [addToast, refreshSchedules]);
+  }, [addToast, refreshSchedules, t]);
 
   const handleDelete = useCallback(async (scheduleId: string) => {
     setConfirmDelete(null);
@@ -107,27 +110,26 @@ export function SchedulingManageClient() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        throw new Error(data?.error?.message ?? "Failed to delete schedule.");
+        throw new Error(data?.error?.message ?? t("manage.failedDelete"));
       }
 
-      addToast("success", "Schedule deleted.");
+      addToast("success", t("manage.toastDeleted"));
       refreshSchedules();
     } catch (err) {
-      addToast("error", err instanceof Error ? err.message : "Failed to delete schedule.");
+      addToast("error", err instanceof Error ? err.message : t("manage.failedDelete"));
     }
-  }, [addToast, refreshSchedules]);
+  }, [addToast, refreshSchedules, t]);
 
   const handleViewShifts = useCallback((scheduleId: string) => {
-    void scheduleId;
-    router.replace("/scheduling");
+    router.replace(`/scheduling?tab=team-calendar&scheduleId=${encodeURIComponent(scheduleId)}`);
   }, [router]);
 
   const handleWizardSubmit = useCallback(async () => {
     // The wizard already created the schedule and generated shifts
     // Just refresh the list
     refreshSchedules();
-    addToast("success", "Schedule created with auto-generated shifts.");
-  }, [refreshSchedules, addToast]);
+    addToast("success", t("manage.toastCreated"));
+  }, [refreshSchedules, addToast, t]);
 
   if (isLoading) {
     return (
@@ -147,9 +149,9 @@ export function SchedulingManageClient() {
       {/* Header with New Schedule button */}
       <div className="schedule-manage-header">
         <div>
-          <h3 className="section-title">Schedules</h3>
+          <h3 className="section-title">{t("manage.title")}</h3>
           <p className="settings-card-description">
-            Create and manage monthly schedules for your team.
+            {t("manage.description")}
           </p>
         </div>
         <button
@@ -157,7 +159,7 @@ export function SchedulingManageClient() {
           className="button button-primary"
           onClick={() => setWizardOpen(true)}
         >
-          New Schedule
+          {t("wizard.newSchedule")}
         </button>
       </div>
 
@@ -182,9 +184,9 @@ export function SchedulingManageClient() {
       {/* Confirm publish dialog */}
       <ConfirmDialog
         isOpen={confirmPublish !== null}
-        title="Publish schedule?"
-        description="Publishing will notify all assigned team members. This action cannot be undone."
-        confirmLabel="Publish"
+        title={t("manage.confirmPublishTitle")}
+        description={t("manage.confirmPublishBody")}
+        confirmLabel={tc("publish")}
         onConfirm={() => {
           if (confirmPublish) void handlePublish(confirmPublish);
         }}
@@ -194,9 +196,9 @@ export function SchedulingManageClient() {
       {/* Confirm delete dialog */}
       <ConfirmDialog
         isOpen={confirmDelete !== null}
-        title="Delete schedule?"
-        description="This will permanently delete the draft schedule and all its shifts."
-        confirmLabel="Delete"
+        title={t("manage.confirmDeleteTitle")}
+        description={t("manage.confirmDeleteBody")}
+        confirmLabel={tc("delete")}
         tone="danger"
         onConfirm={() => {
           if (confirmDelete) void handleDelete(confirmDelete);
@@ -214,7 +216,7 @@ export function SchedulingManageClient() {
                 type="button"
                 className="icon-button"
                 onClick={() => setToasts((prev) => prev.filter((t) => t.id !== toast.id))}
-                aria-label="Dismiss"
+                aria-label={tc("dismiss")}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />

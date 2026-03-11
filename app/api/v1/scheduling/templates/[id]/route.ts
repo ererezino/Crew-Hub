@@ -213,12 +213,12 @@ export async function PUT(
   const effectiveStartTime = updates.startTime ?? (rawExisting.start_time as string).slice(0, 5);
   const effectiveEndTime = updates.endTime ?? (rawExisting.end_time as string).slice(0, 5);
 
-  if (effectiveEndTime <= effectiveStartTime) {
+  if (effectiveEndTime === effectiveStartTime) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "End time must be after start time."
+        message: "End time must be different from start time."
       },
       meta: buildMeta()
     });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 import { SlidePanel } from "../shared/slide-panel";
 import type { ScheduleTrack } from "../../types/scheduling";
@@ -12,13 +13,6 @@ import { ScheduleReview } from "./schedule-review";
 type WizardStep = "track" | "period" | "roster" | "review";
 
 const STEPS: WizardStep[] = ["track", "period", "roster", "review"];
-
-const STEP_TITLES: Record<WizardStep, string> = {
-  track: "Schedule Type",
-  period: "Time Period",
-  roster: "Team Members",
-  review: "Review & Create"
-};
 
 type ScheduleWizardProps = {
   isOpen: boolean;
@@ -33,6 +27,16 @@ type ScheduleWizardProps = {
 };
 
 export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: ScheduleWizardProps) {
+  const t = useTranslations("scheduling");
+  const tc = useTranslations("common");
+
+  const stepTitles: Record<WizardStep, string> = {
+    track: t("wizard.stepTrack"),
+    period: t("wizard.stepPeriod"),
+    roster: t("wizard.stepRoster"),
+    review: t("wizard.stepReview")
+  };
+
   const [step, setStep] = useState<WizardStep>("track");
   const [track, setTrack] = useState<ScheduleTrack | null>(null);
   const [month, setMonth] = useState(getDefaultMonth);
@@ -134,7 +138,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
             months: isCustomPeriod ? undefined : months,
             startDate: isCustomPeriod ? startDate : undefined,
             endDate: isCustomPeriod ? endDate : undefined,
-            name: `${track === "weekend" ? "Weekend" : "Weekday"} Schedule`,
+            name: `${track === "weekend" ? t("track.weekendSchedule") : t("track.weekdaySchedule")}`,
             roster: rosterEntries.map((r) => ({
               employeeId: r.employeeId,
               weekendHours: track === "weekend" ? r.weekendHours : undefined
@@ -144,14 +148,14 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
 
         if (!createRes.ok) {
           const err = await createRes.json().catch(() => null);
-          throw new Error(err?.error?.message ?? "Failed to create schedule");
+          throw new Error(err?.error?.message ?? t("wizard.failedCreate"));
         }
 
         const createData = await createRes.json();
         const scheduleId = createData?.data?.schedule?.id;
 
         if (!scheduleId) {
-          throw new Error("Schedule creation did not return an ID");
+          throw new Error(t("wizard.noScheduleId"));
         }
 
         // Auto-generate shifts
@@ -165,7 +169,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
 
         if (!genRes.ok) {
           const err = await genRes.json().catch(() => null);
-          throw new Error(err?.error?.message ?? "Failed to generate shifts");
+          throw new Error(err?.error?.message ?? t("wizard.failedGenerate"));
         }
 
         const genData = await genRes.json();
@@ -174,7 +178,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
 
         // Confirm (save) the generated assignments
         if (assignments.length > 0) {
-          await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
+          const saveRes = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -188,6 +192,11 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
               }))
             })
           });
+
+          if (!saveRes.ok) {
+            const err = await saveRes.json().catch(() => null);
+            throw new Error(err?.error?.message ?? t("wizard.failedGenerate"));
+          }
         }
 
         // Count warnings about employees on leave
@@ -195,7 +204,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
         if (genWarnings.length > 0) {
           const uniqueDates = new Set(genWarnings.map((w: string) => w.split(":")[0]));
           leaveWarnings.push({
-            message: `${uniqueDates.size} day(s) have unfilled shifts due to limited availability.`
+            message: t("wizard.warningUnfilledShifts", { count: uniqueDates.size })
           });
         }
 
@@ -203,7 +212,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
           estimatedShifts: assignments.length,
           warnings: leaveWarnings,
           shiftDetails: assignments.map((a: Record<string, string>) => ({
-            employeeName: a.employeeName ?? "Unknown",
+            employeeName: a.employeeName ?? t("wizard.unknownEmployee"),
             shiftDate: a.shiftDate,
             slotName: a.slotName,
             startTime: a.startTime,
@@ -213,7 +222,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
       } catch (err) {
         setPreviewData({
           estimatedShifts: 0,
-          warnings: [{ message: err instanceof Error ? err.message : "Failed to generate schedule." }],
+          warnings: [{ message: err instanceof Error ? err.message : t("wizard.failedGenerateSchedule") }],
           shiftDetails: []
         });
       } finally {
@@ -224,7 +233,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     }
 
     setStep(nextStep);
-  }, [currentStepIndex, track, rosterSelected, computedDateRange, month, months, isCustomPeriod]);
+  }, [currentStepIndex, track, rosterSelected, computedDateRange, month, months, isCustomPeriod, t]);
 
   const handleBack = useCallback(() => {
     const prevIndex = currentStepIndex - 1;
@@ -276,8 +285,8 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
   return (
     <SlidePanel
       isOpen={isOpen}
-      title="New Schedule"
-      description={STEP_TITLES[step]}
+      title={t("wizard.newSchedule")}
+      description={stepTitles[step]}
       onClose={handleCloseWizard}
     >
       {/* Wrap in a form with preventDefault to block Enter-key page navigation */}
@@ -351,7 +360,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
         <div className="schedule-wizard-footer">
           {currentStepIndex > 0 ? (
             <button type="button" className="button button-ghost" onClick={handleBack} disabled={isSubmitting || isGenerating}>
-              Back
+              {tc("back")}
             </button>
           ) : (
             <div />
@@ -363,7 +372,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
               className="button button-primary"
               disabled={!canProceed || isSubmitting}
             >
-              {isSubmitting ? "Finishing..." : "Done"}
+              {isSubmitting ? tc("finishing") : tc("done")}
             </button>
           ) : (
             <button
@@ -371,7 +380,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
               className="button button-primary"
               disabled={!canProceed}
             >
-              Next
+              {tc("next")}
             </button>
           )}
         </div>

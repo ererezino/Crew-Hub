@@ -241,12 +241,12 @@ export async function POST(request: Request) {
     });
   }
 
-  if (parsedBody.data.endTime <= parsedBody.data.startTime) {
+  if (parsedBody.data.endTime === parsedBody.data.startTime) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "End time must be after start time."
+        message: "End time must be different from start time."
       },
       meta: buildMeta()
     });

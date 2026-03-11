@@ -189,6 +189,14 @@ export function autoGenerateSchedule(params: {
   for (const date of dates) {
     const weekend = isWeekend(date);
 
+    // Respect selected track: weekday schedules skip weekend dates, and vice versa.
+    if (scheduleType === "weekday" && weekend) {
+      continue;
+    }
+    if (scheduleType === "weekend" && !weekend) {
+      continue;
+    }
+
     // Determine eligible employees for this date based on schedule type
     let eligible: EmployeeScheduleInfo[];
 
@@ -250,23 +258,24 @@ export function autoGenerateSchedule(params: {
       const assignedOnDate = new Set(
         assignments.filter((a) => a.shiftDate === date).map((a) => a.employeeId)
       );
-      candidates = candidates.filter((e) => !assignedOnDate.has(e.id));
+      const unassignedCandidates = candidates.filter((e) => !assignedOnDate.has(e.id));
+      const candidatePool = unassignedCandidates.length > 0 ? unassignedCandidates : candidates;
 
-      if (candidates.length === 0) {
+      if (candidatePool.length === 0) {
         continue;
       }
 
       // Sort by fewest hours (balancing), then shuffle within tied groups
-      candidates.sort((a, b) => {
+      candidatePool.sort((a, b) => {
         const hoursA = hoursMap.get(a.id) ?? 0;
         const hoursB = hoursMap.get(b.id) ?? 0;
         return hoursA - hoursB;
       });
 
       // Find the group of candidates with the minimum hours and shuffle them
-      const minHours = hoursMap.get(candidates[0]!.id) ?? 0;
+      const minHours = hoursMap.get(candidatePool[0]!.id) ?? 0;
       const threshold = minHours * 1.1; // 10% tolerance
-      const tiedCandidates = candidates.filter(
+      const tiedCandidates = candidatePool.filter(
         (c) => (hoursMap.get(c.id) ?? 0) <= threshold
       );
       shuffle(tiedCandidates);

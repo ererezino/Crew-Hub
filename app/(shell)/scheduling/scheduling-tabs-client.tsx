@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -11,11 +12,11 @@ import type { UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
 import { SchedulingCalendarClient } from "./calendar/scheduling-calendar-client";
 import { SchedulingManageClient } from "./manage/scheduling-manage-client";
-import { SchedulingOpenShiftsClient } from "./open-shifts/scheduling-open-shifts-client";
 import { SchedulingClient } from "./scheduling-client";
 
 type SchedulingTabsClientProps = {
   requestedTab: string;
+  requestedScheduleId: string | null;
   userRoles: UserRole[];
   userDepartment?: string | null;
   currentUserId: string;
@@ -35,10 +36,12 @@ function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
 
 export function SchedulingTabsClient({
   requestedTab,
+  requestedScheduleId,
   userRoles,
   userDepartment,
   currentUserId
 }: SchedulingTabsClientProps) {
+  const t = useTranslations("scheduling");
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,35 +57,31 @@ export function SchedulingTabsClient({
     ));
 
   const tabs = useMemo<PageTab[]>(
-    () => [
-      {
-        key: "my-shifts",
-        label: "My Schedule"
-      },
-      {
-        key: "team-calendar",
-        label: "Team Calendar"
-      },
-      {
-        key: "open-shifts",
-        label: "Open Shifts"
-      },
-      {
-        key: "manage",
-        label: "Manage",
-        requiredRoles: ["TEAM_LEAD", "MANAGER", "HR_ADMIN", "SUPER_ADMIN"]
+    () => {
+      const nextTabs: PageTab[] = [
+        {
+          key: "my-shifts",
+          label: t("tab.mySchedule")
+        },
+        {
+          key: "team-calendar",
+          label: t("tab.teamCalendar")
+        }
+      ];
+
+      if (canManage) {
+        nextTabs.push({
+          key: "manage",
+          label: t("tab.manage")
+        });
       }
-    ],
-    []
+
+      return nextTabs;
+    },
+    [canManage, t]
   );
 
-  const visibleTabs = tabs.filter((tab) => {
-    if (!tab.requiredRoles || tab.requiredRoles.length === 0) {
-      return true;
-    }
-
-    return tab.requiredRoles.some((role) => hasRole(userRoles, role));
-  });
+  const visibleTabs = tabs;
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(requestedTab, visibleTabs));
 
@@ -101,6 +100,10 @@ export function SchedulingTabsClient({
       nextParams.set("tab", tabKey);
     }
 
+    if (tabKey !== "team-calendar") {
+      nextParams.delete("scheduleId");
+    }
+
     const queryString = nextParams.toString();
 
     router.replace(queryString.length > 0 ? `${pathname}?${queryString}` : pathname, {
@@ -111,13 +114,13 @@ export function SchedulingTabsClient({
   return (
     <>
       <PageHeader
-        title="Schedule"
-        description="Build, publish, and manage team shift schedules."
+        title={t("pageTitle")}
+        description={t("pageDescription")}
       />
 
       <FeatureBanner
         moduleId="scheduling"
-        description="Scheduling is in limited pilot for Customer Success. Create monthly schedules for your team in a few clicks."
+        description={t("pilotBanner")}
       />
 
       <PageTabs
@@ -136,11 +139,19 @@ export function SchedulingTabsClient({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
         >
-          {activeTab === "my-shifts" ? <SchedulingClient embedded /> : null}
-          {activeTab === "team-calendar" ? (
-            <SchedulingCalendarClient canManageShifts={canManage} />
+          {activeTab === "my-shifts" ? (
+            <SchedulingClient
+              embedded
+              currentUserId={currentUserId}
+              canManageSwaps={canManage}
+            />
           ) : null}
-          {activeTab === "open-shifts" ? <SchedulingOpenShiftsClient embedded /> : null}
+          {activeTab === "team-calendar" ? (
+            <SchedulingCalendarClient
+              canManageShifts={canManage}
+              initialScheduleId={requestedScheduleId}
+            />
+          ) : null}
           {activeTab === "manage" && canManage ? <SchedulingManageClient /> : null}
         </motion.section>
       </AnimatePresence>
