@@ -21,7 +21,7 @@ import { useAnnouncements } from "../../../hooks/use-announcements";
 import { useNotifications } from "../../../hooks/use-notifications";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
-import { Archive, Download, ExternalLink, FileText, ImageIcon, Megaphone, Paperclip, X } from "lucide-react";
+import { Archive, ChevronLeft, ChevronRight, Download, FileText, ImageIcon, Maximize2, Megaphone, Paperclip, X } from "lucide-react";
 import type {
   Announcement,
   AnnouncementDismissResponse,
@@ -121,6 +121,7 @@ function AnnouncementCard({
   onMarkRead,
   onEdit,
   onDelete,
+  onOpenLightbox,
   t,
   locale
 }: {
@@ -134,6 +135,7 @@ function AnnouncementCard({
   onMarkRead: (announcementId: string) => void;
   onEdit: (announcement: Announcement) => void;
   onDelete: (announcement: Announcement) => void;
+  onOpenLightbox: (announcementId: string, images: { attachmentId: string; fileName: string }[], index: number, preloadedSrc: string) => void;
   t: (key: string, params?: Record<string, unknown>) => string;
   locale: AppLocale;
 }) {
@@ -191,16 +193,25 @@ function AnnouncementCard({
             {/* Inline images */}
             {announcement.attachments.some((a) => a.mimeType.startsWith("image/")) ? (
               <div className="att-gallery">
-                {announcement.attachments
-                  .filter((a) => a.mimeType.startsWith("image/"))
-                  .map((attachment) => (
+                {(() => {
+                  const imageAtts = announcement.attachments.filter((a) => a.mimeType.startsWith("image/"));
+                  return imageAtts.map((attachment, idx) => (
                     <AnnouncementImage
                       key={attachment.id}
                       announcementId={announcement.id}
                       attachmentId={attachment.id}
                       fileName={attachment.fileName}
+                      onOpen={(preloadedSrc: string) => {
+                        onOpenLightbox(
+                          announcement.id,
+                          imageAtts.map((a) => ({ attachmentId: a.id, fileName: a.fileName })),
+                          idx,
+                          preloadedSrc
+                        );
+                      }}
                     />
-                  ))}
+                  ));
+                })()}
               </div>
             ) : null}
 
@@ -288,11 +299,13 @@ function AnnouncementsSkeleton() {
 function AnnouncementImage({
   announcementId,
   attachmentId,
-  fileName
+  fileName,
+  onOpen
 }: {
   announcementId: string;
   attachmentId: string;
   fileName: string;
+  onOpen?: (src: string) => void;
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -335,19 +348,18 @@ function AnnouncementImage({
   }
 
   return (
-    <a
+    <button
+      type="button"
       className="att-img-link"
-      href={src}
-      target="_blank"
-      rel="noopener noreferrer"
+      onClick={() => onOpen?.(src)}
       title={fileName}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt={fileName} className="att-img" loading="lazy" />
       <span className="att-img-overlay">
-        <ExternalLink size={16} aria-hidden="true" />
+        <Maximize2 size={16} aria-hidden="true" />
       </span>
-    </a>
+    </button>
   );
 }
 
@@ -402,6 +414,123 @@ function AttachmentFileChip({
       <span className="att-file-chip-name">{fileName}</span>
       <Download size={12} aria-hidden="true" className="att-file-chip-dl" />
     </a>
+  );
+}
+
+/* ─── Image lightbox ─── */
+
+type LightboxData = {
+  announcementId: string;
+  images: { attachmentId: string; fileName: string }[];
+  activeIndex: number;
+  initialSrc: string;
+};
+
+function ImageLightbox({
+  data,
+  onClose
+}: {
+  data: LightboxData;
+  onClose: () => void;
+}) {
+  const [activeIndex, setActiveIndex] = useState(data.activeIndex);
+  const [urls, setUrls] = useState<Map<string, string>>(() => {
+    const initial = new Map<string, string>();
+    const att = data.images[data.activeIndex];
+    if (att) initial.set(att.attachmentId, data.initialSrc);
+    return initial;
+  });
+  const [loading, setLoading] = useState(false);
+
+  const activeImage = data.images[activeIndex];
+  const activeUrl = activeImage ? urls.get(activeImage.attachmentId) : undefined;
+
+  useEffect(() => {
+    if (!activeImage || urls.has(activeImage.attachmentId)) return;
+    setLoading(true);
+    let cancelled = false;
+
+    fetch(`/api/v1/announcements/${data.announcementId}/attachments/${activeImage.attachmentId}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json.data?.url) {
+          setUrls((prev) => {
+            const next = new Map(prev);
+            next.set(activeImage.attachmentId, json.data.url as string);
+            return next;
+          });
+        }
+      })
+      .catch(() => { /* silent */ })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeImage?.attachmentId, data.announcementId]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key === "ArrowLeft" && activeIndex > 0) { setActiveIndex((i) => i - 1); return; }
+      if (e.key === "ArrowRight" && activeIndex < data.images.length - 1) { setActiveIndex((i) => i + 1); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activeIndex, data.images.length, onClose]);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div className="lightbox-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={activeImage?.fileName ?? "Image"}>
+      <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="lightbox-close" onClick={onClose} aria-label="Close">
+          <X size={20} />
+        </button>
+
+        <div className="lightbox-stage">
+          {loading || !activeUrl ? (
+            <div className="lightbox-spinner">
+              <div className="lightbox-spinner-ring" />
+            </div>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={activeUrl} alt={activeImage?.fileName ?? ""} className="lightbox-img" />
+          )}
+        </div>
+
+        {data.images.length > 1 ? (
+          <>
+            <button
+              type="button"
+              className="lightbox-nav lightbox-nav-prev"
+              onClick={() => setActiveIndex((i) => i - 1)}
+              disabled={activeIndex === 0}
+              aria-label="Previous image"
+            >
+              <ChevronLeft size={28} />
+            </button>
+            <button
+              type="button"
+              className="lightbox-nav lightbox-nav-next"
+              onClick={() => setActiveIndex((i) => i + 1)}
+              disabled={activeIndex === data.images.length - 1}
+              aria-label="Next image"
+            >
+              <ChevronRight size={28} />
+            </button>
+            <div className="lightbox-counter">
+              {activeIndex + 1} / {data.images.length}
+            </div>
+          </>
+        ) : null}
+
+        <div className="lightbox-filename">{activeImage?.fileName}</div>
+      </div>
+    </div>
   );
 }
 
@@ -469,6 +598,7 @@ export function AnnouncementsClient({
   const [confirmDeleteAnnouncement, setConfirmDeleteAnnouncement] = useState<Announcement | null>(null);
   const [isDeletingAnnouncement, setIsDeletingAnnouncement] = useState(false);
   useUnsavedGuard(announcementFormDirty);
+  const [lightbox, setLightbox] = useState<LightboxData | null>(null);
 
   type UnifiedItem =
     | { source: "announcement"; data: Announcement }
@@ -903,6 +1033,7 @@ export function AnnouncementsClient({
                       onMarkRead={handleMarkRead}
                       onEdit={openEditPanel}
                       onDelete={setConfirmDeleteAnnouncement}
+                      onOpenLightbox={(aId, imgs, idx, src) => setLightbox({ announcementId: aId, images: imgs, activeIndex: idx, initialSrc: src })}
                       t={td}
                       locale={locale}
                     />
@@ -1121,6 +1252,14 @@ export function AnnouncementsClient({
         }}
         onCancel={() => setConfirmDeleteAnnouncement(null)}
       />
+
+      {lightbox ? (
+        <ImageLightbox
+          key={`${lightbox.announcementId}-${lightbox.images[lightbox.activeIndex]?.attachmentId}`}
+          data={lightbox}
+          onClose={() => setLightbox(null)}
+        />
+      ) : null}
 
       {toasts.length > 0 ? (
         <div className="toast-region" aria-live="polite" aria-atomic="true">
