@@ -3,6 +3,7 @@
 import {
   type ChangeEvent,
   type FormEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -41,6 +42,7 @@ import type {
   UpdateExpenseResponse
 } from "../../../../types/expenses";
 import { humanizeError } from "@/lib/errors";
+import { X } from "lucide-react";
 
 type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
@@ -102,6 +104,63 @@ function ApprovalSkeleton() {
   );
 }
 
+/* ─── Receipt lightbox ─── */
+
+type ReceiptLightboxData = {
+  url: string;
+  fileName: string;
+  label: string;
+};
+
+function ReceiptLightbox({
+  data,
+  onClose
+}: {
+  data: ReceiptLightboxData;
+  onClose: () => void;
+}) {
+  const isPdf = data.fileName.toLowerCase().endsWith(".pdf");
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div className="lightbox-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={data.label}>
+      <div className={isPdf ? "lightbox-inner lightbox-inner-doc" : "lightbox-inner"} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="lightbox-close" onClick={onClose} aria-label="Close">
+          <X size={20} />
+        </button>
+
+        <div className={isPdf ? "lightbox-stage lightbox-stage-doc" : "lightbox-stage"}>
+          {isPdf ? (
+            <iframe
+              src={`${data.url}#toolbar=1&navpanes=0`}
+              title={data.fileName}
+              className="lightbox-pdf"
+            />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={data.url} alt={data.fileName} className="lightbox-img" />
+          )}
+        </div>
+
+        <div className="lightbox-filename">{data.label}</div>
+      </div>
+    </div>
+  );
+}
+
 export function ExpenseApprovalsClient({
   canManagerApprove,
   canFinanceApprove,
@@ -155,6 +214,7 @@ export function ExpenseApprovalsClient({
   const [isMutatingId, setIsMutatingId] = useState<string | null>(null);
   const [isBulkApproving, setIsBulkApproving] = useState(false);
   const [isOpeningReceiptById, setIsOpeningReceiptById] = useState<Record<string, boolean>>({});
+  const [receiptLightbox, setReceiptLightbox] = useState<ReceiptLightboxData | null>(null);
   const [rejectTarget, setRejectTarget] = useState<ExpenseRecord | null>(null);
   const [rejectMode, setRejectMode] = useState<RejectMode>("manager");
   const [rejectValues, setRejectValues] = useState<RejectFormValues>({ reason: "" });
@@ -763,7 +823,11 @@ export function ExpenseApprovalsClient({
         return;
       }
 
-      window.open(payload.data.url, "_blank", "noopener,noreferrer");
+      setReceiptLightbox({
+        url: payload.data.url,
+        fileName: expense.receiptFileName,
+        label: expense.receiptFileName
+      });
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : t('toast.openReceiptError'));
     } finally {
@@ -1378,6 +1442,13 @@ export function ExpenseApprovalsClient({
           void confirmBulkApprove();
         }}
       />
+
+      {receiptLightbox ? (
+        <ReceiptLightbox
+          data={receiptLightbox}
+          onClose={() => setReceiptLightbox(null)}
+        />
+      ) : null}
 
       <div className="toast-region" aria-live="polite" aria-atomic="true">
         {toasts.map((toast) => (
