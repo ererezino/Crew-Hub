@@ -110,7 +110,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   /* ── Search + filter + view state ── */
   const [search, setSearch] = useState("");
   const [activeDept, setActiveDept] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"all" | "by-team">("all");
+  const [viewMode, setViewMode] = useState<"all" | "by-team">("by-team");
 
   /* ── Derived: departments list ── */
   const departments = useMemo(() => {
