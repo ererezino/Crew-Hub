@@ -8,6 +8,7 @@ import {
   RECEIPTS_BUCKET_NAME
 } from "../../../../../../lib/expenses";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ExpenseReceiptSignedUrlResponseData } from "../../../../../../types/expenses";
 import { buildMeta, jsonResponse } from "../../_helpers";
 
@@ -256,11 +257,16 @@ export async function POST(
     });
   }
 
-  // Update expense with the payment proof path
-  const { error: updateError } = await supabase
+  // Update expense with the payment proof path.
+  // Use service-role client because the RLS WITH CHECK policy requires a status
+  // transition (e.g. → reimbursed), but this endpoint only sets the receipt path
+  // without changing status. Auth is already validated above (FINANCE/SUPER_ADMIN).
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { error: updateError } = await serviceClient
     .from("expenses")
     .update({ reimbursement_receipt_path: storagePath })
-    .eq("id", expenseId);
+    .eq("id", expenseId)
+    .eq("org_id", session.profile.org_id);
 
   if (updateError) {
     return jsonResponse<null>(500, {
