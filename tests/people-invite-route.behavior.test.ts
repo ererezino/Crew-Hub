@@ -140,6 +140,7 @@ describe("People invite route behavior", () => {
     expect(result.body.data?.inviteSent).toBe(true);
     expect(result.body.data?.inviteLink).toContain("/api/auth/callback");
     expect(logAuditMock).toHaveBeenCalledTimes(1);
+    expect(sendWelcomeEmailMock).not.toHaveBeenCalled();
   });
 
   it("returns structured JSON 500 when an unexpected error occurs", async () => {
@@ -204,5 +205,13 @@ describe("People invite route behavior", () => {
 
     expect(result.status).toBe(200);
     expect(result.body.data?.inviteLink).toContain("https://crew-hub.useaccrue.com/api/auth/callback");
+  });
+
+  it("keeps invite delivery on the Supabase auth path only", async () => {
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(200);
+    expect(inviteUserByEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendWelcomeEmailMock).not.toHaveBeenCalled();
   });
 });

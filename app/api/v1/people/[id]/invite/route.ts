@@ -5,7 +5,6 @@ import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { getAuthMutationBlockReason } from "../../../../../../lib/auth/auth-mutation-guard";
 import { logAudit } from "../../../../../../lib/audit";
 import { logger } from "../../../../../../lib/logger";
-import { sendWelcomeEmail } from "../../../../../../lib/notifications/email";
 import { deriveSystemPassword } from "../../../../../../lib/auth/system-password";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
@@ -318,8 +317,7 @@ export async function POST(
      *      generateLink always returns the link even if the email provider isn't configured.
      *   2. If redirect URL configuration is stale, retry without redirectTo.
      *   3. Try to send the Supabase invite email (fire-and-forget, may silently fail).
-     *   4. Send our own welcome email (fire-and-forget).
-     *   5. Return the invite link so the admin can copy & share it manually if needed.
+     *   4. Return the invite link so the admin can copy & share it manually if needed.
      */
 
     if (isResend) {
@@ -410,19 +408,6 @@ export async function POST(
         /* Swallow — the manual link is the reliable fallback */
       });
     }
-
-    /* Send welcome email (fire-and-forget, always existing employee for resend) */
-    sendWelcomeEmail({
-      recipientEmail: email,
-      recipientName: fullName,
-      setupLink: inviteLink ?? undefined,
-      isNewHire: false
-    }).catch((error) => {
-      logger.error("Failed to send welcome email during invite.", {
-        personId,
-        message: error instanceof Error ? error.message : String(error)
-      });
-    });
 
     try {
       await logAudit({

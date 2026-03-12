@@ -68,6 +68,22 @@ type RecipientProfile = {
   locale: AppLocale;
 };
 
+type SuspendedEmailFlow =
+  | "paymentDetailsUpdated"
+  | "performanceReview"
+  | "complianceReminder"
+  | "documentExpiry"
+  | "shiftSwap";
+
+// Temporarily paused by product request to preserve quota for critical flows.
+const SUSPENDED_EMAIL_FLOWS = new Set<SuspendedEmailFlow>([
+  "paymentDetailsUpdated",
+  "performanceReview",
+  "complianceReminder",
+  "documentExpiry",
+  "shiftSwap"
+]);
+
 /* ---------------------------------------------------------------------------
  * Helpers
  * -------------------------------------------------------------------------*/
@@ -172,6 +188,10 @@ function firstName(fullName: string, locale: AppLocale = "en"): string {
   if (name) return name;
   const t = createEmailTranslator(locale);
   return t("fallbackName");
+}
+
+function isEmailFlowSuspended(flow: SuspendedEmailFlow): boolean {
+  return SUSPENDED_EMAIL_FLOWS.has(flow);
 }
 
 /* ---------------------------------------------------------------------------
@@ -1150,6 +1170,7 @@ export async function sendPaymentDetailsUpdatedEmail({
   changeEffectiveAt: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("paymentDetailsUpdated")) return;
     if (!isEmailEnabled("paymentDetailsUpdated")) return;
 
     const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
@@ -1210,6 +1231,7 @@ export async function sendComplianceReminderEmail({
   dueDate: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("complianceReminder")) return;
     if (!isEmailEnabled("complianceReminder")) return;
 
     const recipient = await fetchRecipientProfile({ orgId, userId });
@@ -1276,6 +1298,7 @@ export async function sendComplianceOverdueEmail({
   ownerName?: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("complianceReminder")) return;
     if (!isEmailEnabled("complianceOverdue")) return;
 
     const owner = await fetchRecipientProfile({ orgId, userId });
@@ -1386,6 +1409,7 @@ export async function sendReviewCycleStartedEmail({
   selfReviewDeadline: string | null;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("performanceReview")) return;
     if (!isEmailEnabled("reviewCycleStarted")) return;
 
     const recipient = await fetchRecipientProfile({ orgId, userId });
@@ -1454,6 +1478,7 @@ export async function sendReviewReminderEmail({
   deadline: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("performanceReview")) return;
     if (!isEmailEnabled("selfReviewReminder")) return;
 
     const recipient = await fetchRecipientProfile({ orgId, userId });
@@ -1511,6 +1536,7 @@ export async function sendReviewSharedEmail({
   cycleName: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("performanceReview")) return;
     if (!isEmailEnabled("reviewShared")) return;
 
     const recipient = await fetchRecipientProfile({ orgId, userId });
@@ -1570,6 +1596,7 @@ export async function sendReviewAcknowledgedEmail({
   employeeName: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("performanceReview")) return;
     if (!isEmailEnabled("reviewAcknowledged")) return;
 
     const recipient = await fetchRecipientProfile({ orgId, userId });
@@ -1629,6 +1656,7 @@ export async function sendDocumentExpiryEmail({
   expiryDate: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("documentExpiry")) return;
     if (!isEmailEnabled("documentExpiring")) return;
 
     const recipient = await fetchRecipientProfile({ orgId, userId });
@@ -1691,6 +1719,7 @@ export async function sendDocumentExpiredEmail({
   documentTitle: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("documentExpiry")) return;
     if (!isEmailEnabled("documentExpired")) return;
 
     const employee = await fetchRecipientProfile({ orgId, userId });
@@ -2123,6 +2152,7 @@ export async function sendSwapRequestedEmail({
   shiftDate: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("shiftSwap")) return;
     if (!isEmailEnabled("swapRequested")) return;
 
     const target = await fetchRecipientProfile({
@@ -2186,6 +2216,7 @@ export async function sendSwapAcceptedEmail({
   shiftDate: string;
 }): Promise<void> {
   try {
+    if (isEmailFlowSuspended("shiftSwap")) return;
     if (!isEmailEnabled("swapAccepted")) return;
 
     const requester = await fetchRecipientProfile({
