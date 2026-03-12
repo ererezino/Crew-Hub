@@ -186,18 +186,57 @@ function AnnouncementCard({
 
         {announcement.attachments.length > 0 ? (
           <div className="announcement-attachments">
-            <p className="announcement-attachments-label">
-              <Paperclip size={14} aria-hidden="true" />
-              {t('attachmentsLabel')}
-            </p>
-            <ul className="attachment-list">
-              {announcement.attachments.map((attachment) => (
-                <li key={attachment.id} className="attachment-list-item">
+            {/* Inline images */}
+            {announcement.attachments.some((a) => a.mimeType.startsWith("image/")) ? (
+              <div className="announcement-image-gallery">
+                {announcement.attachments
+                  .filter((a) => a.mimeType.startsWith("image/"))
+                  .map((attachment) => (
+                    <a
+                      key={attachment.id}
+                      className="announcement-image-link"
+                      href={`/api/v1/announcements/${announcement.id}/attachments/${attachment.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/api/v1/announcements/${announcement.id}/attachments/${attachment.id}`}
+                        alt={attachment.fileName}
+                        className="announcement-image-preview"
+                        loading="lazy"
+                      />
+                    </a>
+                  ))}
+              </div>
+            ) : null}
+
+            {/* Non-image file attachments */}
+            {announcement.attachments.some((a) => !a.mimeType.startsWith("image/")) ? (
+              <div className="announcement-files">
+                <p className="announcement-attachments-label">
                   <Paperclip size={14} aria-hidden="true" />
-                  <span className="attachment-file-name">{attachment.fileName}</span>
-                </li>
-              ))}
-            </ul>
+                  {t('attachmentsLabel')}
+                </p>
+                <ul className="attachment-list">
+                  {announcement.attachments
+                    .filter((a) => !a.mimeType.startsWith("image/"))
+                    .map((attachment) => (
+                      <li key={attachment.id} className="attachment-list-item">
+                        <a
+                          className="attachment-download-link"
+                          href={`/api/v1/announcements/${announcement.id}/attachments/${attachment.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Paperclip size={14} aria-hidden="true" />
+                          <span className="attachment-file-name">{attachment.fileName}</span>
+                        </a>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

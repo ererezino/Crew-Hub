@@ -17,6 +17,7 @@ const profileSchema = z.object({
   phone: z.string().trim().max(30, "Phone number is too long"),
   bio: z.string().trim().max(500, "Bio is too long").optional(),
   pronouns: z.string().trim().max(50, "Pronouns value is too long").optional(),
+  countryCode: z.string().trim().max(2, "Country code must be 2 characters").optional(),
   emergencyContactName: z.string().trim().max(200, "Emergency contact name is too long").optional(),
   emergencyContactPhone: z.string().trim().max(30, "Emergency contact phone is too long").optional(),
   emergencyContactRelationship: z.string().trim().max(100, "Emergency contact relationship is too long").optional()
@@ -93,6 +94,7 @@ export async function PATCH(request: Request) {
       phone: parsed.data.phone || null,
       bio: parsed.data.bio ?? null,
       pronouns: parsed.data.pronouns ?? null,
+      country_code: parsed.data.countryCode || null,
       emergency_contact_name: parsed.data.emergencyContactName ?? null,
       emergency_contact_phone: parsed.data.emergencyContactPhone ?? null,
       emergency_contact_relationship: parsed.data.emergencyContactRelationship ?? null

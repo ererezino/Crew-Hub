@@ -1486,6 +1486,84 @@ html.dark .topbar {
   white-space: pre-wrap;
 }
 
+.announcement-attachments {
+  margin-top: var(--space-3);
+}
+
+.announcement-image-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.announcement-image-link {
+  display: block;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-secondary);
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
+}
+
+.announcement-image-link:hover {
+  border-color: var(--border-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.announcement-image-preview {
+  display: block;
+  max-width: 320px;
+  max-height: 240px;
+  width: auto;
+  height: auto;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+}
+
+.announcement-files {
+  margin-top: var(--space-2);
+}
+
+.announcement-attachments-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-1);
+}
+
+.attachment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.attachment-list-item {
+  font-size: var(--text-sm);
+}
+
+.attachment-download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-hover);
+}
+
+.attachment-download-link:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.attachment-file-name {
+  word-break: break-all;
+}
+
 .announcement-row-actions {
   display: inline-flex;
   align-items: center;

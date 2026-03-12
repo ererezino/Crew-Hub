@@ -776,6 +776,8 @@
       "unableToUpdate": "Unable to update profile settings.",
       "pronounsLabel": "Pronouns",
       "pronounsPlaceholder": "e.g. she/her, he/him, they/them",
+      "countryLabel": "Country",
+      "countryPlaceholder": "Select your country",
       "bioLabel": "Bio",
       "bioPlaceholder": "A short introduction about yourself",
       "emergencyContactTitle": "Emergency contact",

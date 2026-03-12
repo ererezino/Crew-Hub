@@ -11,6 +11,7 @@ import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
+import { getCountryOptions } from "../../../lib/countries";
 import { LOCALE_META, SUPPORTED_LOCALES, type AppLocale } from "../../../i18n/locales";
 import { updateLocale } from "../../../lib/i18n/update-locale";
 import type { UserRole } from "../../../lib/navigation";
@@ -31,6 +32,7 @@ type SettingsClientProps = {
     notificationPreferences: NotificationPreferences;
     bio: string;
     pronouns: string;
+    countryCode: string;
     emergencyContactName: string;
     emergencyContactPhone: string;
     emergencyContactRelationship: string;
@@ -49,6 +51,7 @@ type ProfileFormValues = {
   phone: string;
   bio: string;
   pronouns: string;
+  countryCode: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelationship: string;
@@ -64,6 +67,7 @@ function makeProfileSchema(msgs: { nameRequired: string; nameTooLong: string; ph
     phone: z.string().trim().max(30, msgs.phoneTooLong),
     bio: z.string().trim().max(500).optional(),
     pronouns: z.string().trim().max(50).optional(),
+    countryCode: z.string().trim().max(2).optional(),
     emergencyContactName: z.string().trim().max(200).optional(),
     emergencyContactPhone: z.string().trim().max(30).optional(),
     emergencyContactRelationship: z.string().trim().max(100).optional()
@@ -178,6 +182,7 @@ export function SettingsClient({
     phone: profile.phone,
     bio: profile.bio,
     pronouns: profile.pronouns,
+    countryCode: profile.countryCode,
     emergencyContactName: profile.emergencyContactName,
     emergencyContactPhone: profile.emergencyContactPhone,
     emergencyContactRelationship: profile.emergencyContactRelationship
@@ -650,6 +655,25 @@ export function SettingsClient({
                     setFormDirty(true);
                   }}
                 />
+              </label>
+
+              <label className="form-field" htmlFor="profile-country">
+                <span className="form-label">{t('profile.countryLabel')}</span>
+                <select
+                  id="profile-country"
+                  className="form-input"
+                  value={profileValues.countryCode}
+                  onChange={(event) => {
+                    const nextValues = { ...profileValues, countryCode: event.currentTarget.value };
+                    setProfileValues(nextValues);
+                    setFormDirty(true);
+                  }}
+                >
+                  <option value="">{t('profile.countryPlaceholder')}</option>
+                  {getCountryOptions(preferredLocale).map((opt) => (
+                    <option key={opt.code} value={opt.code}>{opt.name}</option>
+                  ))}
+                </select>
               </label>
 
               <label className="form-field" htmlFor="profile-bio">

@@ -144,11 +144,15 @@ export function NotificationCenter() {
     for (const a of announcements) {
       if (a.isRead) continue;
       if (optimisticDismissals.has(`announcement-${a.id}`)) continue;
+      const truncatedBody = a.body.length > 120 ? `${a.body.slice(0, 120)}…` : a.body;
+      const attachmentHint = a.attachments.length > 0
+        ? ` · ${a.attachments.length} ${a.attachments.length === 1 ? "file" : "files"} attached`
+        : "";
       items.push({
         id: a.id,
         source: "announcement",
         title: a.title,
-        body: a.body.length > 120 ? `${a.body.slice(0, 120)}…` : a.body,
+        body: `${truncatedBody}${attachmentHint}`,
         link: "/announcements",
         createdAt: a.createdAt,
         isRead: a.isRead,

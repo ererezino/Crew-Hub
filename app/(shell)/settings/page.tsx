@@ -88,6 +88,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           ),
           bio: session.profile.bio ?? "",
           pronouns: session.profile.pronouns ?? "",
+          countryCode: session.profile.country_code ?? "",
           emergencyContactName: session.profile.emergency_contact_name ?? "",
           emergencyContactPhone: session.profile.emergency_contact_phone ?? "",
           emergencyContactRelationship: session.profile.emergency_contact_relationship ?? ""

@@ -776,6 +776,8 @@
       "unableToUpdate": "Impossible de mettre à jour les paramètres du profil.",
       "pronounsLabel": "Pronoms",
       "pronounsPlaceholder": "p. ex. elle, il, iel",
+      "countryLabel": "Pays",
+      "countryPlaceholder": "Sélectionnez votre pays",
       "bioLabel": "Bio",
       "bioPlaceholder": "Une courte introduction sur vous-même",
       "emergencyContactTitle": "Contact d'urgence",
