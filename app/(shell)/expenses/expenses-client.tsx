@@ -565,6 +565,7 @@ function ReceiptLightbox({
   onClose: () => void;
 }) {
   const isPdf = data.fileName.toLowerCase().endsWith(".pdf");
+  const [imageLoaded, setImageLoaded] = useState(isPdf);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -595,8 +596,24 @@ function ReceiptLightbox({
               className="lightbox-pdf"
             />
           ) : (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={data.url} alt={data.fileName} className="lightbox-img" />
+            <>
+              {!imageLoaded ? (
+                <div className="lightbox-spinner">
+                  <div className="lightbox-spinner-ring" />
+                </div>
+              ) : null}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                key={data.url}
+                src={data.url}
+                alt={data.fileName}
+                className="lightbox-img lightbox-img-expense"
+                loading="eager"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageLoaded(true)}
+                style={imageLoaded ? undefined : { display: "none" }}
+              />
+            </>
           )}
         </div>
 
@@ -2396,6 +2413,7 @@ export function ExpensesClient({
 
       {receiptLightbox ? (
         <ReceiptLightbox
+          key={receiptLightbox.url}
           data={receiptLightbox}
           onClose={() => setReceiptLightbox(null)}
         />
