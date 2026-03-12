@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
   type DragEvent,
   type FormEvent,
+  useEffect,
   useMemo,
   useRef,
   useState
@@ -42,7 +43,7 @@ import {
 } from "../../../lib/expenses";
 import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries";
 import { useMePaymentDetails } from "../../../hooks/use-payment-details";
-import { Receipt } from "lucide-react";
+import { Receipt, X } from "lucide-react";
 import type {
   CreateExpenseCommentResponse,
   CreateExpenseResponse,
@@ -546,6 +547,63 @@ function ExpenseTimelineItem({
   );
 }
 
+/* ─── Receipt / payment-proof lightbox ─── */
+
+type ReceiptLightboxData = {
+  url: string;
+  fileName: string;
+  label: string;
+};
+
+function ReceiptLightbox({
+  data,
+  onClose
+}: {
+  data: ReceiptLightboxData;
+  onClose: () => void;
+}) {
+  const isPdf = data.fileName.toLowerCase().endsWith(".pdf");
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div className="lightbox-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={data.label}>
+      <div className={isPdf ? "lightbox-inner lightbox-inner-doc" : "lightbox-inner"} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="lightbox-close" onClick={onClose} aria-label="Close">
+          <X size={20} />
+        </button>
+
+        <div className={isPdf ? "lightbox-stage lightbox-stage-doc" : "lightbox-stage"}>
+          {isPdf ? (
+            <iframe
+              src={`${data.url}#toolbar=1&navpanes=0`}
+              title={data.fileName}
+              className="lightbox-pdf"
+            />
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={data.url} alt={data.fileName} className="lightbox-img" />
+          )}
+        </div>
+
+        <div className="lightbox-filename">{data.label}</div>
+      </div>
+    </div>
+  );
+}
+
 export function ExpensesClient({
   currentUserId,
   canViewReports,
@@ -576,6 +634,7 @@ export function ExpensesClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, setUploadProgress] = useState(0);
   const [isOpeningReceiptById, setIsOpeningReceiptById] = useState<Record<string, boolean>>({});
+  const [receiptLightbox, setReceiptLightbox] = useState<ReceiptLightboxData | null>(null);
   const [isMutatingExpenseId, setIsMutatingExpenseId] = useState<string | null>(null);
   const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
   const [commentsByExpenseId, setCommentsByExpenseId] = useState<Record<string, ExpenseCommentRecord[]>>({});
@@ -875,7 +934,11 @@ export function ExpensesClient({
         return;
       }
 
-      window.open(payload.data.url, "_blank", "noopener,noreferrer");
+      setReceiptLightbox({
+        url: payload.data.url,
+        fileName: expense.receiptFileName,
+        label: expense.receiptFileName
+      });
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : td("toast.unableToOpenReceipt"));
     } finally {
@@ -905,7 +968,14 @@ export function ExpensesClient({
         return;
       }
 
-      window.open(payload.data.url, "_blank", "noopener,noreferrer");
+      const proofPath = expense.reimbursementReceiptPath ?? "";
+      const proofFileName = proofPath.split("/").pop() ?? "payment-proof";
+
+      setReceiptLightbox({
+        url: payload.data.url,
+        fileName: proofFileName,
+        label: td("transactionDetails.viewPaymentProof")
+      });
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : td("toast.unableToOpenPaymentProof"));
     } finally {
@@ -2208,6 +2278,13 @@ export function ExpensesClient({
           </div>
         </form>
       </SlidePanel>
+
+      {receiptLightbox ? (
+        <ReceiptLightbox
+          data={receiptLightbox}
+          onClose={() => setReceiptLightbox(null)}
+        />
+      ) : null}
 
       <div className="toast-region" aria-live="polite" aria-atomic="true">
         {toasts.map((toast) => (
