@@ -23,8 +23,7 @@ import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/
 import type {
   ExpenseCommentAttachment,
   ExpenseCommentRecord,
-  ExpenseCommentsResponseData,
-  ExpenseCommentType
+  ExpenseCommentsResponseData
 } from "../../../../../../types/expenses";
 import { expenseCommentTypeSchema } from "../../_comment-state";
 import { buildMeta, jsonResponse } from "../../_helpers";
@@ -907,12 +906,16 @@ export async function POST(
     (hasRole(session.profile.roles, "FINANCE_ADMIN") || isSuperAdmin);
 
   if (parsedRequest.payload.action === "request_info") {
+    const employeeNotificationBody = isFinanceStageRequester
+      ? `${session.profile.full_name} requested additional details before payment can continue.`
+      : `${session.profile.full_name} requested additional details before approval can continue.`;
+
     await createNotification({
       orgId: session.profile.org_id,
       userId: expense.employee_id,
       type: "expense_status",
       title: "More info requested on your expense",
-      body: `${session.profile.full_name} requested additional details before payment can continue.`,
+      body: employeeNotificationBody,
       link: "/expenses"
     });
 

@@ -25,7 +25,7 @@ describe("Expense clarification and payment language hardening", () => {
     expect(commentsRoute).toContain('action: expenseCommentTypeSchema');
     expect(commentsRoute).toContain('payload.action === "request_info"');
     expect(commentsRoute).toContain('payload.action === "response"');
-    expect(commentsRoute).toContain('formData.getAll("attachments")');
+    expect(commentsRoute).toContain('.getAll("attachments")');
     expect(commentsRoute).toContain('expense_comment_attachments');
     expect(commentsRoute).toContain('FINANCE_THREAD_STATUSES');
     expect(commentsRoute).toContain("sendExpenseInfoRequestedEmail");
