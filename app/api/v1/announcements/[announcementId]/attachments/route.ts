@@ -7,6 +7,7 @@ import { logger } from "../../../../../../lib/logger";
 import { hasRole } from "../../../../../../lib/roles";
 import { sanitizeFileName } from "../../../../../../lib/documents";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import { validateUploadMagicBytes } from "../../../../../../lib/security/upload-signatures";
 import type { ApiResponse } from "../../../../../../types/auth";
 import type { AnnouncementAttachment } from "../../../../../../types/announcements";
@@ -186,11 +187,15 @@ export async function POST(
 
   const safeName = sanitizeFileName(file.name);
   const timestamp = Date.now();
-  const storagePath = `announcement-attachments/${session.profile.org_id}/${paramsParsed.data.announcementId}/${timestamp}-${safeName}`;
+  const storagePath = `${session.profile.org_id}/announcement-attachments/${paramsParsed.data.announcementId}/${timestamp}-${safeName}`;
 
+  // Use service-role for storage upload because the documents bucket INSERT
+  // policy requires paths to start with org_id/ and the SELECT policy only
+  // joins against the documents table (not announcement_attachments).
+  const storageClient = createSupabaseServiceRoleClient();
   const supabase = await createSupabaseServerClient();
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await storageClient.storage
     .from(ATTACHMENTS_BUCKET)
     .upload(storagePath, file, { upsert: false, contentType: file.type });
 
@@ -331,8 +336,9 @@ export async function DELETE(
     });
   }
 
-  // Delete from storage
-  await supabase.storage.from(ATTACHMENTS_BUCKET).remove([attachment.file_path]);
+  // Delete from storage (service-role bypasses bucket RLS)
+  const storageClient = createSupabaseServiceRoleClient();
+  await storageClient.storage.from(ATTACHMENTS_BUCKET).remove([attachment.file_path]);
 
   // Delete DB record
   const { error: deleteError } = await supabase

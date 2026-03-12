@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../../types/auth";
 
 const paramsSchema = z.object({
@@ -72,8 +73,11 @@ export async function GET(
     });
   }
 
-  // Generate a signed URL (valid for 5 minutes)
-  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+  // Generate a signed URL (valid for 5 minutes).
+  // Use service-role because the documents bucket SELECT policy only joins
+  // against the documents table, not announcement_attachments.
+  const storageClient = createSupabaseServiceRoleClient();
+  const { data: signedUrlData, error: signedUrlError } = await storageClient.storage
     .from("documents")
     .createSignedUrl(attachment.file_path, 300);
 
