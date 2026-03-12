@@ -339,6 +339,7 @@ describe("Production Hardening", () => {
         "scheduling_auto_generate",
         "onboarding",
         "team_hub",
+        "the_crew",
         "payroll",
         "payroll_disbursement",
         "payroll_withholding_gh",
