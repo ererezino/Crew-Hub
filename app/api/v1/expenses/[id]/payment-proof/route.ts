@@ -84,8 +84,14 @@ export async function GET(
     });
   }
 
-  const expiresInSeconds = 60;
-  const { data: signedUrlResult, error: signedUrlError } = await supabase.storage
+  // Use service-role client to generate the signed URL because the storage
+  // SELECT policy on the receipts bucket only checks `receipt_file_path`
+  // (employee receipts), not `reimbursement_receipt_path` (finance payment
+  // proof). Auth is validated above — user is authenticated and expense
+  // belongs to their org.
+  const serviceClient = createSupabaseServiceRoleClient();
+  const expiresInSeconds = 300;
+  const { data: signedUrlResult, error: signedUrlError } = await serviceClient.storage
     .from(RECEIPTS_BUCKET_NAME)
     .createSignedUrl(parsed.data.reimbursement_receipt_path, expiresInSeconds);
 
