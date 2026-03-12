@@ -1462,8 +1462,12 @@ export function ExpensesClient({
                             <StatusBadge tone={getDisplayStatusTone(expense)}>
                               {getDisplayStatusLabel(expense)}
                             </StatusBadge>
-                            {expense.infoRequestState === "requested" ? (
-                              <p className="documents-cell-description">{t('infoRequests.actionNeeded')}</p>
+                            {expense.infoRequestState === "requested" && expense.infoRequestUpdatedByName ? (
+                              <p className="documents-cell-description">
+                                {t('infoRequests.requestedByName', { name: expense.infoRequestUpdatedByName })}
+                              </p>
+                            ) : expense.infoRequestState === "requested" ? (
+                              <p className="documents-cell-description">{t('infoRequests.moreInfoRequested')}</p>
                             ) : null}
                             {expense.infoRequestState === "responded" ? (
                               <p className="documents-cell-description">{t('infoRequests.responseSent')}</p>

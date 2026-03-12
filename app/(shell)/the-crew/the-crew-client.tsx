@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { SlidePanel } from "../../../components/shared/slide-panel";
@@ -36,6 +36,15 @@ const DEFAULT_COLOR = { accent: "#64748b", light: "#f8fafc" };
 function getDeptColor(dept: string | null) {
   if (!dept) return DEFAULT_COLOR;
   return DEPT_COLORS[dept.toLowerCase()] ?? DEFAULT_COLOR;
+}
+
+/** Darken a hex color by a percentage (0-1). */
+function darkenColor(hex: string, amount: number): string {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.max(0, ((num >> 16) & 0xff) * (1 - amount));
+  const g = Math.max(0, ((num >> 8) & 0xff) * (1 - amount));
+  const b = Math.max(0, (num & 0xff) * (1 - amount));
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
 }
 
 function getInitials(name: string): string {
@@ -98,9 +107,10 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
 
   useEffect(() => { void fetchCrew(); }, [fetchCrew]);
 
-  /* ── Search + filter state ── */
+  /* ── Search + filter + view state ── */
   const [search, setSearch] = useState("");
   const [activeDept, setActiveDept] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"all" | "by-team">("all");
 
   /* ── Derived: departments list ── */
   const departments = useMemo(() => {
@@ -109,7 +119,6 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       const d = m.department ?? "Other";
       deptSet.set(d, (deptSet.get(d) ?? 0) + 1);
     }
-    // Sort: Founders first (if any), then alphabetical
     return [...deptSet.entries()]
       .sort(([a], [b]) => {
         if (a.toLowerCase() === "founders") return -1;
@@ -137,29 +146,43 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     return list;
   }, [members, activeDept, search]);
 
-  /* ── Grouped by department ── */
+  /* ── Derived: grouped members (for "By team" mode) ── */
   const grouped = useMemo(() => {
+    if (viewMode !== "by-team") return null;
     const map = new Map<string, CrewMember[]>();
     for (const m of filtered) {
       const d = m.department ?? "Other";
       if (!map.has(d)) map.set(d, []);
       map.get(d)!.push(m);
     }
-    // Maintain same sort as departments chips
     const sorted: [string, CrewMember[]][] = [];
     for (const dept of departments) {
       const group = map.get(dept.name);
       if (group && group.length > 0) sorted.push([dept.name, group]);
     }
-    // Add any remaining (shouldn't happen normally)
     for (const [k, v] of map) {
       if (!sorted.some(([name]) => name === k)) sorted.push([k, v]);
     }
     return sorted;
-  }, [filtered, departments]);
+  }, [filtered, departments, viewMode]);
 
   /* ── Profile drawer ── */
   const [selectedMember, setSelectedMember] = useState<CrewMember | null>(null);
+  const drawerTriggerRef = useRef<HTMLElement | null>(null);
+
+  const openDrawer = useCallback((member: CrewMember) => {
+    drawerTriggerRef.current = document.activeElement as HTMLElement | null;
+    setSelectedMember(member);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setSelectedMember(null);
+    // Restore focus to the card that opened the drawer
+    requestAnimationFrame(() => {
+      drawerTriggerRef.current?.focus();
+      drawerTriggerRef.current = null;
+    });
+  }, []);
 
   /* ── Moderation drawer ── */
   const [moderatingMember, setModeratingMember] = useState<CrewMember | null>(null);
@@ -181,7 +204,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       favoriteBooks: member.favoriteBooks ?? "",
       favoriteSports: member.favoriteSports ?? ""
     });
-    setModVisible(true); // directory_visible — we don't have it client-side, assume true
+    setModVisible(true);
     setModMessage(null);
   }, []);
 
@@ -215,7 +238,6 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       }
 
       setModMessage("Profile updated. The user has been notified.");
-      // Refresh data
       void fetchCrew();
     } catch {
       setModMessage("Unable to update.");
@@ -224,16 +246,81 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     }
   }, [moderatingMember, modValues, modVisible, fetchCrew]);
 
-  /* ── Collapsed department state ── */
-  const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
-  const toggleDept = (dept: string) => {
-    setCollapsedDepts((prev) => {
-      const next = new Set(prev);
-      if (next.has(dept)) next.delete(dept);
-      else next.add(dept);
-      return next;
-    });
+  /* ── Render helpers ── */
+
+  const renderCard = (member: CrewMember, index: number) => {
+    const color = getDeptColor(member.department);
+    return (
+      <article
+        key={member.id}
+        className="crew-card"
+        onClick={() => openDrawer(member)}
+        role="button"
+        tabIndex={0}
+        aria-label={[member.fullName, member.title, member.department].filter(Boolean).join(", ")}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDrawer(member); } }}
+      >
+        {/* Admin moderate icon */}
+        {isAdmin ? (
+          <button
+            type="button"
+            className="crew-card-moderate"
+            title="Moderate profile"
+            onClick={(e) => { e.stopPropagation(); openModeration(member); }}
+          >
+            ⚙
+          </button>
+        ) : null}
+
+        {/* Photo area */}
+        <div className="crew-avatar-wrap">
+          {member.avatarUrl ? (
+            <Image
+              src={member.avatarUrl}
+              alt={member.fullName}
+              width={400}
+              height={300}
+              className="crew-avatar-img"
+              sizes="(max-width: 480px) 100vw, (max-width: 767px) 50vw, (max-width: 1023px) 33vw, 25vw"
+              priority={index < 8}
+              unoptimized
+            />
+          ) : (
+            <span
+              className="crew-avatar-fallback"
+              role="img"
+              aria-label={`${getInitials(member.fullName)} of ${member.fullName}`}
+              style={{ background: `linear-gradient(135deg, ${color.accent}, ${darkenColor(color.accent, 0.25)})` }}
+            >
+              {getInitials(member.fullName)}
+            </span>
+          )}
+        </div>
+
+        {/* Caption */}
+        <div className="crew-card-body">
+          <h3 className="crew-card-name">{member.fullName}</h3>
+          {member.title ? <p className="crew-card-title">{member.title}</p> : null}
+          {member.department ? (
+            <div className="crew-card-dept">
+              <span className="crew-card-dept-dot" style={{ backgroundColor: color.accent }} />
+              <span className="crew-card-dept-label">{member.department}</span>
+            </div>
+          ) : null}
+        </div>
+      </article>
+    );
   };
+
+  const renderSkeleton = () => (
+    <div className="crew-card-skeleton">
+      <div className="crew-skeleton-photo" />
+      <div className="crew-skeleton-caption">
+        <div className="crew-skeleton-line" />
+        <div className="crew-skeleton-line" />
+      </div>
+    </div>
+  );
 
   /* ── Render ── */
 
@@ -241,13 +328,16 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     <div className="crew-page">
       {/* ── Hero ── */}
       <div className="crew-hero">
+        <h1 className="crew-hero-heading">
+          {t("pageTitle")}
+        </h1>
         <p className="crew-hero-subtitle">
-          Get to know the people behind the work — their stories, interests, and what makes the team special.
+          {t("pageSubtitle")}
         </p>
         <div className="crew-hero-stats">
-          <span>{totalCount} crew member{totalCount !== 1 ? "s" : ""}</span>
-          <span className="crew-hero-dot">·</span>
-          <span>{departments.length} department{departments.length !== 1 ? "s" : ""}</span>
+          <span>{totalCount} {totalCount !== 1 ? "people" : "person"}</span>
+          <span className="crew-hero-dot" aria-hidden="true" />
+          <span>{departments.length} {departments.length !== 1 ? "teams" : "team"}</span>
         </div>
       </div>
 
@@ -257,43 +347,51 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
           type="text"
           className="form-input crew-search-input"
           placeholder="Search by name, title, or department..."
+          aria-label="Search crew members"
           value={search}
           onChange={(e) => setSearch(e.currentTarget.value)}
         />
       </div>
 
-      {/* ── Department filter chips ── */}
-      <div className="crew-chips">
+      {/* ── Filter bar (chips + view toggle) ── */}
+      <div className="crew-filter-bar">
+        <div className="crew-chips">
+          <button
+            type="button"
+            className={`crew-chip ${activeDept === null ? "crew-chip-active" : ""}`}
+            aria-pressed={activeDept === null}
+            onClick={() => setActiveDept(null)}
+          >
+            All
+          </button>
+          {departments.map((dept) => (
+            <button
+              key={dept.name}
+              type="button"
+              className={`crew-chip ${activeDept === dept.name ? "crew-chip-active" : ""}`}
+              aria-pressed={activeDept === dept.name}
+              style={activeDept === dept.name ? { backgroundColor: getDeptColor(dept.name).accent, color: "#fff", borderColor: getDeptColor(dept.name).accent } : undefined}
+              onClick={() => setActiveDept(activeDept === dept.name ? null : dept.name)}
+            >
+              {dept.name} ({dept.count})
+            </button>
+          ))}
+        </div>
         <button
           type="button"
-          className={`crew-chip ${activeDept === null ? "crew-chip-active" : ""}`}
-          onClick={() => setActiveDept(null)}
+          className={`crew-view-toggle ${viewMode === "by-team" ? "crew-view-toggle-active" : ""}`}
+          onClick={() => setViewMode(viewMode === "all" ? "by-team" : "all")}
+          aria-pressed={viewMode === "by-team"}
         >
-          All
+          By team
         </button>
-        {departments.map((dept) => (
-          <button
-            key={dept.name}
-            type="button"
-            className={`crew-chip ${activeDept === dept.name ? "crew-chip-active" : ""}`}
-            style={activeDept === dept.name ? { backgroundColor: getDeptColor(dept.name).accent, color: "#fff", borderColor: getDeptColor(dept.name).accent } : undefined}
-            onClick={() => setActiveDept(activeDept === dept.name ? null : dept.name)}
-          >
-            {dept.name} ({dept.count})
-          </button>
-        ))}
       </div>
 
-      {/* ── Loading / Error / Empty ── */}
+      {/* ── Loading / Error / Empty / Grid ── */}
       {isLoading ? (
         <div className="crew-grid">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="crew-card crew-card-skeleton">
-              <div className="crew-avatar-skeleton" />
-              <div className="crew-text-skeleton" style={{ width: "70%" }} />
-              <div className="crew-text-skeleton" style={{ width: "50%" }} />
-              <div className="crew-text-skeleton" style={{ width: "40%" }} />
-            </div>
+            <div key={i}>{renderSkeleton()}</div>
           ))}
         </div>
       ) : error ? (
@@ -303,137 +401,64 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
         </div>
       ) : filtered.length === 0 ? (
         <div className="crew-empty">
-          <p>No crew members match your search.</p>
+          <p>No one matches your search.</p>
         </div>
-      ) : (
-        /* ── Department sections ── */
-        <div className="crew-sections">
+      ) : viewMode === "by-team" && grouped ? (
+        /* ── By Team mode: flat grid with label dividers ── */
+        <div className="crew-grid">
           {grouped.map(([deptName, deptMembers]) => {
             const color = getDeptColor(deptName);
-            const isCollapsed = collapsedDepts.has(deptName);
-            return (
-              <section key={deptName} className="crew-dept-section">
-                <button
-                  type="button"
-                  className="crew-dept-header"
-                  onClick={() => toggleDept(deptName)}
-                  aria-expanded={!isCollapsed}
-                >
-                  <span className="crew-dept-bar" style={{ backgroundColor: color.accent }} />
-                  <span className="crew-dept-name">{deptName}</span>
-                  <span className="crew-dept-count">{deptMembers.length} member{deptMembers.length !== 1 ? "s" : ""}</span>
-                  <span className={`crew-dept-chevron ${isCollapsed ? "crew-dept-chevron-collapsed" : ""}`}>▾</span>
-                </button>
-
-                {!isCollapsed ? (
-                  <div className="crew-grid">
-                    {deptMembers.map((member) => {
-                      const socials = getSocials(member);
-                      return (
-                        <article
-                          key={member.id}
-                          className="crew-card"
-                          onClick={() => setSelectedMember(member)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedMember(member); } }}
-                        >
-                          {/* Admin moderate icon */}
-                          {isAdmin ? (
-                            <button
-                              type="button"
-                              className="crew-card-moderate"
-                              title="Moderate profile"
-                              onClick={(e) => { e.stopPropagation(); openModeration(member); }}
-                            >
-                              ⚙
-                            </button>
-                          ) : null}
-
-                          {/* Avatar */}
-                          <div className="crew-avatar-wrap">
-                            {member.avatarUrl ? (
-                              <Image
-                                src={member.avatarUrl}
-                                alt={member.fullName}
-                                width={400}
-                                height={300}
-                                className="crew-avatar-img"
-                                unoptimized
-                              />
-                            ) : (
-                              <span
-                                className="crew-avatar-fallback"
-                                style={{ background: `linear-gradient(135deg, ${color.accent}, ${color.accent}dd)` }}
-                              >
-                                {getInitials(member.fullName)}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Info */}
-                          <div className="crew-card-body">
-                            <h3 className="crew-card-name">{member.fullName}</h3>
-                            {member.title ? <p className="crew-card-title">{member.title}</p> : null}
-                            <p className="crew-card-meta">
-                              {member.countryCode ? <span>{countryFlagFromCode(member.countryCode)}</span> : null}
-                              {member.pronouns ? <span className="crew-card-pronouns">{member.pronouns}</span> : null}
-                            </p>
-                            {member.bio ? (
-                              <p className="crew-card-bio">{member.bio}</p>
-                            ) : null}
-                            {socials.length > 0 ? (
-                              <div className="crew-social-row">
-                                {socials.map((s) => (
-                                  <a
-                                    key={s.key}
-                                    href={s.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="crew-social-icon"
-                                    title={s.label}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {s.icon}
-                                  </a>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </section>
-            );
-          })}
+            // Find the global index for priority loading
+            let globalIdx = 0;
+            for (const [, prevMembers] of grouped) {
+              if (prevMembers === deptMembers) break;
+              globalIdx += prevMembers.length;
+            }
+            return [
+              /* Department divider */
+              <div key={`divider-${deptName}`} className="crew-dept-divider">
+                <span className="crew-dept-divider-dot" style={{ backgroundColor: color.accent }} />
+                <h2 className="crew-dept-divider-name">{deptName}</h2>
+                <span className="crew-dept-divider-count">{deptMembers.length} {deptMembers.length !== 1 ? "members" : "member"}</span>
+                <span className="crew-dept-divider-line" />
+              </div>,
+              /* Cards */
+              ...deptMembers.map((member, i) => renderCard(member, globalIdx + i))
+            ];
+          }).flat()}
+        </div>
+      ) : (
+        /* ── Everyone mode: flat grid ── */
+        <div className="crew-grid">
+          {filtered.map((member, i) => renderCard(member, i))}
         </div>
       )}
 
-      {/* ── Profile Drawer (read-only) ── */}
+      {/* ── Profile Drawer ── */}
       {selectedMember ? (
         <SlidePanel
           isOpen={!!selectedMember}
           title={selectedMember.fullName}
-          onClose={() => setSelectedMember(null)}
+          onClose={closeDrawer}
         >
           <div className="crew-drawer">
-            {/* Photo */}
-            <div className="crew-drawer-photo">
+            {/* Hero image */}
+            <div className="crew-drawer-hero">
               {selectedMember.avatarUrl ? (
                 <Image
                   src={selectedMember.avatarUrl}
                   alt={selectedMember.fullName}
                   width={600}
                   height={450}
-                  className="crew-drawer-img"
+                  className="crew-drawer-hero-img"
                   unoptimized
                 />
               ) : (
                 <span
-                  className="crew-drawer-fallback"
-                  style={{ background: `linear-gradient(135deg, ${getDeptColor(selectedMember.department).accent}, ${getDeptColor(selectedMember.department).accent}dd)` }}
+                  className="crew-drawer-hero-fallback"
+                  role="img"
+                  aria-label={`${getInitials(selectedMember.fullName)} of ${selectedMember.fullName}`}
+                  style={{ background: `linear-gradient(135deg, ${getDeptColor(selectedMember.department).accent}, ${darkenColor(getDeptColor(selectedMember.department).accent, 0.25)})` }}
                 >
                   {getInitials(selectedMember.fullName)}
                 </span>
@@ -443,15 +468,40 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
             {/* Identity */}
             <div className="crew-drawer-identity">
               <h2 className="crew-drawer-name">{selectedMember.fullName}</h2>
-              <p className="crew-drawer-role">
-                {selectedMember.title ?? "Team member"}
-                {selectedMember.department ? ` · ${selectedMember.department}` : ""}
-              </p>
-              <p className="crew-drawer-meta">
-                {selectedMember.countryCode ? `${countryFlagFromCode(selectedMember.countryCode)} ` : ""}
-                {selectedMember.pronouns ? `${selectedMember.pronouns} · ` : ""}
-                {selectedMember.startDate ? `Joined ${formatDate(selectedMember.startDate)}` : ""}
-              </p>
+              {(selectedMember.title || selectedMember.department) ? (
+                <p className="crew-drawer-role">
+                  {selectedMember.title ?? ""}
+                  {selectedMember.title && selectedMember.department ? (
+                    <>
+                      <span style={{ color: "var(--text-muted)" }}> · </span>
+                      <span className="crew-drawer-role-dot" style={{ backgroundColor: getDeptColor(selectedMember.department).accent, display: "inline-block", verticalAlign: "middle" }} />
+                      {" "}{selectedMember.department}
+                    </>
+                  ) : selectedMember.department ? (
+                    <>
+                      <span className="crew-drawer-role-dot" style={{ backgroundColor: getDeptColor(selectedMember.department).accent, display: "inline-block", verticalAlign: "middle" }} />
+                      {" "}{selectedMember.department}
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
+              {(selectedMember.countryCode || selectedMember.pronouns || selectedMember.startDate) ? (
+                <p className="crew-drawer-meta">
+                  {selectedMember.countryCode ? <span>{countryFlagFromCode(selectedMember.countryCode)}</span> : null}
+                  {selectedMember.pronouns ? (
+                    <>
+                      {selectedMember.countryCode ? <span className="crew-drawer-meta-sep">·</span> : null}
+                      <span>{selectedMember.pronouns}</span>
+                    </>
+                  ) : null}
+                  {selectedMember.startDate ? (
+                    <>
+                      {(selectedMember.countryCode || selectedMember.pronouns) ? <span className="crew-drawer-meta-sep">·</span> : null}
+                      <span>Joined {formatDate(selectedMember.startDate)}</span>
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
             </div>
 
             {/* Bio */}
@@ -467,9 +517,9 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
               <div className="crew-drawer-section">
                 <h3 className="crew-drawer-section-title">Favorites</h3>
                 <div className="crew-drawer-favorites">
-                  {selectedMember.favoriteMusic ? <p>🎵 {selectedMember.favoriteMusic}</p> : null}
-                  {selectedMember.favoriteBooks ? <p>📚 {selectedMember.favoriteBooks}</p> : null}
-                  {selectedMember.favoriteSports ? <p>⚽ {selectedMember.favoriteSports}</p> : null}
+                  {selectedMember.favoriteMusic ? <p className="crew-drawer-favorite-item">🎵 {selectedMember.favoriteMusic}</p> : null}
+                  {selectedMember.favoriteBooks ? <p className="crew-drawer-favorite-item">📚 {selectedMember.favoriteBooks}</p> : null}
+                  {selectedMember.favoriteSports ? <p className="crew-drawer-favorite-item">⚽ {selectedMember.favoriteSports}</p> : null}
                 </div>
               </div>
             ) : null}
@@ -487,7 +537,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
                       rel="noopener noreferrer"
                       className="crew-drawer-social-link"
                     >
-                      <span className="crew-social-icon">{s.icon}</span>
+                      <span className="crew-drawer-social-icon">{s.icon}</span>
                       {s.label}
                     </a>
                   ))}
@@ -495,9 +545,9 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
               </div>
             ) : null}
 
-            {/* Edit my profile (own card only) */}
+            {/* Edit my profile */}
             {selectedMember.id === currentUserId ? (
-              <div className="crew-drawer-section crew-drawer-edit">
+              <div className="crew-drawer-edit">
                 <Link href="/settings" className="button button-accent">
                   Edit my profile
                 </Link>
@@ -519,7 +569,6 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
               Changes are logged and the user will be notified.
             </p>
 
-            {/* Visibility toggle */}
             <label className="crew-mod-toggle">
               <input
                 type="checkbox"
@@ -529,7 +578,6 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
               <span>Visible on The Crew</span>
             </label>
 
-            {/* Editable fields */}
             <label className="form-field">
               <span className="form-label-sm">Bio</span>
               <textarea

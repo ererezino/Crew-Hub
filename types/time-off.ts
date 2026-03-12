@@ -37,7 +37,7 @@ export type LeaveAccrualType = (typeof LEAVE_ACCRUAL_TYPES)[number];
 
 export type LeavePolicy = {
   id: string;
-  countryCode: string;
+  countryCode: string | null;
   leaveType: string;
   defaultDaysPerYear: number;
   accrualType: LeaveAccrualType;

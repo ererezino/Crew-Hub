@@ -456,21 +456,23 @@ export function NotificationCenter() {
                           </div>
                         ) : null}
                       </div>
-                      {item.imageAttachment ? (
-                        <NotificationThumbnail
-                          announcementId={item.imageAttachment.announcementId}
-                          attachmentId={item.imageAttachment.attachmentId}
-                          fileName={item.imageAttachment.fileName}
-                          extraCount={(item.imageCount ?? 1) - 1}
-                        />
-                      ) : null}
-                      <button
-                        type="button"
-                        className="table-row-action"
-                        onClick={() => void handleDismiss(item)}
-                      >
-                        {t("dismiss")}
-                      </button>
+                      <div className="notification-item-aside">
+                        <button
+                          type="button"
+                          className="table-row-action"
+                          onClick={() => void handleDismiss(item)}
+                        >
+                          {t("dismiss")}
+                        </button>
+                        {item.imageAttachment ? (
+                          <NotificationThumbnail
+                            announcementId={item.imageAttachment.announcementId}
+                            attachmentId={item.imageAttachment.attachmentId}
+                            fileName={item.imageAttachment.fileName}
+                            extraCount={(item.imageCount ?? 1) - 1}
+                          />
+                        ) : null}
+                      </div>
                     </li>
                   ))}
                 </ul>

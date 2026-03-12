@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { z } from "zod";
 
+import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { getCountryOptions } from "../../../lib/countries";
@@ -72,6 +73,42 @@ type ProfileFormValues = {
   favoriteBooks: string;
   favoriteSports: string;
 };
+
+/** Social link prefix constants — username-only input, full URL stored */
+const SOCIAL_PREFIXES = {
+  linkedin: "https://linkedin.com/in/",
+  twitter: "https://x.com/",
+  instagram: "https://instagram.com/",
+  github: "https://github.com/"
+} as const;
+
+/** Strip a known prefix (case-insensitive) to show just the username in the input */
+function stripSocialPrefix(value: string, prefix: string): string {
+  if (!value) return "";
+  const lower = value.toLowerCase();
+  /* Handle both http and https variants, with/without www */
+  const variants = [
+    prefix,
+    prefix.replace("https://", "http://"),
+    prefix.replace("https://", "https://www."),
+    prefix.replace("https://", "http://www.")
+  ];
+  for (const v of variants) {
+    if (lower.startsWith(v.toLowerCase())) {
+      return value.slice(v.length);
+    }
+  }
+  /* If the value is already a full URL for this platform, strip it */
+  return value;
+}
+
+/** Prepend the prefix to build a full URL (skip if empty or already a full URL) */
+function buildSocialUrl(username: string, prefix: string): string {
+  const trimmed = username.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//.test(trimmed)) return trimmed;
+  return `${prefix}${trimmed}`;
+}
 
 type OrganizationFormValues = {
   name: string;
@@ -215,11 +252,11 @@ export function SettingsClient({
     emergencyContactName: profile.emergencyContactName,
     emergencyContactPhone: profile.emergencyContactPhone,
     emergencyContactRelationship: profile.emergencyContactRelationship,
-    socialLinkedin: profile.socialLinkedin,
-    socialTwitter: profile.socialTwitter,
-    socialInstagram: profile.socialInstagram,
-    socialGithub: profile.socialGithub,
-    socialWebsite: profile.socialWebsite,
+    socialLinkedin: stripSocialPrefix(profile.socialLinkedin, SOCIAL_PREFIXES.linkedin),
+    socialTwitter: stripSocialPrefix(profile.socialTwitter, SOCIAL_PREFIXES.twitter),
+    socialInstagram: stripSocialPrefix(profile.socialInstagram, SOCIAL_PREFIXES.instagram),
+    socialGithub: stripSocialPrefix(profile.socialGithub, SOCIAL_PREFIXES.github),
+    socialWebsite: stripSocialPrefix(profile.socialWebsite, "https://"),
     favoriteMusic: profile.favoriteMusic,
     favoriteBooks: profile.favoriteBooks,
     favoriteSports: profile.favoriteSports
@@ -251,6 +288,13 @@ export function SettingsClient({
   const [browserPushPermission, setBrowserPushPermission] = useState<NotificationPermission | "unsupported">(
     "unsupported"
   );
+
+  /* Confirmation dialog state for disabling a notification channel */
+  const [disableConfirm, setDisableConfirm] = useState<{
+    field: keyof NotificationPreferences;
+    title: string;
+    description: string;
+  } | null>(null);
 
   // Language preference state
   const [isLocaleSaving, setIsLocaleSaving] = useState(false);
@@ -398,7 +442,15 @@ export function SettingsClient({
       const response = await fetch("/api/v1/settings/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...profileValues, avatarUrl })
+        body: JSON.stringify({
+          ...profileValues,
+          avatarUrl,
+          socialLinkedin: buildSocialUrl(profileValues.socialLinkedin, SOCIAL_PREFIXES.linkedin),
+          socialTwitter: buildSocialUrl(profileValues.socialTwitter, SOCIAL_PREFIXES.twitter),
+          socialInstagram: buildSocialUrl(profileValues.socialInstagram, SOCIAL_PREFIXES.instagram),
+          socialGithub: buildSocialUrl(profileValues.socialGithub, SOCIAL_PREFIXES.github),
+          socialWebsite: buildSocialUrl(profileValues.socialWebsite, "https://")
+        })
       });
 
       const payload = (await response.json()) as {
@@ -739,73 +791,88 @@ export function SettingsClient({
                 <div className="settings-emergency-fields">
                   <label className="form-field" htmlFor="profile-social-linkedin">
                     <span className="form-label-sm">LinkedIn</span>
-                    <input
-                      id="profile-social-linkedin"
-                      className="form-input"
-                      maxLength={255}
-                      placeholder="https://linkedin.com/in/yourname"
-                      value={profileValues.socialLinkedin}
-                      onChange={(event) => {
-                        setProfileValues({ ...profileValues, socialLinkedin: event.currentTarget.value });
-                        setFormDirty(true);
-                      }}
-                    />
+                    <div className="input-with-addon">
+                      <span className="input-addon">linkedin.com/in/</span>
+                      <input
+                        id="profile-social-linkedin"
+                        className="form-input input-addon-field"
+                        maxLength={100}
+                        placeholder="yourname"
+                        value={profileValues.socialLinkedin}
+                        onChange={(event) => {
+                          setProfileValues({ ...profileValues, socialLinkedin: event.currentTarget.value });
+                          setFormDirty(true);
+                        }}
+                      />
+                    </div>
                   </label>
                   <label className="form-field" htmlFor="profile-social-twitter">
                     <span className="form-label-sm">Twitter / X</span>
-                    <input
-                      id="profile-social-twitter"
-                      className="form-input"
-                      maxLength={255}
-                      placeholder="https://x.com/yourhandle"
-                      value={profileValues.socialTwitter}
-                      onChange={(event) => {
-                        setProfileValues({ ...profileValues, socialTwitter: event.currentTarget.value });
-                        setFormDirty(true);
-                      }}
-                    />
+                    <div className="input-with-addon">
+                      <span className="input-addon">x.com/</span>
+                      <input
+                        id="profile-social-twitter"
+                        className="form-input input-addon-field"
+                        maxLength={100}
+                        placeholder="yourhandle"
+                        value={profileValues.socialTwitter}
+                        onChange={(event) => {
+                          setProfileValues({ ...profileValues, socialTwitter: event.currentTarget.value });
+                          setFormDirty(true);
+                        }}
+                      />
+                    </div>
                   </label>
                   <label className="form-field" htmlFor="profile-social-instagram">
                     <span className="form-label-sm">Instagram</span>
-                    <input
-                      id="profile-social-instagram"
-                      className="form-input"
-                      maxLength={255}
-                      placeholder="https://instagram.com/yourhandle"
-                      value={profileValues.socialInstagram}
-                      onChange={(event) => {
-                        setProfileValues({ ...profileValues, socialInstagram: event.currentTarget.value });
-                        setFormDirty(true);
-                      }}
-                    />
+                    <div className="input-with-addon">
+                      <span className="input-addon">instagram.com/</span>
+                      <input
+                        id="profile-social-instagram"
+                        className="form-input input-addon-field"
+                        maxLength={100}
+                        placeholder="yourhandle"
+                        value={profileValues.socialInstagram}
+                        onChange={(event) => {
+                          setProfileValues({ ...profileValues, socialInstagram: event.currentTarget.value });
+                          setFormDirty(true);
+                        }}
+                      />
+                    </div>
                   </label>
                   <label className="form-field" htmlFor="profile-social-github">
                     <span className="form-label-sm">GitHub</span>
-                    <input
-                      id="profile-social-github"
-                      className="form-input"
-                      maxLength={255}
-                      placeholder="https://github.com/yourusername"
-                      value={profileValues.socialGithub}
-                      onChange={(event) => {
-                        setProfileValues({ ...profileValues, socialGithub: event.currentTarget.value });
-                        setFormDirty(true);
-                      }}
-                    />
+                    <div className="input-with-addon">
+                      <span className="input-addon">github.com/</span>
+                      <input
+                        id="profile-social-github"
+                        className="form-input input-addon-field"
+                        maxLength={100}
+                        placeholder="yourusername"
+                        value={profileValues.socialGithub}
+                        onChange={(event) => {
+                          setProfileValues({ ...profileValues, socialGithub: event.currentTarget.value });
+                          setFormDirty(true);
+                        }}
+                      />
+                    </div>
                   </label>
                   <label className="form-field" htmlFor="profile-social-website">
                     <span className="form-label-sm">Personal website</span>
-                    <input
-                      id="profile-social-website"
-                      className="form-input"
-                      maxLength={255}
-                      placeholder="https://yoursite.com"
-                      value={profileValues.socialWebsite}
-                      onChange={(event) => {
-                        setProfileValues({ ...profileValues, socialWebsite: event.currentTarget.value });
-                        setFormDirty(true);
-                      }}
-                    />
+                    <div className="input-with-addon">
+                      <span className="input-addon">https://</span>
+                      <input
+                        id="profile-social-website"
+                        className="form-input input-addon-field"
+                        maxLength={255}
+                        placeholder="yoursite.com"
+                        value={profileValues.socialWebsite}
+                        onChange={(event) => {
+                          setProfileValues({ ...profileValues, socialWebsite: event.currentTarget.value });
+                          setFormDirty(true);
+                        }}
+                      />
+                    </div>
                   </label>
                 </div>
               </fieldset>
@@ -976,10 +1043,15 @@ export function SettingsClient({
                   checked={notificationValues.emailAnnouncements}
                   onChange={(event) => {
                     const checked = event.currentTarget.checked;
-                    setNotificationValues((previous) => ({
-                      ...previous,
-                      emailAnnouncements: checked
-                    }));
+                    if (!checked) {
+                      setDisableConfirm({
+                        field: "emailAnnouncements",
+                        title: t('notificationSettings.disableEmailAnnouncementsTitle'),
+                        description: t('notificationSettings.disableEmailAnnouncementsDesc')
+                      });
+                      return;
+                    }
+                    setNotificationValues((previous) => ({ ...previous, emailAnnouncements: true }));
                     setFormDirty(true);
                   }}
                 />
@@ -992,10 +1064,15 @@ export function SettingsClient({
                   checked={notificationValues.emailApprovals}
                   onChange={(event) => {
                     const checked = event.currentTarget.checked;
-                    setNotificationValues((previous) => ({
-                      ...previous,
-                      emailApprovals: checked
-                    }));
+                    if (!checked) {
+                      setDisableConfirm({
+                        field: "emailApprovals",
+                        title: t('notificationSettings.disableEmailApprovalsTitle'),
+                        description: t('notificationSettings.disableEmailApprovalsDesc')
+                      });
+                      return;
+                    }
+                    setNotificationValues((previous) => ({ ...previous, emailApprovals: true }));
                     setFormDirty(true);
                   }}
                 />
@@ -1008,10 +1085,15 @@ export function SettingsClient({
                   checked={notificationValues.inAppReminders}
                   onChange={(event) => {
                     const checked = event.currentTarget.checked;
-                    setNotificationValues((previous) => ({
-                      ...previous,
-                      inAppReminders: checked
-                    }));
+                    if (!checked) {
+                      setDisableConfirm({
+                        field: "inAppReminders",
+                        title: t('notificationSettings.disableInAppRemindersTitle'),
+                        description: t('notificationSettings.disableInAppRemindersDesc')
+                      });
+                      return;
+                    }
+                    setNotificationValues((previous) => ({ ...previous, inAppReminders: true }));
                     setFormDirty(true);
                   }}
                 />
@@ -1023,7 +1105,16 @@ export function SettingsClient({
                   type="checkbox"
                   checked={notificationValues.browserPush}
                   onChange={(event) => {
-                    void handleBrowserPushToggle(event.currentTarget.checked);
+                    const checked = event.currentTarget.checked;
+                    if (!checked) {
+                      setDisableConfirm({
+                        field: "browserPush",
+                        title: t('notificationSettings.disableBrowserAlertsTitle'),
+                        description: t('notificationSettings.disableBrowserAlertsDesc')
+                      });
+                      return;
+                    }
+                    void handleBrowserPushToggle(true);
                   }}
                 />
                 <span>{t('notificationSettings.browserAlerts')}</span>
@@ -1053,6 +1144,33 @@ export function SettingsClient({
 
               {notificationMessage ? <p className="settings-feedback">{notificationMessage}</p> : null}
             </form>
+
+            {/* Confirmation dialog when turning OFF a notification channel */}
+            <ConfirmDialog
+              isOpen={disableConfirm !== null}
+              title={disableConfirm?.title ?? ""}
+              description={disableConfirm?.description}
+              confirmLabel={t('notificationSettings.disableConfirmButton')}
+              cancelLabel={t('notificationSettings.disableCancelButton')}
+              tone="danger"
+              reverseEmphasis
+              onConfirm={() => {
+                if (disableConfirm) {
+                  if (disableConfirm.field === "browserPush") {
+                    setNotificationValues((previous) => ({ ...previous, browserPush: false }));
+                    setFormDirty(true);
+                  } else {
+                    setNotificationValues((previous) => ({
+                      ...previous,
+                      [disableConfirm.field]: false
+                    }));
+                    setFormDirty(true);
+                  }
+                }
+                setDisableConfirm(null);
+              }}
+              onCancel={() => setDisableConfirm(null)}
+            />
           </section>
         ) : null}
 

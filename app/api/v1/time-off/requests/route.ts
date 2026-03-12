@@ -50,7 +50,7 @@ const profileRowSchema = z.object({
 
 const policyRowSchema = z.object({
   id: z.string().uuid(),
-  country_code: z.string(),
+  country_code: z.string().nullable(),
   default_days_per_year: z.union([z.number(), z.string()]),
   is_unlimited: z.boolean()
 });

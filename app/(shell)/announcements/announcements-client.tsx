@@ -42,8 +42,6 @@ const NOTIFICATION_TYPE_KEYS: Record<string, string> = {
   expense_approved: "typeExpenseApproved",
   expense_rejected: "typeExpenseRejected",
   payroll_approved: "typePayrollApproved",
-  timesheet_submitted: "typeTimesheetSubmitted",
-  timesheet_approved: "typeTimesheetApproved",
   schedule_published: "typeSchedulePublished",
   shift_swap_requested: "typeShiftSwap",
   shift_swap_accepted: "typeShiftSwap",

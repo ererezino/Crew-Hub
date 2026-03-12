@@ -26,7 +26,7 @@ const profileDobRowSchema = z.object({
 
 const policyRowSchema = z.object({
   id: z.string().uuid(),
-  country_code: z.string(),
+  country_code: z.string().nullable(),
   leave_type: z.string(),
   default_days_per_year: z.union([z.number(), z.string()]),
   accrual_type: z.enum(LEAVE_ACCRUAL_TYPES),

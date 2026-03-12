@@ -104,7 +104,6 @@ export type DashboardHolidayItem = {
 export type DashboardPendingApprovals = {
   leave: number;
   expenses: number;
-  timesheets: number;
   total: number;
 };
 

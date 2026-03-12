@@ -56,7 +56,6 @@ const APPROVAL_GROUP_ROLES: readonly UserRole[] = [
 type SidebarApprovalCounts = {
   timeOff: number;
   expenses: number;
-  timesheets: number;
   total: number;
 };
 
@@ -274,7 +273,6 @@ async function fetchSidebarApprovalCounts(
     return {
       timeOff: 0,
       expenses: 0,
-      timesheets: 0,
       total: 0
     };
   }
@@ -284,7 +282,6 @@ async function fetchSidebarApprovalCounts(
     return {
       timeOff: 0,
       expenses: 0,
-      timesheets: 0,
       total: 0
     };
   }
@@ -293,20 +290,17 @@ async function fetchSidebarApprovalCounts(
     data?: {
       timeOff?: number;
       expenses?: number;
-      timesheets?: number;
       total?: number;
     } | null;
   };
 
   const timeOff = payload.data?.timeOff ?? 0;
   const expenses = payload.data?.expenses ?? 0;
-  const timesheets = payload.data?.timesheets ?? 0;
 
   return {
     timeOff,
     expenses,
-    timesheets,
-    total: timeOff + expenses + timesheets
+    total: timeOff + expenses
   };
 }
 

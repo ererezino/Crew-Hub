@@ -180,8 +180,6 @@ function ManagerGreeting({ data }: { data: DashboardResponseData }) {
                 {approvals.leave > 0 ? t('manager.leaveCount', { count: approvals.leave }) : ""}
                 {approvals.leave > 0 && approvals.expenses > 0 ? ", " : ""}
                 {approvals.expenses > 0 ? t('manager.expenseCount', { count: approvals.expenses }) : ""}
-                {(approvals.leave > 0 || approvals.expenses > 0) && approvals.timesheets > 0 ? ", " : ""}
-                {approvals.timesheets > 0 ? t('manager.timesheetCount', { count: approvals.timesheets }) : ""}
               </p>
             </div>
             <Link href="/approvals" className="button button-accent">
@@ -634,7 +632,7 @@ function PendingApprovalsWidget({ data }: { data: DashboardResponseData }) {
 
   if (!data.pendingApprovals) return null;
 
-  const { leave, expenses, timesheets } = data.pendingApprovals;
+  const { leave, expenses } = data.pendingApprovals;
 
   return (
     <WidgetCard title={t('widget.pendingApprovals')} icon={<CheckCircle size={14} />} viewAllHref="/approvals">
@@ -646,10 +644,6 @@ function PendingApprovalsWidget({ data }: { data: DashboardResponseData }) {
         <div className={`dashboard-approval-counter${expenses > 5 ? " dashboard-approval-counter-alert" : ""}`}>
           <span className="metric-value numeric">{expenses}</span>
           <span className="metric-label">{t('widget.expenses')}</span>
-        </div>
-        <div className={`dashboard-approval-counter${timesheets > 5 ? " dashboard-approval-counter-alert" : ""}`}>
-          <span className="metric-value numeric">{timesheets}</span>
-          <span className="metric-label">{t('widget.timesheets')}</span>
         </div>
       </div>
     </WidgetCard>

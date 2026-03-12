@@ -102,6 +102,20 @@ const profileRowSchema = z.object({
   directory_visible: z.boolean().default(true),
   schedule_type: z.string().nullable().default(null),
   weekend_shift_hours: z.string().nullable().default(null),
+  bio: z.string().nullable().default(null),
+  pronouns: z.string().nullable().default(null),
+  emergency_contact_name: z.string().nullable().default(null),
+  emergency_contact_phone: z.string().nullable().default(null),
+  emergency_contact_relationship: z.string().nullable().default(null),
+  favorite_music: z.string().nullable().default(null),
+  favorite_books: z.string().nullable().default(null),
+  favorite_sports: z.string().nullable().default(null),
+  privacy_settings: z.record(z.string(), z.unknown()).nullable().default(null),
+  social_linkedin: z.string().nullable().default(null),
+  social_twitter: z.string().nullable().default(null),
+  social_instagram: z.string().nullable().default(null),
+  social_github: z.string().nullable().default(null),
+  social_website: z.string().nullable().default(null),
   account_setup_at: z.string().nullable().default(null),
   last_seen_at: z.string().nullable().default(null),
   created_at: z.string(),
@@ -205,22 +219,22 @@ function mapPersonRow(
     status: row.status,
     noticePeriodEndDate: null,
     avatarUrl: row.avatar_url ?? null,
-    bio: null,
-    favoriteMusic: null,
-    favoriteBooks: null,
-    favoriteSports: null,
-    emergencyContactName: null,
-    emergencyContactPhone: null,
-    emergencyContactRelationship: null,
-    pronouns: null,
-    privacySettings: {},
+    bio: row.bio ?? null,
+    favoriteMusic: row.favorite_music ?? null,
+    favoriteBooks: row.favorite_books ?? null,
+    favoriteSports: row.favorite_sports ?? null,
+    emergencyContactName: row.emergency_contact_name ?? null,
+    emergencyContactPhone: row.emergency_contact_phone ?? null,
+    emergencyContactRelationship: row.emergency_contact_relationship ?? null,
+    pronouns: row.pronouns ?? null,
+    privacySettings: row.privacy_settings ?? {},
     scheduleType: row.schedule_type,
     weekendShiftHours: row.weekend_shift_hours,
-    socialLinkedin: null,
-    socialTwitter: null,
-    socialInstagram: null,
-    socialGithub: null,
-    socialWebsite: null,
+    socialLinkedin: row.social_linkedin ?? null,
+    socialTwitter: row.social_twitter ?? null,
+    socialInstagram: row.social_instagram ?? null,
+    socialGithub: row.social_github ?? null,
+    socialWebsite: row.social_website ?? null,
     directoryVisible: row.directory_visible,
     crewTag: crewTagById?.get(row.id) ?? null,
     inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at),
@@ -330,9 +344,9 @@ export async function GET(request: Request) {
   }
 
   const PEOPLE_SELECT_FULL =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, account_setup_at, last_seen_at, created_at, updated_at";
   const PEOPLE_SELECT_COMPAT =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, account_setup_at, last_seen_at, created_at, updated_at";
 
   async function runPeopleQuery(selectString: string) {
     let q = supabase

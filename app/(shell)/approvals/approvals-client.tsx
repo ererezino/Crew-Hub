@@ -68,13 +68,16 @@ export function ApprovalsClient({
         data?: {
           timeOff?: number;
           expenses?: number;
-          timesheets?: number;
+          managerExpenses?: number;
+          financeExpenses?: number;
         } | null;
       };
 
       return {
         timeOff: payload.data?.timeOff ?? 0,
-        expenses: payload.data?.expenses ?? 0
+        expenses: payload.data?.expenses ?? 0,
+        managerExpenses: payload.data?.managerExpenses ?? 0,
+        financeExpenses: payload.data?.financeExpenses ?? 0
       };
     },
     staleTime: 2 * 60 * 1000,
@@ -83,6 +86,8 @@ export function ApprovalsClient({
 
   const timeOffCount = approvalsCountQuery.data?.timeOff ?? 0;
   const expensesCount = approvalsCountQuery.data?.expenses ?? 0;
+  const managerExpensesCount = approvalsCountQuery.data?.managerExpenses ?? 0;
+  const financeExpensesCount = approvalsCountQuery.data?.financeExpenses ?? 0;
 
   const totalPendingCount = timeOffCount + expensesCount;
 
@@ -197,6 +202,8 @@ export function ApprovalsClient({
             <ExpenseApprovalsClient
               canManagerApprove={canManagerApproveExpenses}
               canFinanceApprove={canFinanceApproveExpenses}
+              managerCount={managerExpensesCount}
+              financeCount={financeExpensesCount}
               embedded
             />
           ) : null}

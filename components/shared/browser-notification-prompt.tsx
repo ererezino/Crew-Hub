@@ -39,9 +39,11 @@ export function BrowserNotificationPrompt() {
         window.localStorage.setItem(BROWSER_PUSH_PREF_KEY, "true");
         window.dispatchEvent(new CustomEvent("crewhub:browser-push-pref-updated"));
 
-        /* Also persist to server so preference survives across devices */
+        /* Persist to server — send all four fields (API requires them all).
+           Use defaults that match the server-side normalizeNotificationPreferences:
+           email/in-app default ON, browserPush now explicitly ON. */
         try {
-          const response = await fetch("/api/v1/settings/notifications", {
+          await fetch("/api/v1/settings/notifications", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -51,13 +53,8 @@ export function BrowserNotificationPrompt() {
               browserPush: true
             })
           });
-
-          if (!response.ok) {
-            /* Non-critical — localStorage is the primary store for browser push */
-            console.warn("Failed to persist browser push preference to server");
-          }
         } catch {
-          /* Network error — preference still saved locally */
+          /* Non-critical — localStorage is the primary store for browser push */
         }
       }
     } catch {

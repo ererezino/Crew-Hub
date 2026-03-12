@@ -458,10 +458,10 @@ async function fetchPendingApprovals(
     const reportIds = reports.map((report) => report.id);
 
     if (reportIds.length === 0) {
-      return { leave: 0, expenses: 0, timesheets: 0, total: 0 };
+      return { leave: 0, expenses: 0, total: 0 };
     }
 
-    const [leaveResult, expenseResult, timesheetResult] = await Promise.all([
+    const [leaveResult, expenseResult] = await Promise.all([
       supabase
         .from("leave_requests")
         .select("id", { count: "exact", head: true })
@@ -475,28 +475,19 @@ async function fetchPendingApprovals(
         .eq("org_id", orgId)
         .eq("status", "pending")
         .in("employee_id", reportIds)
-        .is("deleted_at", null),
-      supabase
-        .from("timesheets")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("status", "submitted")
-        .in("employee_id", reportIds)
         .is("deleted_at", null)
     ]);
 
     const leave = leaveResult.count ?? 0;
     const expenses = expenseResult.count ?? 0;
-    const timesheets = timesheetResult.count ?? 0;
 
     return {
       leave,
       expenses,
-      timesheets,
-      total: leave + expenses + timesheets
+      total: leave + expenses
     };
   } catch {
-    return { leave: 0, expenses: 0, timesheets: 0, total: 0 };
+    return { leave: 0, expenses: 0, total: 0 };
   }
 }
 

@@ -15,11 +15,13 @@ type SettingsPageProps = {
 function normalizeNotificationPreferences(
   value: Record<string, unknown> | null
 ): NotificationPreferences {
+  /* Default all preferences to ON when never explicitly set (null/undefined).
+     Only respect an explicit `false` — any other value (including absence) = enabled. */
   return {
-    emailAnnouncements: Boolean(value?.emailAnnouncements),
-    emailApprovals: Boolean(value?.emailApprovals),
-    inAppReminders: Boolean(value?.inAppReminders),
-    browserPush: Boolean(value?.browserPush)
+    emailAnnouncements: value?.emailAnnouncements !== false,
+    emailApprovals: value?.emailApprovals !== false,
+    inAppReminders: value?.inAppReminders !== false,
+    browserPush: value?.browserPush === true /* Browser push still defaults OFF — requires explicit opt-in via permission grant */
   };
 }
 

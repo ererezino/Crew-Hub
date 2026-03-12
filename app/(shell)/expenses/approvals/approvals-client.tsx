@@ -182,10 +182,16 @@ function ReceiptLightbox({
 export function ExpenseApprovalsClient({
   canManagerApprove,
   canFinanceApprove,
+  managerCount,
+  financeCount,
   embedded = false
 }: {
   canManagerApprove: boolean;
   canFinanceApprove: boolean;
+  /** Number of expenses awaiting manager approval (for sub-tab badge) */
+  managerCount?: number;
+  /** Number of expenses awaiting finance payment (for sub-tab badge) */
+  financeCount?: number;
   embedded?: boolean;
 }) {
   const t = useTranslations('expenseApprovals');
@@ -334,7 +340,7 @@ export function ExpenseApprovalsClient({
 
   const getDisplayStatusLabel = (expense: ExpenseRecord) => {
     if (expense.infoRequestState === "requested") {
-      return t('table.awaitingResponse');
+      return t('table.infoRequestedBadge');
     }
 
     return getExpenseStatusLabel(expense.status);
@@ -972,6 +978,9 @@ export function ExpenseApprovalsClient({
             onClick={() => setStage("manager")}
           >
             {t('tabs.pendingMyApproval')}
+            {typeof managerCount === "number" && managerCount > 0 ? (
+              <span className="page-tab-badge numeric">{managerCount}</span>
+            ) : null}
           </button>
           <button
             type="button"
@@ -979,6 +988,9 @@ export function ExpenseApprovalsClient({
             onClick={() => setStage("finance")}
           >
             {t('tabs.pendingPayment')}
+            {typeof financeCount === "number" && financeCount > 0 ? (
+              <span className="page-tab-badge numeric">{financeCount}</span>
+            ) : null}
           </button>
         </section>
       ) : null}
@@ -1211,9 +1223,13 @@ export function ExpenseApprovalsClient({
                         <StatusBadge tone={getDisplayStatusTone(expense)}>
                           {getDisplayStatusLabel(expense)}
                         </StatusBadge>
-                        {expense.infoRequestState === "requested" ? (
+                        {expense.infoRequestState === "requested" && expense.infoRequestUpdatedByName ? (
                           <p className="documents-cell-description">
-                            {t('table.infoRequested')}.
+                            {t('table.infoRequestedBy', { name: expense.infoRequestUpdatedByName })}
+                          </p>
+                        ) : expense.infoRequestState === "requested" ? (
+                          <p className="documents-cell-description">
+                            {t('table.awaitingEmployeeReply')}
                           </p>
                         ) : null}
                         {expense.infoRequestState === "responded" ? (

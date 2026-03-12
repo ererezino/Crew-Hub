@@ -13,6 +13,9 @@ type ConfirmDialogProps = {
   cancelLabel?: string;
   tone?: ConfirmDialogTone;
   isConfirming?: boolean;
+  /** When true, the cancel button gets the prominent styling and confirm becomes subtle.
+   *  Useful for destructive confirmations where you want to encourage the user to cancel. */
+  reverseEmphasis?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -25,6 +28,7 @@ export function ConfirmDialog({
   cancelLabel,
   tone = "default",
   isConfirming = false,
+  reverseEmphasis = false,
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
@@ -76,17 +80,35 @@ export function ConfirmDialog({
         <h2 className="modal-title">{title}</h2>
         {description ? <p className="settings-card-description">{description}</p> : null}
         <div className="modal-actions">
-          <button type="button" className="button button-subtle" onClick={onCancel} disabled={isConfirming}>
-            {resolvedCancelLabel}
-          </button>
-          <button
-            type="button"
-            className={tone === "danger" ? "button button-danger" : "button button-accent"}
-            onClick={onConfirm}
-            disabled={isConfirming}
-          >
-            {isConfirming ? workingLabel : resolvedConfirmLabel}
-          </button>
+          {reverseEmphasis ? (
+            <>
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={onConfirm}
+                disabled={isConfirming}
+              >
+                {isConfirming ? workingLabel : resolvedConfirmLabel}
+              </button>
+              <button type="button" className="button button-accent" onClick={onCancel} disabled={isConfirming}>
+                {resolvedCancelLabel}
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="button button-subtle" onClick={onCancel} disabled={isConfirming}>
+                {resolvedCancelLabel}
+              </button>
+              <button
+                type="button"
+                className={tone === "danger" ? "button button-danger" : "button button-accent"}
+                onClick={onConfirm}
+                disabled={isConfirming}
+              >
+                {isConfirming ? workingLabel : resolvedConfirmLabel}
+              </button>
+            </>
+          )}
         </div>
       </section>
     </div>
