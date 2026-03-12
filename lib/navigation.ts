@@ -194,6 +194,14 @@ export const NAV_GROUPS: NavGroup[] = [
     requiredRoles: ["HR_ADMIN", "SUPER_ADMIN"],
     items: [
       {
+        label: "People",
+        labelKey: "people",
+        href: "/people",
+        icon: "Users",
+        description: "Manage employee records, roles, and access",
+        shortcut: "G P"
+      },
+      {
         label: "Performance",
         labelKey: "performance",
         href: "/performance",
@@ -227,14 +235,6 @@ export const NAV_GROUPS: NavGroup[] = [
         description: "Request, sign, and track documents with signer timelines",
         shortcut: "G I",
         moduleId: "signatures"
-      },
-      {
-        label: "People",
-        labelKey: "people",
-        href: "/people",
-        icon: "Users",
-        description: "Manage employee records, roles, and access",
-        shortcut: "G P"
       }
     ]
   },
