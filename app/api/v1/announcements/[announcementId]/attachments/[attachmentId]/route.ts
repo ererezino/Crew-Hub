@@ -21,11 +21,17 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
 
 type RouteContext = { params: Promise<Record<string, string>> };
 
+type SignedUrlResponseData = {
+  url: string;
+  fileName: string;
+  mimeType: string;
+};
+
 /**
  * GET /api/v1/announcements/[announcementId]/attachments/[attachmentId]
  *
- * Returns a redirect to a short-lived signed URL for the attachment file.
- * Used for inline image rendering and file downloads.
+ * Returns a JSON response with a short-lived signed URL for the attachment.
+ * Used by the client to render inline images and provide download links.
  * Auth: any authenticated org member.
  */
 export async function GET(
@@ -89,6 +95,13 @@ export async function GET(
     });
   }
 
-  // Redirect to the signed URL
-  return NextResponse.redirect(signedUrlData.signedUrl, { status: 302 });
+  return jsonResponse<SignedUrlResponseData>(200, {
+    data: {
+      url: signedUrlData.signedUrl,
+      fileName: attachment.file_name,
+      mimeType: attachment.mime_type
+    },
+    error: null,
+    meta: buildMeta()
+  });
 }

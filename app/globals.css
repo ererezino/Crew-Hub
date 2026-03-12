@@ -1486,82 +1486,160 @@ html.dark .topbar {
   white-space: pre-wrap;
 }
 
-.announcement-attachments {
-  margin-top: var(--space-3);
-}
+/* ── Announcement Attachment Section ── */
 
-.announcement-image-gallery {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-
-.announcement-image-link {
-  display: block;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 1px solid var(--border-secondary);
-  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
-}
-
-.announcement-image-link:hover {
-  border-color: var(--border-primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.announcement-image-preview {
-  display: block;
-  max-width: 320px;
-  max-height: 240px;
-  width: auto;
-  height: auto;
-  object-fit: cover;
-  border-radius: var(--radius-md);
-}
-
-.announcement-files {
-  margin-top: var(--space-2);
-}
-
-.announcement-attachments-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--text-tertiary);
-  margin-bottom: var(--space-1);
-}
-
-.attachment-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.att-section {
+  margin-top: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-3);
 }
 
-.attachment-list-item {
-  font-size: var(--text-sm);
+/* ── Image Gallery ── */
+
+.att-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
 }
 
-.attachment-download-link {
+.att-img-link {
+  position: relative;
+  display: block;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  aspect-ratio: 4 / 3;
+  transition:
+    border-color 150ms ease-in-out,
+    box-shadow 150ms ease-in-out,
+    transform 150ms ease-in-out;
+}
+
+.att-img-link:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.att-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.att-img-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0);
+  color: #fff;
+  opacity: 0;
+  transition:
+    background 150ms ease-in-out,
+    opacity 150ms ease-in-out;
+  pointer-events: none;
+}
+
+.att-img-link:hover .att-img-overlay {
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 1;
+}
+
+/* Loading skeleton for images */
+
+.att-img-skeleton {
+  border-radius: var(--radius-card);
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(
+    110deg,
+    var(--bg-subtle) 30%,
+    var(--bg-surface) 50%,
+    var(--bg-subtle) 70%
+  );
+  background-size: 200% 100%;
+  animation: att-shimmer 1.4s ease-in-out infinite;
+  border: 1px solid var(--border-subtle);
+}
+
+@keyframes att-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Error fallback for images */
+
+.att-img-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-card);
+  aspect-ratio: 4 / 3;
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border-default);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  padding: var(--space-3);
+  text-align: center;
+  word-break: break-all;
+}
+
+/* ── File Chips ── */
+
+.att-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.att-file-chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-default);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
   color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
   text-decoration: none;
-  transition: color var(--transition-hover);
+  transition:
+    border-color 150ms ease-in-out,
+    background 150ms ease-in-out,
+    color 150ms ease-in-out,
+    box-shadow 150ms ease-in-out;
+  cursor: pointer;
 }
 
-.attachment-download-link:hover {
+.att-file-chip:hover {
+  border-color: var(--accent);
+  background: var(--bg-warm);
   color: var(--text-primary);
-  text-decoration: underline;
+  box-shadow: var(--shadow-xs);
 }
 
-.attachment-file-name {
-  word-break: break-all;
+.att-file-chip-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.att-file-chip-dl {
+  opacity: 0;
+  transition: opacity 150ms ease-in-out;
+  flex-shrink: 0;
+}
+
+.att-file-chip:hover .att-file-chip-dl {
+  opacity: 0.7;
 }
 
 .announcement-row-actions {

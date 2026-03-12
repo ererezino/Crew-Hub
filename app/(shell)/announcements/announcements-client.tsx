@@ -3,6 +3,8 @@
 import {
   type ChangeEvent,
   type FormEvent,
+  useCallback,
+  useEffect,
   useMemo,
   useState
 } from "react";
@@ -19,7 +21,7 @@ import { useAnnouncements } from "../../../hooks/use-announcements";
 import { useNotifications } from "../../../hooks/use-notifications";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
-import { Archive, Megaphone, Paperclip, X } from "lucide-react";
+import { Archive, Download, ExternalLink, FileText, ImageIcon, Megaphone, Paperclip, X } from "lucide-react";
 import type {
   Announcement,
   AnnouncementDismissResponse,
@@ -185,56 +187,37 @@ function AnnouncementCard({
         <p className="announcement-item-body">{announcement.body}</p>
 
         {announcement.attachments.length > 0 ? (
-          <div className="announcement-attachments">
+          <div className="att-section">
             {/* Inline images */}
             {announcement.attachments.some((a) => a.mimeType.startsWith("image/")) ? (
-              <div className="announcement-image-gallery">
+              <div className="att-gallery">
                 {announcement.attachments
                   .filter((a) => a.mimeType.startsWith("image/"))
                   .map((attachment) => (
-                    <a
+                    <AnnouncementImage
                       key={attachment.id}
-                      className="announcement-image-link"
-                      href={`/api/v1/announcements/${announcement.id}/attachments/${attachment.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`/api/v1/announcements/${announcement.id}/attachments/${attachment.id}`}
-                        alt={attachment.fileName}
-                        className="announcement-image-preview"
-                        loading="lazy"
-                      />
-                    </a>
+                      announcementId={announcement.id}
+                      attachmentId={attachment.id}
+                      fileName={attachment.fileName}
+                    />
                   ))}
               </div>
             ) : null}
 
             {/* Non-image file attachments */}
             {announcement.attachments.some((a) => !a.mimeType.startsWith("image/")) ? (
-              <div className="announcement-files">
-                <p className="announcement-attachments-label">
-                  <Paperclip size={14} aria-hidden="true" />
-                  {t('attachmentsLabel')}
-                </p>
-                <ul className="attachment-list">
-                  {announcement.attachments
-                    .filter((a) => !a.mimeType.startsWith("image/"))
-                    .map((attachment) => (
-                      <li key={attachment.id} className="attachment-list-item">
-                        <a
-                          className="attachment-download-link"
-                          href={`/api/v1/announcements/${announcement.id}/attachments/${attachment.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Paperclip size={14} aria-hidden="true" />
-                          <span className="attachment-file-name">{attachment.fileName}</span>
-                        </a>
-                      </li>
-                    ))}
-                </ul>
+              <div className="att-files">
+                {announcement.attachments
+                  .filter((a) => !a.mimeType.startsWith("image/"))
+                  .map((attachment) => (
+                    <AttachmentFileChip
+                      key={attachment.id}
+                      announcementId={announcement.id}
+                      attachmentId={attachment.id}
+                      fileName={attachment.fileName}
+                      mimeType={attachment.mimeType}
+                    />
+                  ))}
               </div>
             ) : null}
           </div>
@@ -297,6 +280,128 @@ function AnnouncementsSkeleton() {
         </section>
       ))}
     </div>
+  );
+}
+
+/* ─── Lazy-loaded announcement image ─── */
+
+function AnnouncementImage({
+  announcementId,
+  attachmentId,
+  fileName
+}: {
+  announcementId: string;
+  attachmentId: string;
+  fileName: string;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch(
+          `/api/v1/announcements/${announcementId}/attachments/${attachmentId}`
+        );
+        if (!res.ok) { setError(true); return; }
+        const json = await res.json();
+        if (!cancelled && json.data?.url) {
+          setSrc(json.data.url);
+        } else {
+          setError(true);
+        }
+      } catch {
+        if (!cancelled) setError(true);
+      }
+    }
+
+    void load();
+    return () => { cancelled = true; };
+  }, [announcementId, attachmentId]);
+
+  if (error) {
+    return (
+      <div className="att-img-error">
+        <ImageIcon size={20} aria-hidden="true" />
+        <span>{fileName}</span>
+      </div>
+    );
+  }
+
+  if (!src) {
+    return <div className="att-img-skeleton" />;
+  }
+
+  return (
+    <a
+      className="att-img-link"
+      href={src}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={fileName}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={fileName} className="att-img" loading="lazy" />
+      <span className="att-img-overlay">
+        <ExternalLink size={16} aria-hidden="true" />
+      </span>
+    </a>
+  );
+}
+
+/* ─── Attachment file chip ─── */
+
+function AttachmentFileChip({
+  announcementId,
+  attachmentId,
+  fileName,
+  mimeType
+}: {
+  announcementId: string;
+  attachmentId: string;
+  fileName: string;
+  mimeType: string;
+}) {
+  const [href, setHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch(
+          `/api/v1/announcements/${announcementId}/attachments/${attachmentId}`
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json.data?.url) {
+          setHref(json.data.url);
+        }
+      } catch {
+        // silent
+      }
+    }
+
+    void load();
+    return () => { cancelled = true; };
+  }, [announcementId, attachmentId]);
+
+  const isPdf = mimeType === "application/pdf";
+
+  return (
+    <a
+      className="att-file-chip"
+      href={href ?? "#"}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-disabled={!href}
+    >
+      {isPdf ? <FileText size={14} aria-hidden="true" /> : <Paperclip size={14} aria-hidden="true" />}
+      <span className="att-file-chip-name">{fileName}</span>
+      <Download size={12} aria-hidden="true" className="att-file-chip-dl" />
+    </a>
   );
 }
 
