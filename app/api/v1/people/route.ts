@@ -99,6 +99,7 @@ const profileRowSchema = z.object({
   primary_currency: z.string(),
   status: z.enum(PROFILE_STATUSES),
   avatar_url: z.string().nullable().default(null),
+  directory_visible: z.boolean().default(true),
   schedule_type: z.string().nullable().default(null),
   weekend_shift_hours: z.string().nullable().default(null),
   account_setup_at: z.string().nullable().default(null),
@@ -215,6 +216,12 @@ function mapPersonRow(
     privacySettings: {},
     scheduleType: row.schedule_type,
     weekendShiftHours: row.weekend_shift_hours,
+    socialLinkedin: null,
+    socialTwitter: null,
+    socialInstagram: null,
+    socialGithub: null,
+    socialWebsite: null,
+    directoryVisible: row.directory_visible,
     crewTag: crewTagById?.get(row.id) ?? null,
     inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at),
     createdAt: row.created_at,
@@ -323,9 +330,9 @@ export async function GET(request: Request) {
   }
 
   const PEOPLE_SELECT_FULL =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, schedule_type, weekend_shift_hours, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, account_setup_at, last_seen_at, created_at, updated_at";
   const PEOPLE_SELECT_COMPAT =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at";
 
   async function runPeopleQuery(selectString: string) {
     let q = supabase
@@ -805,7 +812,7 @@ export async function POST(request: Request) {
       status: profileStatus
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 

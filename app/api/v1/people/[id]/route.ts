@@ -40,6 +40,7 @@ const updatePersonSchema = z.object({
   favoriteBooks: z.string().trim().max(200, "Favorite books must be 200 characters or fewer.").nullable().optional(),
   favoriteSports: z.string().trim().max(200, "Favorite sports must be 200 characters or fewer.").nullable().optional(),
   crewTag: z.string().trim().max(50, "Crew Tag must be 50 characters or fewer.").nullable().optional(),
+  directoryVisible: z.boolean().optional(),
   privacySettings: z.object({
     showEmail: z.boolean().optional(),
     showPhone: z.boolean().optional(),
@@ -90,6 +91,7 @@ const profileRowSchema = z.object({
   emergency_contact_phone: z.string().nullable().default(null),
   emergency_contact_relationship: z.string().nullable().default(null),
   pronouns: z.string().nullable().default(null),
+  directory_visible: z.boolean().default(true),
   privacy_settings: z.unknown().default({}),
   schedule_type: z.string().nullable().optional().default(null),
   weekend_shift_hours: z.string().nullable().optional().default(null),
@@ -154,6 +156,12 @@ function mapPersonRow(
     emergencyContactPhone: row.emergency_contact_phone ?? null,
     emergencyContactRelationship: row.emergency_contact_relationship ?? null,
     pronouns: row.pronouns ?? null,
+    socialLinkedin: null,
+    socialTwitter: null,
+    socialInstagram: null,
+    socialGithub: null,
+    socialWebsite: null,
+    directoryVisible: row.directory_visible,
     privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../../types/people").PrivacySettings,
     scheduleType: row.schedule_type,
     weekendShiftHours: row.weekend_shift_hours,
@@ -273,7 +281,7 @@ export async function PUT(
   const { data: existingProfile, error: existingProfileError } = await serviceRoleClient
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
@@ -464,7 +472,12 @@ export async function PUT(
     favorite_books?: string | null;
     favorite_sports?: string | null;
     privacy_settings?: Record<string, boolean>;
+    directory_visible?: boolean;
   } = {};
+
+  if (payload.directoryVisible !== undefined) {
+    updateValues.directory_visible = payload.directoryVisible;
+  }
 
   if (payload.fullName !== undefined) {
     updateValues.full_name = payload.fullName.trim();
@@ -523,7 +536,7 @@ export async function PUT(
       .eq("id", personId)
       .eq("org_id", session.profile.org_id)
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
       )
       .single();
 
@@ -949,7 +962,7 @@ export async function PATCH(
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 

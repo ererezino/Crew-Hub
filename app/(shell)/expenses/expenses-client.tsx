@@ -19,6 +19,7 @@ import { ContextualHelp } from "../../../components/shared/contextual-help";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
+import { FileAttachmentPicker } from "../../../components/shared/file-attachment-picker";
 import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { MoneyInput } from "../../../components/ui/money-input";
 import { useExpenses } from "../../../hooks/use-expenses";
@@ -45,6 +46,7 @@ import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries"
 import { useMePaymentDetails } from "../../../hooks/use-payment-details";
 import { Receipt, X } from "lucide-react";
 import type {
+  ExpenseCommentAttachmentSignedUrlResponse,
   CreateExpenseCommentResponse,
   CreateExpenseResponse,
   ExpenseCommentRecord,
@@ -641,6 +643,7 @@ export function ExpensesClient({
   const [canReplyByExpenseId, setCanReplyByExpenseId] = useState<Record<string, boolean>>({});
   const [isLoadingCommentsByExpenseId, setIsLoadingCommentsByExpenseId] = useState<Record<string, boolean>>({});
   const [commentDraftByExpenseId, setCommentDraftByExpenseId] = useState<Record<string, string>>({});
+  const [commentFilesByExpenseId, setCommentFilesByExpenseId] = useState<Record<string, File[]>>({});
   const [commentErrorByExpenseId, setCommentErrorByExpenseId] = useState<Record<string, string | null>>({});
   const [isSubmittingCommentByExpenseId, setIsSubmittingCommentByExpenseId] = useState<Record<string, boolean>>({});
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -987,6 +990,45 @@ export function ExpensesClient({
     }
   };
 
+  const openCommentAttachment = async (
+    expenseId: string,
+    attachmentId: string,
+    fileName: string
+  ) => {
+    const loadingKey = `comment-${attachmentId}`;
+    setIsOpeningReceiptById((currentMap) => ({
+      ...currentMap,
+      [loadingKey]: true
+    }));
+
+    try {
+      const response = await fetch(`/api/v1/expenses/${expenseId}/comments/attachments/${attachmentId}`, {
+        method: "GET"
+      });
+
+      const payload = (await response.json()) as ExpenseCommentAttachmentSignedUrlResponse;
+
+      if (!response.ok || !payload.data?.url) {
+        showToast("error", payload.error?.message ?? td("toast.unableToOpenAttachment"));
+        return;
+      }
+
+      setReceiptLightbox({
+        url: payload.data.url,
+        fileName: payload.data.fileName || fileName,
+        label: payload.data.fileName || fileName
+      });
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : td("toast.unableToOpenAttachment"));
+    } finally {
+      setIsOpeningReceiptById((currentMap) => {
+        const nextMap = { ...currentMap };
+        delete nextMap[loadingKey];
+        return nextMap;
+      });
+    }
+  };
+
   const loadExpenseComments = async (expenseId: string) => {
     setIsLoadingCommentsByExpenseId((current) => ({
       ...current,
@@ -1025,11 +1067,12 @@ export function ExpensesClient({
 
   const submitExpenseReply = async (expense: ExpenseRecord) => {
     const message = commentDraftByExpenseId[expense.id]?.trim() ?? "";
+    const files = commentFilesByExpenseId[expense.id] ?? [];
 
-    if (!message) {
+    if (!message && files.length === 0) {
       setCommentErrorByExpenseId((current) => ({
         ...current,
-        [expense.id]: td("validation.responseRequired")
+        [expense.id]: td("validation.responseOrAttachmentRequired")
       }));
       return;
     }
@@ -1052,15 +1095,16 @@ export function ExpensesClient({
     }));
 
     try {
+      const formData = new FormData();
+      formData.set("action", "response");
+      formData.set("message", message);
+      files.forEach((file) => {
+        formData.append("attachments", file);
+      });
+
       const response = await fetch(`/api/v1/expenses/${expense.id}/comments`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "response",
-          message
-        })
+        body: formData
       });
 
       const payload = (await response.json()) as CreateExpenseCommentResponse;
@@ -1068,7 +1112,7 @@ export function ExpensesClient({
       if (!response.ok || !payload.data?.comment) {
         setCommentErrorByExpenseId((current) => ({
           ...current,
-          [expense.id]: payload.error?.message ?? td("toast.unableToSendResponse")
+          [expense.id]: payload.error?.message ?? td("toast.unableToSendReply")
         }));
         return;
       }
@@ -1077,6 +1121,10 @@ export function ExpensesClient({
       setCommentDraftByExpenseId((current) => ({
         ...current,
         [expense.id]: ""
+      }));
+      setCommentFilesByExpenseId((current) => ({
+        ...current,
+        [expense.id]: []
       }));
       setCommentsByExpenseId((current) => ({
         ...current,
@@ -1092,7 +1140,7 @@ export function ExpensesClient({
     } catch (error) {
       setCommentErrorByExpenseId((current) => ({
         ...current,
-        [expense.id]: error instanceof Error ? error.message : td("toast.unableToSendResponse")
+        [expense.id]: error instanceof Error ? error.message : td("toast.unableToSendReply")
       }));
     } finally {
       setIsSubmittingCommentByExpenseId((current) => ({
@@ -1100,6 +1148,27 @@ export function ExpensesClient({
         [expense.id]: false
       }));
     }
+  };
+
+  const handleCommentFilesSelected = (expenseId: string, files: File[]) => {
+    setCommentFilesByExpenseId((current) => ({
+      ...current,
+      [expenseId]: files
+    }));
+
+    if (files.length > 0) {
+      setCommentErrorByExpenseId((current) => ({
+        ...current,
+        [expenseId]: null
+      }));
+    }
+  };
+
+  const removeCommentFile = (expenseId: string, index: number) => {
+    setCommentFilesByExpenseId((current) => ({
+      ...current,
+      [expenseId]: (current[expenseId] ?? []).filter((_, currentIndex) => currentIndex !== index)
+    }));
   };
 
   const mutateExpense = async ({
@@ -1283,6 +1352,7 @@ export function ExpensesClient({
                     const commentThread = commentsByExpenseId[expense.id] ?? [];
                     const canReplyToInfoRequest = canReplyByExpenseId[expense.id] ?? false;
                     const commentDraft = commentDraftByExpenseId[expense.id] ?? "";
+                    const commentFiles = commentFilesByExpenseId[expense.id] ?? [];
                     const commentError = commentErrorByExpenseId[expense.id] ?? null;
                     const isLoadingComments = isLoadingCommentsByExpenseId[expense.id] ?? false;
                     const isSubmittingComment = isSubmittingCommentByExpenseId[expense.id] ?? false;
@@ -1491,7 +1561,38 @@ export function ExpensesClient({
                                                 : t('infoRequests.response')}
                                             </StatusBadge>
                                           </div>
-                                          <p>{comment.message}</p>
+                                          {comment.message ? <p>{comment.message}</p> : null}
+                                          {comment.attachments.length > 0 ? (
+                                            <ul className="expense-comment-attachments">
+                                              {comment.attachments.map((attachment) => {
+                                                const loadingKey = `comment-${attachment.id}`;
+                                                return (
+                                                  <li key={attachment.id} className="expense-comment-attachments-item">
+                                                    <div className="expense-comment-attachment-meta">
+                                                      <span className="expense-comment-attachment-name">{attachment.fileName}</span>
+                                                      <span className="expense-comment-attachment-type">
+                                                        {attachment.mimeType.startsWith("image/")
+                                                          ? t('infoRequests.imageAttachment')
+                                                          : t('infoRequests.fileAttachment')}
+                                                      </span>
+                                                    </div>
+                                                    <button
+                                                      type="button"
+                                                      className="table-row-action"
+                                                      onClick={() => {
+                                                        void openCommentAttachment(expense.id, attachment.id, attachment.fileName);
+                                                      }}
+                                                      disabled={Boolean(isOpeningReceiptById[loadingKey])}
+                                                    >
+                                                      {isOpeningReceiptById[loadingKey]
+                                                        ? t('tableActions.opening')
+                                                        : t('infoRequests.openAttachment')}
+                                                    </button>
+                                                  </li>
+                                                );
+                                              })}
+                                            </ul>
+                                          ) : null}
                                           <p
                                             className="compensation-history-item-meta"
                                             title={formatDateTimeTooltip(comment.createdAt, locale)}
@@ -1530,6 +1631,20 @@ export function ExpensesClient({
                                           <p className="form-field-error">{commentError}</p>
                                         ) : null}
                                       </label>
+                                      <div className="form-field">
+                                        <span className="form-label">{t('infoRequests.attachmentsLabel')}</span>
+                                        <FileAttachmentPicker
+                                          files={commentFiles}
+                                          accept={uploadAcceptValue}
+                                          disabled={isSubmittingComment}
+                                          buttonLabel={t('infoRequests.chooseAttachments')}
+                                          hint={t('infoRequests.attachmentsHint')}
+                                          emptyLabel={t('infoRequests.noAttachmentsSelected')}
+                                          removeLabel={t('infoRequests.removeAttachment')}
+                                          onFilesSelected={(files) => handleCommentFilesSelected(expense.id, files)}
+                                          onRemoveFile={(index) => removeCommentFile(expense.id, index)}
+                                        />
+                                      </div>
                                       <button
                                         type="button"
                                         className="button button-accent"

@@ -25,6 +25,9 @@ describe("Expense clarification and payment language hardening", () => {
     expect(commentsRoute).toContain('action: expenseCommentTypeSchema');
     expect(commentsRoute).toContain('payload.action === "request_info"');
     expect(commentsRoute).toContain('payload.action === "response"');
+    expect(commentsRoute).toContain('formData.getAll("attachments")');
+    expect(commentsRoute).toContain('expense_comment_attachments');
+    expect(commentsRoute).toContain('FINANCE_THREAD_STATUSES');
     expect(commentsRoute).toContain("sendExpenseInfoRequestedEmail");
     expect(commentsRoute).toContain("sendExpenseInfoResponseEmail");
   });
@@ -37,13 +40,43 @@ describe("Expense clarification and payment language hardening", () => {
     expect(migration).toContain("create policy expense_comments_insert_scope");
   });
 
+  it("adds expense comment attachment persistence with scoped access", () => {
+    const migration = read("supabase/migrations/20260312200000_expense_comment_attachments.sql");
+
+    expect(migration).toContain("create table if not exists public.expense_comment_attachments");
+    expect(migration).toContain("create policy expense_comment_attachments_select_scope");
+    expect(migration).toContain("create policy expense_comment_attachments_insert_scope");
+    expect(migration).toContain("drop constraint if exists expense_comments_message_check");
+  });
+
   it("shows info-request conversation and reply UI on employee expense details", () => {
     const expensesClient = read("app/(shell)/expenses/expenses-client.tsx");
 
     expect(expensesClient).toContain("t('infoRequests.title')");
     expect(expensesClient).toContain("t('infoRequests.sendResponse')");
     expect(expensesClient).toContain("t('infoRequests.actionNeeded')");
+    expect(expensesClient).toContain("FileAttachmentPicker");
+    expect(expensesClient).toContain("openCommentAttachment");
+    expect(expensesClient).toContain("comment.attachments.length > 0");
     expect(expensesClient).not.toContain("awaiting disbursement");
+  });
+
+  it("shows attachments and finance request-info action in approvals", () => {
+    const approvalsClient = read("app/(shell)/expenses/approvals/approvals-client.tsx");
+
+    expect(approvalsClient).toContain("FileAttachmentPicker");
+    expect(approvalsClient).toContain("openCommentAttachment");
+    expect(approvalsClient).toContain("comment.attachments.length > 0");
+    expect(approvalsClient).toContain("stage === \"finance\"");
+    expect(approvalsClient).toContain("t('requestInfoPanel.descriptionFinance'");
+  });
+
+  it("adds a signed-url route for expense comment attachments", () => {
+    const attachmentRoute = read("app/api/v1/expenses/[id]/comments/attachments/[attachmentId]/route.ts");
+
+    expect(attachmentRoute).toContain("expense_comment_attachments");
+    expect(attachmentRoute).toContain("createSignedUrl");
+    expect(attachmentRoute).toContain("You are not allowed to view this attachment");
   });
 
   it("enables expense info-request email toggles", () => {

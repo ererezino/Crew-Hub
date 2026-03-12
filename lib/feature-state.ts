@@ -154,7 +154,8 @@ export type ModuleId =
   | "analytics"
   | "signatures"
   | "surveys"
-  | "notifications";
+  | "notifications"
+  | "the_crew";
 
 export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   // Core pilot modules — LIVE
@@ -191,7 +192,10 @@ export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   learning: "UNAVAILABLE",
   signatures: "UNAVAILABLE",
   surveys: "UNAVAILABLE",
-  analytics: "ADMIN_ONLY"
+  analytics: "ADMIN_ONLY",
+
+  // Social team page
+  the_crew: "LIVE"
 };
 
 // ---------------------------------------------------------------------------

@@ -84,7 +84,8 @@ const INSIGHTS_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "SUPER
 
 const DEFAULT_NAV_ROLE_OVERRIDES: Readonly<Record<string, readonly UserRole[]>> = {
   "/approvals": APPROVAL_ROLES,
-  "/people": MANAGE_GROUP_ROLES,
+  "/people": ["HR_ADMIN", "SUPER_ADMIN"],
+  "/the-crew": ALL_ROLES,
   "/scheduling": SCHEDULING_ROLES,
   "/scheduling/manage": SCHEDULING_MANAGE_ROLES,
   "/onboarding": MANAGE_GROUP_ROLES,

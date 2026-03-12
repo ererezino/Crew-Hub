@@ -9,6 +9,7 @@ import {
 
 export const RECEIPTS_BUCKET_NAME = "receipts";
 export const MAX_RECEIPT_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_EXPENSE_COMMENT_ATTACHMENTS = 8;
 
 export const ALLOWED_RECEIPT_EXTENSIONS = ["pdf", "png", "jpg", "jpeg"] as const;
 export const ALLOWED_RECEIPT_MIME_TYPES = [

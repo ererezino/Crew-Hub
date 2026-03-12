@@ -81,6 +81,7 @@ type EditPersonFormValues = {
   managerId: string;
   title: string;
   crewTag: string;
+  directoryVisible: boolean;
 };
 
 type EditPersonFormErrors = {
@@ -508,7 +509,8 @@ export function PeopleClient({
     department: "",
     managerId: "",
     title: "",
-    crewTag: ""
+    crewTag: "",
+    directoryVisible: true
   });
   const [editErrors, setEditErrors] = useState<EditPersonFormErrors>({});
   const [isEditSaving, setIsEditSaving] = useState(false);
@@ -699,7 +701,8 @@ export function PeopleClient({
       department: person.department ?? "",
       managerId: person.managerId ?? "",
       title: person.title ?? "",
-      crewTag: person.crewTag ?? ""
+      crewTag: person.crewTag ?? "",
+      directoryVisible: person.directoryVisible !== false
     });
     setEditErrors({});
     setIsEditOpen(true);
@@ -745,7 +748,8 @@ export function PeopleClient({
           department: editValues.department.trim() || null,
           managerId: editValues.managerId.trim() || null,
           title: editValues.title.trim() || null,
-          crewTag: editValues.crewTag.trim() || null
+          crewTag: editValues.crewTag.trim() || null,
+          directoryVisible: editValues.directoryVisible
         })
       });
 
@@ -1849,6 +1853,15 @@ export function PeopleClient({
               {editErrors.managerId ? (
                 <p className="form-field-error">{editErrors.managerId}</p>
               ) : null}
+            </label>
+
+            <label className="crew-mod-toggle" style={{ padding: "var(--space-3) 0", borderTop: "1px solid var(--border-default)", marginTop: "var(--space-2)" }}>
+              <input
+                type="checkbox"
+                checked={editValues.directoryVisible}
+                onChange={(e) => setEditValues((prev) => ({ ...prev, directoryVisible: e.target.checked }))}
+              />
+              Visible on The Crew
             </label>
 
             <div className="slide-panel-actions">

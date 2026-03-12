@@ -33,7 +33,7 @@ export default async function PeoplePage() {
     const tNav = await getTranslations('nav');
     return (
       <>
-        <PageHeader title={tNav('crewMembers')} description={tNav('description.crewMembers')} />
+        <PageHeader title={tNav('people')} description={tNav('description.people')} />
         <EmptyState
           title={t('emptyState.profileUnavailable')}
           description={t('emptyState.profileUnavailableBody')}

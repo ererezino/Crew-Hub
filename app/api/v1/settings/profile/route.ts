@@ -5,6 +5,15 @@ import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 
+const optionalUrl = z
+  .string()
+  .trim()
+  .max(255, "URL is too long")
+  .refine((value) => value.length === 0 || /^https?:\/\//.test(value), {
+    message: "URL must start with http:// or https://"
+  })
+  .optional();
+
 const profileSchema = z.object({
   fullName: z.string().trim().min(1, "Name is required").max(200, "Name is too long"),
   avatarUrl: z
@@ -20,7 +29,17 @@ const profileSchema = z.object({
   countryCode: z.string().trim().max(2, "Country code must be 2 characters").optional(),
   emergencyContactName: z.string().trim().max(200, "Emergency contact name is too long").optional(),
   emergencyContactPhone: z.string().trim().max(30, "Emergency contact phone is too long").optional(),
-  emergencyContactRelationship: z.string().trim().max(100, "Emergency contact relationship is too long").optional()
+  emergencyContactRelationship: z.string().trim().max(100, "Emergency contact relationship is too long").optional(),
+  /* Social links (The Crew) */
+  socialLinkedin: optionalUrl,
+  socialTwitter: optionalUrl,
+  socialInstagram: optionalUrl,
+  socialGithub: optionalUrl,
+  socialWebsite: optionalUrl,
+  /* Favorites (The Crew) */
+  favoriteMusic: z.string().trim().max(200, "Favorite music is too long").optional(),
+  favoriteBooks: z.string().trim().max(200, "Favorite books is too long").optional(),
+  favoriteSports: z.string().trim().max(200, "Favorite sports is too long").optional()
 });
 
 type ProfileResponseData = {
@@ -32,6 +51,14 @@ type ProfileResponseData = {
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
   emergencyContactRelationship: string | null;
+  socialLinkedin: string | null;
+  socialTwitter: string | null;
+  socialInstagram: string | null;
+  socialGithub: string | null;
+  socialWebsite: string | null;
+  favoriteMusic: string | null;
+  favoriteBooks: string | null;
+  favoriteSports: string | null;
 };
 
 function buildMeta() {
@@ -97,10 +124,23 @@ export async function PATCH(request: Request) {
       country_code: parsed.data.countryCode || null,
       emergency_contact_name: parsed.data.emergencyContactName ?? null,
       emergency_contact_phone: parsed.data.emergencyContactPhone ?? null,
-      emergency_contact_relationship: parsed.data.emergencyContactRelationship ?? null
+      emergency_contact_relationship: parsed.data.emergencyContactRelationship ?? null,
+      social_linkedin: parsed.data.socialLinkedin ?? null,
+      social_twitter: parsed.data.socialTwitter ?? null,
+      social_instagram: parsed.data.socialInstagram ?? null,
+      social_github: parsed.data.socialGithub ?? null,
+      social_website: parsed.data.socialWebsite ?? null,
+      favorite_music: parsed.data.favoriteMusic ?? null,
+      favorite_books: parsed.data.favoriteBooks ?? null,
+      favorite_sports: parsed.data.favoriteSports ?? null
     })
     .eq("id", session.profile.id)
-    .select("full_name, avatar_url, phone, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship")
+    .select(
+      `full_name, avatar_url, phone, bio, pronouns,
+       emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+       social_linkedin, social_twitter, social_instagram, social_github, social_website,
+       favorite_music, favorite_books, favorite_sports`
+    )
     .single();
 
   if (error || !data) {
@@ -123,7 +163,15 @@ export async function PATCH(request: Request) {
       pronouns: data.pronouns,
       emergencyContactName: data.emergency_contact_name,
       emergencyContactPhone: data.emergency_contact_phone,
-      emergencyContactRelationship: data.emergency_contact_relationship
+      emergencyContactRelationship: data.emergency_contact_relationship,
+      socialLinkedin: data.social_linkedin,
+      socialTwitter: data.social_twitter,
+      socialInstagram: data.social_instagram,
+      socialGithub: data.social_github,
+      socialWebsite: data.social_website,
+      favoriteMusic: data.favorite_music,
+      favoriteBooks: data.favorite_books,
+      favoriteSports: data.favorite_sports
     },
     error: null,
     meta: buildMeta()

@@ -57,6 +57,12 @@ export type PersonRecord = {
   emergencyContactPhone: string | null;
   emergencyContactRelationship: string | null;
   pronouns: string | null;
+  socialLinkedin: string | null;
+  socialTwitter: string | null;
+  socialInstagram: string | null;
+  socialGithub: string | null;
+  socialWebsite: string | null;
+  directoryVisible: boolean;
   privacySettings: PrivacySettings;
   scheduleType: string | null;
   weekendShiftHours: string | null;
@@ -121,6 +127,12 @@ export type PeopleUpdatePayload = {
   favoriteMusic?: string | null;
   favoriteBooks?: string | null;
   favoriteSports?: string | null;
+  socialLinkedin?: string | null;
+  socialTwitter?: string | null;
+  socialInstagram?: string | null;
+  socialGithub?: string | null;
+  socialWebsite?: string | null;
+  directoryVisible?: boolean;
   privacySettings?: PrivacySettings;
 };
 
@@ -147,3 +159,50 @@ export type PeoplePasswordResetResponseData = {
 };
 
 export type PeoplePasswordResetResponse = ApiResponse<PeoplePasswordResetResponseData>;
+
+/* ── The Crew (social team page) ── */
+
+/** Public-facing crew member profile shown on The Crew page. */
+export type CrewMember = {
+  id: string;
+  fullName: string;
+  title: string | null;
+  department: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  pronouns: string | null;
+  countryCode: string | null;
+  startDate: string | null;
+  favoriteMusic: string | null;
+  favoriteBooks: string | null;
+  favoriteSports: string | null;
+  socialLinkedin: string | null;
+  socialTwitter: string | null;
+  socialInstagram: string | null;
+  socialGithub: string | null;
+  socialWebsite: string | null;
+};
+
+export type CrewListResponseData = {
+  members: CrewMember[];
+  departmentCounts: Record<string, number>;
+  totalCount: number;
+};
+
+export type CrewListResponse = ApiResponse<CrewListResponseData>;
+
+export type CrewModeratePayload = {
+  bio?: string | null;
+  socialLinkedin?: string | null;
+  socialTwitter?: string | null;
+  socialInstagram?: string | null;
+  socialGithub?: string | null;
+  socialWebsite?: string | null;
+  favoriteMusic?: string | null;
+  favoriteBooks?: string | null;
+  favoriteSports?: string | null;
+  avatarUrl?: string | null;
+  directoryVisible?: boolean;
+};
+
+export type CrewModerateResponse = ApiResponse<{ updated: true }>;

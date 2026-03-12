@@ -64,6 +64,15 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "Bell",
         description: "Company announcements and updates",
         shortcut: "G C"
+      },
+      {
+        label: "The Crew",
+        labelKey: "theCrew",
+        href: "/the-crew",
+        icon: "Heart",
+        description: "Meet your teammates — photos, bios, and what makes everyone tick",
+        shortcut: "G W",
+        moduleId: "the_crew"
       }
     ]
   },
@@ -126,14 +135,6 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "CheckCircle",
         description: "Review and act on pending team requests",
         shortcut: "G V"
-      },
-      {
-        label: "Crew Members",
-        labelKey: "crewMembers",
-        href: "/people",
-        icon: "Users",
-        description: "Find teammates, review roles, and open full profiles",
-        shortcut: "G P"
       },
       {
         label: "Scheduling",
@@ -226,6 +227,14 @@ export const NAV_GROUPS: NavGroup[] = [
         description: "Request, sign, and track documents with signer timelines",
         shortcut: "G I",
         moduleId: "signatures"
+      },
+      {
+        label: "People",
+        labelKey: "people",
+        href: "/people",
+        icon: "Users",
+        description: "Manage employee records, roles, and access",
+        shortcut: "G P"
       }
     ]
   },

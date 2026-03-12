@@ -36,6 +36,14 @@ type SettingsClientProps = {
     emergencyContactName: string;
     emergencyContactPhone: string;
     emergencyContactRelationship: string;
+    socialLinkedin: string;
+    socialTwitter: string;
+    socialInstagram: string;
+    socialGithub: string;
+    socialWebsite: string;
+    favoriteMusic: string;
+    favoriteBooks: string;
+    favoriteSports: string;
   };
   organization: {
     name: string;
@@ -55,6 +63,14 @@ type ProfileFormValues = {
   emergencyContactName: string;
   emergencyContactPhone: string;
   emergencyContactRelationship: string;
+  socialLinkedin: string;
+  socialTwitter: string;
+  socialInstagram: string;
+  socialGithub: string;
+  socialWebsite: string;
+  favoriteMusic: string;
+  favoriteBooks: string;
+  favoriteSports: string;
 };
 
 type OrganizationFormValues = {
@@ -185,7 +201,15 @@ export function SettingsClient({
     countryCode: profile.countryCode,
     emergencyContactName: profile.emergencyContactName,
     emergencyContactPhone: profile.emergencyContactPhone,
-    emergencyContactRelationship: profile.emergencyContactRelationship
+    emergencyContactRelationship: profile.emergencyContactRelationship,
+    socialLinkedin: profile.socialLinkedin,
+    socialTwitter: profile.socialTwitter,
+    socialInstagram: profile.socialInstagram,
+    socialGithub: profile.socialGithub,
+    socialWebsite: profile.socialWebsite,
+    favoriteMusic: profile.favoriteMusic,
+    favoriteBooks: profile.favoriteBooks,
+    favoriteSports: profile.favoriteSports
   });
   const [profileErrors, setProfileErrors] = useState<Record<string, string | undefined>>({});
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
@@ -692,6 +716,138 @@ export function SettingsClient({
                   }}
                 />
               </label>
+
+              {/* ── Social links (The Crew) ── */}
+              <fieldset className="form-field">
+                <legend className="form-label">Social links</legend>
+                <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
+                  Optional — these appear on your profile on The Crew page.
+                </p>
+                <div className="settings-emergency-fields">
+                  <label className="form-field" htmlFor="profile-social-linkedin">
+                    <span className="form-label-sm">LinkedIn</span>
+                    <input
+                      id="profile-social-linkedin"
+                      className="form-input"
+                      maxLength={255}
+                      placeholder="https://linkedin.com/in/yourname"
+                      value={profileValues.socialLinkedin}
+                      onChange={(event) => {
+                        setProfileValues({ ...profileValues, socialLinkedin: event.currentTarget.value });
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-social-twitter">
+                    <span className="form-label-sm">Twitter / X</span>
+                    <input
+                      id="profile-social-twitter"
+                      className="form-input"
+                      maxLength={255}
+                      placeholder="https://x.com/yourhandle"
+                      value={profileValues.socialTwitter}
+                      onChange={(event) => {
+                        setProfileValues({ ...profileValues, socialTwitter: event.currentTarget.value });
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-social-instagram">
+                    <span className="form-label-sm">Instagram</span>
+                    <input
+                      id="profile-social-instagram"
+                      className="form-input"
+                      maxLength={255}
+                      placeholder="https://instagram.com/yourhandle"
+                      value={profileValues.socialInstagram}
+                      onChange={(event) => {
+                        setProfileValues({ ...profileValues, socialInstagram: event.currentTarget.value });
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-social-github">
+                    <span className="form-label-sm">GitHub</span>
+                    <input
+                      id="profile-social-github"
+                      className="form-input"
+                      maxLength={255}
+                      placeholder="https://github.com/yourusername"
+                      value={profileValues.socialGithub}
+                      onChange={(event) => {
+                        setProfileValues({ ...profileValues, socialGithub: event.currentTarget.value });
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-social-website">
+                    <span className="form-label-sm">Personal website</span>
+                    <input
+                      id="profile-social-website"
+                      className="form-input"
+                      maxLength={255}
+                      placeholder="https://yoursite.com"
+                      value={profileValues.socialWebsite}
+                      onChange={(event) => {
+                        setProfileValues({ ...profileValues, socialWebsite: event.currentTarget.value });
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                </div>
+              </fieldset>
+
+              {/* ── Favorites (The Crew) ── */}
+              <fieldset className="form-field">
+                <legend className="form-label">Favorites</legend>
+                <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
+                  Optional — share what you enjoy. Shown on your profile on The Crew.
+                </p>
+                <div className="settings-emergency-fields">
+                  <label className="form-field" htmlFor="profile-fav-music">
+                    <span className="form-label-sm">🎵 Music</span>
+                    <input
+                      id="profile-fav-music"
+                      className="form-input"
+                      maxLength={200}
+                      placeholder="Afrobeats, Jazz, Lo-fi..."
+                      value={profileValues.favoriteMusic}
+                      onChange={(event) => {
+                        setProfileValues({ ...profileValues, favoriteMusic: event.currentTarget.value });
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-fav-books">
+                    <span className="form-label-sm">📚 Books</span>
+                    <input
+                      id="profile-fav-books"
+                      className="form-input"
+                      maxLength={200}
+                      placeholder="Clean Code, DDIA, Atomic Habits..."
+                      value={profileValues.favoriteBooks}
+                      onChange={(event) => {
+                        setProfileValues({ ...profileValues, favoriteBooks: event.currentTarget.value });
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-fav-sports">
+                    <span className="form-label-sm">⚽ Sports</span>
+                    <input
+                      id="profile-fav-sports"
+                      className="form-input"
+                      maxLength={200}
+                      placeholder="Football, Basketball, Swimming..."
+                      value={profileValues.favoriteSports}
+                      onChange={(event) => {
+                        setProfileValues({ ...profileValues, favoriteSports: event.currentTarget.value });
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                </div>
+              </fieldset>
 
               <fieldset className="form-field">
                 <legend className="form-label">{t('profile.emergencyContactTitle')}</legend>

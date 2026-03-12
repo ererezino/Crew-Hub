@@ -3,7 +3,6 @@
 import {
   type ChangeEvent,
   type FormEvent,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -15,6 +14,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { FileAttachmentPicker } from "../../../../components/shared/file-attachment-picker";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
@@ -31,6 +31,7 @@ import {
 } from "../../../../lib/expenses";
 import { EXPENSE_CATEGORIES } from "../../../../types/expenses";
 import type {
+  ExpenseCommentAttachmentSignedUrlResponse,
   CreateExpenseCommentResponse,
   ExpenseCategory,
   ExpenseApprovalStage,
@@ -173,7 +174,6 @@ export function ExpenseApprovalsClient({
   const t = useTranslations('expenseApprovals');
   const tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
-  const td = t as (key: string, params?: Record<string, unknown>) => string;
 
   const rejectSchema = z.object({
     reason: z.string().trim().min(1, t('validation.rejectionReasonRequired')).max(2000, t('validation.reasonTooLong'))
@@ -222,6 +222,7 @@ export function ExpenseApprovalsClient({
   const [isRejecting, setIsRejecting] = useState(false);
   const [requestInfoTarget, setRequestInfoTarget] = useState<ExpenseRecord | null>(null);
   const [requestInfoMessage, setRequestInfoMessage] = useState("");
+  const [requestInfoFiles, setRequestInfoFiles] = useState<File[]>([]);
   const [requestInfoThread, setRequestInfoThread] = useState<ExpenseCommentRecord[]>([]);
   const [requestInfoErrors, setRequestInfoErrors] = useState<RequestInfoFormErrors>({});
   const [isLoadingRequestInfoThread, setIsLoadingRequestInfoThread] = useState(false);
@@ -407,9 +408,45 @@ export function ExpenseApprovalsClient({
     }
   };
 
+  const openCommentAttachment = async (expenseId: string, attachmentId: string, fileName: string) => {
+    const loadingKey = `comment-${attachmentId}`;
+    setIsOpeningReceiptById((current) => ({
+      ...current,
+      [loadingKey]: true
+    }));
+
+    try {
+      const response = await fetch(
+        `/api/v1/expenses/${expenseId}/comments/attachments/${attachmentId}`,
+        { method: "GET" }
+      );
+      const payload = (await response.json()) as ExpenseCommentAttachmentSignedUrlResponse;
+
+      if (!response.ok || !payload.data?.url) {
+        showToast("error", payload.error?.message ?? t('toast.openAttachmentError'));
+        return;
+      }
+
+      setReceiptLightbox({
+        url: payload.data.url,
+        fileName: payload.data.fileName || fileName,
+        label: payload.data.fileName || fileName
+      });
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : t('toast.openAttachmentError'));
+    } finally {
+      setIsOpeningReceiptById((current) => {
+        const next = { ...current };
+        delete next[loadingKey];
+        return next;
+      });
+    }
+  };
+
   const openRequestInfoPanel = (expense: ExpenseRecord) => {
     setRequestInfoTarget(expense);
     setRequestInfoMessage("");
+    setRequestInfoFiles([]);
     setRequestInfoErrors({});
     setRequestInfoThread([]);
     void loadRequestInfoThread(expense.id);
@@ -422,6 +459,7 @@ export function ExpenseApprovalsClient({
 
     setRequestInfoTarget(null);
     setRequestInfoMessage("");
+    setRequestInfoFiles([]);
     setRequestInfoErrors({});
     setRequestInfoThread([]);
   };
@@ -443,6 +481,18 @@ export function ExpenseApprovalsClient({
     setRequestInfoErrors({});
   };
 
+  const handleRequestInfoFilesSelected = (files: File[]) => {
+    setRequestInfoFiles(files);
+
+    if (files.length > 0) {
+      setRequestInfoErrors({});
+    }
+  };
+
+  const removeRequestInfoFile = (index: number) => {
+    setRequestInfoFiles((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+
   const submitRequestInfo = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -451,8 +501,8 @@ export function ExpenseApprovalsClient({
     }
 
     const trimmedMessage = requestInfoMessage.trim();
-    if (!trimmedMessage) {
-      setRequestInfoErrors({ message: t('validation.messageRequired') });
+    if (!trimmedMessage && requestInfoFiles.length === 0) {
+      setRequestInfoErrors({ message: t('validation.messageOrAttachmentRequired') });
       return;
     }
 
@@ -465,15 +515,16 @@ export function ExpenseApprovalsClient({
     setIsMutatingId(requestInfoTarget.id);
 
     try {
+      const formData = new FormData();
+      formData.set("action", "request_info");
+      formData.set("message", trimmedMessage);
+      requestInfoFiles.forEach((file) => {
+        formData.append("attachments", file);
+      });
+
       const response = await fetch(`/api/v1/expenses/${requestInfoTarget.id}/comments`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          action: "request_info",
-          message: trimmedMessage
-        })
+        body: formData
       });
 
       const payload = (await response.json()) as CreateExpenseCommentResponse;
@@ -486,6 +537,7 @@ export function ExpenseApprovalsClient({
 
       setRequestInfoThread((current) => [...current, createdComment]);
       setRequestInfoMessage("");
+      setRequestInfoFiles([]);
       setRequestInfoErrors({});
       approvalsQuery.refresh();
       void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
@@ -1196,6 +1248,14 @@ export function ExpenseApprovalsClient({
                               </button>
                               <button
                                 type="button"
+                                className="table-row-action table-row-action-warning"
+                                onClick={() => openRequestInfoPanel(expense)}
+                                disabled={isMutatingId === expense.id}
+                              >
+                                {t('actions.requestInfo')}
+                              </button>
+                              <button
+                                type="button"
                                 className="table-row-action table-row-action-danger"
                                 onClick={() => openRejectPanel(expense, "finance")}
                                 disabled={isMutatingId === expense.id}
@@ -1352,7 +1412,9 @@ export function ExpenseApprovalsClient({
         title={t('requestInfoPanel.title')}
         description={
           requestInfoTarget
-            ? t('requestInfoPanel.description', { name: requestInfoTarget.employeeName })
+            ? stage === "finance"
+              ? t('requestInfoPanel.descriptionFinance', { name: requestInfoTarget.employeeName })
+              : t('requestInfoPanel.description', { name: requestInfoTarget.employeeName })
             : undefined
         }
         onClose={closeRequestInfoPanel}
@@ -1374,7 +1436,34 @@ export function ExpenseApprovalsClient({
                         {comment.commentType === "request_info" ? t('requestInfoPanel.requestedInfoBadge') : t('requestInfoPanel.responseBadge')}
                       </StatusBadge>
                     </div>
-                    <p>{comment.message}</p>
+                    {comment.message ? <p>{comment.message}</p> : null}
+                    {comment.attachments.length > 0 ? (
+                      <ul className="expense-comment-attachments">
+                        {comment.attachments.map((attachment) => {
+                          const loadingKey = `comment-${attachment.id}`;
+                          return (
+                            <li key={attachment.id} className="expense-comment-attachments-item">
+                              <div className="expense-comment-attachment-meta">
+                                <span className="expense-comment-attachment-name">{attachment.fileName}</span>
+                                <span className="expense-comment-attachment-type">
+                                  {attachment.mimeType.startsWith("image/") ? t('requestInfoPanel.imageAttachment') : t('requestInfoPanel.fileAttachment')}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => {
+                                  void openCommentAttachment(requestInfoTarget?.id ?? "", attachment.id, attachment.fileName);
+                                }}
+                                disabled={Boolean(isOpeningReceiptById[loadingKey]) || !requestInfoTarget}
+                              >
+                                {isOpeningReceiptById[loadingKey] ? t('actions.opening') : t('requestInfoPanel.openAttachment')}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
                     <p className="compensation-history-item-meta" title={formatDateTimeTooltip(comment.createdAt, locale)}>
                       {formatRelativeTime(comment.createdAt, locale)}
                     </p>
@@ -1397,6 +1486,20 @@ export function ExpenseApprovalsClient({
               <p className="form-field-error">{requestInfoErrors.message}</p>
             ) : null}
           </label>
+          <div className="form-field">
+            <span className="form-label">{t('requestInfoPanel.attachmentsLabel')}</span>
+            <FileAttachmentPicker
+              files={requestInfoFiles}
+              accept=".pdf,.png,.jpg,.jpeg"
+              disabled={isRequestingInfo}
+              buttonLabel={t('requestInfoPanel.chooseAttachments')}
+              hint={t('requestInfoPanel.attachmentsHint')}
+              emptyLabel={t('requestInfoPanel.noAttachmentsSelected')}
+              removeLabel={t('requestInfoPanel.removeAttachment')}
+              onFilesSelected={handleRequestInfoFilesSelected}
+              onRemoveFile={removeRequestInfoFile}
+            />
+          </div>
           <div className="slide-panel-actions">
             <button
               type="button"

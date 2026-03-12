@@ -212,7 +212,24 @@ export type ExpenseReceiptSignedUrlResponseData = {
   expiresInSeconds: number;
 };
 
+export type ExpenseCommentAttachmentSignedUrlResponseData = {
+  url: string;
+  fileName: string;
+  mimeType: string;
+  expiresInSeconds: number;
+};
+
 export type ExpenseCommentType = "request_info" | "response";
+
+export type ExpenseCommentAttachment = {
+  id: string;
+  commentId: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  createdAt: string;
+};
 
 export type ExpenseCommentRecord = {
   id: string;
@@ -221,6 +238,7 @@ export type ExpenseCommentRecord = {
   authorName: string;
   commentType: ExpenseCommentType;
   message: string;
+  attachments: ExpenseCommentAttachment[];
   createdAt: string;
 };
 
@@ -249,9 +267,10 @@ export type ExpenseBulkApprovePayload = {
 export type ExpenseBulkApproveResponse = ApiResponse<ExpenseBulkApproveResponseData>;
 export type ExpenseReportsResponse = ApiResponse<ExpenseReportsResponseData>;
 export type ExpenseReceiptSignedUrlResponse = ApiResponse<ExpenseReceiptSignedUrlResponseData>;
+export type ExpenseCommentAttachmentSignedUrlResponse = ApiResponse<ExpenseCommentAttachmentSignedUrlResponseData>;
 export type ExpenseCommentsResponse = ApiResponse<ExpenseCommentsResponseData>;
 export type CreateExpenseCommentPayload = {
   action: ExpenseCommentType;
-  message: string;
+  message?: string;
 };
 export type CreateExpenseCommentResponse = ApiResponse<{ comment: ExpenseCommentRecord }>;

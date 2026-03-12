@@ -33,6 +33,14 @@ export type SessionProfile = {
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   emergency_contact_relationship: string | null;
+  social_linkedin: string | null;
+  social_twitter: string | null;
+  social_instagram: string | null;
+  social_github: string | null;
+  social_website: string | null;
+  favorite_music: string | null;
+  favorite_books: string | null;
+  favorite_sports: string | null;
 };
 
 export type AuthenticatedSession = {
@@ -233,7 +241,7 @@ const getAuthenticatedSessionInternal = cache(
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select(
-        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, start_date, employment_type, status, preferred_locale, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship"
+        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, start_date, employment_type, status, preferred_locale, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_website, favorite_music, favorite_books, favorite_sports"
       )
       .eq("id", user.id)
       .is("deleted_at", null)
@@ -276,7 +284,15 @@ const getAuthenticatedSessionInternal = cache(
       pronouns: profileData.pronouns ?? null,
       emergency_contact_name: profileData.emergency_contact_name ?? null,
       emergency_contact_phone: profileData.emergency_contact_phone ?? null,
-      emergency_contact_relationship: profileData.emergency_contact_relationship ?? null
+      emergency_contact_relationship: profileData.emergency_contact_relationship ?? null,
+      social_linkedin: profileData.social_linkedin ?? null,
+      social_twitter: profileData.social_twitter ?? null,
+      social_instagram: profileData.social_instagram ?? null,
+      social_github: profileData.social_github ?? null,
+      social_website: profileData.social_website ?? null,
+      favorite_music: profileData.favorite_music ?? null,
+      favorite_books: profileData.favorite_books ?? null,
+      favorite_sports: profileData.favorite_sports ?? null
     };
 
     if (!includeOrg) {

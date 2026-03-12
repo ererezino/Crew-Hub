@@ -127,7 +127,8 @@
     "expenses": "Notes de frais",
     "learning": "Formation",
     "approvals": "Approbations",
-    "crewMembers": "Membres de l'équipe",
+    "theCrew": "L'équipe",
+    "people": "Personnel",
     "scheduling": "Planification",
     "onboarding": "Intégration",
     "teamHub": "Espace équipe",
@@ -151,7 +152,8 @@
       "expenses": "Soumettez vos dépenses, téléchargez vos reçus et suivez les remboursements",
       "learning": "Formations, certificats et sondages qui vous sont assignés",
       "approvals": "Examinez et traitez les demandes en attente de votre équipe",
-      "crewMembers": "Trouvez des collègues, consultez les rôles et ouvrez les profils complets",
+      "theCrew": "Découvrez vos collègues — photos, bios et ce qui les passionne",
+      "people": "Gérez les dossiers, rôles et accès des employés",
       "scheduling": "Créez, publiez et gérez les horaires de votre équipe",
       "onboarding": "Lancez des plans d'intégration, suivez la progression et résolvez les blocages",
       "teamHub": "La base de connaissances de votre département : guides, contacts et ressources",
@@ -793,7 +795,17 @@
       "emergencyContactTitle": "Contact d'urgence",
       "emergencyContactNameLabel": "Nom",
       "emergencyContactPhoneLabel": "Téléphone",
-      "emergencyContactRelationshipLabel": "Lien de parenté"
+      "emergencyContactRelationshipLabel": "Lien de parenté",
+      "socialLinksTitle": "Liens sociaux",
+      "socialLinkedinLabel": "LinkedIn",
+      "socialTwitterLabel": "Twitter / X",
+      "socialInstagramLabel": "Instagram",
+      "socialGithubLabel": "GitHub",
+      "socialWebsiteLabel": "Site web",
+      "favoritesTitle": "Favoris",
+      "favoriteMusicLabel": "Musique",
+      "favoriteBooksLabel": "Livres",
+      "favoriteSportsLabel": "Sports"
     },
     "notificationSettings": {
       "heading": "Notifications",
@@ -1073,7 +1085,7 @@
     "modExpenses": "Dépenses",
     "modLearning": "Formation",
     "modApprovals": "Approbations",
-    "modCrewMembers": "Membres de l'équipe",
+    "modCrewMembers": "Personnel",
     "modScheduling": "Planification",
     "modOnboarding": "Intégration",
     "modTeamHub": "Hub d'équipe",
@@ -1130,7 +1142,7 @@
     "privacyPolicy": "Politique de confidentialité"
   },
   "peoplePage": {
-    "profileTitle": "Membres de l'équipe",
+    "profileTitle": "Personnel",
     "overviewTab": "Aperçu",
     "compensationTab": "Rémunération",
     "invalidProfileId": "Identifiant de profil invalide",
@@ -3457,6 +3469,7 @@
     "requestInfoPanel": {
       "title": "Demander plus d'informations",
       "description": "Demandez à {name} des détails supplémentaires avant l'approbation.",
+      "descriptionFinance": "Demandez à {name} les coordonnées de paiement ou les justificatifs encore nécessaires à la finance.",
       "conversationTitle": "Conversation",
       "conversationAriaLabel": "Historique de la conversation",
       "loadingConversation": "Chargement de la conversation...",
@@ -3468,6 +3481,14 @@
       "responseBadge": "Réponse",
       "messageLabel": "Message à l'employé",
       "messagePlaceholder": "Quels détails supplémentaires sont nécessaires ?",
+      "attachmentsLabel": "Pièces jointes",
+      "attachmentsHint": "Téléchargez des captures, reçus ou PDF pour préciser la demande. PDF, PNG, JPG jusqu'à 10 Mo chacun.",
+      "chooseAttachments": "Choisir des pièces jointes",
+      "noAttachmentsSelected": "Aucune pièce jointe sélectionnée.",
+      "removeAttachment": "Supprimer",
+      "openAttachment": "Ouvrir dans l'application",
+      "imageAttachment": "Pièce jointe image",
+      "fileAttachment": "Pièce jointe fichier",
       "submitButton": "Envoyer la demande",
       "sendRequest": "Envoyer la demande",
       "sending": "Envoi en cours..."
@@ -3511,10 +3532,12 @@
       "uploadPaymentProofError": "Impossible de télécharger le justificatif de paiement.",
       "paymentProofNotAvailable": "Justificatif de paiement non disponible.",
       "bulkOnlyManager": "Le traitement groupé est uniquement disponible pour les approbations du responsable.",
-      "unableToUploadProof": "Impossible de télécharger le justificatif de paiement."
+      "unableToUploadProof": "Impossible de télécharger le justificatif de paiement.",
+      "openAttachmentError": "Impossible d'ouvrir la pièce jointe."
     },
     "validation": {
       "messageRequired": "Le message est obligatoire.",
+      "messageOrAttachmentRequired": "Ajoutez un message ou au moins une pièce jointe.",
       "messageTooLong": "Le message est trop long.",
       "paymentProofRequired": "Le justificatif de paiement est obligatoire.",
       "rejectionReasonRequired": "La raison du rejet est obligatoire",
@@ -4387,6 +4410,14 @@
       "yourResponseLabel": "Votre réponse",
       "replyPlaceholder": "Répondez avec les détails demandés par votre approbateur.",
       "responsePlaceholder": "Répondez avec les détails demandés par votre approbateur.",
+      "attachmentsLabel": "Pièces jointes",
+      "attachmentsHint": "Ajoutez des captures, reçus ou PDF. PDF, PNG, JPG jusqu'à 10 Mo chacun.",
+      "chooseAttachments": "Choisir des pièces jointes",
+      "noAttachmentsSelected": "Aucune pièce jointe sélectionnée.",
+      "removeAttachment": "Supprimer",
+      "openAttachment": "Ouvrir dans l'application",
+      "imageAttachment": "Pièce jointe image",
+      "fileAttachment": "Pièce jointe fichier",
       "sendResponse": "Envoyer la réponse",
       "sending": "Envoi en cours..."
     },
@@ -4484,7 +4515,9 @@
       "customCategoryRequired": "Veuillez préciser la catégorie.",
       "vendorNameRequired": "Le nom du fournisseur est obligatoire pour les dépenses professionnelles.",
       "bankAccountNameRequired": "Le nom du titulaire du compte bancaire est obligatoire.",
-      "bankAccountNumberRequired": "Le numéro de compte bancaire est obligatoire."
+      "bankAccountNumberRequired": "Le numéro de compte bancaire est obligatoire.",
+      "responseOrAttachmentRequired": "Ajoutez une réponse ou au moins une pièce jointe.",
+      "responseTooLong": "Votre réponse est trop longue."
     },
     "toast": {
       "expenseSubmitted": "Dépense soumise.",
@@ -4494,6 +4527,7 @@
       "unableToOpenReceipt": "Impossible d'ouvrir le reçu.",
       "paymentProofNotAvailable": "Justificatif de paiement non disponible.",
       "unableToOpenPaymentProof": "Impossible d'ouvrir le justificatif de paiement.",
+      "unableToOpenAttachment": "Impossible d'ouvrir la pièce jointe.",
       "unableToLoadConversation": "Impossible de charger la conversation de la dépense.",
       "unableToSendReply": "Impossible d'envoyer la réponse.",
       "replySent": "Réponse envoyée.",
@@ -4693,7 +4727,7 @@
     "accessDeniedDescription": "Seuls les Admin RH, Admin Finance et Super Admin peuvent gérer la rémunération."
   },
   "people": {
-    "pageTitle": "Membres de l'équipe",
+    "pageTitle": "Personnel",
     "pageDescription": "Trouvez des collègues, consultez les rôles et ouvrez les profils complets.",
     "emptyState": {
       "unavailable": "Les données du personnel sont indisponibles",
@@ -4867,6 +4901,48 @@
       "unableToCreatePerson": "Impossible de créer la personne."
     },
     "dismissNotification": "Fermer la notification"
+  },
+  "theCrew": {
+    "pageTitle": "L'équipe",
+    "pageSubtitle": "Découvrez les personnes derrière le travail — apprenez ce qui passionne vos collègues.",
+    "statMembers": "{count, plural, one {# membre} other {# membres}}",
+    "statDepartments": "{count, plural, one {# département} other {# départements}}",
+    "searchPlaceholder": "Rechercher par nom, poste ou département…",
+    "chipAll": "Tous",
+    "loadError": "Impossible de charger l'équipe.",
+    "retry": "Réessayer",
+    "emptyTitle": "Aucun collègue trouvé",
+    "emptyDescription": "Essayez d'élargir votre recherche ou de supprimer vos filtres.",
+    "memberCount": "{count, plural, one {# membre} other {# membres}}",
+    "drawer": {
+      "bio": "Bio",
+      "favorites": "Favoris",
+      "connect": "Liens",
+      "music": "Musique",
+      "books": "Livres",
+      "sports": "Sports",
+      "editMyProfile": "Modifier mon profil",
+      "joined": "Rejoint le {date}",
+      "noBio": "Pas encore de bio."
+    },
+    "moderate": {
+      "title": "Modérer le profil",
+      "notice": "Les modifications sont enregistrées et l'utilisateur sera notifié.",
+      "directoryVisible": "Visible sur L'équipe",
+      "bioLabel": "Bio",
+      "linkedinLabel": "URL LinkedIn",
+      "twitterLabel": "URL Twitter / X",
+      "instagramLabel": "URL Instagram",
+      "githubLabel": "URL GitHub",
+      "websiteLabel": "URL du site web",
+      "musicLabel": "Musique préférée",
+      "booksLabel": "Livres préférés",
+      "sportsLabel": "Sports préférés",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "saved": "Profil mis à jour.",
+      "failed": "Impossible de mettre à jour le profil."
+    }
   },
   "email": {
     "greeting": "Bonjour {name},",

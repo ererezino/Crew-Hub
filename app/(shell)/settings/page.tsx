@@ -91,7 +91,15 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           countryCode: session.profile.country_code ?? "",
           emergencyContactName: session.profile.emergency_contact_name ?? "",
           emergencyContactPhone: session.profile.emergency_contact_phone ?? "",
-          emergencyContactRelationship: session.profile.emergency_contact_relationship ?? ""
+          emergencyContactRelationship: session.profile.emergency_contact_relationship ?? "",
+          socialLinkedin: session.profile.social_linkedin ?? "",
+          socialTwitter: session.profile.social_twitter ?? "",
+          socialInstagram: session.profile.social_instagram ?? "",
+          socialGithub: session.profile.social_github ?? "",
+          socialWebsite: session.profile.social_website ?? "",
+          favoriteMusic: session.profile.favorite_music ?? "",
+          favoriteBooks: session.profile.favorite_books ?? "",
+          favoriteSports: session.profile.favorite_sports ?? ""
         }}
         organization={{
           name: session.org?.name ?? "",
