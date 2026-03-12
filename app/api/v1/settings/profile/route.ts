@@ -27,9 +27,9 @@ const profileSchema = z.object({
   bio: z.string().trim().max(500, "Bio is too long").optional(),
   pronouns: z.string().trim().max(50, "Pronouns value is too long").optional(),
   countryCode: z.string().trim().max(2, "Country code must be 2 characters").optional(),
-  emergencyContactName: z.string().trim().max(200, "Emergency contact name is too long").optional(),
-  emergencyContactPhone: z.string().trim().max(30, "Emergency contact phone is too long").optional(),
-  emergencyContactRelationship: z.string().trim().max(100, "Emergency contact relationship is too long").optional(),
+  emergencyContactName: z.string().trim().min(1, "Emergency contact name is required").max(200, "Emergency contact name is too long"),
+  emergencyContactPhone: z.string().trim().min(1, "Emergency contact phone is required").max(30, "Emergency contact phone is too long"),
+  emergencyContactRelationship: z.string().trim().min(1, "Emergency contact relationship is required").max(100, "Emergency contact relationship is too long"),
   /* Social links (The Crew) */
   socialLinkedin: optionalUrl,
   socialTwitter: optionalUrl,

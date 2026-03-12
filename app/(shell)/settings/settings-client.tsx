@@ -77,16 +77,23 @@ type OrganizationFormValues = {
   name: string;
 };
 
-function makeProfileSchema(msgs: { nameRequired: string; nameTooLong: string; phoneTooLong: string }) {
+function makeProfileSchema(msgs: {
+  nameRequired: string;
+  nameTooLong: string;
+  phoneTooLong: string;
+  emergencyNameRequired: string;
+  emergencyPhoneRequired: string;
+  emergencyRelationshipRequired: string;
+}) {
   return z.object({
     fullName: z.string().trim().min(1, msgs.nameRequired).max(200, msgs.nameTooLong),
     phone: z.string().trim().max(30, msgs.phoneTooLong),
     bio: z.string().trim().max(500).optional(),
     pronouns: z.string().trim().max(50).optional(),
     countryCode: z.string().trim().max(2).optional(),
-    emergencyContactName: z.string().trim().max(200).optional(),
-    emergencyContactPhone: z.string().trim().max(30).optional(),
-    emergencyContactRelationship: z.string().trim().max(100).optional()
+    emergencyContactName: z.string().trim().min(1, msgs.emergencyNameRequired).max(200),
+    emergencyContactPhone: z.string().trim().min(1, msgs.emergencyPhoneRequired).max(30),
+    emergencyContactRelationship: z.string().trim().min(1, msgs.emergencyRelationshipRequired).max(100)
   });
 }
 
@@ -106,7 +113,10 @@ function validateProfile(values: ProfileFormValues, schema: ReturnType<typeof ma
   const fieldErrors = parsed.error.flatten().fieldErrors;
   return {
     fullName: fieldErrors.fullName?.[0],
-    phone: fieldErrors.phone?.[0]
+    phone: fieldErrors.phone?.[0],
+    emergencyContactName: fieldErrors.emergencyContactName?.[0],
+    emergencyContactPhone: fieldErrors.emergencyContactPhone?.[0],
+    emergencyContactRelationship: fieldErrors.emergencyContactRelationship?.[0]
   };
 }
 
@@ -162,7 +172,10 @@ export function SettingsClient({
   const profileSchema = useMemo(() => makeProfileSchema({
     nameRequired: t('validation.nameRequired'),
     nameTooLong: t('validation.nameTooLong'),
-    phoneTooLong: t('validation.phoneTooLong')
+    phoneTooLong: t('validation.phoneTooLong'),
+    emergencyNameRequired: t('validation.emergencyNameRequired'),
+    emergencyPhoneRequired: t('validation.emergencyPhoneRequired'),
+    emergencyRelationshipRequired: t('validation.emergencyRelationshipRequired')
   }), [t]);
 
   const organizationSchema = useMemo(() => makeOrganizationSchema({
@@ -850,14 +863,18 @@ export function SettingsClient({
               </fieldset>
 
               <fieldset className="form-field">
-                <legend className="form-label">{t('profile.emergencyContactTitle')}</legend>
+                <legend className="form-label">
+                  {t('profile.emergencyContactTitle')}
+                  <span className="form-required-indicator"> *</span>
+                </legend>
                 <div className="settings-emergency-fields">
                   <label className="form-field" htmlFor="profile-ec-name">
                     <span className="form-label-sm">{t('profile.emergencyContactNameLabel')}</span>
                     <input
                       id="profile-ec-name"
-                      className="form-input"
+                      className={profileErrors.emergencyContactName ? "form-input form-input-error" : "form-input"}
                       maxLength={200}
+                      required
                       value={profileValues.emergencyContactName}
                       onChange={(event) => {
                         const nextValues = { ...profileValues, emergencyContactName: event.currentTarget.value };
@@ -865,13 +882,17 @@ export function SettingsClient({
                         setFormDirty(true);
                       }}
                     />
+                    {profileErrors.emergencyContactName ? (
+                      <p className="form-field-error">{profileErrors.emergencyContactName}</p>
+                    ) : null}
                   </label>
                   <label className="form-field" htmlFor="profile-ec-phone">
                     <span className="form-label-sm">{t('profile.emergencyContactPhoneLabel')}</span>
                     <input
                       id="profile-ec-phone"
-                      className="form-input"
+                      className={profileErrors.emergencyContactPhone ? "form-input form-input-error" : "form-input"}
                       maxLength={30}
+                      required
                       value={profileValues.emergencyContactPhone}
                       onChange={(event) => {
                         const nextValues = { ...profileValues, emergencyContactPhone: event.currentTarget.value };
@@ -879,13 +900,17 @@ export function SettingsClient({
                         setFormDirty(true);
                       }}
                     />
+                    {profileErrors.emergencyContactPhone ? (
+                      <p className="form-field-error">{profileErrors.emergencyContactPhone}</p>
+                    ) : null}
                   </label>
                   <label className="form-field" htmlFor="profile-ec-relationship">
                     <span className="form-label-sm">{t('profile.emergencyContactRelationshipLabel')}</span>
                     <input
                       id="profile-ec-relationship"
-                      className="form-input"
+                      className={profileErrors.emergencyContactRelationship ? "form-input form-input-error" : "form-input"}
                       maxLength={100}
+                      required
                       value={profileValues.emergencyContactRelationship}
                       onChange={(event) => {
                         const nextValues = { ...profileValues, emergencyContactRelationship: event.currentTarget.value };
@@ -893,6 +918,9 @@ export function SettingsClient({
                         setFormDirty(true);
                       }}
                     />
+                    {profileErrors.emergencyContactRelationship ? (
+                      <p className="form-field-error">{profileErrors.emergencyContactRelationship}</p>
+                    ) : null}
                   </label>
                 </div>
               </fieldset>
@@ -947,9 +975,10 @@ export function SettingsClient({
                   type="checkbox"
                   checked={notificationValues.emailAnnouncements}
                   onChange={(event) => {
+                    const checked = event.currentTarget.checked;
                     setNotificationValues((previous) => ({
                       ...previous,
-                      emailAnnouncements: event.currentTarget.checked
+                      emailAnnouncements: checked
                     }));
                     setFormDirty(true);
                   }}
@@ -962,9 +991,10 @@ export function SettingsClient({
                   type="checkbox"
                   checked={notificationValues.emailApprovals}
                   onChange={(event) => {
+                    const checked = event.currentTarget.checked;
                     setNotificationValues((previous) => ({
                       ...previous,
-                      emailApprovals: event.currentTarget.checked
+                      emailApprovals: checked
                     }));
                     setFormDirty(true);
                   }}
@@ -977,9 +1007,10 @@ export function SettingsClient({
                   type="checkbox"
                   checked={notificationValues.inAppReminders}
                   onChange={(event) => {
+                    const checked = event.currentTarget.checked;
                     setNotificationValues((previous) => ({
                       ...previous,
-                      inAppReminders: event.currentTarget.checked
+                      inAppReminders: checked
                     }));
                     setFormDirty(true);
                   }}

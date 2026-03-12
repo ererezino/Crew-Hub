@@ -717,6 +717,22 @@ export function ExpensesClient({
     }, 4000);
   };
 
+  const getDisplayStatusLabel = (expense: ExpenseRecord) => {
+    if (expense.infoRequestState === "requested") {
+      return td("infoRequests.actionNeeded");
+    }
+
+    return getExpenseStatusLabel(expense.status);
+  };
+
+  const getDisplayStatusTone = (expense: ExpenseRecord) => {
+    if (expense.infoRequestState === "requested") {
+      return "warning" as const;
+    }
+
+    return toneForExpenseStatus(expense.status);
+  };
+
   const openPanel = () => {
     setIsPanelOpen(true);
     setFormValues({
@@ -1443,8 +1459,8 @@ export function ExpensesClient({
                             </span>
                           </td>
                           <td>
-                            <StatusBadge tone={toneForExpenseStatus(expense.status)}>
-                              {getExpenseStatusLabel(expense.status)}
+                            <StatusBadge tone={getDisplayStatusTone(expense)}>
+                              {getDisplayStatusLabel(expense)}
                             </StatusBadge>
                             {expense.infoRequestState === "requested" ? (
                               <p className="documents-cell-description">{t('infoRequests.actionNeeded')}</p>

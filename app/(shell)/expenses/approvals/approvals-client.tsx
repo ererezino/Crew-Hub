@@ -332,6 +332,22 @@ export function ExpenseApprovalsClient({
     }, 4000);
   };
 
+  const getDisplayStatusLabel = (expense: ExpenseRecord) => {
+    if (expense.infoRequestState === "requested") {
+      return t('table.awaitingResponse');
+    }
+
+    return getExpenseStatusLabel(expense.status);
+  };
+
+  const getDisplayStatusTone = (expense: ExpenseRecord) => {
+    if (expense.infoRequestState === "requested") {
+      return "warning" as const;
+    }
+
+    return toneForExpenseStatus(expense.status);
+  };
+
   const toggleSelected = (expenseId: string) => {
     setSelectedIds((current) =>
       current.includes(expenseId)
@@ -1192,14 +1208,12 @@ export function ExpenseApprovalsClient({
                         </time>
                       </td>
                       <td>
-                        <StatusBadge tone={toneForExpenseStatus(expense.status)}>
-                          {getExpenseStatusLabel(expense.status)}
+                        <StatusBadge tone={getDisplayStatusTone(expense)}>
+                          {getDisplayStatusLabel(expense)}
                         </StatusBadge>
                         {expense.infoRequestState === "requested" ? (
                           <p className="documents-cell-description">
-                            {expense.infoRequestUpdatedByName
-                              ? t('table.infoRequestedBy', { name: expense.infoRequestUpdatedByName })
-                              : t('table.infoRequested')}.
+                            {t('table.infoRequested')}.
                           </p>
                         ) : null}
                         {expense.infoRequestState === "responded" ? (

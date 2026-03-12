@@ -236,6 +236,12 @@
       "manager": "Responsable",
       "teamLead": "Chef d'équipe",
       "employee": "Employé"
+    },
+    "notificationPrompt": {
+      "title": "Restez informé",
+      "body": "Activez les notifications du navigateur pour ne jamais manquer les approbations, annonces ou mises à jour importantes.",
+      "enable": "Activer les alertes",
+      "dismiss": "Fermer"
     }
   },
   "commandPalette": {
@@ -768,7 +774,10 @@
       "nameRequired": "Le nom est requis",
       "nameTooLong": "Le nom est trop long",
       "phoneTooLong": "Le numéro de téléphone est trop long",
-      "orgNameRequired": "Le nom de l'organisation est requis"
+      "orgNameRequired": "Le nom de l'organisation est requis",
+      "emergencyNameRequired": "Le nom du contact d'urgence est requis",
+      "emergencyPhoneRequired": "Le téléphone du contact d'urgence est requis",
+      "emergencyRelationshipRequired": "Le lien de parenté du contact d'urgence est requis"
     },
     "profile": {
       "heading": "Profil",
@@ -3422,6 +3431,7 @@
       "selectAllAria": "Sélectionner toutes les dépenses",
       "selectExpense": "Sélectionner la dépense de {employeeName}",
       "selectExpenseAria": "Sélectionner la dépense",
+      "awaitingResponse": "Réponse attendue",
       "infoRequested": "Informations demandées",
       "infoRequestedBy": "Informations demandées par {name}.",
       "employeeReplied": "L'employé a répondu à la demande d'informations."

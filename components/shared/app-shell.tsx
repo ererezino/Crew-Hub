@@ -37,6 +37,7 @@ import { LocaleToggle } from "./locale-toggle";
 import { ThemeToggle } from "./theme-toggle";
 import { SupportLink } from "./support-link";
 import { UnsavedLeaveDialog } from "./unsaved-leave-dialog";
+import { BrowserNotificationPrompt } from "./browser-notification-prompt";
 import { WhoIsOnline } from "./who-is-online";
 
 const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
@@ -1280,6 +1281,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
         </header>
 
         <main className="page-content">
+          <BrowserNotificationPrompt />
           <AppErrorBoundary>{children}</AppErrorBoundary>
         </main>
       </div>

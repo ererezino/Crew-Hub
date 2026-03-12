@@ -14,6 +14,12 @@ const POLL_INTERVAL_MS = 60_000;
 const PREVIEW_LIMIT = 8;
 const BROWSER_PUSH_PREF_KEY = "crewhub-browser-push-enabled";
 
+type ImageAttachmentRef = {
+  announcementId: string;
+  attachmentId: string;
+  fileName: string;
+};
+
 type FeedItem = {
   id: string;
   source: "notification" | "announcement";
@@ -23,7 +29,72 @@ type FeedItem = {
   createdAt: string;
   isRead: boolean;
   actions: NotificationAction[];
+  /** First image attachment for thumbnail display (announcements only) */
+  imageAttachment?: ImageAttachmentRef;
+  /** Total image count (for "+N" badge) */
+  imageCount?: number;
 };
+
+/** Lazy-loading image thumbnail for announcement notification items. */
+function NotificationThumbnail({
+  announcementId,
+  attachmentId,
+  fileName,
+  extraCount
+}: {
+  announcementId: string;
+  attachmentId: string;
+  fileName: string;
+  extraCount: number;
+}) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const res = await fetch(
+          `/api/v1/announcements/${announcementId}/attachments/${attachmentId}`
+        );
+        if (!res.ok) { setError(true); return; }
+        const json = await res.json() as { data?: { url?: string } };
+        if (!cancelled && json.data?.url) {
+          setSrc(json.data.url);
+        } else {
+          setError(true);
+        }
+      } catch {
+        if (!cancelled) setError(true);
+      }
+    }
+
+    void load();
+    return () => { cancelled = true; };
+  }, [announcementId, attachmentId]);
+
+  if (error) return null;
+
+  return (
+    <div className="notification-thumbnail-wrap">
+      {src ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={src}
+          alt={fileName}
+          className="notification-thumbnail-img"
+          loading="lazy"
+        />
+      ) : (
+        <div className="notification-thumbnail-skeleton" />
+      )}
+      {extraCount > 0 ? (
+        <span className="notification-thumbnail-badge">+{extraCount}</span>
+      ) : null}
+    </div>
+  );
+}
 
 export function NotificationCenter() {
   const t = useTranslations("notifications");
@@ -145,8 +216,10 @@ export function NotificationCenter() {
       if (a.isRead) continue;
       if (optimisticDismissals.has(`announcement-${a.id}`)) continue;
       const truncatedBody = a.body.length > 120 ? `${a.body.slice(0, 120)}…` : a.body;
-      const attachmentHint = a.attachments.length > 0
-        ? ` · ${a.attachments.length} ${a.attachments.length === 1 ? "file" : "files"} attached`
+      const imageAtts = a.attachments.filter((att) => att.mimeType.startsWith("image/"));
+      const nonImageCount = a.attachments.length - imageAtts.length;
+      const attachmentHint = nonImageCount > 0
+        ? ` · ${nonImageCount} ${nonImageCount === 1 ? "file" : "files"} attached`
         : "";
       items.push({
         id: a.id,
@@ -156,7 +229,11 @@ export function NotificationCenter() {
         link: "/announcements",
         createdAt: a.createdAt,
         isRead: a.isRead,
-        actions: []
+        actions: [],
+        imageAttachment: imageAtts.length > 0
+          ? { announcementId: a.id, attachmentId: imageAtts[0].id, fileName: imageAtts[0].fileName }
+          : undefined,
+        imageCount: imageAtts.length
       });
     }
 
@@ -379,6 +456,14 @@ export function NotificationCenter() {
                           </div>
                         ) : null}
                       </div>
+                      {item.imageAttachment ? (
+                        <NotificationThumbnail
+                          announcementId={item.imageAttachment.announcementId}
+                          attachmentId={item.imageAttachment.attachmentId}
+                          fileName={item.imageAttachment.fileName}
+                          extraCount={(item.imageCount ?? 1) - 1}
+                        />
+                      ) : null}
                       <button
                         type="button"
                         className="table-row-action"

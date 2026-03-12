@@ -236,6 +236,12 @@
       "manager": "Manager",
       "teamLead": "Team Lead",
       "employee": "Employee"
+    },
+    "notificationPrompt": {
+      "title": "Stay in the loop",
+      "body": "Enable browser notifications so you never miss approvals, announcements, or important updates.",
+      "enable": "Enable alerts",
+      "dismiss": "Dismiss"
     }
   },
   "commandPalette": {
@@ -768,7 +774,10 @@
       "nameRequired": "Name is required",
       "nameTooLong": "Name is too long",
       "phoneTooLong": "Phone number is too long",
-      "orgNameRequired": "Organization name is required"
+      "orgNameRequired": "Organization name is required",
+      "emergencyNameRequired": "Emergency contact name is required",
+      "emergencyPhoneRequired": "Emergency contact phone is required",
+      "emergencyRelationshipRequired": "Emergency contact relationship is required"
     },
     "profile": {
       "heading": "Profile",
@@ -3422,6 +3431,7 @@
       "selectAllAria": "Select all expenses",
       "selectExpense": "Select expense from {employeeName}",
       "selectExpenseAria": "Select expense",
+      "awaitingResponse": "Awaiting Response",
       "infoRequested": "Info requested",
       "infoRequestedBy": "Info requested by {name}.",
       "employeeReplied": "Employee replied to info request."
