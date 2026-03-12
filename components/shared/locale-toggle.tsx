@@ -144,6 +144,9 @@ export function LocaleToggle({ profileLocale }: LocaleToggleProps) {
 
     if (targetLocale === locale) return;
 
+    // Prevent the DB→cookie sync effect from undoing this user selection
+    hasSynced.current = true;
+
     startTransition(async () => {
       const result = await updateLocale(targetLocale);
 

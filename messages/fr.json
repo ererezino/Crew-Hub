@@ -3428,7 +3428,7 @@
     },
     "disbursePanel": {
       "title": "Marquer la dépense comme payée",
-      "description": "Enregistrez la confirmation de paiement pour {employeeName}.",
+      "description": "Enregistrez la confirmation de paiement pour {name}.",
       "referenceLabel": "Référence de remboursement",
       "referencePlaceholder": "BANK-REF-1234",
       "notesLabel": "Notes",
@@ -3444,7 +3444,7 @@
     },
     "requestInfoPanel": {
       "title": "Demander plus d'informations",
-      "description": "Demandez à {employeeName} des détails supplémentaires avant l'approbation.",
+      "description": "Demandez à {name} des détails supplémentaires avant l'approbation.",
       "conversationTitle": "Conversation",
       "conversationAriaLabel": "Historique de la conversation",
       "loadingConversation": "Chargement de la conversation...",
@@ -3462,7 +3462,7 @@
     },
     "confirmApprove": {
       "title": "Approuver la dépense ?",
-      "description": "Approuver la dépense de {employeeName} et la transférer dans la file d'attente de paiement de la finance.",
+      "description": "Approuver la dépense de {name} et la transférer dans la file d'attente de paiement de la finance.",
       "confirmLabel": "Approuver la dépense"
     },
     "confirmBulkApprove": {

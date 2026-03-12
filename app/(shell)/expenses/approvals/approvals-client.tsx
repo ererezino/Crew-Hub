@@ -1097,7 +1097,7 @@ export function ExpenseApprovalsClient({
                             <>
                               <button
                                 type="button"
-                                className="table-row-action"
+                                className="table-row-action table-row-action-success"
                                 onClick={() => openApproveConfirm(expense)}
                                 disabled={isMutatingId === expense.id}
                               >
@@ -1105,7 +1105,7 @@ export function ExpenseApprovalsClient({
                               </button>
                               <button
                                 type="button"
-                                className="table-row-action"
+                                className="table-row-action table-row-action-warning"
                                 onClick={() => openRequestInfoPanel(expense)}
                                 disabled={isMutatingId === expense.id}
                               >
@@ -1113,7 +1113,7 @@ export function ExpenseApprovalsClient({
                               </button>
                               <button
                                 type="button"
-                                className="table-row-action"
+                                className="table-row-action table-row-action-danger"
                                 onClick={() => openRejectPanel(expense, "manager")}
                                 disabled={isMutatingId === expense.id}
                               >
@@ -1124,7 +1124,7 @@ export function ExpenseApprovalsClient({
                             <>
                               <button
                                 type="button"
-                                className="table-row-action"
+                                className="table-row-action table-row-action-success"
                                 onClick={() => openDisbursePanel(expense)}
                                 disabled={isMutatingId === expense.id}
                               >
@@ -1132,7 +1132,7 @@ export function ExpenseApprovalsClient({
                               </button>
                               <button
                                 type="button"
-                                className="table-row-action"
+                                className="table-row-action table-row-action-danger"
                                 onClick={() => openRejectPanel(expense, "finance")}
                                 disabled={isMutatingId === expense.id}
                               >

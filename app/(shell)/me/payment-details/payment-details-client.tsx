@@ -446,7 +446,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                   <h2 className="section-title">{t('currentTitle')}</h2>
                   <p className="settings-card-description">
                     {methodLabel(paymentDetailsQuery.data.paymentDetail.paymentMethod)} •{" "}
-                    {paymentDetailsQuery.data.paymentDetail.maskedDestination}
+                    {paymentDetailsQuery.data.paymentDetail.destination}
                   </p>
                 </div>
                 <div className="payment-details-card-status">
@@ -466,7 +466,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
                 </div>
                 <div>
                   <dt>{t('maskedDestinationDt')}</dt>
-                  <dd className="numeric">{paymentDetailsQuery.data.paymentDetail.maskedDestination}</dd>
+                  <dd className="numeric">{paymentDetailsQuery.data.paymentDetail.destination}</dd>
                 </div>
                 <div>
                   <dt>{t('lastUpdatedDt')}</dt>
@@ -709,7 +709,7 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
 
       {crewTagConfirmOpen ? (
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="crew-tag-confirm-title">
-          <div className="modal-panel">
+          <div className="modal-dialog">
             <h3 id="crew-tag-confirm-title" className="modal-title">{t('crewTagConfirmTitle')}</h3>
             <p className="modal-description">
               {t('crewTagConfirmDescription', { tag: `@${formValues.crewTag.trim()}` })}

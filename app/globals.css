@@ -3783,17 +3783,6 @@ html.dark .topbar {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  opacity: 0;
-  transform: translateY(2px);
-  pointer-events: none;
-  transition: opacity var(--transition-hover), transform var(--transition-hover);
-}
-
-.data-table-row:hover .timeoff-row-actions,
-.data-table-row:focus-within .timeoff-row-actions {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
 }
 
 .timeatt-row-actions {
@@ -5071,19 +5060,6 @@ html.dark .topbar {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  opacity: 0;
-  transform: translateY(2px);
-  pointer-events: none;
-  transition: opacity var(--transition-hover), transform var(--transition-hover);
-}
-
-.data-table-row:hover .expenses-row-actions,
-.data-table-row:focus-within .expenses-row-actions,
-.data-table-row:hover .expenses-approval-row-actions,
-.data-table-row:focus-within .expenses-approval-row-actions {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
 }
 
 .expenses-detail-row td {
@@ -7742,15 +7718,40 @@ html.dark .topbar {
   color: var(--color-accent);
 }
 
+.table-row-action-success {
+  color: var(--status-success-text);
+  border-color: var(--status-success-text);
+  background: var(--status-success-bg);
+}
+
+.table-row-action-success:hover {
+  border-color: var(--status-success-text);
+  background: var(--crew-sage-tint);
+  color: var(--status-success-text);
+}
+
+.table-row-action-warning {
+  color: var(--status-warning-text);
+  border-color: var(--status-warning-text);
+  background: var(--status-warning-bg);
+}
+
+.table-row-action-warning:hover {
+  border-color: var(--status-warning-text);
+  background: var(--crew-amber-tint);
+  color: var(--status-warning-text);
+}
+
 .table-row-action-danger {
-  color: var(--color-danger);
-  border-color: var(--color-danger);
+  color: var(--status-error-text);
+  border-color: var(--status-error-text);
+  background: var(--status-error-bg);
 }
 
 .table-row-action-danger:hover {
-  border-color: var(--color-danger);
+  border-color: var(--status-error-text);
   background: var(--crew-red-tint);
-  color: var(--color-danger);
+  color: var(--status-error-text);
 }
 
 .table-row-action-select {

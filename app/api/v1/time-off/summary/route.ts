@@ -192,17 +192,14 @@ export async function GET(request: Request) {
       ? "id, country_code, leave_type, default_days_per_year, accrual_type, carry_over, is_unlimited, notes, created_at, updated_at"
       : "id, country_code, leave_type, default_days_per_year, accrual_type, carry_over, notes, created_at, updated_at";
 
-    let query = supabase
+    const query = supabase
       .from("leave_policies")
       .select(selectCols)
       .eq("org_id", orgId)
       .is("deleted_at", null)
       .order("leave_type", { ascending: true });
 
-    if (employeeProfile.country_code) {
-      query = query.eq("country_code", employeeProfile.country_code);
-    }
-
+    // Leave policies are org-wide — no country filtering needed
     return query;
   };
 

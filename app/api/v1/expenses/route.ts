@@ -404,26 +404,29 @@ export async function POST(request: Request) {
       });
     }
 
-    if (!payload.vendorBankAccountName?.trim()) {
-      return jsonResponse<null>(422, {
-        data: null,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Vendor bank account name is required for work expenses."
-        },
-        meta: buildMeta()
-      });
-    }
+    // Bank fields only required when vendor payment method is bank_transfer
+    if (payload.vendorPaymentMethod === "bank_transfer") {
+      if (!payload.vendorBankAccountName?.trim()) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Vendor bank account name is required for bank transfer expenses."
+          },
+          meta: buildMeta()
+        });
+      }
 
-    if (!payload.vendorBankAccountNumber?.trim()) {
-      return jsonResponse<null>(422, {
-        data: null,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Vendor bank account number is required for work expenses."
-        },
-        meta: buildMeta()
-      });
+      if (!payload.vendorBankAccountNumber?.trim()) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Vendor bank account number is required for bank transfer expenses."
+          },
+          meta: buildMeta()
+        });
+      }
     }
   }
 

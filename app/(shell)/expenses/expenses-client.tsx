@@ -301,12 +301,15 @@ function getFormErrors(
       errors.vendorName = td("validation.vendorNameRequired");
     }
 
-    if (touched.vendorBankAccountName && !values.vendorBankAccountName.trim()) {
-      errors.vendorBankAccountName = td("validation.bankAccountNameRequired");
-    }
+    // Bank fields only required when vendor payment method is bank_transfer
+    if (values.vendorPaymentMethod === "bank_transfer") {
+      if (touched.vendorBankAccountName && !values.vendorBankAccountName.trim()) {
+        errors.vendorBankAccountName = td("validation.bankAccountNameRequired");
+      }
 
-    if (touched.vendorBankAccountNumber && !values.vendorBankAccountNumber.trim()) {
-      errors.vendorBankAccountNumber = td("validation.bankAccountNumberRequired");
+      if (touched.vendorBankAccountNumber && !values.vendorBankAccountNumber.trim()) {
+        errors.vendorBankAccountNumber = td("validation.bankAccountNumberRequired");
+      }
     }
   }
 

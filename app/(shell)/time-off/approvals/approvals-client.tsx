@@ -355,7 +355,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       </button>
                       <button
                         type="button"
-                        className="table-row-action"
+                        className="table-row-action table-row-action-success"
                         onClick={() => openApproveDialog(requestRecord)}
                         disabled={isMutatingRequestId === requestRecord.id}
                       >
@@ -363,7 +363,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       </button>
                       <button
                         type="button"
-                        className="table-row-action"
+                        className="table-row-action table-row-action-danger"
                         onClick={() => openRejectPanel(requestRecord)}
                         disabled={isMutatingRequestId === requestRecord.id}
                       >

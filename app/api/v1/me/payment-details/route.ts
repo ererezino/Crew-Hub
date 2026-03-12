@@ -93,11 +93,22 @@ function toMaskedPaymentDetail(
       ? crewTagMasked ?? "****"
       : maskFromLast4(last4);
 
+  // Full destination visible to the account owner
+  const destination =
+    row.payment_method === "crew_tag" && row.crew_tag
+      ? `@${row.crew_tag}`
+      : row.payment_method === "bank_transfer" && row.bank_account_last4
+        ? `****${row.bank_account_last4}`
+        : row.payment_method === "mobile_money" && row.mobile_money_last4
+          ? `****${row.mobile_money_last4}`
+          : maskedDestination;
+
   return {
     id: row.id,
     employeeId: row.employee_id,
     paymentMethod: row.payment_method,
     currency: row.currency,
+    destination,
     maskedDestination,
     last4,
     crewTagMasked,
@@ -267,7 +278,7 @@ export async function PUT(request: Request) {
       employeeId: session.profile.id
     });
 
-    const holdEffectiveAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const holdEffectiveAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 
     const writePayload: Record<string, string | boolean | null> = {
       payment_method: payload.paymentMethod,
@@ -403,7 +414,7 @@ export async function PUT(request: Request) {
         userIds: hrRecipientIds,
         type: "payment_details_changed",
         title: "Payment details changed",
-        body: `${session.profile.full_name} updated payment details. Change holds for 48 hours.`,
+        body: `${session.profile.full_name} updated payment details. Change holds for 2 hours.`,
         link: "/admin/payment-details"
       });
     }
@@ -413,7 +424,7 @@ export async function PUT(request: Request) {
       userId: session.profile.id,
       type: "payment_details_changed",
       title: "Payment details updated",
-      body: "Your payment details were updated and will become effective in 48 hours.",
+      body: "Your payment details were updated and will become effective in 2 hours.",
       link: "/me/payment-details"
     });
 

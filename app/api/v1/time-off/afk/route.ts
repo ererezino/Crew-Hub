@@ -259,14 +259,14 @@ export async function POST(request: Request) {
 
   // Auto-reclassify if > 2 hours
   if (durationMinutes > AFK_RECLASSIFY_THRESHOLD_MINUTES) {
-    reclassifiedAs = "personal_day";
+    reclassifiedAs = "personal_days";
 
     const { data: leaveRequest, error: leaveError } = await supabase
       .from("leave_requests")
       .insert({
         org_id: session.profile.org_id,
         employee_id: session.profile.id,
-        leave_type: "personal_day",
+        leave_type: "personal_days",
         start_date: parsedBody.data.date,
         end_date: parsedBody.data.date,
         total_days: 1,

@@ -9,6 +9,8 @@ export type PaymentDetailMasked = {
   employeeId: string;
   paymentMethod: PaymentMethod;
   currency: string;
+  /** Full unmasked destination visible to the account owner. */
+  destination: string;
   maskedDestination: string;
   last4: string | null;
   crewTagMasked: string | null;

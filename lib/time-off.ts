@@ -177,6 +177,10 @@ export function formatLeaveTypeLabel(leaveType: string, locale?: "en" | "fr"): s
     return isFr ? "Congé maladie" : "Sick Leave";
   }
 
+  if (normalized === "personal_days" || normalized === "personal_day") {
+    return isFr ? "Jours personnels" : "Personal Days";
+  }
+
   if (normalized === "birthday" || normalized === "birthday_leave") {
     return isFr ? "Congé anniversaire" : "Birthday Leave";
   }

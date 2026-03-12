@@ -3,9 +3,8 @@ import type { ApiResponse } from "./auth";
 export const LEAVE_TYPES = [
   "annual_leave",
   "sick_leave",
-  "personal_day",
+  "personal_days",
   "birthday_leave",
-  "unpaid_personal_day",
   "maternity_leave",
   "paternity_leave"
 ] as const;

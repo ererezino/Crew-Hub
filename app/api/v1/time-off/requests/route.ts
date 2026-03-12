@@ -303,7 +303,7 @@ export async function POST(request: Request) {
     });
   }
 
-  let policiesQuery = supabase
+  const policiesQuery = supabase
     .from("leave_policies")
     .select("id, default_days_per_year, country_code, is_unlimited")
     .eq("org_id", employeeProfile.org_id)
@@ -311,9 +311,7 @@ export async function POST(request: Request) {
     .is("deleted_at", null)
     .limit(5);
 
-  if (employeeProfile.country_code) {
-    policiesQuery = policiesQuery.in("country_code", [employeeProfile.country_code, "NG"]);
-  }
+  // Leave policies are org-wide — no country filtering
 
   const { data: policyRows, error: policyError } = await policiesQuery;
 
@@ -335,16 +333,14 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "POLICY_NOT_FOUND",
-        message: "Leave type is not configured for your country policy."
+        message: "Leave type is not configured for your organization."
       },
       meta: buildMeta()
     });
   }
 
-  const selectedPolicy =
-    parsedPolicyRows.data.find((policy) => policy.country_code === employeeProfile.country_code) ??
-    parsedPolicyRows.data.find((policy) => policy.country_code === "NG") ??
-    parsedPolicyRows.data[0];
+  // Policies are org-wide — pick the first matching one
+  const selectedPolicy = parsedPolicyRows.data[0];
 
   const { data: rawHolidays, error: holidaysError } = await supabase
     .from("holiday_calendars")
