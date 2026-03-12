@@ -334,58 +334,63 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
         <p className="crew-hero-subtitle">
           {t("pageSubtitle")}
         </p>
-        <div className="crew-hero-stats">
-          <span>{totalCount} {totalCount !== 1 ? "people" : "person"}</span>
-          <span className="crew-hero-dot" aria-hidden="true" />
-          <span>{departments.length} {departments.length !== 1 ? "teams" : "team"}</span>
-        </div>
+        {!isLoading && (
+          <div className="crew-hero-stats">
+            <span>{totalCount} {totalCount !== 1 ? "people" : "person"}</span>
+            <span className="crew-hero-dot" aria-hidden="true" />
+            <span>{departments.length} {departments.length !== 1 ? "teams" : "team"}</span>
+          </div>
+        )}
       </div>
 
-      {/* ── Search ── */}
-      <div className="crew-search-bar">
-        <input
-          type="text"
-          className="form-input crew-search-input"
-          placeholder="Search by name, title, or department..."
-          aria-label="Search crew members"
-          value={search}
-          onChange={(e) => setSearch(e.currentTarget.value)}
-        />
-      </div>
+      {/* ── Search + filter (hidden while loading) ── */}
+      {!isLoading && (
+        <>
+          <div className="crew-search-bar">
+            <input
+              type="text"
+              className="form-input crew-search-input"
+              placeholder="Search by name, title, or department..."
+              aria-label="Search crew members"
+              value={search}
+              onChange={(e) => setSearch(e.currentTarget.value)}
+            />
+          </div>
 
-      {/* ── Filter bar (chips + view toggle) ── */}
-      <div className="crew-filter-bar">
-        <div className="crew-chips">
-          <button
-            type="button"
-            className={`crew-chip ${activeDept === null ? "crew-chip-active" : ""}`}
-            aria-pressed={activeDept === null}
-            onClick={() => setActiveDept(null)}
-          >
-            All
-          </button>
-          {departments.map((dept) => (
+          <div className="crew-filter-bar">
+            <div className="crew-chips">
+              <button
+                type="button"
+                className={`crew-chip ${activeDept === null ? "crew-chip-active" : ""}`}
+                aria-pressed={activeDept === null}
+                onClick={() => setActiveDept(null)}
+              >
+                All
+              </button>
+              {departments.map((dept) => (
+                <button
+                  key={dept.name}
+                  type="button"
+                  className={`crew-chip ${activeDept === dept.name ? "crew-chip-active" : ""}`}
+                  aria-pressed={activeDept === dept.name}
+                  style={activeDept === dept.name ? { backgroundColor: getDeptColor(dept.name).accent, color: "#fff", borderColor: getDeptColor(dept.name).accent } : undefined}
+                  onClick={() => setActiveDept(activeDept === dept.name ? null : dept.name)}
+                >
+                  {dept.name} ({dept.count})
+                </button>
+              ))}
+            </div>
             <button
-              key={dept.name}
               type="button"
-              className={`crew-chip ${activeDept === dept.name ? "crew-chip-active" : ""}`}
-              aria-pressed={activeDept === dept.name}
-              style={activeDept === dept.name ? { backgroundColor: getDeptColor(dept.name).accent, color: "#fff", borderColor: getDeptColor(dept.name).accent } : undefined}
-              onClick={() => setActiveDept(activeDept === dept.name ? null : dept.name)}
+              className={`crew-view-toggle ${viewMode === "by-team" ? "crew-view-toggle-active" : ""}`}
+              onClick={() => setViewMode(viewMode === "all" ? "by-team" : "all")}
+              aria-pressed={viewMode === "by-team"}
             >
-              {dept.name} ({dept.count})
+              By team
             </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          className={`crew-view-toggle ${viewMode === "by-team" ? "crew-view-toggle-active" : ""}`}
-          onClick={() => setViewMode(viewMode === "all" ? "by-team" : "all")}
-          aria-pressed={viewMode === "by-team"}
-        >
-          By team
-        </button>
-      </div>
+          </div>
+        </>
+      )}
 
       {/* ── Loading / Error / Empty / Grid ── */}
       {isLoading ? (
