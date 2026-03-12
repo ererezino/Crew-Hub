@@ -690,7 +690,17 @@
       "progress": "{completed}/{total} terminé(s)",
       "expand": "Développer",
       "collapse": "Réduire",
-      "dismiss": "Masquer la liste"
+      "dismiss": "Masquer la liste",
+      "item_add_employee": "Ajouter un premier employé",
+      "item_configure_departments": "Configurer les départements",
+      "item_leave_policy": "Configurer la politique de congés",
+      "item_document_template": "Téléverser un premier document",
+      "item_compliance_policy": "Configurer une politique de conformité",
+      "item_payroll_settings": "Configurer la paie",
+      "item_onboarding_template": "Créer un modèle d'intégration",
+      "item_announcement": "Publier une annonce",
+      "item_invite_member": "Inviter un membre de l'équipe",
+      "item_org_profile": "Compléter le profil de l'organisation"
     },
     "onboarding": {
       "ariaLabel": "Progression de l'intégration",

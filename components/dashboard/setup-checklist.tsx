@@ -65,6 +65,30 @@ export function SetupChecklist() {
     }
   }, [dismissed, fetchStatus]);
 
+  /* Refetch when window regains focus — catches returning from setup pages */
+  useEffect(() => {
+    if (dismissed) return;
+
+    const handleFocus = () => {
+      void fetchStatus();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [dismissed, fetchStatus]);
+
+  /* Refetch on custom badge-refresh event (fired by other components) */
+  useEffect(() => {
+    if (dismissed) return;
+
+    const handleBadgeRefresh = () => {
+      void fetchStatus();
+    };
+
+    window.addEventListener("crew-hub:badge-refresh", handleBadgeRefresh);
+    return () => window.removeEventListener("crew-hub:badge-refresh", handleBadgeRefresh);
+  }, [dismissed, fetchStatus]);
+
   const handleDismiss = () => {
     try {
       localStorage.setItem(DISMISS_KEY, "true");
@@ -73,6 +97,22 @@ export function SetupChecklist() {
     }
     setDismissed(true);
   };
+
+  /**
+   * Resolve the display label for a checklist item.
+   * Prefer the i18n key `setupChecklist.item_{id}`; fall back to the API-provided label.
+   */
+  const resolveLabel = useCallback(
+    (item: SetupItem): string => {
+      const key = `setupChecklist.item_${item.id}`;
+      try {
+        return t(key as Parameters<typeof t>[0]);
+      } catch {
+        return item.label;
+      }
+    },
+    [t]
+  );
 
   if (loading || dismissed || !data) return null;
   if (data.completed_count === data.total_count) return null;
@@ -136,7 +176,7 @@ export function SetupChecklist() {
               >
                 {item.completed && <Check size={12} />}
               </span>
-              <span className="setup-checklist-item-label">{item.label}</span>
+              <span className="setup-checklist-item-label">{resolveLabel(item)}</span>
             </button>
           ))}
         </div>

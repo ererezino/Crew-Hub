@@ -690,7 +690,17 @@
       "progress": "{completed}/{total} completed",
       "expand": "Expand",
       "collapse": "Collapse",
-      "dismiss": "Dismiss checklist"
+      "dismiss": "Dismiss checklist",
+      "item_add_employee": "Add first employee",
+      "item_configure_departments": "Configure departments",
+      "item_leave_policy": "Set up leave policy",
+      "item_document_template": "Upload first document",
+      "item_compliance_policy": "Set up compliance policy",
+      "item_payroll_settings": "Configure payroll",
+      "item_onboarding_template": "Create onboarding template",
+      "item_announcement": "Add company announcement",
+      "item_invite_member": "Invite a team member",
+      "item_org_profile": "Complete organization profile"
     },
     "onboarding": {
       "ariaLabel": "Onboarding progress",
