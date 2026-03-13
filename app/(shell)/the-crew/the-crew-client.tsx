@@ -7,6 +7,11 @@ import { useTranslations } from "next-intl";
 
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { countryFlagFromCode } from "../../../lib/countries";
+import {
+  crewDisplayDepartment,
+  CREW_MGS_DISPLAY_LABEL,
+  isCrewMgsDepartment
+} from "../../../lib/crew-department-display";
 import { formatDate } from "../../../lib/datetime";
 import type { CrewMember, CrewListResponseData } from "../../../types/people";
 
@@ -117,8 +122,8 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
 
   // Custom display order for The Crew page.
   // Product appears directly below Design.
-  // Marketing, Growth, and Sales are separate in the data model but will be
-  // merged into one visual section in the "grouped" memo below.
+  // Marketing, Growth, Sales, and the legacy "Marketing & Growth" DB value all
+  // map to a single display bucket via crewDisplayDepartment().
   // No special "Founders" section — founders appear with their actual teams.
   const CREW_DISPLAY_ORDER: string[] = [
     "Customer Success",
@@ -127,26 +132,15 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     "Engineering",
     "Finance",
     "Operations",
-    // Marketing, Growth, Sales (and the legacy "Marketing & Growth" value)
-    // are handled by the grouping logic below — merged into one display section.
-    "Marketing",
-    "Growth",
-    "Sales",
-    "Marketing & Growth",
+    CREW_MGS_DISPLAY_LABEL,
   ];
-
-  // Departments that should be merged into one combined display section.
-  // This is presentation-layer only — the underlying department values remain separate.
-  // Includes "marketing & growth" which exists as a legacy value in some production records.
-  const MGS_DEPTS = new Set(["marketing", "growth", "sales", "marketing & growth"]);
-  const MGS_LABEL = "Marketing & Growth";
 
   const departments = useMemo(() => {
     const deptSet = new Map<string, number>();
     for (const m of members) {
-      const raw = m.department ?? "Other";
-      // Merge MGS departments into one combined display entry
-      const d = MGS_DEPTS.has(raw.toLowerCase()) ? MGS_LABEL : raw;
+      // Use crewDisplayDepartment() for ALL department bucketing on this page.
+      // This is the single source of truth — see lib/crew-department-display.ts.
+      const d = crewDisplayDepartment(m.department);
       deptSet.set(d, (deptSet.get(d) ?? 0) + 1);
     }
     return [...deptSet.entries()]
@@ -169,12 +163,9 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   const filtered = useMemo(() => {
     let list = members;
     if (activeDept) {
-      if (activeDept === MGS_LABEL) {
-        // When the merged MGS chip is active, match all constituent departments
-        list = list.filter((m) => MGS_DEPTS.has((m.department ?? "Other").toLowerCase()));
-      } else {
-        list = list.filter((m) => (m.department ?? "Other") === activeDept);
-      }
+      // Filter by the display department — crewDisplayDepartment normalizes
+      // Marketing / Growth / Sales / "Marketing & Growth" into one bucket.
+      list = list.filter((m) => crewDisplayDepartment(m.department) === activeDept);
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -192,37 +183,27 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
 
   const grouped = useMemo(() => {
     if (viewMode !== "by-team") return null;
+
+    // Key by DISPLAY department (crewDisplayDepartment), not raw department.
+    // This ensures Marketing / Growth / Sales / "Marketing & Growth" all land
+    // in the same map bucket from the start — no manual merge needed.
     const map = new Map<string, CrewMember[]>();
     for (const m of filtered) {
-      const d = m.department ?? "Other";
+      const d = crewDisplayDepartment(m.department);
       if (!map.has(d)) map.set(d, []);
       map.get(d)!.push(m);
     }
 
-    // Build sorted list following department order, but merge MGS departments.
+    // Build sorted list following the department display order.
     const sorted: [string, CrewMember[]][] = [];
-    const mgsMembers: CrewMember[] = [];
     const added = new Set<string>();
 
     for (const dept of departments) {
-      if (MGS_DEPTS.has(dept.name.toLowerCase())) {
-        // Collect members from Marketing, Growth, Sales into one group
-        const group = map.get(dept.name);
-        if (group) mgsMembers.push(...group);
-        added.add(dept.name);
-        continue;
-      }
       const group = map.get(dept.name);
       if (group && group.length > 0) {
         sorted.push([dept.name, group]);
-        added.add(dept.name);
       }
-    }
-
-    // Insert the combined MGS section at the position where the first MGS
-    // department would have appeared (after Operations in the sort order).
-    if (mgsMembers.length > 0) {
-      sorted.push([MGS_LABEL, mgsMembers]);
+      added.add(dept.name);
     }
 
     // Add any remaining departments not in the custom order
