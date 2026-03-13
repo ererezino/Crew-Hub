@@ -784,15 +784,15 @@ export function SettingsClient({
 
               {/* ── Social links (The Crew) ── */}
               <fieldset className="form-field">
-                <legend className="form-label">Social links</legend>
+                <legend className="form-label">{t('profile.socialLinksTitle')}</legend>
                 <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
-                  Optional — these appear on your profile on The Crew page.
+                  {t('profile.socialLinksDescription')}
                 </p>
                 <div className="settings-emergency-fields">
                   <label className="form-field" htmlFor="profile-social-linkedin">
-                    <span className="form-label-sm">LinkedIn</span>
+                    <span className="form-label-sm">{t('profile.socialLinkedinLabel')}</span>
                     <div className="input-with-addon">
-                      <span className="input-addon">linkedin.com/in/</span>
+                      <span className="input-addon">{"linkedin.com/in/"}</span>
                       <input
                         id="profile-social-linkedin"
                         className="form-input input-addon-field"
@@ -807,9 +807,9 @@ export function SettingsClient({
                     </div>
                   </label>
                   <label className="form-field" htmlFor="profile-social-twitter">
-                    <span className="form-label-sm">Twitter / X</span>
+                    <span className="form-label-sm">{t('profile.socialTwitterLabel')}</span>
                     <div className="input-with-addon">
-                      <span className="input-addon">x.com/</span>
+                      <span className="input-addon">{"x.com/"}</span>
                       <input
                         id="profile-social-twitter"
                         className="form-input input-addon-field"
@@ -824,9 +824,9 @@ export function SettingsClient({
                     </div>
                   </label>
                   <label className="form-field" htmlFor="profile-social-instagram">
-                    <span className="form-label-sm">Instagram</span>
+                    <span className="form-label-sm">{t('profile.socialInstagramLabel')}</span>
                     <div className="input-with-addon">
-                      <span className="input-addon">instagram.com/</span>
+                      <span className="input-addon">{"instagram.com/"}</span>
                       <input
                         id="profile-social-instagram"
                         className="form-input input-addon-field"
@@ -841,9 +841,9 @@ export function SettingsClient({
                     </div>
                   </label>
                   <label className="form-field" htmlFor="profile-social-github">
-                    <span className="form-label-sm">GitHub</span>
+                    <span className="form-label-sm">{t('profile.socialGithubLabel')}</span>
                     <div className="input-with-addon">
-                      <span className="input-addon">github.com/</span>
+                      <span className="input-addon">{"github.com/"}</span>
                       <input
                         id="profile-social-github"
                         className="form-input input-addon-field"
@@ -858,9 +858,9 @@ export function SettingsClient({
                     </div>
                   </label>
                   <label className="form-field" htmlFor="profile-social-website">
-                    <span className="form-label-sm">Personal website</span>
+                    <span className="form-label-sm">{t('profile.socialWebsiteLabel')}</span>
                     <div className="input-with-addon">
-                      <span className="input-addon">https://</span>
+                      <span className="input-addon">{"https://"}</span>
                       <input
                         id="profile-social-website"
                         className="form-input input-addon-field"
@@ -879,13 +879,13 @@ export function SettingsClient({
 
               {/* ── Favorites (The Crew) ── */}
               <fieldset className="form-field">
-                <legend className="form-label">Favorites</legend>
+                <legend className="form-label">{t('profile.favoritesTitle')}</legend>
                 <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
-                  Optional — share what you enjoy. Shown on your profile on The Crew.
+                  {t('profile.favoritesDescription')}
                 </p>
                 <div className="settings-emergency-fields">
                   <label className="form-field" htmlFor="profile-fav-music">
-                    <span className="form-label-sm">🎵 Music</span>
+                    <span className="form-label-sm">{t('profile.favoriteMusicLabel')}</span>
                     <input
                       id="profile-fav-music"
                       className="form-input"
@@ -899,7 +899,7 @@ export function SettingsClient({
                     />
                   </label>
                   <label className="form-field" htmlFor="profile-fav-books">
-                    <span className="form-label-sm">📚 Books</span>
+                    <span className="form-label-sm">{t('profile.favoriteBooksLabel')}</span>
                     <input
                       id="profile-fav-books"
                       className="form-input"
@@ -913,7 +913,7 @@ export function SettingsClient({
                     />
                   </label>
                   <label className="form-field" htmlFor="profile-fav-sports">
-                    <span className="form-label-sm">⚽ Sports</span>
+                    <span className="form-label-sm">{t('profile.favoriteSportsLabel')}</span>
                     <input
                       id="profile-fav-sports"
                       className="form-input"

@@ -237,10 +237,10 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
         return;
       }
 
-      setModMessage("Profile updated. The user has been notified.");
+      setModMessage(t("moderate.saved"));
       void fetchCrew();
     } catch {
-      setModMessage("Unable to update.");
+      setModMessage(t("moderate.failed"));
     } finally {
       setIsModSaving(false);
     }
@@ -265,7 +265,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
           <button
             type="button"
             className="crew-card-moderate"
-            title="Moderate profile"
+            title={t("moderate.title")}
             onClick={(e) => { e.stopPropagation(); openModeration(member); }}
           >
             ⚙
@@ -336,9 +336,9 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
         </p>
         {!isLoading && (
           <div className="crew-hero-stats">
-            <span>{totalCount} {totalCount !== 1 ? "people" : "person"}</span>
+            <span>{t("statMembers", { count: totalCount })}</span>
             <span className="crew-hero-dot" aria-hidden="true" />
-            <span>{departments.length} {departments.length !== 1 ? "teams" : "team"}</span>
+            <span>{t("statDepartments", { count: departments.length })}</span>
           </div>
         )}
       </div>
@@ -350,8 +350,8 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
             <input
               type="text"
               className="form-input crew-search-input"
-              placeholder="Search by name, title, or department..."
-              aria-label="Search crew members"
+              placeholder={t("searchPlaceholder")}
+              aria-label={t("searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.currentTarget.value)}
             />
@@ -365,7 +365,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
                 aria-pressed={activeDept === null}
                 onClick={() => setActiveDept(null)}
               >
-                All
+                {t("chipAll")}
               </button>
               {departments.map((dept) => (
                 <button
@@ -386,7 +386,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
               onClick={() => setViewMode(viewMode === "all" ? "by-team" : "all")}
               aria-pressed={viewMode === "by-team"}
             >
-              By team
+              {t("viewByTeam")}
             </button>
           </div>
         </>
@@ -402,11 +402,11 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       ) : error ? (
         <div className="crew-empty">
           <p>{error}</p>
-          <button type="button" className="button" onClick={() => void fetchCrew()}>Retry</button>
+          <button type="button" className="button" onClick={() => void fetchCrew()}>{t("retry")}</button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="crew-empty">
-          <p>No one matches your search.</p>
+          <p>{t("emptyTitle")}</p>
         </div>
       ) : viewMode === "by-team" && grouped ? (
         /* ── By Team mode: flat grid with label dividers ── */
@@ -424,7 +424,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
               <div key={`divider-${deptName}`} className="crew-dept-divider">
                 <span className="crew-dept-divider-dot" style={{ backgroundColor: color.accent }} />
                 <h2 className="crew-dept-divider-name">{deptName}</h2>
-                <span className="crew-dept-divider-count">{deptMembers.length} {deptMembers.length !== 1 ? "members" : "member"}</span>
+                <span className="crew-dept-divider-count">{t("memberCount", { count: deptMembers.length })}</span>
                 <span className="crew-dept-divider-line" />
               </div>,
               /* Cards */
@@ -502,7 +502,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
                   {selectedMember.startDate ? (
                     <>
                       {(selectedMember.countryCode || selectedMember.pronouns) ? <span className="crew-drawer-meta-sep">·</span> : null}
-                      <span>Joined {formatDate(selectedMember.startDate)}</span>
+                      <span>{t("drawer.joined", { date: formatDate(selectedMember.startDate) })}</span>
                     </>
                   ) : null}
                 </p>
@@ -512,7 +512,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
             {/* Bio */}
             {selectedMember.bio ? (
               <div className="crew-drawer-section">
-                <h3 className="crew-drawer-section-title">Bio</h3>
+                <h3 className="crew-drawer-section-title">{t("drawer.bio")}</h3>
                 <p className="crew-drawer-bio">{selectedMember.bio}</p>
               </div>
             ) : null}
@@ -520,7 +520,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
             {/* Favorites */}
             {(selectedMember.favoriteMusic || selectedMember.favoriteBooks || selectedMember.favoriteSports) ? (
               <div className="crew-drawer-section">
-                <h3 className="crew-drawer-section-title">Favorites</h3>
+                <h3 className="crew-drawer-section-title">{t("drawer.favorites")}</h3>
                 <div className="crew-drawer-favorites">
                   {selectedMember.favoriteMusic ? <p className="crew-drawer-favorite-item">🎵 {selectedMember.favoriteMusic}</p> : null}
                   {selectedMember.favoriteBooks ? <p className="crew-drawer-favorite-item">📚 {selectedMember.favoriteBooks}</p> : null}
@@ -532,7 +532,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
             {/* Social */}
             {getSocials(selectedMember).length > 0 ? (
               <div className="crew-drawer-section">
-                <h3 className="crew-drawer-section-title">Connect</h3>
+                <h3 className="crew-drawer-section-title">{t("drawer.connect")}</h3>
                 <div className="crew-drawer-socials">
                   {getSocials(selectedMember).map((s) => (
                     <a
@@ -554,7 +554,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
             {selectedMember.id === currentUserId ? (
               <div className="crew-drawer-edit">
                 <Link href="/settings" className="button button-accent">
-                  Edit my profile
+                  {t("drawer.editMyProfile")}
                 </Link>
               </div>
             ) : null}
@@ -566,12 +566,12 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       {moderatingMember && isAdmin ? (
         <SlidePanel
           isOpen={!!moderatingMember}
-          title={`Moderate: ${moderatingMember.fullName}`}
+          title={t("moderate.title")}
           onClose={() => setModeratingMember(null)}
         >
           <div className="crew-mod-drawer">
             <p className="crew-mod-notice">
-              Changes are logged and the user will be notified.
+              {t("moderate.notice")}
             </p>
 
             <label className="crew-mod-toggle">
@@ -580,11 +580,11 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
                 checked={modVisible}
                 onChange={(e) => setModVisible(e.currentTarget.checked)}
               />
-              <span>Visible on The Crew</span>
+              <span>{t("moderate.directoryVisible")}</span>
             </label>
 
             <label className="form-field">
-              <span className="form-label-sm">Bio</span>
+              <span className="form-label-sm">{t("moderate.bioLabel")}</span>
               <textarea
                 className="form-input"
                 rows={3}
@@ -595,36 +595,36 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
             </label>
 
             <label className="form-field">
-              <span className="form-label-sm">LinkedIn</span>
+              <span className="form-label-sm">{t("moderate.linkedinLabel")}</span>
               <input className="form-input" maxLength={255} value={modValues.socialLinkedin ?? ""} onChange={(e) => setModValues({ ...modValues, socialLinkedin: e.currentTarget.value })} />
             </label>
             <label className="form-field">
-              <span className="form-label-sm">Twitter / X</span>
+              <span className="form-label-sm">{t("moderate.twitterLabel")}</span>
               <input className="form-input" maxLength={255} value={modValues.socialTwitter ?? ""} onChange={(e) => setModValues({ ...modValues, socialTwitter: e.currentTarget.value })} />
             </label>
             <label className="form-field">
-              <span className="form-label-sm">Instagram</span>
+              <span className="form-label-sm">{t("moderate.instagramLabel")}</span>
               <input className="form-input" maxLength={255} value={modValues.socialInstagram ?? ""} onChange={(e) => setModValues({ ...modValues, socialInstagram: e.currentTarget.value })} />
             </label>
             <label className="form-field">
-              <span className="form-label-sm">GitHub</span>
+              <span className="form-label-sm">{t("moderate.githubLabel")}</span>
               <input className="form-input" maxLength={255} value={modValues.socialGithub ?? ""} onChange={(e) => setModValues({ ...modValues, socialGithub: e.currentTarget.value })} />
             </label>
             <label className="form-field">
-              <span className="form-label-sm">Website</span>
+              <span className="form-label-sm">{t("moderate.websiteLabel")}</span>
               <input className="form-input" maxLength={255} value={modValues.socialWebsite ?? ""} onChange={(e) => setModValues({ ...modValues, socialWebsite: e.currentTarget.value })} />
             </label>
 
             <label className="form-field">
-              <span className="form-label-sm">Favorite Music</span>
+              <span className="form-label-sm">{t("moderate.musicLabel")}</span>
               <input className="form-input" maxLength={200} value={modValues.favoriteMusic ?? ""} onChange={(e) => setModValues({ ...modValues, favoriteMusic: e.currentTarget.value })} />
             </label>
             <label className="form-field">
-              <span className="form-label-sm">Favorite Books</span>
+              <span className="form-label-sm">{t("moderate.booksLabel")}</span>
               <input className="form-input" maxLength={200} value={modValues.favoriteBooks ?? ""} onChange={(e) => setModValues({ ...modValues, favoriteBooks: e.currentTarget.value })} />
             </label>
             <label className="form-field">
-              <span className="form-label-sm">Favorite Sports</span>
+              <span className="form-label-sm">{t("moderate.sportsLabel")}</span>
               <input className="form-input" maxLength={200} value={modValues.favoriteSports ?? ""} onChange={(e) => setModValues({ ...modValues, favoriteSports: e.currentTarget.value })} />
             </label>
 
@@ -635,7 +635,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
                 disabled={isModSaving}
                 onClick={() => void handleModSave()}
               >
-                {isModSaving ? "Saving..." : "Save changes"}
+                {isModSaving ? t("moderate.saving") : t("moderate.save")}
               </button>
             </div>
 

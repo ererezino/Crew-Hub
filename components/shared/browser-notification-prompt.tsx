@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslations } from "next-intl";
 
 const DISMISS_KEY = "crewhub-browser-notification-prompt-dismissed";
@@ -17,19 +17,18 @@ const BROWSER_PUSH_PREF_KEY = "crewhub-browser-push-enabled";
  *  3. User hasn't dismissed this prompt before
  *  4. Browser push preference is NOT already enabled in localStorage
  */
+function shouldShowPrompt(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!("Notification" in window)) return false;
+  if (Notification.permission !== "default") return false;
+  if (window.localStorage.getItem(DISMISS_KEY) === "true") return false;
+  if (window.localStorage.getItem(BROWSER_PUSH_PREF_KEY) === "true") return false;
+  return true;
+}
+
 export function BrowserNotificationPrompt() {
   const t = useTranslations("appShell.notificationPrompt");
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) return;
-    if (Notification.permission !== "default") return;
-    if (window.localStorage.getItem(DISMISS_KEY) === "true") return;
-    if (window.localStorage.getItem(BROWSER_PUSH_PREF_KEY) === "true") return;
-
-    setVisible(true);
-  }, []);
+  const [dismissed, setDismissed] = useState(false);
 
   const handleEnable = useCallback(async () => {
     try {
@@ -63,15 +62,15 @@ export function BrowserNotificationPrompt() {
 
     /* Dismiss regardless of outcome */
     window.localStorage.setItem(DISMISS_KEY, "true");
-    setVisible(false);
+    setDismissed(true);
   }, []);
 
   const handleDismiss = useCallback(() => {
     window.localStorage.setItem(DISMISS_KEY, "true");
-    setVisible(false);
+    setDismissed(true);
   }, []);
 
-  if (!visible) return null;
+  if (dismissed || !shouldShowPrompt()) return null;
 
   return (
     <div className="browser-notification-prompt" role="status">

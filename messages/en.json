@@ -805,12 +805,14 @@
       "emergencyContactPhoneLabel": "Phone",
       "emergencyContactRelationshipLabel": "Relationship",
       "socialLinksTitle": "Social links",
+      "socialLinksDescription": "Optional — these appear on your profile on The Crew page.",
       "socialLinkedinLabel": "LinkedIn",
       "socialTwitterLabel": "Twitter / X",
       "socialInstagramLabel": "Instagram",
       "socialGithubLabel": "GitHub",
       "socialWebsiteLabel": "Website",
       "favoritesTitle": "Favorites",
+      "favoritesDescription": "Optional — share what you enjoy. Shown on your profile on The Crew.",
       "favoriteMusicLabel": "Music",
       "favoriteBooksLabel": "Books",
       "favoriteSportsLabel": "Sports"
@@ -4817,7 +4819,8 @@
       "jobTitlePlaceholder": "e.g. Software Engineer",
       "crewTagLabel": "Crew tag",
       "crewTagPlaceholder": "e.g. john.doe",
-      "saveChanges": "Save Changes"
+      "saveChanges": "Save Changes",
+      "directoryVisible": "Visible on The Crew"
     },
     "bulkUpload": {
       "title": "Bulk Upload",
@@ -4930,6 +4933,7 @@
     "statDepartments": "{count, plural, one {# department} other {# departments}}",
     "searchPlaceholder": "Search by name, title, or department…",
     "chipAll": "All",
+    "viewByTeam": "By team",
     "loadError": "Unable to load crew.",
     "retry": "Retry",
     "emptyTitle": "No teammates found",

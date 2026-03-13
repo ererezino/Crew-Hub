@@ -1861,7 +1861,7 @@ export function PeopleClient({
                 checked={editValues.directoryVisible}
                 onChange={(e) => setEditValues((prev) => ({ ...prev, directoryVisible: e.target.checked }))}
               />
-              Visible on The Crew
+              {t('editPanel.directoryVisible')}
             </label>
 
             <div className="slide-panel-actions">
