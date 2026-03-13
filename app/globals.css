@@ -761,6 +761,37 @@ html.dark .button-orange:hover {
   color: var(--color-accent);
 }
 
+/* ── Sidebar tooltip (portal-based) ──
+   Rendered by <SidebarTooltip> via React portal to escape overflow clipping.
+   The component sets position: fixed inline; these rules handle appearance. */
+.sidebar-tooltip {
+  background: #1a1a1a;
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 4px 10px;
+  border-radius: var(--radius-default);
+  pointer-events: none;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  animation: sidebar-tooltip-in 120ms ease both;
+}
+
+@keyframes sidebar-tooltip-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.sidebar-tooltip-arrow {
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #1a1a1a;
+}
+
 /* Keep the old dot class for backward compat but hide it */
 .sidebar-link-dot {
   display: none;
@@ -5287,15 +5318,6 @@ button.att-img-link {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--transition-hover);
-}
-
-.data-table-row:hover .people-row-actions,
-.data-table-row:focus-within .people-row-actions {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 /* ── People name link ── */
@@ -8248,6 +8270,17 @@ button.att-img-link {
   border-color: var(--status-error-text);
   background: var(--crew-red-tint);
   color: var(--status-error-text);
+}
+
+.table-row-action-accent {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.table-row-action-accent:hover {
+  background: var(--color-accent);
+  color: #fff;
 }
 
 .table-row-action-select {

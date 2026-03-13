@@ -3639,6 +3639,19 @@
       "roles": "Roles",
       "startDate": "Start Date"
     },
+    "systemInfo": {
+      "title": "System Info",
+      "employeeStatus": "Employee status",
+      "joinedCompany": "Joined company",
+      "addedToCrewHub": "Added to Crew Hub",
+      "accountAccess": "Account access",
+      "accountSetupDate": "Account setup date",
+      "lastSignIn": "Last sign-in",
+      "accessActive": "Active",
+      "accessInvited": "Invited",
+      "accessNotInvited": "Not invited",
+      "never": "Never"
+    },
     "privacy": {
       "title": "Privacy Settings",
       "description": "Control what your colleagues can see on your profile.",
@@ -4774,6 +4787,10 @@
       "joined": "Joined",
       "actions": "Actions",
       "noRole": "No role",
+      "accessNotInvited": "Not invited",
+      "accessInvited": "Invited",
+      "accessNotInvitedTooltip": "No invite has been sent yet.",
+      "accessInvitedTooltip": "Invited but has not completed account setup.",
       "accessNotSetUp": "Not set up",
       "accountConfirmed": "Account confirmed and set up",
       "notSetUp": "Has not set up their account yet",
@@ -4820,7 +4837,11 @@
       "crewTagLabel": "Crew tag",
       "crewTagPlaceholder": "e.g. john.doe",
       "saveChanges": "Save Changes",
-      "directoryVisible": "Visible on The Crew"
+      "directoryVisible": "Visible on The Crew",
+      "statusLabel": "Employment status",
+      "statusHintOnboardingToActive": "Leave balances will be created and any active onboarding plan will be closed.",
+      "statusHintToInactive": "This person's access will be revoked immediately.",
+      "statusHintToOnboarding": "This will mark them as a new hire in onboarding."
     },
     "bulkUpload": {
       "title": "Bulk Upload",
@@ -4893,7 +4914,8 @@
       "emailInvalid": "Email is not valid.",
       "duplicateEmail": "Duplicate email within this file.",
       "employmentTypeInvalid": "Employment type must be contractor, full_time, or part_time.",
-      "managerEmailInvalid": "Manager email is not valid."
+      "managerEmailInvalid": "Manager email is not valid.",
+      "selectEmployeeType": "Choose whether this is a new hire or an existing employee."
     },
     "bulkValidation": {
       "csvRequired": "Please upload a .csv file.",

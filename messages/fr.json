@@ -3636,6 +3636,19 @@
       "roles": "Rôles",
       "startDate": "Date de début"
     },
+    "systemInfo": {
+      "title": "Informations système",
+      "employeeStatus": "Statut de l'employé",
+      "joinedCompany": "A rejoint l'entreprise",
+      "addedToCrewHub": "Ajouté à Crew Hub",
+      "accountAccess": "Accès au compte",
+      "accountSetupDate": "Date de configuration du compte",
+      "lastSignIn": "Dernière connexion",
+      "accessActive": "Actif",
+      "accessInvited": "Invité",
+      "accessNotInvited": "Non invité",
+      "never": "Jamais"
+    },
     "privacy": {
       "title": "Paramètres de confidentialité",
       "description": "Contrôlez ce que vos collègues peuvent voir sur votre profil.",
@@ -4768,6 +4781,10 @@
       "invite": "Inviter",
       "sending": "Envoi en cours...",
       "access": "Accès",
+      "accessNotInvited": "Non invité",
+      "accessInvited": "Invité",
+      "accessNotInvitedTooltip": "Aucune invitation n'a encore été envoyée.",
+      "accessInvitedTooltip": "Invité mais n'a pas encore configuré son compte.",
       "accessNotSetUp": "Non configuré",
       "actions": "Actions",
       "ariaLabel": "Tableau de l’annuaire du personnel",
@@ -4816,7 +4833,12 @@
       "jobTitlePlaceholder": "ex. Ingénieur logiciel",
       "crewTagLabel": "Identifiant Crew",
       "crewTagPlaceholder": "ex. jean.dupont",
-      "saveChanges": "Enregistrer les modifications"
+      "saveChanges": "Enregistrer les modifications",
+      "directoryVisible": "Visible sur L'équipe",
+      "statusLabel": "Statut d'emploi",
+      "statusHintOnboardingToActive": "Les soldes de congés seront créés et tout plan d'intégration actif sera clôturé.",
+      "statusHintToInactive": "L'accès de cette personne sera révoqué immédiatement.",
+      "statusHintToOnboarding": "Cette personne sera marquée comme nouvelle recrue en intégration."
     },
     "bulkUpload": {
       "title": "Import groupé",
@@ -4889,7 +4911,8 @@
       "emailInvalid": "L'adresse e-mail n'est pas valide.",
       "duplicateEmail": "Adresse e-mail en double dans ce fichier.",
       "employmentTypeInvalid": "Le type de contrat doit être contractor, full_time ou part_time.",
-      "managerEmailInvalid": "L'adresse e-mail du responsable n'est pas valide."
+      "managerEmailInvalid": "L'adresse e-mail du responsable n'est pas valide.",
+      "selectEmployeeType": "Choisissez s'il s'agit d'une nouvelle recrue ou d'un employé existant."
     },
     "bulkValidation": {
       "csvRequired": "Veuillez importer un fichier .csv.",

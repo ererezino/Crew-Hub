@@ -69,7 +69,9 @@ const createPersonSchema = z.object({
     .length(3, "Currency must be a 3-letter code.")
     .default("USD"),
   status: z.enum(PROFILE_STATUSES).optional(),
-  isNewEmployee: z.boolean().optional().default(true),
+  isNewEmployee: z.boolean({
+    error: "You must specify whether this is a new hire or an existing employee."
+  }),
   accessOverrides: z
     .object({
       granted: z.array(z.string().trim().min(1).max(100)).default([]),
@@ -188,16 +190,19 @@ function normalizePayrollMode(
 
 function deriveInviteStatus(
   accountSetupAt: string | null,
-  lastSeenAt: string | null
+  lastSeenAt: string | null,
+  hasAuthUser: boolean
 ): "not_invited" | "invited" | "active" {
   if (accountSetupAt || lastSeenAt) return "active";
-  return "invited";
+  if (hasAuthUser) return "invited";
+  return "not_invited";
 }
 
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
   managerNameById: ReadonlyMap<string, string>,
-  crewTagById?: ReadonlyMap<string, string>
+  crewTagById?: ReadonlyMap<string, string>,
+  invitedProfileIds?: ReadonlySet<string>
 ): PersonRecord {
   return {
     id: row.id,
@@ -237,7 +242,9 @@ function mapPersonRow(
     socialWebsite: row.social_website ?? null,
     directoryVisible: row.directory_visible,
     crewTag: crewTagById?.get(row.id) ?? null,
-    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at),
+    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at, invitedProfileIds?.has(row.id) ?? true),
+    accountSetupAt: row.account_setup_at,
+    lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -465,7 +472,37 @@ export async function GET(request: Request) {
     }
   }
 
-  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById));
+  /* Check which profiles have been sent invite links (to distinguish "not invited" from "invited").
+     In this codebase, auth users are always created alongside profiles, so auth user existence
+     cannot distinguish the two states. Instead, we check the audit log for invite actions —
+     each successful invite call logs an entry with "invitedBy" in new_value. */
+  let invitedProfileIds = new Set<string>();
+
+  if (profileIds.length > 0) {
+    try {
+      const serviceClient = createSupabaseServiceRoleClient();
+      const { data: inviteAuditRows } = await serviceClient
+        .from("audit_log")
+        .select("record_id")
+        .eq("action", "updated")
+        .eq("table_name", "profiles")
+        .in("record_id", profileIds)
+        .not("new_value->invitedBy", "is", null);
+
+      if (inviteAuditRows) {
+        invitedProfileIds = new Set(
+          (inviteAuditRows as Array<{ record_id: string }>)
+            .filter((row) => typeof row?.record_id === "string")
+            .map((row) => row.record_id)
+        );
+      }
+    } catch {
+      // Non-critical — fall back to assuming all were invited (previous behavior)
+      invitedProfileIds = new Set(profileIds);
+    }
+  }
+
+  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById, invitedProfileIds));
 
   return jsonResponse<PeopleListResponseData>(200, {
     data: { people },

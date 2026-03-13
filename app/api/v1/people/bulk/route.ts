@@ -481,7 +481,7 @@ export async function POST(request: Request) {
           employment_type: employmentType,
           payroll_mode: employmentType === "contractor" ? "contractor_usd_no_withholding" : "employee_local_withholding",
           primary_currency: "USD",
-          status: "onboarding"
+          status: "active"
         });
 
       if (insertProfileError) {
@@ -502,13 +502,13 @@ export async function POST(request: Request) {
         link: "/settings"
       });
 
-      // Send welcome email (bulk upload treats all as new hires by default)
+      // Send welcome email (bulk upload is for existing employees)
       try {
         await sendWelcomeEmail({
           recipientEmail: normalizedEmail,
           recipientName: employee.fullName.trim(),
           setupLink,
-          isNewHire: true,
+          isNewHire: false,
           department: normalizedDepartment || undefined
         });
       } catch (emailError) {

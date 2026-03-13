@@ -117,16 +117,19 @@ function normalizeRoles(values: readonly string[]): AppRole[] {
 
 function deriveInviteStatus(
   accountSetupAt: string | null,
-  lastSeenAt: string | null
+  lastSeenAt: string | null,
+  hasBeenInvited: boolean
 ): "not_invited" | "invited" | "active" {
   if (accountSetupAt || lastSeenAt) return "active";
-  return "invited";
+  if (hasBeenInvited) return "invited";
+  return "not_invited";
 }
 
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
   managerNameById: ReadonlyMap<string, string>,
-  crewTag?: string | null
+  crewTag?: string | null,
+  hasBeenInvited?: boolean
 ): PersonRecord {
   return {
     id: row.id,
@@ -166,7 +169,9 @@ function mapPersonRow(
     scheduleType: row.schedule_type,
     weekendShiftHours: row.weekend_shift_hours,
     crewTag: crewTag ?? null,
-    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at),
+    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at, hasBeenInvited ?? true),
+    accountSetupAt: row.account_setup_at,
+    lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
@@ -684,6 +689,40 @@ export async function PUT(
     }
   }
 
+  /* Auto-complete/cancel onboarding instances when transitioning away from "onboarding".
+     - onboarding → active: mark instances as "completed"
+     - onboarding → offboarding/inactive: mark instances as "cancelled" */
+  if (
+    parsedExistingProfile.data.status === "onboarding" &&
+    payload.status &&
+    payload.status !== "onboarding"
+  ) {
+    try {
+      const newInstanceStatus = payload.status === "active" ? "completed" : "cancelled";
+      await serviceRoleClient
+        .from("onboarding_instances")
+        .update({
+          status: newInstanceStatus,
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("employee_id", personId)
+        .eq("status", "active")
+        .eq("type", "onboarding");
+
+      logger.info(`Onboarding instances ${newInstanceStatus} for employee on status transition.`, {
+        personId,
+        fromStatus: parsedExistingProfile.data.status,
+        toStatus: payload.status
+      });
+    } catch (error) {
+      logger.error("Failed to update onboarding instances on status transition (non-blocking).", {
+        personId,
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
   const managerId = parsedUpdatedRow.data.manager_id;
   let managerNameById = new Map<string, string>();
 
@@ -714,10 +753,29 @@ export async function PUT(
     .not("crew_tag", "is", null)
     .maybeSingle();
 
+  /* Check if this person has been sent an invite (audit log entry with invitedBy) */
+  let hasBeenInvited = true; // Default to true (previous behavior)
+  try {
+    const { data: inviteAuditRow } = await serviceRoleClient
+      .from("audit_log")
+      .select("id")
+      .eq("action", "updated")
+      .eq("table_name", "profiles")
+      .eq("record_id", personId)
+      .not("new_value->invitedBy", "is", null)
+      .limit(1)
+      .maybeSingle();
+
+    hasBeenInvited = !!inviteAuditRow;
+  } catch {
+    // Non-critical — fall back to previous behavior
+  }
+
   const person = mapPersonRow(
     parsedUpdatedRow.data,
     managerNameById,
-    typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null
+    typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null,
+    hasBeenInvited
   );
 
   let accessConfigChangedKeys: string[] = [];
@@ -1020,10 +1078,29 @@ export async function PATCH(
     .not("crew_tag", "is", null)
     .maybeSingle();
 
+  /* Check if this person has been sent an invite */
+  let selfHasBeenInvited = true;
+  try {
+    const { data: selfInviteAuditRow } = await serviceRoleClient
+      .from("audit_log")
+      .select("id")
+      .eq("action", "updated")
+      .eq("table_name", "profiles")
+      .eq("record_id", personId)
+      .not("new_value->invitedBy", "is", null)
+      .limit(1)
+      .maybeSingle();
+
+    selfHasBeenInvited = !!selfInviteAuditRow;
+  } catch {
+    // Non-critical
+  }
+
   const person = mapPersonRow(
     parsedUpdatedRow.data,
     managerNameById,
-    typeof selfCrewTagRow?.crew_tag === "string" ? selfCrewTagRow.crew_tag : null
+    typeof selfCrewTagRow?.crew_tag === "string" ? selfCrewTagRow.crew_tag : null,
+    selfHasBeenInvited
   );
 
   return jsonResponse<PeopleUpdateResponseData>(200, {

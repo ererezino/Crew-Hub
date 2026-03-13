@@ -9,7 +9,7 @@ import { ErrorState } from "../../../../components/shared/error-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
-import { formatDate as formatDateLib } from "../../../../lib/datetime";
+import { formatDate as formatDateLib, formatRelativeTime } from "../../../../lib/datetime";
 import { DEPARTMENTS } from "../../../../lib/departments";
 import { USER_ROLES } from "../../../../lib/navigation";
 import type { ApiResponse, AppRole } from "../../../../types/auth";
@@ -820,7 +820,7 @@ export function PeopleOverviewClient({
             ) : null}
 
             <dt>{t('basicInfo.joined')}</dt>
-            <dd>{formatDate(person.startDate || person.createdAt, locale)}</dd>
+            <dd>{person.startDate ? formatDate(person.startDate, locale) : "—"}</dd>
 
             {person.managerName ? (
               <>
@@ -940,6 +940,49 @@ export function PeopleOverviewClient({
             <dd>{formatDate(person.startDate, locale)}</dd>
           </dl>
         </div>
+
+        {/* System Info (admin only) */}
+        {isAdmin ? (
+          <div className="profile-overview-card">
+            <h3 className="profile-overview-card-title">{t('systemInfo.title')}</h3>
+            <dl className="profile-overview-dl">
+              <dt>{t('systemInfo.employeeStatus')}</dt>
+              <dd>
+                <StatusBadge
+                  tone={
+                    person.status === "active" ? "success"
+                    : person.status === "onboarding" ? "info"
+                    : person.status === "offboarding" ? "warning"
+                    : "draft"
+                  }
+                >
+                  {person.status.charAt(0).toUpperCase() + person.status.slice(1)}
+                </StatusBadge>
+              </dd>
+
+              <dt>{t('systemInfo.joinedCompany')}</dt>
+              <dd>{person.startDate ? formatDate(person.startDate, locale) : "—"}</dd>
+
+              <dt>{t('systemInfo.addedToCrewHub')}</dt>
+              <dd>{formatDate(person.createdAt, locale)}</dd>
+
+              <dt>{t('systemInfo.accountAccess')}</dt>
+              <dd>
+                {person.inviteStatus === "active"
+                  ? t('systemInfo.accessActive')
+                  : person.inviteStatus === "invited"
+                    ? t('systemInfo.accessInvited')
+                    : t('systemInfo.accessNotInvited')}
+              </dd>
+
+              <dt>{t('systemInfo.accountSetupDate')}</dt>
+              <dd>{person.accountSetupAt ? formatDate(person.accountSetupAt, locale) : "—"}</dd>
+
+              <dt>{t('systemInfo.lastSignIn')}</dt>
+              <dd>{person.lastSeenAt ? formatRelativeTime(person.lastSeenAt) : t('systemInfo.never')}</dd>
+            </dl>
+          </div>
+        ) : null}
 
         {/* Privacy Settings (self only) */}
         {isSelf ? (

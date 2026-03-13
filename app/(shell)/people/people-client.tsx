@@ -68,7 +68,7 @@ type CreatePersonFormValues = {
   employmentType: EmploymentType;
   primaryCurrency: string;
   status: ProfileStatus;
-  isNewHire: boolean;
+  isNewHire: boolean | null;
 };
 
 type CreatePersonFormErrors = Partial<Record<keyof CreatePersonFormValues, string>> & {
@@ -82,6 +82,7 @@ type EditPersonFormValues = {
   title: string;
   crewTag: string;
   directoryVisible: boolean;
+  status: ProfileStatus;
 };
 
 type EditPersonFormErrors = {
@@ -118,7 +119,7 @@ function createValidationSchema(tv: (key: string) => string) {
       .trim()
       .length(3, tv('validation.currencyCode')),
     status: z.enum(PROFILE_STATUSES),
-    isNewHire: z.boolean()
+    isNewHire: z.boolean({ error: tv('validation.selectEmployeeType') })
   });
 }
 
@@ -159,7 +160,7 @@ const initialCreatePersonFormValues: CreatePersonFormValues = {
   employmentType: "contractor",
   primaryCurrency: "USD",
   status: "active",
-  isNewHire: true
+  isNewHire: null
 };
 
 function createToastId() {
@@ -510,7 +511,8 @@ export function PeopleClient({
     managerId: "",
     title: "",
     crewTag: "",
-    directoryVisible: true
+    directoryVisible: true,
+    status: "active"
   });
   const [editErrors, setEditErrors] = useState<EditPersonFormErrors>({});
   const [isEditSaving, setIsEditSaving] = useState(false);
@@ -702,7 +704,8 @@ export function PeopleClient({
       managerId: person.managerId ?? "",
       title: person.title ?? "",
       crewTag: person.crewTag ?? "",
-      directoryVisible: person.directoryVisible !== false
+      directoryVisible: person.directoryVisible !== false,
+      status: person.status as ProfileStatus
     });
     setEditErrors({});
     setIsEditOpen(true);
@@ -749,7 +752,8 @@ export function PeopleClient({
           managerId: editValues.managerId.trim() || null,
           title: editValues.title.trim() || null,
           crewTag: editValues.crewTag.trim() || null,
-          directoryVisible: editValues.directoryVisible
+          directoryVisible: editValues.directoryVisible,
+          status: editValues.status
         })
       });
 
@@ -926,6 +930,11 @@ export function PeopleClient({
     event.preventDefault();
 
     const validationErrors = mapSchemaErrors(createValues, createPersonSchema);
+
+    if (createValues.isNewHire === null) {
+      validationErrors.isNewHire = t('validation.selectEmployeeType');
+    }
+
     setCreateErrors(validationErrors);
 
     if (hasValidationErrors(validationErrors)) {
@@ -1159,20 +1168,28 @@ export function PeopleClient({
                         <span className="role-tag role-tag-active" title={t('table.accountConfirmed')}>
                           {tcd('status.active')}
                         </span>
+                      ) : person.inviteStatus === "invited" ? (
+                        <span className="role-tag role-tag-muted" title={t('table.accessInvitedTooltip')}>
+                          {t('table.accessInvited')}
+                        </span>
                       ) : (
-                        <span className="role-tag role-tag-muted" title={t('table.notSetUp')}>
-                          {t('table.accessNotSetUp')}
+                        <span className="role-tag role-tag-muted" title={t('table.accessNotInvitedTooltip')}>
+                          {t('table.accessNotInvited')}
                         </span>
                       )}
                     </td>
                   ) : null}
                   <td>
-                    <time
-                      dateTime={toDateTimeValue(person.startDate || person.createdAt)}
-                      title={formatDateTimeTooltip(toDateTimeValue(person.startDate || person.createdAt), locale)}
-                    >
-                      {formatRelativeTime(toDateTimeValue(person.startDate || person.createdAt), locale)}
-                    </time>
+                    {person.startDate ? (
+                      <time
+                        dateTime={toDateTimeValue(person.startDate)}
+                        title={formatDateTimeTooltip(toDateTimeValue(person.startDate), locale)}
+                      >
+                        {formatRelativeTime(toDateTimeValue(person.startDate), locale)}
+                      </time>
+                    ) : (
+                      <span className="text-muted">{"\u2014"}</span>
+                    )}
                   </td>
                   {canManageAnyPersonAction ? (
                     <td className="table-row-action-cell">
@@ -1189,7 +1206,7 @@ export function PeopleClient({
                         {person.inviteStatus === "active" && canResetAuthenticator ? (
                           <button
                             type="button"
-                            className="table-row-action"
+                            className="table-row-action table-row-action-warning"
                             disabled={resettingId === person.id}
                             onClick={() => openResetDialog(person)}
                           >
@@ -1199,7 +1216,7 @@ export function PeopleClient({
                         {person.inviteStatus !== "active" && canInvitePeople ? (
                           <button
                             type="button"
-                            className="table-row-action"
+                            className="table-row-action table-row-action-accent"
                             disabled={invitingId === person.id}
                             onClick={() => setConfirmInvitePerson(person)}
                           >
@@ -1236,7 +1253,7 @@ export function PeopleClient({
             <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
               <button
                 type="button"
-                className={createValues.isNewHire ? "button button-accent" : "button"}
+                className={createValues.isNewHire === true ? "button button-accent" : "button"}
                 style={{ flex: 1, height: 36 }}
                 onClick={() => updateCreateValues({ ...createValues, isNewHire: true })}
               >
@@ -1244,18 +1261,21 @@ export function PeopleClient({
               </button>
               <button
                 type="button"
-                className={!createValues.isNewHire ? "button button-accent" : "button"}
+                className={createValues.isNewHire === false ? "button button-accent" : "button"}
                 style={{ flex: 1, height: 36 }}
                 onClick={() => updateCreateValues({ ...createValues, isNewHire: false })}
               >
                 {t('createPanel.existingEmployee')}
               </button>
             </div>
-            <p className="form-field-hint">
-              {createValues.isNewHire
-                ? t('createPanel.newHireHint')
-                : t('createPanel.existingEmployeeHint')}
-            </p>
+            {createErrors.isNewHire ? <p className="form-field-error">{createErrors.isNewHire}</p> : null}
+            {createValues.isNewHire !== null ? (
+              <p className="form-field-hint">
+                {createValues.isNewHire
+                  ? t('createPanel.newHireHint')
+                  : t('createPanel.existingEmployeeHint')}
+              </p>
+            ) : null}
           </div>
 
           <label className="form-field" htmlFor="person-email">
@@ -1862,6 +1882,36 @@ export function PeopleClient({
                 onChange={(e) => setEditValues((prev) => ({ ...prev, directoryVisible: e.target.checked }))}
               />
               {t('editPanel.directoryVisible')}
+            </label>
+
+            <label className="form-field" htmlFor="edit-person-status" style={{ borderTop: "1px solid var(--border-default)", paddingTop: "var(--space-3)" }}>
+              <span className="form-label">{t('editPanel.statusLabel')}</span>
+              <select
+                id="edit-person-status"
+                className="form-input"
+                value={editValues.status}
+                onChange={(e) => {
+                  const val = e.currentTarget.value as ProfileStatus;
+                  setEditValues((prev) => ({ ...prev, status: val }));
+                }}
+              >
+                {PROFILE_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {formatProfileStatus(s, locale as "en" | "fr")}
+                  </option>
+                ))}
+              </select>
+              {editPerson && editValues.status !== editPerson.status ? (
+                <p className="form-field-hint">
+                  {editValues.status === "active" && editPerson.status === "onboarding"
+                    ? t('editPanel.statusHintOnboardingToActive')
+                    : editValues.status === "inactive"
+                      ? t('editPanel.statusHintToInactive')
+                      : editValues.status === "onboarding" && editPerson.status === "active"
+                        ? t('editPanel.statusHintToOnboarding')
+                        : null}
+                </p>
+              ) : null}
             </label>
 
             <div className="slide-panel-actions">

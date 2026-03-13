@@ -35,6 +35,7 @@ import { NavIcon } from "./nav-icon";
 import { NotificationCenter } from "./notification-center";
 import { LocaleToggle } from "./locale-toggle";
 import { ThemeToggle } from "./theme-toggle";
+import { SidebarTooltip } from "./sidebar-tooltip";
 import { SupportLink } from "./support-link";
 import { UnsavedLeaveDialog } from "./unsaved-leave-dialog";
 import { BrowserNotificationPrompt } from "./browser-notification-prompt";
@@ -1196,6 +1197,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
 
                     return (
                       <li key={item.href}>
+                        <SidebarTooltip label={tNav(item.labelKey as never)} enabled={isSidebarCollapsed && !isMobileSidebarOpen}>
                         <Link
                           href={item.href}
                           className={isActive ? "sidebar-link sidebar-link-active" : "sidebar-link"}
@@ -1218,6 +1220,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
                             </span>
                           ) : null}
                         </Link>
+                        </SidebarTooltip>
                       </li>
                     );
                   })}
@@ -1233,6 +1236,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
 
         <div className="sidebar-bottom">
           {settingsAllowed ? (
+            <SidebarTooltip label={tNav("settings")} enabled={isSidebarCollapsed && !isMobileSidebarOpen}>
             <Link
               href="/settings"
               className={
@@ -1246,11 +1250,15 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
               <NavIcon name="Settings" size={18} className="sidebar-link-icon" />
               <span className="sidebar-link-text">{tNav("settings")}</span>
             </Link>
+            </SidebarTooltip>
           ) : null}
 
+          <SidebarTooltip label={tNav("support")} enabled={isSidebarCollapsed && !isMobileSidebarOpen}>
           <SupportLink isActive={isRouteActive(activePathname, "/support")} />
+          </SidebarTooltip>
 
           {settingsAllowed && currentUserProfile ? (
+            <SidebarTooltip label={currentUserProfile.fullName} enabled={isSidebarCollapsed && !isMobileSidebarOpen}>
             <Link
               href="/settings?tab=profile"
               className="sidebar-profile-link"
@@ -1268,6 +1276,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
                 <span className="sidebar-profile-email">{currentUserProfile.email}</span>
               </span>
             </Link>
+            </SidebarTooltip>
           ) : null}
         </div>
       </aside>
