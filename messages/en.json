@@ -306,9 +306,10 @@
     }
   },
   "presence": {
-    "header": "Who's Online",
+    "header": "Team Presence",
     "empty": "No one online right now",
     "collapsedTooltip": "{online} online, {away} away",
+    "offlineSection": "Offline ({count})",
     "state": {
       "online": "Online",
       "away": "Away",

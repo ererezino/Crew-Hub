@@ -39,6 +39,7 @@ import { SupportLink } from "./support-link";
 import { UnsavedLeaveDialog } from "./unsaved-leave-dialog";
 import { BrowserNotificationPrompt } from "./browser-notification-prompt";
 import { WhoIsOnline } from "./who-is-online";
+import { useActivityTracker } from "../../hooks/use-activity-tracker";
 
 const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "crew-hub-sidebar-collapsed";
@@ -780,33 +781,88 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
     return () => window.removeEventListener("crew-hub:badge-refresh", handler);
   }, [queryClient]);
 
-  /* Presence heartbeat — pings /api/v1/me/heartbeat every 60s while the tab is visible */
-  useEffect(() => {
-    const HEARTBEAT_INTERVAL_MS = 60_000;
+  /* ── Presence heartbeat ──
+   * Pings /api/v1/me/heartbeat every 30s regardless of tab visibility.
+   * Includes isActive flag based on mouse/keyboard activity. */
+  const { getAndResetActivityFlag, getInactiveDurationMs } = useActivityTracker();
 
-    const sendHeartbeat = () => {
-      if (document.visibilityState !== "visible") return;
-      void fetch("/api/v1/me/heartbeat", { method: "POST" }).catch(() => {
+  useEffect(() => {
+    const HEARTBEAT_INTERVAL_MS = 30_000;
+    const IDLE_RECOVERY_THRESHOLD_MS = 4 * 60 * 1000; // 4 min — send immediate heartbeat on activity resume
+    const IMMEDIATE_HEARTBEAT_COOLDOWN_MS = 5_000; // don't spam immediate heartbeats
+    let lastHeartbeatAt = 0;
+    let stopped = false;
+
+    const sendHeartbeat = (isActive: boolean) => {
+      if (stopped) return;
+      lastHeartbeatAt = Date.now();
+      void fetch("/api/v1/me/heartbeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive }),
+      }).catch(() => {
         /* swallow — heartbeat is best-effort */
       });
     };
 
-    /* Send initial heartbeat on mount */
-    sendHeartbeat();
+    /* Send initial heartbeat on mount (page load = active, see spec) */
+    sendHeartbeat(true);
 
-    const intervalId = window.setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+    /* Regular interval — fires in both visible and hidden tabs */
+    const intervalId = window.setInterval(() => {
+      sendHeartbeat(getAndResetActivityFlag());
+    }, HEARTBEAT_INTERVAL_MS);
 
-    /* Also send one when the tab becomes visible again */
+    /* Tab becomes visible → immediate heartbeat with isActive: true */
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") sendHeartbeat();
+      if (document.visibilityState === "visible") {
+        sendHeartbeat(true);
+      }
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
+    /* Network reconnect → immediate heartbeat */
+    const handleOnline = () => {
+      sendHeartbeat(getAndResetActivityFlag());
+    };
+    window.addEventListener("online", handleOnline);
+
+    /* Idle recovery: when user resumes activity after extended idle, send immediate heartbeat */
+    const handleIdleRecovery = () => {
+      const sinceLastHeartbeat = Date.now() - lastHeartbeatAt;
+      if (
+        sinceLastHeartbeat > IMMEDIATE_HEARTBEAT_COOLDOWN_MS &&
+        getInactiveDurationMs() > IDLE_RECOVERY_THRESHOLD_MS
+      ) {
+        sendHeartbeat(true);
+      }
+    };
+    document.addEventListener("mousemove", handleIdleRecovery, { capture: true, passive: true });
+    document.addEventListener("keydown", handleIdleRecovery, { capture: true, passive: true });
+
+    /* Best-effort sendBeacon on tab close (freshness signal, not required for correctness) */
+    const handleBeforeUnload = () => {
+      try {
+        navigator.sendBeacon(
+          "/api/v1/me/heartbeat",
+          new Blob([JSON.stringify({ isActive: false })], { type: "application/json" })
+        );
+      } catch {
+        /* swallow — beacon is best-effort */
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
+      stopped = true;
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("mousemove", handleIdleRecovery, { capture: true });
+      document.removeEventListener("keydown", handleIdleRecovery, { capture: true });
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, []);
+  }, [getAndResetActivityFlag, getInactiveDurationMs]);
 
   const fallbackAllowedRouteKeys = useMemo(
     () => new Set(defaultNavVisibilityForRoles(currentUserRoles)),

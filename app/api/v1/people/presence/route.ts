@@ -3,16 +3,17 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
+import { hasRole } from "../../../../../lib/roles";
 import type { ApiResponse } from "../../../../../types/auth";
 
 /**
- * Presence thresholds (in milliseconds):
- * - Online:  last_seen_at within 2 minutes
- * - Away:    last_seen_at between 2–5 minutes
- * - Offline: last_seen_at > 5 minutes or null
+ * Presence thresholds:
+ * - Online:  last_seen_at within 90s AND last_active_at within 5 minutes
+ * - Away:    last_seen_at within 90s BUT last_active_at > 5 minutes (or null)
+ * - Offline: last_seen_at > 90s or null
  */
-const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
-const AWAY_THRESHOLD_MS = 5 * 60 * 1000;
+const HEARTBEAT_THRESHOLD_MS = 90 * 1000;
+const ACTIVITY_THRESHOLD_MS = 5 * 60 * 1000;
 
 type PresenceState = "online" | "away" | "offline";
 
@@ -25,6 +26,7 @@ type PresenceEntry = {
   statusNote: string | null;
   presence: PresenceState;
   lastSeenAt: string | null;
+  awaySince: string | null;
 };
 
 const PresenceMetaSchema = z.object({
@@ -39,19 +41,28 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-function computePresence(lastSeenAt: string | null, now: Date): PresenceState {
-  if (!lastSeenAt) return "offline";
-  const diff = now.getTime() - new Date(lastSeenAt).getTime();
-  if (diff <= ONLINE_THRESHOLD_MS) return "online";
-  if (diff <= AWAY_THRESHOLD_MS) return "away";
-  return "offline";
+function computePresence(
+  lastSeenAt: string | null,
+  lastActiveAt: string | null,
+  now: Date
+): { state: PresenceState; awaySince: string | null } {
+  if (!lastSeenAt || now.getTime() - new Date(lastSeenAt).getTime() > HEARTBEAT_THRESHOLD_MS) {
+    return { state: "offline", awaySince: null };
+  }
+
+  if (lastActiveAt && now.getTime() - new Date(lastActiveAt).getTime() <= ACTIVITY_THRESHOLD_MS) {
+    return { state: "online", awaySince: null };
+  }
+
+  /* Away: heartbeat recent but activity stale */
+  return { state: "away", awaySince: lastActiveAt ?? lastSeenAt };
 }
 
 /**
  * GET /api/v1/people/presence
  *
  * Returns presence state for all org members.
- * Accessible to any authenticated org member.
+ * Accessible only to super admins (returns 403 for other roles).
  */
 export async function GET() {
   const session = await getAuthenticatedSession();
@@ -64,12 +75,21 @@ export async function GET() {
     });
   }
 
+  /* Super-admin gate — hard block, no data returned */
+  if (!hasRole(session.profile.roles, "SUPER_ADMIN")) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: { code: "FORBIDDEN", message: "Presence data is restricted to super admins." },
+      meta: buildMeta()
+    });
+  }
+
   const supabase = createSupabaseServiceRoleClient();
   const now = new Date();
 
   const { data: profiles, error } = await supabase
     .from("profiles")
-    .select("id, full_name, department, avatar_url, availability_status, status_note, last_seen_at")
+    .select("id, full_name, department, avatar_url, availability_status, status_note, last_seen_at, last_active_at")
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
     .order("full_name");
@@ -82,33 +102,47 @@ export async function GET() {
     });
   }
 
-  const entries: PresenceEntry[] = (profiles ?? []).map((p) => ({
-    id: p.id as string,
-    fullName: (p.full_name as string) ?? "Unknown",
-    department: (p.department as string) ?? null,
-    avatarUrl: (p.avatar_url as string) ?? null,
-    availabilityStatus: (p.availability_status as string) ?? "available",
-    statusNote: (p.status_note as string) ?? null,
-    presence: computePresence(p.last_seen_at as string | null, now),
-    lastSeenAt: (p.last_seen_at as string) ?? null
-  }));
+  const entries: PresenceEntry[] = (profiles ?? []).map((p) => {
+    const { state, awaySince } = computePresence(
+      p.last_seen_at as string | null,
+      p.last_active_at as string | null,
+      now
+    );
+    return {
+      id: p.id as string,
+      fullName: (p.full_name as string) ?? "Unknown",
+      department: (p.department as string) ?? null,
+      avatarUrl: (p.avatar_url as string) ?? null,
+      availabilityStatus: (p.availability_status as string) ?? "available",
+      statusNote: (p.status_note as string) ?? null,
+      presence: state,
+      lastSeenAt: (p.last_seen_at as string) ?? null,
+      awaySince,
+    };
+  });
 
-  /* Sort: online first, then away, then offline, then alphabetical */
+  /* Sort: online first, then away, then offline (most recently seen first), then alphabetical */
   const presenceOrder: Record<PresenceState, number> = { online: 0, away: 1, offline: 2 };
   entries.sort((a, b) => {
     const orderDiff = presenceOrder[a.presence] - presenceOrder[b.presence];
     if (orderDiff !== 0) return orderDiff;
+    /* Within offline, sort by most recently seen first */
+    if (a.presence === "offline" && b.presence === "offline") {
+      const aTime = a.lastSeenAt ? new Date(a.lastSeenAt).getTime() : 0;
+      const bTime = b.lastSeenAt ? new Date(b.lastSeenAt).getTime() : 0;
+      if (aTime !== bTime) return bTime - aTime; // descending — most recent first
+    }
     return a.fullName.localeCompare(b.fullName);
   });
 
   const counts = {
     online: entries.filter((e) => e.presence === "online").length,
     away: entries.filter((e) => e.presence === "away").length,
-    offline: entries.filter((e) => e.presence === "offline").length
+    offline: entries.filter((e) => e.presence === "offline").length,
   };
 
-  return jsonResponse<{ entries: PresenceEntry[]; counts: typeof counts }>(200, {
-    data: { entries, counts },
+  return jsonResponse<{ entries: PresenceEntry[]; counts: typeof counts; serverTime: string }>(200, {
+    data: { entries, counts, serverTime: now.toISOString() },
     error: null,
     meta: buildMeta()
   });
