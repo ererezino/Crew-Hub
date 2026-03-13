@@ -318,6 +318,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       <div className="crew-skeleton-caption">
         <div className="crew-skeleton-line" />
         <div className="crew-skeleton-line" />
+        <div className="crew-skeleton-line" />
       </div>
     </div>
   );
