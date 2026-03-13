@@ -860,7 +860,8 @@ export async function POST(request: Request) {
       employment_type: payload.employmentType as EmploymentType,
       payroll_mode: payrollMode,
       primary_currency: primaryCurrency,
-      status: profileStatus
+      status: profileStatus,
+      employee_type_at_creation: isNewEmployee ? "new_hire" : "existing"
     })
     .select(
       "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
@@ -970,7 +971,8 @@ export async function POST(request: Request) {
         },
         template: onboardingTemplate,
         type: "onboarding",
-        startedAt: startDate ?? undefined
+        startedAt: startDate ?? undefined,
+        creatingAdminId: profile.id
       });
 
       onboardingInstanceId = onboardingCreateResult.instance.id;

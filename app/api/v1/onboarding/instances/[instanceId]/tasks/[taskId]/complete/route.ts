@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../../../lib/audit";
 import { logger } from "../../../../../../../../../lib/logger";
+import { completeOnboarding } from "../../../../../../../../../lib/onboarding/auto-transition";
 import { hasRole } from "../../../../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../../../../lib/supabase/service-role";
@@ -202,10 +203,10 @@ export async function POST(request: Request, context: RouteContext) {
     }
   }
 
-  // Recompute progress: check if all tasks in this instance are completed
+  // Recompute per-track progress
   const { data: allTasks, error: tasksError } = await serviceClient
     .from("onboarding_tasks")
-    .select("id, status")
+    .select("id, status, track")
     .eq("instance_id", instanceId)
     .eq("org_id", profile.org_id)
     .is("deleted_at", null);
@@ -222,51 +223,30 @@ export async function POST(request: Request, context: RouteContext) {
 
   const totalTasks = allTasks.length;
   const completedTasks = allTasks.filter((t) => t.status === "completed").length;
-  const allDone = totalTasks > 0 && completedTasks === totalTasks;
+
+  // Per-track completion check: both employee AND operations tracks must be 100%
+  const employeeTasks = allTasks.filter((t) => t.track === "employee");
+  const opsTasks = allTasks.filter((t) => t.track === "operations");
+  const employeeDone = employeeTasks.length === 0 || employeeTasks.every((t) => t.status === "completed");
+  const opsDone = opsTasks.length === 0 || opsTasks.every((t) => t.status === "completed");
+  const allDone = totalTasks > 0 && employeeDone && opsDone;
 
   if (allDone && action === "complete") {
-    // Mark instance as completed
-    const { error: instanceUpdateError } = await serviceClient
-      .from("onboarding_instances")
-      .update({
-        status: "completed",
-        completed_at: new Date().toISOString()
-      })
-      .eq("id", instanceId)
-      .eq("org_id", profile.org_id);
-
-    if (instanceUpdateError) {
-      logger.error("Failed to mark instance as completed.", { error: instanceUpdateError.message });
-    }
-
-    // Auto-transition employee from onboarding to active
+    // Both tracks 100% — complete instance and auto-transition to active
     if (instance.type === "onboarding") {
-      const { error: profileUpdateError } = await serviceClient
-        .from("profiles")
-        .update({ status: "active" })
-        .eq("id", instance.employee_id)
-        .eq("org_id", profile.org_id)
-        .eq("status", "onboarding");
-
-      if (profileUpdateError) {
-        logger.error("Failed to transition employee to active.", {
-          error: profileUpdateError.message,
-          employeeId: instance.employee_id
-        });
-      } else {
-        logger.info("Employee transitioned to active after onboarding completion.", {
-          employeeId: instance.employee_id,
-          instanceId
-        });
-
-        await logAudit({
-          action: "updated",
-          tableName: "profiles",
-          recordId: instance.employee_id,
-          oldValue: { status: "onboarding" },
-          newValue: { status: "active" }
-        });
-      }
+      await completeOnboarding({
+        supabase: serviceClient,
+        orgId: profile.org_id,
+        instanceId,
+        employeeId: instance.employee_id
+      });
+    } else {
+      // Offboarding — just mark instance as completed
+      await serviceClient
+        .from("onboarding_instances")
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", instanceId)
+        .eq("org_id", profile.org_id);
     }
   } else if (action === "undo" && instance.status === "completed") {
     // Reopen instance if undoing a task in a completed instance

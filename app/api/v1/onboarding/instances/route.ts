@@ -68,7 +68,8 @@ const templateRowSchema = z.object({
 
 const taskStatusRowSchema = z.object({
   instance_id: z.string().uuid(),
-  status: z.enum(ONBOARDING_TASK_STATUSES)
+  status: z.enum(ONBOARDING_TASK_STATUSES),
+  track: z.string().default("employee")
 });
 
 const templateDetailRowSchema = z.object({
@@ -290,7 +291,7 @@ export async function GET(request: Request) {
         : Promise.resolve({ data: [], error: null }),
       supabase
         .from("onboarding_tasks")
-        .select("instance_id, status")
+        .select("instance_id, status, track")
         .eq("org_id", session.profile.org_id)
         .is("deleted_at", null)
         .in("instance_id", instanceIds)
@@ -329,23 +330,39 @@ export async function GET(request: Request) {
     parsedTemplates.data.map((row) => [row.id, row.name])
   );
 
-  const countsByInstanceId = new Map<
-    string,
-    {
-      totalTasks: number;
-      completedTasks: number;
-    }
-  >();
+  type InstanceCounts = {
+    totalTasks: number;
+    completedTasks: number;
+    employeeTotal: number;
+    employeeCompleted: number;
+    opsTotal: number;
+    opsCompleted: number;
+  };
+
+  const countsByInstanceId = new Map<string, InstanceCounts>();
 
   for (const task of parsedTaskStatuses.data) {
     const currentCounts = countsByInstanceId.get(task.instance_id) ?? {
       totalTasks: 0,
-      completedTasks: 0
+      completedTasks: 0,
+      employeeTotal: 0,
+      employeeCompleted: 0,
+      opsTotal: 0,
+      opsCompleted: 0
     };
 
     currentCounts.totalTasks += 1;
+    const isCompleted = task.status === "completed";
 
-    if (task.status === "completed") {
+    if (task.track === "operations") {
+      currentCounts.opsTotal += 1;
+      if (isCompleted) { currentCounts.opsCompleted += 1; }
+    } else {
+      currentCounts.employeeTotal += 1;
+      if (isCompleted) { currentCounts.employeeCompleted += 1; }
+    }
+
+    if (isCompleted) {
       currentCounts.completedTasks += 1;
     }
 
@@ -355,7 +372,11 @@ export async function GET(request: Request) {
   const instances: OnboardingInstanceSummary[] = instancesRows.map((row) => {
     const counts = countsByInstanceId.get(row.id) ?? {
       totalTasks: 0,
-      completedTasks: 0
+      completedTasks: 0,
+      employeeTotal: 0,
+      employeeCompleted: 0,
+      opsTotal: 0,
+      opsCompleted: 0
     };
 
     return {
@@ -372,7 +393,17 @@ export async function GET(request: Request) {
       completedAt: row.completed_at,
       totalTasks: counts.totalTasks,
       completedTasks: counts.completedTasks,
-      progressPercent: toProgressPercent(counts.completedTasks, counts.totalTasks)
+      progressPercent: toProgressPercent(counts.completedTasks, counts.totalTasks),
+      employeeTrack: {
+        total: counts.employeeTotal,
+        completed: counts.employeeCompleted,
+        percent: toProgressPercent(counts.employeeCompleted, counts.employeeTotal)
+      },
+      operationsTrack: {
+        total: counts.opsTotal,
+        completed: counts.opsCompleted,
+        percent: toProgressPercent(counts.opsCompleted, counts.opsTotal)
+      }
     };
   });
 
@@ -513,7 +544,8 @@ export async function POST(request: Request) {
         tasks: parsedTemplate.data.tasks
       },
       type: payload.type,
-      startedAt: payload.startedAt
+      startedAt: payload.startedAt,
+      creatingAdminId: profile.id
     });
 
     instance = created.instance;

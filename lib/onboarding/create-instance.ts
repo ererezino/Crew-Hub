@@ -4,8 +4,10 @@ import { z } from "zod";
 import { createNotification } from "../notifications/service";
 import {
   ONBOARDING_TASK_STATUSES,
+  ONBOARDING_TRACKS,
   ONBOARDING_TYPES,
   type OnboardingInstanceSummary,
+  type OnboardingTrack,
   type OnboardingType
 } from "../../types/onboarding";
 
@@ -28,6 +30,8 @@ type CreateOnboardingInstanceInput = {
   template: OnboardingTemplate;
   type?: OnboardingType;
   startedAt?: string;
+  /** Admin who created this instance — auto-assigned to operations-track tasks */
+  creatingAdminId?: string;
 };
 
 const ONBOARDING_TASK_TYPES = ["manual", "e_signature", "link", "form"] as const;
@@ -37,6 +41,9 @@ const templateTaskSchema = z.object({
   title: z.string(),
   description: z.string().default(""),
   category: z.string(),
+  track: z.enum(ONBOARDING_TRACKS).optional(),
+  sectionId: z.string().nullable().optional(),
+  section_id: z.string().nullable().optional(),
   dueOffsetDays: z.number().int().nullable().optional(),
   due_offset_days: z.number().int().nullable().optional(),
   taskType: z.enum(ONBOARDING_TASK_TYPES).optional(),
@@ -83,6 +90,8 @@ export type NormalizedTemplateTask = {
   title: string;
   description: string;
   category: string;
+  track: OnboardingTrack;
+  sectionId: string | null;
   dueOffsetDays: number | null;
   taskType: OnboardingTaskType;
   documentId: string | null;
@@ -110,6 +119,8 @@ export function normalizeTemplateTasks(value: unknown): NormalizedTemplateTask[]
       title: parsedTask.data.title,
       description: parsedTask.data.description,
       category: parsedTask.data.category,
+      track: parsedTask.data.track ?? "employee",
+      sectionId: parsedTask.data.sectionId ?? parsedTask.data.section_id ?? null,
       dueOffsetDays: parsedTask.data.dueOffsetDays ?? parsedTask.data.due_offset_days ?? null,
       taskType: parsedTask.data.taskType ?? parsedTask.data.task_type ?? "manual",
       documentId: parsedTask.data.documentId ?? parsedTask.data.document_id ?? null,
@@ -130,7 +141,8 @@ export async function createOnboardingInstance({
   employee,
   template,
   type,
-  startedAt
+  startedAt,
+  creatingAdminId
 }: CreateOnboardingInstanceInput): Promise<{
   instance: OnboardingInstanceSummary;
 }> {
@@ -179,8 +191,11 @@ export async function createOnboardingInstance({
       title: task.title,
       description: task.description || null,
       category: task.category,
+      track: task.track,
       status: ONBOARDING_TASK_STATUSES[0],
-      assigned_to: employee.id,
+      assigned_to: task.track === "operations" && creatingAdminId
+        ? creatingAdminId
+        : employee.id,
       due_date: dueDate,
       task_type: task.taskType,
       document_id: task.documentId ?? null,
@@ -269,6 +284,9 @@ export async function createOnboardingInstance({
     }
   }
 
+  const employeeTaskCount = taskRows.filter((t) => t.track === "employee").length;
+  const opsTaskCount = taskRows.filter((t) => t.track === "operations").length;
+
   return {
     instance: {
       id: parsedInstance.data.id,
@@ -282,7 +300,9 @@ export async function createOnboardingInstance({
       completedAt: parsedInstance.data.completed_at,
       totalTasks: taskRows.length,
       completedTasks: 0,
-      progressPercent: 0
+      progressPercent: 0,
+      employeeTrack: { total: employeeTaskCount, completed: 0, percent: 0 },
+      operationsTrack: { total: opsTaskCount, completed: 0, percent: 0 }
     }
   };
 }

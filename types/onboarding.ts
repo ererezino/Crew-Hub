@@ -25,10 +25,30 @@ export const ONBOARDING_TASK_TYPES = ["manual", "e_signature", "link", "form"] a
 
 export type OnboardingTaskType = (typeof ONBOARDING_TASK_TYPES)[number];
 
+export const ONBOARDING_TRACKS = ["employee", "operations"] as const;
+
+export type OnboardingTrack = (typeof ONBOARDING_TRACKS)[number];
+
+export const ONBOARDING_SECTION_TYPES = ["content", "tasks", "policies", "tools"] as const;
+
+export type OnboardingSectionType = (typeof ONBOARDING_SECTION_TYPES)[number];
+
+export type OnboardingContentSection = {
+  id: string;
+  title: string;
+  type: OnboardingSectionType;
+  content: string;
+  order: number;
+  isRoleSpecific?: boolean;
+  department?: string | null;
+};
+
 export type OnboardingTemplateTask = {
   title: string;
   description: string;
   category: string;
+  track?: OnboardingTrack;
+  sectionId?: string | null;
   dueOffsetDays: number | null;
   taskType?: OnboardingTaskType;
   documentId?: string | null;
@@ -42,6 +62,8 @@ export type OnboardingTemplateTaskInput = {
   title: string;
   description?: string;
   category: string;
+  track?: OnboardingTrack;
+  sectionId?: string | null;
   dueOffsetDays?: number | null;
   taskType?: OnboardingTaskType;
   documentId?: string | null;
@@ -58,8 +80,15 @@ export type OnboardingTemplate = {
   countryCode: string | null;
   department: string | null;
   tasks: OnboardingTemplateTask[];
+  sections?: OnboardingContentSection[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type TrackProgress = {
+  total: number;
+  completed: number;
+  percent: number;
 };
 
 export type OnboardingInstanceSummary = {
@@ -75,6 +104,9 @@ export type OnboardingInstanceSummary = {
   totalTasks: number;
   completedTasks: number;
   progressPercent: number;
+  employeeTrack: TrackProgress;
+  operationsTrack: TrackProgress;
+  sections?: OnboardingContentSection[];
 };
 
 export type OnboardingTask = {
@@ -83,6 +115,8 @@ export type OnboardingTask = {
   title: string;
   description: string | null;
   category: string;
+  track: OnboardingTrack;
+  sectionId: string | null;
   status: OnboardingTaskStatus;
   taskType: OnboardingTaskType;
   assignedTo: string | null;
