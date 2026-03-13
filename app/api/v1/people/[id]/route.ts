@@ -116,20 +116,19 @@ function normalizeRoles(values: readonly string[]): AppRole[] {
 }
 
 function deriveInviteStatus(
-  accountSetupAt: string | null,
-  _lastSeenAt: string | null,
-  hasBeenInvited: boolean
-): "not_invited" | "invited" | "active" {
-  if (accountSetupAt) return "active";
-  if (hasBeenInvited) return "invited";
-  return "not_invited";
+  hasSignedIn: boolean
+): "active" | "not_invited" {
+  // Two-state model based on auth.users.last_sign_in_at:
+  // - "active"      = user has signed in at least once
+  // - "not_invited" = user has never signed in
+  return hasSignedIn ? "active" : "not_invited";
 }
 
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
   managerNameById: ReadonlyMap<string, string>,
   crewTag?: string | null,
-  hasBeenInvited?: boolean
+  hasSignedIn?: boolean
 ): PersonRecord {
   return {
     id: row.id,
@@ -169,7 +168,7 @@ function mapPersonRow(
     scheduleType: row.schedule_type,
     weekendShiftHours: row.weekend_shift_hours,
     crewTag: crewTag ?? null,
-    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at, hasBeenInvited ?? true),
+    inviteStatus: deriveInviteStatus(hasSignedIn ?? false),
     accountSetupAt: row.account_setup_at,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
@@ -753,29 +752,20 @@ export async function PUT(
     .not("crew_tag", "is", null)
     .maybeSingle();
 
-  /* Check if this person has been sent an invite (audit log entry with invitedBy) */
-  let hasBeenInvited = true; // Default to true (previous behavior)
+  /* Check if this person has ever signed in via auth.users.last_sign_in_at */
+  let hasSignedIn = false;
   try {
-    const { data: inviteAuditRow } = await serviceRoleClient
-      .from("audit_log")
-      .select("id")
-      .eq("action", "updated")
-      .eq("table_name", "profiles")
-      .eq("record_id", personId)
-      .not("new_value->invitedBy", "is", null)
-      .limit(1)
-      .maybeSingle();
-
-    hasBeenInvited = !!inviteAuditRow;
+    const { data: authUserData } = await serviceRoleClient.auth.admin.getUserById(personId);
+    hasSignedIn = !!authUserData?.user?.last_sign_in_at;
   } catch {
-    // Non-critical — fall back to previous behavior
+    // Non-critical — default to not signed in (safer: shows Invite button, not Reset Auth)
   }
 
   const person = mapPersonRow(
     parsedUpdatedRow.data,
     managerNameById,
     typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null,
-    hasBeenInvited
+    hasSignedIn
   );
 
   let accessConfigChangedKeys: string[] = [];

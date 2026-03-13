@@ -188,20 +188,21 @@ function normalizePayrollMode(
 }
 
 function deriveInviteStatus(
-  accountSetupAt: string | null,
-  _lastSeenAt: string | null,
-  hasAuthUser: boolean
-): "not_invited" | "invited" | "active" {
-  if (accountSetupAt) return "active";
-  if (hasAuthUser) return "invited";
-  return "not_invited";
+  hasSignedIn: boolean
+): "active" | "not_invited" {
+  // Two-state model based on auth.users.last_sign_in_at:
+  // - "active"      = user has signed in at least once (last_sign_in_at IS NOT NULL)
+  // - "not_invited" = user has never signed in (last_sign_in_at IS NULL)
+  // This replaces the previous 3-state model that relied on polluted account_setup_at
+  // and an audit_log invite query that returned 0 rows in production.
+  return hasSignedIn ? "active" : "not_invited";
 }
 
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
   managerNameById: ReadonlyMap<string, string>,
   crewTagById?: ReadonlyMap<string, string>,
-  invitedProfileIds?: ReadonlySet<string>
+  signedInUserIds?: ReadonlySet<string>
 ): PersonRecord {
   return {
     id: row.id,
@@ -241,7 +242,7 @@ function mapPersonRow(
     socialWebsite: row.social_website ?? null,
     directoryVisible: row.directory_visible,
     crewTag: crewTagById?.get(row.id) ?? null,
-    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at, invitedProfileIds?.has(row.id) ?? true),
+    inviteStatus: deriveInviteStatus(signedInUserIds?.has(row.id) ?? false),
     accountSetupAt: row.account_setup_at,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
@@ -471,38 +472,35 @@ export async function GET(request: Request) {
     }
   }
 
-  /* Check which profiles have been sent invite links (to distinguish "not invited" from "invited").
-     In this codebase, auth users are always created alongside profiles, so auth user existence
-     cannot distinguish the two states. Instead, we check the audit log for invite actions —
-     each successful invite call logs an entry with "invitedBy" in new_value. */
-  let invitedProfileIds = new Set<string>();
+  /* Determine which users have signed in by checking auth.users.last_sign_in_at.
+     This replaces the previous audit_log invite query (which returned 0 rows in production)
+     and the account_setup_at check (which was polluted for all 36 profiles). */
+  let signedInUserIds = new Set<string>();
 
-  if (profileIds.length > 0) {
-    try {
-      const serviceClient = createSupabaseServiceRoleClient();
-      const { data: inviteAuditRows } = await serviceClient
-        .from("audit_log")
-        .select("record_id")
-        .eq("action", "updated")
-        .eq("table_name", "profiles")
-        .in("record_id", profileIds)
-        .not("new_value->invitedBy", "is", null);
-
-      if (inviteAuditRows) {
-        invitedProfileIds = new Set(
-          (inviteAuditRows as Array<{ record_id: string }>)
-            .filter((row) => typeof row?.record_id === "string")
-            .map((row) => row.record_id)
-        );
+  try {
+    const serviceClient = createSupabaseServiceRoleClient();
+    // Fetch all auth users — paginate in case of >1000 users
+    let page = 1;
+    const perPage = 1000;
+    let hasMore = true;
+    while (hasMore) {
+      const { data: authData, error: authError } = await serviceClient.auth.admin.listUsers({ page, perPage });
+      if (authError || !authData?.users) break;
+      for (const authUser of authData.users) {
+        if (authUser.last_sign_in_at) {
+          signedInUserIds.add(authUser.id);
+        }
       }
-    } catch {
-      // Non-critical — if audit query fails, assume nobody was invited (safer than
-      // marking everyone as invited, which incorrectly shows Reset Auth buttons)
-      invitedProfileIds = new Set();
+      hasMore = authData.users.length >= perPage;
+      page++;
     }
+  } catch {
+    // Non-critical — if auth query fails, assume nobody has signed in (safer than
+    // marking everyone as signed in, which incorrectly shows Reset Auth buttons)
+    signedInUserIds = new Set();
   }
 
-  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById, invitedProfileIds));
+  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById, signedInUserIds));
 
   return jsonResponse<PeopleListResponseData>(200, {
     data: { people },

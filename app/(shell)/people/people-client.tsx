@@ -1174,16 +1174,12 @@ export function PeopleClient({
                   {canViewAccessState ? (
                     <td>
                       {person.inviteStatus === "active" ? (
-                        <span className="role-tag role-tag-active" title={t('table.accountConfirmed')}>
-                          {tcd('status.active')}
-                        </span>
-                      ) : person.inviteStatus === "invited" ? (
-                        <span className="role-tag role-tag-muted" title={t('table.accessInvitedTooltip')}>
-                          {t('table.accessInvited')}
+                        <span className="role-tag role-tag-active" title={t('table.accessSignedInTooltip')}>
+                          {t('table.accessSignedIn')}
                         </span>
                       ) : (
-                        <span className="role-tag role-tag-muted" title={t('table.accessNotInvitedTooltip')}>
-                          {t('table.accessNotInvited')}
+                        <span className="role-tag role-tag-muted" title={t('table.accessNotSignedInTooltip')}>
+                          {t('table.accessNotSignedIn')}
                         </span>
                       )}
                     </td>
