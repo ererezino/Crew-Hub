@@ -15,7 +15,6 @@ import {
 import { logger } from "../../../../lib/logger";
 import { USER_ROLES, type UserRole } from "../../../../lib/navigation";
 import { deriveSystemPassword } from "../../../../lib/auth/system-password";
-import { sendWelcomeEmail } from "../../../../lib/notifications/email";
 import { createNotification } from "../../../../lib/notifications/service";
 import { createOnboardingInstance } from "../../../../lib/onboarding/create-instance";
 import { hasRole } from "../../../../lib/roles";
@@ -935,24 +934,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Send welcome email with setup link (fire-and-forget)
-  const resolvedManagerName = parsedInsertedProfile.data.manager_id
-    ? managerNameById.get(parsedInsertedProfile.data.manager_id) || undefined
-    : undefined;
-
-  sendWelcomeEmail({
-    recipientEmail: normalizedEmail,
-    recipientName: payload.fullName.trim(),
-    setupLink,
-    isNewHire: isNewEmployee,
-    department: normalizedDepartment || undefined,
-    managerName: resolvedManagerName
-  }).catch((error) => {
-    logger.error("Failed to send welcome email.", {
-      userId: createdUserId,
-      message: error instanceof Error ? error.message : String(error)
-    });
-  });
+  // Email is NOT sent at creation time. The admin must explicitly click
+  // "Invite" to trigger a branded welcome email via POST /people/[id]/invite.
 
   const person = mapPersonRow(parsedInsertedProfile.data, managerNameById);
   let onboardingInstanceId: string | null = null;

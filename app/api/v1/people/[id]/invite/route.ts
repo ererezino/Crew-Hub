@@ -7,6 +7,7 @@ import { logAudit } from "../../../../../../lib/audit";
 import { logger } from "../../../../../../lib/logger";
 import { deriveSystemPassword } from "../../../../../../lib/auth/system-password";
 import { hasRole } from "../../../../../../lib/roles";
+import { sendWelcomeEmail } from "../../../../../../lib/notifications/email";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
 
@@ -362,12 +363,17 @@ export async function POST(
         });
       }
 
-      /* Also try the standard invite email (may silently fail if email not configured) */
-      serviceRoleClient.auth.admin.inviteUserByEmail(email, {
-        data: { full_name: fullName },
-        redirectTo: authRedirectUrl
-      }).catch(() => {
-        /* Swallow — the manual link is the reliable path */
+      /* Send branded welcome email with setup link */
+      sendWelcomeEmail({
+        recipientEmail: email,
+        recipientName: fullName,
+        setupLink: inviteLink ?? undefined,
+        isNewHire: profile.status === "onboarding"
+      }).catch((error) => {
+        logger.error("Failed to send welcome email on re-invite.", {
+          personId,
+          message: error instanceof Error ? error.message : String(error)
+        });
       });
     } else {
       /* No auth account — generate an invite link (creates the auth user + generates link) */
@@ -398,14 +404,17 @@ export async function POST(
         actionLink: linkData.properties.action_link
       });
 
-      /* Also fire the standard Supabase invite email so the user receives
-         a message in their inbox. generateLink only creates the link —
-         it doesn't send anything. */
-      serviceRoleClient.auth.admin.inviteUserByEmail(email, {
-        data: { full_name: fullName },
-        redirectTo: authRedirectUrl
-      }).catch(() => {
-        /* Swallow — the manual link is the reliable fallback */
+      /* Send branded welcome email with setup link */
+      sendWelcomeEmail({
+        recipientEmail: email,
+        recipientName: fullName,
+        setupLink: inviteLink ?? undefined,
+        isNewHire: profile.status === "onboarding"
+      }).catch((error) => {
+        logger.error("Failed to send welcome email on invite.", {
+          personId,
+          message: error instanceof Error ? error.message : String(error)
+        });
       });
     }
 

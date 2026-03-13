@@ -766,6 +766,15 @@ export function PeopleClient({
 
       const updated = payload.data.person;
 
+      // Diagnostic: verify status save round-trip (remove after production verification)
+      if (editValues.status !== updated.status) {
+        console.warn("[EditSave] Status mismatch!", {
+          requested: editValues.status,
+          returned: updated.status,
+          httpStatus: response.status
+        });
+      }
+
       setPeople((current) =>
         current.map((p) => (p.id === updated.id ? updated : p))
       );
