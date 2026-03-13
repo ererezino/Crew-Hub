@@ -4227,6 +4227,394 @@ button.att-img-link {
   margin-top: var(--space-4);
 }
 
+/* ── Employee Journey Page ── */
+
+.journey-page {
+  max-width: 720px;
+}
+
+.journey-welcome {
+  margin-bottom: var(--space-5);
+}
+
+.journey-welcome-title {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  margin-bottom: var(--space-1);
+}
+
+.journey-welcome-subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.journey-progress {
+  background: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.journey-progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.journey-progress-pct {
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-progress-bar {
+  height: 8px;
+  background: var(--border-default);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.journey-progress-bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 4px;
+  transition: width 0.4s ease-out;
+  min-width: 0;
+}
+
+.journey-progress-count {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.journey-ops-progress {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-default);
+}
+
+.journey-ops-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.journey-progress-bar-ops {
+  height: 6px;
+}
+
+.journey-progress-bar-fill-ops {
+  background: var(--color-success);
+}
+
+.journey-ops-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-1);
+}
+
+.journey-sections {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.journey-section {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.journey-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-raised);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  gap: var(--space-3);
+}
+
+.journey-section-header:hover {
+  background: var(--surface-hover);
+}
+
+.journey-section-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.journey-section-icon {
+  font-size: var(--font-size-base);
+  flex-shrink: 0;
+}
+
+.journey-section-status-indicator {
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+  font-size: var(--font-size-sm);
+}
+
+.journey-section-check {
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.journey-section-progress {
+  color: var(--color-accent);
+}
+
+.journey-section-pending {
+  color: var(--text-tertiary);
+}
+
+.journey-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.journey-section-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.journey-section-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.journey-section-chevron {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.journey-section-chevron-open {
+  transform: rotate(90deg);
+}
+
+.journey-section-body {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--border-default);
+}
+
+.journey-section-content {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: var(--space-3);
+}
+
+.journey-section-content h3 {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.journey-section-content p {
+  margin-bottom: var(--space-2);
+}
+
+.journey-section-content ul {
+  padding-left: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.journey-task-list {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.journey-task {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  align-items: flex-start;
+}
+
+.journey-task-done {
+  opacity: 0.7;
+}
+
+.journey-task-check {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.journey-check-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-success);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.journey-check-signature {
+  background: var(--color-accent);
+  font-size: 13px;
+}
+
+.journey-check-button {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.journey-check-button:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+.journey-check-button:disabled {
+  cursor: wait;
+}
+
+.journey-check-loading {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: journey-spin 0.6s linear infinite;
+}
+
+@keyframes journey-spin {
+  to { transform: rotate(360deg); }
+}
+
+.journey-task-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.journey-task-title {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.journey-task-title-done {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.journey-task-description {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.journey-task-meta {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.journey-task-due,
+.journey-task-guidance {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.journey-task-action {
+  margin-top: var(--space-1);
+}
+
+.journey-task-completed-info {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--space-1);
+}
+
+.journey-empty {
+  max-width: 720px;
+}
+
+/* ── Admin Track View (onboarding instance detail) ── */
+
+.admin-tracks-container {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.admin-track-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.admin-track-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.admin-track-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-track-count {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-track-progress-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-secondary);
+  overflow: hidden;
+}
+
+.admin-track-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-primary);
+  transition: width 0.4s ease;
+}
+
+.admin-track-progress-fill-ops {
+  background: var(--accent-secondary, var(--accent-primary));
+}
+
 .onboarding-details-skeleton {
   display: grid;
   gap: var(--space-3);

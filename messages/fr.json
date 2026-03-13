@@ -1415,7 +1415,9 @@
     "completedBy": "Complété par : {name}",
     "completionGuidance": "Guide d'achèvement : {text}",
     "openTaskAction": "Ouvrir l'action de la tâche",
-    "noNotes": "Aucune note"
+    "noNotes": "Aucune note",
+    "completing": "En cours…",
+    "markComplete": "Marquer terminé"
   },
   "myOnboarding": {
     "title": "Mon intégration",

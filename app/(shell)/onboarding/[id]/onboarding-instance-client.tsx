@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
@@ -11,7 +11,7 @@ import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useOnboardingInstanceDetail } from "../../../../hooks/use-onboarding";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { toSentenceCase } from "../../../../lib/format-labels";
-import type { OnboardingTask } from "../../../../types/onboarding";
+import type { OnboardingTask, OnboardingTrack } from "../../../../types/onboarding";
 
 type AppLocale = "en" | "fr";
 
@@ -43,9 +43,7 @@ function groupTasksByCategory(tasks: readonly OnboardingTask[]): Map<string, Onb
     groupedTasks.set(task.category, categoryTasks);
   }
 
-  return new Map([...groupedTasks.entries()].sort((leftEntry, rightEntry) =>
-    leftEntry[0].localeCompare(rightEntry[0])
-  ));
+  return new Map([...groupedTasks.entries()].sort((a, b) => a[0].localeCompare(b[0])));
 }
 
 function OnboardingDetailsSkeleton() {
@@ -62,14 +60,165 @@ function OnboardingDetailsSkeleton() {
   );
 }
 
+/* ── Track Section (admin can complete ops tasks) ── */
+
+function TrackSection({
+  track,
+  tasks,
+  instanceId,
+  completingTaskId,
+  onComplete,
+  locale,
+  t
+}: {
+  track: OnboardingTrack;
+  tasks: OnboardingTask[];
+  instanceId: string;
+  completingTaskId: string | null;
+  onComplete: (instanceId: string, taskId: string) => void;
+  locale: AppLocale;
+  t: ReturnType<typeof useTranslations<"onboardingInstance">>;
+}) {
+  const tasksByCategory = useMemo(() => groupTasksByCategory(tasks), [tasks]);
+  const completedCount = tasks.filter((t) => t.status === "completed").length;
+  const isOps = track === "operations";
+
+  return (
+    <section className="admin-track-section">
+      <header className="admin-track-header">
+        <h2 className="admin-track-title">
+          {isOps ? "⚙️ Operations track" : "👤 Employee track"}
+        </h2>
+        <span className="admin-track-count">
+          {completedCount}/{tasks.length} complete
+        </span>
+      </header>
+
+      <div className="admin-track-progress-bar">
+        <div
+          className={`admin-track-progress-fill ${isOps ? "admin-track-progress-fill-ops" : ""}`}
+          style={{
+            width: tasks.length > 0 ? `${Math.round((completedCount / tasks.length) * 100)}%` : "0%"
+          }}
+        />
+      </div>
+
+      {[...tasksByCategory.entries()].map(([category, categoryTasks]) => (
+        <article key={category} className="onboarding-category-card">
+          <header className="onboarding-category-header">
+            <h3 className="section-title">{category}</h3>
+            <span className="pill numeric">{t("taskCount", { count: categoryTasks.length })}</span>
+          </header>
+          <ul className="onboarding-task-list">
+            {categoryTasks.map((task) => (
+              <li key={task.id} className="onboarding-task-item">
+                <div className="onboarding-task-main">
+                  <p className="onboarding-task-title">{task.title}</p>
+                  <p className="settings-card-description">
+                    {task.description ?? t("noDescription")}
+                  </p>
+                </div>
+                <div className="onboarding-task-meta">
+                  <StatusBadge tone={toneForTaskStatus(task.status)}>
+                    {toSentenceCase(task.status)}
+                  </StatusBadge>
+                  <p className="settings-card-description">
+                    {t("assigned", { name: task.assignedToName })}
+                  </p>
+                  <p className="settings-card-description">
+                    {t("due")}{" "}
+                    {task.dueDate ? (
+                      <time
+                        dateTime={task.dueDate}
+                        title={formatDateTimeTooltip(task.dueDate, locale)}
+                      >
+                        {formatRelativeTime(task.dueDate, locale)}
+                      </time>
+                    ) : (
+                      "--"
+                    )}
+                  </p>
+                  {task.completionGuidance ? (
+                    <p className="settings-card-description">
+                      {t("completionGuidance", { text: task.completionGuidance })}
+                    </p>
+                  ) : null}
+                  {task.actionUrl ? (
+                    <a
+                      href={task.actionUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="button button-sm"
+                    >
+                      {task.actionLabel ?? t("openTaskAction")}
+                    </a>
+                  ) : null}
+                  {/* Admin can complete ops-track tasks */}
+                  {isOps && task.status !== "completed" && task.taskType !== "e_signature" ? (
+                    <button
+                      type="button"
+                      className="button button-accent button-sm"
+                      disabled={completingTaskId === task.id}
+                      onClick={() => onComplete(instanceId, task.id)}
+                    >
+                      {completingTaskId === task.id ? t("completing") : t("markComplete")}
+                    </button>
+                  ) : null}
+                  {task.status === "completed" ? (
+                    <p className="settings-card-description">
+                      {t("completedBy", { name: task.completedByName ?? "--" })}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+/* ── Main Component ── */
+
 export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClientProps) {
-  const t = useTranslations('onboardingInstance');
+  const t = useTranslations("onboardingInstance");
   const locale = useLocale() as AppLocale;
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
-  const { detail, isLoading, errorMessage } = useOnboardingInstanceDetail(instanceId);
+  const { detail, isLoading, errorMessage, refresh } = useOnboardingInstanceDetail(instanceId);
 
-  const tasksByCategory = useMemo(
-    () => groupTasksByCategory(detail?.tasks ?? []),
+  const handleCompleteTask = useCallback(
+    async (instId: string, taskId: string) => {
+      setCompletingTaskId(taskId);
+      try {
+        const response = await fetch(
+          `/api/v1/onboarding/instances/${instId}/tasks/${taskId}/complete`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "complete" })
+          }
+        );
+        if (response.ok) {
+          refresh();
+        }
+      } catch {
+        // Swallow
+      } finally {
+        setCompletingTaskId(null);
+      }
+    },
+    [refresh]
+  );
+
+  const employeeTasks = useMemo(
+    () => (detail?.tasks ?? []).filter((t) => t.track !== "operations"),
+    [detail?.tasks]
+  );
+
+  const opsTasks = useMemo(
+    () => (detail?.tasks ?? []).filter((t) => t.track === "operations"),
     [detail?.tasks]
   );
 
@@ -80,8 +229,8 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
   if (errorMessage || !detail) {
     return (
       <ErrorState
-        title={t('unavailable')}
-        message={errorMessage ?? t('unableToLoad')}
+        title={t("unavailable")}
+        message={errorMessage ?? t("unableToLoad")}
       />
     );
   }
@@ -89,15 +238,15 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
   return (
     <>
       <PageHeader
-        title={`${detail.instance.employeeName} - ${toSentenceCase(detail.instance.type)}`}
-        description={t('template', { name: detail.instance.templateName })}
+        title={`${detail.instance.employeeName} — ${toSentenceCase(detail.instance.type)}`}
+        description={t("template", { name: detail.instance.templateName })}
       />
 
       <section className="onboarding-instance-summary">
-        <ProgressRing value={detail.instance.progressPercent} label={t('progress')} />
+        <ProgressRing value={detail.instance.progressPercent} label={t("progress")} />
         <div className="onboarding-instance-summary-metrics">
           <article className="onboarding-instance-metric">
-            <p className="onboarding-instance-metric-label">{t('status')}</p>
+            <p className="onboarding-instance-metric-label">{t("status")}</p>
             <StatusBadge
               tone={detail.instance.status === "completed" ? "success" : "processing"}
             >
@@ -105,33 +254,19 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
             </StatusBadge>
           </article>
           <article className="onboarding-instance-metric">
-            <p className="onboarding-instance-metric-label">{t('started')}</p>
-            <p className="onboarding-instance-metric-value">
-              <time
-                dateTime={detail.instance.startedAt}
-                title={formatDateTimeTooltip(detail.instance.startedAt, locale)}
-              >
-                {formatRelativeTime(detail.instance.startedAt, locale)}
-              </time>
+            <p className="onboarding-instance-metric-label">Employee track</p>
+            <p className="onboarding-instance-metric-value numeric">
+              {detail.instance.employeeTrack.percent}%
             </p>
           </article>
           <article className="onboarding-instance-metric">
-            <p className="onboarding-instance-metric-label">{t('completed')}</p>
-            <p className="onboarding-instance-metric-value">
-              {detail.instance.completedAt ? (
-                <time
-                  dateTime={detail.instance.completedAt}
-                  title={formatDateTimeTooltip(detail.instance.completedAt, locale)}
-                >
-                  {formatRelativeTime(detail.instance.completedAt, locale)}
-                </time>
-              ) : (
-                "--"
-              )}
+            <p className="onboarding-instance-metric-label">Operations track</p>
+            <p className="onboarding-instance-metric-value numeric">
+              {detail.instance.operationsTrack.percent}%
             </p>
           </article>
           <article className="onboarding-instance-metric">
-            <p className="onboarding-instance-metric-label">{t('taskCompletion')}</p>
+            <p className="onboarding-instance-metric-label">{t("taskCompletion")}</p>
             <p className="onboarding-instance-metric-value numeric">
               {detail.instance.completedTasks}/{detail.instance.totalTasks}
             </p>
@@ -139,69 +274,38 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
         </div>
       </section>
 
-      {tasksByCategory.size === 0 ? (
+      {detail.tasks.length === 0 ? (
         <EmptyState
-          title={t('noTasks')}
-          description={t('noTasksDescription')}
-          ctaLabel={t('backToOnboarding')}
+          title={t("noTasks")}
+          description={t("noTasksDescription")}
+          ctaLabel={t("backToOnboarding")}
           ctaHref="/onboarding"
         />
       ) : (
-        <section className="onboarding-category-grid">
-          {[...tasksByCategory.entries()].map(([category, tasks]) => (
-            <article key={category} className="onboarding-category-card">
-              <header className="onboarding-category-header">
-                <h2 className="section-title">{category}</h2>
-                <span className="pill numeric">{t('taskCount', { count: tasks.length })}</span>
-              </header>
-              <ul className="onboarding-task-list">
-                {tasks.map((task) => (
-                  <li key={task.id} className="onboarding-task-item">
-                    <div className="onboarding-task-main">
-                      <p className="onboarding-task-title">{task.title}</p>
-                      <p className="settings-card-description">
-                        {task.description ?? t('noDescription')}
-                      </p>
-                    </div>
-                    <div className="onboarding-task-meta">
-                      <StatusBadge tone={toneForTaskStatus(task.status)}>{toSentenceCase(task.status)}</StatusBadge>
-                      <p className="settings-card-description">{t('assigned', { name: task.assignedToName })}</p>
-                      <p className="settings-card-description">
-                        {t('due')}{" "}
-                        {task.dueDate ? (
-                          <time dateTime={task.dueDate} title={formatDateTimeTooltip(task.dueDate, locale)}>
-                            {formatRelativeTime(task.dueDate, locale)}
-                          </time>
-                        ) : (
-                          "--"
-                        )}
-                      </p>
-                      <p className="settings-card-description">
-                        {t('completedBy', { name: task.completedByName ?? "--" })}
-                      </p>
-                      {task.completionGuidance ? (
-                        <p className="settings-card-description">
-                          {t('completionGuidance', { text: task.completionGuidance })}
-                        </p>
-                      ) : null}
-                      {task.actionUrl ? (
-                        <a
-                          href={task.actionUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="button button-sm"
-                        >
-                          {task.actionLabel ?? t('openTaskAction')}
-                        </a>
-                      ) : null}
-                      <p className="settings-card-description">{task.notes ?? t('noNotes')}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </section>
+        <div className="admin-tracks-container">
+          {employeeTasks.length > 0 ? (
+            <TrackSection
+              track="employee"
+              tasks={employeeTasks}
+              instanceId={instanceId}
+              completingTaskId={completingTaskId}
+              onComplete={handleCompleteTask}
+              locale={locale}
+              t={t}
+            />
+          ) : null}
+          {opsTasks.length > 0 ? (
+            <TrackSection
+              track="operations"
+              tasks={opsTasks}
+              instanceId={instanceId}
+              completingTaskId={completingTaskId}
+              onComplete={handleCompleteTask}
+              locale={locale}
+              t={t}
+            />
+          ) : null}
+        </div>
       )}
     </>
   );
