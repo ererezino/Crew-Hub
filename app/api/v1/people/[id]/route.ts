@@ -117,10 +117,10 @@ function normalizeRoles(values: readonly string[]): AppRole[] {
 
 function deriveInviteStatus(
   accountSetupAt: string | null,
-  lastSeenAt: string | null,
+  _lastSeenAt: string | null,
   hasBeenInvited: boolean
 ): "not_invited" | "invited" | "active" {
-  if (accountSetupAt || lastSeenAt) return "active";
+  if (accountSetupAt) return "active";
   if (hasBeenInvited) return "invited";
   return "not_invited";
 }

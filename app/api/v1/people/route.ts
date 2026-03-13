@@ -190,10 +190,10 @@ function normalizePayrollMode(
 
 function deriveInviteStatus(
   accountSetupAt: string | null,
-  lastSeenAt: string | null,
+  _lastSeenAt: string | null,
   hasAuthUser: boolean
 ): "not_invited" | "invited" | "active" {
-  if (accountSetupAt || lastSeenAt) return "active";
+  if (accountSetupAt) return "active";
   if (hasAuthUser) return "invited";
   return "not_invited";
 }
@@ -497,8 +497,9 @@ export async function GET(request: Request) {
         );
       }
     } catch {
-      // Non-critical — fall back to assuming all were invited (previous behavior)
-      invitedProfileIds = new Set(profileIds);
+      // Non-critical — if audit query fails, assume nobody was invited (safer than
+      // marking everyone as invited, which incorrectly shows Reset Auth buttons)
+      invitedProfileIds = new Set();
     }
   }
 
