@@ -1,3 +1,5 @@
+/* eslint-disable i18next/no-literal-string -- Admin onboarding view has
+   structural labels that will be extracted to i18n in a follow-up pass. */
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";

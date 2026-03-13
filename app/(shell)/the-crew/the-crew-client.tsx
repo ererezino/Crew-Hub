@@ -10,7 +10,6 @@ import { countryFlagFromCode } from "../../../lib/countries";
 import {
   crewDisplayDepartment,
   CREW_MGS_DISPLAY_LABEL,
-  isCrewMgsDepartment
 } from "../../../lib/crew-department-display";
 import { formatDate } from "../../../lib/datetime";
 import type { CrewMember, CrewListResponseData } from "../../../types/people";

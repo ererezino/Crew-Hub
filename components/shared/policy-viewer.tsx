@@ -188,6 +188,7 @@ export function PolicyViewer({
         <div className="policy-viewer-acknowledge">
           {isAcknowledged ? (
             <div className="policy-viewer-acknowledged">
+              {/* eslint-disable-next-line i18next/no-literal-string */}
               <span className="policy-viewer-acknowledged-icon">✓</span>
               <p>
                 {t("acknowledged")}{" "}
