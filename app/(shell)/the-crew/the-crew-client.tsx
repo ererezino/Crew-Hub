@@ -119,8 +119,8 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   // Product appears directly below Design.
   // Marketing, Growth, and Sales are separate in the data model but will be
   // merged into one visual section in the "grouped" memo below.
+  // No special "Founders" section — founders appear with their actual teams.
   const CREW_DISPLAY_ORDER: string[] = [
-    "Founders",
     "Customer Success",
     "Design",
     "Product",
