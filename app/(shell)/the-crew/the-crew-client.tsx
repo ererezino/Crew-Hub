@@ -29,7 +29,8 @@ const DEPT_COLORS: Record<string, { accent: string; light: string }> = {
   product: { accent: "#14b8a6", light: "#f0fdfa" },
   compliance: { accent: "#64748b", light: "#f8fafc" },
   legal: { accent: "#64748b", light: "#f8fafc" },
-  founders: { accent: "#FD8B05", light: "#FFF3DC" }
+  founders: { accent: "#FD8B05", light: "#FFF3DC" },
+  "marketing, growth & sales": { accent: "#f59e0b", light: "#fffbeb" }
 };
 const DEFAULT_COLOR = { accent: "#64748b", light: "#f8fafc" };
 
@@ -113,6 +114,26 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   const [viewMode, setViewMode] = useState<"all" | "by-team">("by-team");
 
   /* ── Derived: departments list ── */
+
+  // Custom display order for The Crew page.
+  // Product appears directly below Design.
+  // Marketing, Growth, and Sales are separate in the data model but will be
+  // merged into one visual section in the "grouped" memo below.
+  const CREW_DISPLAY_ORDER: string[] = [
+    "Founders",
+    "Customer Success",
+    "Design",
+    "Product",
+    "Engineering",
+    "Finance",
+    "Operations",
+    // Marketing, Growth, Sales are handled by the grouping logic below
+    // and appear as individual entries here only for the filter chips.
+    "Marketing",
+    "Growth",
+    "Sales",
+  ];
+
   const departments = useMemo(() => {
     const deptSet = new Map<string, number>();
     for (const m of members) {
@@ -121,8 +142,15 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     }
     return [...deptSet.entries()]
       .sort(([a], [b]) => {
-        if (a.toLowerCase() === "founders") return -1;
-        if (b.toLowerCase() === "founders") return 1;
+        const aLower = a.toLowerCase();
+        const bLower = b.toLowerCase();
+        const aIdx = CREW_DISPLAY_ORDER.findIndex((d) => d.toLowerCase() === aLower);
+        const bIdx = CREW_DISPLAY_ORDER.findIndex((d) => d.toLowerCase() === bLower);
+        // Known departments sort by their position in the array.
+        // Unknown departments sort alphabetically after known ones.
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+        if (aIdx !== -1) return -1;
+        if (bIdx !== -1) return 1;
         return a.localeCompare(b);
       })
       .map(([name, count]) => ({ name, count }));
@@ -147,6 +175,12 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   }, [members, activeDept, search]);
 
   /* ── Derived: grouped members (for "By team" mode) ── */
+
+  // Departments that should be merged into one combined display section.
+  // This is presentation-layer only — the underlying department values remain separate.
+  const MGS_DEPTS = new Set(["marketing", "growth", "sales"]);
+  const MGS_LABEL = "Marketing, Growth & Sales";
+
   const grouped = useMemo(() => {
     if (viewMode !== "by-team") return null;
     const map = new Map<string, CrewMember[]>();
@@ -155,14 +189,43 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       if (!map.has(d)) map.set(d, []);
       map.get(d)!.push(m);
     }
+
+    // Build sorted list following department order, but merge MGS departments.
     const sorted: [string, CrewMember[]][] = [];
+    const mgsMembers: CrewMember[] = [];
+    const added = new Set<string>();
+
     for (const dept of departments) {
+      if (MGS_DEPTS.has(dept.name.toLowerCase())) {
+        // Collect members from Marketing, Growth, Sales into one group
+        const group = map.get(dept.name);
+        if (group) mgsMembers.push(...group);
+        added.add(dept.name);
+        continue;
+      }
       const group = map.get(dept.name);
-      if (group && group.length > 0) sorted.push([dept.name, group]);
+      if (group && group.length > 0) {
+        sorted.push([dept.name, group]);
+        added.add(dept.name);
+      }
     }
+
+    // Insert the combined MGS section at the position where the first MGS
+    // department would have appeared (after Operations in the sort order).
+    if (mgsMembers.length > 0) {
+      sorted.push([MGS_LABEL, mgsMembers]);
+    }
+
+    // Add any remaining departments not in the custom order
     for (const [k, v] of map) {
-      if (!sorted.some(([name]) => name === k)) sorted.push([k, v]);
+      if (!added.has(k) && k !== "Other") sorted.push([k, v]);
     }
+    // "Other" always last
+    const otherGroup = map.get("Other");
+    if (otherGroup && otherGroup.length > 0 && !added.has("Other")) {
+      sorted.push(["Other", otherGroup]);
+    }
+
     return sorted;
   }, [filtered, departments, viewMode]);
 

@@ -60,12 +60,11 @@ export async function GET() {
     });
   }
 
-  // Filter out not-invited stubs (no account_setup_at AND no last_seen_at)
-  const visibleRows = (rows ?? []).filter((row) => {
-    const hasSetup = !!row.account_setup_at;
-    const hasSeen = !!row.last_seen_at;
-    return hasSetup || hasSeen;
-  });
+  // Show all directory-visible active/onboarding profiles.
+  // Previous filter gated on account_setup_at || last_seen_at, but those
+  // signals are unreliable (account_setup_at is polluted in production).
+  // The Crew should show every employee who is directory-visible.
+  const visibleRows = rows ?? [];
 
   const departmentCounts: Record<string, number> = {};
   const members: CrewMember[] = visibleRows.map((row) => {
