@@ -7,7 +7,6 @@ import { useTranslations } from "next-intl";
 
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { countryFlagFromCode } from "../../../lib/countries";
-import { DEPARTMENTS } from "../../../lib/departments";
 import { formatDate } from "../../../lib/datetime";
 import type { CrewMember, CrewListResponseData } from "../../../types/people";
 
@@ -15,7 +14,6 @@ import type { CrewMember, CrewListResponseData } from "../../../types/people";
 
 const DEPT_COLORS: Record<string, { accent: string; light: string }> = {
   marketing: { accent: "#f59e0b", light: "#fffbeb" },
-  "marketing & growth": { accent: "#f59e0b", light: "#fffbeb" },
   "content & marketing": { accent: "#f59e0b", light: "#fffbeb" },
   growth: { accent: "#f59e0b", light: "#fffbeb" },
   "customer success": { accent: "#10b981", light: "#ecfdf5" },
@@ -125,12 +123,6 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       .sort(([a], [b]) => {
         if (a.toLowerCase() === "founders") return -1;
         if (b.toLowerCase() === "founders") return 1;
-        const aIdx = (DEPARTMENTS as readonly string[]).indexOf(a);
-        const bIdx = (DEPARTMENTS as readonly string[]).indexOf(b);
-        // Known departments sort by their DEPARTMENTS order; unknowns go to the end alphabetically
-        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
-        if (aIdx !== -1) return -1;
-        if (bIdx !== -1) return 1;
         return a.localeCompare(b);
       })
       .map(([name, count]) => ({ name, count }));
