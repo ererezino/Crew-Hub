@@ -719,7 +719,7 @@ export function ExpensesClient({
 
   const getDisplayStatusLabel = (expense: ExpenseRecord) => {
     if (expense.infoRequestState === "requested") {
-      return td("infoRequests.actionNeeded");
+      return t('infoRequests.actionNeeded');
     }
 
     return getExpenseStatusLabel(expense.status);

@@ -7,7 +7,8 @@ const ZOD_AUDIT_WAIVERS: Record<string, string> = {
   "payments/[id]/retry/route.ts": "Intentionally disabled payment stub endpoint.",
   "payments/batch/route.ts": "Intentionally disabled payment stub endpoint.",
   "payments/webhook/route.ts": "Intentionally disabled payment stub endpoint.",
-  "me/data-export/route.ts": "GET-only endpoint with no user input — reads authenticated user data."
+  "me/data-export/route.ts": "GET-only endpoint with no user input — reads authenticated user data.",
+  "the-crew/route.ts": "GET-only endpoint with no user input — returns visible crew members for the authenticated org."
 };
 
 function collectRouteFiles(directory: string): string[] {
