@@ -30,7 +30,7 @@ const DEPT_COLORS: Record<string, { accent: string; light: string }> = {
   compliance: { accent: "#64748b", light: "#f8fafc" },
   legal: { accent: "#64748b", light: "#f8fafc" },
   founders: { accent: "#FD8B05", light: "#FFF3DC" },
-  "marketing, growth & sales": { accent: "#f59e0b", light: "#fffbeb" }
+  "marketing & growth": { accent: "#f59e0b", light: "#fffbeb" }
 };
 const DEFAULT_COLOR = { accent: "#64748b", light: "#f8fafc" };
 
@@ -181,7 +181,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   // This is presentation-layer only — the underlying department values remain separate.
   // Includes "marketing & growth" which exists as a legacy value in some production records.
   const MGS_DEPTS = new Set(["marketing", "growth", "sales", "marketing & growth"]);
-  const MGS_LABEL = "Marketing, Growth & Sales";
+  const MGS_LABEL = "Marketing & Growth";
 
   const grouped = useMemo(() => {
     if (viewMode !== "by-team") return null;
