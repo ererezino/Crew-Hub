@@ -127,11 +127,12 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     "Engineering",
     "Finance",
     "Operations",
-    // Marketing, Growth, Sales are handled by the grouping logic below
-    // and appear as individual entries here only for the filter chips.
+    // Marketing, Growth, Sales (and the legacy "Marketing & Growth" value)
+    // are handled by the grouping logic below — merged into one display section.
     "Marketing",
     "Growth",
     "Sales",
+    "Marketing & Growth",
   ];
 
   const departments = useMemo(() => {
@@ -178,7 +179,8 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
 
   // Departments that should be merged into one combined display section.
   // This is presentation-layer only — the underlying department values remain separate.
-  const MGS_DEPTS = new Set(["marketing", "growth", "sales"]);
+  // Includes "marketing & growth" which exists as a legacy value in some production records.
+  const MGS_DEPTS = new Set(["marketing", "growth", "sales", "marketing & growth"]);
   const MGS_LABEL = "Marketing, Growth & Sales";
 
   const grouped = useMemo(() => {
