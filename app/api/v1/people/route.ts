@@ -118,6 +118,7 @@ const profileRowSchema = z.object({
   social_github: z.string().nullable().default(null),
   social_website: z.string().nullable().default(null),
   account_setup_at: z.string().nullable().default(null),
+  invited_at: z.string().nullable().default(null),
   last_seen_at: z.string().nullable().default(null),
   created_at: z.string(),
   updated_at: z.string()
@@ -189,19 +190,17 @@ function normalizePayrollMode(
 
 function deriveInviteStatus(
   accountSetupAt: string | null,
-  _lastSeenAt: string | null,
-  hasAuthUser: boolean
+  invitedAt: string | null
 ): "not_invited" | "invited" | "active" {
   if (accountSetupAt) return "active";
-  if (hasAuthUser) return "invited";
+  if (invitedAt) return "invited";
   return "not_invited";
 }
 
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
   managerNameById: ReadonlyMap<string, string>,
-  crewTagById?: ReadonlyMap<string, string>,
-  invitedProfileIds?: ReadonlySet<string>
+  crewTagById?: ReadonlyMap<string, string>
 ): PersonRecord {
   return {
     id: row.id,
@@ -241,7 +240,7 @@ function mapPersonRow(
     socialWebsite: row.social_website ?? null,
     directoryVisible: row.directory_visible,
     crewTag: crewTagById?.get(row.id) ?? null,
-    inviteStatus: deriveInviteStatus(row.account_setup_at, row.last_seen_at, invitedProfileIds?.has(row.id) ?? true),
+    inviteStatus: deriveInviteStatus(row.account_setup_at, row.invited_at),
     accountSetupAt: row.account_setup_at,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
@@ -350,9 +349,9 @@ export async function GET(request: Request) {
   }
 
   const PEOPLE_SELECT_FULL =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, account_setup_at, invited_at, last_seen_at, created_at, updated_at";
   const PEOPLE_SELECT_COMPAT =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, account_setup_at, invited_at, last_seen_at, created_at, updated_at";
 
   async function runPeopleQuery(selectString: string) {
     let q = supabase
@@ -471,38 +470,10 @@ export async function GET(request: Request) {
     }
   }
 
-  /* Check which profiles have been sent invite links (to distinguish "not invited" from "invited").
-     In this codebase, auth users are always created alongside profiles, so auth user existence
-     cannot distinguish the two states. Instead, we check the audit log for invite actions —
-     each successful invite call logs an entry with "invitedBy" in new_value. */
-  let invitedProfileIds = new Set<string>();
+  /* Invite status is now derived directly from the invited_at column on profiles,
+     set when an admin explicitly invites a user. No audit log query needed. */
 
-  if (profileIds.length > 0) {
-    try {
-      const serviceClient = createSupabaseServiceRoleClient();
-      const { data: inviteAuditRows } = await serviceClient
-        .from("audit_log")
-        .select("record_id")
-        .eq("action", "updated")
-        .eq("table_name", "profiles")
-        .in("record_id", profileIds)
-        .not("new_value->invitedBy", "is", null);
-
-      if (inviteAuditRows) {
-        invitedProfileIds = new Set(
-          (inviteAuditRows as Array<{ record_id: string }>)
-            .filter((row) => typeof row?.record_id === "string")
-            .map((row) => row.record_id)
-        );
-      }
-    } catch {
-      // Non-critical — if audit query fails, assume nobody was invited (safer than
-      // marking everyone as invited, which incorrectly shows Reset Auth buttons)
-      invitedProfileIds = new Set();
-    }
-  }
-
-  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById, invitedProfileIds));
+  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById));
 
   return jsonResponse<PeopleListResponseData>(200, {
     data: { people },
@@ -864,7 +835,7 @@ export async function POST(request: Request) {
       employee_type_at_creation: isNewEmployee ? "new_hire" : "existing"
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, invited_at, last_seen_at, created_at, updated_at"
     )
     .single();
 

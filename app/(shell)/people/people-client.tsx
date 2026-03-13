@@ -1196,6 +1196,13 @@ export function PeopleClient({
                       >
                         {formatRelativeTime(toDateTimeValue(person.startDate), locale)}
                       </time>
+                    ) : person.accountSetupAt ? (
+                      <time
+                        dateTime={person.accountSetupAt}
+                        title={formatDateTimeTooltip(person.accountSetupAt, locale)}
+                      >
+                        {formatRelativeTime(person.accountSetupAt, locale)}
+                      </time>
                     ) : (
                       <span className="text-muted">{"\u2014"}</span>
                     )}

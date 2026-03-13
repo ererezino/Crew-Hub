@@ -418,6 +418,18 @@ export async function POST(
       });
     }
 
+    /* Mark the profile as invited (set invited_at if not already set) */
+    try {
+      const serviceForInvitedAt = createSupabaseServiceRoleClient();
+      await serviceForInvitedAt
+        .from("profiles")
+        .update({ invited_at: new Date().toISOString() })
+        .eq("id", personId)
+        .is("invited_at", null);
+    } catch {
+      // Non-critical — invited_at is a convenience column
+    }
+
     try {
       await logAudit({
         action: "updated",
