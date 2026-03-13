@@ -135,10 +135,18 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     "Marketing & Growth",
   ];
 
+  // Departments that should be merged into one combined display section.
+  // This is presentation-layer only — the underlying department values remain separate.
+  // Includes "marketing & growth" which exists as a legacy value in some production records.
+  const MGS_DEPTS = new Set(["marketing", "growth", "sales", "marketing & growth"]);
+  const MGS_LABEL = "Marketing & Growth";
+
   const departments = useMemo(() => {
     const deptSet = new Map<string, number>();
     for (const m of members) {
-      const d = m.department ?? "Other";
+      const raw = m.department ?? "Other";
+      // Merge MGS departments into one combined display entry
+      const d = MGS_DEPTS.has(raw.toLowerCase()) ? MGS_LABEL : raw;
       deptSet.set(d, (deptSet.get(d) ?? 0) + 1);
     }
     return [...deptSet.entries()]
@@ -161,7 +169,12 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   const filtered = useMemo(() => {
     let list = members;
     if (activeDept) {
-      list = list.filter((m) => (m.department ?? "Other") === activeDept);
+      if (activeDept === MGS_LABEL) {
+        // When the merged MGS chip is active, match all constituent departments
+        list = list.filter((m) => MGS_DEPTS.has((m.department ?? "Other").toLowerCase()));
+      } else {
+        list = list.filter((m) => (m.department ?? "Other") === activeDept);
+      }
     }
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -176,12 +189,6 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   }, [members, activeDept, search]);
 
   /* ── Derived: grouped members (for "By team" mode) ── */
-
-  // Departments that should be merged into one combined display section.
-  // This is presentation-layer only — the underlying department values remain separate.
-  // Includes "marketing & growth" which exists as a legacy value in some production records.
-  const MGS_DEPTS = new Set(["marketing", "growth", "sales", "marketing & growth"]);
-  const MGS_LABEL = "Marketing & Growth";
 
   const grouped = useMemo(() => {
     if (viewMode !== "by-team") return null;
