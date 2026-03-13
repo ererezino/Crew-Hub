@@ -8,6 +8,9 @@
  * Users without TOTP need an admin to resend their invite.
  */
 
+import { assertSafety } from "./lib/safety.mjs";
+assertSafety({ requireEnv: true, requireConfirm: true });
+
 import { createHmac } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 

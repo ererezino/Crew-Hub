@@ -21,8 +21,25 @@ function validateEnvironment() {
   }
 }
 
+const PRODUCTION_PROJECT_REF = "xmeruhyybvyosqxfleiu";
+
+function enforceEnvironmentIsolation() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const isProductionSupabase = supabaseUrl.includes(PRODUCTION_PROJECT_REF);
+  const isProductionHost = process.env.VERCEL_ENV === "production";
+
+  if (!isProductionHost && isProductionSupabase) {
+    throw new Error(
+      "FATAL: Non-production host is configured against production Supabase project " +
+        `(${PRODUCTION_PROJECT_REF}). This is a misconfiguration. ` +
+        "Set NEXT_PUBLIC_SUPABASE_URL to the staging project."
+    );
+  }
+}
+
 export async function register() {
   validateEnvironment();
+  enforceEnvironmentIsolation();
 
   if (process.env.NEXT_RUNTIME === "nodejs") {
     await import("./sentry.server.config");

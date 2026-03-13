@@ -1,3 +1,15 @@
+/* ── Production safety guard ── */
+const _ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost").hostname.split(".")[0];
+const _flags = process.argv.slice(2).join(" ");
+if (_ref === "xmeruhyybvyosqxfleiu" && !_flags.includes("--env=production")) {
+  console.error("ABORT: Detected production Supabase. Pass --env=production to confirm.");
+  process.exit(1);
+}
+if (_ref === "xmeruhyybvyosqxfleiu" && !_flags.includes("--confirm")) {
+  console.error("ABORT: Destructive operation on production requires --confirm flag.");
+  process.exit(1);
+}
+
 import { createClient } from "@supabase/supabase-js";
 
 function requiredEnv(name: string): string {

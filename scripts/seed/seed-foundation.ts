@@ -1,3 +1,7 @@
+/* ── Production safety guard ── */
+const _ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost").hostname.split(".")[0];
+if (_ref === "xmeruhyybvyosqxfleiu") { console.error("ABORT: Seed scripts cannot run against production."); process.exit(1); }
+
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";
 
 import { encryptSensitiveValue } from "../../lib/crypto";
@@ -204,7 +208,7 @@ type SeedEquityGrant = {
   notes: string | null;
 };
 
-type SeedPaymentMethod = "bank_transfer" | "mobile_money" | "wise";
+type SeedPaymentMethod = "bank_transfer" | "mobile_money" | "crew_tag";
 
 type SeedPaymentDetailBase = {
   employeeKey: SeedMember["key"];
@@ -227,7 +231,7 @@ type SeedPaymentDetail =
       mobileMoneyNumber: string;
     })
   | (SeedPaymentDetailBase & {
-      paymentMethod: "wise";
+      paymentMethod: "crew_tag";
       wiseRecipientId: string;
     });
 
@@ -1757,7 +1761,7 @@ const SEED_PAYMENT_DETAILS: SeedPaymentDetail[] = [
   },
   {
     employeeKey: "ceo",
-    paymentMethod: "wise",
+    paymentMethod: "crew_tag",
     wiseRecipientId: "wise-recipient-9083",
     currency: "USD",
     isVerified: true,
@@ -1794,7 +1798,7 @@ const SEED_PAYMENT_DETAILS: SeedPaymentDetail[] = [
   },
   {
     employeeKey: "engineer_1",
-    paymentMethod: "wise",
+    paymentMethod: "crew_tag",
     wiseRecipientId: "wise-recipient-3190",
     currency: "USD",
     isVerified: false,
@@ -1822,7 +1826,7 @@ const SEED_PAYMENT_DETAILS: SeedPaymentDetail[] = [
   },
   {
     employeeKey: "compliance_officer",
-    paymentMethod: "wise",
+    paymentMethod: "crew_tag",
     wiseRecipientId: "wise-recipient-7714",
     currency: "USD",
     isVerified: true,
@@ -4293,7 +4297,7 @@ async function upsertSeedScheduling(
       .select("id")
       .eq("org_id", orgId)
       .eq("name", schedule.name)
-      .eq("week_start", weekStart)
+      .eq("start_date", weekStart)
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -4305,8 +4309,8 @@ async function upsertSeedScheduling(
       org_id: orgId,
       name: schedule.name,
       department: schedule.department,
-      week_start: weekStart,
-      week_end: weekEnd,
+      start_date: weekStart,
+      end_date: weekEnd,
       status: schedule.status,
       published_at:
         schedule.status === "published" && schedule.publishedOffsetHours !== null
@@ -4730,7 +4734,7 @@ async function upsertSeedPaymentDetails(
       bank_routing_number_encrypted: null as string | null,
       mobile_money_provider_encrypted: null as string | null,
       mobile_money_number_encrypted: null as string | null,
-      wise_recipient_id: null as string | null,
+      crew_tag: null as string | null,
       currency: detail.currency,
       bank_account_last4: null as string | null,
       mobile_money_last4: null as string | null,
@@ -4758,8 +4762,8 @@ async function upsertSeedPaymentDetails(
       payload.mobile_money_last4 = extractLast4Digits(detail.mobileMoneyNumber);
     }
 
-    if (detail.paymentMethod === "wise") {
-      payload.wise_recipient_id = detail.wiseRecipientId;
+    if (detail.paymentMethod === "crew_tag") {
+      payload.crew_tag = detail.wiseRecipientId;
     }
 
     const { data: existingRow, error: existingRowError } = await client

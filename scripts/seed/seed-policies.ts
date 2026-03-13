@@ -18,6 +18,10 @@
  * Usage:  npx tsx scripts/seed/seed-policies.ts
  */
 
+/* ── Production safety guard ── */
+const _ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost").hostname.split(".")[0];
+if (_ref === "xmeruhyybvyosqxfleiu") { console.error("ABORT: Seed scripts cannot run against production."); process.exit(1); }
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /* ── Helpers ── */

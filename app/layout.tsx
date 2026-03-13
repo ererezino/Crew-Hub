@@ -3,6 +3,7 @@ import { DM_Sans, Playfair_Display } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 
+import { EnvironmentBanner } from "../components/shared/environment-banner";
 import { ThemeProvider } from "../components/shared/theme-provider";
 import "./globals.css";
 
@@ -47,6 +48,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} suppressHydrationWarning>
       <body className={`${playfair.variable} ${dmSans.variable}`}>
+        <EnvironmentBanner />
         <NextIntlClientProvider messages={messages}>
           <ThemeProvider>{children}</ThemeProvider>
         </NextIntlClientProvider>
