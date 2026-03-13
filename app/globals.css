@@ -4615,6 +4615,111 @@ button.att-img-link {
   background: var(--accent-secondary, var(--accent-primary));
 }
 
+/* ── Policy Viewer ── */
+
+.policy-viewer {
+  display: grid;
+  gap: var(--space-4);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  background: var(--surface-primary);
+}
+
+.policy-viewer-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.policy-viewer-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.policy-viewer-body {
+  min-height: 200px;
+}
+
+.policy-viewer-iframe {
+  width: 100%;
+  min-height: 500px;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.policy-viewer-loading,
+.policy-viewer-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--surface-secondary);
+  border-radius: var(--radius-sm);
+  min-height: 200px;
+}
+
+.policy-viewer-content {
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+.policy-viewer-signoff {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-secondary);
+}
+
+.policy-viewer-signoff-line {
+  width: 120px;
+  height: 1px;
+  background: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.policy-viewer-signoff-text {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.policy-viewer-signoff-date {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-1);
+}
+
+.policy-viewer-acknowledge {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-secondary);
+}
+
+.policy-viewer-acknowledged {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--status-success);
+  font-size: var(--font-size-sm);
+}
+
+.policy-viewer-acknowledged-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--status-success);
+  color: white;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 .onboarding-details-skeleton {
   display: grid;
   gap: var(--space-3);

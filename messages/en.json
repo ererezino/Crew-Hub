@@ -5010,9 +5010,9 @@
       "newHire": {
         "preheader": "Your Crew Hub account is ready",
         "subject": "Welcome to Accrue, {name}",
-        "body1": "Welcome to Accrue. We're glad you're here.",
-        "body2": "Your Crew Hub account is ready. Crew Hub is where you'll find everything you need: your team, your pay, your time off, and your documents. Think of it as home base.",
-        "body3": "To get started, tap the button below to set up your login and authenticator:",
+        "body1": "Welcome to Accrue — we're excited to have you join the crew!",
+        "body2": "Your Crew Hub account is ready. Crew Hub is home base — it's where you'll find your onboarding journey, your team, pay, time off, and documents all in one place.",
+        "body3": "To get started, tap the button below to set up your login. Once you're in, your onboarding journey will guide you through everything step by step:",
         "cta": "Set Up Your Account",
         "closing": "If anything feels off or you have questions, reach out to your manager or the Operations team.",
         "loginEmail": "Login email",
@@ -5337,5 +5337,15 @@
     "fallbackEmployee": "A team member",
     "fallbackApprover": "your manager",
     "fallbackApproverAdmin": "an admin"
+  },
+  "policyViewer": {
+    "loadingDocument": "Loading document…",
+    "unableToLoad": "Unable to display document inline. You can download it instead.",
+    "downloadDocument": "Download document",
+    "noContent": "No policy content available.",
+    "signedBy": "Approved by {name}, {title}",
+    "acknowledged": "You acknowledged this policy on",
+    "acknowledging": "Acknowledging…",
+    "acknowledgeButton": "I have read and acknowledge this policy"
   }
 }

@@ -825,8 +825,8 @@
       "permissionStatus": "Statut de la permission :",
       "permUnsupported": "Non pris en charge",
       "permGranted": "Accordée",
-      "permBlocked": "Bloquée \u2014 cliquez sur l'icône de cadenas dans la barre d'adresse pour autoriser les notifications",
-      "permNotGranted": "Pas encore accordée \u2014 cochez la case ci-dessus pour activer",
+      "permBlocked": "Bloquée — cliquez sur l'icône de cadenas dans la barre d'adresse pour autoriser les notifications",
+      "permNotGranted": "Pas encore accordée — cochez la case ci-dessus pour activer",
       "saveNotifications": "Enregistrer les notifications",
       "saved": "Paramètres de notification enregistrés.",
       "unableToUpdate": "Impossible de mettre à jour les paramètres de notification.",
@@ -5000,9 +5000,9 @@
       "newHire": {
         "preheader": "Votre compte Crew Hub est prêt",
         "subject": "Bienvenue chez Accrue, {name}",
-        "body1": "Bienvenue chez Accrue. Nous sommes ravis de vous accueillir.",
-        "body2": "Votre compte Crew Hub est prêt. Crew Hub est l'endroit où vous trouverez tout ce dont vous avez besoin : votre équipe, votre paie, vos congés et vos documents. Considérez-le comme votre point de départ.",
-        "body3": "Pour commencer, appuyez sur le bouton ci-dessous pour configurer votre identifiant et votre authentificateur :",
+        "body1": "Bienvenue chez Accrue — nous sommes ravis de vous accueillir dans l'équipe !",
+        "body2": "Votre compte Crew Hub est prêt. Crew Hub est votre point de départ — vous y trouverez votre parcours d'intégration, votre équipe, votre paie, vos congés et vos documents, le tout au même endroit.",
+        "body3": "Pour commencer, appuyez sur le bouton ci-dessous pour configurer votre connexion. Une fois connecté, votre parcours d'intégration vous guidera étape par étape :",
         "cta": "Configurer votre compte",
         "closing": "Si quelque chose ne va pas ou si vous avez des questions, contactez votre responsable ou l'équipe des opérations.",
         "loginEmail": "E-mail de connexion",
@@ -5327,5 +5327,15 @@
     "fallbackEmployee": "Un membre de l'équipe",
     "fallbackApprover": "votre responsable",
     "fallbackApproverAdmin": "un administrateur"
+  },
+  "policyViewer": {
+    "loadingDocument": "Chargement du document…",
+    "unableToLoad": "Impossible d'afficher le document. Vous pouvez le télécharger à la place.",
+    "downloadDocument": "Télécharger le document",
+    "noContent": "Aucun contenu de politique disponible.",
+    "signedBy": "Approuvé par {name}, {title}",
+    "acknowledged": "Vous avez reconnu cette politique le",
+    "acknowledging": "Confirmation en cours…",
+    "acknowledgeButton": "J'ai lu et je reconnais cette politique"
   }
 }
