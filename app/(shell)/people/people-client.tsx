@@ -1093,6 +1093,8 @@ export function PeopleClient({
                 {isAdmin ? <th>{t('table.status')}</th> : null}
                 {canViewAccessState ? <th>{t('table.access')}</th> : null}
                 <th>{t('table.joined')}</th>
+                {canViewAccessState ? <th>{t('table.crewHubJoined')}</th> : null}
+                {canViewAccessState ? <th>{t('table.inviteSent')}</th> : null}
                 <th className="table-action-column">{t('table.actions')}</th>
               </tr>
             </thead>
@@ -1173,13 +1175,17 @@ export function PeopleClient({
                   ) : null}
                   {canViewAccessState ? (
                     <td>
-                      {person.inviteStatus === "active" ? (
+                      {person.inviteStatus === "signed_in" ? (
                         <span className="role-tag role-tag-active" title={t('table.accessSignedInTooltip')}>
                           {t('table.accessSignedIn')}
                         </span>
+                      ) : person.inviteStatus === "invited" ? (
+                        <span className="role-tag role-tag-pending" title={t('table.accessInvitedTooltip')}>
+                          {t('table.accessInvited')}
+                        </span>
                       ) : (
-                        <span className="role-tag role-tag-muted" title={t('table.accessNotSignedInTooltip')}>
-                          {t('table.accessNotSignedIn')}
+                        <span className="role-tag role-tag-muted" title={t('table.accessNotInvitedTooltip')}>
+                          {t('table.accessNotInvited')}
                         </span>
                       )}
                     </td>
@@ -1196,6 +1202,34 @@ export function PeopleClient({
                       <span className="text-muted">{"\u2014"}</span>
                     )}
                   </td>
+                  {canViewAccessState ? (
+                    <td>
+                      {person.crewHubJoinedAt ? (
+                        <time
+                          dateTime={toDateTimeValue(person.crewHubJoinedAt)}
+                          title={formatDateTimeTooltip(toDateTimeValue(person.crewHubJoinedAt), locale)}
+                        >
+                          {formatRelativeTime(toDateTimeValue(person.crewHubJoinedAt), locale)}
+                        </time>
+                      ) : (
+                        <span className="text-muted">{"\u2014"}</span>
+                      )}
+                    </td>
+                  ) : null}
+                  {canViewAccessState ? (
+                    <td>
+                      {person.firstInvitedAt ? (
+                        <time
+                          dateTime={toDateTimeValue(person.firstInvitedAt)}
+                          title={formatDateTimeTooltip(toDateTimeValue(person.firstInvitedAt), locale)}
+                        >
+                          {formatRelativeTime(toDateTimeValue(person.firstInvitedAt), locale)}
+                        </time>
+                      ) : (
+                        <span className="text-muted">{"\u2014"}</span>
+                      )}
+                    </td>
+                  ) : null}
                   {canManageAnyPersonAction ? (
                     <td className="table-row-action-cell">
                       <div className="people-row-actions">
@@ -1208,7 +1242,7 @@ export function PeopleClient({
                             {t('table.edit')}
                           </button>
                         ) : null}
-                        {person.inviteStatus === "active" && canResetAuthenticator ? (
+                        {person.inviteStatus === "signed_in" && canResetAuthenticator ? (
                           <button
                             type="button"
                             className="table-row-action table-row-action-warning"
@@ -1218,7 +1252,17 @@ export function PeopleClient({
                             {resettingId === person.id ? t('table.resetting') : t('table.resetAuthenticator')}
                           </button>
                         ) : null}
-                        {person.inviteStatus !== "active" && canInvitePeople ? (
+                        {person.inviteStatus === "invited" && canInvitePeople ? (
+                          <button
+                            type="button"
+                            className="table-row-action table-row-action-accent"
+                            disabled={invitingId === person.id}
+                            onClick={() => setConfirmInvitePerson(person)}
+                          >
+                            {invitingId === person.id ? t('table.sending') : t('table.reInvite')}
+                          </button>
+                        ) : null}
+                        {person.inviteStatus === "not_invited" && canInvitePeople ? (
                           <button
                             type="button"
                             className="table-row-action table-row-action-accent"

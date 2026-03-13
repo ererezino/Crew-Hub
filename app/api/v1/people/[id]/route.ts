@@ -95,6 +95,8 @@ const profileRowSchema = z.object({
   privacy_settings: z.unknown().default({}),
   schedule_type: z.string().nullable().optional().default(null),
   weekend_shift_hours: z.string().nullable().optional().default(null),
+  crew_hub_joined_at: z.string().nullable().default(null),
+  first_invited_at: z.string().nullable().default(null),
   account_setup_at: z.string().nullable().default(null),
   last_seen_at: z.string().nullable().default(null),
   created_at: z.string(),
@@ -115,20 +117,19 @@ function normalizeRoles(values: readonly string[]): AppRole[] {
   );
 }
 
-function deriveInviteStatus(
-  hasSignedIn: boolean
-): "active" | "not_invited" {
-  // Two-state model based on auth.users.last_sign_in_at:
-  // - "active"      = user has signed in at least once
-  // - "not_invited" = user has never signed in
-  return hasSignedIn ? "active" : "not_invited";
+function deriveAccessStatus(
+  crewHubJoinedAt: string | null,
+  firstInvitedAt: string | null
+): "signed_in" | "invited" | "not_invited" {
+  if (crewHubJoinedAt) return "signed_in";
+  if (firstInvitedAt) return "invited";
+  return "not_invited";
 }
 
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
   managerNameById: ReadonlyMap<string, string>,
-  crewTag?: string | null,
-  hasSignedIn?: boolean
+  crewTag?: string | null
 ): PersonRecord {
   return {
     id: row.id,
@@ -168,7 +169,9 @@ function mapPersonRow(
     scheduleType: row.schedule_type,
     weekendShiftHours: row.weekend_shift_hours,
     crewTag: crewTag ?? null,
-    inviteStatus: deriveInviteStatus(hasSignedIn ?? false),
+    inviteStatus: deriveAccessStatus(row.crew_hub_joined_at, row.first_invited_at),
+    crewHubJoinedAt: row.crew_hub_joined_at,
+    firstInvitedAt: row.first_invited_at,
     accountSetupAt: row.account_setup_at,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
@@ -285,7 +288,7 @@ export async function PUT(
   const { data: existingProfile, error: existingProfileError } = await serviceRoleClient
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
@@ -540,7 +543,7 @@ export async function PUT(
       .eq("id", personId)
       .eq("org_id", session.profile.org_id)
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
       )
       .single();
 
@@ -752,20 +755,10 @@ export async function PUT(
     .not("crew_tag", "is", null)
     .maybeSingle();
 
-  /* Check if this person has ever signed in via auth.users.last_sign_in_at */
-  let hasSignedIn = false;
-  try {
-    const { data: authUserData } = await serviceRoleClient.auth.admin.getUserById(personId);
-    hasSignedIn = !!authUserData?.user?.last_sign_in_at;
-  } catch {
-    // Non-critical — default to not signed in (safer: shows Invite button, not Reset Auth)
-  }
-
   const person = mapPersonRow(
     parsedUpdatedRow.data,
     managerNameById,
-    typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null,
-    hasSignedIn
+    typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null
   );
 
   let accessConfigChangedKeys: string[] = [];
@@ -1010,7 +1003,7 @@ export async function PATCH(
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 
@@ -1068,29 +1061,10 @@ export async function PATCH(
     .not("crew_tag", "is", null)
     .maybeSingle();
 
-  /* Check if this person has been sent an invite */
-  let selfHasBeenInvited = true;
-  try {
-    const { data: selfInviteAuditRow } = await serviceRoleClient
-      .from("audit_log")
-      .select("id")
-      .eq("action", "updated")
-      .eq("table_name", "profiles")
-      .eq("record_id", personId)
-      .not("new_value->invitedBy", "is", null)
-      .limit(1)
-      .maybeSingle();
-
-    selfHasBeenInvited = !!selfInviteAuditRow;
-  } catch {
-    // Non-critical
-  }
-
   const person = mapPersonRow(
     parsedUpdatedRow.data,
     managerNameById,
-    typeof selfCrewTagRow?.crew_tag === "string" ? selfCrewTagRow.crew_tag : null,
-    selfHasBeenInvited
+    typeof selfCrewTagRow?.crew_tag === "string" ? selfCrewTagRow.crew_tag : null
   );
 
   return jsonResponse<PeopleUpdateResponseData>(200, {

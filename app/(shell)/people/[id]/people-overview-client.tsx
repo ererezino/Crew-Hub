@@ -968,7 +968,7 @@ export function PeopleOverviewClient({
 
               <dt>{t('systemInfo.accountAccess')}</dt>
               <dd>
-                {person.inviteStatus === "active"
+                {person.inviteStatus === "signed_in"
                   ? t('systemInfo.accessActive')
                   : person.inviteStatus === "invited"
                     ? t('systemInfo.accessInvited')

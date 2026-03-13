@@ -68,15 +68,22 @@ export async function POST(request: Request) {
     }
   });
 
-  /* Mark account as set up on first real login (no-op if already set).
+  /* Mark account as set up and record first Crew Hub sign-in on first real login.
+     Both are idempotent (no-op if already set).
      Uses the service role client to bypass RLS so the update always succeeds. */
   try {
     const serviceRole = createSupabaseServiceRoleClient();
+    const now = new Date().toISOString();
     await serviceRole
       .from("profiles")
-      .update({ account_setup_at: new Date().toISOString() })
+      .update({ account_setup_at: now })
       .eq("id", user.id)
       .is("account_setup_at", null);
+    await serviceRole
+      .from("profiles")
+      .update({ crew_hub_joined_at: now })
+      .eq("id", user.id)
+      .is("crew_hub_joined_at", null);
   } catch {
     // Non-critical — don't fail the login audit if this update fails.
   }

@@ -117,6 +117,8 @@ const profileRowSchema = z.object({
   social_instagram: z.string().nullable().default(null),
   social_github: z.string().nullable().default(null),
   social_website: z.string().nullable().default(null),
+  crew_hub_joined_at: z.string().nullable().default(null),
+  first_invited_at: z.string().nullable().default(null),
   account_setup_at: z.string().nullable().default(null),
   last_seen_at: z.string().nullable().default(null),
   created_at: z.string(),
@@ -187,22 +189,23 @@ function normalizePayrollMode(
   return requestedPayrollMode ?? "employee_local_withholding";
 }
 
-function deriveInviteStatus(
-  hasSignedIn: boolean
-): "active" | "not_invited" {
-  // Two-state model based on auth.users.last_sign_in_at:
-  // - "active"      = user has signed in at least once (last_sign_in_at IS NOT NULL)
-  // - "not_invited" = user has never signed in (last_sign_in_at IS NULL)
-  // This replaces the previous 3-state model that relied on polluted account_setup_at
-  // and an audit_log invite query that returned 0 rows in production.
-  return hasSignedIn ? "active" : "not_invited";
+function deriveAccessStatus(
+  crewHubJoinedAt: string | null,
+  firstInvitedAt: string | null
+): "signed_in" | "invited" | "not_invited" {
+  // Three-state model based on application-managed fields:
+  // - "signed_in"   = crew_hub_joined_at IS NOT NULL (first real sign-in recorded)
+  // - "invited"     = first_invited_at IS NOT NULL AND crew_hub_joined_at IS NULL
+  // - "not_invited" = both are NULL
+  if (crewHubJoinedAt) return "signed_in";
+  if (firstInvitedAt) return "invited";
+  return "not_invited";
 }
 
 function mapPersonRow(
   row: z.infer<typeof profileRowSchema>,
   managerNameById: ReadonlyMap<string, string>,
-  crewTagById?: ReadonlyMap<string, string>,
-  signedInUserIds?: ReadonlySet<string>
+  crewTagById?: ReadonlyMap<string, string>
 ): PersonRecord {
   return {
     id: row.id,
@@ -242,7 +245,9 @@ function mapPersonRow(
     socialWebsite: row.social_website ?? null,
     directoryVisible: row.directory_visible,
     crewTag: crewTagById?.get(row.id) ?? null,
-    inviteStatus: deriveInviteStatus(signedInUserIds?.has(row.id) ?? false),
+    inviteStatus: deriveAccessStatus(row.crew_hub_joined_at, row.first_invited_at),
+    crewHubJoinedAt: row.crew_hub_joined_at,
+    firstInvitedAt: row.first_invited_at,
     accountSetupAt: row.account_setup_at,
     lastSeenAt: row.last_seen_at,
     createdAt: row.created_at,
@@ -351,9 +356,9 @@ export async function GET(request: Request) {
   }
 
   const PEOPLE_SELECT_FULL =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
   const PEOPLE_SELECT_COMPAT =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
 
   async function runPeopleQuery(selectString: string) {
     let q = supabase
@@ -472,35 +477,7 @@ export async function GET(request: Request) {
     }
   }
 
-  /* Determine which users have signed in by checking auth.users.last_sign_in_at.
-     This replaces the previous audit_log invite query (which returned 0 rows in production)
-     and the account_setup_at check (which was polluted for all 36 profiles). */
-  let signedInUserIds = new Set<string>();
-
-  try {
-    const serviceClient = createSupabaseServiceRoleClient();
-    // Fetch all auth users — paginate in case of >1000 users
-    let page = 1;
-    const perPage = 1000;
-    let hasMore = true;
-    while (hasMore) {
-      const { data: authData, error: authError } = await serviceClient.auth.admin.listUsers({ page, perPage });
-      if (authError || !authData?.users) break;
-      for (const authUser of authData.users) {
-        if (authUser.last_sign_in_at) {
-          signedInUserIds.add(authUser.id);
-        }
-      }
-      hasMore = authData.users.length >= perPage;
-      page++;
-    }
-  } catch {
-    // Non-critical — if auth query fails, assume nobody has signed in (safer than
-    // marking everyone as signed in, which incorrectly shows Reset Auth buttons)
-    signedInUserIds = new Set();
-  }
-
-  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById, signedInUserIds));
+  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById));
 
   return jsonResponse<PeopleListResponseData>(200, {
     data: { people },

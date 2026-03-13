@@ -67,7 +67,9 @@ export type PersonRecord = {
   scheduleType: string | null;
   weekendShiftHours: string | null;
   crewTag: string | null;
-  inviteStatus: "not_invited" | "invited" | "active";
+  inviteStatus: "signed_in" | "invited" | "not_invited";
+  crewHubJoinedAt: string | null;
+  firstInvitedAt: string | null;
   accountSetupAt: string | null;
   lastSeenAt: string | null;
   createdAt: string;

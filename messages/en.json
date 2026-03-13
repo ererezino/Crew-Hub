@@ -4793,6 +4793,8 @@
       "status": "Status",
       "access": "Access",
       "joined": "Joined",
+      "crewHubJoined": "Crew Hub Joined",
+      "inviteSent": "Invite Sent",
       "actions": "Actions",
       "noRole": "No role",
       "accessNotInvited": "Not invited",
@@ -4811,6 +4813,7 @@
       "resetAuthenticator": "Reset Authenticator",
       "resetting": "Resetting...",
       "invite": "Invite",
+      "reInvite": "Re-invite",
       "sending": "Sending..."
     },
     "createPanel": {

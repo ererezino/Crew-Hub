@@ -437,6 +437,17 @@ export async function POST(
       });
     }
 
+    /* Record the first invite timestamp (idempotent — only set once, not on re-invite). */
+    try {
+      await serviceRoleClient
+        .from("profiles")
+        .update({ first_invited_at: new Date().toISOString() })
+        .eq("id", personId)
+        .is("first_invited_at", null);
+    } catch {
+      // Non-critical — don't fail the invite if this update fails.
+    }
+
     return jsonResponse<InviteResponseData>(200, {
       data: {
         personId,
