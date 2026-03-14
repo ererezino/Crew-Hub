@@ -76,6 +76,10 @@ export type ExpenseRecord = {
   managerApprovedBy: string | null;
   managerApprovedByName: string | null;
   managerApprovedAt: string | null;
+  /** If manager-stage was approved by a delegate, the principal they acted on behalf of. */
+  managerActingFor: string | null;
+  managerActingForName: string | null;
+  managerDelegateType: string | null;
   financeApprovedBy: string | null;
   financeApprovedByName: string | null;
   financeApprovedAt: string | null;

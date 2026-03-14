@@ -106,6 +106,7 @@ export const profileRowSchema = z.object({
   // detail-only: absent from list SELECT → defaults to null
   date_of_birth: z.string().nullable().optional().default(null),
   manager_id: z.string().uuid().nullable(),
+  team_lead_id: z.string().uuid().nullable().optional().default(null),
   employment_type: z.enum(EMPLOYMENT_TYPES),
   payroll_mode: z.enum(PAYROLL_MODES),
   primary_currency: z.string(),
@@ -151,7 +152,7 @@ export type ProfileRow = z.infer<typeof profileRowSchema>;
 
 export function mapProfileRow(
   row: ProfileRow,
-  managerNameById: ReadonlyMap<string, string>,
+  nameById: ReadonlyMap<string, string>,
   crewTag: string | null
 ): PersonRecord {
   const privacySettings: PrivacySettings =
@@ -174,7 +175,9 @@ export function mapProfileRow(
     startDate: row.start_date,
     dateOfBirth: row.date_of_birth ?? null,
     managerId: row.manager_id,
-    managerName: row.manager_id ? managerNameById.get(row.manager_id) ?? null : null,
+    managerName: row.manager_id ? nameById.get(row.manager_id) ?? null : null,
+    teamLeadId: row.team_lead_id ?? null,
+    teamLeadName: row.team_lead_id ? nameById.get(row.team_lead_id) ?? null : null,
     employmentType: row.employment_type,
     payrollMode: row.payroll_mode,
     primaryCurrency: row.primary_currency,

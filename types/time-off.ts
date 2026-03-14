@@ -77,6 +77,10 @@ export type LeaveRequestRecord = {
   approverId: string | null;
   approverName: string | null;
   rejectionReason: string | null;
+  /** If approved/rejected by a delegate, the principal they acted on behalf of. */
+  actingFor: string | null;
+  actingForName: string | null;
+  delegateType: string | null;
   requiresDocumentation?: boolean;
   medicalEvidencePath?: string | null;
   createdAt: string;

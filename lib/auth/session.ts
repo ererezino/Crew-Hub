@@ -23,6 +23,7 @@ export type SessionProfile = {
   notification_preferences: Record<string, unknown> | null;
   roles: UserRole[];
   manager_id: string | null;
+  team_lead_id: string | null;
   country_code: string | null;
   start_date: string | null;
   employment_type: string | null;
@@ -241,7 +242,7 @@ const getAuthenticatedSessionInternal = cache(
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select(
-        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, country_code, start_date, employment_type, status, preferred_locale, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_website, favorite_music, favorite_books, favorite_sports"
+        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, team_lead_id, country_code, start_date, employment_type, status, preferred_locale, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_website, favorite_music, favorite_books, favorite_sports"
       )
       .eq("id", user.id)
       .is("deleted_at", null)
@@ -275,6 +276,7 @@ const getAuthenticatedSessionInternal = cache(
       notification_preferences: profileData.notification_preferences,
       roles,
       manager_id: profileData.manager_id,
+      team_lead_id: profileData.team_lead_id ?? null,
       country_code: profileData.country_code,
       start_date: profileData.start_date,
       employment_type: profileData.employment_type,

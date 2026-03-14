@@ -43,6 +43,8 @@ export type PersonRecord = {
   dateOfBirth: string | null;
   managerId: string | null;
   managerName: string | null;
+  teamLeadId: string | null;
+  teamLeadName: string | null;
   employmentType: EmploymentType;
   payrollMode: PayrollMode;
   primaryCurrency: string;
