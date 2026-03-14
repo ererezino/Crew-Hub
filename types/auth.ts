@@ -1,13 +1,7 @@
-export const APP_ROLES = [
-  "EMPLOYEE",
-  "TEAM_LEAD",
-  "MANAGER",
-  "HR_ADMIN",
-  "FINANCE_ADMIN",
-  "SUPER_ADMIN"
-] as const;
-
-export type AppRole = (typeof APP_ROLES)[number];
+// Canonical role definition lives in lib/navigation.ts.
+// These are compatibility re-exports so consumers importing from
+// types/auth continue to work without changes.
+export { USER_ROLES as APP_ROLES, type UserRole as AppRole } from "../lib/navigation";
 
 export type RoleAwareProfile = {
   roles: readonly string[] | null;
