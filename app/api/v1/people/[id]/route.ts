@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
@@ -13,13 +12,19 @@ import {
   parseDepartment
 } from "../../../../../lib/departments";
 import { USER_ROLES } from "../../../../../lib/navigation";
+import {
+  buildMeta,
+  jsonResponse,
+  normalizeRoles,
+  profileRowSchema,
+  mapProfileRow
+} from "../../../../../lib/people/shared";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
-import type { ApiResponse, AppRole } from "../../../../../types/auth";
+import type { AppRole } from "../../../../../types/auth";
 import {
   PROFILE_STATUSES,
   type PeopleUpdateResponseData,
-  type PersonRecord,
   type ProfileStatus
 } from "../../../../../types/people";
 
@@ -60,125 +65,6 @@ const updatePersonSchema = z.object({
       revoked: []
     })
 });
-
-const profileRowSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
-  full_name: z.string(),
-  roles: z.array(z.string()),
-  department: z.string().nullable(),
-  title: z.string().nullable(),
-  country_code: z.string().nullable(),
-  timezone: z.string().nullable(),
-  phone: z.string().nullable(),
-  start_date: z.string().nullable(),
-  date_of_birth: z.string().nullable().default(null),
-  manager_id: z.string().uuid().nullable(),
-  employment_type: z.enum(["full_time", "part_time", "contractor"]),
-  payroll_mode: z.enum([
-    "contractor_usd_no_withholding",
-    "employee_local_withholding",
-    "employee_usd_withholding"
-  ]),
-  primary_currency: z.string(),
-  status: z.enum(PROFILE_STATUSES),
-  notice_period_end_date: z.string().nullable().default(null),
-  bio: z.string().nullable().default(null),
-  favorite_music: z.string().nullable().default(null),
-  favorite_books: z.string().nullable().default(null),
-  favorite_sports: z.string().nullable().default(null),
-  avatar_url: z.string().nullable().default(null),
-  emergency_contact_name: z.string().nullable().default(null),
-  emergency_contact_phone: z.string().nullable().default(null),
-  emergency_contact_relationship: z.string().nullable().default(null),
-  pronouns: z.string().nullable().default(null),
-  directory_visible: z.boolean().default(true),
-  privacy_settings: z.unknown().default({}),
-  schedule_type: z.string().nullable().optional().default(null),
-  weekend_shift_hours: z.string().nullable().optional().default(null),
-  crew_hub_joined_at: z.string().nullable().default(null),
-  first_invited_at: z.string().nullable().default(null),
-  account_setup_at: z.string().nullable().default(null),
-  last_seen_at: z.string().nullable().default(null),
-  created_at: z.string(),
-  updated_at: z.string()
-});
-
-function buildMeta() {
-  return { timestamp: new Date().toISOString() };
-}
-
-function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
-  return NextResponse.json(payload, { status });
-}
-
-function normalizeRoles(values: readonly string[]): AppRole[] {
-  return values.filter((value): value is AppRole =>
-    USER_ROLES.includes(value as AppRole)
-  );
-}
-
-function deriveAccessStatus(
-  crewHubJoinedAt: string | null,
-  firstInvitedAt: string | null
-): "signed_in" | "invited" | "not_invited" {
-  if (crewHubJoinedAt) return "signed_in";
-  if (firstInvitedAt) return "invited";
-  return "not_invited";
-}
-
-function mapPersonRow(
-  row: z.infer<typeof profileRowSchema>,
-  managerNameById: ReadonlyMap<string, string>,
-  crewTag?: string | null
-): PersonRecord {
-  return {
-    id: row.id,
-    email: row.email,
-    fullName: row.full_name,
-    roles: normalizeRoles(row.roles),
-    department: row.department,
-    title: row.title,
-    countryCode: row.country_code,
-    timezone: row.timezone,
-    phone: row.phone,
-    startDate: row.start_date,
-    dateOfBirth: row.date_of_birth,
-    managerId: row.manager_id,
-    managerName: row.manager_id ? managerNameById.get(row.manager_id) ?? null : null,
-    employmentType: row.employment_type,
-    payrollMode: row.payroll_mode,
-    primaryCurrency: row.primary_currency,
-    status: row.status,
-    noticePeriodEndDate: row.notice_period_end_date ?? null,
-    avatarUrl: row.avatar_url ?? null,
-    bio: row.bio ?? null,
-    favoriteMusic: row.favorite_music ?? null,
-    favoriteBooks: row.favorite_books ?? null,
-    favoriteSports: row.favorite_sports ?? null,
-    emergencyContactName: row.emergency_contact_name ?? null,
-    emergencyContactPhone: row.emergency_contact_phone ?? null,
-    emergencyContactRelationship: row.emergency_contact_relationship ?? null,
-    pronouns: row.pronouns ?? null,
-    socialLinkedin: null,
-    socialTwitter: null,
-    socialInstagram: null,
-    socialGithub: null,
-    socialWebsite: null,
-    directoryVisible: row.directory_visible,
-    privacySettings: (row.privacy_settings && typeof row.privacy_settings === "object" ? row.privacy_settings : {}) as import("../../../../../types/people").PrivacySettings,
-    scheduleType: row.schedule_type,
-    weekendShiftHours: row.weekend_shift_hours,
-    crewTag: crewTag ?? null,
-    inviteStatus: deriveAccessStatus(row.crew_hub_joined_at, row.first_invited_at),
-    crewHubJoinedAt: row.crew_hub_joined_at,
-    firstInvitedAt: row.first_invited_at,
-    accountSetupAt: row.account_setup_at,
-    lastSeenAt: row.last_seen_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
-}
 
 export async function PUT(
   request: Request,
@@ -761,7 +647,7 @@ export async function PUT(
     .not("crew_tag", "is", null)
     .maybeSingle();
 
-  const person = mapPersonRow(
+  const person = mapProfileRow(
     parsedUpdatedRow.data,
     managerNameById,
     typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null
@@ -1069,7 +955,7 @@ export async function PATCH(
     .not("crew_tag", "is", null)
     .maybeSingle();
 
-  const person = mapPersonRow(
+  const person = mapProfileRow(
     parsedUpdatedRow.data,
     managerNameById,
     typeof selfCrewTagRow?.crew_tag === "string" ? selfCrewTagRow.crew_tag : null

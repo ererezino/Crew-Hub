@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
@@ -14,13 +13,20 @@ import {
 } from "../../../../lib/departments";
 import { logger } from "../../../../lib/logger";
 import { USER_ROLES, type UserRole } from "../../../../lib/navigation";
+import {
+  buildMeta,
+  jsonResponse,
+  normalizeRoles,
+  profileRowSchema,
+  mapProfileRow
+} from "../../../../lib/people/shared";
 import { deriveSystemPassword } from "../../../../lib/auth/system-password";
 import { createNotification } from "../../../../lib/notifications/service";
 import { createOnboardingInstance } from "../../../../lib/onboarding/create-instance";
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
-import type { ApiResponse, AppRole } from "../../../../types/auth";
+import type { AppRole } from "../../../../types/auth";
 import {
   EMPLOYMENT_TYPES,
   PAYROLL_MODES,
@@ -29,7 +35,6 @@ import {
   type PayrollMode,
   type PeopleCreateResponseData,
   type PeopleListResponseData,
-  type PersonRecord,
   type ProfileStatus
 } from "../../../../types/people";
 
@@ -83,55 +88,6 @@ const createPersonSchema = z.object({
     })
 });
 
-const profileRowSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().email(),
-  full_name: z.string(),
-  roles: z.array(z.string()),
-  department: z.string().nullable(),
-  title: z.string().nullable(),
-  country_code: z.string().nullable(),
-  timezone: z.string().nullable(),
-  phone: z.string().nullable(),
-  start_date: z.string().nullable(),
-  manager_id: z.string().uuid().nullable(),
-  employment_type: z.enum(EMPLOYMENT_TYPES),
-  payroll_mode: z.enum(PAYROLL_MODES),
-  primary_currency: z.string(),
-  status: z.enum(PROFILE_STATUSES),
-  avatar_url: z.string().nullable().default(null),
-  directory_visible: z.boolean().default(true),
-  schedule_type: z.string().nullable().default(null),
-  weekend_shift_hours: z.string().nullable().default(null),
-  bio: z.string().nullable().default(null),
-  pronouns: z.string().nullable().default(null),
-  emergency_contact_name: z.string().nullable().default(null),
-  emergency_contact_phone: z.string().nullable().default(null),
-  emergency_contact_relationship: z.string().nullable().default(null),
-  favorite_music: z.string().nullable().default(null),
-  favorite_books: z.string().nullable().default(null),
-  favorite_sports: z.string().nullable().default(null),
-  privacy_settings: z.record(z.string(), z.unknown()).nullable().default(null),
-  social_linkedin: z.string().nullable().default(null),
-  social_twitter: z.string().nullable().default(null),
-  social_instagram: z.string().nullable().default(null),
-  social_github: z.string().nullable().default(null),
-  social_website: z.string().nullable().default(null),
-  crew_hub_joined_at: z.string().nullable().default(null),
-  first_invited_at: z.string().nullable().default(null),
-  account_setup_at: z.string().nullable().default(null),
-  last_seen_at: z.string().nullable().default(null),
-  created_at: z.string(),
-  updated_at: z.string()
-});
-
-function buildMeta() {
-  return { timestamp: new Date().toISOString() };
-}
-
-function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
-  return NextResponse.json(payload, { status });
-}
 
 function resolveAuthRedirectUrl(request: Request): string {
   const requestUrl = new URL(request.url);
@@ -158,12 +114,6 @@ function canViewReports(userRoles: readonly UserRole[]): boolean {
   return hasRole(userRoles, "MANAGER") || hasRole(userRoles, "TEAM_LEAD") || canViewAllPeople(userRoles);
 }
 
-function normalizeRoles(values: readonly string[]): AppRole[] {
-  return values.filter((value): value is AppRole =>
-    USER_ROLES.includes(value as AppRole)
-  );
-}
-
 function normalizeCountryCode(value: string | undefined): string | null {
   if (!value || value.trim().length === 0) {
     return null;
@@ -187,72 +137,6 @@ function normalizePayrollMode(
   }
 
   return requestedPayrollMode ?? "employee_local_withholding";
-}
-
-function deriveAccessStatus(
-  crewHubJoinedAt: string | null,
-  firstInvitedAt: string | null
-): "signed_in" | "invited" | "not_invited" {
-  // Three-state model based on application-managed fields:
-  // - "signed_in"   = crew_hub_joined_at IS NOT NULL (first real sign-in recorded)
-  // - "invited"     = first_invited_at IS NOT NULL AND crew_hub_joined_at IS NULL
-  // - "not_invited" = both are NULL
-  if (crewHubJoinedAt) return "signed_in";
-  if (firstInvitedAt) return "invited";
-  return "not_invited";
-}
-
-function mapPersonRow(
-  row: z.infer<typeof profileRowSchema>,
-  managerNameById: ReadonlyMap<string, string>,
-  crewTagById?: ReadonlyMap<string, string>
-): PersonRecord {
-  return {
-    id: row.id,
-    email: row.email,
-    fullName: row.full_name,
-    roles: normalizeRoles(row.roles),
-    department: row.department,
-    title: row.title,
-    countryCode: row.country_code,
-    timezone: row.timezone,
-    phone: row.phone,
-    startDate: row.start_date,
-    dateOfBirth: null,
-    managerId: row.manager_id,
-    managerName: row.manager_id ? managerNameById.get(row.manager_id) ?? null : null,
-    employmentType: row.employment_type,
-    payrollMode: row.payroll_mode,
-    primaryCurrency: row.primary_currency,
-    status: row.status,
-    noticePeriodEndDate: null,
-    avatarUrl: row.avatar_url ?? null,
-    bio: row.bio ?? null,
-    favoriteMusic: row.favorite_music ?? null,
-    favoriteBooks: row.favorite_books ?? null,
-    favoriteSports: row.favorite_sports ?? null,
-    emergencyContactName: row.emergency_contact_name ?? null,
-    emergencyContactPhone: row.emergency_contact_phone ?? null,
-    emergencyContactRelationship: row.emergency_contact_relationship ?? null,
-    pronouns: row.pronouns ?? null,
-    privacySettings: row.privacy_settings ?? {},
-    scheduleType: row.schedule_type,
-    weekendShiftHours: row.weekend_shift_hours,
-    socialLinkedin: row.social_linkedin ?? null,
-    socialTwitter: row.social_twitter ?? null,
-    socialInstagram: row.social_instagram ?? null,
-    socialGithub: row.social_github ?? null,
-    socialWebsite: row.social_website ?? null,
-    directoryVisible: row.directory_visible,
-    crewTag: crewTagById?.get(row.id) ?? null,
-    inviteStatus: deriveAccessStatus(row.crew_hub_joined_at, row.first_invited_at),
-    crewHubJoinedAt: row.crew_hub_joined_at,
-    firstInvitedAt: row.first_invited_at,
-    accountSetupAt: row.account_setup_at,
-    lastSeenAt: row.last_seen_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at
-  };
 }
 
 export async function GET(request: Request) {
@@ -477,7 +361,9 @@ export async function GET(request: Request) {
     }
   }
 
-  const people = parsedPeople.data.map((row) => mapPersonRow(row, managerNameById, crewTagById));
+  const people = parsedPeople.data.map((row) =>
+    mapProfileRow(row, managerNameById, crewTagById.get(row.id) ?? null)
+  );
 
   return jsonResponse<PeopleListResponseData>(200, {
     data: { people },
@@ -913,7 +799,7 @@ export async function POST(request: Request) {
   // Email is NOT sent at creation time. The admin must explicitly click
   // "Invite" to trigger a branded welcome email via POST /people/[id]/invite.
 
-  const person = mapPersonRow(parsedInsertedProfile.data, managerNameById);
+  const person = mapProfileRow(parsedInsertedProfile.data, managerNameById, null);
   let onboardingInstanceId: string | null = null;
   let accessConfigChangedKeys: string[] = [];
 
