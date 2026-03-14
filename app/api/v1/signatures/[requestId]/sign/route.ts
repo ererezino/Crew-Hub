@@ -5,6 +5,7 @@ import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
 import { sendOnboardingCompleteEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
+import { completeOnboarding } from "../../../../../../lib/onboarding/auto-transition";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
@@ -479,36 +480,53 @@ export async function POST(
           .eq("id", linkedTask.id)
           .eq("org_id", session.profile.org_id);
 
-        // Recalculate onboarding instance progress
+        // Recalculate onboarding instance progress using per-track checks
+        // (same logic as the normal task completion path)
         if (linkedTask.instance_id) {
           const { data: allInstanceTasks } = await serviceRoleClient
             .from("onboarding_tasks")
-            .select("id, status")
+            .select("id, status, track")
             .eq("instance_id", linkedTask.instance_id)
-            .eq("org_id", session.profile.org_id);
+            .eq("org_id", session.profile.org_id)
+            .is("deleted_at", null);
 
           if (allInstanceTasks && allInstanceTasks.length > 0) {
-            const completedCount = allInstanceTasks.filter((t) => t.status === "completed").length;
+            const employeeTasks = allInstanceTasks.filter((t) => t.track === "employee");
+            const opsTasks = allInstanceTasks.filter((t) => t.track === "operations");
+            const employeeDone = employeeTasks.length === 0 || employeeTasks.every((t) => t.status === "completed");
+            const opsDone = opsTasks.length === 0 || opsTasks.every((t) => t.status === "completed");
+            const allDone = allInstanceTasks.length > 0 && employeeDone && opsDone;
 
-            if (completedCount === allInstanceTasks.length) {
-              await serviceRoleClient
-                .from("onboarding_instances")
-                .update({
-                  status: "completed",
-                  completed_at: signedAt
-                })
-                .eq("id", linkedTask.instance_id)
-                .eq("org_id", session.profile.org_id);
-
-              // Send onboarding complete email to employee and manager
+            if (allDone) {
+              // Fetch instance type to determine whether to call completeOnboarding
               const { data: instanceRow } = await serviceRoleClient
                 .from("onboarding_instances")
-                .select("employee_id")
+                .select("employee_id, type")
                 .eq("id", linkedTask.instance_id)
                 .eq("org_id", session.profile.org_id)
                 .maybeSingle();
 
-              if (instanceRow?.employee_id) {
+              if (instanceRow) {
+                if (instanceRow.type === "onboarding") {
+                  // Use the same completeOnboarding() as the normal task completion path:
+                  // marks instance completed, transitions profile to active, creates leave balances,
+                  // writes audit log, sends in-app notification
+                  await completeOnboarding({
+                    supabase: serviceRoleClient,
+                    orgId: session.profile.org_id,
+                    instanceId: linkedTask.instance_id,
+                    employeeId: instanceRow.employee_id
+                  });
+                } else {
+                  // Offboarding — just mark instance as completed
+                  await serviceRoleClient
+                    .from("onboarding_instances")
+                    .update({ status: "completed", completed_at: new Date().toISOString() })
+                    .eq("id", linkedTask.instance_id)
+                    .eq("org_id", session.profile.org_id);
+                }
+
+                // Send onboarding/offboarding complete email
                 const { data: empProfile } = await serviceRoleClient
                   .from("profiles")
                   .select("id, full_name, manager_id")
