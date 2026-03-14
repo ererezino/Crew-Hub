@@ -7,6 +7,7 @@ import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { parseNumeric } from "../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
   LEAVE_REQUEST_STATUSES,
@@ -103,6 +104,10 @@ export async function GET(request: Request) {
   const query = parsedQuery.data;
   const supabase = await createSupabaseServerClient();
 
+  // Use the service-role client for data queries after authorisation is resolved.
+  // RLS on leave_requests does not model delegation or team-lead access.
+  const svcClient = createSupabaseServiceRoleClient();
+
   let reportIds: string[] = [];
 
   if (!isAdmin) {
@@ -140,7 +145,7 @@ export async function GET(request: Request) {
     }
   }
 
-  let requestsQuery = supabase
+  let requestsQuery = svcClient
     .from("leave_requests")
     .select(
       "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, acting_for, delegate_type, rejection_reason, created_at, updated_at"
@@ -211,7 +216,7 @@ export async function GET(request: Request) {
   ];
   const actorIds = [...new Set([...employeeIds, ...approverIds, ...actingForIds])];
 
-  const { data: rawProfiles, error: profilesError } = await supabase
+  const { data: rawProfiles, error: profilesError } = await svcClient
     .from("profiles")
     .select("id, full_name, department, country_code")
     .eq("org_id", session.profile.org_id)

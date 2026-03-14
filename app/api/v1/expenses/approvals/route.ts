@@ -13,6 +13,7 @@ import { createBulkNotifications, createNotification } from "../../../../../lib/
 import { currentMonthKey, isIsoMonth, monthDateRange, parseIntegerAmount } from "../../../../../lib/expenses";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type {
   ExpenseApprovalStage,
   ExpenseApprovalsResponseData,
@@ -214,6 +215,7 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const svcClient = createSupabaseServiceRoleClient();
   const isSuperAdmin = hasRole(profile.roles, "SUPER_ADMIN");
   const targetStatus = statusForStage(stage);
 
@@ -241,7 +243,7 @@ export async function GET(request: Request) {
     }
   }
 
-  let expenseQuery = supabase
+  let expenseQuery = svcClient
     .from("expenses")
     .select(expenseSelectColumns)
     .eq("org_id", profile.org_id)
@@ -310,7 +312,7 @@ export async function GET(request: Request) {
   }
 
   const latestCommentStates = await loadLatestExpenseCommentStates({
-    supabase,
+    supabase: svcClient,
     orgId: profile.org_id,
     expenseIds: parsedExpenses.data.map((row) => row.id)
   });
@@ -321,7 +323,7 @@ export async function GET(request: Request) {
   )];
 
   const profileIds = [...new Set([...collectProfileIds(parsedExpenses.data), ...commentAuthorIds])];
-  const { data: rawProfiles, error: profilesError } = await supabase
+  const { data: rawProfiles, error: profilesError } = await svcClient
     .from("profiles")
     .select("id, full_name, department, country_code, manager_id")
     .eq("org_id", profile.org_id)
@@ -473,12 +475,13 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const svcClient = createSupabaseServiceRoleClient();
   const isSuperAdmin = hasRole(profile.roles, "SUPER_ADMIN");
   const nowIso = new Date().toISOString();
   const currentMonth = currentMonthKey();
   const targetStatus = statusForStage(stage);
 
-  const { data: rawTargetRows, error: targetRowsError } = await supabase
+  const { data: rawTargetRows, error: targetRowsError } = await svcClient
     .from("expenses")
     .select(expenseSelectColumns)
     .eq("org_id", profile.org_id)
@@ -585,7 +588,7 @@ export async function POST(request: Request) {
     const allUpdatedRows: unknown[] = [];
 
     for (const group of groups.values()) {
-      const { data: groupRows, error: groupError } = await supabase
+      const { data: groupRows, error: groupError } = await svcClient
         .from("expenses")
         .update({
           status: "manager_approved" as const,
@@ -620,7 +623,7 @@ export async function POST(request: Request) {
       updatedRowsRaw = allUpdatedRows;
     }
   } else {
-    const financeResult = await supabase
+    const financeResult = await svcClient
       .from("expenses")
       .update({
         status: "reimbursed" as const,
@@ -671,7 +674,7 @@ export async function POST(request: Request) {
   }
 
   const profileIds = collectProfileIds(parsedUpdatedRows.data);
-  const { data: rawProfiles, error: profilesError } = await supabase
+  const { data: rawProfiles, error: profilesError } = await svcClient
     .from("profiles")
     .select("id, full_name, department, country_code, manager_id")
     .eq("org_id", profile.org_id)

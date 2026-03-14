@@ -273,8 +273,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const svcClient = createSupabaseServiceRoleClient();
 
-  const { data: requestRow, error: requestError } = await supabase
+  const { data: requestRow, error: requestError } = await svcClient
     .from("leave_requests")
     .select(
       "id, org_id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"
@@ -310,7 +311,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const existingRequest = parsedRequest.data;
 
-  const { data: employeeRow, error: employeeError } = await supabase
+  const { data: employeeRow, error: employeeError } = await svcClient
     .from("profiles")
     .select("id, email, full_name, department, country_code, manager_id")
     .eq("id", existingRequest.employee_id)
@@ -513,7 +514,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     ].filter((id): id is string => Boolean(id));
 
     if (profileIdsToResolve.length > 0) {
-      const { data: resolvedProfiles } = await supabase
+      const { data: resolvedProfiles } = await svcClient
         .from("profiles")
         .select("id, full_name")
         .eq("org_id", session.profile.org_id)
@@ -603,7 +604,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   // Cancel path: standard multi-step (no balance atomicity needed for cancels)
-  const { data: updatedRequestRow, error: updateError } = await supabase
+  const { data: updatedRequestRow, error: updateError } = await svcClient
     .from("leave_requests")
     .update({
       status: nextStatus,
@@ -663,7 +664,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   let approverName: string | null = null;
 
   if (parsedUpdatedRequest.data.approver_id) {
-    const { data: approverRow } = await supabase
+    const { data: approverRow } = await svcClient
       .from("profiles")
       .select("id, full_name")
       .eq("org_id", session.profile.org_id)

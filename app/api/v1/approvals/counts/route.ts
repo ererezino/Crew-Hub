@@ -6,6 +6,7 @@ import { getEffectiveApproverScope } from "../../../../../lib/delegation";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 
 type ApprovalsCountsResponseData = {
@@ -162,6 +163,12 @@ export async function GET(request: Request) {
 
   const supabase = await createSupabaseServerClient();
 
+  // Use the service-role client for scoped data queries. The delegation engine
+  // has already determined authorisation; RLS on leave_requests / expenses
+  // does not model delegation or team-lead access, so the privileged client
+  // is required to actually fetch the data.
+  const svcClient = createSupabaseServiceRoleClient();
+
   // Resolve operational scope (direct + delegated reports) for non-admin users.
   // Use scope-specific queries so delegation scope filtering is accurate.
   const needsLeaveScope = includeTimeOff && !canViewAllTimeOff(roles);
@@ -189,14 +196,14 @@ export async function GET(request: Request) {
   const [timeOffCount, managerExpenseCount, financeExpenseCount] = await Promise.all([
     includeTimeOff
       ? countPendingLeaveRequests({
-          supabase,
+          supabase: svcClient,
           orgId: profile.org_id,
           employeeIds: canViewAllTimeOff(roles) ? null : leaveReportIds
         })
       : Promise.resolve(0),
     includeManagerExpenses
       ? countExpensesByStatus({
-          supabase,
+          supabase: svcClient,
           orgId: profile.org_id,
           status: "pending",
           employeeIds: superAdmin ? null : expenseReportIds
@@ -204,7 +211,7 @@ export async function GET(request: Request) {
       : Promise.resolve(0),
     includeFinanceExpenses
       ? countExpensesByStatus({
-          supabase,
+          supabase: svcClient,
           orgId: profile.org_id,
           status: "manager_approved",
           employeeIds: null
