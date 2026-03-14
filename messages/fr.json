@@ -4780,7 +4780,8 @@
     "pageDescription": "Trouvez des collègues, consultez les rôles et ouvrez les profils complets.",
     "tab": {
       "directory": "Répertoire",
-      "orgChart": "Organigramme"
+      "orgChart": "Organigramme",
+      "delegations": "Délégations"
     },
     "emptyState": {
       "unavailable": "Les données du personnel sont indisponibles",
@@ -5391,5 +5392,90 @@
       "confirmSave": "Enregistrer",
       "inactiveWarning": "Cette personne est actuellement {status}. Les changements de relation peuvent avoir un effet limité."
     }
+  },
+  "delegations": {
+    "errorLoading": "Impossible de charger les délégations.",
+    "saveFailed": "Impossible d'enregistrer la délégation. Veuillez réessayer.",
+    "retry": "Réessayer",
+    "newDelegation": "Nouvelle délégation",
+    "editDelegation": "Modifier la délégation",
+    "createDelegation": "Créer la délégation",
+    "saveChanges": "Enregistrer",
+    "saving": "Enregistrement…",
+    "deactivate": "Désactiver",
+    "reactivate": "Réactiver",
+    "edit": "Modifier",
+    "expired": "Expirée",
+    "emptyTitle": "Aucune délégation configurée",
+    "emptyDescription": "Créez une délégation pour configurer la couverture d'approbation en cas d'absence.",
+    "sidePanelDescription": "Configurez qui peut approuver au nom de quelqu'un d'autre.",
+    "tableAriaLabel": "Tableau des délégations",
+    "expiredCannotReactivate": "Expirée — créez une nouvelle délégation avec des dates mises à jour.",
+    "filter": {
+      "active": "Actives",
+      "expired": "Expirées",
+      "inactive": "Inactives",
+      "all": "Toutes"
+    },
+    "column": {
+      "principal": "Couvert par",
+      "delegate": "Délégué",
+      "type": "Type",
+      "scope": "Portée",
+      "activation": "Activation",
+      "dates": "Dates",
+      "status": "Statut",
+      "actions": "Actions"
+    },
+    "status": {
+      "in_effect": "En vigueur",
+      "standby": "En attente",
+      "expired": "Expirée",
+      "inactive": "Inactive"
+    },
+    "type": {
+      "deputy_team_lead": "Chef d'équipe adjoint",
+      "cofounder_coverage": "Couverture cofondateur",
+      "temporary": "Temporaire"
+    },
+    "typeDescription": {
+      "deputy_team_lead": "Remplacement permanent du chef d'équipe.",
+      "cofounder_coverage": "Un cofondateur couvrant un autre cofondateur.",
+      "temporary": "Couverture limitée dans le temps (ex. congé parental, vacances)."
+    },
+    "scope": {
+      "leave": "Congés",
+      "expense": "Dépenses",
+      "schedule": "Planning"
+    },
+    "activation": {
+      "when_unavailable": "En cas d'absence",
+      "always": "Toujours"
+    },
+    "activationDescription": {
+      "when_unavailable": "Actif uniquement lorsque le principal est en congé ou marqué absent.",
+      "always": "Actif en permanence, quelle que soit la disponibilité du principal."
+    },
+    "field": {
+      "principal": "Principal (couvert)",
+      "principalHint": "La personne dont les approbations seront couvertes. Doit avoir un rôle de manager ou responsable.",
+      "delegate": "Délégué (couvrant)",
+      "delegateHint": "La personne qui approuvera au nom du principal.",
+      "selectPerson": "Sélectionner une personne…",
+      "delegateType": "Type de délégation",
+      "scope": "Portée",
+      "scopeHint": "Quels types d'approbation cette délégation couvre.",
+      "activation": "Mode d'activation",
+      "dateRange": "Plage de dates",
+      "startsAt": "Date de début",
+      "endsAt": "Date de fin"
+    },
+    "confirmCreateTitle": "Confirmer la nouvelle délégation",
+    "confirmEditTitle": "Confirmer les modifications",
+    "confirmSaveDescription": "Cela permettra à {delegate} d'approuver {scopes} au nom de {principal} ({activation}). Confirmer ?",
+    "confirmDeactivateTitle": "Désactiver la délégation",
+    "confirmDeactivateDescription": "{delegate} ne pourra plus approuver au nom de {principal}.",
+    "confirmReactivateTitle": "Réactiver la délégation",
+    "confirmReactivateDescription": "{delegate} pourra à nouveau approuver au nom de {principal}."
   }
 }

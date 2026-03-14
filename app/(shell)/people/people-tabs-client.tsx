@@ -14,6 +14,10 @@ const OrgChartClient = lazy(() =>
   import("./org-chart/org-chart-client").then((m) => ({ default: m.OrgChartClient }))
 );
 
+const DelegationsClient = lazy(() =>
+  import("./delegations/delegations-client").then((m) => ({ default: m.DelegationsClient }))
+);
+
 type PeopleScope = "all" | "reports" | "me";
 
 type PeopleTabsClientProps = {
@@ -67,6 +71,12 @@ export function PeopleTabsClient({
       items.push({
         key: "org-chart",
         label: t("tab.orgChart"),
+        requiredRoles: ["SUPER_ADMIN"]
+      });
+
+      items.push({
+        key: "delegations",
+        label: t("tab.delegations"),
         requiredRoles: ["SUPER_ADMIN"]
       });
     }
@@ -143,6 +153,18 @@ export function PeopleTabsClient({
               }
             >
               <OrgChartClient />
+            </Suspense>
+          ) : null}
+
+          {activeTab === "delegations" ? (
+            <Suspense
+              fallback={
+                <div className="delegations-loading">
+                  <div className="spinner" />
+                </div>
+              }
+            >
+              <DelegationsClient />
             </Suspense>
           ) : null}
         </motion.section>

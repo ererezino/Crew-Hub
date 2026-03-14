@@ -4789,7 +4789,8 @@
     "pageDescription": "Find teammates, review roles, and open full profiles.",
     "tab": {
       "directory": "Directory",
-      "orgChart": "Org Chart"
+      "orgChart": "Org Chart",
+      "delegations": "Delegations"
     },
     "emptyState": {
       "unavailable": "People data is unavailable",
@@ -5401,5 +5402,90 @@
       "confirmSave": "Save",
       "inactiveWarning": "This person is currently {status}. Relationship changes may have limited effect."
     }
+  },
+  "delegations": {
+    "errorLoading": "Unable to load delegations.",
+    "saveFailed": "Unable to save delegation. Please try again.",
+    "retry": "Try again",
+    "newDelegation": "New delegation",
+    "editDelegation": "Edit delegation",
+    "createDelegation": "Create delegation",
+    "saveChanges": "Save changes",
+    "saving": "Saving…",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "edit": "Edit",
+    "expired": "Expired",
+    "emptyTitle": "No delegations configured",
+    "emptyDescription": "Create a delegation to set up approval coverage when someone is away.",
+    "sidePanelDescription": "Configure who can approve on behalf of someone else.",
+    "tableAriaLabel": "Delegations table",
+    "expiredCannotReactivate": "Expired — create a new delegation with updated dates.",
+    "filter": {
+      "active": "Active",
+      "expired": "Expired",
+      "inactive": "Inactive",
+      "all": "All"
+    },
+    "column": {
+      "principal": "Covered by",
+      "delegate": "Delegate",
+      "type": "Type",
+      "scope": "Scope",
+      "activation": "Activation",
+      "dates": "Dates",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "in_effect": "In Effect",
+      "standby": "Standby",
+      "expired": "Expired",
+      "inactive": "Inactive"
+    },
+    "type": {
+      "deputy_team_lead": "Deputy Team Lead",
+      "cofounder_coverage": "Cofounder Coverage",
+      "temporary": "Temporary"
+    },
+    "typeDescription": {
+      "deputy_team_lead": "Permanent backup for the team lead.",
+      "cofounder_coverage": "Cofounder covering another cofounder.",
+      "temporary": "Time-bound coverage (e.g. parental leave, vacation)."
+    },
+    "scope": {
+      "leave": "Leave",
+      "expense": "Expense",
+      "schedule": "Schedule"
+    },
+    "activation": {
+      "when_unavailable": "When unavailable",
+      "always": "Always"
+    },
+    "activationDescription": {
+      "when_unavailable": "Only active when principal is on leave or marked OOO.",
+      "always": "Active at all times regardless of principal's availability."
+    },
+    "field": {
+      "principal": "Principal (being covered)",
+      "principalHint": "The person whose approvals will be covered. Must hold a manager or lead role.",
+      "delegate": "Delegate (covering)",
+      "delegateHint": "The person who will approve on behalf of the principal.",
+      "selectPerson": "Select a person…",
+      "delegateType": "Delegation type",
+      "scope": "Scope",
+      "scopeHint": "Which approval types this delegation covers.",
+      "activation": "Activation mode",
+      "dateRange": "Date range",
+      "startsAt": "Start date",
+      "endsAt": "End date"
+    },
+    "confirmCreateTitle": "Confirm new delegation",
+    "confirmEditTitle": "Confirm delegation changes",
+    "confirmSaveDescription": "This will allow {delegate} to approve {scopes} on behalf of {principal} ({activation}). Confirm?",
+    "confirmDeactivateTitle": "Deactivate delegation",
+    "confirmDeactivateDescription": "{delegate} will no longer be able to approve on behalf of {principal}.",
+    "confirmReactivateTitle": "Reactivate delegation",
+    "confirmReactivateDescription": "{delegate} will be able to approve on behalf of {principal} again."
   }
 }
