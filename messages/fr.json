@@ -4990,7 +4990,27 @@
       "beginOnboardingFailed": "Impossible de démarrer l'intégration.",
       "rescindSuccess": "Offre annulée pour {name}.",
       "rescindFailed": "Impossible d'annuler l'offre.",
-      "unableToCreatePerson": "Impossible de créer la personne."
+      "unableToCreatePerson": "Impossible de créer la personne.",
+      "contractAddFailed": "Impossible d'ajouter le contrat.",
+      "contractUpdateFailed": "Impossible de mettre à jour le contrat."
+    },
+    "contracts": {
+      "title": "Contrats",
+      "loading": "Chargement des contrats…",
+      "empty": "Aucun contrat pour le moment.",
+      "titlePlaceholder": "Titre du contrat (ex. Contrat de travail)",
+      "notesPlaceholder": "Notes (facultatif)",
+      "add": "Ajouter un contrat",
+      "adding": "Ajout en cours…",
+      "markSent": "Marquer envoyé",
+      "markSigned": "Marquer signé",
+      "void": "Annuler",
+      "status": {
+        "draft": "Brouillon",
+        "sent": "Envoyé",
+        "signed": "Signé",
+        "voided": "Annulé"
+      }
     },
     "dismissNotification": "Fermer la notification"
   },

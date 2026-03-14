@@ -28,6 +28,7 @@ import {
   type PeoplePasswordResetResponse,
   type PeopleUpdateResponse,
   type PersonRecord,
+  type PreStartContract,
   type ProfileStatus
 } from "../../../types/people";
 import { humanizeError } from "@/lib/errors";
@@ -539,6 +540,14 @@ export function PeopleClient({
   const [rescindTarget, setRescindTarget] = useState<PersonRecord | null>(null);
   const [isRescinding, setIsRescinding] = useState(false);
 
+  // Contract state
+  const [contracts, setContracts] = useState<PreStartContract[]>([]);
+  const [isLoadingContracts, setIsLoadingContracts] = useState(false);
+  const [newContractTitle, setNewContractTitle] = useState("");
+  const [newContractNotes, setNewContractNotes] = useState("");
+  const [isAddingContract, setIsAddingContract] = useState(false);
+  const [updatingContractId, setUpdatingContractId] = useState<string | null>(null);
+
   // Invite state
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [confirmInvitePerson, setConfirmInvitePerson] = useState<PersonRecord | null>(null);
@@ -876,6 +885,85 @@ export function PeopleClient({
       setIsRescinding(false);
     }
   }, [rescindTarget, closeEditPanel, setPeople, t, td]);
+
+  /* ── Contract handlers ── */
+
+  const loadContracts = useCallback(async (personId: string) => {
+    setIsLoadingContracts(true);
+    try {
+      const response = await fetch(`/api/v1/people/${personId}/contracts`);
+      const payload = await response.json();
+      if (response.ok && Array.isArray(payload.data?.contracts)) {
+        setContracts(payload.data.contracts as PreStartContract[]);
+      } else {
+        setContracts([]);
+      }
+    } catch {
+      setContracts([]);
+    } finally {
+      setIsLoadingContracts(false);
+    }
+  }, []);
+
+  const handleAddContract = useCallback(async () => {
+    if (!editPerson || !newContractTitle.trim()) return;
+    setIsAddingContract(true);
+    try {
+      const response = await fetch(`/api/v1/people/${editPerson.id}/contracts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newContractTitle.trim(),
+          notes: newContractNotes.trim() || null
+        })
+      });
+      const payload = await response.json();
+      if (response.ok && payload.data?.contract) {
+        setContracts((prev) => [payload.data.contract as PreStartContract, ...prev]);
+        setNewContractTitle("");
+        setNewContractNotes("");
+      } else {
+        addToast("error", humanizeError(payload?.error?.message ?? td('toast.contractAddFailed')));
+      }
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : td('toast.contractAddFailed'));
+    } finally {
+      setIsAddingContract(false);
+    }
+  }, [editPerson, newContractTitle, newContractNotes, td]);
+
+  const handleUpdateContract = useCallback(async (contractId: string, update: Record<string, unknown>) => {
+    if (!editPerson) return;
+    setUpdatingContractId(contractId);
+    try {
+      const response = await fetch(`/api/v1/people/${editPerson.id}/contracts`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractId, ...update })
+      });
+      const payload = await response.json();
+      if (response.ok && payload.data?.contract) {
+        setContracts((prev) =>
+          prev.map((c) => (c.id === contractId ? (payload.data.contract as PreStartContract) : c))
+        );
+      } else {
+        addToast("error", humanizeError(payload?.error?.message ?? td('toast.contractUpdateFailed')));
+      }
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : td('toast.contractUpdateFailed'));
+    } finally {
+      setUpdatingContractId(null);
+    }
+  }, [editPerson, td]);
+
+  // Load contracts when editing a pre_start person
+  useEffect(() => {
+    if (editPerson && editPerson.status === "pre_start") {
+      void loadContracts(editPerson.id);
+    } else {
+      setContracts([]);
+    }
+  }, [editPerson, loadContracts]);
 
   /* ── Invite handlers ── */
 
@@ -1349,7 +1437,7 @@ export function PeopleClient({
                             {resettingId === person.id ? t('table.resetting') : t('table.resetAuthenticator')}
                           </button>
                         ) : null}
-                        {person.accessStatus === "invited" && canInvitePeople ? (
+                        {person.accessStatus === "invited" && canInvitePeople && person.status !== "pre_start" ? (
                           <button
                             type="button"
                             className="table-row-action table-row-action-accent"
@@ -1359,7 +1447,7 @@ export function PeopleClient({
                             {invitingId === person.id ? t('table.sending') : t('table.reInvite')}
                           </button>
                         ) : null}
-                        {person.accessStatus === "not_invited" && canInvitePeople ? (
+                        {person.accessStatus === "not_invited" && canInvitePeople && person.status !== "pre_start" ? (
                           <button
                             type="button"
                             className="table-row-action table-row-action-accent"
@@ -2094,6 +2182,117 @@ export function PeopleClient({
                 </p>
               ) : null}
             </label>
+
+            {/* Contracts section for pre_start people */}
+            {editPerson && editPerson.status === "pre_start" ? (
+              <div className="contracts-section" style={{ borderTop: "1px solid var(--border-default)", paddingTop: "var(--space-3)" }}>
+                <h4 className="form-label" style={{ marginBottom: "var(--space-2)" }}>
+                  {t('contracts.title')}
+                </h4>
+
+                {isLoadingContracts ? (
+                  <p className="text-muted" style={{ fontSize: "var(--text-sm)" }}>{t('contracts.loading')}</p>
+                ) : contracts.length === 0 ? (
+                  <p className="text-muted" style={{ fontSize: "var(--text-sm)" }}>{t('contracts.empty')}</p>
+                ) : (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                    {contracts.map((contract) => (
+                      <li
+                        key={contract.id}
+                        style={{
+                          padding: "var(--space-2)",
+                          border: "1px solid var(--border-default)",
+                          borderRadius: "var(--radius-md)",
+                          fontSize: "var(--text-sm)"
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: contract.notes ? "var(--space-1)" : 0 }}>
+                          <span
+                            className={
+                              `role-tag ${
+                                contract.status === "signed" ? "role-tag-success"
+                                : contract.status === "sent" ? "role-tag-info"
+                                : contract.status === "voided" ? "role-tag-danger"
+                                : "role-tag-muted"
+                              }`
+                            }
+                            style={{ fontSize: "0.65rem", textTransform: "uppercase" }}
+                          >
+                            {t(`contracts.status.${contract.status}`)}
+                          </span>
+                          <span style={{ fontWeight: 500 }}>{contract.title}</span>
+                        </div>
+                        {contract.notes ? (
+                          <p className="text-muted" style={{ fontSize: "var(--text-xs)", margin: "var(--space-1) 0 0 0" }}>
+                            {contract.notes}
+                          </p>
+                        ) : null}
+                        {contract.status !== "voided" ? (
+                          <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
+                            {contract.status === "draft" ? (
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                disabled={updatingContractId === contract.id}
+                                onClick={() => void handleUpdateContract(contract.id, { sentAt: new Date().toISOString() })}
+                              >
+                                {t('contracts.markSent')}
+                              </button>
+                            ) : null}
+                            {contract.status === "draft" || contract.status === "sent" ? (
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                disabled={updatingContractId === contract.id}
+                                onClick={() => void handleUpdateContract(contract.id, { signedAt: new Date().toISOString() })}
+                              >
+                                {t('contracts.markSigned')}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className="table-row-action table-row-action-warning"
+                              disabled={updatingContractId === contract.id}
+                              onClick={() => void handleUpdateContract(contract.id, { voidedAt: new Date().toISOString() })}
+                            >
+                              {t('contracts.void')}
+                            </button>
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)", marginTop: "var(--space-2)" }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder={t('contracts.titlePlaceholder')}
+                    value={newContractTitle}
+                    onChange={(e) => setNewContractTitle(e.currentTarget.value)}
+                    style={{ fontSize: "var(--text-sm)" }}
+                  />
+                  <textarea
+                    className="form-input"
+                    placeholder={t('contracts.notesPlaceholder')}
+                    value={newContractNotes}
+                    onChange={(e) => setNewContractNotes(e.currentTarget.value)}
+                    rows={2}
+                    style={{ fontSize: "var(--text-sm)", resize: "vertical" }}
+                  />
+                  <button
+                    type="button"
+                    className="button"
+                    disabled={isAddingContract || !newContractTitle.trim()}
+                    onClick={() => void handleAddContract()}
+                    style={{ alignSelf: "flex-start", fontSize: "var(--text-sm)" }}
+                  >
+                    {isAddingContract ? t('contracts.adding') : t('contracts.add')}
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {/* Begin onboarding / Rescind for pre_start people */}
             {editPerson && editPerson.status === "pre_start" ? (

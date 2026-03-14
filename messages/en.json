@@ -4999,7 +4999,27 @@
       "beginOnboardingSuccess": "Onboarding started for {name}.",
       "beginOnboardingFailed": "Unable to start onboarding.",
       "rescindSuccess": "Offer rescinded for {name}.",
-      "rescindFailed": "Unable to rescind offer."
+      "rescindFailed": "Unable to rescind offer.",
+      "contractAddFailed": "Unable to add contract.",
+      "contractUpdateFailed": "Unable to update contract."
+    },
+    "contracts": {
+      "title": "Contracts",
+      "loading": "Loading contracts…",
+      "empty": "No contracts yet.",
+      "titlePlaceholder": "Contract title (e.g. Employment Agreement)",
+      "notesPlaceholder": "Notes (optional)",
+      "add": "Add contract",
+      "adding": "Adding…",
+      "markSent": "Mark sent",
+      "markSigned": "Mark signed",
+      "void": "Void",
+      "status": {
+        "draft": "Draft",
+        "sent": "Sent",
+        "signed": "Signed",
+        "voided": "Voided"
+      }
     },
     "dismissNotification": "Dismiss notification"
   },

@@ -9,6 +9,7 @@ import { ErrorState } from "../../../../components/shared/error-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
+import { formatProfileStatus } from "../../../../lib/format-labels";
 import { formatDate as formatDateLib, formatRelativeTime } from "../../../../lib/datetime";
 import { DEPARTMENTS } from "../../../../lib/departments";
 import { USER_ROLES } from "../../../../lib/navigation";
@@ -723,14 +724,16 @@ export function PeopleOverviewClient({
               >
                 {t('header.edit')}
               </button>
-              <button
-                type="button"
-                className="button button-accent"
-                onClick={() => setInviteConfirmOpen(true)}
-                disabled={isInviting}
-              >
-                {isInviting ? t('header.sendingInvite') : t('header.sendInvite')}
-              </button>
+              {person?.status !== "pre_start" ? (
+                <button
+                  type="button"
+                  className="button button-accent"
+                  onClick={() => setInviteConfirmOpen(true)}
+                  disabled={isInviting}
+                >
+                  {isInviting ? t('header.sendingInvite') : t('header.sendInvite')}
+                </button>
+              ) : null}
             </>
           ) : null}
         </div>
@@ -970,11 +973,12 @@ export function PeopleOverviewClient({
                   tone={
                     person.status === "active" ? "success"
                     : person.status === "onboarding" ? "info"
+                    : person.status === "pre_start" ? "info"
                     : person.status === "offboarding" ? "warning"
                     : "draft"
                   }
                 >
-                  {person.status.charAt(0).toUpperCase() + person.status.slice(1)}
+                  {formatProfileStatus(person.status, locale)}
                 </StatusBadge>
               </dd>
 
