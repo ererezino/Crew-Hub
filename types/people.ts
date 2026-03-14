@@ -116,6 +116,7 @@ export type PeopleUpdatePayload = {
   roles?: AppRole[];
   department?: string | null;
   title?: string | null;
+  startDate?: string | null;
   dateOfBirth?: string | null;
   managerId?: string | null;
   status?: ProfileStatus;

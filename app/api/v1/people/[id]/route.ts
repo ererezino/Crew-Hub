@@ -32,6 +32,7 @@ const updatePersonSchema = z.object({
   roles: z.array(z.enum(USER_ROLES)).min(1, "Select at least one role.").optional(),
   department: z.string().trim().max(100, "Department is too long.").nullable().optional(),
   title: z.string().trim().max(200, "Title is too long.").nullable().optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD.").nullable().optional(),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be YYYY-MM-DD.").nullable().optional(),
   managerId: z.string().uuid("Manager must be a valid user id.").nullable().optional(),
   status: z.enum(PROFILE_STATUSES).optional(),
@@ -471,6 +472,7 @@ export async function PUT(
     roles?: string[];
     department?: string | null;
     title?: string | null;
+    start_date?: string | null;
     date_of_birth?: string | null;
     manager_id?: string | null;
     status?: ProfileStatus;
@@ -500,6 +502,10 @@ export async function PUT(
 
   if (payload.title !== undefined) {
     updateValues.title = payload.title?.trim() || null;
+  }
+
+  if (payload.startDate !== undefined) {
+    updateValues.start_date = payload.startDate ?? null;
   }
 
   if (payload.dateOfBirth !== undefined) {
@@ -799,6 +805,7 @@ export async function PUT(
       roles: existingRoles,
       department: parsedExistingProfile.data.department,
       title: parsedExistingProfile.data.title,
+      startDate: parsedExistingProfile.data.start_date,
       managerId: parsedExistingProfile.data.manager_id,
       status: parsedExistingProfile.data.status
     },
@@ -806,6 +813,7 @@ export async function PUT(
       roles: person.roles,
       department: person.department,
       title: person.title,
+      startDate: person.startDate,
       managerId: person.managerId,
       status: person.status
     }

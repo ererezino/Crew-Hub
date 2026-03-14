@@ -3736,6 +3736,7 @@
       "description": "Mettez à jour le rôle, le département et le responsable de ce membre de l'équipe.",
       "jobTitle": "Intitulé de poste",
       "jobTitlePlaceholder": "ex. Ingénieur logiciel",
+      "startDate": "Date de début (Accrue)",
       "roles": "Rôles",
       "rolesLabel": "Rôles",
       "department": "Département",

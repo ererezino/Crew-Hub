@@ -3745,6 +3745,7 @@
       "description": "Update role, department, and manager for this crew member.",
       "jobTitle": "Job title",
       "jobTitlePlaceholder": "e.g. Software Engineer",
+      "startDate": "Start date (Accrue)",
       "roles": "Roles",
       "rolesLabel": "Roles",
       "department": "Department",

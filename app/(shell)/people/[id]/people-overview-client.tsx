@@ -164,6 +164,7 @@ export function PeopleOverviewClient({
     department: "",
     managerId: "",
     title: "",
+    startDate: "",
     status: "active" as string
   });
   const [adminEditError, setAdminEditError] = useState<string | null>(null);
@@ -260,6 +261,7 @@ export function PeopleOverviewClient({
       department: person.department ?? "",
       managerId: person.managerId ?? "",
       title: person.title ?? "",
+      startDate: person.startDate ?? "",
       status: person.status ?? "active"
     });
     setAdminEditError(null);
@@ -299,6 +301,7 @@ export function PeopleOverviewClient({
             department: adminEditValues.department.trim() || null,
             managerId: adminEditValues.managerId.trim() || null,
             title: adminEditValues.title.trim() || null,
+            startDate: adminEditValues.startDate.trim() || null,
             status: adminEditValues.status || undefined
           })
         });
@@ -1413,6 +1416,20 @@ export function PeopleOverviewClient({
                 onChange={(e) => {
                   const val = e.currentTarget.value;
                   setAdminEditValues((prev) => ({ ...prev, title: val }));
+                }}
+              />
+            </label>
+
+            <label className="form-field" htmlFor="admin-edit-start-date">
+              <span className="form-label">{t('adminEditPanel.startDate')}</span>
+              <input
+                id="admin-edit-start-date"
+                type="date"
+                className="form-input"
+                value={adminEditValues.startDate}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setAdminEditValues((prev) => ({ ...prev, startDate: val }));
                 }}
               />
             </label>
