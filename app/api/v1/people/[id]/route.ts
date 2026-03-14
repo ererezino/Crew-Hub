@@ -17,7 +17,9 @@ import {
   jsonResponse,
   normalizeRoles,
   profileRowSchema,
-  mapProfileRow
+  mapProfileRow,
+  isValidStatusTransition,
+  getStatusTransitionError
 } from "../../../../../lib/people/shared";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
@@ -403,6 +405,17 @@ export async function PUT(
   }
 
   if (payload.status !== undefined) {
+    const currentStatus = parsedExistingProfile.data.status;
+    if (!isValidStatusTransition(currentStatus, payload.status)) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "INVALID_STATUS_TRANSITION",
+          message: getStatusTransitionError(currentStatus, payload.status)
+        },
+        meta: buildMeta()
+      });
+    }
     updateValues.status = payload.status;
   }
 

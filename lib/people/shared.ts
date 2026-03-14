@@ -8,7 +8,8 @@ import {
   PAYROLL_MODES,
   PROFILE_STATUSES,
   type PersonRecord,
-  type PrivacySettings
+  type PrivacySettings,
+  type ProfileStatus
 } from "../../types/people";
 
 // ── Response helpers ──
@@ -42,6 +43,46 @@ export function deriveAccessStatus(
   if (crewHubJoinedAt) return "signed_in";
   if (firstInvitedAt) return "invited";
   return "not_invited";
+}
+
+// ── Status transition validation ──
+
+/**
+ * Allowed status transitions for the People update flow.
+ *
+ * onboarding → active    Normal onboarding completion
+ * onboarding → inactive  No-show / rescinded offer
+ * active → offboarding   Employee begins structured departure
+ * active → inactive      Immediate termination / contract end
+ * offboarding → inactive Offboarding complete, last day passed
+ * offboarding → active   Offboarding cancelled, employee stays
+ * inactive → active      Rehire / reactivation
+ *
+ * Same-status transitions are always allowed (no-op).
+ *
+ * Rejected:
+ * active → onboarding       Backwards lifecycle
+ * inactive → onboarding     Onboarding is set at creation, not manually
+ * inactive → offboarding    Must reactivate first
+ * offboarding → onboarding  Backwards lifecycle
+ * onboarding → offboarding  Never active, use inactive instead
+ */
+const ALLOWED_STATUS_TRANSITIONS: ReadonlyMap<ProfileStatus, ReadonlySet<ProfileStatus>> = new Map([
+  ["onboarding", new Set<ProfileStatus>(["active", "inactive"])],
+  ["active", new Set<ProfileStatus>(["offboarding", "inactive"])],
+  ["offboarding", new Set<ProfileStatus>(["inactive", "active"])],
+  ["inactive", new Set<ProfileStatus>(["active"])]
+]);
+
+export function isValidStatusTransition(from: ProfileStatus, to: ProfileStatus): boolean {
+  if (from === to) return true;
+  return ALLOWED_STATUS_TRANSITIONS.get(from)?.has(to) ?? false;
+}
+
+export function getStatusTransitionError(from: ProfileStatus, to: ProfileStatus): string {
+  return `Cannot change status from "${from}" to "${to}". Allowed transitions from "${from}": ${
+    [...(ALLOWED_STATUS_TRANSITIONS.get(from) ?? [])].join(", ") || "none"
+  }.`;
 }
 
 // ── Profile row schema (superset) ──
