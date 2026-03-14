@@ -1193,7 +1193,9 @@ export function ExpenseApprovalsClient({
                         <div className="documents-cell-copy">
                           <p className="documents-cell-title">{expense.employeeName}</p>
                           <p className="documents-cell-description">
-                            {expense.employeeDepartment ?? ""}
+                            {expense.managerActingForName
+                              ? t('delegatedTag', { name: expense.managerActingForName })
+                              : expense.employeeDepartment ?? ""}
                           </p>
                         </div>
                       </td>

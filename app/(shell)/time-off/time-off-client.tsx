@@ -964,7 +964,7 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                       <td>
                         {requestRecord.approverName
                           ? requestRecord.actingForName
-                            ? `${requestRecord.approverName} (on behalf of ${requestRecord.actingForName})`
+                            ? t('approverOnBehalfOf', { approver: requestRecord.approverName, principal: requestRecord.actingForName })
                             : requestRecord.approverName
                           : "--"}
                       </td>

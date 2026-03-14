@@ -3259,6 +3259,7 @@
       "noActions": "Aucune action",
       "cancelling": "Annulation..."
     },
+    "approverOnBehalfOf": "{approver} (au nom de {principal})",
     "requestTable": {
       "leaveType": "Type de congé",
       "dateRange": "Période",

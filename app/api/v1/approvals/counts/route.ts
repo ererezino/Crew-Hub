@@ -163,19 +163,27 @@ export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
 
   // Resolve operational scope (direct + delegated reports) for non-admin users.
-  const needsScopedIds =
-    (includeTimeOff && !canViewAllTimeOff(roles)) ||
-    (includeManagerExpenses && !superAdmin);
+  // Use scope-specific queries so delegation scope filtering is accurate.
+  const needsLeaveScope = includeTimeOff && !canViewAllTimeOff(roles);
+  const needsExpenseScope = includeManagerExpenses && !superAdmin;
 
-  let scopedReportIds: string[] | null = null;
-  if (needsScopedIds) {
-    const scope = await getEffectiveApproverScope({
-      supabase,
-      orgId: profile.org_id,
-      userId: profile.id,
-      scope: "leave"
-    });
-    scopedReportIds = [...scope.directReportIds, ...scope.delegatedReportIds];
+  let leaveReportIds: string[] | null = null;
+  let expenseReportIds: string[] | null = null;
+
+  if (needsLeaveScope && needsExpenseScope) {
+    // Fetch both scopes in parallel.
+    const [leaveScope, expenseScope] = await Promise.all([
+      getEffectiveApproverScope({ supabase, orgId: profile.org_id, userId: profile.id, scope: "leave" }),
+      getEffectiveApproverScope({ supabase, orgId: profile.org_id, userId: profile.id, scope: "expense" })
+    ]);
+    leaveReportIds = [...leaveScope.directReportIds, ...leaveScope.delegatedReportIds];
+    expenseReportIds = [...expenseScope.directReportIds, ...expenseScope.delegatedReportIds];
+  } else if (needsLeaveScope) {
+    const leaveScope = await getEffectiveApproverScope({ supabase, orgId: profile.org_id, userId: profile.id, scope: "leave" });
+    leaveReportIds = [...leaveScope.directReportIds, ...leaveScope.delegatedReportIds];
+  } else if (needsExpenseScope) {
+    const expenseScope = await getEffectiveApproverScope({ supabase, orgId: profile.org_id, userId: profile.id, scope: "expense" });
+    expenseReportIds = [...expenseScope.directReportIds, ...expenseScope.delegatedReportIds];
   }
 
   const [timeOffCount, managerExpenseCount, financeExpenseCount] = await Promise.all([
@@ -183,7 +191,7 @@ export async function GET(request: Request) {
       ? countPendingLeaveRequests({
           supabase,
           orgId: profile.org_id,
-          employeeIds: canViewAllTimeOff(roles) ? null : scopedReportIds
+          employeeIds: canViewAllTimeOff(roles) ? null : leaveReportIds
         })
       : Promise.resolve(0),
     includeManagerExpenses
@@ -191,7 +199,7 @@ export async function GET(request: Request) {
           supabase,
           orgId: profile.org_id,
           status: "pending",
-          employeeIds: superAdmin ? null : scopedReportIds
+          employeeIds: superAdmin ? null : expenseReportIds
         })
       : Promise.resolve(0),
     includeFinanceExpenses

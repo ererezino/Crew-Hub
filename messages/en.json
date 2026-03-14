@@ -3268,6 +3268,7 @@
       "noActions": "No actions",
       "cancelling": "Cancelling..."
     },
+    "approverOnBehalfOf": "{approver} (on behalf of {principal})",
     "requestTable": {
       "leaveType": "Leave type",
       "dateRange": "Date range",
