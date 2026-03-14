@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../lib/department";
-import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
+import { isDepartmentOnlyTeamLead } from "../../../../../lib/roles";
 import {
   canViewTeamSchedules,
   isIsoDate,
@@ -224,7 +224,7 @@ export async function GET(request: Request) {
   const query = parsedQuery.data;
   const supabase = await createSupabaseServerClient();
   const canViewTeam = canViewTeamSchedules(session.profile.roles);
-  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
   const isManager = isSchedulingManager(session.profile.roles);
   const scope = query.scope === "team" && canViewTeam ? "team" : "mine";
 
@@ -464,7 +464,7 @@ export async function POST(request: Request) {
   // session-resolution edge cases.  The API already enforces authorization
   // above (isSchedulingManager + team-lead scoping).
   const supabase = createSupabaseServiceRoleClient();
-  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
 
   if (isScopedTeamLead && !session.profile.department) {
     return jsonResponse<null>(422, {

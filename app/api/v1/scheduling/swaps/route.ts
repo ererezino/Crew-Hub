@@ -6,7 +6,7 @@ import { logAudit } from "../../../../../lib/audit";
 import { sendSwapRequestedEmail } from "../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../lib/notifications/service";
 import { areTimeRangesOverlapping, canViewTeamSchedules } from "../../../../../lib/scheduling";
-import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
+import { isDepartmentOnlyTeamLead } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
@@ -201,7 +201,7 @@ export async function GET(request: Request) {
   const query = parsedQuery.data;
   const canViewTeam = canViewTeamSchedules(session.profile.roles);
   const scope = query.scope === "team" && canViewTeam ? "team" : "mine";
-  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
   const supabase = await createSupabaseServerClient();
 
   if (scope === "team" && isScopedTeamLead && !session.profile.department) {

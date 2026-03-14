@@ -23,7 +23,7 @@ export function isAdminUser(userRoles: readonly UserRole[]): boolean {
   );
 }
 
-export function isDepartmentScopedTeamLead(userRoles: readonly UserRole[]): boolean {
+export function isDepartmentOnlyTeamLead(userRoles: readonly UserRole[]): boolean {
   if (!hasRole(userRoles, "TEAM_LEAD")) {
     return false;
   }

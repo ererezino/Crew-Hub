@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../../lib/department";
-import { isDepartmentScopedTeamLead } from "../../../../../../lib/roles";
+import { isDepartmentOnlyTeamLead } from "../../../../../../lib/roles";
 import { isSchedulingManager } from "../../../../../../lib/scheduling";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
@@ -75,7 +75,7 @@ export async function DELETE(
   }
 
   const supabase = createSupabaseServiceRoleClient();
-  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
 
   if (isScopedTeamLead && !session.profile.department) {
     return jsonResponse<null>(422, {

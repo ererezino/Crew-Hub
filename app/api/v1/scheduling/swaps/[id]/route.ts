@@ -10,7 +10,7 @@ import {
   areTimeRangesOverlapping,
   isSchedulingManager
 } from "../../../../../../lib/scheduling";
-import { isDepartmentScopedTeamLead } from "../../../../../../lib/roles";
+import { isDepartmentOnlyTeamLead } from "../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
@@ -200,7 +200,7 @@ export async function PUT(
   const requestedTargetId = parsedBody.data.targetId;
   const allowLeaveConflict = parsedBody.data.allowLeaveConflict === true;
   const isManager = isSchedulingManager(session.profile.roles);
-  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
   const supabase = await createSupabaseServerClient();
 
   if (isScopedTeamLead && !session.profile.department) {

@@ -8,7 +8,7 @@ import { areDepartmentsEqual } from "../../../../../../../lib/department";
 import { sendSchedulePublishedEmail } from "../../../../../../../lib/notifications/email";
 import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { isSchedulingManager } from "../../../../../../../lib/scheduling";
-import { isDepartmentScopedTeamLead } from "../../../../../../../lib/roles";
+import { isDepartmentOnlyTeamLead } from "../../../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../../types/auth";
 import {
@@ -130,7 +130,7 @@ export async function POST(
   }
 
   if (
-    isDepartmentScopedTeamLead(session.profile.roles) &&
+    isDepartmentOnlyTeamLead(session.profile.roles) &&
     !session.profile.department
   ) {
     return jsonResponse<null>(422, {
@@ -144,7 +144,7 @@ export async function POST(
   }
 
   if (
-    isDepartmentScopedTeamLead(session.profile.roles) &&
+    isDepartmentOnlyTeamLead(session.profile.roles) &&
     !areDepartmentsEqual(parsedExistingSchedule.data.department, session.profile.department)
   ) {
     return jsonResponse<null>(403, {

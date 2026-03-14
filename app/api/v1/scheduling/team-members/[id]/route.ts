@@ -5,7 +5,7 @@ import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../../lib/department";
 import type { UserRole } from "../../../../../../lib/navigation";
-import { hasRole, isDepartmentScopedTeamLead } from "../../../../../../lib/roles";
+import { hasRole, isDepartmentOnlyTeamLead } from "../../../../../../lib/roles";
 import { isSchedulingManager } from "../../../../../../lib/scheduling";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
@@ -130,7 +130,7 @@ export async function PUT(
   const actorIsAdmin =
     hasRole(session.profile.roles, "SUPER_ADMIN") ||
     hasRole(session.profile.roles, "HR_ADMIN");
-  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
   const actorRequiresDepartmentScope =
     !actorIsAdmin &&
     (isScopedTeamLead ||

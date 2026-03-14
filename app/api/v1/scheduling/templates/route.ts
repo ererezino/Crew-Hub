@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../lib/department";
-import { isDepartmentScopedTeamLead } from "../../../../../lib/roles";
+import { isDepartmentOnlyTeamLead } from "../../../../../lib/roles";
 import {
   isIsoTime,
   isSchedulingManager,
@@ -109,7 +109,7 @@ export async function GET(request: Request) {
 
   const supabase = await createSupabaseServerClient();
   const query = parsedQuery.data;
-  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
 
   if (isScopedTeamLead && !session.profile.department) {
     return jsonResponse<null>(422, {
@@ -253,7 +253,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const isScopedTeamLead = isDepartmentScopedTeamLead(session.profile.roles);
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
 
   if (isScopedTeamLead && !session.profile.department) {
     return jsonResponse<null>(422, {
