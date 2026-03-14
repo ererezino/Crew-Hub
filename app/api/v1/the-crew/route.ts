@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { crewDisplayDepartment } from "../../../../lib/crew-department-display";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../types/auth";
 import type { CrewListResponseData, CrewMember } from "../../../../types/people";
@@ -72,7 +73,7 @@ export async function GET() {
     const showBio = privacy.showBio !== false;
     const showInterests = privacy.showInterests !== false;
 
-    const dept = (row.department as string | null) ?? "Other";
+    const dept = crewDisplayDepartment(row.department as string | null);
     departmentCounts[dept] = (departmentCounts[dept] ?? 0) + 1;
 
     return {
