@@ -163,6 +163,7 @@ export function PeopleOverviewClient({
     roles: ["EMPLOYEE"] as AppRole[],
     department: "",
     managerId: "",
+    teamLeadId: "",
     title: "",
     startDate: "",
     status: "active" as string
@@ -260,6 +261,7 @@ export function PeopleOverviewClient({
       roles: person.roles.length > 0 ? [...person.roles] : ["EMPLOYEE"],
       department: person.department ?? "",
       managerId: person.managerId ?? "",
+      teamLeadId: person.teamLeadId ?? "",
       title: person.title ?? "",
       startDate: person.startDate ?? "",
       status: person.status ?? "active"
@@ -300,6 +302,7 @@ export function PeopleOverviewClient({
             roles: adminEditValues.roles,
             department: adminEditValues.department.trim() || null,
             managerId: adminEditValues.managerId.trim() || null,
+            teamLeadId: adminEditValues.teamLeadId.trim() || null,
             title: adminEditValues.title.trim() || null,
             startDate: adminEditValues.startDate.trim() || null,
             status: adminEditValues.status || undefined
@@ -1499,6 +1502,29 @@ export function PeopleOverviewClient({
                   .sort((a, b) => a.fullName.localeCompare(b.fullName))
                   .map((p) => (
                     <option key={`admin-mgr-${p.id}`} value={p.id}>
+                      {p.fullName}
+                    </option>
+                  ))}
+              </select>
+            </label>
+
+            <label className="form-field" htmlFor="admin-edit-team-lead">
+              <span className="form-label">{t('adminEditPanel.teamLead')}</span>
+              <select
+                id="admin-edit-team-lead"
+                className="form-input"
+                value={adminEditValues.teamLeadId}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setAdminEditValues((prev) => ({ ...prev, teamLeadId: val }));
+                }}
+              >
+                <option value="">{t('adminEditPanel.noTeamLead')}</option>
+                {allPeople
+                  .filter((p) => p.id !== person.id && p.status === "active")
+                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                  .map((p) => (
+                    <option key={`admin-tl-${p.id}`} value={p.id}>
                       {p.fullName}
                     </option>
                   ))}

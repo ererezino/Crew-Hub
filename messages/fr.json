@@ -3753,6 +3753,8 @@
       "manager": "Responsable",
       "managerLabel": "Responsable",
       "noManager": "Aucun responsable",
+      "teamLead": "Responsable opérationnel",
+      "noTeamLead": "Même que le responsable",
       "statusLabel": "Statut",
       "statusActive": "Actif",
       "statusOnboarding": "Intégration",

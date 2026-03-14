@@ -3762,6 +3762,8 @@
       "manager": "Manager",
       "managerLabel": "Manager",
       "noManager": "No manager",
+      "teamLead": "Operational lead",
+      "noTeamLead": "Same as manager",
       "statusLabel": "Status",
       "statusActive": "Active",
       "statusOnboarding": "Onboarding",

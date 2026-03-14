@@ -43,6 +43,7 @@ const updatePersonSchema = z.object({
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD.").nullable().optional(),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be YYYY-MM-DD.").nullable().optional(),
   managerId: z.string().uuid("Manager must be a valid user id.").nullable().optional(),
+  teamLeadId: z.string().uuid("Team lead must be a valid user id.").nullable().optional(),
   status: z.enum(PROFILE_STATUSES).optional(),
   bio: z.string().trim().max(500, "Bio must be 500 characters or fewer.").nullable().optional(),
   favoriteMusic: z.string().trim().max(200, "Favorite music must be 200 characters or fewer.").nullable().optional(),
@@ -290,6 +291,17 @@ export async function PUT(
     });
   }
 
+  if (payload.teamLeadId === personId) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "A person cannot be their own team lead."
+      },
+      meta: buildMeta()
+    });
+  }
+
   if (
     existingRoles.includes("SUPER_ADMIN") &&
     !nextRoles.includes("SUPER_ADMIN")
@@ -356,6 +368,38 @@ export async function PUT(
     }
   }
 
+  if (payload.teamLeadId) {
+    const { data: teamLeadRow, error: teamLeadError } = await serviceRoleClient
+      .from("profiles")
+      .select("id")
+      .eq("id", payload.teamLeadId)
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (teamLeadError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "TEAM_LEAD_FETCH_FAILED",
+          message: "Unable to validate team lead assignment."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (!teamLeadRow?.id) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Selected team lead was not found in this organization."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
   const updateValues: {
     full_name?: string;
     roles?: string[];
@@ -364,6 +408,7 @@ export async function PUT(
     start_date?: string | null;
     date_of_birth?: string | null;
     manager_id?: string | null;
+    team_lead_id?: string | null;
     status?: ProfileStatus;
     bio?: string | null;
     favorite_music?: string | null;
@@ -403,6 +448,10 @@ export async function PUT(
 
   if (payload.managerId !== undefined) {
     updateValues.manager_id = payload.managerId ?? null;
+  }
+
+  if (payload.teamLeadId !== undefined) {
+    updateValues.team_lead_id = payload.teamLeadId ?? null;
   }
 
   if (payload.status !== undefined) {
@@ -646,6 +695,7 @@ export async function PUT(
       title: parsedExistingProfile.data.title,
       startDate: parsedExistingProfile.data.start_date,
       managerId: parsedExistingProfile.data.manager_id,
+      teamLeadId: parsedExistingProfile.data.team_lead_id,
       status: parsedExistingProfile.data.status
     },
     newValue: {
@@ -654,6 +704,7 @@ export async function PUT(
       title: person.title,
       startDate: person.startDate,
       managerId: person.managerId,
+      teamLeadId: person.teamLeadId,
       status: person.status
     }
   });
