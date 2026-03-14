@@ -20,8 +20,7 @@ const TEAM_LEAD_ADDITIONAL_ACCESS = [
 
 const MANAGER_ADDITIONAL_ACCESS = [
   "/approvals",
-  "/onboarding",
-  "/people"
+  "/onboarding"
 ] as const;
 
 const HR_ADMIN_ADDITIONAL_ACCESS = [

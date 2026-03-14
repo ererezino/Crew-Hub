@@ -67,6 +67,18 @@ describe("Nav visibility alignment (W2.6)", () => {
     expect(access).toContain("/scheduling/manage");
   });
 
+  // ── MANAGER: /people is admin-only, not part of MANAGER default access ──
+
+  it("MANAGER does NOT have /people in default role access", () => {
+    const access = defaultAccessForRole("MANAGER");
+    expect(access).not.toContain("/people");
+  });
+
+  it("MANAGER does NOT see /people in nav visibility", () => {
+    const visible = navVisibleForRole("MANAGER");
+    expect(visible).not.toContain("/people");
+  });
+
   // ── MANAGER: still has /approvals and /onboarding ──
 
   it("MANAGER still sees /approvals in nav visibility", () => {
