@@ -681,18 +681,23 @@ export async function PUT(
 
   const lookupIds = [
     parsedUpdatedRow.data.manager_id,
-    parsedUpdatedRow.data.team_lead_id ?? null
+    parsedUpdatedRow.data.team_lead_id ?? null,
+    parsedExistingProfile.data.manager_id,
+    parsedExistingProfile.data.team_lead_id ?? null
   ].filter((id): id is string => Boolean(id));
+
+  // Deduplicate
+  const uniqueLookupIds = [...new Set(lookupIds)];
 
   let nameById = new Map<string, string>();
 
-  if (lookupIds.length > 0) {
+  if (uniqueLookupIds.length > 0) {
     const { data: nameRows } = await serviceRoleClient
       .from("profiles")
       .select("id, full_name")
       .eq("org_id", session.profile.org_id)
       .is("deleted_at", null)
-      .in("id", lookupIds);
+      .in("id", uniqueLookupIds);
 
     nameById = new Map(
       (nameRows ?? [])
@@ -759,7 +764,13 @@ export async function PUT(
       title: parsedExistingProfile.data.title,
       startDate: parsedExistingProfile.data.start_date,
       managerId: parsedExistingProfile.data.manager_id,
+      managerName: parsedExistingProfile.data.manager_id
+        ? nameById.get(parsedExistingProfile.data.manager_id) ?? null
+        : null,
       teamLeadId: parsedExistingProfile.data.team_lead_id,
+      teamLeadName: parsedExistingProfile.data.team_lead_id
+        ? nameById.get(parsedExistingProfile.data.team_lead_id) ?? null
+        : null,
       status: parsedExistingProfile.data.status
     },
     newValue: {
@@ -768,7 +779,9 @@ export async function PUT(
       title: person.title,
       startDate: person.startDate,
       managerId: person.managerId,
+      managerName: person.managerName,
       teamLeadId: person.teamLeadId,
+      teamLeadName: person.teamLeadName,
       status: person.status
     }
   });
