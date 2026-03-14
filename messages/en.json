@@ -4870,7 +4870,9 @@
       "statusLabel": "Employment status",
       "statusHintOnboardingToActive": "Leave balances will be created and any active onboarding plan will be closed.",
       "statusHintToInactive": "This person's access will be revoked immediately.",
-      "statusHintToOnboarding": "This will mark them as a new hire in onboarding."
+      "statusHintToOnboarding": "This will mark them as a new hire in onboarding.",
+      "teamLeadLabel": "Operational lead",
+      "noTeamLead": "Same as manager"
     },
     "bulkUpload": {
       "title": "Bulk Upload",

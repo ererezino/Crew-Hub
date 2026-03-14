@@ -4861,7 +4861,9 @@
       "statusLabel": "Statut d'emploi",
       "statusHintOnboardingToActive": "Les soldes de congés seront créés et tout plan d'intégration actif sera clôturé.",
       "statusHintToInactive": "L'accès de cette personne sera révoqué immédiatement.",
-      "statusHintToOnboarding": "Cette personne sera marquée comme nouvelle recrue en intégration."
+      "statusHintToOnboarding": "Cette personne sera marquée comme nouvelle recrue en intégration.",
+      "teamLeadLabel": "Responsable opérationnel",
+      "noTeamLead": "Même que le responsable"
     },
     "bulkUpload": {
       "title": "Import groupé",

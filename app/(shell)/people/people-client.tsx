@@ -79,6 +79,7 @@ type EditPersonFormValues = {
   roles: AppRole[];
   department: string;
   managerId: string;
+  teamLeadId: string;
   title: string;
   crewTag: string;
   directoryVisible: boolean;
@@ -509,6 +510,7 @@ export function PeopleClient({
     roles: ["EMPLOYEE"],
     department: "",
     managerId: "",
+    teamLeadId: "",
     title: "",
     crewTag: "",
     directoryVisible: true,
@@ -702,6 +704,7 @@ export function PeopleClient({
       roles: person.roles.length > 0 ? [...person.roles] : ["EMPLOYEE"],
       department: person.department ?? "",
       managerId: person.managerId ?? "",
+      teamLeadId: person.teamLeadId ?? "",
       title: person.title ?? "",
       crewTag: person.crewTag ?? "",
       directoryVisible: person.directoryVisible !== false,
@@ -750,6 +753,7 @@ export function PeopleClient({
           roles: editValues.roles,
           department: editValues.department.trim() || null,
           managerId: editValues.managerId.trim() || null,
+          teamLeadId: editValues.teamLeadId.trim() || null,
           title: editValues.title.trim() || null,
           crewTag: editValues.crewTag.trim() || null,
           directoryVisible: editValues.directoryVisible,
@@ -1922,6 +1926,29 @@ export function PeopleClient({
               {editErrors.managerId ? (
                 <p className="form-field-error">{editErrors.managerId}</p>
               ) : null}
+            </label>
+
+            <label className="form-field" htmlFor="edit-person-team-lead">
+              <span className="form-label">{t('editPanel.teamLeadLabel')}</span>
+              <select
+                id="edit-person-team-lead"
+                className="form-input"
+                value={editValues.teamLeadId}
+                onChange={(e) => {
+                  const val = e.currentTarget.value;
+                  setEditValues((prev) => ({ ...prev, teamLeadId: val }));
+                }}
+              >
+                <option value="">{t('editPanel.noTeamLead')}</option>
+                {people
+                  .filter((p) => p.id !== editPerson.id && p.status === "active")
+                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                  .map((p) => (
+                    <option key={`edit-tl-${p.id}`} value={p.id}>
+                      {p.fullName}
+                    </option>
+                  ))}
+              </select>
             </label>
 
             <label className="crew-mod-toggle" style={{ padding: "var(--space-3) 0", borderTop: "1px solid var(--border-default)", marginTop: "var(--space-2)" }}>
