@@ -387,6 +387,9 @@ export async function GET(request: Request) {
     approverId: row.approver_id,
     approverName: row.approver_id ? approverNameById.get(row.approver_id) ?? "Unknown user" : null,
     rejectionReason: row.rejection_reason,
+    actingFor: null,
+    actingForName: null,
+    delegateType: null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }));

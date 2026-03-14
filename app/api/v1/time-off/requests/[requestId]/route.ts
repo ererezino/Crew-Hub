@@ -4,6 +4,10 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
 import { formatDateRangeHuman } from "../../../../../../lib/datetime";
+import {
+  getEffectiveApproverScope,
+  resolveDelegationContext
+} from "../../../../../../lib/delegation";
 import { sendLeaveCancelledEmail, sendLeaveStatusEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import type { UserRole } from "../../../../../../lib/navigation";
@@ -40,6 +44,8 @@ const leaveRequestRowSchema = z.object({
   status: z.enum(LEAVE_REQUEST_STATUSES),
   reason: z.string(),
   approver_id: z.string().uuid().nullable(),
+  acting_for: z.string().uuid().nullable().optional(),
+  delegate_type: z.string().nullable().optional(),
   rejection_reason: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string()
@@ -166,11 +172,13 @@ async function applyBalanceDeltas({
 function toLeaveRequestRecord({
   requestRow,
   employeeRow,
-  approverName
+  approverName,
+  actingForName
 }: {
   requestRow: z.infer<typeof leaveRequestRowSchema>;
   employeeRow: z.infer<typeof employeeProfileSchema>;
   approverName: string | null;
+  actingForName?: string | null;
 }): LeaveRequestRecord {
   return {
     id: requestRow.id,
@@ -187,6 +195,9 @@ function toLeaveRequestRecord({
     approverId: requestRow.approver_id,
     approverName,
     rejectionReason: requestRow.rejection_reason,
+    actingFor: requestRow.acting_for ?? null,
+    actingForName: actingForName ?? null,
+    delegateType: requestRow.delegate_type ?? null,
     createdAt: requestRow.created_at,
     updatedAt: requestRow.updated_at
   };
@@ -335,7 +346,27 @@ export async function PATCH(request: Request, context: RouteContext) {
   const isOverrideUser = canOverrideRequests(session.profile.roles);
   const isApproverUser = canApproveRequests(session.profile.roles);
   const isEmployeeOwner = existingRequest.employee_id === session.profile.id;
-  const isManagerOfEmployee = employeeProfile.manager_id === session.profile.id;
+
+  // Delegation-aware authorization: check if this user is the operational lead
+  // (team_lead_id ?? manager_id) or an active delegate for the employee's lead.
+  let delegationCtx = { actingFor: null as string | null, delegateType: null as string | null };
+  let isOperationalLeadOrDelegate = false;
+
+  if (!isOverrideUser && !isEmployeeOwner) {
+    const scope = await getEffectiveApproverScope({
+      supabase,
+      orgId: session.profile.org_id,
+      userId: session.profile.id,
+      scope: "leave"
+    });
+
+    const allReportIds = [...scope.directReportIds, ...scope.delegatedReportIds];
+    isOperationalLeadOrDelegate = allReportIds.includes(existingRequest.employee_id);
+
+    if (isOperationalLeadOrDelegate) {
+      delegationCtx = resolveDelegationContext(existingRequest.employee_id, scope);
+    }
+  }
 
   let nextStatus = existingRequest.status;
   let nextApproverId = existingRequest.approver_id;
@@ -379,7 +410,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       });
     }
 
-    if (!(isOverrideUser || (isApproverUser && isManagerOfEmployee))) {
+    if (!(isOverrideUser || (isApproverUser && isOperationalLeadOrDelegate) || isOperationalLeadOrDelegate)) {
       return jsonResponse<null>(403, {
         data: null,
         error: {
@@ -419,8 +450,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     const rpcName = parsedBody.data.action === "approve" ? "approve_leave_request" : "reject_leave_request";
     const rpcParams =
       parsedBody.data.action === "approve"
-        ? { p_request_id: existingRequest.id, p_approver_id: session.profile.id }
-        : { p_request_id: existingRequest.id, p_approver_id: session.profile.id, p_reason: nextRejectionReason ?? "" };
+        ? {
+            p_request_id: existingRequest.id,
+            p_approver_id: session.profile.id,
+            p_acting_for: delegationCtx.actingFor,
+            p_delegate_type: delegationCtx.delegateType
+          }
+        : {
+            p_request_id: existingRequest.id,
+            p_approver_id: session.profile.id,
+            p_reason: nextRejectionReason ?? "",
+            p_acting_for: delegationCtx.actingFor,
+            p_delegate_type: delegationCtx.delegateType
+          };
 
     const { data: rpcResult, error: rpcError } = await serviceClient.rpc(rpcName, rpcParams);
 
@@ -462,30 +504,56 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     let approverName: string | null = null;
+    let actingForName: string | null = null;
 
-    if (parsedUpdatedRequest.data.approver_id) {
-      const { data: approverRow } = await supabase
+    // Resolve approver and acting_for profile names for the response
+    const profileIdsToResolve = [
+      parsedUpdatedRequest.data.approver_id,
+      parsedUpdatedRequest.data.acting_for
+    ].filter((id): id is string => Boolean(id));
+
+    if (profileIdsToResolve.length > 0) {
+      const { data: resolvedProfiles } = await supabase
         .from("profiles")
         .select("id, full_name")
         .eq("org_id", session.profile.org_id)
-        .eq("id", parsedUpdatedRequest.data.approver_id)
         .is("deleted_at", null)
-        .maybeSingle();
+        .in("id", profileIdsToResolve);
 
-      const parsedApprover = approverProfileSchema.safeParse(approverRow);
-      approverName = parsedApprover.success ? parsedApprover.data.full_name : "Unknown user";
+      const profileMap = new Map(
+        (resolvedProfiles ?? [])
+          .map((p) => {
+            const parsed = approverProfileSchema.safeParse(p);
+            return parsed.success ? [parsed.data.id, parsed.data.full_name] as const : null;
+          })
+          .filter((entry): entry is readonly [string, string] => entry !== null)
+      );
+
+      approverName = parsedUpdatedRequest.data.approver_id
+        ? profileMap.get(parsedUpdatedRequest.data.approver_id) ?? "Unknown user"
+        : null;
+
+      actingForName = parsedUpdatedRequest.data.acting_for
+        ? profileMap.get(parsedUpdatedRequest.data.acting_for) ?? null
+        : null;
     }
 
     const responseData: TimeOffRequestMutationResponseData = {
       request: toLeaveRequestRecord({
         requestRow: parsedUpdatedRequest.data,
         employeeRow: employeeProfile,
-        approverName
+        approverName,
+        actingForName
       })
     };
 
     const leaveLabel = formatLeaveTypeLabel(existingRequest.leave_type);
     const dateLabel = formatDateRangeHuman(existingRequest.start_date, existingRequest.end_date);
+
+    const approverDisplayName = session.profile.full_name;
+    const delegationSuffix = delegationCtx.actingFor
+      ? ` (covering for a team lead who is away)`
+      : "";
 
     await createNotification({
       orgId: session.profile.org_id,
@@ -497,8 +565,8 @@ export async function PATCH(request: Request, context: RouteContext) {
           : `${leaveLabel} request rejected`,
       body:
         nextStatus === "approved"
-          ? `Your ${leaveLabel} request (${dateLabel}) was approved.`
-          : `Your ${leaveLabel} request (${dateLabel}) was rejected.`,
+          ? `Your ${leaveLabel} request (${dateLabel}) was approved by ${approverDisplayName}${delegationSuffix}.`
+          : `Your ${leaveLabel} request (${dateLabel}) was rejected by ${approverDisplayName}${delegationSuffix}.`,
       link: "/time-off"
     });
 
@@ -635,7 +703,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     request: toLeaveRequestRecord({
       requestRow: parsedUpdatedRequest.data,
       employeeRow: employeeProfile,
-      approverName
+      approverName,
+      actingForName: null
     })
   };
 

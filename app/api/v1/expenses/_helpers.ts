@@ -14,7 +14,7 @@ import {
 export const expenseCategorySchema = z.enum(EXPENSE_CATEGORIES);
 export const expenseStatusSchema = z.enum(EXPENSE_STATUSES);
 export const expenseSelectColumns =
-  "id, org_id, employee_id, expense_type, category, custom_category, description, amount, currency, receipt_file_path, expense_date, status, vendor_name, vendor_payment_method, vendor_bank_account_name, vendor_bank_account_number, vendor_mobile_money_provider, vendor_mobile_money_number, vendor_crew_tag, vendor_wire_bank_name, vendor_wire_account_number, vendor_wire_swift_bic, vendor_wire_iban, vendor_wire_bank_country, vendor_wire_currency, manager_approved_by, manager_approved_at, finance_approved_by, finance_approved_at, finance_rejected_by, finance_rejected_at, finance_rejection_reason, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, reimbursement_receipt_path, created_at, updated_at";
+  "id, org_id, employee_id, expense_type, category, custom_category, description, amount, currency, receipt_file_path, expense_date, status, vendor_name, vendor_payment_method, vendor_bank_account_name, vendor_bank_account_number, vendor_mobile_money_provider, vendor_mobile_money_number, vendor_crew_tag, vendor_wire_bank_name, vendor_wire_account_number, vendor_wire_swift_bic, vendor_wire_iban, vendor_wire_bank_country, vendor_wire_currency, manager_approved_by, manager_approved_at, manager_acting_for, manager_delegate_type, finance_approved_by, finance_approved_at, finance_rejected_by, finance_rejected_at, finance_rejection_reason, approved_by, approved_at, rejected_by, rejected_at, rejection_reason, reimbursed_by, reimbursed_at, reimbursement_reference, reimbursement_notes, reimbursement_receipt_path, created_at, updated_at";
 
 export const expenseRowSchema = z.object({
   id: z.string().uuid(),
@@ -44,6 +44,8 @@ export const expenseRowSchema = z.object({
   vendor_wire_currency: z.string().nullable().default(null),
   manager_approved_by: z.string().uuid().nullable(),
   manager_approved_at: z.string().nullable(),
+  manager_acting_for: z.string().uuid().nullable().optional(),
+  manager_delegate_type: z.string().nullable().optional(),
   finance_approved_by: z.string().uuid().nullable(),
   finance_approved_at: z.string().nullable(),
   finance_rejected_by: z.string().uuid().nullable(),
@@ -163,6 +165,11 @@ export function toExpenseRecord(
     managerApprovedBy: row.manager_approved_by ?? row.approved_by,
     managerApprovedByName: managerApprovedBy?.full_name ?? approvedBy?.full_name ?? null,
     managerApprovedAt: row.manager_approved_at ?? row.approved_at,
+    managerActingFor: row.manager_acting_for ?? null,
+    managerActingForName: row.manager_acting_for
+      ? (profileById.get(row.manager_acting_for)?.full_name ?? null)
+      : null,
+    managerDelegateType: row.manager_delegate_type ?? null,
     financeApprovedBy: row.finance_approved_by,
     financeApprovedByName: financeApprovedBy?.full_name ?? null,
     financeApprovedAt: row.finance_approved_at,
@@ -201,6 +208,10 @@ export function collectProfileIds(
 
     if (expense.manager_approved_by) {
       ids.add(expense.manager_approved_by);
+    }
+
+    if (expense.manager_acting_for) {
+      ids.add(expense.manager_acting_for);
     }
 
     if (expense.finance_approved_by) {

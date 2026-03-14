@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { getEffectiveApproverScope } from "../../../../../lib/delegation";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { parseNumeric } from "../../../../../lib/time-off";
@@ -30,6 +31,8 @@ const requestRowSchema = z.object({
   status: z.enum(LEAVE_REQUEST_STATUSES),
   reason: z.string(),
   approver_id: z.string().uuid().nullable(),
+  acting_for: z.string().uuid().nullable(),
+  delegate_type: z.string().nullable(),
   rejection_reason: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string()
@@ -76,16 +79,10 @@ export async function GET(request: Request) {
     });
   }
 
-  if (!canApproveRequests(session.profile.roles)) {
-    return jsonResponse<null>(403, {
-      data: null,
-      error: {
-        code: "FORBIDDEN",
-        message: "You are not allowed to review leave approvals."
-      },
-      meta: buildMeta()
-    });
-  }
+  // HR_ADMIN / SUPER_ADMIN can view all; MANAGER sees scoped results.
+  // Non-managers may still see items via delegation (checked below).
+  const isAdmin = canViewAllRequests(session.profile.roles);
+  const isApprover = canApproveRequests(session.profile.roles);
 
   const requestUrl = new URL(request.url);
   const parsedQuery = querySchema.safeParse(
@@ -108,28 +105,29 @@ export async function GET(request: Request) {
 
   let reportIds: string[] = [];
 
-  if (!canViewAllRequests(session.profile.roles)) {
-    const { data: reportRows, error: reportsError } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("org_id", session.profile.org_id)
-      .eq("manager_id", session.profile.id)
-      .is("deleted_at", null);
+  if (!isAdmin) {
+    // Use delegation-aware scope: includes direct operational reports
+    // (team_lead_id ?? manager_id) plus delegated reports when principal is away.
+    const scope = await getEffectiveApproverScope({
+      supabase,
+      orgId: session.profile.org_id,
+      userId: session.profile.id,
+      scope: "leave"
+    });
 
-    if (reportsError) {
-      return jsonResponse<null>(500, {
+    reportIds = [...scope.directReportIds, ...scope.delegatedReportIds];
+
+    // If not an approver-role user AND no delegated reports, deny access
+    if (!isApprover && reportIds.length === 0) {
+      return jsonResponse<null>(403, {
         data: null,
         error: {
-          code: "REPORTS_FETCH_FAILED",
-          message: "Unable to load direct reports for approvals scope."
+          code: "FORBIDDEN",
+          message: "You are not allowed to review leave approvals."
         },
         meta: buildMeta()
       });
     }
-
-    reportIds = (reportRows ?? [])
-      .map((row) => row.id)
-      .filter((value): value is string => typeof value === "string");
 
     if (reportIds.length === 0) {
       return jsonResponse<TimeOffApprovalsResponseData>(200, {
@@ -145,7 +143,7 @@ export async function GET(request: Request) {
   let requestsQuery = supabase
     .from("leave_requests")
     .select(
-      "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"
+      "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, acting_for, delegate_type, rejection_reason, created_at, updated_at"
     )
     .eq("org_id", session.profile.org_id)
     .eq("status", query.status)
@@ -193,6 +191,7 @@ export async function GET(request: Request) {
     });
   }
 
+  // Collect all profile IDs we need to resolve (employees, approvers, acting_for principals)
   const employeeIds = [
     ...new Set(parsedRequests.data.map((row) => row.employee_id))
   ];
@@ -203,7 +202,14 @@ export async function GET(request: Request) {
         .filter((value): value is string => Boolean(value))
     )
   ];
-  const actorIds = [...new Set([...employeeIds, ...approverIds])];
+  const actingForIds = [
+    ...new Set(
+      parsedRequests.data
+        .map((row) => row.acting_for)
+        .filter((value): value is string => Boolean(value))
+    )
+  ];
+  const actorIds = [...new Set([...employeeIds, ...approverIds, ...actingForIds])];
 
   const { data: rawProfiles, error: profilesError } = await supabase
     .from("profiles")
@@ -241,6 +247,7 @@ export async function GET(request: Request) {
   const requests: LeaveRequestRecord[] = parsedRequests.data.map((row) => {
     const employee = profileById.get(row.employee_id);
     const approver = row.approver_id ? profileById.get(row.approver_id) : null;
+    const actingForProfile = row.acting_for ? profileById.get(row.acting_for) : null;
 
     return {
       id: row.id,
@@ -257,6 +264,9 @@ export async function GET(request: Request) {
       approverId: row.approver_id,
       approverName: approver?.full_name ?? null,
       rejectionReason: row.rejection_reason,
+      actingFor: row.acting_for,
+      actingForName: actingForProfile?.full_name ?? null,
+      delegateType: row.delegate_type,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };

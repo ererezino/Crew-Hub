@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { getEffectiveApproverScope } from "../../../../../lib/delegation";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
@@ -28,7 +29,12 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
 }
 
 function canReviewTimeOff(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "MANAGER") || hasRole(roles, "HR_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return (
+    hasRole(roles, "MANAGER") ||
+    hasRole(roles, "TEAM_LEAD") ||
+    hasRole(roles, "HR_ADMIN") ||
+    hasRole(roles, "SUPER_ADMIN")
+  );
 }
 
 function canViewAllTimeOff(roles: readonly UserRole[]): boolean {
@@ -36,36 +42,11 @@ function canViewAllTimeOff(roles: readonly UserRole[]): boolean {
 }
 
 function canManagerApproveExpenses(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "MANAGER") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "MANAGER") || hasRole(roles, "TEAM_LEAD") || hasRole(roles, "SUPER_ADMIN");
 }
 
 function canFinanceApproveExpenses(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
-}
-
-async function listManagerReportIds({
-  supabase,
-  orgId,
-  managerId
-}: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
-  orgId: string;
-  managerId: string;
-}) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("manager_id", managerId)
-    .is("deleted_at", null);
-
-  if (error || !data) {
-    return [];
-  }
-
-  return data
-    .map((row) => row.id)
-    .filter((value): value is string => typeof value === "string");
 }
 
 async function countPendingLeaveRequests({
@@ -181,17 +162,20 @@ export async function GET(request: Request) {
 
   const supabase = await createSupabaseServerClient();
 
-  const needsManagerScopedIds =
+  // Resolve operational scope (direct + delegated reports) for non-admin users.
+  const needsScopedIds =
     (includeTimeOff && !canViewAllTimeOff(roles)) ||
     (includeManagerExpenses && !superAdmin);
 
-  let managerReportIds: string[] | null = null;
-  if (needsManagerScopedIds) {
-    managerReportIds = await listManagerReportIds({
+  let scopedReportIds: string[] | null = null;
+  if (needsScopedIds) {
+    const scope = await getEffectiveApproverScope({
       supabase,
       orgId: profile.org_id,
-      managerId: profile.id
+      userId: profile.id,
+      scope: "leave"
     });
+    scopedReportIds = [...scope.directReportIds, ...scope.delegatedReportIds];
   }
 
   const [timeOffCount, managerExpenseCount, financeExpenseCount] = await Promise.all([
@@ -199,7 +183,7 @@ export async function GET(request: Request) {
       ? countPendingLeaveRequests({
           supabase,
           orgId: profile.org_id,
-          employeeIds: canViewAllTimeOff(roles) ? null : managerReportIds
+          employeeIds: canViewAllTimeOff(roles) ? null : scopedReportIds
         })
       : Promise.resolve(0),
     includeManagerExpenses
@@ -207,7 +191,7 @@ export async function GET(request: Request) {
           supabase,
           orgId: profile.org_id,
           status: "pending",
-          employeeIds: superAdmin ? null : managerReportIds
+          employeeIds: superAdmin ? null : scopedReportIds
         })
       : Promise.resolve(0),
     includeFinanceExpenses

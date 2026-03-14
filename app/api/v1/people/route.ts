@@ -240,9 +240,9 @@ export async function GET(request: Request) {
   }
 
   const PEOPLE_SELECT_FULL =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, schedule_type, weekend_shift_hours, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
   const PEOPLE_SELECT_COMPAT =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
+    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
 
   async function runPeopleQuery(selectString: string) {
     let q = supabase
@@ -298,25 +298,25 @@ export async function GET(request: Request) {
     });
   }
 
-  const managerIds = [
+  const lookupIds = [
     ...new Set(
       parsedPeople.data
-        .map((row) => row.manager_id)
+        .flatMap((row) => [row.manager_id, row.team_lead_id ?? null])
         .filter((value): value is string => Boolean(value))
     )
   ];
 
-  let managerNameById = new Map<string, string>();
+  let nameById = new Map<string, string>();
 
-  if (managerIds.length > 0) {
-    const { data: managerRows, error: managersError } = await supabase
+  if (lookupIds.length > 0) {
+    const { data: nameRows, error: namesError } = await supabase
       .from("profiles")
       .select("id, full_name")
       .eq("org_id", profile.org_id)
       .is("deleted_at", null)
-      .in("id", managerIds);
+      .in("id", lookupIds);
 
-    if (managersError) {
+    if (namesError) {
       return jsonResponse<null>(500, {
         data: null,
         error: {
@@ -327,8 +327,8 @@ export async function GET(request: Request) {
       });
     }
 
-    managerNameById = new Map(
-      (managerRows ?? [])
+    nameById = new Map(
+      (nameRows ?? [])
         .filter(
           (row): row is { id: string; full_name: string } =>
             typeof row?.id === "string" && typeof row?.full_name === "string"
@@ -362,7 +362,7 @@ export async function GET(request: Request) {
   }
 
   const people = parsedPeople.data.map((row) =>
-    mapProfileRow(row, managerNameById, crewTagById.get(row.id) ?? null)
+    mapProfileRow(row, nameById, crewTagById.get(row.id) ?? null)
   );
 
   return jsonResponse<PeopleListResponseData>(200, {
@@ -725,7 +725,7 @@ export async function POST(request: Request) {
       employee_type_at_creation: isNewEmployee ? "new_hire" : "existing"
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 
@@ -776,18 +776,22 @@ export async function POST(request: Request) {
     });
   }
 
-  let managerNameById = new Map<string, string>();
+  const postLookupIds = [parsedInsertedProfile.data.manager_id].filter(
+    (id): id is string => Boolean(id)
+  );
 
-  if (parsedInsertedProfile.data.manager_id) {
-    const { data: managerRows } = await serviceRoleClient
+  let postNameById = new Map<string, string>();
+
+  if (postLookupIds.length > 0) {
+    const { data: nameRows } = await serviceRoleClient
       .from("profiles")
       .select("id, full_name")
-      .eq("id", parsedInsertedProfile.data.manager_id)
+      .in("id", postLookupIds)
       .eq("org_id", profile.org_id)
       .is("deleted_at", null);
 
-    managerNameById = new Map(
-      (managerRows ?? [])
+    postNameById = new Map(
+      (nameRows ?? [])
         .filter(
           (row): row is { id: string; full_name: string } =>
             typeof row?.id === "string" && typeof row?.full_name === "string"
@@ -799,7 +803,7 @@ export async function POST(request: Request) {
   // Email is NOT sent at creation time. The admin must explicitly click
   // "Invite" to trigger a branded welcome email via POST /people/[id]/invite.
 
-  const person = mapProfileRow(parsedInsertedProfile.data, managerNameById, null);
+  const person = mapProfileRow(parsedInsertedProfile.data, postNameById, null);
   let onboardingInstanceId: string | null = null;
   let accessConfigChangedKeys: string[] = [];
 

@@ -2,6 +2,11 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import {
+  getEffectiveApproverScope,
+  resolveDelegationContext,
+  type ApproverScope
+} from "../../../../../lib/delegation";
 import { logger } from "../../../../../lib/logger";
 import { sendExpenseDisbursedEmail } from "../../../../../lib/notifications/email";
 import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
@@ -95,29 +100,21 @@ function formatMinorUnits(amount: number, currency: string): string {
   }
 }
 
-async function listManagerReportIds({
+async function getManagerStageScope({
   supabase,
   orgId,
-  managerId
+  userId
 }: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   orgId: string;
-  managerId: string;
-}): Promise<string[]> {
-  const { data: rows, error } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("manager_id", managerId)
-    .is("deleted_at", null);
-
-  if (error || !rows) {
-    return [];
-  }
-
-  return rows
-    .map((row) => row.id)
-    .filter((id): id is string => typeof id === "string");
+  userId: string;
+}): Promise<ApproverScope> {
+  return getEffectiveApproverScope({
+    supabase,
+    orgId,
+    userId,
+    scope: "expense"
+  });
 }
 
 async function listFinanceAdminIds({
@@ -222,11 +219,13 @@ export async function GET(request: Request) {
 
   let allowedEmployeeIds: string[] = [];
   if (stage === "manager" && !isSuperAdmin) {
-    allowedEmployeeIds = await listManagerReportIds({
+    const scope = await getManagerStageScope({
       supabase,
       orgId: profile.org_id,
-      managerId: profile.id
+      userId: profile.id
     });
+
+    allowedEmployeeIds = [...scope.directReportIds, ...scope.delegatedReportIds];
 
     if (allowedEmployeeIds.length === 0) {
       return jsonResponse<ExpenseApprovalsResponseData>(200, {
@@ -512,16 +511,22 @@ export async function POST(request: Request) {
   }
 
   let allowedRows = parsedTargetRows.data;
+  let managerStageScope: ApproverScope | null = null;
 
   if (stage === "manager" && !isSuperAdmin) {
     const currentUserId = profile.id;
-    const reportIds = await listManagerReportIds({
+    managerStageScope = await getManagerStageScope({
       supabase,
       orgId: profile.org_id,
-      managerId: profile.id
+      userId: profile.id
     });
 
-    const reportIdSet = new Set(reportIds);
+    const reportIdSet = new Set([
+      ...managerStageScope.directReportIds,
+      ...managerStageScope.delegatedReportIds
+    ]);
+
+    // No self-approval: exclude expenses submitted by the approver
     allowedRows = allowedRows.filter(
       (row) => reportIdSet.has(row.employee_id) && row.employee_id !== currentUserId
     );
@@ -545,12 +550,49 @@ export async function POST(request: Request) {
 
   const batchReference = `EXP-${currentMonth.replace("-", "")}-${Date.now()}`;
 
-  const updatePayload =
-    stage === "manager"
-      ? {
+  // For manager stage, resolve delegation context per expense and group by context
+  // to minimize DB round-trips while maintaining per-item audit accuracy.
+  let updatedRowsRaw: unknown[] | null = null;
+  let updatedRowsError: { code?: string; message: string } | null = null;
+
+  if (stage === "manager") {
+    type DelegationGroup = {
+      ids: string[];
+      actingFor: string | null;
+      delegateType: string | null;
+    };
+
+    const groups = new Map<string, DelegationGroup>();
+
+    for (const row of allowedRows) {
+      const ctx = managerStageScope
+        ? resolveDelegationContext(row.employee_id, managerStageScope)
+        : { actingFor: null, delegateType: null };
+
+      const key = ctx.actingFor ?? "direct";
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          ids: [],
+          actingFor: ctx.actingFor,
+          delegateType: ctx.delegateType
+        });
+      }
+
+      groups.get(key)!.ids.push(row.id);
+    }
+
+    const allUpdatedRows: unknown[] = [];
+
+    for (const group of groups.values()) {
+      const { data: groupRows, error: groupError } = await supabase
+        .from("expenses")
+        .update({
           status: "manager_approved" as const,
           manager_approved_by: profile.id,
           manager_approved_at: nowIso,
+          manager_acting_for: group.actingFor,
+          manager_delegate_type: group.delegateType,
           approved_by: profile.id,
           approved_at: nowIso,
           rejected_by: null,
@@ -559,26 +601,46 @@ export async function POST(request: Request) {
           finance_rejected_by: null,
           finance_rejected_at: null,
           finance_rejection_reason: null
-        }
-      : {
-          status: "reimbursed" as const,
-          finance_approved_by: profile.id,
-          finance_approved_at: nowIso,
-          reimbursed_by: profile.id,
-          reimbursed_at: nowIso,
-          reimbursement_reference: batchReference,
-          reimbursement_notes: "Bulk reimbursement run",
-          finance_rejected_by: null,
-          finance_rejected_at: null,
-          finance_rejection_reason: null
-        };
+        })
+        .eq("org_id", profile.org_id)
+        .in("id", group.ids)
+        .select(expenseSelectColumns);
 
-  const { data: updatedRowsRaw, error: updatedRowsError } = await supabase
-    .from("expenses")
-    .update(updatePayload)
-    .eq("org_id", profile.org_id)
-    .in("id", allowedIds)
-    .select(expenseSelectColumns);
+      if (groupError) {
+        updatedRowsError = groupError;
+        break;
+      }
+
+      if (groupRows) {
+        allUpdatedRows.push(...groupRows);
+      }
+    }
+
+    if (!updatedRowsError) {
+      updatedRowsRaw = allUpdatedRows;
+    }
+  } else {
+    const financeResult = await supabase
+      .from("expenses")
+      .update({
+        status: "reimbursed" as const,
+        finance_approved_by: profile.id,
+        finance_approved_at: nowIso,
+        reimbursed_by: profile.id,
+        reimbursed_at: nowIso,
+        reimbursement_reference: batchReference,
+        reimbursement_notes: "Bulk reimbursement run",
+        finance_rejected_by: null,
+        finance_rejected_at: null,
+        finance_rejection_reason: null
+      })
+      .eq("org_id", profile.org_id)
+      .in("id", allowedIds)
+      .select(expenseSelectColumns);
+
+    updatedRowsRaw = financeResult.data;
+    updatedRowsError = financeResult.error;
+  }
 
   if (updatedRowsError) {
     const isPermissionError = updatedRowsError.code === "42501" || updatedRowsError.code === "PGRST301";
@@ -658,12 +720,17 @@ export async function POST(request: Request) {
   });
 
   if (stage === "manager") {
+    const coveringFor = managerStageScope?.coveringFor ?? [];
+    const delegationSuffix = coveringFor.length > 0
+      ? ` (covering for ${coveringFor.map((c) => c.principalName).join(", ")})`
+      : "";
+
     await createBulkNotifications({
       orgId: profile.org_id,
       userIds: employeeIds,
       type: "expense_status",
       title: "Expense manager-approved",
-      body: "Your expense was approved by your manager and is pending finance payment confirmation.",
+      body: `Your expense was approved by ${profile.full_name}${delegationSuffix} and is pending finance payment confirmation.`,
       link: "/expenses"
     });
 

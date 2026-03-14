@@ -109,6 +109,9 @@ function toRequestRecord(
     approverId: requestRow.approver_id,
     approverName: null,
     rejectionReason: requestRow.rejection_reason,
+    actingFor: null,
+    actingForName: null,
+    delegateType: null,
     createdAt: requestRow.created_at,
     updatedAt: requestRow.updated_at
   };

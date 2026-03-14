@@ -4,11 +4,11 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
 import { formatDateRange } from "../../../../../../../lib/datetime";
-import { areDepartmentsEqual } from "../../../../../../../lib/department";
+import { canPublishScheduleForShifts } from "../../../../../../../lib/delegation";
 import { sendSchedulePublishedEmail } from "../../../../../../../lib/notifications/email";
 import { createBulkNotifications } from "../../../../../../../lib/notifications/service";
 import { isSchedulingManager } from "../../../../../../../lib/scheduling";
-import { isDepartmentOnlyTeamLead } from "../../../../../../../lib/roles";
+import { hasAnyRole } from "../../../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../../types/auth";
 import {
@@ -129,34 +129,6 @@ export async function POST(
     });
   }
 
-  if (
-    isDepartmentOnlyTeamLead(session.profile.roles) &&
-    !session.profile.department
-  ) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
-        message: "Team lead scheduling requires a department on your profile."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  if (
-    isDepartmentOnlyTeamLead(session.profile.roles) &&
-    !areDepartmentsEqual(parsedExistingSchedule.data.department, session.profile.department)
-  ) {
-    return jsonResponse<null>(403, {
-      data: null,
-      error: {
-        code: "FORBIDDEN",
-        message: "Team lead can only publish schedules for their own department."
-      },
-      meta: buildMeta()
-    });
-  }
-
   if (parsedExistingSchedule.data.status === "locked") {
     return jsonResponse<null>(409, {
       data: null,
@@ -197,12 +169,51 @@ export async function POST(
     });
   }
 
+  // People-based authorization: for non-admin users, verify all shift employees
+  // are in their operational scope (direct reports or delegated reports).
+  let publishActingFor: string | null = null;
+  let publishDelegateType: string | null = null;
+
+  if (!hasAnyRole(session.profile.roles, ["MANAGER", "HR_ADMIN", "SUPER_ADMIN"])) {
+    const shiftEmployeeIds = [
+      ...new Set(
+        (rawShiftRows ?? [])
+          .map((row) => (typeof row.employee_id === "string" ? row.employee_id : null))
+          .filter((value): value is string => Boolean(value))
+      )
+    ];
+
+    const publishAuth = await canPublishScheduleForShifts({
+      supabase,
+      orgId: session.profile.org_id,
+      userId: session.profile.id,
+      userRoles: session.profile.roles,
+      shiftEmployeeIds
+    });
+
+    if (!publishAuth.allowed) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "You can only publish schedules for employees in your team."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    publishActingFor = publishAuth.actingFor;
+    publishDelegateType = publishAuth.delegateType;
+  }
+
   const { data: rawPublishedSchedule, error: publishError } = await supabase
     .from("schedules")
     .update({
       status: "published",
       published_at: new Date().toISOString(),
-      published_by: session.profile.id
+      published_by: session.profile.id,
+      published_acting_for: publishActingFor,
+      published_delegate_type: publishDelegateType
     })
     .eq("id", scheduleId)
     .eq("org_id", session.profile.org_id)
@@ -249,12 +260,17 @@ export async function POST(
     parsedPublishedSchedule.data.end_date
   );
 
+  const publisherDisplayName = session.profile.full_name;
+  const scheduleDelegationSuffix = publishActingFor
+    ? ` (published by ${publisherDisplayName} while covering)`
+    : "";
+
   void createBulkNotifications({
     orgId: session.profile.org_id,
     userIds: assignedUserIds,
     type: "schedule_published",
     title: "New schedule published",
-    body: `Check out your new work schedule for ${dateRange}.`,
+    body: `Check out your new work schedule for ${dateRange}.${scheduleDelegationSuffix}`,
     link: "/scheduling"
   });
 

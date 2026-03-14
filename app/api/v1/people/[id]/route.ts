@@ -178,7 +178,7 @@ export async function PUT(
   const { data: existingProfile, error: existingProfileError } = await serviceRoleClient
     .from("profiles")
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
@@ -449,7 +449,7 @@ export async function PUT(
       .eq("id", personId)
       .eq("org_id", session.profile.org_id)
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
       )
       .single();
 
@@ -566,19 +566,23 @@ export async function PUT(
     }
   }
 
-  const managerId = parsedUpdatedRow.data.manager_id;
-  let managerNameById = new Map<string, string>();
+  const lookupIds = [
+    parsedUpdatedRow.data.manager_id,
+    parsedUpdatedRow.data.team_lead_id ?? null
+  ].filter((id): id is string => Boolean(id));
 
-  if (managerId) {
-    const { data: managerRows } = await serviceRoleClient
+  let nameById = new Map<string, string>();
+
+  if (lookupIds.length > 0) {
+    const { data: nameRows } = await serviceRoleClient
       .from("profiles")
       .select("id, full_name")
       .eq("org_id", session.profile.org_id)
       .is("deleted_at", null)
-      .eq("id", managerId);
+      .in("id", lookupIds);
 
-    managerNameById = new Map(
-      (managerRows ?? [])
+    nameById = new Map(
+      (nameRows ?? [])
         .filter(
           (row): row is { id: string; full_name: string } =>
             typeof row?.id === "string" && typeof row?.full_name === "string"
@@ -598,7 +602,7 @@ export async function PUT(
 
   const person = mapProfileRow(
     parsedUpdatedRow.data,
-    managerNameById,
+    nameById,
     typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null
   );
 
@@ -846,7 +850,7 @@ export async function PATCH(
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 
@@ -874,19 +878,23 @@ export async function PATCH(
     });
   }
 
-  const managerId = parsedUpdatedRow.data.manager_id;
-  let managerNameById = new Map<string, string>();
+  const selfLookupIds = [
+    parsedUpdatedRow.data.manager_id,
+    parsedUpdatedRow.data.team_lead_id ?? null
+  ].filter((id): id is string => Boolean(id));
 
-  if (managerId) {
-    const { data: managerRows } = await serviceRoleClient
+  let selfNameById = new Map<string, string>();
+
+  if (selfLookupIds.length > 0) {
+    const { data: nameRows } = await serviceRoleClient
       .from("profiles")
       .select("id, full_name")
       .eq("org_id", session.profile.org_id)
       .is("deleted_at", null)
-      .eq("id", managerId);
+      .in("id", selfLookupIds);
 
-    managerNameById = new Map(
-      (managerRows ?? [])
+    selfNameById = new Map(
+      (nameRows ?? [])
         .filter(
           (row): row is { id: string; full_name: string } =>
             typeof row?.id === "string" && typeof row?.full_name === "string"
@@ -906,7 +914,7 @@ export async function PATCH(
 
   const person = mapProfileRow(
     parsedUpdatedRow.data,
-    managerNameById,
+    selfNameById,
     typeof selfCrewTagRow?.crew_tag === "string" ? selfCrewTagRow.crew_tag : null
   );
 
