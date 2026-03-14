@@ -20,6 +20,22 @@ function toDateString(value: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Return a check-failure alert when a health check cannot complete.
+ * The admin sees this as an error-severity alert, making it impossible
+ * to confuse "no issues found" with "the system couldn't check."
+ */
+function checkFailedAlert(checkKey: string, description: string): HealthAlert {
+  return {
+    key: `check_failed_${checkKey}`,
+    label: `Unable to check: ${description}`,
+    count: 0,
+    severity: "error",
+    href: "#",
+    icon: "AlertTriangle"
+  };
+}
+
 /* ── Individual checks ── */
 
 async function checkContractorsMissingPayout(
@@ -36,7 +52,11 @@ async function checkContractorsMissingPayout(
       .eq("employment_type", "contractor")
       .is("deleted_at", null);
 
-    if (contractorsError || !contractors || contractors.length === 0) return null;
+    if (contractorsError) {
+      return checkFailedAlert("contractors_missing_payout", "contractors missing payout method");
+    }
+
+    if (!contractors || contractors.length === 0) return null;
 
     const contractorIds = contractors.map((c) => c.id);
 
@@ -48,7 +68,9 @@ async function checkContractorsMissingPayout(
       .eq("is_primary", true)
       .is("deleted_at", null);
 
-    if (paymentError) return null;
+    if (paymentError) {
+      return checkFailedAlert("contractors_missing_payout", "contractors missing payout method");
+    }
 
     const paidIds = new Set((withPayment ?? []).map((p) => p.employee_id));
     const missingCount = contractorIds.filter((id) => !paidIds.has(id)).length;
@@ -64,7 +86,7 @@ async function checkContractorsMissingPayout(
       icon: "AlertTriangle"
     };
   } catch {
-    return null;
+    return checkFailedAlert("contractors_missing_payout", "contractors missing payout method");
   }
 }
 
@@ -85,7 +107,9 @@ async function checkStaleOnboarding(
       .is("deleted_at", null)
       .lte("updated_at", threeDaysAgoStr);
 
-    if (error || !data) return null;
+    if (error || !data) {
+      return checkFailedAlert("stale_onboarding", "stale onboarding instances");
+    }
 
     const staleCount = data.length;
     if (staleCount === 0) return null;
@@ -99,7 +123,7 @@ async function checkStaleOnboarding(
       icon: "UserX"
     };
   } catch {
-    return null;
+    return checkFailedAlert("stale_onboarding", "stale onboarding instances");
   }
 }
 
@@ -123,7 +147,11 @@ async function checkComplianceDeadlines(
       .lte("due_date", fourteenDaysLaterStr)
       .is("deleted_at", null);
 
-    if (error || !count || count === 0) return null;
+    if (error) {
+      return checkFailedAlert("compliance_due_soon", "compliance deadlines");
+    }
+
+    if (!count || count === 0) return null;
 
     return {
       key: "compliance_due_soon",
@@ -134,7 +162,7 @@ async function checkComplianceDeadlines(
       icon: "ShieldAlert"
     };
   } catch {
-    return null;
+    return checkFailedAlert("compliance_due_soon", "compliance deadlines");
   }
 }
 
@@ -155,7 +183,11 @@ async function checkStuckExpenses(
       .lte("updated_at", sevenDaysAgoStr)
       .is("deleted_at", null);
 
-    if (error || !count || count === 0) return null;
+    if (error) {
+      return checkFailedAlert("expenses_stuck", "stuck expenses");
+    }
+
+    if (!count || count === 0) return null;
 
     return {
       key: "expenses_stuck",
@@ -166,7 +198,7 @@ async function checkStuckExpenses(
       icon: "Receipt"
     };
   } catch {
-    return null;
+    return checkFailedAlert("expenses_stuck", "stuck expenses");
   }
 }
 
@@ -189,7 +221,11 @@ async function checkExpiringDocuments(
       .lte("expiry_date", thirtyDaysLaterStr)
       .is("deleted_at", null);
 
-    if (error || !count || count === 0) return null;
+    if (error) {
+      return checkFailedAlert("documents_expiring", "expiring documents");
+    }
+
+    if (!count || count === 0) return null;
 
     return {
       key: "documents_expiring",
@@ -200,7 +236,7 @@ async function checkExpiringDocuments(
       icon: "FileWarning"
     };
   } catch {
-    return null;
+    return checkFailedAlert("documents_expiring", "expiring documents");
   }
 }
 
