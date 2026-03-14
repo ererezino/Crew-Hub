@@ -131,7 +131,7 @@ describe("People invite route behavior", () => {
     deriveSystemPasswordMock.mockReturnValue("derived-password");
   });
 
-  it("returns 200 even when audit logging fails after invite generation", async () => {
+  it("returns 200 with inviteSent true when audit logging fails after successful invite", async () => {
     logAuditMock.mockRejectedValueOnce(new Error("audit unavailable"));
 
     const result = await callInviteRoute();
@@ -139,6 +139,7 @@ describe("People invite route behavior", () => {
     expect(result.status).toBe(200);
     expect(result.body.data?.inviteSent).toBe(true);
     expect(result.body.data?.inviteLink).toContain("/api/auth/callback");
+    expect(result.body.error).toBeNull();
     expect(logAuditMock).toHaveBeenCalledTimes(1);
     expect(sendWelcomeEmailMock).toHaveBeenCalledTimes(1);
   });
@@ -154,7 +155,7 @@ describe("People invite route behavior", () => {
     expect(loggerErrorMock).toHaveBeenCalled();
   });
 
-  it("continues resend invite generation when system password derivation is unavailable", async () => {
+  it("blocks resend with 503 when system password derivation is unavailable", async () => {
     getUserByIdMock.mockResolvedValueOnce({
       data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
       error: null
@@ -165,9 +166,67 @@ describe("People invite route behavior", () => {
 
     const result = await callInviteRoute();
 
+    expect(result.status).toBe(503);
+    expect(result.body.error?.code).toBe("AUTH_SYSTEM_UNAVAILABLE");
+    expect(result.body.data).toBeNull();
+    expect(generateLinkMock).not.toHaveBeenCalled();
+    expect(sendWelcomeEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks resend with 500 when password sync API call fails", async () => {
+    getUserByIdMock.mockResolvedValueOnce({
+      data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+      error: null
+    });
+    updateUserByIdMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "service_role key rejected" }
+    });
+
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(500);
+    expect(result.body.error?.code).toBe("PASSWORD_SYNC_FAILED");
+    expect(result.body.data).toBeNull();
+    expect(generateLinkMock).not.toHaveBeenCalled();
+    expect(sendWelcomeEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 with inviteSent false and error message when email delivery fails (new invite)", async () => {
+    sendWelcomeEmailMock.mockRejectedValueOnce(new Error("SMTP connection refused"));
+
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(200);
+    expect(result.body.data?.inviteSent).toBe(false);
+    expect(result.body.data?.inviteLink).toContain("/api/auth/callback");
+    expect(result.body.error?.code).toBe("EMAIL_DELIVERY_FAILED");
+    expect(result.body.error?.message).toContain("share the invite link");
+  });
+
+  it("returns 200 with inviteSent false when email delivery fails (resend)", async () => {
+    getUserByIdMock.mockResolvedValueOnce({
+      data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+      error: null
+    });
+    sendWelcomeEmailMock.mockRejectedValueOnce(new Error("SMTP timeout"));
+
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(200);
+    expect(result.body.data?.inviteSent).toBe(false);
+    expect(result.body.data?.isResend).toBe(true);
+    expect(result.body.data?.inviteLink).toBeTruthy();
+    expect(result.body.error?.code).toBe("EMAIL_DELIVERY_FAILED");
+  });
+
+  it("returns 200 with inviteSent true and no error when everything succeeds", async () => {
+    const result = await callInviteRoute();
+
     expect(result.status).toBe(200);
     expect(result.body.data?.inviteSent).toBe(true);
-    expect(result.body.data?.isResend).toBe(true);
+    expect(result.body.data?.inviteLink).toContain("/api/auth/callback");
+    expect(result.body.error).toBeNull();
   });
 
   it("falls back to generate link without redirect URL when redirect config is stale", async () => {

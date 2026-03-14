@@ -274,6 +274,7 @@ export async function POST(
     /* Check if an auth user already exists (profile id = auth user id) */
     let isResend = false;
     let inviteLink: string | null = null;
+    let emailSent = false;
 
     const {
       data: existingAuthUser,
@@ -296,18 +297,43 @@ export async function POST(
     }
 
     /* Ensure the user's password is set to the system-derived value.
-       If the secret is temporarily unavailable, continue invite generation
-       so admin can still share a setup link. */
+       These failures are BLOCKING because the user cannot sign in without
+       a correctly synced system password, and the self-heal at sign-in
+       relies on the same infrastructure (secret + Supabase Admin API). */
     if (existingAuthUser?.user) {
+      let systemPassword: string;
       try {
-        const systemPassword = deriveSystemPassword(personId);
-        await serviceRoleClient.auth.admin
-          .updateUserById(personId, { password: systemPassword })
-          .catch(() => undefined);
+        systemPassword = deriveSystemPassword(personId);
       } catch (error) {
-        logger.warn("Skipped password sync during invite because auth secret is unavailable.", {
+        logger.error("Auth system secret is unavailable — cannot sync password for invite.", {
           personId,
           message: error instanceof Error ? error.message : String(error)
+        });
+        return jsonResponse<null>(503, {
+          data: null,
+          error: {
+            code: "AUTH_SYSTEM_UNAVAILABLE",
+            message: "Auth system is temporarily unavailable. The invite was not sent. Please try again later."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      const { error: passwordSyncError } = await serviceRoleClient.auth.admin
+        .updateUserById(personId, { password: systemPassword });
+
+      if (passwordSyncError) {
+        logger.error("Password sync failed during invite — user may not be able to sign in.", {
+          personId,
+          message: passwordSyncError.message
+        });
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "PASSWORD_SYNC_FAILED",
+            message: "Unable to sync account credentials. The invite was not sent. Please try again."
+          },
+          meta: buildMeta()
         });
       }
     }
@@ -363,18 +389,22 @@ export async function POST(
         });
       }
 
-      /* Send branded welcome email with setup link */
-      sendWelcomeEmail({
-        recipientEmail: email,
-        recipientName: fullName,
-        setupLink: inviteLink ?? undefined,
-        isNewHire: profile.status === "onboarding"
-      }).catch((error) => {
+      /* Send branded welcome email with setup link.
+         Awaited so we can surface delivery failure to the admin. */
+      try {
+        await sendWelcomeEmail({
+          recipientEmail: email,
+          recipientName: fullName,
+          setupLink: inviteLink ?? undefined,
+          isNewHire: profile.status === "onboarding"
+        });
+        emailSent = true;
+      } catch (error) {
         logger.error("Failed to send welcome email on re-invite.", {
           personId,
           message: error instanceof Error ? error.message : String(error)
         });
-      });
+      }
     } else {
       /* No auth account — generate an invite link (creates the auth user + generates link) */
       const { data: linkData, error: linkError } = await generateLinkWithRedirectFallback({
@@ -404,18 +434,22 @@ export async function POST(
         actionLink: linkData.properties.action_link
       });
 
-      /* Send branded welcome email with setup link */
-      sendWelcomeEmail({
-        recipientEmail: email,
-        recipientName: fullName,
-        setupLink: inviteLink ?? undefined,
-        isNewHire: profile.status === "onboarding"
-      }).catch((error) => {
+      /* Send branded welcome email with setup link.
+         Awaited so we can surface delivery failure to the admin. */
+      try {
+        await sendWelcomeEmail({
+          recipientEmail: email,
+          recipientName: fullName,
+          setupLink: inviteLink ?? undefined,
+          isNewHire: profile.status === "onboarding"
+        });
+        emailSent = true;
+      } catch (error) {
         logger.error("Failed to send welcome email on invite.", {
           personId,
           message: error instanceof Error ? error.message : String(error)
         });
-      });
+      }
     }
 
     try {
@@ -444,19 +478,29 @@ export async function POST(
         .update({ first_invited_at: new Date().toISOString() })
         .eq("id", personId)
         .is("first_invited_at", null);
-    } catch {
-      // Non-critical — don't fail the invite if this update fails.
+    } catch (error) {
+      // Non-critical — don't fail the invite, but log for operator visibility.
+      logger.error("Failed to set first_invited_at timestamp.", {
+        personId,
+        message: error instanceof Error ? error.message : String(error)
+      });
     }
 
     return jsonResponse<InviteResponseData>(200, {
       data: {
         personId,
         email,
-        inviteSent: true,
+        inviteSent: emailSent,
         isResend,
         inviteLink
       },
-      error: null,
+      error: emailSent
+        ? null
+        : {
+            code: "EMAIL_DELIVERY_FAILED",
+            message:
+              "The invite was created and the link is valid, but the email could not be delivered. Please share the invite link with the user manually."
+          },
       meta: buildMeta()
     });
   } catch (error) {
