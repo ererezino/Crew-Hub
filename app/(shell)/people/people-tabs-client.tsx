@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PageHeader } from "../../../components/shared/page-header";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
@@ -86,6 +86,16 @@ export function PeopleTabsClient({
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(requestedTab, tabs));
 
+  // Actions exposed by PeopleClient so the tabs-level header can trigger them
+  const peopleActionsRef = useRef<{ openCreate: () => void; openBulkUpload: () => void } | null>(null);
+
+  const handleRegisterActions = useCallback(
+    (actions: { openCreate: () => void; openBulkUpload: () => void }) => {
+      peopleActionsRef.current = actions;
+    },
+    []
+  );
+
   useEffect(() => {
     setActiveTab(resolveInitialTab(requestedTab, tabs));
   }, [requestedTab, tabs]);
@@ -113,6 +123,26 @@ export function PeopleTabsClient({
       <PageHeader
         title={tNav("people")}
         description={tNav("description.people")}
+        actions={
+          canCreatePeople && activeTab === "directory" ? (
+            <>
+              <button
+                type="button"
+                className="button"
+                onClick={() => peopleActionsRef.current?.openBulkUpload()}
+              >
+                {t("bulkUpload.title")}
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => peopleActionsRef.current?.openCreate()}
+              >
+                {t("createPanel.addPersonButton")}
+              </button>
+            </>
+          ) : null
+        }
       />
 
       <PageTabs
@@ -141,6 +171,7 @@ export function PeopleTabsClient({
               canResetAuthenticator={canResetAuthenticator}
               isAdmin={isAdmin}
               embedded
+              onRegisterActions={handleRegisterActions}
             />
           ) : null}
 

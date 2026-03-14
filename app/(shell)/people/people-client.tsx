@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 
@@ -48,6 +48,8 @@ type PeopleClientProps = {
   isAdmin?: boolean;
   /** When true, the page header is rendered by the parent tabs wrapper. */
   embedded?: boolean;
+  /** Called once on mount so the parent tabs wrapper can trigger create / bulk-upload. */
+  onRegisterActions?: (actions: { openCreate: () => void; openBulkUpload: () => void }) => void;
 };
 
 type ToastMessage = {
@@ -450,7 +452,8 @@ export function PeopleClient({
   canEditPeople,
   canResetAuthenticator,
   isAdmin = false,
-  embedded = false
+  embedded = false,
+  onRegisterActions
 }: PeopleClientProps) {
   const t = useTranslations('people');
   const tCommon = useTranslations('common');
@@ -540,6 +543,16 @@ export function PeopleClient({
   const [bulkResults, setBulkResults] = useState<BulkResult[]>([]);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Expose create / bulk-upload actions to the parent tabs wrapper
+  useEffect(() => {
+    if (embedded && onRegisterActions) {
+      onRegisterActions({
+        openCreate: () => setIsCreateOpen(true),
+        openBulkUpload: () => setIsBulkUploadOpen(true)
+      });
+    }
+  }, [embedded, onRegisterActions]);
 
   const sortedPeople = useMemo(
     () =>
