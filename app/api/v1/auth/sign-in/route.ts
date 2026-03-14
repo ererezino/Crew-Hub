@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -7,6 +9,7 @@ import {
   clearFailedLogins,
   recordFailedLogin
 } from "../../../../../lib/security/login-protection";
+import { extractSupabaseProjectRef } from "../../../../../lib/supabase/project-ref";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
@@ -35,6 +38,54 @@ function extractIpAddress(request: Request): string {
     request.headers.get("x-real-ip")?.trim() ||
     "unknown"
   );
+}
+
+/**
+ * Await signOut to ensure auth cookies are cleared before the response is
+ * returned.  If signOut itself fails, fall back to manually deleting the
+ * exact auth-cookie family for this Supabase project so no partial AAL1
+ * session leaks to the browser.
+ */
+async function ensureSignedOut(
+  supabase: SupabaseClient,
+  context: { email: string; ipAddress: string; trigger: string }
+): Promise<void> {
+  const { error } = await supabase.auth
+    .signOut({ scope: "local" })
+    .catch((err: unknown) => ({
+      error: { message: err instanceof Error ? err.message : String(err) }
+    }));
+
+  if (!error) return;
+
+  logger.error("signOut failed after MFA rejection — clearing auth cookies manually.", {
+    email: context.email,
+    ipAddress: context.ipAddress,
+    trigger: context.trigger,
+    reason: error.message
+  });
+
+  // Derive the exact cookie-name family used by this project:
+  //   sb-<projectRef>-auth-token, sb-<projectRef>-auth-token.0, .1, …,
+  //   sb-<projectRef>-auth-token-code-verifier
+  const projectRef = extractSupabaseProjectRef(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  if (!projectRef) return; // env not set — nothing to clear
+
+  const storageKey = `sb-${projectRef}-auth-token`;
+
+  try {
+    const cookieStore = await cookies();
+    for (const cookie of cookieStore.getAll()) {
+      if (cookie.name === storageKey || cookie.name.startsWith(`${storageKey}.`) || cookie.name.startsWith(`${storageKey}-`)) {
+        cookieStore.delete(cookie.name);
+      }
+    }
+  } catch (cookieErr) {
+    logger.error("Failed to clear auth cookies after signOut failure.", {
+      email: context.email,
+      message: cookieErr instanceof Error ? cookieErr.message : String(cookieErr)
+    });
+  }
 }
 
 function shouldAttemptPasswordSync(): boolean {
@@ -348,7 +399,7 @@ export async function POST(request: Request) {
         });
       }
 
-      supabase.auth.signOut().catch(() => undefined);
+      await ensureSignedOut(supabase, { email, ipAddress, trigger: "MFA_NOT_ENROLLED" });
 
       return jsonResponse<null>(403, {
         data: null,
@@ -367,7 +418,7 @@ export async function POST(request: Request) {
       await supabase.auth.mfa.challenge({ factorId });
 
     if (challengeError || !challengeData) {
-      supabase.auth.signOut().catch(() => undefined);
+      await ensureSignedOut(supabase, { email, ipAddress, trigger: "MFA_CHALLENGE_FAILED" });
 
       return jsonResponse<null>(500, {
         data: null,
@@ -386,7 +437,7 @@ export async function POST(request: Request) {
     });
 
     if (verifyError) {
-      supabase.auth.signOut().catch(() => undefined);
+      await ensureSignedOut(supabase, { email, ipAddress, trigger: "INVALID_TOTP" });
       recordFailedLogin(email, ipAddress).catch(() => undefined);
 
       return jsonResponse<null>(401, {

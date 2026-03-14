@@ -116,12 +116,29 @@ vi.mock("../lib/supabase/service-role", () => ({
   }))
 }));
 
+vi.mock("../lib/supabase/project-ref", () => ({
+  extractSupabaseProjectRef: vi.fn(() => "test-project-ref")
+}));
+
+const cookieDeleteMock = vi.fn();
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => ({
+    getAll: () => [
+      { name: "sb-test-project-ref-auth-token.0", value: "chunk0" },
+      { name: "sb-test-project-ref-auth-token.1", value: "chunk1" },
+      { name: "unrelated-cookie", value: "keep-me" }
+    ],
+    delete: cookieDeleteMock
+  }))
+}));
+
+const loggerErrorMock = vi.fn();
 vi.mock("../lib/logger", () => ({
   logger: {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
-    error: vi.fn()
+    error: loggerErrorMock
   }
 }));
 
@@ -156,6 +173,8 @@ describe("Auth sign-in route behavior", () => {
     listFactorsMock.mockReset();
     challengeMock.mockReset();
     verifyMock.mockReset();
+    cookieDeleteMock.mockReset();
+    loggerErrorMock.mockReset();
 
     dbState.ipCount = 0;
     dbState.emailCount = 0;
@@ -185,7 +204,7 @@ describe("Auth sign-in route behavior", () => {
     });
     verifyMock.mockResolvedValue({ error: null });
 
-    signOutMock.mockResolvedValue(undefined);
+    signOutMock.mockResolvedValue({ error: null });
     recordFailedLoginMock.mockResolvedValue(undefined);
     clearFailedLoginsMock.mockResolvedValue(undefined);
   });
@@ -303,5 +322,71 @@ describe("Auth sign-in route behavior", () => {
     expect(deriveSystemPasswordMock).toHaveBeenCalledWith("user-1");
     expect(clearFailedLoginsMock).toHaveBeenCalledWith("coo@accrue.test");
     expect(recordFailedLoginMock).not.toHaveBeenCalled();
+  });
+
+  it("still returns 403 MFA_NOT_ENROLLED when signOut fails, and clears auth cookies", async () => {
+    // No verified TOTP factor
+    signInWithPasswordMock.mockResolvedValueOnce({
+      data: { user: { id: "user-1", factors: [] } },
+      error: null
+    });
+    listFactorsMock.mockResolvedValueOnce({ data: { totp: [] } });
+    signOutMock.mockRejectedValueOnce(new Error("network timeout"));
+
+    const result = await callSignIn({
+      email: "coo@accrue.test",
+      totpCode: "123456"
+    });
+
+    expect(result.status).toBe(403);
+    expect(result.body.error?.code).toBe("MFA_NOT_ENROLLED");
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    // Fallback cookie clearing should have deleted only project auth cookies
+    expect(cookieDeleteMock).toHaveBeenCalledWith("sb-test-project-ref-auth-token.0");
+    expect(cookieDeleteMock).toHaveBeenCalledWith("sb-test-project-ref-auth-token.1");
+    expect(cookieDeleteMock).not.toHaveBeenCalledWith("unrelated-cookie");
+    expect(loggerErrorMock).toHaveBeenCalled();
+  });
+
+  it("still returns 500 MFA_CHALLENGE_FAILED when signOut fails, and clears auth cookies", async () => {
+    challengeMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "challenge service unavailable" }
+    });
+    signOutMock.mockRejectedValueOnce(new Error("signOut crashed"));
+
+    const result = await callSignIn({
+      email: "coo@accrue.test",
+      totpCode: "123456"
+    });
+
+    expect(result.status).toBe(500);
+    expect(result.body.error?.code).toBe("MFA_CHALLENGE_FAILED");
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(cookieDeleteMock).toHaveBeenCalledWith("sb-test-project-ref-auth-token.0");
+    expect(cookieDeleteMock).toHaveBeenCalledWith("sb-test-project-ref-auth-token.1");
+    expect(cookieDeleteMock).not.toHaveBeenCalledWith("unrelated-cookie");
+    expect(loggerErrorMock).toHaveBeenCalled();
+  });
+
+  it("still returns 401 INVALID_TOTP when signOut fails, and clears auth cookies", async () => {
+    verifyMock.mockResolvedValueOnce({
+      error: { message: "invalid code" }
+    });
+    signOutMock.mockRejectedValueOnce(new Error("signOut crashed"));
+
+    const result = await callSignIn({
+      email: "coo@accrue.test",
+      totpCode: "000000"
+    });
+
+    expect(result.status).toBe(401);
+    expect(result.body.error?.code).toBe("INVALID_TOTP");
+    expect(signOutMock).toHaveBeenCalledTimes(1);
+    expect(cookieDeleteMock).toHaveBeenCalledWith("sb-test-project-ref-auth-token.0");
+    expect(cookieDeleteMock).toHaveBeenCalledWith("sb-test-project-ref-auth-token.1");
+    expect(cookieDeleteMock).not.toHaveBeenCalledWith("unrelated-cookie");
+    expect(recordFailedLoginMock).toHaveBeenCalledWith("coo@accrue.test", "203.0.113.10");
+    expect(loggerErrorMock).toHaveBeenCalled();
   });
 });
