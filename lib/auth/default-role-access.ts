@@ -15,13 +15,13 @@ const EMPLOYEE_DEFAULT_ACCESS = [
 ] as const;
 
 const TEAM_LEAD_ADDITIONAL_ACCESS = [
-  "/scheduling/manage",
-  "/approvals"
+  "/scheduling/manage"
 ] as const;
 
 const MANAGER_ADDITIONAL_ACCESS = [
-  "/people",
-  "/onboarding"
+  "/approvals",
+  "/onboarding",
+  "/people"
 ] as const;
 
 const HR_ADMIN_ADDITIONAL_ACCESS = [

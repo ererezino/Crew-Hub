@@ -69,14 +69,12 @@ const SCHEDULING_MANAGE_ROLES: readonly UserRole[] = [
 ];
 const APPROVAL_ROLES: readonly UserRole[] = [
   "MANAGER",
-  "TEAM_LEAD",
   "HR_ADMIN",
   "FINANCE_ADMIN",
   "SUPER_ADMIN"
 ];
 const MANAGE_GROUP_ROLES: readonly UserRole[] = [
   "MANAGER",
-  "TEAM_LEAD",
   "HR_ADMIN",
   "SUPER_ADMIN"
 ];
