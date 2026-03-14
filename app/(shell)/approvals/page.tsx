@@ -44,10 +44,12 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
   const roles = session.profile.roles;
 
   const canReviewTimeOff =
+    hasRole(roles, "TEAM_LEAD") ||
     hasRole(roles, "MANAGER") ||
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "SUPER_ADMIN");
   const canReviewExpenses =
+    hasRole(roles, "TEAM_LEAD") ||
     hasRole(roles, "MANAGER") ||
     hasRole(roles, "FINANCE_ADMIN") ||
     hasRole(roles, "SUPER_ADMIN");

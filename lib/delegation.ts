@@ -5,6 +5,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { todayIsoDate } from "./datetime";
 import type { UserRole } from "./navigation";
 import { hasAnyRole } from "./roles";
+import { createSupabaseServiceRoleClient } from "./supabase/service-role";
+
+// ---------------------------------------------------------------------------
+// Internal: privileged client for cross-user queries
+// ---------------------------------------------------------------------------
+//
+// Delegation resolution inherently requires reading profiles across users
+// (e.g. listing a principal's operational reports). The caller's session
+// client is RLS-bound and may not have policies for this. We use the
+// service-role client for these internal lookups, while the caller's client
+// is still accepted for backward compatibility.
+// ---------------------------------------------------------------------------
+
+function getPrivilegedClient(): SupabaseClient {
+  return createSupabaseServiceRoleClient();
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -94,8 +110,10 @@ export async function getUnavailablePrincipalIds({
 
   const today = todayInOrgTimezone();
 
+  const svc = getPrivilegedClient();
+
   const [leaveResult, oooResult] = await Promise.all([
-    supabase
+    svc
       .from("leave_requests")
       .select("employee_id")
       .eq("org_id", orgId)
@@ -104,7 +122,7 @@ export async function getUnavailablePrincipalIds({
       .gte("end_date", today)
       .is("deleted_at", null)
       .in("employee_id", principalIds),
-    supabase
+    svc
       .from("profiles")
       .select("id")
       .eq("org_id", orgId)
@@ -178,7 +196,8 @@ export async function listOperationalReportIds({
 }): Promise<string[]> {
   // People whose team_lead_id = leadId
   // OR whose team_lead_id IS NULL AND manager_id = leadId
-  const { data, error } = await supabase
+  const svc = getPrivilegedClient();
+  const { data, error } = await svc
     .from("profiles")
     .select("id")
     .eq("org_id", orgId)
@@ -225,7 +244,9 @@ async function loadActiveDelegations({
   delegateId: string;
   scope: DelegateScope;
 }): Promise<ActiveDelegation[]> {
-  const { data: delegations, error } = await supabase
+  const svc = getPrivilegedClient();
+
+  const { data: delegations, error } = await svc
     .from("approval_delegates")
     .select("principal_id, delegate_type, activation, starts_at, ends_at, scope")
     .eq("org_id", orgId)
@@ -267,7 +288,7 @@ async function loadActiveDelegations({
   // Fetch principal profile info (name, department, roles) to:
   // 1. Populate coveringFor display data
   // 2. Validate the principal has an approval-capable role (safeguard #20)
-  const { data: principalProfiles } = await supabase
+  const { data: principalProfiles } = await svc
     .from("profiles")
     .select("id, full_name, department, roles")
     .eq("org_id", orgId)
