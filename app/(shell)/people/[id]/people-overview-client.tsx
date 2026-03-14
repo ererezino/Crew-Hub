@@ -831,6 +831,12 @@ export function PeopleOverviewClient({
                 <dd>{person.managerName}</dd>
               </>
             ) : null}
+            {person.teamLeadName && person.teamLeadId !== person.managerId ? (
+              <>
+                <dt>{t('basicInfo.operationalLead')}</dt>
+                <dd>{person.teamLeadName}</dd>
+              </>
+            ) : null}
           </dl>
         </div>
 
@@ -933,6 +939,12 @@ export function PeopleOverviewClient({
               <>
                 <dt>{t('workInfo.manager')}</dt>
                 <dd>{person.managerName}</dd>
+              </>
+            ) : null}
+            {person.teamLeadName && person.teamLeadId !== person.managerId ? (
+              <>
+                <dt>{t('workInfo.operationalLead')}</dt>
+                <dd>{person.teamLeadName}</dd>
               </>
             ) : null}
 

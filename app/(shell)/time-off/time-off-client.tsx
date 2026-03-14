@@ -961,7 +961,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
                           {formatLeaveStatus(requestRecord.status, locale)}
                         </StatusBadge>
                       </td>
-                      <td>{requestRecord.approverName ?? "--"}</td>
+                      <td>
+                        {requestRecord.approverName
+                          ? requestRecord.actingForName
+                            ? `${requestRecord.approverName} (on behalf of ${requestRecord.actingForName})`
+                            : requestRecord.approverName
+                          : "--"}
+                      </td>
                       <td>
                         <time
                           dateTime={requestRecord.createdAt}

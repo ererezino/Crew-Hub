@@ -2032,7 +2032,10 @@
     "toastAriaLabel": "Notifications d'approbation",
     "dismissAriaLabel": "Fermer la notification",
     "validationRejectionRequired": "Le motif du refus est requis",
-    "validationRejectionTooLong": "Le motif est trop long"
+    "validationRejectionTooLong": "Le motif est trop long",
+    "coveringForBanner": "Vous couvrez pour {name} pendant son absence.",
+    "coveringForMultipleBanner": "Vous couvrez pour {names} pendant leur absence.",
+    "delegatedTag": "Couvrant pour {name}"
   },
   "timeOffCalendar": {
     "title": "Calendrier des congés",
@@ -3381,6 +3384,9 @@
       "manager": "Dépenses de vos subordonnés directs en attente d'approbation du responsable.",
       "finance": "Dépenses approuvées par le responsable en attente de confirmation de paiement par la finance avec justificatif de paiement."
     },
+    "coveringForBanner": "Vous couvrez pour {name} pendant son absence.",
+    "coveringForMultipleBanner": "Vous couvrez pour {names} pendant leur absence.",
+    "delegatedTag": "Couvrant pour {name}",
     "toolbar": {
       "ariaLabel": "Barre d'outils d'approbation",
       "month": "Mois",
@@ -3603,7 +3609,8 @@
       "timezone": "Fuseau horaire",
       "pronouns": "Pronoms",
       "joined": "Date d'arrivée",
-      "reportsTo": "Supérieur hiérarchique"
+      "reportsTo": "Supérieur hiérarchique",
+      "operationalLead": "Responsable opérationnel"
     },
     "about": {
       "title": "À propos",
@@ -3635,6 +3642,7 @@
       "country": "Pays",
       "employmentType": "Type de contrat",
       "manager": "Responsable",
+      "operationalLead": "Responsable opérationnel",
       "roles": "Rôles",
       "startDate": "Date de début"
     },
@@ -4422,7 +4430,9 @@
       "submittedBy": "Soumis par {name}.",
       "managerApproval": "Approbation du responsable",
       "approvedBy": "Approuvé par {name}.",
+      "approvedByOnBehalf": "Approuvé par {name} au nom de {principal}.",
       "rejectedBy": "Rejeté par {name}.",
+      "rejectedByOnBehalf": "Rejeté par {name} au nom de {principal}.",
       "rejectionReason": "Raison : {reason}",
       "awaitingManager": "En attente de la décision du responsable.",
       "financePayment": "Paiement par la finance",

@@ -104,6 +104,14 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
     });
   }, [approvalsQuery.data?.requests, sortDirection]);
 
+  const coveringForNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const req of requests) {
+      if (req.actingForName) names.add(req.actingForName);
+    }
+    return [...names];
+  }, [requests]);
+
   const dismissToast = (toastId: string) => {
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
   };
@@ -277,7 +285,15 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
       ) : null}
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && requests.length > 0 ? (
-        <div className="data-table-container">
+        <>
+          {coveringForNames.length > 0 ? (
+            <p className="delegation-banner">
+              {coveringForNames.length === 1
+                ? t('coveringForBanner', { name: coveringForNames[0] })
+                : t('coveringForMultipleBanner', { names: coveringForNames.join(", ") })}
+            </p>
+          ) : null}
+          <div className="data-table-container">
           <table className="data-table" aria-label={t('tableAriaLabel')}>
             <thead>
               <tr>
@@ -310,7 +326,9 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                     <div className="documents-cell-copy">
                       <p className="documents-cell-title">{requestRecord.employeeName}</p>
                       <p className="documents-cell-description">
-                        {requestRecord.employeeDepartment ?? ""}
+                        {requestRecord.actingForName
+                          ? t('delegatedTag', { name: requestRecord.actingForName })
+                          : requestRecord.employeeDepartment ?? ""}
                       </p>
                     </div>
                   </td>
@@ -376,6 +394,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
             </tbody>
           </table>
         </div>
+        </>
       ) : null}
 
       <SlidePanel

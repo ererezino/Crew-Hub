@@ -1391,7 +1391,9 @@ export function ExpensesClient({
                     const isSubmittingComment = isSubmittingCommentByExpenseId[expense.id] ?? false;
 
                     const managerDescription = expense.managerApprovedByName
-                      ? td("timeline.approvedBy", { name: expense.managerApprovedByName })
+                      ? expense.managerActingForName
+                        ? td("timeline.approvedByOnBehalf", { name: expense.managerApprovedByName, principal: expense.managerActingForName })
+                        : td("timeline.approvedBy", { name: expense.managerApprovedByName })
                       : expense.status === "rejected"
                         ? td("timeline.rejectedByWithReason", {
                             name: expense.rejectedByName ?? td("timeline.managerFallback"),

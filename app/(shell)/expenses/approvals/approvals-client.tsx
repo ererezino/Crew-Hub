@@ -278,6 +278,14 @@ export function ExpenseApprovalsClient({
     });
   }, [approvalsQuery.data?.expenses, sortDirection]);
 
+  const coveringForNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const exp of expenses) {
+      if (exp.managerActingForName) names.add(exp.managerActingForName);
+    }
+    return [...names];
+  }, [expenses]);
+
   const filteredExpenses = useMemo(() => {
     const normalizedEmployeeFilter = employeeFilter.trim().toLowerCase();
 
@@ -1119,6 +1127,14 @@ export function ExpenseApprovalsClient({
               ctaHref="/expenses"
             />
           ) : (
+            <>
+            {stage === "manager" && coveringForNames.length > 0 ? (
+              <p className="delegation-banner">
+                {coveringForNames.length === 1
+                  ? t('coveringForBanner', { name: coveringForNames[0] })
+                  : t('coveringForMultipleBanner', { names: coveringForNames.join(", ") })}
+              </p>
+            ) : null}
             <section className="data-table-container" aria-label={t('table.ariaLabel')}>
               <table className="data-table">
                 <thead>
@@ -1318,6 +1334,7 @@ export function ExpenseApprovalsClient({
                 </tbody>
               </table>
             </section>
+            </>
           )}
         </>
       ) : null}

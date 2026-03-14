@@ -1955,7 +1955,10 @@
     "toastAriaLabel": "Approval notifications",
     "dismissAriaLabel": "Dismiss notification",
     "validationRejectionRequired": "Rejection reason is required",
-    "validationRejectionTooLong": "Reason is too long"
+    "validationRejectionTooLong": "Reason is too long",
+    "coveringForBanner": "You are covering for {name} while they are away.",
+    "coveringForMultipleBanner": "You are covering for {names} while they are away.",
+    "delegatedTag": "Covering for {name}"
   },
   "timeOffCalendar": {
     "title": "Time Off Calendar",
@@ -3390,6 +3393,9 @@
       "manager": "Expenses from your direct reports awaiting manager approval.",
       "finance": "Manager-approved expenses awaiting finance payment confirmation with uploaded payment proof."
     },
+    "coveringForBanner": "You are covering for {name} while they are away.",
+    "coveringForMultipleBanner": "You are covering for {names} while they are away.",
+    "delegatedTag": "Covering for {name}",
     "toolbar": {
       "ariaLabel": "Approval toolbar",
       "month": "Month",
@@ -3612,7 +3618,8 @@
       "timezone": "Timezone",
       "pronouns": "Pronouns",
       "joined": "Joined",
-      "reportsTo": "Reports to"
+      "reportsTo": "Reports to",
+      "operationalLead": "Operational lead"
     },
     "about": {
       "title": "About",
@@ -3644,6 +3651,7 @@
       "country": "Country",
       "employmentType": "Employment Type",
       "manager": "Manager",
+      "operationalLead": "Operational lead",
       "roles": "Roles",
       "startDate": "Start Date"
     },
@@ -4431,7 +4439,9 @@
       "submittedBy": "Submitted by {name}.",
       "managerApproval": "Manager Approval",
       "approvedBy": "Approved by {name}.",
+      "approvedByOnBehalf": "Approved by {name} on behalf of {principal}.",
       "rejectedBy": "Rejected by {name}.",
+      "rejectedByOnBehalf": "Rejected by {name} on behalf of {principal}.",
       "rejectionReason": "Reason: {reason}",
       "awaitingManager": "Awaiting manager decision.",
       "financePayment": "Finance Payment",
