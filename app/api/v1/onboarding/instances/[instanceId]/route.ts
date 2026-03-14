@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { createNotification } from "../../../../../../lib/notifications/service";
+import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
@@ -168,6 +169,45 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   const instance = parsedInstance.data;
+
+  // ── Object-level authorization ──────────────────────────────────────
+  // HR_ADMIN / SUPER_ADMIN: full access (org_id already filtered above)
+  // MANAGER: own instance OR direct reports' instances
+  // Everyone else (EMPLOYEE, TEAM_LEAD, FINANCE_ADMIN): own instance only
+  const isHrOrSuperAdmin =
+    hasRole(profile.roles, "HR_ADMIN") || hasRole(profile.roles, "SUPER_ADMIN");
+
+  if (!isHrOrSuperAdmin) {
+    const isOwnInstance = instance.employee_id === profile.id;
+
+    if (!isOwnInstance) {
+      // Check if caller is a MANAGER and the instance employee is their direct report
+      let isDirectReport = false;
+
+      if (hasRole(profile.roles, "MANAGER")) {
+        const { data: employeeProfile } = await supabase
+          .from("profiles")
+          .select("manager_id")
+          .eq("id", instance.employee_id)
+          .eq("org_id", profile.org_id)
+          .is("deleted_at", null)
+          .maybeSingle();
+
+        isDirectReport = employeeProfile?.manager_id === profile.id;
+      }
+
+      if (!isDirectReport) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "You do not have permission to view this onboarding instance."
+          },
+          meta: buildMeta()
+        });
+      }
+    }
+  }
 
   const { data: rawTasks, error: tasksError } = await supabase
     .from("onboarding_tasks")
