@@ -76,6 +76,7 @@ const createPersonSchema = z.object({
   isNewEmployee: z.boolean({
     error: "You must specify whether this is a new hire or an existing employee."
   }),
+  hireType: z.enum(["pre_start", "new_hire", "existing"]).optional(),
   accessOverrides: z
     .object({
       granted: z.array(z.string().trim().min(1).max(100)).default([]),
@@ -399,18 +400,6 @@ export async function POST(request: Request) {
     });
   }
 
-  const authMutationBlockReason = getAuthMutationBlockReason();
-  if (authMutationBlockReason) {
-    return jsonResponse<null>(409, {
-      data: null,
-      error: {
-        code: "AUTH_MUTATION_BLOCKED",
-        message: authMutationBlockReason
-      },
-      meta: buildMeta()
-    });
-  }
-
   let body: unknown;
 
   try {
@@ -463,6 +452,18 @@ export async function POST(request: Request) {
       error: {
         code: "VALIDATION_ERROR",
         message: parsedBody.error.issues[0]?.message ?? "Invalid person payload."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const authMutationBlockReason = getAuthMutationBlockReason();
+  if (authMutationBlockReason) {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "AUTH_MUTATION_BLOCKED",
+        message: authMutationBlockReason
       },
       meta: buildMeta()
     });
@@ -549,8 +550,13 @@ export async function POST(request: Request) {
   const normalizedEmail = payload.email.trim().toLowerCase();
   const authRedirectUrl = resolveAuthRedirectUrl(request);
 
-  const isNewEmployee = payload.isNewEmployee;
-  const profileStatus: ProfileStatus = isNewEmployee ? "onboarding" : "active";
+  const isPreStart = payload.hireType === "pre_start";
+  const isNewEmployee = isPreStart ? false : payload.isNewEmployee;
+  const profileStatus: ProfileStatus = isPreStart
+    ? "pre_start"
+    : isNewEmployee
+      ? "onboarding"
+      : "active";
   const startDate = payload.startDate?.trim() || null;
   const payrollMode = normalizePayrollMode(payload.employmentType, payload.payrollMode);
   const primaryCurrency = payload.primaryCurrency.trim().toUpperCase();
@@ -664,6 +670,157 @@ export async function POST(request: Request) {
       }
     }
   }
+
+  // ── Pre-start path: placeholder auth user, profile, no onboarding ──────
+
+  if (isPreStart) {
+    // Check for duplicate email in existing profiles
+    const { data: existingProfile } = await serviceRoleClient
+      .from("profiles")
+      .select("id")
+      .eq("org_id", profile.org_id)
+      .eq("email", normalizedEmail)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "A person with this email already exists in this organisation."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    // Create a placeholder auth user (unconfirmed email → cannot log in).
+    // The "Begin onboarding" step will confirm the email and set a real password.
+    const placeholderPassword = crypto.randomUUID();
+    const { data: authData, error: authError } = await serviceRoleClient.auth.admin.createUser({
+      email: normalizedEmail,
+      password: placeholderPassword,
+      email_confirm: false,
+      user_metadata: { full_name: payload.fullName.trim(), pre_start: true }
+    });
+
+    if (authError || !authData.user) {
+      const message =
+        authError?.message.includes("already") || authError?.message.includes("registered")
+          ? "An auth user with this email already exists."
+          : "Unable to create placeholder authentication user.";
+      return jsonResponse<null>(422, {
+        data: null,
+        error: { code: "AUTH_USER_CREATE_FAILED", message },
+        meta: buildMeta()
+      });
+    }
+
+    const preStartId = authData.user.id;
+
+    const { data: insertedProfile, error: insertProfileError } = await serviceRoleClient
+      .from("profiles")
+      .insert({
+        id: preStartId,
+        org_id: profile.org_id,
+        email: normalizedEmail,
+        full_name: payload.fullName.trim(),
+        roles,
+        department: normalizedDepartment,
+        title: payload.title?.trim() || null,
+        country_code: countryCode,
+        timezone: payload.timezone?.trim() || null,
+        phone: payload.phone?.trim() || null,
+        start_date: startDate,
+        manager_id: payload.managerId ?? null,
+        employment_type: payload.employmentType as EmploymentType,
+        payroll_mode: payrollMode,
+        primary_currency: primaryCurrency,
+        status: profileStatus,
+        employee_type_at_creation: "pre_start"
+      })
+      .select(
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
+      )
+      .single();
+
+    if (insertProfileError || !insertedProfile) {
+      // Rollback: delete the placeholder auth user
+      await serviceRoleClient.auth.admin.deleteUser(preStartId).catch(() => undefined);
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PROFILE_CREATE_FAILED",
+          message: "Unable to create profile record."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedInsertedProfile = profileRowSchema.safeParse(insertedProfile);
+
+    if (!parsedInsertedProfile.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PROFILE_PARSE_FAILED",
+          message: "Created profile data is not in the expected shape."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const postLookupIds = [parsedInsertedProfile.data.manager_id].filter(
+      (id): id is string => Boolean(id)
+    );
+
+    let postNameById = new Map<string, string>();
+
+    if (postLookupIds.length > 0) {
+      const { data: nameRows } = await serviceRoleClient
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", postLookupIds)
+        .eq("org_id", profile.org_id)
+        .is("deleted_at", null);
+
+      postNameById = new Map(
+        (nameRows ?? [])
+          .filter(
+            (row): row is { id: string; full_name: string } =>
+              typeof row?.id === "string" && typeof row?.full_name === "string"
+          )
+          .map((row) => [row.id, row.full_name])
+      );
+    }
+
+    const person = mapProfileRow(parsedInsertedProfile.data, postNameById, null);
+
+    await logAudit({
+      action: "created",
+      tableName: "profiles",
+      recordId: person.id,
+      newValue: {
+        email: person.email,
+        fullName: person.fullName,
+        roles: person.roles,
+        department: person.department,
+        countryCode: person.countryCode,
+        employmentType: person.employmentType,
+        payrollMode: person.payrollMode,
+        status: person.status,
+        hireType: "pre_start"
+      }
+    });
+
+    return jsonResponse<PeopleCreateResponseData>(201, {
+      data: { person },
+      error: null,
+      meta: buildMeta()
+    });
+  }
+
+  // ── Standard path: create auth user + profile + onboarding ────────────
 
   /* Create the auth user with a temporary random password.
      After creation, we immediately replace it with the system-derived
@@ -893,6 +1050,7 @@ export async function POST(request: Request) {
       payrollMode: person.payrollMode,
       status: person.status,
       isNewEmployee,
+      hireType: payload.hireType ?? (isNewEmployee ? "new_hire" : "existing"),
       onboardingTemplateId: onboardingTemplate?.id ?? null,
       onboardingInstanceId
     }

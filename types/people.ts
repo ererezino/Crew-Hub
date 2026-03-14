@@ -16,7 +16,8 @@ export const PROFILE_STATUSES = [
   "active",
   "inactive",
   "onboarding",
-  "offboarding"
+  "offboarding",
+  "pre_start"
 ] as const;
 
 export type ProfileStatus = (typeof PROFILE_STATUSES)[number];
@@ -95,6 +96,10 @@ export type PeopleAccessOverrides = {
   revoked: string[];
 };
 
+export const HIRE_TYPES = ["pre_start", "new_hire", "existing"] as const;
+
+export type HireType = (typeof HIRE_TYPES)[number];
+
 export type PeopleCreatePayload = {
   email: string;
   fullName: string;
@@ -110,7 +115,27 @@ export type PeopleCreatePayload = {
   payrollMode?: PayrollMode;
   primaryCurrency: string;
   isNewEmployee?: boolean;
+  hireType?: HireType;
   accessOverrides?: PeopleAccessOverrides;
+};
+
+// ── Pre-Start Contracts ──
+
+export const CONTRACT_STATUSES = ["draft", "sent", "signed", "voided"] as const;
+
+export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
+
+export type PreStartContract = {
+  id: string;
+  personId: string;
+  title: string;
+  notes: string | null;
+  status: ContractStatus;
+  sentAt: string | null;
+  signedAt: string | null;
+  voidedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type PeopleUpdatePayload = {

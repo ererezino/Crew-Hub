@@ -61,6 +61,7 @@ const PROFILE_STATUS_LABELS_EN: Record<string, string> = {
   inactive: "Inactive",
   onboarding: "Onboarding",
   offboarding: "Offboarding",
+  pre_start: "Pre-start",
   suspended: "Suspended",
   terminated: "Terminated"
 };
@@ -70,6 +71,7 @@ const PROFILE_STATUS_LABELS_FR: Record<string, string> = {
   inactive: "Inactif",
   onboarding: "Intégration",
   offboarding: "Départ",
+  pre_start: "Pré-embauche",
   suspended: "Suspendu",
   terminated: "Résilié"
 };

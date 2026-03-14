@@ -4842,8 +4842,11 @@
       "creating": "Creating...",
       "createPerson": "Create person",
       "employeeTypeLabel": "Employee type",
+      "hireTypeLabel": "Hire type",
+      "preStart": "Pre-start",
       "newHire": "New hire",
       "existingEmployee": "Existing employee",
+      "preStartHint": "Pre-start creates a profile only — no account, no onboarding. Use this for people who have accepted an offer but haven't started yet.",
       "newHireHint": "New hires get an onboarding checklist and welcome email.",
       "existingEmployeeHint": "Existing team members get a profile only.",
       "emailLabel": "Email",
@@ -4876,8 +4879,19 @@
       "statusHintOnboardingToActive": "Leave balances will be created and any active onboarding plan will be closed.",
       "statusHintToInactive": "This person's access will be revoked immediately.",
       "statusHintToOnboarding": "This will mark them as a new hire in onboarding.",
+      "statusHintPreStartToInactive": "This will rescind the offer and mark the person as inactive.",
+      "beginOnboarding": "Begin onboarding",
+      "beginningOnboarding": "Starting…",
+      "rescind": "Rescind offer",
       "teamLeadLabel": "Operational lead",
       "noTeamLead": "Same as manager"
+    },
+    "rescindDialog": {
+      "title": "Rescind offer",
+      "ariaLabel": "Rescind offer confirmation",
+      "description": "Are you sure you want to rescind the offer for {name}? This will mark them as inactive. This action cannot be undone.",
+      "confirm": "Rescind",
+      "rescinding": "Rescinding…"
     },
     "bulkUpload": {
       "title": "Bulk Upload",
@@ -4951,7 +4965,8 @@
       "duplicateEmail": "Duplicate email within this file.",
       "employmentTypeInvalid": "Employment type must be contractor, full_time, or part_time.",
       "managerEmailInvalid": "Manager email is not valid.",
-      "selectEmployeeType": "Choose whether this is a new hire or an existing employee."
+      "selectEmployeeType": "Choose whether this is a new hire or an existing employee.",
+      "selectHireType": "Choose a hire type: pre-start, new hire, or existing employee."
     },
     "bulkValidation": {
       "csvRequired": "Please upload a .csv file.",
@@ -4980,7 +4995,11 @@
       "sessionExpired": "Your session has expired. Please sign in again.",
       "noInvitePermission": "You do not have permission to send invites.",
       "personNotFound": "Person not found. Refresh and try again.",
-      "unableToSaveChanges": "Unable to save changes."
+      "unableToSaveChanges": "Unable to save changes.",
+      "beginOnboardingSuccess": "Onboarding started for {name}.",
+      "beginOnboardingFailed": "Unable to start onboarding.",
+      "rescindSuccess": "Offer rescinded for {name}.",
+      "rescindFailed": "Unable to rescind offer."
     },
     "dismissNotification": "Dismiss notification"
   },

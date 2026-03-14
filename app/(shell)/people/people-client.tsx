@@ -58,6 +58,8 @@ type ToastMessage = {
   variant: ToastVariant;
 };
 
+type HireTypeSelection = "pre_start" | "new_hire" | "existing" | null;
+
 type CreatePersonFormValues = {
   email: string;
   fullName: string;
@@ -73,6 +75,7 @@ type CreatePersonFormValues = {
   primaryCurrency: string;
   status: ProfileStatus;
   isNewHire: boolean | null;
+  hireType: HireTypeSelection;
 };
 
 type CreatePersonFormErrors = Partial<Record<keyof CreatePersonFormValues, string>> & {
@@ -124,7 +127,8 @@ function createValidationSchema(tv: (key: string) => string) {
       .trim()
       .length(3, tv('validation.currencyCode')),
     status: z.enum(PROFILE_STATUSES),
-    isNewHire: z.boolean({ error: tv('validation.selectEmployeeType') })
+    isNewHire: z.boolean({ error: tv('validation.selectEmployeeType') }),
+    hireType: z.enum(["pre_start", "new_hire", "existing"], { error: tv('validation.selectHireType') })
   });
 }
 
@@ -165,7 +169,8 @@ const initialCreatePersonFormValues: CreatePersonFormValues = {
   employmentType: "contractor",
   primaryCurrency: "USD",
   status: "active",
-  isNewHire: null
+  isNewHire: null,
+  hireType: null
 };
 
 function createToastId() {
@@ -192,6 +197,8 @@ function toneForProfileStatus(status: ProfileStatus) {
       return "processing" as const;
     case "offboarding":
       return "warning" as const;
+    case "pre_start":
+      return "info" as const;
     case "inactive":
     default:
       return "draft" as const;
@@ -226,7 +233,8 @@ function mapSchemaErrors(values: CreatePersonFormValues, schema: z.ZodObject<z.Z
     employmentType: values.employmentType,
     primaryCurrency: values.primaryCurrency,
     status: values.status,
-    isNewHire: values.isNewHire
+    isNewHire: values.isNewHire,
+    hireType: values.hireType
   });
 
   if (parsed.success) {
@@ -248,7 +256,8 @@ function mapSchemaErrors(values: CreatePersonFormValues, schema: z.ZodObject<z.Z
     managerId: fieldErrors.managerId?.[0],
     employmentType: fieldErrors.employmentType?.[0],
     primaryCurrency: fieldErrors.primaryCurrency?.[0],
-    status: fieldErrors.status?.[0]
+    status: fieldErrors.status?.[0],
+    hireType: fieldErrors.hireType?.[0]
   };
 }
 
@@ -524,6 +533,11 @@ export function PeopleClient({
   });
   const [editErrors, setEditErrors] = useState<EditPersonFormErrors>({});
   const [isEditSaving, setIsEditSaving] = useState(false);
+
+  // Pre-start actions state
+  const [isBeginningOnboarding, setIsBeginningOnboarding] = useState(false);
+  const [rescindTarget, setRescindTarget] = useState<PersonRecord | null>(null);
+  const [isRescinding, setIsRescinding] = useState(false);
 
   // Invite state
   const [invitingId, setInvitingId] = useState<string | null>(null);
@@ -808,6 +822,61 @@ export function PeopleClient({
     }
   }, [editPerson, editValues, closeEditPanel, setPeople, t, td]);
 
+  /* ── Pre-start action handlers ── */
+
+  const handleBeginOnboarding = useCallback(async (person: PersonRecord) => {
+    setIsBeginningOnboarding(true);
+    try {
+      const response = await fetch(`/api/v1/people/${person.id}/begin-onboarding`, {
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        addToast("error", humanizeError(payload?.error?.message ?? t('toast.beginOnboardingFailed')));
+        return;
+      }
+
+      closeEditPanel();
+      addToast("success", td('toast.beginOnboardingSuccess', { name: person.fullName }));
+      refresh();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : t('toast.beginOnboardingFailed'));
+    } finally {
+      setIsBeginningOnboarding(false);
+    }
+  }, [closeEditPanel, refresh, t, td]);
+
+  const handleRescind = useCallback(async () => {
+    if (!rescindTarget) return;
+    setIsRescinding(true);
+    try {
+      const response = await fetch(`/api/v1/people/${rescindTarget.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "inactive" })
+      });
+      const payload = (await response.json()) as PeopleUpdateResponse;
+
+      if (!response.ok || !payload.data?.person) {
+        addToast("error", humanizeError(payload?.error?.message ?? t('toast.rescindFailed')));
+        return;
+      }
+
+      setPeople((current) =>
+        current.map((p) => (p.id === payload.data!.person.id ? payload.data!.person : p))
+      );
+
+      setRescindTarget(null);
+      closeEditPanel();
+      addToast("success", td('toast.rescindSuccess', { name: rescindTarget.fullName }));
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : t('toast.rescindFailed'));
+    } finally {
+      setIsRescinding(false);
+    }
+  }, [rescindTarget, closeEditPanel, setPeople, t, td]);
+
   /* ── Invite handlers ── */
 
   const closeInviteDialog = useCallback(() => {
@@ -960,8 +1029,13 @@ export function PeopleClient({
 
     const validationErrors = mapSchemaErrors(createValues, createPersonSchema);
 
-    if (createValues.isNewHire === null) {
-      validationErrors.isNewHire = t('validation.selectEmployeeType');
+    if (createValues.hireType === null) {
+      validationErrors.hireType = t('validation.selectHireType');
+    }
+
+    // Derive isNewHire from hireType for backward compat
+    if (createValues.hireType !== null && createValues.isNewHire === null) {
+      // Auto-set based on hireType selection
     }
 
     setCreateErrors(validationErrors);
@@ -993,7 +1067,8 @@ export function PeopleClient({
           employmentType: createValues.employmentType,
           primaryCurrency: createValues.primaryCurrency.trim().toUpperCase(),
           status: createValues.status,
-          isNewEmployee: createValues.isNewHire
+          isNewEmployee: createValues.hireType === "new_hire",
+          hireType: createValues.hireType
         })
       });
 
@@ -1320,31 +1395,41 @@ export function PeopleClient({
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleCreatePerson} noValidate>
           <div className="form-field">
-            <span className="form-label">{t('createPanel.employeeTypeLabel')}</span>
+            <span className="form-label">{t('createPanel.hireTypeLabel')}</span>
             <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
               <button
                 type="button"
-                className={createValues.isNewHire === true ? "button button-accent" : "button"}
+                className={createValues.hireType === "pre_start" ? "button button-accent" : "button"}
                 style={{ flex: 1, height: 36 }}
-                onClick={() => updateCreateValues({ ...createValues, isNewHire: true })}
+                onClick={() => updateCreateValues({ ...createValues, hireType: "pre_start", isNewHire: false })}
+              >
+                {t('createPanel.preStart')}
+              </button>
+              <button
+                type="button"
+                className={createValues.hireType === "new_hire" ? "button button-accent" : "button"}
+                style={{ flex: 1, height: 36 }}
+                onClick={() => updateCreateValues({ ...createValues, hireType: "new_hire", isNewHire: true })}
               >
                 {t('createPanel.newHire')}
               </button>
               <button
                 type="button"
-                className={createValues.isNewHire === false ? "button button-accent" : "button"}
+                className={createValues.hireType === "existing" ? "button button-accent" : "button"}
                 style={{ flex: 1, height: 36 }}
-                onClick={() => updateCreateValues({ ...createValues, isNewHire: false })}
+                onClick={() => updateCreateValues({ ...createValues, hireType: "existing", isNewHire: false })}
               >
                 {t('createPanel.existingEmployee')}
               </button>
             </div>
-            {createErrors.isNewHire ? <p className="form-field-error">{createErrors.isNewHire}</p> : null}
-            {createValues.isNewHire !== null ? (
+            {createErrors.hireType ? <p className="form-field-error">{createErrors.hireType}</p> : null}
+            {createValues.hireType !== null ? (
               <p className="form-field-hint">
-                {createValues.isNewHire
-                  ? t('createPanel.newHireHint')
-                  : t('createPanel.existingEmployeeHint')}
+                {createValues.hireType === "pre_start"
+                  ? t('createPanel.preStartHint')
+                  : createValues.hireType === "new_hire"
+                    ? t('createPanel.newHireHint')
+                    : t('createPanel.existingEmployeeHint')}
               </p>
             ) : null}
           </div>
@@ -1999,14 +2084,44 @@ export function PeopleClient({
                 <p className="form-field-hint">
                   {editValues.status === "active" && editPerson.status === "onboarding"
                     ? t('editPanel.statusHintOnboardingToActive')
-                    : editValues.status === "inactive"
-                      ? t('editPanel.statusHintToInactive')
-                      : editValues.status === "onboarding" && editPerson.status === "active"
-                        ? t('editPanel.statusHintToOnboarding')
-                        : null}
+                    : editValues.status === "inactive" && editPerson.status === "pre_start"
+                      ? t('editPanel.statusHintPreStartToInactive')
+                      : editValues.status === "inactive"
+                        ? t('editPanel.statusHintToInactive')
+                        : editValues.status === "onboarding" && editPerson.status === "active"
+                          ? t('editPanel.statusHintToOnboarding')
+                          : null}
                 </p>
               ) : null}
             </label>
+
+            {/* Begin onboarding / Rescind for pre_start people */}
+            {editPerson && editPerson.status === "pre_start" ? (
+              <div className="pre-start-actions" style={{ borderTop: "1px solid var(--border-default)", paddingTop: "var(--space-3)", display: "flex", gap: "var(--space-2)" }}>
+                <button
+                  type="button"
+                  className="button button-accent"
+                  style={{ flex: 1 }}
+                  disabled={isEditSaving || isBeginningOnboarding}
+                  onClick={() => {
+                    if (editPerson) void handleBeginOnboarding(editPerson);
+                  }}
+                >
+                  {isBeginningOnboarding ? t('editPanel.beginningOnboarding') : t('editPanel.beginOnboarding')}
+                </button>
+                <button
+                  type="button"
+                  className="button button-danger"
+                  style={{ flex: 1 }}
+                  disabled={isEditSaving || isBeginningOnboarding}
+                  onClick={() => {
+                    if (editPerson) setRescindTarget(editPerson);
+                  }}
+                >
+                  {t('editPanel.rescind')}
+                </button>
+              </div>
+            ) : null}
 
             <div className="slide-panel-actions">
               <button type="button" className="button" onClick={closeEditPanel} disabled={isEditSaving}>
@@ -2180,6 +2295,45 @@ export function PeopleClient({
                 disabled={resettingId !== null}
               >
                 {resettingId ? t('resetDialog.resetting') : resetSetupLink ? t('resetDialog.generateNewLink') : t('resetDialog.resetAuthenticator')}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/* ── Rescind Confirmation Dialog ── */}
+      {rescindTarget !== null ? (
+        <div
+          className="modal-overlay"
+          onClick={() => { if (!isRescinding) setRescindTarget(null); }}
+        >
+          <section
+            className="confirm-dialog modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('rescindDialog.ariaLabel')}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="modal-title">{t('rescindDialog.title')}</h2>
+            <p className="settings-card-description">
+              {td('rescindDialog.description', { name: rescindTarget.fullName })}
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={() => setRescindTarget(null)}
+                disabled={isRescinding}
+              >
+                {tCommon('cancel')}
+              </button>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={() => { void handleRescind(); }}
+                disabled={isRescinding}
+              >
+                {isRescinding ? t('rescindDialog.rescinding') : t('rescindDialog.confirm')}
               </button>
             </div>
           </section>

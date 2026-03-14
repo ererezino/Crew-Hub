@@ -50,13 +50,15 @@ export function deriveAccessStatus(
 /**
  * Allowed status transitions for the People update flow.
  *
- * onboarding → active    Normal onboarding completion
- * onboarding → inactive  No-show / rescinded offer
- * active → offboarding   Employee begins structured departure
- * active → inactive      Immediate termination / contract end
- * offboarding → inactive Offboarding complete, last day passed
- * offboarding → active   Offboarding cancelled, employee stays
- * inactive → active      Rehire / reactivation
+ * pre_start → onboarding  Begin onboarding (creates auth user + onboarding instance)
+ * pre_start → inactive    Rescind offer
+ * onboarding → active     Normal onboarding completion
+ * onboarding → inactive   No-show / rescinded offer
+ * active → offboarding    Employee begins structured departure
+ * active → inactive       Immediate termination / contract end
+ * offboarding → inactive  Offboarding complete, last day passed
+ * offboarding → active    Offboarding cancelled, employee stays
+ * inactive → active       Rehire / reactivation
  *
  * Same-status transitions are always allowed (no-op).
  *
@@ -66,8 +68,10 @@ export function deriveAccessStatus(
  * inactive → offboarding    Must reactivate first
  * offboarding → onboarding  Backwards lifecycle
  * onboarding → offboarding  Never active, use inactive instead
+ * inactive → pre_start      Must create new profile
  */
 const ALLOWED_STATUS_TRANSITIONS: ReadonlyMap<ProfileStatus, ReadonlySet<ProfileStatus>> = new Map([
+  ["pre_start", new Set<ProfileStatus>(["onboarding", "inactive"])],
   ["onboarding", new Set<ProfileStatus>(["active", "inactive"])],
   ["active", new Set<ProfileStatus>(["offboarding", "inactive"])],
   ["offboarding", new Set<ProfileStatus>(["inactive", "active"])],

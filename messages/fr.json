@@ -4836,6 +4836,9 @@
       "departmentLabel": "Département",
       "emailLabel": "Courriel",
       "employeeTypeLabel": "Type d’employé",
+      "hireTypeLabel": "Type d’embauche",
+      "preStart": "Pré-embauche",
+      "preStartHint": "Pré-embauche crée un profil uniquement — pas de compte, pas d’intégration. Utilisez ceci pour les personnes qui ont accepté une offre mais n’ont pas encore commencé.",
       "employmentTypeLabel": "Type d’emploi",
       "existingEmployee": "Employé existant",
       "existingEmployeeHint": "Les membres existants reçoivent uniquement un profil.",
@@ -4867,8 +4870,19 @@
       "statusHintOnboardingToActive": "Les soldes de congés seront créés et tout plan d'intégration actif sera clôturé.",
       "statusHintToInactive": "L'accès de cette personne sera révoqué immédiatement.",
       "statusHintToOnboarding": "Cette personne sera marquée comme nouvelle recrue en intégration.",
+      "statusHintPreStartToInactive": "Cela annulera l'offre et marquera la personne comme inactive.",
+      "beginOnboarding": "Démarrer l'intégration",
+      "beginningOnboarding": "Démarrage…",
+      "rescind": "Annuler l'offre",
       "teamLeadLabel": "Responsable opérationnel",
       "noTeamLead": "Même que le responsable"
+    },
+    "rescindDialog": {
+      "title": "Annuler l'offre",
+      "ariaLabel": "Confirmation d'annulation de l'offre",
+      "description": "Êtes-vous sûr de vouloir annuler l'offre pour {name} ? Cette personne sera marquée comme inactive. Cette action est irréversible.",
+      "confirm": "Annuler l'offre",
+      "rescinding": "Annulation…"
     },
     "bulkUpload": {
       "title": "Import groupé",
@@ -4942,7 +4956,8 @@
       "duplicateEmail": "Adresse e-mail en double dans ce fichier.",
       "employmentTypeInvalid": "Le type de contrat doit être contractor, full_time ou part_time.",
       "managerEmailInvalid": "L'adresse e-mail du responsable n'est pas valide.",
-      "selectEmployeeType": "Choisissez s'il s'agit d'une nouvelle recrue ou d'un employé existant."
+      "selectEmployeeType": "Choisissez s'il s'agit d'une nouvelle recrue ou d'un employé existant.",
+      "selectHireType": "Choisissez un type d'embauche : pré-embauche, nouvelle recrue ou employé existant."
     },
     "bulkValidation": {
       "csvRequired": "Veuillez importer un fichier .csv.",
@@ -4971,6 +4986,10 @@
       "noInvitePermission": "Vous n'avez pas la permission d'envoyer des invitations.",
       "personNotFound": "Personne introuvable. Actualisez et réessayez.",
       "unableToSaveChanges": "Impossible d'enregistrer les modifications.",
+      "beginOnboardingSuccess": "Intégration démarrée pour {name}.",
+      "beginOnboardingFailed": "Impossible de démarrer l'intégration.",
+      "rescindSuccess": "Offre annulée pour {name}.",
+      "rescindFailed": "Impossible d'annuler l'offre.",
       "unableToCreatePerson": "Impossible de créer la personne."
     },
     "dismissNotification": "Fermer la notification"
