@@ -43,7 +43,7 @@ export function ApprovalsClient({
   const searchParams = useSearchParams();
 
   const canManagerApproveExpenses =
-    hasRole(userRoles, "MANAGER") || hasRole(userRoles, "SUPER_ADMIN");
+    hasRole(userRoles, "TEAM_LEAD") || hasRole(userRoles, "MANAGER") || hasRole(userRoles, "SUPER_ADMIN");
   const canFinanceApproveExpenses =
     hasRole(userRoles, "FINANCE_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
 
@@ -102,13 +102,13 @@ export function ApprovalsClient({
         key: "time-off",
         label: t('tab.timeOff'),
         badge: timeOffCount,
-        requiredRoles: ["MANAGER", "HR_ADMIN", "SUPER_ADMIN"]
+        requiredRoles: ["TEAM_LEAD", "MANAGER", "HR_ADMIN", "SUPER_ADMIN"]
       },
       {
         key: "expenses",
         label: t('tab.expenses'),
         badge: expensesCount,
-        requiredRoles: ["MANAGER", "FINANCE_ADMIN", "SUPER_ADMIN"]
+        requiredRoles: ["TEAM_LEAD", "MANAGER", "FINANCE_ADMIN", "SUPER_ADMIN"]
       }
     ],
     [expensesCount, timeOffCount, totalPendingCount, t]

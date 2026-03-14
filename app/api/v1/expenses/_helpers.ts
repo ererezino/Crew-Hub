@@ -86,7 +86,7 @@ export function canApproveExpenses(roles: readonly UserRole[]): boolean {
 }
 
 export function canManagerApproveExpenses(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "MANAGER") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "MANAGER") || hasRole(roles, "TEAM_LEAD") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export function canFinanceApproveExpenses(roles: readonly UserRole[]): boolean {
