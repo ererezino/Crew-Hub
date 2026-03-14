@@ -2,6 +2,10 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import {
+  getEffectiveApproverScope,
+  resolveDelegationContext
+} from "../../../../../lib/delegation";
 import { logger } from "../../../../../lib/logger";
 import {
   sendExpenseApprovedEmail,
@@ -12,6 +16,7 @@ import { createBulkNotifications, createNotification } from "../../../../../lib/
 import { parseIntegerAmount } from "../../../../../lib/expenses";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type {
   ExpenseAction,
   ExpenseMutationResponseData,
@@ -173,8 +178,9 @@ export async function PATCH(
 
   const payload: UpdateExpensePayload = parsedBody.data;
   const supabase = await createSupabaseServerClient();
+  const svcClient = createSupabaseServiceRoleClient();
 
-  const { data: rawExpenseRow, error: expenseError } = await supabase
+  const { data: rawExpenseRow, error: expenseError } = await svcClient
     .from("expenses")
     .select(expenseSelectColumns)
     .eq("id", expenseId)
@@ -213,35 +219,27 @@ export async function PATCH(
   const canCancelAsOwner = session.profile.id === expense.employee_id;
   const nowIso = new Date().toISOString();
 
-  let managerOwnsEmployee = false;
+  // Delegation-aware authorization: resolve operational scope
+  let isOperationalLeadOrDelegate = false;
+  let delegationCtx = { actingFor: null as string | null, delegateType: null as string | null };
+
   if (!isSuperAdmin && hasManagerApprovalAccess) {
-    const { data: rawEmployeeProfile, error: employeeProfileError } = await supabase
-      .from("profiles")
-      .select("id, manager_id")
-      .eq("id", expense.employee_id)
-      .eq("org_id", session.profile.org_id)
-      .is("deleted_at", null)
-      .maybeSingle();
+    const scope = await getEffectiveApproverScope({
+      supabase,
+      orgId: session.profile.org_id,
+      userId: session.profile.id,
+      scope: "expense"
+    });
 
-    if (employeeProfileError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "EXPENSE_MANAGER_SCOPE_FAILED",
-          message: "Unable to verify manager approval scope."
-        },
-        meta: buildMeta()
-      });
+    const allReportIds = [...scope.directReportIds, ...scope.delegatedReportIds];
+    isOperationalLeadOrDelegate = allReportIds.includes(expense.employee_id);
+
+    if (isOperationalLeadOrDelegate) {
+      delegationCtx = resolveDelegationContext(expense.employee_id, scope);
     }
-
-    const parsedEmployeeProfile = profileManagerSchema.safeParse(rawEmployeeProfile);
-    managerOwnsEmployee =
-      parsedEmployeeProfile.success &&
-      parsedEmployeeProfile.data.manager_id === session.profile.id &&
-      parsedEmployeeProfile.data.id !== session.profile.id;
   }
 
-  const canManagerApproveThisExpense = isSuperAdmin || managerOwnsEmployee;
+  const canManagerApproveThisExpense = isSuperAdmin || isOperationalLeadOrDelegate;
   const normalizedAction: ExpenseAction =
     payload.action === "mark_reimbursed" ? "approve" : payload.action;
 
@@ -275,6 +273,8 @@ export async function PATCH(
         status: "manager_approved",
         manager_approved_by: session.profile.id,
         manager_approved_at: nowIso,
+        manager_acting_for: delegationCtx.actingFor,
+        manager_delegate_type: delegationCtx.delegateType,
         approved_by: session.profile.id,
         approved_at: nowIso,
         rejected_by: null,
@@ -375,6 +375,8 @@ export async function PATCH(
         rejected_by: session.profile.id,
         rejected_at: nowIso,
         rejection_reason: payload.rejectionReason.trim(),
+        manager_acting_for: delegationCtx.actingFor,
+        manager_delegate_type: delegationCtx.delegateType,
         manager_approved_by: null,
         manager_approved_at: null,
         approved_by: null,
@@ -473,7 +475,7 @@ export async function PATCH(
     });
   }
 
-  const { data: updatedExpenseRaw, error: updateExpenseError } = await supabase
+  const { data: updatedExpenseRaw, error: updateExpenseError } = await svcClient
     .from("expenses")
     .update(updatePayload)
     .eq("id", expenseId)
@@ -510,7 +512,7 @@ export async function PATCH(
   }
 
   const profileIds = collectProfileIds([parsedUpdatedExpense.data]);
-  const { data: rawProfiles, error: profilesError } = await supabase
+  const { data: rawProfiles, error: profilesError } = await svcClient
     .from("profiles")
     .select("id, full_name, department, country_code, manager_id")
     .eq("org_id", session.profile.org_id)
@@ -584,7 +586,7 @@ export async function PATCH(
 
   if (normalizedAction === "approve" && updatedExpense.status === "manager_approved") {
     const financeAdminUserIds = await listFinanceAdminIds({
-      supabase,
+      supabase: svcClient,
       orgId: session.profile.org_id
     });
 

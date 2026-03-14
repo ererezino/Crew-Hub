@@ -1395,12 +1395,14 @@ export function ExpensesClient({
                         ? td("timeline.approvedByOnBehalf", { name: expense.managerApprovedByName, principal: expense.managerActingForName })
                         : td("timeline.approvedBy", { name: expense.managerApprovedByName })
                       : expense.status === "rejected"
-                        ? td("timeline.rejectedByWithReason", {
-                            name: expense.rejectedByName ?? td("timeline.managerFallback"),
-                            reason: expense.rejectionReason
-                              ? td("timeline.reasonSuffix", { reason: expense.rejectionReason })
+                        ? [
+                            expense.managerActingForName
+                              ? td("timeline.rejectedByOnBehalf", { name: expense.rejectedByName ?? "Manager", principal: expense.managerActingForName })
+                              : td("timeline.rejectedBy", { name: expense.rejectedByName ?? "Manager" }),
+                            expense.rejectionReason
+                              ? ` ${td("timeline.rejectionReason", { reason: expense.rejectionReason })}`
                               : ""
-                          })
+                          ].join("")
                         : td("timeline.awaitingManager");
 
                     const financeDescription = expense.reimbursedAt
