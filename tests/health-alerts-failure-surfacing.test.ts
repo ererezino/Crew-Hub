@@ -26,7 +26,7 @@ function chainable(resolvedValue: { data?: unknown; error?: unknown; count?: unk
     then: (resolve: (v: unknown) => void) => resolve(resolvedValue)
   };
   for (const method of ["select", "eq", "neq", "is", "in", "gte", "lte", "order", "limit"]) {
-    (self as Record<string, ReturnType<typeof vi.fn>>)[method].mockReturnValue(self);
+    (self as unknown as Record<string, ReturnType<typeof vi.fn>>)[method].mockReturnValue(self);
   }
   self.maybeSingle.mockResolvedValue(resolvedValue);
   self.single.mockResolvedValue(resolvedValue);
