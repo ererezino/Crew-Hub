@@ -158,7 +158,7 @@ export function mapProfileRow(
     scheduleType: row.schedule_type ?? null,
     weekendShiftHours: row.weekend_shift_hours ?? null,
     crewTag,
-    inviteStatus: deriveAccessStatus(row.crew_hub_joined_at, row.first_invited_at),
+    accessStatus: deriveAccessStatus(row.crew_hub_joined_at, row.first_invited_at),
     crewHubJoinedAt: row.crew_hub_joined_at,
     firstInvitedAt: row.first_invited_at,
     accountSetupAt: row.account_setup_at,

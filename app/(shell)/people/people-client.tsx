@@ -1175,11 +1175,11 @@ export function PeopleClient({
                   ) : null}
                   {canViewAccessState ? (
                     <td>
-                      {person.inviteStatus === "signed_in" ? (
+                      {person.accessStatus === "signed_in" ? (
                         <span className="role-tag role-tag-active" title={t('table.accessSignedInTooltip')}>
                           {t('table.accessSignedIn')}
                         </span>
-                      ) : person.inviteStatus === "invited" ? (
+                      ) : person.accessStatus === "invited" ? (
                         <span className="role-tag role-tag-pending" title={t('table.accessInvitedTooltip')}>
                           {t('table.accessInvited')}
                         </span>
@@ -1242,7 +1242,7 @@ export function PeopleClient({
                             {t('table.edit')}
                           </button>
                         ) : null}
-                        {person.inviteStatus === "signed_in" && canResetAuthenticator ? (
+                        {person.accessStatus === "signed_in" && canResetAuthenticator ? (
                           <button
                             type="button"
                             className="table-row-action table-row-action-warning"
@@ -1252,7 +1252,7 @@ export function PeopleClient({
                             {resettingId === person.id ? t('table.resetting') : t('table.resetAuthenticator')}
                           </button>
                         ) : null}
-                        {person.inviteStatus === "invited" && canInvitePeople ? (
+                        {person.accessStatus === "invited" && canInvitePeople ? (
                           <button
                             type="button"
                             className="table-row-action table-row-action-accent"
@@ -1262,7 +1262,7 @@ export function PeopleClient({
                             {invitingId === person.id ? t('table.sending') : t('table.reInvite')}
                           </button>
                         ) : null}
-                        {person.inviteStatus === "not_invited" && canInvitePeople ? (
+                        {person.accessStatus === "not_invited" && canInvitePeople ? (
                           <button
                             type="button"
                             className="table-row-action table-row-action-accent"

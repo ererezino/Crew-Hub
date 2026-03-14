@@ -190,7 +190,7 @@ describe("mapProfileRow (W2.1)", () => {
     expect(person.socialLinkedin).toBe("https://linkedin.com/in/alice");
     expect(person.socialGithub).toBe("alice-gh");
     expect(person.crewTag).toBeNull();
-    expect(person.inviteStatus).toBe("signed_in");
+    expect(person.accessStatus).toBe("signed_in");
     expect(person.privacySettings).toEqual({ showEmail: true, showPhone: false });
   });
 
@@ -203,7 +203,7 @@ describe("mapProfileRow (W2.1)", () => {
     expect(person.socialLinkedin).toBeNull();
     expect(person.socialTwitter).toBeNull();
     expect(person.crewTag).toBe("CT-001");
-    expect(person.inviteStatus).toBe("signed_in");
+    expect(person.accessStatus).toBe("signed_in");
   });
 
   it("resolves managerName as null when manager_id is not in map", () => {
@@ -315,7 +315,7 @@ describe("list vs detail route output equivalence (W2.1)", () => {
       "emergencyContactRelationship", "pronouns", "socialLinkedin",
       "socialTwitter", "socialInstagram", "socialGithub", "socialWebsite",
       "directoryVisible", "privacySettings", "scheduleType",
-      "weekendShiftHours", "crewTag", "inviteStatus",
+      "weekendShiftHours", "crewTag", "accessStatus",
       "crewHubJoinedAt", "firstInvitedAt", "accountSetupAt",
       "lastSeenAt", "createdAt", "updatedAt"
     ];
@@ -340,7 +340,7 @@ describe("list vs detail route output equivalence (W2.1)", () => {
     expect(listPerson.roles).toEqual(detailPerson.roles);
     expect(listPerson.department).toBe(detailPerson.department);
     expect(listPerson.status).toBe(detailPerson.status);
-    expect(listPerson.inviteStatus).toBe(detailPerson.inviteStatus);
+    expect(listPerson.accessStatus).toBe(detailPerson.accessStatus);
     expect(listPerson.managerName).toBe(detailPerson.managerName);
     expect(listPerson.privacySettings).toEqual(detailPerson.privacySettings);
   });
