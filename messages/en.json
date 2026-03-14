@@ -4787,6 +4787,10 @@
   "people": {
     "pageTitle": "People",
     "pageDescription": "Find teammates, review roles, and open full profiles.",
+    "tab": {
+      "directory": "Directory",
+      "orgChart": "Org Chart"
+    },
     "emptyState": {
       "unavailable": "People data is unavailable",
       "noCrew": "No crew members found",
@@ -5370,5 +5374,32 @@
     "acknowledged": "You acknowledged this policy on",
     "acknowledging": "Acknowledging…",
     "acknowledgeButton": "I have read and acknowledge this policy"
+  },
+  "orgChart": {
+    "loading": "Loading org chart…",
+    "errorTitle": "Unable to load org chart",
+    "emptyTitle": "No team members found",
+    "emptyDescription": "Assign managers to crew members to build the org chart.",
+    "toolbar": {
+      "operationalLeads": "Operational leads",
+      "showOperationalLeads": "Show operational lead relationships",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fitToScreen": "Fit to screen"
+    },
+    "sidePanel": {
+      "reportsTo": "Reports to",
+      "reportsToHint": "Formal reporting manager for HR and expense approval.",
+      "operationalLead": "Operational lead",
+      "operationalLeadHint": "Day-to-day lead for schedules and leave. Falls back to reporting manager when empty.",
+      "none": "None",
+      "fallbackToManager": "None (falls back to {name})",
+      "saveChanges": "Save changes",
+      "saveFailed": "Unable to save changes. Please try again.",
+      "confirmTitle": "Confirm relationship change",
+      "confirmChange": "Change {name}'s {field} from {oldValue} to {newValue}?",
+      "confirmSave": "Save",
+      "inactiveWarning": "This person is currently {status}. Relationship changes may have limited effect."
+    }
   }
 }

@@ -46,6 +46,8 @@ type PeopleClientProps = {
   canEditPeople: boolean;
   canResetAuthenticator: boolean;
   isAdmin?: boolean;
+  /** When true, the page header is rendered by the parent tabs wrapper. */
+  embedded?: boolean;
 };
 
 type ToastMessage = {
@@ -447,7 +449,8 @@ export function PeopleClient({
   canInvitePeople,
   canEditPeople,
   canResetAuthenticator,
-  isAdmin = false
+  isAdmin = false,
+  embedded = false
 }: PeopleClientProps) {
   const t = useTranslations('people');
   const tCommon = useTranslations('common');
@@ -1015,30 +1018,32 @@ export function PeopleClient({
 
   return (
     <>
-      <PageHeader
-        title={t('pageTitle')}
-        description={t('pageDescription')}
-        actions={
-          canCreatePeople ? (
-            <>
-              <button
-                type="button"
-                className="button"
-                onClick={() => setIsBulkUploadOpen(true)}
-              >
-                {t('bulkUpload.title')}
-              </button>
-              <button
-                type="button"
-                className="button button-accent"
-                onClick={() => setIsCreateOpen(true)}
-              >
-                {t('createPanel.addPersonButton')}
-              </button>
-            </>
-          ) : null
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          title={t('pageTitle')}
+          description={t('pageDescription')}
+          actions={
+            canCreatePeople ? (
+              <>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setIsBulkUploadOpen(true)}
+                >
+                  {t('bulkUpload.title')}
+                </button>
+                <button
+                  type="button"
+                  className="button button-accent"
+                  onClick={() => setIsCreateOpen(true)}
+                >
+                  {t('createPanel.addPersonButton')}
+                </button>
+              </>
+            ) : null
+          }
+        />
+      ) : null}
 
       {isLoading ? <PeopleTableSkeleton /> : null}
 

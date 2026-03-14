@@ -4778,6 +4778,10 @@
   "people": {
     "pageTitle": "Personnel",
     "pageDescription": "Trouvez des collègues, consultez les rôles et ouvrez les profils complets.",
+    "tab": {
+      "directory": "Répertoire",
+      "orgChart": "Organigramme"
+    },
     "emptyState": {
       "unavailable": "Les données du personnel sont indisponibles",
       "noCrew": "Aucun membre de l'équipe trouvé",
@@ -5360,5 +5364,32 @@
     "acknowledged": "Vous avez reconnu cette politique le",
     "acknowledging": "Confirmation en cours…",
     "acknowledgeButton": "J'ai lu et je reconnais cette politique"
+  },
+  "orgChart": {
+    "loading": "Chargement de l'organigramme…",
+    "errorTitle": "Impossible de charger l'organigramme",
+    "emptyTitle": "Aucun membre d'équipe trouvé",
+    "emptyDescription": "Attribuez des managers aux membres de l'équipe pour construire l'organigramme.",
+    "toolbar": {
+      "operationalLeads": "Responsables opérationnels",
+      "showOperationalLeads": "Afficher les relations de responsable opérationnel",
+      "zoomIn": "Zoom avant",
+      "zoomOut": "Zoom arrière",
+      "fitToScreen": "Ajuster à l'écran"
+    },
+    "sidePanel": {
+      "reportsTo": "Rend compte à",
+      "reportsToHint": "Manager hiérarchique pour les RH et l'approbation des dépenses.",
+      "operationalLead": "Responsable opérationnel",
+      "operationalLeadHint": "Responsable quotidien pour les plannings et les congés. Revient au manager hiérarchique si vide.",
+      "none": "Aucun",
+      "fallbackToManager": "Aucun (revient à {name})",
+      "saveChanges": "Enregistrer",
+      "saveFailed": "Impossible d'enregistrer les modifications. Veuillez réessayer.",
+      "confirmTitle": "Confirmer le changement de relation",
+      "confirmChange": "Changer le {field} de {name} de {oldValue} à {newValue} ?",
+      "confirmSave": "Enregistrer",
+      "inactiveWarning": "Cette personne est actuellement {status}. Les changements de relation peuvent avoir un effet limité."
+    }
   }
 }

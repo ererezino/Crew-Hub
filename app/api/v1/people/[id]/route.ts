@@ -400,6 +400,70 @@ export async function PUT(
     }
   }
 
+  // Circular manager chain detection
+  if (payload.managerId) {
+    const chainIds: string[] = [payload.managerId];
+    for (let i = 0; i < chainIds.length && i < 20; i++) {
+      const currentId = chainIds[i];
+      if (currentId === personId) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "This manager assignment would create a circular reporting chain."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      const { data: chainRow } = await serviceRoleClient
+        .from("profiles")
+        .select("manager_id")
+        .eq("id", currentId)
+        .eq("org_id", session.profile.org_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      const nextId = (chainRow as { manager_id: string | null } | null)?.manager_id;
+      if (nextId && !chainIds.includes(nextId)) {
+        chainIds.push(nextId);
+      }
+    }
+  }
+
+  // Circular operational lead chain detection
+  if (payload.teamLeadId) {
+    const chainIds: string[] = [payload.teamLeadId];
+    for (let i = 0; i < chainIds.length && i < 20; i++) {
+      const currentId = chainIds[i];
+      if (currentId === personId) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "This operational lead assignment would create a circular chain."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      const { data: chainRow } = await serviceRoleClient
+        .from("profiles")
+        .select("team_lead_id, manager_id")
+        .eq("id", currentId)
+        .eq("org_id", session.profile.org_id)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      // Walk operational lead chain: team_lead_id if set, else manager_id (fallback)
+      const row = chainRow as { team_lead_id: string | null; manager_id: string | null } | null;
+      const nextId = row?.team_lead_id ?? row?.manager_id;
+      if (nextId && !chainIds.includes(nextId)) {
+        chainIds.push(nextId);
+      }
+    }
+  }
+
   const updateValues: {
     full_name?: string;
     roles?: string[];
