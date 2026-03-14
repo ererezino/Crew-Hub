@@ -102,6 +102,10 @@ vi.mock("../lib/audit", () => ({
   logAudit: vi.fn(async () => undefined)
 }));
 
+vi.mock("../lib/onboarding/auto-transition", () => ({
+  createLeaveBalancesForActivation: vi.fn(async () => undefined)
+}));
+
 vi.mock("../lib/logger", () => ({
   logger: {
     debug: vi.fn(),

@@ -12,6 +12,7 @@ import {
   parseDepartment
 } from "../../../../../lib/departments";
 import { USER_ROLES } from "../../../../../lib/navigation";
+import { createLeaveBalancesForActivation } from "../../../../../lib/onboarding/auto-transition";
 import {
   buildMeta,
   jsonResponse,
@@ -518,82 +519,17 @@ export async function PUT(
     });
   }
 
-  // Auto-create leave balances for all applicable types when status changes to "active"
+  // Auto-create leave balances when status changes to "active"
   if (
     payload.status === "active" &&
     parsedExistingProfile.data.status !== "active"
   ) {
-    try {
-      const currentYear = new Date().getUTCFullYear();
-      const employeeCountryCode = parsedUpdatedRow.data.country_code;
-
-      // Fetch all leave policies for the employee's country
-      const { data: policies } = await serviceRoleClient
-        .from("leave_policies")
-        .select("leave_type, default_days_per_year, is_unlimited")
-        .eq("org_id", session.profile.org_id)
-        .eq("country_code", employeeCountryCode ?? "")
-        .is("deleted_at", null);
-
-      // Determine which leave types need balances (skip unlimited and probation-only)
-      const balanceTypes = (policies ?? []).filter(
-        (p) => !p.is_unlimited && p.leave_type !== "unpaid_personal_day"
-      );
-
-      for (const policy of balanceTypes) {
-        const { data: existingBalance } = await serviceRoleClient
-          .from("leave_balances")
-          .select("id")
-          .eq("org_id", session.profile.org_id)
-          .eq("employee_id", personId)
-          .eq("year", currentYear)
-          .eq("leave_type", policy.leave_type)
-          .is("deleted_at", null)
-          .maybeSingle();
-
-        if (!existingBalance) {
-          let totalDays = policy.leave_type === "annual_leave" ? 20 : 5;
-
-          if (policy.default_days_per_year) {
-            const policyDays =
-              typeof policy.default_days_per_year === "string"
-                ? Number.parseFloat(policy.default_days_per_year)
-                : (policy.default_days_per_year as number);
-
-            if (Number.isFinite(policyDays) && policyDays > 0) {
-              totalDays = policyDays;
-            }
-          }
-
-          const { error: balanceError } = await serviceRoleClient
-            .from("leave_balances")
-            .insert({
-              org_id: session.profile.org_id,
-              employee_id: personId,
-              leave_type: policy.leave_type,
-              year: currentYear,
-              total_days: totalDays,
-              used_days: 0,
-              pending_days: 0,
-              carried_days: 0
-            });
-
-          if (balanceError) {
-            logger.error("Unable to auto-create leave balance on activation.", {
-              personId,
-              leaveType: policy.leave_type,
-              year: currentYear,
-              message: balanceError.message
-            });
-          }
-        }
-      }
-    } catch (error) {
-      logger.error("Leave balance auto-creation failed (non-blocking).", {
-        personId,
-        message: error instanceof Error ? error.message : String(error)
-      });
-    }
+    await createLeaveBalancesForActivation({
+      supabase: serviceRoleClient,
+      orgId: session.profile.org_id,
+      employeeId: personId,
+      countryCode: parsedUpdatedRow.data.country_code
+    });
   }
 
   /* Auto-complete/cancel onboarding instances when transitioning away from "onboarding".
