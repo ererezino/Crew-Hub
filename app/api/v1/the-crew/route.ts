@@ -19,7 +19,7 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
  *
  * Returns all visible crew members for the social "The Crew" page.
  * Respects privacy settings — hides bio/interests when the user has opted out.
- * Only returns active + onboarding members who have been invited or are active.
+ * Only returns active + onboarding members with directory_visible = true.
  */
 export async function GET() {
   const session = await getAuthenticatedSession();
@@ -35,16 +35,13 @@ export async function GET() {
   const orgId = session.profile.org_id;
   const serviceClient = createSupabaseServiceRoleClient();
 
-  // invite_status is derived, not a real column. We use account_setup_at/last_seen_at
-  // to determine if the person has actually accepted their invite.
-  // "not_invited" = no account_setup_at AND no last_seen_at (exclude these)
   const { data: rows, error } = await serviceClient
     .from("profiles")
     .select(
       `id, full_name, title, department, avatar_url, bio, pronouns,
        country_code, start_date, favorite_music, favorite_books, favorite_sports,
        social_linkedin, social_twitter, social_instagram, social_github, social_website,
-       privacy_settings, status, directory_visible, account_setup_at, last_seen_at`
+       privacy_settings, status, directory_visible`
     )
     .eq("org_id", orgId)
     .in("status", ["active", "onboarding"])
@@ -61,10 +58,6 @@ export async function GET() {
     });
   }
 
-  // Show all directory-visible active/onboarding profiles.
-  // Previous filter gated on account_setup_at || last_seen_at, but those
-  // signals are unreliable (account_setup_at is polluted in production).
-  // The Crew should show every employee who is directory-visible.
   const visibleRows = rows ?? [];
 
   const departmentCounts: Record<string, number> = {};
