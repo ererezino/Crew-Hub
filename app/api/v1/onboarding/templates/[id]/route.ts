@@ -128,6 +128,36 @@ function extractTasksArray(value: unknown): unknown[] {
   return [];
 }
 
+/**
+ * Check if the JSONB value is a compound object with sections metadata.
+ * If so, return the sections array; otherwise return null.
+ */
+function extractSectionsArray(value: unknown): unknown[] | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.sections)) {
+      return record.sections;
+    }
+  }
+  return null;
+}
+
+/**
+ * Build the JSONB payload for the tasks column. If the original value had a
+ * compound `{ sections, tasks }` wrapper, preserve that structure so that
+ * section metadata survives round-trips through the editor.
+ */
+function buildTasksPayload(
+  mergedTasks: OnboardingTemplateTask[],
+  originalValue: unknown
+): OnboardingTemplateTask[] | { sections: unknown[]; tasks: OnboardingTemplateTask[] } {
+  const existingSections = extractSectionsArray(originalValue);
+  if (existingSections) {
+    return { sections: existingSections, tasks: mergedTasks };
+  }
+  return mergedTasks;
+}
+
 function parseExistingTasks(value: unknown): ExistingTaskParsed[] {
   const rawTasks = extractTasksArray(value);
 
@@ -330,9 +360,8 @@ export async function PUT(request: Request, context: RouteContext) {
       ? payload.department.trim()
       : null;
 
-  // Build the JSONB payload — store tasks array directly (sections are preserved
-  // only if the existing template had a wrapper object with sections)
-  const tasksPayload = mergedTasks;
+  // Re-wrap tasks in the compound format if the original had sections metadata
+  const tasksPayload = buildTasksPayload(mergedTasks, existingRow.tasks);
 
   const { data: updatedRow, error: updateError } = await supabase
     .from("onboarding_templates")

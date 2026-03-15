@@ -101,14 +101,32 @@ export type NormalizedTemplateTask = {
   completionGuidance: string | null;
 };
 
-export function normalizeTemplateTasks(value: unknown): NormalizedTemplateTask[] {
-  if (!Array.isArray(value)) {
-    return [];
+/**
+ * Extract the tasks array from the JSONB column. The column may be either:
+ * - a flat array of tasks (user-created templates)
+ * - a compound object `{ sections: [...], tasks: [...] }` (seed templates)
+ */
+function extractTasksArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
   }
+
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.tasks)) {
+      return record.tasks;
+    }
+  }
+
+  return [];
+}
+
+export function normalizeTemplateTasks(value: unknown): NormalizedTemplateTask[] {
+  const rawTasks = extractTasksArray(value);
 
   const tasks: NormalizedTemplateTask[] = [];
 
-  for (const task of value) {
+  for (const task of rawTasks) {
     const parsedTask = templateTaskSchema.safeParse(task);
 
     if (!parsedTask.success) {
