@@ -3696,6 +3696,15 @@
       "bannerText": "This person is being offboarded.",
       "lastWorkingDay": "Last working day: {date}."
     },
+    "cancelOffboard": {
+      "button": "Cancel offboarding",
+      "title": "Cancel offboarding for {name}",
+      "description": "This will revert {name} to active status, cancel the active offboarding workflow, and notify relevant parties.",
+      "confirmLabel": "To confirm, type {name} below",
+      "processing": "Processing...",
+      "cancelOffboarding": "Cancel offboarding",
+      "keepOffboarding": "Keep offboarding"
+    },
     "dangerZone": {
       "title": "Danger zone",
       "enableAccount": "Enable account",

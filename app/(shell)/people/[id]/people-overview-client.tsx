@@ -187,6 +187,12 @@ export function PeopleOverviewClient({
   const [isSubmittingOffboard, setIsSubmittingOffboard] = useState(false);
   const [offboardError, setOffboardError] = useState<string | null>(null);
 
+  // Cancel offboarding state
+  const [isCancelOffboardOpen, setIsCancelOffboardOpen] = useState(false);
+  const [cancelOffboardConfirmName, setCancelOffboardConfirmName] = useState("");
+  const [isSubmittingCancelOffboard, setIsSubmittingCancelOffboard] = useState(false);
+  const [cancelOffboardError, setCancelOffboardError] = useState<string | null>(null);
+
   // Disable/enable account state
   const [confirmDisableOpen, setConfirmDisableOpen] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
@@ -602,6 +608,41 @@ export function PeopleOverviewClient({
   const offboardNameMatches = person
     ? offboardConfirmName === person.fullName
     : false;
+
+  const cancelOffboardNameMatches = person
+    ? cancelOffboardConfirmName === person.fullName
+    : false;
+
+  // Cancel offboarding handler
+  const handleCancelOffboard = useCallback(async () => {
+    if (!person) return;
+
+    setIsSubmittingCancelOffboard(true);
+    setCancelOffboardError(null);
+
+    try {
+      const response = await fetch(`/api/v1/people/${person.id}/cancel-offboarding`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmName: cancelOffboardConfirmName })
+      });
+
+      const payload = (await response.json()) as ApiResponse<{ profileId: string; status: string }>;
+
+      if (!response.ok || !payload.data) {
+        setCancelOffboardError(payload.error?.message ?? t('toast.unableToOffboard'));
+        return;
+      }
+
+      setIsCancelOffboardOpen(false);
+      setCancelOffboardConfirmName("");
+      refresh();
+    } catch (error) {
+      setCancelOffboardError(error instanceof Error ? error.message : t('toast.unableToOffboard'));
+    } finally {
+      setIsSubmittingCancelOffboard(false);
+    }
+  }, [person, cancelOffboardConfirmName, refresh, t]);
 
   /* ── Loading & Error States ── */
 
@@ -1064,11 +1105,24 @@ export function PeopleOverviewClient({
                 : ""}
             </p>
           </div>
+          {canInitiateOffboarding && !isSelf ? (
+            <button
+              type="button"
+              className="button button-danger button-sm"
+              onClick={() => {
+                setCancelOffboardConfirmName("");
+                setCancelOffboardError(null);
+                setIsCancelOffboardOpen(true);
+              }}
+            >
+              {t('cancelOffboard.button')}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
-      {/* Danger Zone -- Super Admin / HR Admin only, non-self, non-offboarding */}
-      {(isSuperAdmin || canInitiateOffboarding) && !isSelf && person.status !== "offboarding" ? (
+      {/* Danger Zone -- Super Admin / HR Admin only, non-self */}
+      {(isSuperAdmin || canInitiateOffboarding) && !isSelf ? (
         <div className="danger-zone">
           <h3 className="danger-zone-title">{t('dangerZone.title')}</h3>
 
@@ -1095,8 +1149,8 @@ export function PeopleOverviewClient({
             </div>
           ) : null}
 
-          {/* Initiate offboarding */}
-          {canInitiateOffboarding ? (
+          {/* Initiate offboarding -- hidden when already offboarding or inactive */}
+          {canInitiateOffboarding && person.status !== "offboarding" && person.status !== "inactive" ? (
             <div className="danger-zone-content">
               <div className="danger-zone-description">
                 <p className="danger-zone-label">{t('dangerZone.initiateOffboarding')}</p>
@@ -1202,6 +1256,54 @@ export function PeopleOverviewClient({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Cancel Offboarding Confirmation Dialog */}
+      {isCancelOffboardOpen && person ? (
+        <div className="modal-overlay" onClick={() => setIsCancelOffboardOpen(false)}>
+          <div
+            className="modal-dialog modal-dialog-danger"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="modal-title">{t('cancelOffboard.title', { name: person.fullName })}</h2>
+            <p className="modal-description">{t('cancelOffboard.description', { name: person.fullName })}</p>
+
+            {cancelOffboardError ? (
+              <div className="form-error-banner">{cancelOffboardError}</div>
+            ) : null}
+
+            <label className="form-field" htmlFor="cancel-offboard-confirm-name">
+              <span className="form-label">{t('cancelOffboard.confirmLabel', { name: person.fullName })}</span>
+              <input
+                id="cancel-offboard-confirm-name"
+                className="form-input"
+                placeholder={person.fullName}
+                value={cancelOffboardConfirmName}
+                onChange={(e) => setCancelOffboardConfirmName(e.currentTarget.value)}
+                disabled={isSubmittingCancelOffboard}
+              />
+            </label>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={() => setIsCancelOffboardOpen(false)}
+                disabled={isSubmittingCancelOffboard}
+              >
+                {t('cancelOffboard.keepOffboarding')}
+              </button>
+              <button
+                type="button"
+                className="button button-danger"
+                disabled={isSubmittingCancelOffboard || !cancelOffboardNameMatches}
+                onClick={handleCancelOffboard}
+              >
+                {isSubmittingCancelOffboard ? t('cancelOffboard.processing') : t('cancelOffboard.cancelOffboarding')}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

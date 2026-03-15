@@ -3687,6 +3687,15 @@
       "bannerText": "Cette personne est en cours de départ.",
       "lastWorkingDay": "Dernier jour de travail : {date}."
     },
+    "cancelOffboard": {
+      "button": "Annuler le départ",
+      "title": "Annuler le départ de {name}",
+      "description": "Cela rétablira {name} au statut actif, annulera le processus de départ en cours et notifiera les parties concernées.",
+      "confirmLabel": "Pour confirmer, saisissez {name} ci-dessous",
+      "processing": "Traitement en cours...",
+      "cancelOffboarding": "Annuler le départ",
+      "keepOffboarding": "Maintenir le départ"
+    },
     "dangerZone": {
       "title": "Zone de danger",
       "enableAccount": "Activer le compte",

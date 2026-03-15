@@ -13394,12 +13394,18 @@ html.dark .dashboard-audit-table {
   background: var(--color-warning-bg, #fffbeb);
   border: 1px solid var(--color-warning-border, #fbbf24);
   border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
 }
 
 .offboarding-banner-content {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
 }
 
 .offboarding-banner-text {
@@ -13443,6 +13449,13 @@ html.dark .dashboard-audit-table {
   font-weight: 600;
   color: var(--text-primary);
   margin-bottom: var(--space-5);
+}
+
+.modal-description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+  line-height: 1.5;
 }
 
 .modal-actions {
