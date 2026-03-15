@@ -152,14 +152,7 @@ export async function POST(
       tableName: "profiles",
       recordId: employeeId,
       oldValue: { status: "offboarding" },
-      newValue: { status: "inactive" },
-      userId: profile.id,
-      orgId: profile.org_id,
-      metadata: {
-        trigger: "manual_finalise_offboarding",
-        instanceId: activeInstance.id,
-        employeeName: employee.full_name
-      }
+      newValue: { status: "inactive", trigger: "manual_finalise_offboarding" }
     });
 
     logger.info("Offboarding finalised manually.", {
