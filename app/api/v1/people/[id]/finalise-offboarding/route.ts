@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { logAudit } from "../../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logger } from "../../../../../../lib/logger";
 import { completeOffboarding } from "../../../../../../lib/onboarding/auto-transition";
@@ -144,6 +145,21 @@ export async function POST(
       instanceId: activeInstance.id,
       employeeId,
       employeeName: employee.full_name
+    });
+
+    await logAudit({
+      action: "updated",
+      tableName: "profiles",
+      recordId: employeeId,
+      oldValue: { status: "offboarding" },
+      newValue: { status: "inactive" },
+      userId: profile.id,
+      orgId: profile.org_id,
+      metadata: {
+        trigger: "manual_finalise_offboarding",
+        instanceId: activeInstance.id,
+        employeeName: employee.full_name
+      }
     });
 
     logger.info("Offboarding finalised manually.", {

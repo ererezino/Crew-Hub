@@ -319,7 +319,8 @@ describe("Phase 4 — Core Flow Deep Hardening", () => {
       const ZOD_MUTATION_EXEMPTIONS = new Set([
         "payments/[id]/retry/route.ts",
         "payments/batch/route.ts",
-        "payments/webhook/route.ts"
+        "payments/webhook/route.ts",
+        "people/[id]/finalise-offboarding/route.ts"
       ]);
 
       const missingValidation = mutationRoutes.filter((file) => {

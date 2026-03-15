@@ -9,7 +9,8 @@ const ZOD_AUDIT_WAIVERS: Record<string, string> = {
   "payments/webhook/route.ts": "Intentionally disabled payment stub endpoint.",
   "me/data-export/route.ts": "GET-only endpoint with no user input — reads authenticated user data.",
   "the-crew/route.ts": "GET-only endpoint with no user input — returns visible crew members for the authenticated org.",
-  "delegations/route.ts": "Zod validation via createDelegationSchema imported from _helpers.ts."
+  "delegations/route.ts": "Zod validation via createDelegationSchema imported from _helpers.ts.",
+  "people/[id]/finalise-offboarding/route.ts": "No request body — action is determined by URL path param only."
 };
 
 function collectRouteFiles(directory: string): string[] {
