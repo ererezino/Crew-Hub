@@ -10,6 +10,7 @@ import {
   type OnboardingTrack,
   type OnboardingType
 } from "../../types/onboarding";
+import { actionUrlSchema } from "./validation";
 
 type OnboardingEmployee = {
   id: string;
@@ -57,8 +58,8 @@ const templateTaskSchema = z.object({
   document_id: z.string().uuid().optional(),
   linkUrl: z.string().optional(),
   link_url: z.string().optional(),
-  actionUrl: z.string().url().nullable().optional(),
-  action_url: z.string().url().nullable().optional(),
+  actionUrl: actionUrlSchema.nullable().optional(),
+  action_url: actionUrlSchema.nullable().optional(),
   actionLabel: z.string().max(120).nullable().optional(),
   action_label: z.string().max(120).nullable().optional(),
   completionGuidance: z.string().max(1000).nullable().optional(),

@@ -8,6 +8,7 @@ import { logAudit } from "../../../../../../lib/audit";
 import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { actionUrlSchema } from "../../../../../../lib/onboarding/validation";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
   ONBOARDING_TYPES,
@@ -25,13 +26,7 @@ const updateTemplateTaskInputSchema = z.object({
   category: z.string().trim().min(1, "Task category is required.").max(50, "Task category is too long."),
   track: z.enum(ONBOARDING_TRACKS).optional(),
   dueOffsetDays: z.number().int().min(-365).max(365).nullable().optional(),
-  actionUrl: z
-    .string()
-    .trim()
-    .url("Action URL must be a valid URL.")
-    .max(500, "Action URL is too long.")
-    .nullable()
-    .optional(),
+  actionUrl: actionUrlSchema.nullable().optional(),
   actionLabel: z.string().trim().max(120, "Action label is too long.").nullable().optional(),
   completionGuidance: z
     .string()
