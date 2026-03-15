@@ -44,6 +44,7 @@ export type OnboardingContentSection = {
 };
 
 export type OnboardingTemplateTask = {
+  taskId?: string;
   title: string;
   description: string;
   category: string;
@@ -59,6 +60,7 @@ export type OnboardingTemplateTask = {
 };
 
 export type OnboardingTemplateTaskInput = {
+  taskId?: string;
   title: string;
   description?: string;
   category: string;
@@ -112,6 +114,7 @@ export type OnboardingInstanceSummary = {
 export type OnboardingTask = {
   id: string;
   instanceId: string;
+  templateTaskId: string | null;
   title: string;
   description: string | null;
   category: string;

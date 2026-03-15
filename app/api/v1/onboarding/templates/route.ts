@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -69,6 +71,7 @@ const templateRowSchema = z.object({
 });
 
 const templateTaskSchema = z.object({
+  taskId: z.string().uuid().optional(),
   title: z.string(),
   description: z.string().default(""),
   category: z.string(),
@@ -139,6 +142,7 @@ function normalizeTemplateTasks(value: unknown): OnboardingTemplateTask[] {
         : undefined;
 
     normalizedTasks.push({
+      taskId: parsedTask.data.taskId,
       title: parsedTask.data.title,
       description: parsedTask.data.description,
       category: parsedTask.data.category,
@@ -319,6 +323,7 @@ export async function POST(request: Request) {
       : null;
 
   const templateTaskPayload = payload.tasks.map((task) => ({
+    taskId: randomUUID(),
     title: task.title.trim(),
     description: task.description?.trim() ?? "",
     category: task.category.trim(),

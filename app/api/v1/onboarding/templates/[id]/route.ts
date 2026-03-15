@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -17,6 +19,7 @@ import {
 } from "../../../../../../types/onboarding";
 
 const updateTemplateTaskInputSchema = z.object({
+  taskId: z.string().uuid().optional(),
   title: z.string().trim().min(1, "Task title is required.").max(200, "Task title is too long."),
   description: z.string().trim().max(1000, "Task description is too long.").optional(),
   category: z.string().trim().min(1, "Task category is required.").max(50, "Task category is too long."),
@@ -66,6 +69,7 @@ const templateRowSchema = z.object({
 });
 
 const existingTaskSchema = z.object({
+  taskId: z.string().uuid().optional(),
   title: z.string(),
   description: z.string().default(""),
   category: z.string(),
@@ -175,21 +179,49 @@ function parseExistingTasks(value: unknown): ExistingTaskParsed[] {
 
 /**
  * Server-side preservation: merge client-sent task fields with hidden fields
- * from the existing template tasks. Match by title to handle reordering.
+ * from the existing template tasks.
+ *
+ * Matching precedence:
+ * 1. Match by taskId (stable UUID) — primary contract
+ * 2. Fall back to title match (exact, then case-insensitive) — legacy only
+ * 3. No match → treat as new task, assign fresh taskId
+ *
+ * Also handles duplicate taskId detection: if two incoming tasks share the
+ * same taskId (e.g., copy-paste in editor), the second gets a fresh UUID.
  */
 function mergeTasksWithPreservation(
   incomingTasks: z.infer<typeof updateTemplateSchema>["tasks"],
   existingTasks: ExistingTaskParsed[]
 ): OnboardingTemplateTask[] {
   const usedIndices = new Set<number>();
+  const usedTaskIds = new Set<string>();
+
+  // Build a lookup map for taskId-based matching
+  const existingByTaskId = new Map<string, number>();
+  for (let i = 0; i < existingTasks.length; i++) {
+    const tid = existingTasks[i]?.taskId;
+    if (tid) {
+      existingByTaskId.set(tid, i);
+    }
+  }
 
   return incomingTasks.map((incoming) => {
-    // Find best match by title in existing tasks (not yet used)
-    let matchIndex = existingTasks.findIndex(
-      (existing, index) => !usedIndices.has(index) && existing.title === incoming.title
-    );
+    let matchIndex = -1;
 
-    // If no title match, try to match by title case-insensitive
+    // 1. Primary: match by taskId
+    if (incoming.taskId && existingByTaskId.has(incoming.taskId)) {
+      const candidateIndex = existingByTaskId.get(incoming.taskId)!;
+      if (!usedIndices.has(candidateIndex)) {
+        matchIndex = candidateIndex;
+      }
+    }
+
+    // 2. Legacy fallback: match by title (exact, then case-insensitive)
+    if (matchIndex === -1) {
+      matchIndex = existingTasks.findIndex(
+        (existing, index) => !usedIndices.has(index) && existing.title === incoming.title
+      );
+    }
     if (matchIndex === -1) {
       matchIndex = existingTasks.findIndex(
         (existing, index) =>
@@ -202,6 +234,14 @@ function mergeTasksWithPreservation(
     if (matchIndex >= 0) {
       usedIndices.add(matchIndex);
     }
+
+    // Resolve taskId: use existing match's taskId, then incoming, then generate new.
+    // De-duplicate: if this taskId was already claimed, generate a fresh one.
+    let resolvedTaskId = existing?.taskId ?? incoming.taskId ?? randomUUID();
+    if (usedTaskIds.has(resolvedTaskId)) {
+      resolvedTaskId = randomUUID();
+    }
+    usedTaskIds.add(resolvedTaskId);
 
     // Resolve hidden fields from existing task (preserve what client doesn't send)
     const taskType = existing?.taskType ?? existing?.task_type ?? undefined;
@@ -217,6 +257,7 @@ function mergeTasksWithPreservation(
         : undefined;
 
     return {
+      taskId: resolvedTaskId,
       title: incoming.title.trim(),
       description: incoming.description?.trim() ?? "",
       category: incoming.category.trim(),
@@ -243,6 +284,7 @@ function mapTemplateRow(row: z.infer<typeof templateRowSchema>): OnboardingTempl
     countryCode: row.country_code,
     department: row.department,
     tasks: tasks.map((task) => ({
+      taskId: task.taskId,
       title: task.title,
       description: task.description,
       category: task.category,

@@ -42,6 +42,7 @@ const ONBOARDING_TASK_TYPES = ["manual", "e_signature", "link", "form"] as const
 type OnboardingTaskType = (typeof ONBOARDING_TASK_TYPES)[number];
 
 const templateTaskSchema = z.object({
+  taskId: z.string().uuid().optional(),
   title: z.string(),
   description: z.string().default(""),
   category: z.string(),
@@ -91,6 +92,7 @@ export function resolveOnboardingStartTimestamp(rawValue: string | undefined): s
 }
 
 export type NormalizedTemplateTask = {
+  taskId: string | null;
   title: string;
   description: string;
   category: string;
@@ -138,6 +140,7 @@ export function normalizeTemplateTasks(value: unknown): NormalizedTemplateTask[]
     }
 
     tasks.push({
+      taskId: parsedTask.data.taskId ?? null,
       title: parsedTask.data.title,
       description: parsedTask.data.description,
       category: parsedTask.data.category,
@@ -214,6 +217,7 @@ export async function createOnboardingInstance({
     return {
       org_id: orgId,
       instance_id: parsedInstance.data.id,
+      template_task_id: task.taskId ?? null,
       title: task.title,
       description: task.description || null,
       category: task.category,

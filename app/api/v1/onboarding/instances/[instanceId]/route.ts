@@ -34,6 +34,7 @@ const TASK_TYPE_VALUES = ["manual", "e_signature", "link", "form"] as const;
 const taskRowSchema = z.object({
   id: z.string().uuid(),
   instance_id: z.string().uuid(),
+  template_task_id: z.string().uuid().nullable().default(null),
   title: z.string(),
   description: z.string().nullable(),
   category: z.string(),
@@ -212,7 +213,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { data: rawTasks, error: tasksError } = await supabase
     .from("onboarding_tasks")
     .select(
-      "id, instance_id, title, description, category, track, section_id, status, task_type, assigned_to, due_date, completed_at, completed_by, notes, document_id, signature_request_id, action_url, action_label, completion_guidance"
+      "id, instance_id, template_task_id, title, description, category, track, section_id, status, task_type, assigned_to, due_date, completed_at, completed_by, notes, document_id, signature_request_id, action_url, action_label, completion_guidance"
     )
     .eq("instance_id", instance.id)
     .eq("org_id", profile.org_id)
@@ -340,6 +341,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const tasks: OnboardingTask[] = tasksRows.map((task) => ({
     id: task.id,
     instanceId: task.instance_id,
+    templateTaskId: task.template_task_id,
     title: task.title,
     description: task.description,
     category: task.category,
