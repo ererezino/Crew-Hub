@@ -20,12 +20,8 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
 }
 
-function isExpenseAdmin(roles: readonly UserRole[]): boolean {
-  return (
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN")
-  );
+function canManageRoutingRules(roles: readonly UserRole[]): boolean {
+  return hasRole(roles, "SUPER_ADMIN");
 }
 
 // ---------------------------------------------------------------------------
@@ -78,12 +74,12 @@ export async function GET() {
     });
   }
 
-  if (!isExpenseAdmin(session.profile.roles)) {
+  if (!canManageRoutingRules(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only Super Admin, HR Admin, or Finance Admin can manage routing rules.",
+        message: "Only Super Admin can manage expense routing rules.",
       },
       meta: buildMeta(),
     });
@@ -163,12 +159,12 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!isExpenseAdmin(session.profile.roles)) {
+  if (!canManageRoutingRules(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only Super Admin, HR Admin, or Finance Admin can manage routing rules.",
+        message: "Only Super Admin can manage expense routing rules.",
       },
       meta: buildMeta(),
     });
