@@ -433,13 +433,21 @@ export function MyOnboardingClient() {
           <header className="journey-welcome">
             <h1 className="journey-welcome-title">
               {selectedInstance.status === "completed"
-                ? "🎉 " + t("completedTitle")
-                : "👋 " + t("welcomeTitle")}
+                ? selectedInstance.type === "offboarding"
+                  ? "👋 " + t("offboardingCompletedTitle")
+                  : "🎉 " + t("completedTitle")
+                : selectedInstance.type === "offboarding"
+                  ? "📋 " + t("offboardingWelcomeTitle")
+                  : "👋 " + t("welcomeTitle")}
             </h1>
             <p className="journey-welcome-subtitle">
               {selectedInstance.status === "completed"
-                ? t("completedSubtitle")
-                : t("welcomeSubtitle")}
+                ? selectedInstance.type === "offboarding"
+                  ? t("offboardingCompletedSubtitle")
+                  : t("completedSubtitle")
+                : selectedInstance.type === "offboarding"
+                  ? t("offboardingWelcomeSubtitle")
+                  : t("welcomeSubtitle")}
             </p>
           </header>
 
@@ -483,6 +491,16 @@ export function MyOnboardingClient() {
               </div>
             ) : null}
           </section>
+
+          {/* Awaiting last working day banner (offboarding: all tasks done, instance still active) */}
+          {selectedInstance.type === "offboarding" &&
+           selectedInstance.status === "active" &&
+           selectedInstance.totalTasks > 0 &&
+           selectedInstance.completedTasks === selectedInstance.totalTasks ? (
+            <div className="journey-awaiting-banner" role="status">
+              <p>{t("awaitingLastDay")}</p>
+            </div>
+          ) : null}
 
           {/* Journey sections */}
           {journeySections.length === 0 ? (

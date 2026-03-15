@@ -176,3 +176,79 @@ export async function completeOnboarding({
     link: "/me/onboarding"
   }).catch(() => {});
 }
+
+/**
+ * Handle offboarding completion: transition employee to inactive.
+ * Called when both tracks are 100% AND today >= notice_period_end_date.
+ */
+export async function completeOffboarding({
+  supabase,
+  orgId,
+  instanceId,
+  employeeId,
+  employeeName
+}: {
+  supabase: SupabaseClient;
+  orgId: string;
+  instanceId: string;
+  employeeId: string;
+  employeeName?: string;
+}): Promise<void> {
+  // 1. Mark instance as completed
+  const { error: instanceUpdateError } = await supabase
+    .from("onboarding_instances")
+    .update({
+      status: "completed",
+      completed_at: new Date().toISOString()
+    })
+    .eq("id", instanceId)
+    .eq("org_id", orgId);
+
+  if (instanceUpdateError) {
+    logger.error("Failed to mark offboarding instance as completed.", {
+      error: instanceUpdateError.message,
+      instanceId
+    });
+  }
+
+  // 2. Transition profile from offboarding → inactive
+  const { error: profileUpdateError } = await supabase
+    .from("profiles")
+    .update({ status: "inactive" })
+    .eq("id", employeeId)
+    .eq("org_id", orgId)
+    .eq("status", "offboarding");
+
+  if (profileUpdateError) {
+    logger.error("Failed to transition employee to inactive.", {
+      error: profileUpdateError.message,
+      employeeId,
+      instanceId
+    });
+  } else {
+    logger.info("Employee transitioned to inactive after offboarding completion.", {
+      employeeId,
+      instanceId
+    });
+
+    await logAudit({
+      action: "updated",
+      tableName: "profiles",
+      recordId: employeeId,
+      oldValue: { status: "offboarding" },
+      newValue: { status: "inactive" }
+    }).catch(() => {});
+  }
+
+  // 3. Send completion notification
+  const name = employeeName ?? "Employee";
+
+  await createNotification({
+    orgId,
+    userId: employeeId,
+    type: "offboarding",
+    title: "Offboarding complete",
+    body: `${name}'s offboarding is now complete. Profile has been set to inactive.`,
+    link: "/people"
+  }).catch(() => {});
+}

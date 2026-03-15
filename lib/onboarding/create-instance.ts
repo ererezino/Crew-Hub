@@ -32,6 +32,10 @@ type CreateOnboardingInstanceInput = {
   startedAt?: string;
   /** Admin who created this instance — auto-assigned to operations-track tasks */
   creatingAdminId?: string;
+  /** Date to anchor due-date offsets to. Defaults to startedAt.
+   *  For offboarding, pass notice_period_end_date so negative offsets
+   *  count backward from the last working day. */
+  anchorDate?: string;
 };
 
 const ONBOARDING_TASK_TYPES = ["manual", "e_signature", "link", "form"] as const;
@@ -160,7 +164,8 @@ export async function createOnboardingInstance({
   template,
   type,
   startedAt,
-  creatingAdminId
+  creatingAdminId,
+  anchorDate
 }: CreateOnboardingInstanceInput): Promise<{
   instance: OnboardingInstanceSummary;
 }> {
@@ -192,6 +197,9 @@ export async function createOnboardingInstance({
 
   const normalizedTemplateTasks = normalizeTemplateTasks(template.tasks);
   const baseDate = new Date(startTimestamp);
+  const dueDateAnchor = anchorDate
+    ? new Date(resolveOnboardingStartTimestamp(anchorDate))
+    : baseDate;
 
   const taskRows = normalizedTemplateTasks.map((task) => {
     const dueDate =
@@ -199,7 +207,7 @@ export async function createOnboardingInstance({
         ? null
         : formatDateOnly(
             new Date(
-              baseDate.getTime() + task.dueOffsetDays * 24 * 60 * 60 * 1000
+              dueDateAnchor.getTime() + task.dueOffsetDays * 24 * 60 * 60 * 1000
             )
           );
 

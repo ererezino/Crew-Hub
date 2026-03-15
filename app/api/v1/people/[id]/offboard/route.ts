@@ -177,6 +177,32 @@ export async function POST(
     });
   }
 
+  // Cancel any active onboarding instance before creating offboarding
+  const { data: activeOnboarding } = await serviceClient
+    .from("onboarding_instances")
+    .select("id")
+    .eq("employee_id", employeeId)
+    .eq("org_id", profile.org_id)
+    .eq("type", "onboarding")
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (activeOnboarding) {
+    await serviceClient
+      .from("onboarding_instances")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("id", activeOnboarding.id)
+      .eq("org_id", profile.org_id);
+
+    await logAudit({
+      action: "updated",
+      tableName: "onboarding_instances",
+      recordId: activeOnboarding.id,
+      oldValue: { status: "active" },
+      newValue: { status: "cancelled", reason: "offboarding_initiated" }
+    }).catch(() => {});
+  }
+
   // Find offboarding template
   let offboardTemplate: {
     id: string;
@@ -269,7 +295,9 @@ export async function POST(
         },
         template: offboardTemplate,
         type: "offboarding",
-        startedAt: new Date().toISOString()
+        startedAt: new Date().toISOString(),
+        anchorDate: parsedBody.data.lastWorkingDay,
+        creatingAdminId: profile.id
       });
 
       instanceId = result.instance.id;

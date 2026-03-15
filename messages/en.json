@@ -1369,7 +1369,15 @@
     "completing": "Completing…",
     "taskCompleteFailed": "Unable to complete task. Please try again.",
     "eSignatureOnly": "E-signature tasks can only be completed by signing the document.",
-    "openFullView": "Open full instance view"
+    "openFullView": "Open full instance view",
+    "offboardingWelcomeTitle": "Your offboarding checklist",
+    "offboardingWelcomeSubtitle": "Complete each section before your last working day. Your team is handling the rest.",
+    "offboardingCompletedTitle": "Offboarding complete",
+    "offboardingCompletedSubtitle": "All tasks are done. Thank you for your contributions — we wish you well.",
+    "lastWorkingDay": "Last working day: {date}",
+    "awaitingLastDay": "All tasks are complete. Your offboarding will finalise on your last working day.",
+    "offboardingNoInstance": "No offboarding assigned yet",
+    "offboardingNoInstanceDescription": "Your offboarding tasks will appear here once your team sets them up."
   },
   "learning": {
     "title": "Learning",
@@ -4010,7 +4018,13 @@
       "unableToSendReminder": "Unable to send reminder.",
       "reminderSent": "Reminder sent to {name}."
     },
-    "dismissNotification": "Dismiss notification"
+    "dismissNotification": "Dismiss notification",
+    "typeFilter": {
+      "all": "All types",
+      "onboarding": "Onboarding only",
+      "offboarding": "Offboarding only"
+    },
+    "awaitingLastDay": "All tasks complete — awaiting last working day"
   },
   "compensationBands": {
     "pageTitle": "Compensation Bands",

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
 import { logger } from "../../../../../../../../../lib/logger";
-import { completeOnboarding } from "../../../../../../../../../lib/onboarding/auto-transition";
+import { completeOnboarding, completeOffboarding } from "../../../../../../../../../lib/onboarding/auto-transition";
 import { hasRole } from "../../../../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../../../../lib/supabase/service-role";
@@ -230,8 +230,9 @@ export async function POST(request: Request, context: RouteContext) {
   const opsDone = opsTasks.length === 0 || opsTasks.every((t) => t.status === "completed");
   const allDone = totalTasks > 0 && employeeDone && opsDone;
 
+  let awaitingLastDay = false;
+
   if (allDone && action === "complete") {
-    // Both tracks 100% — complete instance and auto-transition to active
     if (instance.type === "onboarding") {
       await completeOnboarding({
         supabase: serviceClient,
@@ -239,13 +240,30 @@ export async function POST(request: Request, context: RouteContext) {
         instanceId,
         employeeId: instance.employee_id
       });
-    } else {
-      // Offboarding — just mark instance as completed
-      await serviceClient
-        .from("onboarding_instances")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("id", instanceId)
-        .eq("org_id", profile.org_id);
+    } else if (instance.type === "offboarding") {
+      // Two-gate: all tasks done AND today >= last working day
+      const { data: employeeProfile } = await serviceClient
+        .from("profiles")
+        .select("notice_period_end_date, full_name")
+        .eq("id", instance.employee_id)
+        .eq("org_id", profile.org_id)
+        .maybeSingle();
+
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+      const lastDay = employeeProfile?.notice_period_end_date;
+
+      if (lastDay && today >= lastDay) {
+        await completeOffboarding({
+          supabase: serviceClient,
+          orgId: profile.org_id,
+          instanceId,
+          employeeId: instance.employee_id,
+          employeeName: employeeProfile?.full_name
+        });
+      } else {
+        // Tasks complete but date gate not met — instance stays active
+        awaitingLastDay = true;
+      }
     }
   } else if (action === "undo" && instance.status === "completed") {
     // Reopen instance if undoing a task in a completed instance
@@ -259,8 +277,8 @@ export async function POST(request: Request, context: RouteContext) {
       .eq("org_id", profile.org_id);
   }
 
-  return jsonResponse<{ taskId: string; action: string; totalTasks: number; completedTasks: number }>(200, {
-    data: { taskId, action, totalTasks, completedTasks: action === "complete" ? completedTasks : completedTasks },
+  return jsonResponse<{ taskId: string; action: string; totalTasks: number; completedTasks: number; allTasksComplete: boolean; awaitingLastDay: boolean }>(200, {
+    data: { taskId, action, totalTasks, completedTasks, allTasksComplete: allDone && action === "complete", awaitingLastDay },
     error: null,
     meta: buildMeta()
   });

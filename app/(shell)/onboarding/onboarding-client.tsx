@@ -39,6 +39,7 @@ type OnboardingClientProps = {
 type OnboardingTab = "active" | "completed" | "at_risk" | "templates";
 type InstanceSortKey = "employee" | "startedAt";
 type SortDirection = "asc" | "desc";
+type TypeFilter = "all" | OnboardingType;
 type ToastVariant = "success" | "error" | "info";
 
 type ToastMessage = {
@@ -331,6 +332,7 @@ export function OnboardingClient({
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 
   const [activeTab, setActiveTab] = useState<OnboardingTab>("active");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [sortKey, setSortKey] = useState<InstanceSortKey>("startedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
@@ -396,12 +398,22 @@ export function OnboardingClient({
   );
 
   const activeInstances = useMemo(
-    () => sortInstances(activeInstancesQuery.instances, sortKey, sortDirection),
-    [activeInstancesQuery.instances, sortDirection, sortKey]
+    () => {
+      const filtered = typeFilter === "all"
+        ? activeInstancesQuery.instances
+        : activeInstancesQuery.instances.filter((i) => i.type === typeFilter);
+      return sortInstances(filtered, sortKey, sortDirection);
+    },
+    [activeInstancesQuery.instances, sortDirection, sortKey, typeFilter]
   );
   const completedInstances = useMemo(
-    () => sortInstances(completedInstancesQuery.instances, sortKey, sortDirection),
-    [completedInstancesQuery.instances, sortDirection, sortKey]
+    () => {
+      const filtered = typeFilter === "all"
+        ? completedInstancesQuery.instances
+        : completedInstancesQuery.instances.filter((i) => i.type === typeFilter);
+      return sortInstances(filtered, sortKey, sortDirection);
+    },
+    [completedInstancesQuery.instances, sortDirection, sortKey, typeFilter]
   );
   const templatePreview = useMemo(
     () =>
@@ -830,6 +842,19 @@ export function OnboardingClient({
 
       {activeTab === "active" || activeTab === "completed" ? (
         <>
+          <div className="onboarding-type-filter">
+            <select
+              className="form-input form-input-sm"
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.currentTarget.value as TypeFilter)}
+              aria-label={td('typeFilter.all')}
+            >
+              <option value="all">{td('typeFilter.all')}</option>
+              <option value="onboarding">{td('typeFilter.onboarding')}</option>
+              <option value="offboarding">{td('typeFilter.offboarding')}</option>
+            </select>
+          </div>
+
           {activeInstancesQueryForTab.isLoading ? <OnboardingTableSkeleton /> : null}
 
           {!activeInstancesQueryForTab.isLoading && activeInstancesQueryForTab.errorMessage ? (
@@ -900,6 +925,14 @@ export function OnboardingClient({
                         <StatusBadge tone={toneForInstanceStatus(instance.status)}>
                           {toSentenceCase(instance.status)}
                         </StatusBadge>
+                        {instance.type === "offboarding" &&
+                         instance.status === "active" &&
+                         instance.totalTasks > 0 &&
+                         instance.completedTasks === instance.totalTasks ? (
+                          <span className="onboarding-awaiting-badge" title={td('awaitingLastDay')}>
+                            ⏳
+                          </span>
+                        ) : null}
                       </td>
                       <td className="numeric">
                         {instance.completedTasks}/{instance.totalTasks} ({instance.progressPercent}%)

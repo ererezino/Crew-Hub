@@ -1446,7 +1446,15 @@
     "completing": "En cours…",
     "taskCompleteFailed": "Impossible de terminer la tâche. Veuillez réessayer.",
     "eSignatureOnly": "Les tâches de signature électronique ne peuvent être complétées qu'en signant le document.",
-    "openFullView": "Ouvrir la vue complète de l'instance"
+    "openFullView": "Ouvrir la vue complète de l'instance",
+    "offboardingWelcomeTitle": "Votre liste de départ",
+    "offboardingWelcomeSubtitle": "Complétez chaque section avant votre dernier jour de travail. Votre équipe s'occupe du reste.",
+    "offboardingCompletedTitle": "Départ finalisé",
+    "offboardingCompletedSubtitle": "Toutes les tâches sont terminées. Merci pour vos contributions — nous vous souhaitons le meilleur.",
+    "lastWorkingDay": "Dernier jour de travail : {date}",
+    "awaitingLastDay": "Toutes les tâches sont terminées. Votre départ sera finalisé à votre dernier jour de travail.",
+    "offboardingNoInstance": "Aucune instance de départ assignée",
+    "offboardingNoInstanceDescription": "Vos tâches de départ apparaîtront ici une fois que votre équipe les aura mises en place."
   },
   "learning": {
     "title": "Formations",
@@ -4001,7 +4009,13 @@
       "unableToSendReminder": "Impossible d'envoyer le rappel.",
       "reminderSent": "Rappel envoyé à {name}."
     },
-    "dismissNotification": "Fermer la notification"
+    "dismissNotification": "Fermer la notification",
+    "typeFilter": {
+      "all": "Tous les types",
+      "onboarding": "Intégration uniquement",
+      "offboarding": "Départ uniquement"
+    },
+    "awaitingLastDay": "Toutes les tâches terminées — en attente du dernier jour de travail"
   },
   "compensationBands": {
     "pageTitle": "Grilles de rémunération",
