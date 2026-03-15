@@ -38,12 +38,12 @@ const approvalsQuerySchema = z.object({
     .string()
     .optional()
     .refine((value) => (value ? isIsoMonth(value) : true), "Month must be in YYYY-MM format"),
-  stage: z.enum(["manager", "finance"]).optional()
+  stage: z.enum(["manager", "additional", "finance"]).optional()
 });
 
 const bulkApprovePayloadSchema = z.object({
   expenseIds: z.array(z.string().uuid()).min(1, "Select at least one expense to approve.").max(200),
-  stage: z.enum(["manager", "finance"])
+  stage: z.enum(["manager", "additional", "finance"])
 });
 
 const approverProfileSchema = z.object({
@@ -51,12 +51,16 @@ const approverProfileSchema = z.object({
   roles: z.array(z.string()).nullable()
 });
 
-function statusForStage(stage: ExpenseApprovalStage): "pending" | "manager_approved" {
-  return stage === "manager" ? "pending" : "manager_approved";
+function statusForStage(stage: ExpenseApprovalStage): "pending" | "manager_approved" | "manager_approved" {
+  if (stage === "manager") return "pending";
+  if (stage === "additional") return "manager_approved";
+  return "manager_approved"; // finance sees manager_approved (no additional) or additional_approved
 }
 
 function stageLabel(stage: ExpenseApprovalStage): string {
-  return stage === "manager" ? "manager approval" : "finance payment confirmation";
+  if (stage === "manager") return "manager approval";
+  if (stage === "additional") return "additional approval";
+  return "finance payment confirmation";
 }
 
 function resolveStage({
@@ -76,6 +80,12 @@ function resolveStage({
 
   if (stage === "manager" && !canManagerApprove) {
     return null;
+  }
+
+  // Additional stage: anyone who is a configured additional approver can view
+  // We allow it through — filtering happens in the query by additional_approver_id
+  if (stage === "additional") {
+    return stage;
   }
 
   if (stage === "finance" && !canFinanceApprove) {
@@ -217,7 +227,6 @@ export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
   const svcClient = createSupabaseServiceRoleClient();
   const isSuperAdmin = hasRole(profile.roles, "SUPER_ADMIN");
-  const targetStatus = statusForStage(stage);
 
   let allowedEmployeeIds: string[] = [];
   if (stage === "manager" && !isSuperAdmin) {
@@ -247,12 +256,31 @@ export async function GET(request: Request) {
     .from("expenses")
     .select(expenseSelectColumns)
     .eq("org_id", profile.org_id)
-    .eq("status", targetStatus)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
 
-  if (stage === "manager" && !isSuperAdmin) {
-    expenseQuery = expenseQuery.in("employee_id", allowedEmployeeIds);
+  if (stage === "manager") {
+    expenseQuery = expenseQuery.eq("status", "pending");
+    if (!isSuperAdmin) {
+      expenseQuery = expenseQuery.in("employee_id", allowedEmployeeIds);
+    }
+  } else if (stage === "additional") {
+    // Show manager_approved expenses that require additional approval
+    expenseQuery = expenseQuery
+      .eq("status", "manager_approved")
+      .eq("requires_additional_approval", true);
+    if (!isSuperAdmin) {
+      // Only show expenses where this user is the additional approver
+      expenseQuery = expenseQuery.eq("additional_approver_id", profile.id);
+    }
+  } else {
+    // Finance stage: show expenses ready for payment
+    // manager_approved where no additional needed, OR additional_approved, OR legacy approved
+    expenseQuery = expenseQuery.or(
+      "and(status.eq.manager_approved,requires_additional_approval.eq.false)," +
+      "status.eq.additional_approved," +
+      "status.eq.approved"
+    );
   }
 
   if (query.month) {
@@ -479,15 +507,24 @@ export async function POST(request: Request) {
   const isSuperAdmin = hasRole(profile.roles, "SUPER_ADMIN");
   const nowIso = new Date().toISOString();
   const currentMonth = currentMonthKey();
-  const targetStatus = statusForStage(stage);
 
-  const { data: rawTargetRows, error: targetRowsError } = await svcClient
+  // Build the target query based on stage
+  let targetQuery = svcClient
     .from("expenses")
     .select(expenseSelectColumns)
     .eq("org_id", profile.org_id)
     .in("id", payload.expenseIds)
-    .eq("status", targetStatus)
     .is("deleted_at", null);
+
+  if (stage === "manager") {
+    targetQuery = targetQuery.eq("status", "pending");
+  } else if (stage === "additional") {
+    targetQuery = targetQuery
+      .eq("status", "manager_approved")
+      .eq("requires_additional_approval", true);
+  }
+
+  const { data: rawTargetRows, error: targetRowsError } = await targetQuery;
 
   if (targetRowsError) {
     return jsonResponse<null>(500, {
@@ -535,6 +572,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (stage === "additional" && !isSuperAdmin) {
+    // Only allow expenses where this user is the additional approver
+    allowedRows = allowedRows.filter(
+      (row) => row.additional_approver_id === profile.id && row.employee_id !== profile.id
+    );
+  }
+
   const allowedIds = allowedRows.map((row) => row.id);
   const skippedIds = payload.expenseIds.filter((id) => !allowedIds.includes(id));
 
@@ -558,7 +602,27 @@ export async function POST(request: Request) {
   let updatedRowsRaw: unknown[] | null = null;
   let updatedRowsError: { code?: string; message: string } | null = null;
 
-  if (stage === "manager") {
+  if (stage === "additional") {
+    // Bulk approve at additional stage — simpler, no delegation grouping needed
+    const { data: additionalRows, error: additionalError } = await svcClient
+      .from("expenses")
+      .update({
+        status: "additional_approved" as const,
+        additional_approved_by: profile.id,
+        additional_approved_at: nowIso,
+        additional_acting_for: null,
+        additional_delegate_type: null,
+        additional_rejected_by: null,
+        additional_rejected_at: null,
+        additional_rejection_reason: null
+      })
+      .eq("org_id", profile.org_id)
+      .in("id", allowedIds)
+      .select(expenseSelectColumns);
+
+    updatedRowsRaw = additionalRows;
+    updatedRowsError = additionalError;
+  } else if (stage === "manager") {
     type DelegationGroup = {
       ids: string[];
       actingFor: string | null;
@@ -722,7 +786,30 @@ export async function POST(request: Request) {
     }
   });
 
-  if (stage === "manager") {
+  if (stage === "additional") {
+    await createBulkNotifications({
+      orgId: profile.org_id,
+      userIds: employeeIds,
+      type: "expense_status",
+      title: "Expense additionally approved",
+      body: `Your expense received additional approval and is pending finance payment confirmation.`,
+      link: "/expenses"
+    });
+
+    const financeAdminIds = await listFinanceAdminIds({
+      supabase,
+      orgId: profile.org_id
+    });
+
+    await createBulkNotifications({
+      orgId: profile.org_id,
+      userIds: financeAdminIds,
+      type: "expense_status",
+      title: "Expenses ready for payment confirmation",
+      body: `${expenses.length} expense${expenses.length === 1 ? "" : "s"} received additional approval and are ready for finance payment confirmation.`,
+      link: "/expenses/approvals"
+    });
+  } else if (stage === "manager") {
     const coveringFor = managerStageScope?.coveringFor ?? [];
     const delegationSuffix = coveringFor.length > 0
       ? ` (covering for ${coveringFor.map((c) => c.principalName).join(", ")})`

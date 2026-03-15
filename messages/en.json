@@ -3396,10 +3396,12 @@
     "tabs": {
       "ariaLabel": "Approval tabs",
       "pendingMyApproval": "Pending My Approval",
+      "pendingAdditionalApproval": "Pending Additional Approval",
       "pendingPayment": "Pending Payment"
     },
     "stageDescription": {
       "manager": "Expenses from your direct reports awaiting manager approval.",
+      "additional": "Expenses awaiting additional approval before finance review.",
       "finance": "Manager-approved expenses awaiting finance payment confirmation with uploaded payment proof."
     },
     "coveringForBanner": "You are covering for {name} while they are away.",
@@ -3428,6 +3430,7 @@
     "metrics": {
       "ariaLabel": "Expense metrics",
       "pendingManagerApproval": "Pending Manager Approval",
+      "pendingAdditionalApproval": "Pending Additional Approval",
       "pendingPayment": "Pending Payment",
       "queueAmount": "Queue Amount",
       "queueAmountHint": "Total amount currently in this queue"
@@ -3440,6 +3443,8 @@
       "noMatchFilters": "No expenses match current filters",
       "noPendingManager": "No expenses pending manager approval",
       "noPendingManagerTitle": "No expenses pending manager approval",
+      "noPendingAdditional": "No expenses pending additional approval",
+      "noPendingAdditionalTitle": "No expenses pending additional approval",
       "noPendingPayment": "No expenses pending payment confirmation",
       "noPendingPaymentTitle": "No expenses pending payment confirmation",
       "allProcessedDescription": "All current expense submissions have been processed for this stage.",
@@ -3564,6 +3569,8 @@
       "bulkApproveSuccess": "{count, plural, one {# expense} other {# expenses}} approved and moved to finance.",
       "bulkApproveError": "Unable to process selected expenses.",
       "bulkApproved": "{count, plural, one {# expense} other {# expenses}} approved and moved to finance.",
+      "additionalApproveSuccess": "Expense approved and forwarded to finance.",
+      "additionalRejectSuccess": "Expense rejected.",
       "rejectSuccess": "Expense rejected.",
       "financeRejectSuccess": "Expense rejected by finance.",
       "rejectError": "Unable to reject expense.",

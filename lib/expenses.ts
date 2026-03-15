@@ -108,6 +108,8 @@ export function getExpenseStatusLabel(status: ExpenseStatus): string {
       return "Pending";
     case "manager_approved":
       return "Awaiting Finance";
+    case "additional_approved":
+      return "Awaiting Finance";
     case "approved":
       return "Approved";
     case "rejected":
@@ -130,6 +132,8 @@ export function toneForExpenseStatus(
     case "pending":
       return "pending";
     case "manager_approved":
+      return "warning";
+    case "additional_approved":
       return "warning";
     case "approved":
       return "info";
@@ -203,6 +207,11 @@ export function summarizeExpenses(expenses: readonly ExpenseRecord[]): ExpensesS
       }
 
       if (expense.status === "manager_approved") {
+        summary.managerApprovedCount += 1;
+        summary.pendingAmount += expense.amount;
+      }
+
+      if (expense.status === "additional_approved") {
         summary.managerApprovedCount += 1;
         summary.pendingAmount += expense.amount;
       }

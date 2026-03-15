@@ -229,11 +229,13 @@ export async function GET(request: Request) {
         "Department",
         "Category",
         "Description",
-        "Amount (minor units)",
+        "Amount",
         "Currency",
         "Status",
         "Manager Approved By",
         "Manager Approved At",
+        "Additional Approver",
+        "Additional Approved By",
         "Finance Approved By",
         "Finance Approved At",
         "Finance Rejected By",
@@ -358,6 +360,7 @@ export async function GET(request: Request) {
     if (
       expense.status === "pending" ||
       expense.status === "manager_approved" ||
+      expense.status === "additional_approved" ||
       expense.status === "approved"
     ) {
       pendingAmount += safeAmount;
@@ -548,11 +551,13 @@ export async function GET(request: Request) {
       "Department",
       "Category",
       "Description",
-      "Amount (minor units)",
+      "Amount",
       "Currency",
       "Status",
       "Manager Approved By",
       "Manager Approved At",
+      "Additional Approver",
+      "Additional Approved By",
       "Finance Approved By",
       "Finance Approved At",
       "Finance Rejected By",
@@ -575,6 +580,12 @@ export async function GET(request: Request) {
       const financeRejector = expense.finance_rejected_by
         ? profileById.get(expense.finance_rejected_by)
         : null;
+      const additionalApprover = expense.additional_approver_id
+        ? profileById.get(expense.additional_approver_id)
+        : null;
+      const additionalApprovedBy = expense.additional_approved_by
+        ? profileById.get(expense.additional_approved_by)
+        : null;
       const amount = typeof expense.amount === "number" ? expense.amount : Number.parseInt(expense.amount, 10);
       const safeAmount = Number.isFinite(amount) ? Math.trunc(amount) : 0;
 
@@ -585,11 +596,13 @@ export async function GET(request: Request) {
         profile?.department ?? "No department",
         getExpenseCategoryLabel(expense.category),
         expense.description,
-        safeAmount,
+        (safeAmount / 100).toFixed(2),
         expense.currency,
         expense.status,
         managerApprover?.full_name ?? "",
         expense.manager_approved_at ?? expense.approved_at ?? "",
+        additionalApprover?.full_name ?? "",
+        additionalApprovedBy?.full_name ?? "",
         financeApprover?.full_name ?? "",
         expense.finance_approved_at ?? "",
         financeRejector?.full_name ?? "",

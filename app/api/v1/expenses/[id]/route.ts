@@ -6,6 +6,10 @@ import {
   getEffectiveApproverScope,
   resolveDelegationContext
 } from "../../../../../lib/delegation";
+import {
+  resolveCurrentStage,
+  canApproveAtStage
+} from "../../../../../lib/expense-routing";
 import { logger } from "../../../../../lib/logger";
 import {
   sendExpenseApprovedEmail,
@@ -35,7 +39,7 @@ import {
 } from "../_helpers";
 
 const expenseActionSchema = z.object({
-  action: z.enum(["approve", "reject", "cancel", "mark_reimbursed"]),
+  action: z.enum(["approve", "reject", "cancel", "mark_reimbursed", "additional_approve", "additional_reject"]),
   rejectionReason: z.string().trim().max(2000).optional(),
   financeRejectionReason: z.string().trim().max(2000).optional(),
   reimbursementReference: z.string().trim().max(120).optional(),
@@ -236,7 +240,10 @@ export async function PATCH(
 
   const canManagerApproveThisExpense = isSuperAdmin || isOperationalLeadOrDelegate;
   const normalizedAction: ExpenseAction =
-    payload.action === "mark_reimbursed" ? "approve" : payload.action;
+    payload.action === "mark_reimbursed" ? "approve"
+    : payload.action === "additional_approve" ? "additional_approve"
+    : payload.action === "additional_reject" ? "additional_reject"
+    : payload.action;
 
   let updatePayload: Record<string, unknown> | null = null;
 
@@ -279,7 +286,20 @@ export async function PATCH(
         finance_rejected_at: null,
         finance_rejection_reason: null
       };
-    } else if (expense.status === "manager_approved" || expense.status === "approved") {
+    } else if (expense.status === "manager_approved" || expense.status === "approved" || expense.status === "additional_approved") {
+      // Check if this expense is at the additional stage (not finance yet)
+      const stageInfo = resolveCurrentStage(expense);
+      if (stageInfo.currentStage === "additional") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message: "This expense requires additional approval before finance can process it. Use additional_approve action."
+          },
+          meta: buildMeta()
+        });
+      }
+
       if (!hasFinanceApprovalAccess) {
         return jsonResponse<null>(403, {
           data: null,
@@ -382,7 +402,20 @@ export async function PATCH(
         finance_rejected_at: null,
         finance_rejection_reason: null
       };
-    } else if (expense.status === "manager_approved" || expense.status === "approved") {
+    } else if (expense.status === "manager_approved" || expense.status === "approved" || expense.status === "additional_approved") {
+      // Check if this expense is at the additional stage
+      const stageInfo = resolveCurrentStage(expense);
+      if (stageInfo.currentStage === "additional") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message: "This expense is pending additional approval. Use additional_reject action."
+          },
+          meta: buildMeta()
+        });
+      }
+
       if (!hasFinanceApprovalAccess) {
         return jsonResponse<null>(403, {
           data: null,
@@ -429,6 +462,107 @@ export async function PATCH(
         meta: buildMeta()
       });
     }
+  }
+
+  // Additional approval actions
+  if (payload.action === "additional_approve") {
+    const stageInfo = resolveCurrentStage(expense);
+    if (stageInfo.currentStage !== "additional") {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "INVALID_STATE",
+          message: "This expense is not pending additional approval."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const authResult = await canApproveAtStage({
+      supabase,
+      userId: session.profile.id,
+      userRoles: session.profile.roles,
+      orgId: session.profile.org_id,
+      expense,
+      stage: "additional"
+    });
+
+    if (!authResult.allowed) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "You are not authorized to approve this expense at the additional stage."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    updatePayload = {
+      status: "additional_approved",
+      additional_approved_by: session.profile.id,
+      additional_approved_at: nowIso,
+      additional_acting_for: authResult.delegationCtx.actingFor,
+      additional_delegate_type: authResult.delegationCtx.delegateType,
+      additional_rejected_by: null,
+      additional_rejected_at: null,
+      additional_rejection_reason: null
+    };
+  }
+
+  if (payload.action === "additional_reject") {
+    const stageInfo = resolveCurrentStage(expense);
+    if (stageInfo.currentStage !== "additional") {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "INVALID_STATE",
+          message: "This expense is not pending additional approval."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const authResult = await canApproveAtStage({
+      supabase,
+      userId: session.profile.id,
+      userRoles: session.profile.roles,
+      orgId: session.profile.org_id,
+      expense,
+      stage: "additional"
+    });
+
+    if (!authResult.allowed) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "You are not authorized to reject this expense at the additional stage."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const reason = payload.rejectionReason?.trim();
+    if (!reason) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Rejection reason is required."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    updatePayload = {
+      status: "rejected",
+      additional_rejected_by: session.profile.id,
+      additional_rejected_at: nowIso,
+      additional_rejection_reason: reason,
+      additional_acting_for: authResult.delegationCtx.actingFor,
+      additional_delegate_type: authResult.delegationCtx.delegateType
+    };
   }
 
   if (normalizedAction === "cancel") {
@@ -578,6 +712,44 @@ export async function PATCH(
       reimbursementReference: updatedExpense.reimbursementReference
     }
   });
+
+  // Notification: additional approval → notify employee + finance
+  if (payload.action === "additional_approve" && updatedExpense.status === "additional_approved") {
+    const financeAdminUserIds = await listFinanceAdminIds({
+      supabase: svcClient,
+      orgId: session.profile.org_id
+    });
+
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      type: "expense_status",
+      title: "Expense additionally approved",
+      body: `Your expense received additional approval and is pending finance payment confirmation.`,
+      link: "/expenses"
+    });
+
+    await createBulkNotifications({
+      orgId: session.profile.org_id,
+      userIds: financeAdminUserIds.filter((userId) => userId !== updatedExpense.employeeId),
+      type: "expense_status",
+      title: "Expense ready for payment confirmation",
+      body: `${updatedExpense.employeeName}'s expense received all approvals and is ready for finance payment confirmation.`,
+      link: "/expenses/approvals"
+    });
+  }
+
+  // Notification: additional rejection → notify employee
+  if (payload.action === "additional_reject" && updatedExpense.status === "rejected") {
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: updatedExpense.employeeId,
+      type: "expense_status",
+      title: "Expense rejected",
+      body: `Your expense was rejected at additional approval.${updatedExpense.additionalRejectionReason ? ` Reason: ${updatedExpense.additionalRejectionReason}` : ""}`,
+      link: "/expenses"
+    });
+  }
 
   if (normalizedAction === "approve" && updatedExpense.status === "manager_approved") {
     const financeAdminUserIds = await listFinanceAdminIds({

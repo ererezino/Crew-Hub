@@ -3387,10 +3387,12 @@
     "tabs": {
       "ariaLabel": "Onglets d'approbation",
       "pendingMyApproval": "En attente de mon approbation",
+      "pendingAdditionalApproval": "En attente d'approbation supplémentaire",
       "pendingPayment": "En attente de paiement"
     },
     "stageDescription": {
       "manager": "Dépenses de vos subordonnés directs en attente d'approbation du responsable.",
+      "additional": "Dépenses en attente d'approbation supplémentaire avant examen financier.",
       "finance": "Dépenses approuvées par le responsable en attente de confirmation de paiement par la finance avec justificatif de paiement."
     },
     "coveringForBanner": "Vous couvrez pour {name} pendant son absence.",
@@ -3419,6 +3421,7 @@
     "metrics": {
       "ariaLabel": "Métriques des dépenses",
       "pendingManagerApproval": "En attente d'approbation du responsable",
+      "pendingAdditionalApproval": "En attente d'approbation supplémentaire",
       "pendingPayment": "En attente de paiement",
       "queueAmount": "Montant en file d'attente",
       "queueAmountHint": "Montant total actuellement dans cette file d'attente"
@@ -3431,6 +3434,8 @@
       "noMatchFilters": "Aucune dépense ne correspond aux filtres actuels",
       "noPendingManager": "Aucune dépense en attente d'approbation du responsable",
       "noPendingManagerTitle": "Aucune dépense en attente d'approbation du responsable",
+      "noPendingAdditional": "Aucune dépense en attente d'approbation supplémentaire",
+      "noPendingAdditionalTitle": "Aucune dépense en attente d'approbation supplémentaire",
       "noPendingPayment": "Aucune dépense en attente de confirmation de paiement",
       "noPendingPaymentTitle": "Aucune dépense en attente de confirmation de paiement",
       "allProcessedDescription": "Toutes les soumissions de dépenses actuelles ont été traitées pour cette étape.",
@@ -3555,6 +3560,8 @@
       "bulkApproveSuccess": "{count, plural, one {# dépense approuvée} other {# dépenses approuvées}} et transférée(s) vers la finance.",
       "bulkApproveError": "Impossible de traiter les dépenses sélectionnées.",
       "bulkApproved": "{count, plural, one {# dépense approuvée} other {# dépenses approuvées}} et transférée(s) vers la finance.",
+      "additionalApproveSuccess": "Dépense approuvée et transmise à la finance.",
+      "additionalRejectSuccess": "Dépense rejetée.",
       "rejectSuccess": "Dépense rejetée.",
       "financeRejectSuccess": "Dépense rejetée par la finance.",
       "rejectError": "Impossible de rejeter la dépense.",

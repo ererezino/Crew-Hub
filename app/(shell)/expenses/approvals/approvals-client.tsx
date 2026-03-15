@@ -55,7 +55,7 @@ type ToastMessage = {
   message: string;
 };
 
-type RejectMode = "manager" | "finance";
+type RejectMode = "manager" | "additional" | "finance";
 
 type RejectFormValues = {
   reason: string;
@@ -181,15 +181,20 @@ function ReceiptLightbox({
 
 export function ExpenseApprovalsClient({
   canManagerApprove,
+  canAdditionalApprove,
   canFinanceApprove,
   managerCount,
+  additionalCount,
   financeCount,
   embedded = false
 }: {
   canManagerApprove: boolean;
+  canAdditionalApprove?: boolean;
   canFinanceApprove: boolean;
   /** Number of expenses awaiting manager approval (for sub-tab badge) */
   managerCount?: number;
+  /** Number of expenses awaiting additional approval (for sub-tab badge) */
+  additionalCount?: number;
   /** Number of expenses awaiting finance payment (for sub-tab badge) */
   financeCount?: number;
   embedded?: boolean;
@@ -219,12 +224,16 @@ export function ExpenseApprovalsClient({
       stages.push("manager");
     }
 
+    if (canAdditionalApprove) {
+      stages.push("additional");
+    }
+
     if (canFinanceApprove) {
       stages.push("finance");
     }
 
     return stages;
-  }, [canFinanceApprove, canManagerApprove]);
+  }, [canAdditionalApprove, canFinanceApprove, canManagerApprove]);
   const [month, setMonth] = useState(currentMonthKey());
   const [stage, setStage] = useState<ExpenseApprovalStage>(availableStages[0] ?? "manager");
   const [employeeFilter, setEmployeeFilter] = useState("");
@@ -389,7 +398,7 @@ export function ExpenseApprovalsClient({
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          action: "approve"
+          action: stage === "additional" ? "additional_approve" : "approve"
         })
       });
 
@@ -743,7 +752,7 @@ export function ExpenseApprovalsClient({
   };
 
   const handleBulkApprove = async () => {
-    if (stage !== "manager") {
+    if (stage !== "manager" && stage !== "additional") {
       showToast("error", t('toast.bulkOnlyManager'));
       return;
     }
@@ -788,7 +797,7 @@ export function ExpenseApprovalsClient({
   };
 
   const openBulkApproveConfirm = () => {
-    if (stage !== "manager") {
+    if (stage !== "manager" && stage !== "additional") {
       return;
     }
 
@@ -874,10 +883,15 @@ export function ExpenseApprovalsClient({
                 action: "reject",
                 rejectionReason: rejectValues.reason.trim()
               }
-            : {
-                action: "reject",
-                financeRejectionReason: rejectValues.reason.trim()
-              }
+            : rejectMode === "additional"
+              ? {
+                  action: "additional_reject",
+                  rejectionReason: rejectValues.reason.trim()
+                }
+              : {
+                  action: "reject",
+                  financeRejectionReason: rejectValues.reason.trim()
+                }
         )
       });
 
@@ -938,17 +952,23 @@ export function ExpenseApprovalsClient({
     }
   };
 
-  const stageTitle = stage === "manager" ? t('tabs.pendingMyApproval') : t('tabs.pendingPayment');
+  const stageTitle = stage === "manager"
+    ? t('tabs.pendingMyApproval')
+    : stage === "additional"
+      ? t('tabs.pendingAdditionalApproval')
+      : t('tabs.pendingPayment');
   const stageDescription =
     stage === "manager"
       ? t('stageDescription.manager')
-      : t('stageDescription.finance');
+      : stage === "additional"
+        ? t('stageDescription.additional')
+        : t('stageDescription.finance');
   const hasActiveFilters =
     employeeFilter.trim().length > 0 ||
     categoryFilter !== "all" ||
     fromDateFilter.length > 0 ||
     toDateFilter.length > 0;
-  const canBulkProcess = stage === "manager";
+  const canBulkProcess = stage === "manager" || stage === "additional";
 
   const clearFilters = () => {
     setEmployeeFilter("");
@@ -990,6 +1010,18 @@ export function ExpenseApprovalsClient({
               <span className="page-tab-badge numeric">{managerCount}</span>
             ) : null}
           </button>
+          {availableStages.includes("additional") ? (
+            <button
+              type="button"
+              className={stage === "additional" ? "page-tab page-tab-active" : "page-tab"}
+              onClick={() => setStage("additional")}
+            >
+              {t('tabs.pendingAdditionalApproval')}
+              {typeof additionalCount === "number" ? (
+                <span className="page-tab-badge numeric">{additionalCount}</span>
+              ) : null}
+            </button>
+          ) : null}
           <button
             type="button"
             className={stage === "finance" ? "page-tab page-tab-active" : "page-tab"}
@@ -1096,7 +1128,7 @@ export function ExpenseApprovalsClient({
         <>
           <section className="expenses-metric-grid" aria-label={t('metrics.ariaLabel')}>
             <article className="metric-card">
-              <p className="metric-label">{stage === "manager" ? t('metrics.pendingManagerApproval') : t('metrics.pendingPayment')}</p>
+              <p className="metric-label">{stage === "manager" ? t('metrics.pendingManagerApproval') : stage === "additional" ? t('metrics.pendingAdditionalApproval') : t('metrics.pendingPayment')}</p>
               <p className="metric-value numeric">{approvalsQuery.data.pendingCount}</p>
               <p className="metric-hint">{stageDescription}</p>
             </article>
@@ -1296,6 +1328,25 @@ export function ExpenseApprovalsClient({
                                 type="button"
                                 className="table-row-action table-row-action-danger"
                                 onClick={() => openRejectPanel(expense, "manager")}
+                                disabled={isMutatingId === expense.id}
+                              >
+                                {t('actions.reject')}
+                              </button>
+                            </>
+                          ) : stage === "additional" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="table-row-action table-row-action-success"
+                                onClick={() => openApproveConfirm(expense)}
+                                disabled={isMutatingId === expense.id}
+                              >
+                                {isMutatingId === expense.id ? tCommon('working') : t('actions.approve')}
+                              </button>
+                              <button
+                                type="button"
+                                className="table-row-action table-row-action-danger"
+                                onClick={() => openRejectPanel(expense, "additional")}
                                 disabled={isMutatingId === expense.id}
                               >
                                 {t('actions.reject')}

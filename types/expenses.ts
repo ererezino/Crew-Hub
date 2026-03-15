@@ -18,6 +18,7 @@ export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export const EXPENSE_STATUSES = [
   "pending",
   "manager_approved",
+  "additional_approved",
   "approved",
   "rejected",
   "finance_rejected",
@@ -26,13 +27,15 @@ export const EXPENSE_STATUSES = [
 ] as const;
 
 export type ExpenseStatus = (typeof EXPENSE_STATUSES)[number];
-export type ExpenseApprovalStage = "manager" | "finance";
+export type ExpenseApprovalStage = "manager" | "additional" | "finance";
 
 export const EXPENSE_ACTIONS = [
   "approve",
   "reject",
   "cancel",
-  "mark_reimbursed"
+  "mark_reimbursed",
+  "additional_approve",
+  "additional_reject"
 ] as const;
 
 export type ExpenseAction = (typeof EXPENSE_ACTIONS)[number];
@@ -80,6 +83,21 @@ export type ExpenseRecord = {
   managerActingFor: string | null;
   managerActingForName: string | null;
   managerDelegateType: string | null;
+  /** Routing: whether this expense requires additional approval between manager and finance. */
+  requiresAdditionalApproval: boolean;
+  additionalApproverId: string | null;
+  additionalApproverName: string | null;
+  matchedRuleId: string | null;
+  additionalApprovedBy: string | null;
+  additionalApprovedByName: string | null;
+  additionalApprovedAt: string | null;
+  additionalActingFor: string | null;
+  additionalActingForName: string | null;
+  additionalDelegateType: string | null;
+  additionalRejectedBy: string | null;
+  additionalRejectedByName: string | null;
+  additionalRejectedAt: string | null;
+  additionalRejectionReason: string | null;
   financeApprovedBy: string | null;
   financeApprovedByName: string | null;
   financeApprovedAt: string | null;

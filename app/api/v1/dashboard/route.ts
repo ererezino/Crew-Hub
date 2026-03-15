@@ -985,7 +985,7 @@ async function fetchExpensePipeline(
   reimbursed: number;
 }> {
   try {
-    const [pendingResult, financeResult, reimbursedResult] =
+    const [pendingResult, financeResult, reimbursedResult, additionalResult] =
       await Promise.all([
         supabase
           .from("expenses")
@@ -1004,17 +1004,24 @@ async function fetchExpensePipeline(
           .select("id", { count: "exact", head: true })
           .eq("org_id", orgId)
           .eq("status", "reimbursed")
+          .is("deleted_at", null),
+        supabase
+          .from("expenses")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("status", "additional_approved")
           .is("deleted_at", null)
       ]);
 
     const pendingManager = pendingResult.count ?? 0;
     const pendingFinance = financeResult.count ?? 0;
     const reimbursed = reimbursedResult.count ?? 0;
+    const additionalApproved = additionalResult.count ?? 0;
 
     return {
-      submitted: pendingManager + pendingFinance,
+      submitted: pendingManager + pendingFinance + additionalApproved,
       pendingManager,
-      pendingFinance,
+      pendingFinance: pendingFinance + additionalApproved,
       reimbursed
     };
   } catch {

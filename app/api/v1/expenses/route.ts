@@ -17,6 +17,8 @@ import {
 } from "../../../../lib/expenses";
 import { validateUploadMagicBytes } from "../../../../lib/security/upload-signatures";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
+import { resolveExpenseRoute } from "../../../../lib/expense-routing";
+import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import type { ExpenseMutationResponseData, ExpensesListResponseData } from "../../../../types/expenses";
 import {
   buildMeta,
@@ -502,7 +504,45 @@ export async function POST(request: Request) {
     });
   }
 
-  const parsedExpense = expenseRowSchema.safeParse(insertedExpense);
+  // Evaluate routing rules to determine if additional approval is needed
+  const svcClient = createSupabaseServiceRoleClient();
+  const employeeDept = await (async () => {
+    const { data: emp } = await svcClient
+      .from("profiles")
+      .select("department")
+      .eq("id", session.profile!.id)
+      .maybeSingle();
+    return emp?.department as string | null;
+  })();
+
+  const route = await resolveExpenseRoute({
+    supabase: svcClient,
+    orgId: session.profile!.org_id,
+    employeeId: session.profile!.id,
+    department: employeeDept,
+    amount,
+    category: payload.category
+  });
+
+  if (route.requiresAdditionalApproval || route.matchedRuleId) {
+    await svcClient
+      .from("expenses")
+      .update({
+        requires_additional_approval: route.requiresAdditionalApproval,
+        additional_approver_id: route.additionalApproverId,
+        matched_rule_id: route.matchedRuleId
+      })
+      .eq("id", expenseId);
+  }
+
+  // Re-fetch the expense with routing fields populated
+  const { data: routedExpense } = await svcClient
+    .from("expenses")
+    .select(expenseSelectColumns)
+    .eq("id", expenseId)
+    .single();
+
+  const parsedExpense = expenseRowSchema.safeParse(routedExpense ?? insertedExpense);
 
   if (!parsedExpense.success) {
     await cleanupUploadedFile(filePath);
