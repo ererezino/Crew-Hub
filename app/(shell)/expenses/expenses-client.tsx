@@ -1405,6 +1405,21 @@ export function ExpensesClient({
                           ].join("")
                         : td("timeline.awaitingManager");
 
+                    const additionalDescription = expense.requiresAdditionalApproval
+                      ? expense.additionalApprovedByName
+                        ? expense.additionalActingForName
+                          ? td("timeline.approvedByOnBehalf", { name: expense.additionalApprovedByName, principal: expense.additionalActingForName })
+                          : td("timeline.approvedBy", { name: expense.additionalApprovedByName })
+                        : expense.additionalRejectedByName
+                          ? [
+                              td("timeline.rejectedBy", { name: expense.additionalRejectedByName }),
+                              expense.additionalRejectionReason
+                                ? ` ${td("timeline.rejectionReason", { reason: expense.additionalRejectionReason })}`
+                                : ""
+                            ].join("")
+                          : td("timeline.awaitingAdditional", { name: expense.additionalApproverName ?? "" })
+                      : null;
+
                     const financeDescription = expense.reimbursedAt
                       ? td("timeline.markedPaidBy", {
                           name: expense.reimbursedByName ?? td("timeline.financeFallback"),
@@ -1564,6 +1579,22 @@ export function ExpensesClient({
                                     locale={locale}
                                     pendingLabel={t('timeline.pending')}
                                   />
+                                  {expense.requiresAdditionalApproval ? (
+                                    <ExpenseTimelineItem
+                                      title={t('timeline.additionalApproval')}
+                                      timestamp={expense.additionalApprovedAt ?? expense.additionalRejectedAt}
+                                      description={additionalDescription ?? ""}
+                                      tone={
+                                        expense.additionalApprovedAt
+                                          ? "success"
+                                          : expense.additionalRejectedAt
+                                            ? "error"
+                                            : "pending"
+                                      }
+                                      locale={locale}
+                                      pendingLabel={t('timeline.pending')}
+                                    />
+                                  ) : null}
                                   <ExpenseTimelineItem
                                     title={t('timeline.financePayment')}
                                     timestamp={expense.reimbursedAt ?? expense.financeRejectedAt}

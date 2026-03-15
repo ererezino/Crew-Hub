@@ -67,11 +67,7 @@ create policy "routing_rules_insert"
     and exists (
       select 1 from public.profiles
       where id = auth.uid()
-        and (
-          roles @> '["SUPER_ADMIN"]'::jsonb
-          or roles @> '["HR_ADMIN"]'::jsonb
-          or roles @> '["FINANCE_ADMIN"]'::jsonb
-        )
+        and roles && ARRAY['SUPER_ADMIN','HR_ADMIN','FINANCE_ADMIN']::text[]
     )
   );
 
@@ -83,11 +79,7 @@ create policy "routing_rules_update"
     and exists (
       select 1 from public.profiles
       where id = auth.uid()
-        and (
-          roles @> '["SUPER_ADMIN"]'::jsonb
-          or roles @> '["HR_ADMIN"]'::jsonb
-          or roles @> '["FINANCE_ADMIN"]'::jsonb
-        )
+        and roles && ARRAY['SUPER_ADMIN','HR_ADMIN','FINANCE_ADMIN']::text[]
     )
   );
 

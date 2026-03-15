@@ -140,6 +140,7 @@
     "signatures": "Signatures",
     "rolesAccess": "Rôles et accès",
     "auditLog": "Journal d'audit",
+    "expenseRouting": "Routage des dépenses",
     "myProfile": "Mon profil",
     "settings": "Paramètres",
     "support": "Aide et support",
@@ -165,6 +166,7 @@
       "signatures": "Demandez, signez et suivez les documents avec chronologie des signataires",
       "rolesAccess": "Permissions par défaut des rôles et dérogations individuelles",
       "auditLog": "Qui a fait quoi, quand et sur quel enregistrement",
+      "expenseRouting": "Configurer les règles de routage d'approbation pour les dépenses",
       "settings": "Gérez votre profil, vos préférences et votre sécurité",
       "support": "Obtenir de l'aide et du support"
     }
@@ -4499,7 +4501,9 @@
       "paymentRef": "(Réf : {reference})",
       "financeRejectedBy": "Rejeté par {name}.",
       "financeRejectionReason": "Raison : {reason}",
-      "awaitingFinance": "En attente de la confirmation de paiement par la finance."
+      "awaitingFinance": "En attente de la confirmation de paiement par la finance.",
+      "additionalApproval": "Approbation supplémentaire",
+      "awaitingAdditional": "En attente d'approbation supplémentaire de {name}."
     },
     "infoRequests": {
       "title": "Demandes d'informations",
@@ -5572,5 +5576,68 @@
     "confirmDeactivateDescription": "{delegate} ne pourra plus approuver au nom de {principal}.",
     "confirmReactivateTitle": "Réactiver la délégation",
     "confirmReactivateDescription": "{delegate} pourra à nouveau approuver au nom de {principal}."
+  },
+  "expenseRouting": {
+    "pageTitle": "Règles de routage des dépenses",
+    "pageDescription": "Configurez les règles qui dirigent les dépenses vers des approbateurs supplémentaires avant la revue financière.",
+    "accessDenied": "Vous n'avez pas la permission de gérer les règles de routage des dépenses.",
+    "firstMatchInfo": "Les règles sont évaluées par ordre de priorité. La première règle correspondante l'emporte — un seul approbateur supplémentaire est assigné par dépense.",
+    "addRule": "Ajouter une règle",
+    "editRule": "Modifier la règle",
+    "createRule": "Créer une règle",
+    "emptyTitle": "Aucune règle de routage configurée",
+    "emptyDescription": "Sans règles de routage, toutes les dépenses passent directement de l'approbation du responsable aux finances. Ajoutez une règle pour exiger une approbation supplémentaire pour des départements, catégories ou montants spécifiques.",
+    "table": {
+      "priority": "#",
+      "name": "Nom",
+      "department": "Département",
+      "category": "Catégorie",
+      "amountRange": "Plage de montant",
+      "approver": "Approbateur",
+      "status": "Statut",
+      "actions": "Actions",
+      "any": "Tous",
+      "noMax": "Pas de max",
+      "noMin": "Pas de min",
+      "departmentOwner": "Responsable du département",
+      "active": "Actif",
+      "inactive": "Inactif"
+    },
+    "form": {
+      "name": "Nom de la règle",
+      "namePlaceholder": "ex. Grosses dépenses de voyage",
+      "nameRequired": "Le nom de la règle est requis.",
+      "department": "Département",
+      "departmentPlaceholder": "Laisser vide pour tous les départements",
+      "category": "Catégorie",
+      "anyCategory": "Toutes les catégories",
+      "minAmount": "Montant minimum (centimes)",
+      "minAmountPlaceholder": "ex. 50000 pour 500 $",
+      "maxAmount": "Montant maximum (centimes)",
+      "maxAmountPlaceholder": "ex. 100000 pour 1 000 $",
+      "approverType": "Type d'approbateur",
+      "departmentOwner": "Responsable du département",
+      "specificPerson": "Personne spécifique",
+      "approverId": "ID de l'approbateur",
+      "approverIdPlaceholder": "UUID de l'utilisateur",
+      "approverIdRequired": "L'ID de l'approbateur est requis pour une personne spécifique.",
+      "priority": "Priorité",
+      "priorityHint": "Les numéros plus bas sont évalués en premier.",
+      "active": "Actif"
+    },
+    "toast": {
+      "createSuccess": "Règle de routage créée.",
+      "createError": "Échec de la création de la règle de routage.",
+      "updateSuccess": "Règle de routage mise à jour.",
+      "updateError": "Échec de la mise à jour de la règle de routage.",
+      "deactivateSuccess": "Règle de routage désactivée.",
+      "reactivateSuccess": "Règle de routage réactivée."
+    },
+    "confirm": {
+      "deactivateTitle": "Désactiver la règle",
+      "deactivateDescription": "Cette règle ne correspondra plus aux nouvelles dépenses. Les dépenses déjà routées par cette règle ne seront pas affectées.",
+      "deactivateConfirm": "Désactiver",
+      "reactivate": "Réactiver"
+    }
   }
 }

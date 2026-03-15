@@ -14,6 +14,8 @@ type ApprovalsCountsResponseData = {
   expenses: number;
   /** Expenses awaiting manager approval (status = "pending") */
   managerExpenses: number;
+  /** Expenses awaiting additional approval (status = "manager_approved" with requires_additional_approval) */
+  additionalExpenses: number;
   /** Expenses awaiting finance payment confirmation (status = "manager_approved") */
   financeExpenses: number;
   total: number;
@@ -110,6 +112,28 @@ async function countExpensesByStatus({
   return typeof count === "number" ? count : 0;
 }
 
+async function countAdditionalExpenses({
+  supabase,
+  orgId,
+  userId
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  orgId: string;
+  userId: string;
+}) {
+  const { count, error } = await supabase
+    .from("expenses")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("status", "manager_approved")
+    .eq("requires_additional_approval", true)
+    .eq("additional_approver_id", userId)
+    .is("deleted_at", null);
+
+  if (error) return 0;
+  return typeof count === "number" ? count : 0;
+}
+
 export async function GET(request: Request) {
   const parsedQuery = querySchema.safeParse(
     Object.fromEntries(new URL(request.url).searchParams.entries())
@@ -153,6 +177,7 @@ export async function GET(request: Request) {
         timeOff: 0,
         expenses: 0,
         managerExpenses: 0,
+        additionalExpenses: 0,
         financeExpenses: 0,
         total: 0
       },
@@ -193,7 +218,7 @@ export async function GET(request: Request) {
     expenseReportIds = [...expenseScope.directReportIds, ...expenseScope.delegatedReportIds];
   }
 
-  const [timeOffCount, managerExpenseCount, financeExpenseCount] = await Promise.all([
+  const [timeOffCount, managerExpenseCount, additionalExpenseCount, financeExpenseCount] = await Promise.all([
     includeTimeOff
       ? countPendingLeaveRequests({
           supabase: svcClient,
@@ -209,6 +234,13 @@ export async function GET(request: Request) {
           employeeIds: superAdmin ? null : expenseReportIds
         })
       : Promise.resolve(0),
+    (includeManagerExpenses || includeFinanceExpenses)
+      ? countAdditionalExpenses({
+          supabase: svcClient,
+          orgId: profile.org_id,
+          userId: profile.id
+        })
+      : Promise.resolve(0),
     includeFinanceExpenses
       ? countExpensesByStatus({
           supabase: svcClient,
@@ -219,7 +251,7 @@ export async function GET(request: Request) {
       : Promise.resolve(0)
   ]);
 
-  const expensesCount = managerExpenseCount + financeExpenseCount;
+  const expensesCount = managerExpenseCount + additionalExpenseCount + financeExpenseCount;
   const total = timeOffCount + expensesCount;
 
   return jsonResponse<ApprovalsCountsResponseData>(200, {
@@ -227,6 +259,7 @@ export async function GET(request: Request) {
       timeOff: timeOffCount,
       expenses: expensesCount,
       managerExpenses: managerExpenseCount,
+      additionalExpenses: additionalExpenseCount,
       financeExpenses: financeExpenseCount,
       total
     },

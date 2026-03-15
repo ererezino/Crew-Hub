@@ -259,6 +259,14 @@ export const NAV_GROUPS: NavGroup[] = [
         icon: "ScrollText",
         description: "Who did what, when, and to which record",
         shortcut: "A L"
+      },
+      {
+        label: "Expense routing",
+        labelKey: "expenseRouting",
+        href: "/admin/expense-routing",
+        icon: "Route",
+        description: "Configure additional approval routing rules for expenses",
+        shortcut: "A E"
       }
     ]
   }

@@ -140,6 +140,7 @@
     "signatures": "Signatures",
     "rolesAccess": "Roles & access",
     "auditLog": "Audit log",
+    "expenseRouting": "Expense Routing",
     "myProfile": "My Profile",
     "settings": "Settings",
     "support": "Help & Support",
@@ -165,6 +166,7 @@
       "signatures": "Request, sign, and track documents with signer timelines",
       "rolesAccess": "Default role permissions and per-person overrides",
       "auditLog": "Who did what, when, and to which record",
+      "expenseRouting": "Configure additional approval routing rules for expenses",
       "settings": "Manage your profile, preferences, and security",
       "support": "Get help and support"
     }
@@ -4508,7 +4510,9 @@
       "paymentRef": "(Ref: {reference})",
       "financeRejectedBy": "Rejected by {name}.",
       "financeRejectionReason": "Reason: {reason}",
-      "awaitingFinance": "Awaiting finance payment confirmation."
+      "awaitingFinance": "Awaiting finance payment confirmation.",
+      "additionalApproval": "Additional Approval",
+      "awaitingAdditional": "Awaiting additional approval from {name}."
     },
     "infoRequests": {
       "title": "Info Requests",
@@ -5582,5 +5586,68 @@
     "confirmDeactivateDescription": "{delegate} will no longer be able to approve on behalf of {principal}.",
     "confirmReactivateTitle": "Reactivate delegation",
     "confirmReactivateDescription": "{delegate} will be able to approve on behalf of {principal} again."
+  },
+  "expenseRouting": {
+    "pageTitle": "Expense Routing Rules",
+    "pageDescription": "Configure rules that route expenses to additional approvers before finance review.",
+    "accessDenied": "You do not have permission to manage expense routing rules.",
+    "firstMatchInfo": "Rules are evaluated in priority order. The first matching rule wins — only one additional approver is assigned per expense.",
+    "addRule": "Add Rule",
+    "editRule": "Edit Rule",
+    "createRule": "Create Rule",
+    "emptyTitle": "No routing rules configured",
+    "emptyDescription": "Without routing rules, all expenses go directly from manager approval to finance. Add a rule to require additional approval for specific departments, categories, or amount ranges.",
+    "table": {
+      "priority": "#",
+      "name": "Name",
+      "department": "Department",
+      "category": "Category",
+      "amountRange": "Amount Range",
+      "approver": "Approver",
+      "status": "Status",
+      "actions": "Actions",
+      "any": "Any",
+      "noMax": "No max",
+      "noMin": "No min",
+      "departmentOwner": "Department Owner",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "form": {
+      "name": "Rule Name",
+      "namePlaceholder": "e.g. Large travel expenses",
+      "nameRequired": "Rule name is required.",
+      "department": "Department",
+      "departmentPlaceholder": "Leave blank for any department",
+      "category": "Category",
+      "anyCategory": "Any category",
+      "minAmount": "Minimum Amount (cents)",
+      "minAmountPlaceholder": "e.g. 50000 for $500",
+      "maxAmount": "Maximum Amount (cents)",
+      "maxAmountPlaceholder": "e.g. 100000 for $1,000",
+      "approverType": "Approver Type",
+      "departmentOwner": "Department Owner",
+      "specificPerson": "Specific Person",
+      "approverId": "Approver ID",
+      "approverIdPlaceholder": "User UUID",
+      "approverIdRequired": "Approver ID is required for specific person.",
+      "priority": "Priority",
+      "priorityHint": "Lower numbers are evaluated first.",
+      "active": "Active"
+    },
+    "toast": {
+      "createSuccess": "Routing rule created.",
+      "createError": "Failed to create routing rule.",
+      "updateSuccess": "Routing rule updated.",
+      "updateError": "Failed to update routing rule.",
+      "deactivateSuccess": "Routing rule deactivated.",
+      "reactivateSuccess": "Routing rule reactivated."
+    },
+    "confirm": {
+      "deactivateTitle": "Deactivate Rule",
+      "deactivateDescription": "This rule will stop matching new expenses. Existing expenses already routed by this rule will not be affected.",
+      "deactivateConfirm": "Deactivate",
+      "reactivate": "Reactivate"
+    }
   }
 }
