@@ -3705,6 +3705,10 @@
       "cancelOffboarding": "Cancel offboarding",
       "keepOffboarding": "Keep offboarding"
     },
+    "finaliseOffboard": {
+      "button": "Finalise offboarding",
+      "processing": "Finalising..."
+    },
     "dangerZone": {
       "title": "Danger zone",
       "enableAccount": "Enable account",

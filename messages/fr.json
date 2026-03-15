@@ -3696,6 +3696,10 @@
       "cancelOffboarding": "Annuler le départ",
       "keepOffboarding": "Maintenir le départ"
     },
+    "finaliseOffboard": {
+      "button": "Finaliser le départ",
+      "processing": "Finalisation..."
+    },
     "dangerZone": {
       "title": "Zone de danger",
       "enableAccount": "Activer le compte",

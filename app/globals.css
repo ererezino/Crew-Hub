@@ -13413,6 +13413,12 @@ html.dark .dashboard-audit-table {
   color: var(--text-primary);
 }
 
+.offboarding-banner-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
 /* Modal overlay and dialog */
 .modal-overlay {
   position: fixed;

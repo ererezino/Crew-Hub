@@ -193,6 +193,13 @@ export function PeopleOverviewClient({
   const [isSubmittingCancelOffboard, setIsSubmittingCancelOffboard] = useState(false);
   const [cancelOffboardError, setCancelOffboardError] = useState<string | null>(null);
 
+  // Finalise offboarding state
+  const [isSubmittingFinalise, setIsSubmittingFinalise] = useState(false);
+  const [finaliseError, setFinaliseError] = useState<string | null>(null);
+
+  // Offboarding finalisation gate state
+  const [offboardingAllTasksDone, setOffboardingAllTasksDone] = useState(false);
+
   // Disable/enable account state
   const [confirmDisableOpen, setConfirmDisableOpen] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
@@ -250,6 +257,50 @@ export function PeopleOverviewClient({
   const refresh = useCallback(() => {
     setReloadToken((v) => v + 1);
   }, []);
+
+  // Check offboarding task completion for finalisation gate
+  useEffect(() => {
+    if (!person || person.status !== "offboarding") {
+      setOffboardingAllTasksDone(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/v1/onboarding/instances?scope=all&status=active&type=offboarding`,
+          { signal: controller.signal }
+        );
+        if (!res.ok) return;
+        const payload = await res.json();
+        const instances = payload?.data?.instances ?? [];
+        const match = instances.find(
+          (i: { employeeId: string; totalTasks: number; completedTasks: number }) =>
+            i.employeeId === person.id
+        );
+        if (match && match.totalTasks > 0 && match.completedTasks === match.totalTasks) {
+          setOffboardingAllTasksDone(true);
+        } else {
+          setOffboardingAllTasksDone(false);
+        }
+      } catch {
+        // Non-blocking
+      }
+    })();
+
+    return () => controller.abort();
+  }, [person]);
+
+  // Compute finalisation gate
+  const canFinalise = useMemo(() => {
+    if (!person || person.status !== "offboarding") return false;
+    if (!offboardingAllTasksDone) return false;
+    if (!person.noticePeriodEndDate) return false;
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+    return today >= person.noticePeriodEndDate;
+  }, [person, offboardingAllTasksDone]);
 
   // Role labels
   const roleLabels: Record<AppRole, string> = useMemo(() => ({
@@ -643,6 +694,35 @@ export function PeopleOverviewClient({
       setIsSubmittingCancelOffboard(false);
     }
   }, [person, cancelOffboardConfirmName, refresh, t]);
+
+  // Finalise offboarding handler
+  const handleFinaliseOffboarding = useCallback(async () => {
+    if (!person) return;
+
+    setIsSubmittingFinalise(true);
+    setFinaliseError(null);
+
+    try {
+      const response = await fetch(`/api/v1/people/${person.id}/finalise-offboarding`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const payload = (await response.json()) as ApiResponse<{ profileId: string; status: string }>;
+
+      if (!response.ok || !payload.data) {
+        setFinaliseError(payload.error?.message ?? t('toast.unableToOffboard'));
+        return;
+      }
+
+      setFinaliseError(null);
+      refresh();
+    } catch (error) {
+      setFinaliseError(error instanceof Error ? error.message : t('toast.unableToOffboard'));
+    } finally {
+      setIsSubmittingFinalise(false);
+    }
+  }, [person, refresh, t]);
 
   /* ── Loading & Error States ── */
 
@@ -1106,17 +1186,32 @@ export function PeopleOverviewClient({
             </p>
           </div>
           {canInitiateOffboarding && !isSelf ? (
-            <button
-              type="button"
-              className="button button-danger button-sm"
-              onClick={() => {
-                setCancelOffboardConfirmName("");
-                setCancelOffboardError(null);
-                setIsCancelOffboardOpen(true);
-              }}
-            >
-              {t('cancelOffboard.button')}
-            </button>
+            <div className="offboarding-banner-actions">
+              {canFinalise ? (
+                <button
+                  type="button"
+                  className="button button-accent button-sm"
+                  disabled={isSubmittingFinalise}
+                  onClick={handleFinaliseOffboarding}
+                >
+                  {isSubmittingFinalise ? t('finaliseOffboard.processing') : t('finaliseOffboard.button')}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="button button-danger button-sm"
+                onClick={() => {
+                  setCancelOffboardConfirmName("");
+                  setCancelOffboardError(null);
+                  setIsCancelOffboardOpen(true);
+                }}
+              >
+                {t('cancelOffboard.button')}
+              </button>
+            </div>
+          ) : null}
+          {finaliseError ? (
+            <div className="form-error-banner">{finaliseError}</div>
           ) : null}
         </div>
       ) : null}
