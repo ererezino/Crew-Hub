@@ -39,7 +39,6 @@ const taskRowSchema = z.object({
   description: z.string().nullable(),
   category: z.string(),
   track: z.string().default("employee"),
-  section_id: z.string().nullable().default(null),
   status: z.enum(ONBOARDING_TASK_STATUSES),
   task_type: z.enum(TASK_TYPE_VALUES).default("manual"),
   assigned_to: z.string().uuid().nullable(),
@@ -213,7 +212,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { data: rawTasks, error: tasksError } = await supabase
     .from("onboarding_tasks")
     .select(
-      "id, instance_id, template_task_id, title, description, category, track, section_id, status, task_type, assigned_to, due_date, completed_at, completed_by, notes, document_id, signature_request_id, action_url, action_label, completion_guidance"
+      "id, instance_id, template_task_id, title, description, category, track, status, task_type, assigned_to, due_date, completed_at, completed_by, notes, document_id, signature_request_id, action_url, action_label, completion_guidance"
     )
     .eq("instance_id", instance.id)
     .eq("org_id", profile.org_id)
@@ -346,7 +345,7 @@ export async function GET(_request: Request, context: RouteContext) {
     description: task.description,
     category: task.category,
     track: (task.track as "employee" | "operations") ?? "employee",
-    sectionId: task.section_id ?? null,
+    sectionId: null,
     status: task.status,
     taskType: task.task_type ?? "manual",
     assignedTo: task.assigned_to,
