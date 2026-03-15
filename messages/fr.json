@@ -3866,7 +3866,11 @@
       "createTemplate": "Créer un modèle",
       "view": "Voir",
       "preview": "Aperçu",
+      "edit": "Modifier",
       "start": "Lancer",
+      "archive": "Archiver",
+      "confirmArchive": "Confirmer l'archivage",
+      "archiving": "Archivage en cours...",
       "sending": "Envoi en cours...",
       "sendReminder": "Envoyer un rappel",
       "openResource": "Ouvrir la ressource",
@@ -3971,11 +3975,29 @@
         "completionGuidanceTooLong": "Les critères d'achèvement sont trop longs."
       }
     },
+    "templateEditorPanel": {
+      "editTitle": "Modifier le modèle",
+      "editDescription": "Mettez à jour les tâches et les paramètres de ce modèle. Les modifications s'appliquent uniquement aux futures instances.",
+      "saveChanges": "Enregistrer les modifications",
+      "saving": "Enregistrement...",
+      "taskTrackLabel": "Voie",
+      "trackNone": "Aucune voie",
+      "track_employee": "Employé",
+      "track_operations": "Opérations",
+      "moveUp": "Déplacer la tâche vers le haut",
+      "moveDown": "Déplacer la tâche vers le bas",
+      "moveUpLabel": "Haut",
+      "moveDownLabel": "Bas"
+    },
     "toast": {
       "onboardingStarted": "Instance d'intégration lancée.",
       "startFailed": "Impossible de lancer l'intégration.",
       "templateCreated": "Modèle créé.",
       "templateCreateFailed": "Impossible de créer le modèle.",
+      "templateUpdated": "Modèle mis à jour.",
+      "templateUpdateFailed": "Impossible de mettre à jour le modèle.",
+      "templateArchived": "Modèle archivé.",
+      "templateArchiveFailed": "Impossible d'archiver le modèle.",
       "unableToSendReminder": "Impossible d'envoyer le rappel.",
       "reminderSent": "Rappel envoyé à {name}."
     },

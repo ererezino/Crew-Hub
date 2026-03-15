@@ -3875,7 +3875,11 @@
       "createTemplate": "Create template",
       "view": "View",
       "preview": "Preview",
+      "edit": "Edit",
       "start": "Start",
+      "archive": "Archive",
+      "confirmArchive": "Confirm archive",
+      "archiving": "Archiving...",
       "sending": "Sending...",
       "sendReminder": "Send Reminder",
       "openResource": "Open resource",
@@ -3980,11 +3984,29 @@
         "completionGuidanceTooLong": "Completion guidance is too long."
       }
     },
+    "templateEditorPanel": {
+      "editTitle": "Edit Template",
+      "editDescription": "Update tasks and settings for this template. Changes apply to future instances only.",
+      "saveChanges": "Save changes",
+      "saving": "Saving...",
+      "taskTrackLabel": "Track",
+      "trackNone": "No track",
+      "track_employee": "Employee",
+      "track_operations": "Operations",
+      "moveUp": "Move task up",
+      "moveDown": "Move task down",
+      "moveUpLabel": "Up",
+      "moveDownLabel": "Down"
+    },
     "toast": {
       "onboardingStarted": "Onboarding instance started.",
       "startFailed": "Unable to start onboarding.",
       "templateCreated": "Template created.",
       "templateCreateFailed": "Unable to create template.",
+      "templateUpdated": "Template updated.",
+      "templateUpdateFailed": "Unable to update template.",
+      "templateArchived": "Template archived.",
+      "templateArchiveFailed": "Unable to archive template.",
       "unableToSendReminder": "Unable to send reminder.",
       "reminderSent": "Reminder sent to {name}."
     },

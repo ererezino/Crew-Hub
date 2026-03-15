@@ -9,6 +9,8 @@ import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
   ONBOARDING_TYPES,
+  ONBOARDING_TRACKS,
+  ONBOARDING_TASK_TYPES,
   type OnboardingTemplateCreateResponseData,
   type OnboardingTemplate,
   type OnboardingTemplateTask,
@@ -23,6 +25,8 @@ const templateTaskInputSchema = z.object({
   title: z.string().trim().min(1, "Task title is required.").max(200, "Task title is too long."),
   description: z.string().trim().max(1000, "Task description is too long.").optional(),
   category: z.string().trim().min(1, "Task category is required.").max(50, "Task category is too long."),
+  track: z.enum(ONBOARDING_TRACKS).optional(),
+  taskType: z.enum(ONBOARDING_TASK_TYPES).optional(),
   dueOffsetDays: z.number().int().min(-365).max(365).nullable().optional(),
   actionUrl: z
     .string()
@@ -68,6 +72,9 @@ const templateTaskSchema = z.object({
   title: z.string(),
   description: z.string().default(""),
   category: z.string(),
+  track: z.enum(ONBOARDING_TRACKS).optional(),
+  taskType: z.enum(ONBOARDING_TASK_TYPES).optional(),
+  task_type: z.string().optional(),
   dueOffsetDays: z.number().int().nullable().optional(),
   due_offset_days: z.number().int().nullable().optional(),
   actionUrl: z.string().nullable().optional(),
@@ -92,24 +99,51 @@ function canManageTemplates(userRoles: readonly UserRole[]): boolean {
   return hasRole(userRoles, "HR_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
 }
 
-function normalizeTemplateTasks(value: unknown): OnboardingTemplateTask[] {
-  if (!Array.isArray(value)) {
-    return [];
+/**
+ * Extract the tasks array from the JSONB column. The column may be either:
+ * - a flat array of tasks (user-created templates)
+ * - a compound object `{ sections: [...], tasks: [...] }` (seed templates)
+ */
+function extractTasksArray(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
   }
+
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.tasks)) {
+      return record.tasks;
+    }
+  }
+
+  return [];
+}
+
+function normalizeTemplateTasks(value: unknown): OnboardingTemplateTask[] {
+  const rawTasks = extractTasksArray(value);
 
   const normalizedTasks: OnboardingTemplateTask[] = [];
 
-  for (const task of value) {
+  for (const task of rawTasks) {
     const parsedTask = templateTaskSchema.safeParse(task);
 
     if (!parsedTask.success) {
       continue;
     }
 
+    const rawTaskType = parsedTask.data.taskType ?? parsedTask.data.task_type;
+    const validTaskTypes = new Set(ONBOARDING_TASK_TYPES as readonly string[]);
+    const resolvedTaskType =
+      rawTaskType && validTaskTypes.has(rawTaskType)
+        ? (rawTaskType as (typeof ONBOARDING_TASK_TYPES)[number])
+        : undefined;
+
     normalizedTasks.push({
       title: parsedTask.data.title,
       description: parsedTask.data.description,
       category: parsedTask.data.category,
+      track: parsedTask.data.track,
+      taskType: resolvedTaskType,
       dueOffsetDays:
         parsedTask.data.dueOffsetDays ??
         parsedTask.data.due_offset_days ??
@@ -288,6 +322,8 @@ export async function POST(request: Request) {
     title: task.title.trim(),
     description: task.description?.trim() ?? "",
     category: task.category.trim(),
+    track: task.track ?? undefined,
+    taskType: task.taskType ?? undefined,
     dueOffsetDays: task.dueOffsetDays ?? null,
     actionUrl: task.actionUrl?.trim() || null,
     actionLabel: task.actionLabel?.trim() || null,

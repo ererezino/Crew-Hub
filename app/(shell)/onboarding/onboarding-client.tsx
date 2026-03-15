@@ -16,12 +16,15 @@ import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime
 import { toSentenceCase } from "../../../lib/format-labels";
 import {
   ONBOARDING_TYPES,
+  ONBOARDING_TRACKS,
   type AtRiskInstance,
   type OnboardingInstanceCreateResponse,
   type OnboardingInstanceStatus,
   type OnboardingInstanceSummary,
   type OnboardingRemindResponse,
+  type OnboardingTemplate,
   type OnboardingTemplateCreateResponse,
+  type OnboardingTrack,
   type OnboardingType
 } from "../../../types/onboarding";
 
@@ -59,6 +62,7 @@ type TemplateTaskDraft = {
   title: string;
   description: string;
   category: string;
+  track: OnboardingTrack | "";
   dueOffsetDays: string;
   actionUrl: string;
   actionLabel: string;
@@ -97,6 +101,7 @@ const initialTemplateTaskDraft: TemplateTaskDraft = {
   title: "",
   description: "",
   category: "",
+  track: "",
   dueOffsetDays: "",
   actionUrl: "",
   actionLabel: "",
@@ -333,6 +338,10 @@ export function OnboardingClient({
   const [isTemplatePanelOpen, setIsTemplatePanelOpen] = useState(false);
   const [isStartingOnboarding, setIsStartingOnboarding] = useState(false);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [archivingTemplateId, setArchivingTemplateId] = useState<string | null>(null);
+  const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
   const [startValues, setStartValues] = useState<StartOnboardingFormValues>(
     initialStartOnboardingFormValues
   );
@@ -569,6 +578,7 @@ export function OnboardingClient({
             title: task.title.trim(),
             description: task.description.trim(),
             category: task.category.trim(),
+            track: task.track || undefined,
             dueOffsetDays:
               task.dueOffsetDays.trim().length === 0
                 ? null
@@ -593,7 +603,7 @@ export function OnboardingClient({
         return;
       }
 
-      closeTemplatePanel();
+      closeTemplatePanelAndReset();
       setActiveTab("templates");
       setPreviewTemplateId(payload.data.template.id);
       templatesQuery.refresh();
@@ -605,6 +615,142 @@ export function OnboardingClient({
       }));
     } finally {
       setIsCreatingTemplate(false);
+    }
+  };
+
+  const openEditPanel = (template: OnboardingTemplate) => {
+    setEditingTemplateId(template.id);
+    setTemplateValues({
+      name: template.name,
+      type: template.type,
+      countryCode: template.countryCode ?? "",
+      department: template.department ?? "",
+      tasks: template.tasks.length > 0
+        ? template.tasks.map((task) => ({
+            title: task.title,
+            description: task.description ?? "",
+            category: task.category,
+            track: task.track ?? "",
+            dueOffsetDays: task.dueOffsetDays !== null && task.dueOffsetDays !== undefined
+              ? String(task.dueOffsetDays)
+              : "",
+            actionUrl: task.actionUrl ?? "",
+            actionLabel: task.actionLabel ?? "",
+            completionGuidance: task.completionGuidance ?? ""
+          }))
+        : [{ ...initialTemplateTaskDraft }]
+    });
+    setTemplateErrors({ taskErrors: [] });
+    setTemplateFormDirty(false);
+    setIsTemplatePanelOpen(true);
+  };
+
+  const closeTemplatePanelAndReset = () => {
+    closeTemplatePanel();
+    setEditingTemplateId(null);
+  };
+
+  const handleSaveTemplate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const validationErrors = validateCreateTemplateForm(templateValues, td);
+    setTemplateErrors(validationErrors);
+
+    if (hasCreateTemplateErrors(validationErrors)) {
+      return;
+    }
+
+    // If editing, use PUT; if creating, use POST
+    if (editingTemplateId) {
+      setIsSavingTemplate(true);
+      setTemplateErrors((currentErrors) => ({
+        ...currentErrors,
+        form: undefined
+      }));
+
+      try {
+        const response = await fetch(`/api/v1/onboarding/templates/${editingTemplateId}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: templateValues.name.trim(),
+            type: templateValues.type,
+            countryCode: templateValues.countryCode.trim() || undefined,
+            department: templateValues.department.trim() || undefined,
+            tasks: templateValues.tasks.map((task) => ({
+              title: task.title.trim(),
+              description: task.description.trim(),
+              category: task.category.trim(),
+              track: task.track || undefined,
+              dueOffsetDays:
+                task.dueOffsetDays.trim().length === 0
+                  ? null
+                  : Number(task.dueOffsetDays),
+              actionUrl: task.actionUrl.trim().length === 0 ? null : task.actionUrl.trim(),
+              actionLabel: task.actionLabel.trim().length === 0 ? null : task.actionLabel.trim(),
+              completionGuidance:
+                task.completionGuidance.trim().length === 0
+                  ? null
+                  : task.completionGuidance.trim()
+            }))
+          })
+        });
+
+        const payload = (await response.json()) as OnboardingTemplateCreateResponse;
+
+        if (!response.ok || !payload.data?.template) {
+          setTemplateErrors((currentErrors) => ({
+            ...currentErrors,
+            form: payload.error?.message ?? td('toast.templateUpdateFailed')
+          }));
+          return;
+        }
+
+        closeTemplatePanelAndReset();
+        templatesQuery.refresh();
+        addToast("success", td('toast.templateUpdated'));
+      } catch (error) {
+        setTemplateErrors((currentErrors) => ({
+          ...currentErrors,
+          form: error instanceof Error ? error.message : td('toast.templateUpdateFailed')
+        }));
+      } finally {
+        setIsSavingTemplate(false);
+      }
+    } else {
+      // Forward to existing create handler
+      await handleCreateTemplate(event);
+    }
+  };
+
+  const handleArchiveTemplate = async (templateId: string) => {
+    setArchivingTemplateId(templateId);
+
+    try {
+      const response = await fetch(`/api/v1/onboarding/templates/${templateId}`, {
+        method: "DELETE"
+      });
+
+      const payload = (await response.json()) as { data: { archived: boolean } | null; error: { message: string } | null };
+
+      if (!response.ok || !payload.data?.archived) {
+        addToast("error", payload.error?.message ?? td('toast.templateArchiveFailed'));
+        return;
+      }
+
+      templatesQuery.refresh();
+      setPreviewTemplateId(null);
+      setConfirmArchiveId(null);
+      addToast("success", td('toast.templateArchived'));
+    } catch (error) {
+      addToast(
+        "error",
+        error instanceof Error ? error.message : td('toast.templateArchiveFailed')
+      );
+    } finally {
+      setArchivingTemplateId(null);
     }
   };
 
@@ -992,21 +1138,59 @@ export function OnboardingClient({
                               {t('actions.preview')}
                             </button>
                             {canManageOnboarding ? (
-                              <button
-                                type="button"
-                                className="table-row-action"
-                                onClick={() => {
-                                  setStartValues((currentValues) => ({
-                                    ...currentValues,
-                                    templateId: template.id,
-                                    type: template.type
-                                  }));
-                                  setStartErrors({});
-                                  setIsStartPanelOpen(true);
-                                }}
-                              >
-                                {t('actions.start')}
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  className="table-row-action"
+                                  onClick={() => openEditPanel(template)}
+                                >
+                                  {t('actions.edit')}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="table-row-action"
+                                  onClick={() => {
+                                    setStartValues((currentValues) => ({
+                                      ...currentValues,
+                                      templateId: template.id,
+                                      type: template.type
+                                    }));
+                                    setStartErrors({});
+                                    setIsStartPanelOpen(true);
+                                  }}
+                                >
+                                  {t('actions.start')}
+                                </button>
+                                {confirmArchiveId === template.id ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="table-row-action table-row-action-danger"
+                                      disabled={archivingTemplateId === template.id}
+                                      onClick={() => handleArchiveTemplate(template.id)}
+                                    >
+                                      {archivingTemplateId === template.id
+                                        ? t('actions.archiving')
+                                        : t('actions.confirmArchive')}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="table-row-action"
+                                      onClick={() => setConfirmArchiveId(null)}
+                                    >
+                                      {tCommon('cancel')}
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="table-row-action"
+                                    onClick={() => setConfirmArchiveId(template.id)}
+                                  >
+                                    {t('actions.archive')}
+                                  </button>
+                                )}
+                              </>
                             ) : null}
                           </div>
                         </td>
@@ -1043,6 +1227,11 @@ export function OnboardingClient({
                         </div>
                         <div className="onboarding-template-task-meta">
                           <StatusBadge tone="info">{toSentenceCase(task.category)}</StatusBadge>
+                          {task.track ? (
+                            <StatusBadge tone={task.track === "employee" ? "processing" : "pending"}>
+                              {t(`templateEditorPanel.track_${task.track}`)}
+                            </StatusBadge>
+                          ) : null}
                           <span className="numeric">
                             {task.dueOffsetDays === null
                               ? t('actions.noDueOffset')
@@ -1190,11 +1379,11 @@ export function OnboardingClient({
 
       <SlidePanel
         isOpen={isTemplatePanelOpen}
-        title={t('createTemplatePanel.title')}
-        description={t('createTemplatePanel.description')}
-        onClose={closeTemplatePanel}
+        title={editingTemplateId ? t('templateEditorPanel.editTitle') : t('createTemplatePanel.title')}
+        description={editingTemplateId ? t('templateEditorPanel.editDescription') : t('createTemplatePanel.description')}
+        onClose={closeTemplatePanelAndReset}
       >
-        <form className="slide-panel-form-wrapper" onSubmit={handleCreateTemplate} noValidate>
+        <form className="slide-panel-form-wrapper" onSubmit={handleSaveTemplate} noValidate>
           <label className="form-field" htmlFor="template-name">
             <span className="form-label">{t('createTemplatePanel.nameLabel')}</span>
             <input
@@ -1296,19 +1485,51 @@ export function OnboardingClient({
                 <article key={`template-task-${index}`} className="onboarding-template-editor-card">
                   <header className="onboarding-template-editor-card-header">
                     <p className="section-title">{t('createTemplatePanel.taskNumber', { number: index + 1 })}</p>
-                    <button
-                      type="button"
-                      className="table-row-action"
-                      onClick={() =>
-                        updateTemplateValues({
-                          ...templateValues,
-                          tasks: templateValues.tasks.filter((_, taskIndex) => taskIndex !== index)
-                        })
-                      }
-                      disabled={templateValues.tasks.length === 1}
-                    >
-                      {t('createTemplatePanel.removeTask')}
-                    </button>
+                    <div className="onboarding-template-editor-card-actions">
+                      <button
+                        type="button"
+                        className="table-row-action"
+                        disabled={index === 0}
+                        aria-label={t('templateEditorPanel.moveUp')}
+                        onClick={() => {
+                          const nextTasks = [...templateValues.tasks];
+                          const swapped = nextTasks[index - 1];
+                          nextTasks[index - 1] = nextTasks[index]!;
+                          nextTasks[index] = swapped!;
+                          updateTemplateValues({ ...templateValues, tasks: nextTasks });
+                        }}
+                      >
+                        {t('templateEditorPanel.moveUpLabel')}
+                      </button>
+                      <button
+                        type="button"
+                        className="table-row-action"
+                        disabled={index === templateValues.tasks.length - 1}
+                        aria-label={t('templateEditorPanel.moveDown')}
+                        onClick={() => {
+                          const nextTasks = [...templateValues.tasks];
+                          const swapped = nextTasks[index + 1];
+                          nextTasks[index + 1] = nextTasks[index]!;
+                          nextTasks[index] = swapped!;
+                          updateTemplateValues({ ...templateValues, tasks: nextTasks });
+                        }}
+                      >
+                        {t('templateEditorPanel.moveDownLabel')}
+                      </button>
+                      <button
+                        type="button"
+                        className="table-row-action"
+                        onClick={() =>
+                          updateTemplateValues({
+                            ...templateValues,
+                            tasks: templateValues.tasks.filter((_, taskIndex) => taskIndex !== index)
+                          })
+                        }
+                        disabled={templateValues.tasks.length === 1}
+                      >
+                        {t('createTemplatePanel.removeTask')}
+                      </button>
+                    </div>
                   </header>
 
                   <label className="form-field" htmlFor={`template-task-title-${index}`}>
@@ -1354,7 +1575,7 @@ export function OnboardingClient({
                     ) : null}
                   </label>
 
-                  <div className="onboarding-template-editor-grid">
+                  <div className="onboarding-template-editor-grid onboarding-template-editor-grid-3">
                     <label className="form-field" htmlFor={`template-task-category-${index}`}>
                       <span className="form-label">{t('createTemplatePanel.taskCategoryLabel')}</span>
                       <input
@@ -1375,6 +1596,32 @@ export function OnboardingClient({
                       {taskErrors.category ? (
                         <p className="form-field-error">{taskErrors.category}</p>
                       ) : null}
+                    </label>
+
+                    <label className="form-field" htmlFor={`template-task-track-${index}`}>
+                      <span className="form-label">{t('templateEditorPanel.taskTrackLabel')}</span>
+                      <select
+                        id={`template-task-track-${index}`}
+                        className="form-input"
+                        value={task.track}
+                        onChange={(event) =>
+                          updateTemplateValues({
+                            ...templateValues,
+                            tasks: templateValues.tasks.map((currentTask, taskIndex) =>
+                              taskIndex === index
+                                ? { ...currentTask, track: event.currentTarget.value as OnboardingTrack | "" }
+                                : currentTask
+                            )
+                          })
+                        }
+                      >
+                        <option value="">{t('templateEditorPanel.trackNone')}</option>
+                        {ONBOARDING_TRACKS.map((track) => (
+                          <option key={`task-track-${index}-${track}`} value={track}>
+                            {t(`templateEditorPanel.track_${track}`)}
+                          </option>
+                        ))}
+                      </select>
                     </label>
 
                     <label className="form-field" htmlFor={`template-task-offset-${index}`}>
@@ -1485,17 +1732,23 @@ export function OnboardingClient({
             <button
               type="button"
               className="button"
-              onClick={closeTemplatePanel}
-              disabled={isCreatingTemplate}
+              onClick={closeTemplatePanelAndReset}
+              disabled={isCreatingTemplate || isSavingTemplate}
             >
               {tCommon('cancel')}
             </button>
             <button
               type="submit"
               className="button button-accent"
-              disabled={isCreatingTemplate}
+              disabled={isCreatingTemplate || isSavingTemplate}
             >
-              {isCreatingTemplate ? t('createTemplatePanel.creating') : t('actions.createTemplate')}
+              {editingTemplateId
+                ? isSavingTemplate
+                  ? t('templateEditorPanel.saving')
+                  : t('templateEditorPanel.saveChanges')
+                : isCreatingTemplate
+                  ? t('createTemplatePanel.creating')
+                  : t('actions.createTemplate')}
             </button>
           </div>
         </form>
