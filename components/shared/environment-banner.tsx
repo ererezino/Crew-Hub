@@ -58,7 +58,6 @@ export function EnvironmentBanner() {
         pointerEvents: "none",
       }}
     >
-      {/* eslint-disable-next-line i18next/no-literal-string */}
       {`${label} ENVIRONMENT — Not production`}
     </div>
   );

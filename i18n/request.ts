@@ -37,7 +37,7 @@ export default getRequestConfig(async () => {
         );
       }
     },
-    getMessageFallback({ namespace, key, error }) {
+    getMessageFallback({ namespace, key, error: _error }) {
       if (isDev) {
         // Loud in development — show the full path so devs notice
         return `⚠ ${namespace}.${key}`;

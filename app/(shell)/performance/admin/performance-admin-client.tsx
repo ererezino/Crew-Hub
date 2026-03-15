@@ -216,7 +216,6 @@ function sharingStatusTone(status: "unshared" | "shared" | "acknowledged"): "dra
 function CalibrationTab() {
   const t = useTranslations("performanceAdmin");
   const td = t as (key: string, params?: Record<string, unknown>) => string;
-  const tCommon = useTranslations("common");
   const locale = useLocale() as AppLocale;
 
   const cycleIdFilter = "";
@@ -457,7 +456,6 @@ function CalibrationTab() {
 export function AdminPerformanceClient() {
   const t = useTranslations("performanceAdmin");
   const td = t as (key: string, params?: Record<string, unknown>) => string;
-  const tCommon = useTranslations("common");
   const locale = useLocale() as AppLocale;
 
   const adminQuery = usePerformanceAdmin();

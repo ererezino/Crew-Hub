@@ -655,6 +655,7 @@ function ReviewActionItemsSection({
     } finally {
       setIsLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
   }, [assignment.id]);
 
   useEffect(() => {
@@ -1014,6 +1015,7 @@ export function PerformanceClient({ canManagePerformance }: { canManagePerforman
       refreshOverview();
       return true;
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
     [refreshOverview, showToast]
   );
 

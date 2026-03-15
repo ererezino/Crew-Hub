@@ -170,7 +170,7 @@ export function AccessControlAdminClient() {
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [loadedFromApi, setLoadedFromApi] = useState(false);
+  const [_loadedFromApi, setLoadedFromApi] = useState(false);
 
   /* Fetch saved config on mount */
   useEffect(() => {

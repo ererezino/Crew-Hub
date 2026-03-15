@@ -18,7 +18,7 @@ import { EmptyState } from "../../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../../components/shared/status-badge";
 import { useSurveyResults } from "../../../../../../hooks/use-surveys";
-import { formatDateTimeTooltip, formatMonth, formatRelativeTime } from "../../../../../../lib/datetime";
+import { formatMonth, formatRelativeTime } from "../../../../../../lib/datetime";
 import type {
   SurveyHeatmapData,
   SurveyTrendData

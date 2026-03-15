@@ -8,6 +8,17 @@ export default defineConfig([
   ...nextTypescript,
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "scripts/**"]),
 
+  // Allow underscore-prefixed variables to signal intentionally unused bindings
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+      }],
+    },
+  },
+
   // i18n: error on hardcoded literal strings in user-facing UI files
   {
     files: [

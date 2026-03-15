@@ -163,7 +163,7 @@ export function CompensationBandsClient() {
   const t = useTranslations('compensationBands');
   const tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
-  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const _td = t as (key: string, params?: Record<string, unknown>) => string;
 
   const bandsQuery = useCompensationBands();
 

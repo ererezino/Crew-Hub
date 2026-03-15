@@ -137,7 +137,7 @@ export function PeopleOverviewClient({
   const t = useTranslations('peopleOverview');
   const tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
-  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const _td = t as (key: string, params?: Record<string, unknown>) => string;
 
   const [person, setPerson] = useState<PersonRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);

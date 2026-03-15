@@ -168,6 +168,7 @@ export function ShiftSwapModal({
     } finally {
       setIsSubmitting(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
   }, [affected, reason, isSubmitting, onSubmit, onClose]);
 
   if (!isOpen || !anchorShift) return null;

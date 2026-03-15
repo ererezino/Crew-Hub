@@ -82,6 +82,21 @@ type TheCrewClientProps = {
 
 /* ── Component ── */
 
+// Custom display order for The Crew page.
+// Product appears directly below Design.
+// Marketing, Growth, Sales, and the legacy "Marketing & Growth" DB value all
+// map to a single display bucket via crewDisplayDepartment().
+// No special "Founders" section — founders appear with their actual teams.
+const CREW_DISPLAY_ORDER: string[] = [
+  "Customer Success",
+  "Design",
+  "Product",
+  "Engineering",
+  "Finance",
+  "Operations",
+  CREW_MGS_DISPLAY_LABEL,
+];
+
 export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   const t = useTranslations("theCrew");
 
@@ -118,21 +133,6 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
   const [viewMode, setViewMode] = useState<"all" | "by-team">("by-team");
 
   /* ── Derived: departments list ── */
-
-  // Custom display order for The Crew page.
-  // Product appears directly below Design.
-  // Marketing, Growth, Sales, and the legacy "Marketing & Growth" DB value all
-  // map to a single display bucket via crewDisplayDepartment().
-  // No special "Founders" section — founders appear with their actual teams.
-  const CREW_DISPLAY_ORDER: string[] = [
-    "Customer Success",
-    "Design",
-    "Product",
-    "Engineering",
-    "Finance",
-    "Operations",
-    CREW_MGS_DISPLAY_LABEL,
-  ];
 
   const departments = useMemo(() => {
     const deptSet = new Map<string, number>();
@@ -296,6 +296,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     } finally {
       setIsModSaving(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
   }, [moderatingMember, modValues, modVisible, fetchCrew]);
 
   /* ── Render helpers ── */

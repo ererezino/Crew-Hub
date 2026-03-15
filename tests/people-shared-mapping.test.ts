@@ -5,8 +5,7 @@ import {
   deriveAccessStatus,
   mapProfileRow,
   normalizeRoles,
-  profileRowSchema,
-  type ProfileRow
+  profileRowSchema
 } from "../lib/people/shared";
 
 /**

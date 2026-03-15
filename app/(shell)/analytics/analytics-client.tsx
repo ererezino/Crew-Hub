@@ -204,7 +204,7 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const t = useTranslations('analytics');
-  const tCommon = useTranslations('common');
+  const _tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 

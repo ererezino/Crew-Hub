@@ -75,6 +75,7 @@ export function TeamAvailabilityPanel({ startDate, endDate }: TeamAvailabilityPa
     return () => {
       cancelled = true;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
   }, [startDate, endDate]);
 
   // Don't render anything when dates are not both set

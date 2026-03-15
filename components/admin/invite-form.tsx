@@ -81,10 +81,6 @@ function normalizeRoles(roles: readonly AppRole[]): AppRole[] {
   return [...new Set(["EMPLOYEE", ...roles] as AppRole[])];
 }
 
-function copyToClipboard(value: string) {
-  void navigator.clipboard?.writeText(value);
-}
-
 function stepLabel(
   step: Step,
   t: ReturnType<typeof useTranslations>
@@ -159,6 +155,7 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
     }
 
     return nextErrors;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
   }, [values.department, values.email, values.fullName, values.roles]);
 
   const roleSelection = useMemo(() => normalizeRoles(values.roles), [values.roles]);

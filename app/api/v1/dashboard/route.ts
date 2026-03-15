@@ -1233,7 +1233,6 @@ export async function GET() {
       ? "manager"
       : null;
 
-    const employmentType = profile.employment_type;
     const activeOnboarding = roleBasedPersona
       ? null
       : (

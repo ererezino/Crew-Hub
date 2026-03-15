@@ -40,7 +40,7 @@ import {
 import { humanizeError } from "@/lib/errors";
 
 type AppLocale = "en" | "fr";
-type TranslatorFn = (key: string) => string;
+type _TranslatorFn = (key: string) => string;
 type ToastVariant = "success" | "error" | "info";
 type SortDirection = "asc" | "desc";
 type SalaryApprovalAction = "approve" | "revoke";
@@ -389,7 +389,7 @@ export function AdminCompensationClient({
   const t = useTranslations('adminCompensation');
   const tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
-  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const _td = t as (key: string, params?: Record<string, unknown>) => string;
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(initialEmployeeId);
   const [salarySortDirection, setSalarySortDirection] = useState<SortDirection>("desc");

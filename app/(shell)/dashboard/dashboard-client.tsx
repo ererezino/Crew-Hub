@@ -795,28 +795,6 @@ function ComplianceHealthWidget({ data }: { data: DashboardResponseData }) {
   );
 }
 
-function AuditLogWidget({ data }: { data: DashboardResponseData }) {
-  const t = useTranslations('dashboard');
-  const locale = useLocale() as AppLocale;
-
-  if (!data.recentAuditLog || data.recentAuditLog.length === 0) return null;
-
-  return (
-    <WidgetCard title={t('widget.recentAuditActivity')} icon={<Activity size={14} />} viewAllHref="/settings?tab=audit">
-      <ul className="dashboard-audit-list">
-        {data.recentAuditLog.map((entry) => (
-          <li key={entry.id} className="dashboard-audit-item">
-            <span className="dashboard-audit-actor">{entry.actorName}</span>
-            <span className="dashboard-audit-action">{entry.action}</span>
-            <span className="dashboard-audit-table">{entry.tableName}</span>
-            <time className="settings-card-description">{formatRelativeTime(entry.timestamp, locale)}</time>
-          </li>
-        ))}
-      </ul>
-    </WidgetCard>
-  );
-}
-
 function PendingDecisionsWidget({ data }: { data: DashboardResponseData }) {
   const t = useTranslations('dashboard');
   const queryClient = useQueryClient();

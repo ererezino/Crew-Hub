@@ -204,7 +204,6 @@ export async function POST(
       typeof profile.full_name === "string" && profile.full_name.trim().length > 0
         ? profile.full_name.trim()
         : "Crew member";
-    const appUrl = resolveAppUrl(request);
     const authRedirectUrl = resolveAuthRedirectUrl(request);
 
     const generateLinkWithRedirectFallback = async ({

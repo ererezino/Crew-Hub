@@ -3,7 +3,7 @@
  * instead of silently returning null (which the dashboard treats as "all clear").
  */
 import { describe, expect, it, vi } from "vitest";
-import { getOrgHealthAlerts, type HealthAlert } from "../lib/dashboard/health-alerts";
+import { getOrgHealthAlerts } from "../lib/dashboard/health-alerts";
 
 const ORG_ID = "a0000000-0000-4000-8000-000000000001";
 

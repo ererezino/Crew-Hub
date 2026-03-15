@@ -148,7 +148,7 @@ export function ComplianceClient() {
   const t = useTranslations('compliance');
   const tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
-  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const _td = t as (key: string, params?: Record<string, unknown>) => string;
   const initialRange = useMemo(() => defaultDateRange(), []);
   const [draftStartDate, setDraftStartDate] = useState(initialRange.startDate);
   const [draftEndDate, setDraftEndDate] = useState(initialRange.endDate);
@@ -234,6 +234,7 @@ export function ComplianceClient() {
         total: counts.total,
         overdue: counts.overdue
       }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- locale is a stable ref from useLocale
   }, [sourceDeadlines]);
 
   const localGuidance = useMemo(() => {

@@ -270,7 +270,7 @@ export async function POST(
 /* ─── DELETE — remove attachment (SUPER_ADMIN only) ─── */
 export async function DELETE(
   request: Request,
-  context: RouteContext
+  _context: RouteContext
 ) {
   const session = await getAuthenticatedSession();
 

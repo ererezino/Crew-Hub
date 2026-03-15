@@ -96,7 +96,7 @@ function todayInOrgTimezone(): string {
  * Batched: two queries total regardless of how many principals.
  */
 export async function getUnavailablePrincipalIds({
-  supabase,
+  supabase: _supabase,
   orgId,
   principalIds
 }: {
@@ -186,7 +186,7 @@ export async function isPrincipalUnavailable({
  *   falls back to manager_id (handled by the OR query structure).
  */
 export async function listOperationalReportIds({
-  supabase,
+  supabase: _supabase,
   orgId,
   leadId
 }: {
@@ -234,7 +234,7 @@ type ActiveDelegation = {
  * for 'when_unavailable' delegations.
  */
 async function loadActiveDelegations({
-  supabase,
+  supabase: _supabase,
   orgId,
   delegateId,
   scope

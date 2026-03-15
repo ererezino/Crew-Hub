@@ -1,5 +1,3 @@
-import { getTranslations } from "next-intl/server";
-
 import { getAuthenticatedSession } from "../../../lib/auth/session";
 import { hasRole } from "../../../lib/roles";
 import { TheCrewClient } from "./the-crew-client";

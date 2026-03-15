@@ -358,6 +358,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         setIsSubmittingTravel(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
     [travelForm, refreshTravel, showToast]
   );
 
@@ -392,6 +393,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         });
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
     [showToast]
   );
 
@@ -459,6 +461,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         setIsApproving(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
     [approvalTarget, approvalCountry, approvalAddress, refreshPending, refreshTravel, refreshEntities, showToast]
   );
 
@@ -507,6 +510,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         setIsRejecting(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
     [rejectionTarget, rejectionReason, refreshPending, refreshTravel, showToast]
   );
 

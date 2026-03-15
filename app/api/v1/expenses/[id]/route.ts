@@ -43,11 +43,6 @@ const expenseActionSchema = z.object({
   reimbursementReceiptPath: z.string().trim().optional()
 });
 
-const profileManagerSchema = z.object({
-  id: z.string().uuid(),
-  manager_id: z.string().uuid().nullable()
-});
-
 const approverProfileSchema = z.object({
   id: z.string().uuid(),
   roles: z.array(z.string()).nullable()

@@ -450,7 +450,7 @@ function LinkModuleContent({
 
 export function LearningCourseClient({ courseId }: LearningCourseClientProps) {
   const t = useTranslations('learningCourse');
-  const tCommon = useTranslations('common');
+  const _tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 

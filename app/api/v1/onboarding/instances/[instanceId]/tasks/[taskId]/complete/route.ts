@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
-import { logAudit } from "../../../../../../../../../lib/audit";
 import { logger } from "../../../../../../../../../lib/logger";
 import { completeOnboarding } from "../../../../../../../../../lib/onboarding/auto-transition";
 import { hasRole } from "../../../../../../../../../lib/roles";

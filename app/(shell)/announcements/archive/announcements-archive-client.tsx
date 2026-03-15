@@ -25,7 +25,7 @@ export function AnnouncementsArchiveClient({ isSuperAdmin }: ArchiveProps) {
   const tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
 
-  const { announcements, isLoading, errorMessage, refresh, setAnnouncements } =
+  const { announcements, isLoading, errorMessage, setAnnouncements } =
     useAnnouncements({ dismissed: true });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Announcement | null>(null);

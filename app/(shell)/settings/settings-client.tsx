@@ -188,7 +188,6 @@ export function SettingsClient({
   organization,
   canManageOrganization,
   canViewAudit,
-  canViewTimePolicies: _canViewTimePolicies
 }: SettingsClientProps) {
   const t = useTranslations('settings');
   const tCommon = useTranslations('common');

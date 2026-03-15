@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { AccessChecklist, type AccessChecklistItem } from "../../../../components/admin/access-checklist";
@@ -159,7 +159,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     setEditMessage(null);
   };
 
-  const loadAccessConfig = async () => {
+  const loadAccessConfig = useCallback(async () => {
     setIsAccessLoading(true);
     setAccessError(null);
 
@@ -191,11 +191,12 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     } finally {
       setIsAccessLoading(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
+  }, []);
 
   useEffect(() => {
     void loadAccessConfig();
-  }, []);
+  }, [loadAccessConfig]);
 
   const handleCreated = (person: PersonRecord) => {
     setPeople((currentPeople) => {

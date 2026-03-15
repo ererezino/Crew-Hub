@@ -9,34 +9,17 @@ import { useCallback, useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
-import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useOnboardingInstanceDetail, useOnboardingInstances } from "../../../../hooks/use-onboarding";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
-import { toSentenceCase } from "../../../../lib/format-labels";
 import type {
   OnboardingContentSection,
-  OnboardingTask,
-  OnboardingTrack
+  OnboardingTask
 } from "../../../../types/onboarding";
 
 type AppLocale = "en" | "fr";
 
 /* ── Helpers ── */
 
-function toneForTaskStatus(taskStatus: OnboardingTask["status"]) {
-  switch (taskStatus) {
-    case "pending":
-      return "pending" as const;
-    case "in_progress":
-      return "processing" as const;
-    case "completed":
-      return "success" as const;
-    case "blocked":
-      return "error" as const;
-    default:
-      return "draft" as const;
-  }
-}
 
 function sectionIcon(type: OnboardingContentSection["type"]): string {
   switch (type) {

@@ -16,7 +16,6 @@ import { USER_ROLES, type UserRole } from "../../../../lib/navigation";
 import {
   buildMeta,
   jsonResponse,
-  normalizeRoles,
   profileRowSchema,
   mapProfileRow
 } from "../../../../lib/people/shared";
@@ -26,7 +25,6 @@ import { createOnboardingInstance } from "../../../../lib/onboarding/create-inst
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
-import type { AppRole } from "../../../../types/auth";
 import {
   EMPLOYMENT_TYPES,
   PAYROLL_MODES,
@@ -915,17 +913,12 @@ export async function POST(request: Request) {
   }
 
   // Generate a password-setup link so the user can set their own password
-  let setupLink: string | undefined;
   try {
-    const { data: linkData } = await serviceRoleClient.auth.admin.generateLink({
+    await serviceRoleClient.auth.admin.generateLink({
       type: "recovery",
       email: normalizedEmail,
       options: { redirectTo: authRedirectUrl }
     });
-
-    if (linkData?.properties?.action_link) {
-      setupLink = linkData.properties.action_link;
-    }
   } catch (linkError) {
     logger.error("Failed to generate setup link.", {
       userId: createdUserId,
