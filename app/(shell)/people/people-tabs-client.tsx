@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -152,54 +151,45 @@ export function PeopleTabsClient({
         userRoles={userRoles}
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.section
-          key={activeTab}
-          className="tab-content-layout"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
-          {activeTab === "directory" ? (
-            <PeopleClient
-              currentUserId={currentUserId}
-              initialScope={initialScope}
-              canCreatePeople={canCreatePeople}
-              canInvitePeople={canInvitePeople}
-              canEditPeople={canEditPeople}
-              canResetAuthenticator={canResetAuthenticator}
-              isAdmin={isAdmin}
-              embedded
-              onRegisterActions={handleRegisterActions}
-            />
-          ) : null}
+      <section key={activeTab} className="tab-content-layout">
+        {activeTab === "directory" ? (
+          <PeopleClient
+            currentUserId={currentUserId}
+            initialScope={initialScope}
+            canCreatePeople={canCreatePeople}
+            canInvitePeople={canInvitePeople}
+            canEditPeople={canEditPeople}
+            canResetAuthenticator={canResetAuthenticator}
+            isAdmin={isAdmin}
+            embedded
+            onRegisterActions={handleRegisterActions}
+          />
+        ) : null}
 
-          {activeTab === "org-chart" ? (
-            <Suspense
-              fallback={
-                <div className="org-chart-loading">
-                  <div className="spinner" />
-                </div>
-              }
-            >
-              <OrgChartClient />
-            </Suspense>
-          ) : null}
+        {activeTab === "org-chart" ? (
+          <Suspense
+            fallback={
+              <div className="org-chart-loading">
+                <div className="spinner" />
+              </div>
+            }
+          >
+            <OrgChartClient />
+          </Suspense>
+        ) : null}
 
-          {activeTab === "delegations" ? (
-            <Suspense
-              fallback={
-                <div className="delegations-loading">
-                  <div className="spinner" />
-                </div>
-              }
-            >
-              <DelegationsClient />
-            </Suspense>
-          ) : null}
-        </motion.section>
-      </AnimatePresence>
+        {activeTab === "delegations" ? (
+          <Suspense
+            fallback={
+              <div className="delegations-loading">
+                <div className="spinner" />
+              </div>
+            }
+          >
+            <DelegationsClient />
+          </Suspense>
+        ) : null}
+      </section>
     </>
   );
 }

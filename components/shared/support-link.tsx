@@ -36,6 +36,7 @@ export const SupportLink = forwardRef<HTMLAnchorElement, SupportLinkProps>(
     return (
       <Link
         href="/support"
+        prefetch={false}
         className={
           isActive
             ? "sidebar-link sidebar-link-active sidebar-link-pinned"

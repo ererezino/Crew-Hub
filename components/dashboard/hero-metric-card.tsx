@@ -1,7 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
-
 import { AnimatedNumber } from "./animated-number";
 import { DeltaBadge } from "./delta-badge";
 import { Sparkline } from "./sparkline";
@@ -14,20 +12,9 @@ type HeroMetricCardProps = {
 
 export function HeroMetricCard({ metric, index }: HeroMetricCardProps) {
   return (
-    <motion.article
-      className="hero-metric-card"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        type: "spring",
-        stiffness: 120,
-        damping: 18,
-        delay: index * 0.08
-      }}
-      whileHover={{
-        scale: 1.02,
-        transition: { type: "spring", stiffness: 400, damping: 25 }
-      }}
+    <article
+      className="hero-metric-card dashboard-fade-in"
+      style={{ animationDelay: `${index * 0.08}s` }}
     >
       <div className="hero-metric-header">
         <p className="hero-metric-label">{metric.label}</p>
@@ -48,6 +35,6 @@ export function HeroMetricCard({ metric, index }: HeroMetricCardProps) {
           className="hero-metric-sparkline"
         />
       </div>
-    </motion.article>
+    </article>
   );
 }

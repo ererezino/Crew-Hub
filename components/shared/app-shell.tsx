@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tan
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import {
   useCallback,
@@ -29,17 +30,19 @@ import {
 import type { MeAccessConfigResponse } from "../../types/access-control";
 import { useKeyboardShortcuts } from "../../hooks/use-keyboard-shortcuts";
 import { AppErrorBoundary } from "./app-error-boundary";
-import { CommandPalette } from "./command-palette";
 import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { NavIcon } from "./nav-icon";
-import { NotificationCenter } from "./notification-center";
+
+const CommandPalette = dynamic(() => import("./command-palette").then((m) => m.CommandPalette));
+const NotificationCenter = dynamic(() => import("./notification-center").then((m) => m.NotificationCenter), { ssr: false });
 import { LocaleToggle } from "./locale-toggle";
 import { ThemeToggle } from "./theme-toggle";
 import { SidebarTooltip } from "./sidebar-tooltip";
 import { SupportLink } from "./support-link";
 import { UnsavedLeaveDialog } from "./unsaved-leave-dialog";
 import { BrowserNotificationPrompt } from "./browser-notification-prompt";
-import { WhoIsOnline } from "./who-is-online";
+
+const WhoIsOnline = dynamic(() => import("./who-is-online").then((m) => m.WhoIsOnline), { ssr: false });
 import { useActivityTracker } from "../../hooks/use-activity-tracker";
 
 const RECENT_ROUTE_STORAGE_KEY = "crew-hub-recent-routes";
@@ -1089,6 +1092,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
             <>
               <Link
                 href="/dashboard"
+                prefetch={false}
                 className="sidebar-brand desktop-only"
                 aria-label={t("crewHubHome")}
                 onClick={() => handleSidebarItemClick("/dashboard")}
@@ -1131,6 +1135,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
 
           <Link
             href="/dashboard"
+            prefetch={false}
             className="sidebar-brand mobile-only"
             aria-label={t("crewHubHome")}
             onClick={() => handleSidebarItemClick("/dashboard")}
@@ -1200,6 +1205,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
                         <SidebarTooltip label={tNav(item.labelKey as never)} enabled={isSidebarCollapsed && !isMobileSidebarOpen}>
                         <Link
                           href={item.href}
+                          prefetch={false}
                           className={isActive ? "sidebar-link sidebar-link-active" : "sidebar-link"}
                           onClick={() => handleSidebarItemClick(item.href)}
                         >
@@ -1239,6 +1245,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
             <SidebarTooltip label={tNav("settings")} enabled={isSidebarCollapsed && !isMobileSidebarOpen}>
             <Link
               href="/settings"
+              prefetch={false}
               className={
                 isRouteActive(activePathname, "/settings")
                   ? "sidebar-link sidebar-link-active sidebar-link-pinned"
@@ -1261,6 +1268,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
             <SidebarTooltip label={currentUserProfile.fullName} enabled={isSidebarCollapsed && !isMobileSidebarOpen}>
             <Link
               href="/settings?tab=profile"
+              prefetch={false}
               className="sidebar-profile-link"
               onClick={() => handleSidebarItemClick("/settings")}
             >

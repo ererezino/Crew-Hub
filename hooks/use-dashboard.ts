@@ -15,10 +15,11 @@ async function fetchDashboard(): Promise<DashboardResponseData> {
   return payload.data;
 }
 
-export function useDashboard() {
+export function useDashboard(initialData?: DashboardResponseData) {
   return useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
+    initialData,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false

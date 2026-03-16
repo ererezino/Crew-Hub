@@ -47,8 +47,8 @@ function buildMeta() {
   return { timestamp: new Date().toISOString() };
 }
 
-function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
-  return NextResponse.json(payload, { status });
+function jsonResponse<T>(status: number, payload: ApiResponse<T>, headers?: Record<string, string>) {
+  return NextResponse.json(payload, { status, headers });
 }
 
 function canManageAnnouncements(roles: readonly UserRole[]): boolean {
@@ -291,7 +291,7 @@ export async function GET(request: Request) {
     data: responseData,
     error: null,
     meta: buildMeta()
-  });
+  }, { "Cache-Control": "private, max-age=120, stale-while-revalidate=300" });
 }
 
 export async function POST(request: Request) {

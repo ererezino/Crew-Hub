@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import {
   Area,
   AreaChart,
@@ -27,16 +26,9 @@ const CHART_COLORS = {
 
 export function DashboardChart({ chart }: DashboardChartProps) {
   return (
-    <motion.article
-      className="dashboard-v2-primary-chart"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        type: "spring",
-        stiffness: 100,
-        damping: 20,
-        delay: 0.35
-      }}
+    <article
+      className="dashboard-v2-primary-chart dashboard-fade-in"
+      style={{ animationDelay: "0.35s" }}
     >
       <h2 className="section-title">{chart.title}</h2>
       <ResponsiveContainer width="100%" height={300}>
@@ -149,6 +141,6 @@ export function DashboardChart({ chart }: DashboardChartProps) {
           </BarChart>
         )}
       </ResponsiveContainer>
-    </motion.article>
+    </article>
   );
 }

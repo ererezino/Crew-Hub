@@ -136,11 +136,6 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const isLoginRoute = pathname === "/login";
   const isAuthContinueRoute = pathname === "/auth/continue";
-  const isMfaSetupRoute = pathname === "/mfa-setup";
-  const isMfaApiRoute = pathname === "/api/v1/me/mfa";
-  const isAuthSignInApiRoute = pathname === "/api/v1/auth/sign-in";
-  const isAuthSignOutApiRoute = pathname === "/api/auth/sign-out";
-  const isAuthCallbackVerifyApiRoute = pathname === "/api/auth/callback/verify";
   const isPublicLegalRoute = pathname === "/privacy" || pathname === "/terms";
 
   if (!user && !isApiRoute && !isLoginRoute && !isPublicLegalRoute && !isAuthContinueRoute) {
@@ -159,108 +154,9 @@ export async function applySupabaseAuthMiddleware(request: NextRequest) {
     );
   }
 
-  // MFA enforcement and account status checks for authenticated users.
-  if (user && !isLoginRoute) {
-    /* For API routes, skip profile-table lookups here.
-       Route handlers already load profile via getAuthenticatedSession(). */
-    if (!isApiRoute) {
-      const { data: profileRow } = await supabase
-        .from("profiles")
-        .select("status")
-        .eq("id", user.id)
-        .is("deleted_at", null)
-        .maybeSingle();
-
-      /* ── Inactive account check ── */
-      if (profileRow?.status === "inactive") {
-        await supabase.auth.signOut();
-
-        const loginUrl = new URL("/login", request.url);
-        loginUrl.searchParams.set("error", "account_disabled");
-        return secure(NextResponse.redirect(loginUrl));
-      }
-    }
-
-    /* ── MFA enforcement for ALL users ── */
-    const { data: factorsData } =
-      await supabase.auth.mfa.listFactors();
-
-    const verifiedFactors = (factorsData?.totp ?? []).filter(
-      (f) => f.status === "verified"
-    );
-
-    if (verifiedFactors.length === 0) {
-      /* User has no verified TOTP — must complete MFA setup */
-      const isMfaExemptApiRoute =
-        isMfaApiRoute ||
-        isAuthSignInApiRoute ||
-        isAuthSignOutApiRoute ||
-        isAuthCallbackVerifyApiRoute;
-
-      if (isApiRoute && !isMfaExemptApiRoute) {
-        return secure(
-          NextResponse.json(
-            {
-              data: null,
-              error: {
-                code: "MFA_REQUIRED",
-                message:
-                  "Authenticator setup is required. Complete setup to continue."
-              },
-              meta: {
-                timestamp: new Date().toISOString()
-              }
-            },
-            { status: 403 }
-          )
-        );
-      }
-
-      if (!isApiRoute && !isMfaSetupRoute) {
-        return secure(
-          NextResponse.redirect(new URL("/mfa-setup", request.url))
-        );
-      }
-    }
-
-    /* ── AAL2 enforcement (defense in depth) ── */
-    if (verifiedFactors.length > 0) {
-      const { data: aalData } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-
-      if (aalData?.currentLevel === "aal1") {
-        /* Session is AAL1 but user has TOTP — force re-login */
-      const isMfaExemptApiRoute =
-          isMfaApiRoute ||
-          isAuthSignInApiRoute ||
-          isAuthSignOutApiRoute ||
-          isAuthCallbackVerifyApiRoute;
-
-        if (isApiRoute && !isMfaExemptApiRoute) {
-          return secure(
-            NextResponse.json(
-              {
-                data: null,
-                error: {
-                  code: "MFA_VERIFICATION_REQUIRED",
-                  message: "Please sign in again to verify your authenticator."
-                },
-                meta: { timestamp: new Date().toISOString() }
-              },
-              { status: 403 }
-            )
-          );
-        }
-
-        if (!isApiRoute && !isMfaSetupRoute) {
-          await supabase.auth.signOut();
-          return secure(
-            NextResponse.redirect(new URL("/login", request.url))
-          );
-        }
-      }
-    }
-  }
+  /* Profile status, MFA enrollment, and AAL2 enforcement are handled by
+     getAuthenticatedSession() in the session layer + shell layout redirects.
+     Middleware only needs getUser() to gate login/logout redirects. */
 
   return secure(response);
 }

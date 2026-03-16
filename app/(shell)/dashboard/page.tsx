@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
+import { fetchDashboardData } from "../../../lib/dashboard/fetch-dashboard-data";
 
 import { DashboardClient } from "./dashboard-client";
 
@@ -28,5 +29,7 @@ export default async function DashboardPage() {
     );
   }
 
-  return <DashboardClient />;
+  const initialData = await fetchDashboardData(session.profile, session.org);
+
+  return <DashboardClient initialData={initialData} />;
 }

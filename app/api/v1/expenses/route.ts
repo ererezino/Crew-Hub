@@ -249,7 +249,7 @@ export async function GET(request: Request) {
     data: responseData,
     error: null,
     meta: buildMeta()
-  });
+  }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
 }
 
 export async function POST(request: Request) {

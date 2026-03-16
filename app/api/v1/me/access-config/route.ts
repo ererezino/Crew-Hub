@@ -35,8 +35,8 @@ function buildMeta() {
   return { timestamp: new Date().toISOString() };
 }
 
-function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
-  return NextResponse.json(payload, { status });
+function jsonResponse<T>(status: number, payload: ApiResponse<T>, headers?: Record<string, string>) {
+  return NextResponse.json(payload, { status, headers });
 }
 
 export async function GET() {
@@ -65,7 +65,7 @@ export async function GET() {
       },
       error: null,
       meta: buildMeta()
-    });
+    }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" });
   }
 
   const supabase = await createSupabaseServerClient();
@@ -117,7 +117,7 @@ export async function GET() {
       },
       error: null,
       meta: buildMeta()
-    });
+    }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" });
   }
 
   const navRowByKey = new Map(parsedNavRows.data.map((row) => [row.nav_item_key, row] as const));
@@ -162,5 +162,5 @@ export async function GET() {
     },
     error: null,
     meta: buildMeta()
-  });
+  }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" });
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -156,65 +155,56 @@ export function ApprovalsClient({
         userRoles={userRoles}
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.section
-          key={activeTab}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
-          {activeTab === "all" ? (
-            <section className="all-pending-overview">
-              {totalPendingCount === 0 ? (
-                <div className="all-pending-empty">
-                  <p className="settings-card-description">{t('allCaughtUp')}</p>
-                </div>
-              ) : (
-                <div className="all-pending-items">
-                  {timeOffCount > 0 ? (
-                    <button
-                      type="button"
-                      className="all-pending-item"
-                      onClick={() => handleTabChange("time-off")}
-                    >
-                      <span className="all-pending-badge all-pending-badge-timeoff">{t('tab.timeOff')}</span>
-                      <span className="all-pending-count">{t('pendingRequests', { count: timeOffCount })}</span>
-                      <span className="all-pending-arrow">→</span>
-                    </button>
-                  ) : null}
-                  {expensesCount > 0 ? (
-                    <button
-                      type="button"
-                      className="all-pending-item"
-                      onClick={() => handleTabChange("expenses")}
-                    >
-                      <span className="all-pending-badge all-pending-badge-expenses">{t('tab.expenses')}</span>
-                      <span className="all-pending-count">{t('pendingExpenses', { count: expensesCount })}</span>
-                      <span className="all-pending-arrow">→</span>
-                    </button>
-                  ) : null}
-                </div>
-              )}
-            </section>
-          ) : null}
+      <section key={activeTab} className="tab-content-layout">
+        {activeTab === "all" ? (
+          <section className="all-pending-overview">
+            {totalPendingCount === 0 ? (
+              <div className="all-pending-empty">
+                <p className="settings-card-description">{t('allCaughtUp')}</p>
+              </div>
+            ) : (
+              <div className="all-pending-items">
+                {timeOffCount > 0 ? (
+                  <button
+                    type="button"
+                    className="all-pending-item"
+                    onClick={() => handleTabChange("time-off")}
+                  >
+                    <span className="all-pending-badge all-pending-badge-timeoff">{t('tab.timeOff')}</span>
+                    <span className="all-pending-count">{t('pendingRequests', { count: timeOffCount })}</span>
+                    <span className="all-pending-arrow">→</span>
+                  </button>
+                ) : null}
+                {expensesCount > 0 ? (
+                  <button
+                    type="button"
+                    className="all-pending-item"
+                    onClick={() => handleTabChange("expenses")}
+                  >
+                    <span className="all-pending-badge all-pending-badge-expenses">{t('tab.expenses')}</span>
+                    <span className="all-pending-count">{t('pendingExpenses', { count: expensesCount })}</span>
+                    <span className="all-pending-arrow">→</span>
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </section>
+        ) : null}
 
-          {activeTab === "time-off" ? <TimeOffApprovalsClient embedded /> : null}
+        {activeTab === "time-off" ? <TimeOffApprovalsClient embedded /> : null}
 
-          {activeTab === "expenses" ? (
-            <ExpenseApprovalsClient
-              canManagerApprove={canManagerApproveExpenses}
-              canAdditionalApprove={canManagerApproveExpenses || canFinanceApproveExpenses}
-              canFinanceApprove={canFinanceApproveExpenses}
-              managerCount={managerExpensesCount}
-              additionalCount={additionalExpensesCount}
-              financeCount={financeExpensesCount}
-              embedded
-            />
-          ) : null}
-
-        </motion.section>
-      </AnimatePresence>
+        {activeTab === "expenses" ? (
+          <ExpenseApprovalsClient
+            canManagerApprove={canManagerApproveExpenses}
+            canAdditionalApprove={canManagerApproveExpenses || canFinanceApproveExpenses}
+            canFinanceApprove={canFinanceApproveExpenses}
+            managerCount={managerExpensesCount}
+            additionalCount={additionalExpensesCount}
+            financeCount={financeExpensesCount}
+            embedded
+          />
+        ) : null}
+      </section>
     </>
   );
 }

@@ -13,7 +13,8 @@ const ZOD_AUDIT_WAIVERS: Record<string, string> = {
   "people/[id]/finalise-offboarding/route.ts": "No request body — action is determined by URL path param only.",
   "crew-games/download/route.ts": "GET with query params, not JSON body.",
   "crew-games/employees/route.ts": "GET-only endpoint with no user input.",
-  "crew-games/upload/route.ts": "FormData upload, not JSON body."
+  "crew-games/upload/route.ts": "FormData upload, not JSON body.",
+  "dashboard/route.ts": "Zod validation via fetchDashboardData imported from lib/dashboard/fetch-dashboard-data.ts."
 };
 
 function collectRouteFiles(directory: string): string[] {

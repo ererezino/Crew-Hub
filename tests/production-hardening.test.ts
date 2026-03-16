@@ -234,42 +234,44 @@ describe("Production Hardening", () => {
   });
 
   // =========================================================================
-  // 7. MFA enforcement in middleware
+  // 7. MFA enforcement in session layer + shell layout
   // =========================================================================
-  describe("MFA enforcement in middleware", () => {
-    it("middleware source contains mfa references", () => {
+  describe("MFA enforcement in session layer and shell layout", () => {
+    it("session layer checks MFA status", () => {
       const content = readFileSync(
-        resolve(ROOT, "lib/supabase/middleware.ts"),
+        resolve(ROOT, "lib/auth/session.ts"),
         "utf-8"
       );
-      expect(content.toLowerCase()).toContain("mfa");
+      expect(content).toContain("checkMfaStatus");
+      expect(content).toContain("mfa_required");
+      expect(content).toContain("mfa_setup_required");
     });
 
-    it("middleware responds with MFA_REQUIRED for protected APIs", () => {
+    it("session layer distinguishes MFA setup vs verification", () => {
       const content = readFileSync(
-        resolve(ROOT, "lib/supabase/middleware.ts"),
+        resolve(ROOT, "lib/auth/session.ts"),
         "utf-8"
       );
-      expect(content).toContain("MFA_REQUIRED");
+      expect(content).toContain("setup_required");
+      expect(content).toContain("verification_required");
     });
 
-    it("middleware has explicit MFA API exemptions for setup/sign-in/sign-out", () => {
+    it("shell layout redirects users without MFA to /mfa-setup", () => {
       const content = readFileSync(
-        resolve(ROOT, "lib/supabase/middleware.ts"),
-        "utf-8"
-      );
-      expect(content).toContain("isMfaApiRoute");
-      expect(content).toContain("isAuthSignInApiRoute");
-      expect(content).toContain("isAuthSignOutApiRoute");
-      expect(content).toContain("isMfaExemptApiRoute");
-    });
-
-    it("middleware redirects users without MFA to /mfa-setup", () => {
-      const content = readFileSync(
-        resolve(ROOT, "lib/supabase/middleware.ts"),
+        resolve(ROOT, "app/(shell)/layout.tsx"),
         "utf-8"
       );
       expect(content).toContain("/mfa-setup");
+      expect(content).toContain("mfa_setup_required");
+    });
+
+    it("shell layout handles inactive accounts", () => {
+      const content = readFileSync(
+        resolve(ROOT, "app/(shell)/layout.tsx"),
+        "utf-8"
+      );
+      expect(content).toContain("inactive");
+      expect(content).toContain("account_disabled");
     });
   });
 

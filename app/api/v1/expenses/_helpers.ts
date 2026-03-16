@@ -87,8 +87,8 @@ export function buildMeta() {
   return { timestamp: new Date().toISOString() };
 }
 
-export function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
-  return NextResponse.json(payload, { status });
+export function jsonResponse<T>(status: number, payload: ApiResponse<T>, headers?: Record<string, string>) {
+  return NextResponse.json(payload, { status, headers });
 }
 
 export function canApproveExpenses(roles: readonly UserRole[]): boolean {

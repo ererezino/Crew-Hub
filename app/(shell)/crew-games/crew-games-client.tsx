@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -73,30 +72,22 @@ export function CrewGamesClient({
         userRoles={userRoles}
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.section
-          key={activeTab}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -4 }}
-          transition={{ duration: 0.15 }}
-        >
-          {activeTab === "games-night" ? (
-            <GamesNightTab
-              orgId={orgId}
-              currentUserId={currentUserId}
-              isAdmin={isAdmin}
-            />
-          ) : null}
-          {activeTab === "presentation-night" ? (
-            <PresentationNightTab
-              orgId={orgId}
-              currentUserId={currentUserId}
-              isAdmin={isAdmin}
-            />
-          ) : null}
-        </motion.section>
-      </AnimatePresence>
+      <section key={activeTab} className="tab-content-layout">
+        {activeTab === "games-night" ? (
+          <GamesNightTab
+            orgId={orgId}
+            currentUserId={currentUserId}
+            isAdmin={isAdmin}
+          />
+        ) : null}
+        {activeTab === "presentation-night" ? (
+          <PresentationNightTab
+            orgId={orgId}
+            currentUserId={currentUserId}
+            isAdmin={isAdmin}
+          />
+        ) : null}
+      </section>
     </>
   );
 }

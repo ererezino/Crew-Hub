@@ -10,8 +10,8 @@ function buildMeta() {
   return { timestamp: new Date().toISOString() };
 }
 
-function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
-  return NextResponse.json(payload, { status });
+function jsonResponse<T>(status: number, payload: ApiResponse<T>, headers?: Record<string, string>) {
+  return NextResponse.json(payload, { status, headers });
 }
 
 /**
@@ -94,5 +94,5 @@ export async function GET() {
     data: { members, departmentCounts, totalCount: members.length },
     error: null,
     meta: buildMeta()
-  });
+  }, { "Cache-Control": "private, max-age=120, stale-while-revalidate=300" });
 }

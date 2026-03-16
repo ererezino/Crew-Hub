@@ -1,7 +1,6 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -42,13 +41,6 @@ import {
   Activity
 } from "lucide-react";
 
-/* ── Animation ── */
-
-const fadeIn = {
-  initial: { y: 8 },
-  animate: { y: 0, transition: { type: "spring" as const, stiffness: 120, damping: 18 } }
-};
-
 /* ── Greeting helpers ── */
 
 function greetingIcon(tod: "morning" | "afternoon" | "evening") {
@@ -86,7 +78,7 @@ function QuickActionsRow() {
 function NewHireGreeting({ data }: { data: DashboardResponseData }) {
   const t = useTranslations('dashboard');
   return (
-    <motion.section className="home-welcome-hero" {...fadeIn}>
+    <section className="home-welcome-hero dashboard-fade-in">
       <div className="home-welcome-content">
         <h1 className="home-welcome-title">
           {t('newHire.welcome', { org: data.org?.name ?? t('newHire.yourTeam'), firstName: data.greeting.firstName })}
@@ -121,7 +113,7 @@ function NewHireGreeting({ data }: { data: DashboardResponseData }) {
         ) : null}
 
       </div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -133,7 +125,7 @@ function EmployeeGreeting({ data }: { data: DashboardResponseData }) {
   );
 
   return (
-    <motion.section className="home-welcome-hero" {...fadeIn}>
+    <section className="home-welcome-hero dashboard-fade-in">
       <div className="home-welcome-content">
         <p className="home-welcome-eyebrow">
           {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
@@ -152,7 +144,7 @@ function EmployeeGreeting({ data }: { data: DashboardResponseData }) {
         ) : null}
       </div>
       <QuickActionsRow />
-    </motion.section>
+    </section>
   );
 }
 
@@ -161,7 +153,7 @@ function ManagerGreeting({ data }: { data: DashboardResponseData }) {
   const approvals = data.pendingApprovals;
 
   return (
-    <motion.section className="home-welcome-hero" {...fadeIn}>
+    <section className="home-welcome-hero dashboard-fade-in">
       <div className="home-welcome-content">
         <p className="home-welcome-eyebrow">
           {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
@@ -194,7 +186,7 @@ function ManagerGreeting({ data }: { data: DashboardResponseData }) {
         )}
       </div>
       <QuickActionsRow />
-    </motion.section>
+    </section>
   );
 }
 
@@ -219,7 +211,7 @@ function HrAdminGreeting({ data }: { data: DashboardResponseData }) {
   }
 
   return (
-    <motion.section className="home-welcome-hero" {...fadeIn}>
+    <section className="home-welcome-hero dashboard-fade-in">
       <div className="home-welcome-content">
         <p className="home-welcome-eyebrow">
           {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
@@ -262,7 +254,7 @@ function HrAdminGreeting({ data }: { data: DashboardResponseData }) {
       <Link href={ctaHref} className="button button-accent" style={{ marginTop: "var(--space-4)" }}>
         {ctaLabel} <ArrowRight size={14} />
       </Link>
-    </motion.section>
+    </section>
   );
 }
 
@@ -288,7 +280,7 @@ function FinanceAdminGreeting({ data }: { data: DashboardResponseData }) {
   }
 
   return (
-    <motion.section className="home-welcome-hero" {...fadeIn}>
+    <section className="home-welcome-hero dashboard-fade-in">
       <div className="home-welcome-content">
         <p className="home-welcome-eyebrow">
           {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
@@ -321,7 +313,7 @@ function FinanceAdminGreeting({ data }: { data: DashboardResponseData }) {
       <Link href={ctaHref} className="button button-accent" style={{ marginTop: "var(--space-4)" }}>
         {ctaLabel} <ArrowRight size={14} />
       </Link>
-    </motion.section>
+    </section>
   );
 }
 
@@ -336,7 +328,7 @@ function SuperAdminGreeting({ data }: { data: DashboardResponseData }) {
   const expenseSpendSummary = data.expenseSpendSummary;
 
   return (
-    <motion.section className="home-welcome-hero" {...fadeIn}>
+    <section className="home-welcome-hero dashboard-fade-in">
       <div className="home-welcome-content">
         <p className="home-welcome-eyebrow">
           {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
@@ -446,7 +438,7 @@ function SuperAdminGreeting({ data }: { data: DashboardResponseData }) {
           </ul>
         </div>
       ) : null}
-    </motion.section>
+    </section>
   );
 }
 
@@ -469,9 +461,8 @@ function WidgetCard({
 }) {
   const tCommon = useTranslations('common');
   return (
-    <motion.article
+    <article
       className={`home-card dashboard-widget${fullWidth ? " dashboard-widget-full" : ""}`}
-      variants={fadeIn}
     >
       <header className="dashboard-widget-header">
         <h3 className="section-title">
@@ -484,7 +475,7 @@ function WidgetCard({
         ) : null}
       </header>
       {children}
-    </motion.article>
+    </article>
   );
 }
 
@@ -918,12 +909,7 @@ function GreetingCard({ data }: { data: DashboardResponseData }) {
 
 function WidgetGrid({ data }: { data: DashboardResponseData }) {
   return (
-    <motion.div
-      className="dashboard-widget-grid"
-      initial="initial"
-      animate="animate"
-      variants={{ animate: { transition: { staggerChildren: 0.06 } } }}
-    >
+    <div className="dashboard-widget-grid">
       {/* Universal widgets (all roles) */}
       <WidgetErrorBoundary title="Announcements">
         <AnnouncementsWidget data={data} />
@@ -971,7 +957,7 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
       <WidgetErrorBoundary title="Compliance health">
         <ComplianceHealthWidget data={data} />
       </WidgetErrorBoundary>
-    </motion.div>
+    </div>
   );
 }
 
@@ -979,10 +965,10 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
    MAIN CONTENT
    ══════════════════════════════════════════════ */
 
-function DashboardContent() {
+function DashboardContent({ initialData }: { initialData?: DashboardResponseData }) {
   const t = useTranslations('dashboard');
   const tCommon = useTranslations('common');
-  const dashboardQuery = useDashboard();
+  const dashboardQuery = useDashboard(initialData);
 
   if (dashboardQuery.isPending) {
     return <DashboardSkeleton />;
@@ -1043,6 +1029,6 @@ function DashboardContent() {
    ROOT EXPORT
    ══════════════════════════════════════════════ */
 
-export function DashboardClient() {
-  return <DashboardContent />;
+export function DashboardClient({ initialData }: { initialData?: DashboardResponseData }) {
+  return <DashboardContent initialData={initialData} />;
 }

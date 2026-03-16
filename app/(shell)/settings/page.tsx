@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { DEFAULT_LOCALE, type AppLocale } from "../../../i18n/locales";
-import { getAuthenticatedSession } from "../../../lib/auth/session";
+import { getAuthenticatedSession, getSettingsProfileFields } from "../../../lib/auth/session";
 import { hasRole } from "../../../lib/roles";
 import { SETTINGS_TABS, type NotificationPreferences, type SettingsTab } from "../../../types/settings";
 import { SettingsClient } from "./settings-client";
@@ -57,7 +57,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
     );
   }
 
-  const resolvedSearchParams = await searchParams;
+  const [resolvedSearchParams, settingsFields] = await Promise.all([
+    searchParams,
+    getSettingsProfileFields(session.profile.id)
+  ]);
   const requestedTab = resolveTab(resolvedSearchParams);
 
   const canManageOrganization = hasRole(session.profile.roles, "SUPER_ADMIN");
@@ -82,26 +85,26 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         profile={{
           fullName: session.profile.full_name,
           avatarUrl: session.profile.avatar_url ?? "",
-          phone: session.profile.phone ?? "",
+          phone: settingsFields?.phone ?? "",
           email: session.profile.email,
           roles: session.profile.roles,
           notificationPreferences: normalizeNotificationPreferences(
-            session.profile.notification_preferences
+            settingsFields?.notification_preferences ?? null
           ),
-          bio: session.profile.bio ?? "",
-          pronouns: session.profile.pronouns ?? "",
+          bio: settingsFields?.bio ?? "",
+          pronouns: settingsFields?.pronouns ?? "",
           countryCode: session.profile.country_code ?? "",
-          emergencyContactName: session.profile.emergency_contact_name ?? "",
-          emergencyContactPhone: session.profile.emergency_contact_phone ?? "",
-          emergencyContactRelationship: session.profile.emergency_contact_relationship ?? "",
-          socialLinkedin: session.profile.social_linkedin ?? "",
-          socialTwitter: session.profile.social_twitter ?? "",
-          socialInstagram: session.profile.social_instagram ?? "",
-          socialGithub: session.profile.social_github ?? "",
-          socialWebsite: session.profile.social_website ?? "",
-          favoriteMusic: session.profile.favorite_music ?? "",
-          favoriteBooks: session.profile.favorite_books ?? "",
-          favoriteSports: session.profile.favorite_sports ?? ""
+          emergencyContactName: settingsFields?.emergency_contact_name ?? "",
+          emergencyContactPhone: settingsFields?.emergency_contact_phone ?? "",
+          emergencyContactRelationship: settingsFields?.emergency_contact_relationship ?? "",
+          socialLinkedin: settingsFields?.social_linkedin ?? "",
+          socialTwitter: settingsFields?.social_twitter ?? "",
+          socialInstagram: settingsFields?.social_instagram ?? "",
+          socialGithub: settingsFields?.social_github ?? "",
+          socialWebsite: settingsFields?.social_website ?? "",
+          favoriteMusic: settingsFields?.favorite_music ?? "",
+          favoriteBooks: settingsFields?.favorite_books ?? "",
+          favoriteSports: settingsFields?.favorite_sports ?? ""
         }}
         organization={{
           name: session.org?.name ?? "",

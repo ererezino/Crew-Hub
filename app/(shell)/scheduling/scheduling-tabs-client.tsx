@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -130,36 +129,27 @@ export function SchedulingTabsClient({
         userRoles={userRoles}
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.section
-          key={activeTab}
-          className="tab-content-layout"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
-          {activeTab === "my-shifts" ? (
-            <SchedulingClient
-              embedded
-              currentUserId={currentUserId}
-              canManageSwaps={canManage}
-            />
-          ) : null}
-          {activeTab === "team-calendar" ? (
-            <SchedulingCalendarClient
-              canManageShifts={canManage}
-              initialScheduleId={requestedScheduleId}
-            />
-          ) : null}
-          {activeTab === "manage" && canManage ? (
-            <SchedulingManageClient
-              userRoles={userRoles}
-              userDepartment={userDepartment}
-            />
-          ) : null}
-        </motion.section>
-      </AnimatePresence>
+      <section key={activeTab} className="tab-content-layout">
+        {activeTab === "my-shifts" ? (
+          <SchedulingClient
+            embedded
+            currentUserId={currentUserId}
+            canManageSwaps={canManage}
+          />
+        ) : null}
+        {activeTab === "team-calendar" ? (
+          <SchedulingCalendarClient
+            canManageShifts={canManage}
+            initialScheduleId={requestedScheduleId}
+          />
+        ) : null}
+        {activeTab === "manage" && canManage ? (
+          <SchedulingManageClient
+            userRoles={userRoles}
+            userDepartment={userDepartment}
+          />
+        ) : null}
+      </section>
     </>
   );
 }

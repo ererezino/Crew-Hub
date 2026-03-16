@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -101,22 +100,13 @@ export function LearningTabsClient({
         userRoles={userRoles}
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.section
-          key={activeTab}
-          className="tab-content-layout"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
-          {activeTab === "courses" ? <LearningClient embedded /> : null}
-          {activeTab === "certificates" ? <LearningCertificatesClient embedded /> : null}
-          {activeTab === "surveys" ? (
-            <SurveysClient canManageSurveys={canManageSurveys} embedded />
-          ) : null}
-        </motion.section>
-      </AnimatePresence>
+      <section key={activeTab} className="tab-content-layout">
+        {activeTab === "courses" ? <LearningClient embedded /> : null}
+        {activeTab === "certificates" ? <LearningCertificatesClient embedded /> : null}
+        {activeTab === "surveys" ? (
+          <SurveysClient canManageSurveys={canManageSurveys} embedded />
+        ) : null}
+      </section>
     </>
   );
 }

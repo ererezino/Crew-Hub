@@ -27,8 +27,8 @@ function buildMeta() {
   return { timestamp: new Date().toISOString() };
 }
 
-function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
-  return NextResponse.json(payload, { status });
+function jsonResponse<T>(status: number, payload: ApiResponse<T>, headers?: Record<string, string>) {
+  return NextResponse.json(payload, { status, headers });
 }
 
 function canReviewTimeOff(roles: readonly UserRole[]): boolean {
@@ -183,7 +183,7 @@ export async function GET(request: Request) {
       },
       error: null,
       meta: buildMeta()
-    });
+    }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
   }
 
   const supabase = await createSupabaseServerClient();
@@ -265,5 +265,5 @@ export async function GET(request: Request) {
     },
     error: null,
     meta: buildMeta()
-  });
+  }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
 }
