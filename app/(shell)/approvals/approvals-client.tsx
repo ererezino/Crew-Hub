@@ -7,6 +7,7 @@ import { useMemo } from "react";
 
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { PageHeader } from "../../../components/shared/page-header";
+import type { ApprovalsCountsData } from "../../../lib/approvals/fetch-approvals-counts";
 import type { UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
 import { ExpenseApprovalsClient } from "../expenses/approvals/approvals-client";
@@ -17,6 +18,7 @@ type ApprovalsClientProps = {
   userRoles: UserRole[];
   canReviewTimeOff: boolean;
   canReviewExpenses: boolean;
+  initialCountsData?: ApprovalsCountsData;
 };
 
 function resolveInitialTab(requestedTab: string, visibleTabs: PageTab[]): string {
@@ -33,7 +35,8 @@ export function ApprovalsClient({
   requestedTab,
   userRoles,
   canReviewTimeOff,
-  canReviewExpenses
+  canReviewExpenses,
+  initialCountsData
 }: ApprovalsClientProps) {
   const tNav = useTranslations('nav');
   const t = useTranslations('approvalsPage');
@@ -59,7 +62,11 @@ export function ApprovalsClient({
       if (!response.ok) {
         return {
           timeOff: 0,
-          expenses: 0
+          expenses: 0,
+          managerExpenses: 0,
+          additionalExpenses: 0,
+          financeExpenses: 0,
+          total: 0
         };
       }
 
@@ -70,17 +77,26 @@ export function ApprovalsClient({
           managerExpenses?: number;
           additionalExpenses?: number;
           financeExpenses?: number;
+          total?: number;
         } | null;
       };
 
+      const timeOff = payload.data?.timeOff ?? 0;
+      const managerExpenses = payload.data?.managerExpenses ?? 0;
+      const additionalExpenses = payload.data?.additionalExpenses ?? 0;
+      const financeExpenses = payload.data?.financeExpenses ?? 0;
+      const expenses = payload.data?.expenses ?? (managerExpenses + additionalExpenses + financeExpenses);
+
       return {
-        timeOff: payload.data?.timeOff ?? 0,
-        expenses: payload.data?.expenses ?? 0,
-        managerExpenses: payload.data?.managerExpenses ?? 0,
-        additionalExpenses: payload.data?.additionalExpenses ?? 0,
-        financeExpenses: payload.data?.financeExpenses ?? 0
+        timeOff,
+        expenses,
+        managerExpenses,
+        additionalExpenses,
+        financeExpenses,
+        total: payload.data?.total ?? (timeOff + expenses)
       };
     },
+    initialData: initialCountsData,
     staleTime: 2 * 60 * 1000,
     gcTime: 2 * 60 * 1000
   });

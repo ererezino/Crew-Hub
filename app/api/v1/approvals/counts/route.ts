@@ -1,27 +1,9 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
+import { fetchApprovalsCountsData, type ApprovalsCountsData } from "../../../../../lib/approvals/fetch-approvals-counts";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
-import { getEffectiveApproverScope } from "../../../../../lib/delegation";
-import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
-import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
-import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
-
-type ApprovalsCountsResponseData = {
-  timeOff: number;
-  expenses: number;
-  /** Expenses awaiting manager approval (status = "pending") */
-  managerExpenses: number;
-  /** Expenses awaiting additional approval (status = "manager_approved" with requires_additional_approval) */
-  additionalExpenses: number;
-  /** Expenses awaiting finance payment confirmation (status = "manager_approved") */
-  financeExpenses: number;
-  total: number;
-};
-
-const querySchema = z.object({});
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -31,125 +13,7 @@ function jsonResponse<T>(status: number, payload: ApiResponse<T>, headers?: Reco
   return NextResponse.json(payload, { status, headers });
 }
 
-function canReviewTimeOff(roles: readonly UserRole[]): boolean {
-  return (
-    hasRole(roles, "MANAGER") ||
-    hasRole(roles, "TEAM_LEAD") ||
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN")
-  );
-}
-
-function canViewAllTimeOff(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "HR_ADMIN") || hasRole(roles, "SUPER_ADMIN");
-}
-
-function canManagerApproveExpenses(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "MANAGER") || hasRole(roles, "TEAM_LEAD") || hasRole(roles, "SUPER_ADMIN");
-}
-
-function canFinanceApproveExpenses(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
-}
-
-async function countPendingLeaveRequests({
-  supabase,
-  orgId,
-  employeeIds
-}: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
-  orgId: string;
-  employeeIds?: string[] | null;
-}) {
-  if (Array.isArray(employeeIds) && employeeIds.length === 0) {
-    return 0;
-  }
-
-  let query = supabase
-    .from("leave_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .eq("status", "pending")
-    .is("deleted_at", null);
-
-  if (Array.isArray(employeeIds) && employeeIds.length > 0) {
-    query = query.in("employee_id", employeeIds);
-  }
-
-  const { count, error } = await query;
-  if (error) return 0;
-  return typeof count === "number" ? count : 0;
-}
-
-async function countExpensesByStatus({
-  supabase,
-  orgId,
-  status,
-  employeeIds
-}: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
-  orgId: string;
-  status: "pending" | "manager_approved";
-  employeeIds?: string[] | null;
-}) {
-  if (Array.isArray(employeeIds) && employeeIds.length === 0) {
-    return 0;
-  }
-
-  let query = supabase
-    .from("expenses")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .eq("status", status)
-    .is("deleted_at", null);
-
-  if (Array.isArray(employeeIds) && employeeIds.length > 0) {
-    query = query.in("employee_id", employeeIds);
-  }
-
-  const { count, error } = await query;
-  if (error) return 0;
-  return typeof count === "number" ? count : 0;
-}
-
-async function countAdditionalExpenses({
-  supabase,
-  orgId,
-  userId
-}: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
-  orgId: string;
-  userId: string;
-}) {
-  const { count, error } = await supabase
-    .from("expenses")
-    .select("id", { count: "exact", head: true })
-    .eq("org_id", orgId)
-    .eq("status", "manager_approved")
-    .eq("requires_additional_approval", true)
-    .eq("additional_approver_id", userId)
-    .is("deleted_at", null);
-
-  if (error) return 0;
-  return typeof count === "number" ? count : 0;
-}
-
-export async function GET(request: Request) {
-  const parsedQuery = querySchema.safeParse(
-    Object.fromEntries(new URL(request.url).searchParams.entries())
-  );
-
-  if (!parsedQuery.success) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Invalid approvals counts query."
-      },
-      meta: buildMeta()
-    });
-  }
-
+export async function GET() {
   const session = await getAuthenticatedSession();
 
   if (!session?.profile) {
@@ -165,14 +29,16 @@ export async function GET(request: Request) {
 
   const { profile } = session;
   const roles = profile.roles;
-  const superAdmin = hasRole(roles, "SUPER_ADMIN");
 
-  const includeTimeOff = canReviewTimeOff(roles);
-  const includeManagerExpenses = canManagerApproveExpenses(roles);
-  const includeFinanceExpenses = canFinanceApproveExpenses(roles);
+  const canReview =
+    hasRole(roles, "TEAM_LEAD") ||
+    hasRole(roles, "MANAGER") ||
+    hasRole(roles, "HR_ADMIN") ||
+    hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "SUPER_ADMIN");
 
-  if (!includeTimeOff && !includeManagerExpenses && !includeFinanceExpenses) {
-    return jsonResponse<ApprovalsCountsResponseData>(200, {
+  if (!canReview) {
+    return jsonResponse<ApprovalsCountsData>(200, {
       data: {
         timeOff: 0,
         expenses: 0,
@@ -186,84 +52,22 @@ export async function GET(request: Request) {
     }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
   }
 
-  const supabase = await createSupabaseServerClient();
+  try {
+    const data = await fetchApprovalsCountsData(profile);
 
-  // Use the service-role client for scoped data queries. The delegation engine
-  // has already determined authorisation; RLS on leave_requests / expenses
-  // does not model delegation or team-lead access, so the privileged client
-  // is required to actually fetch the data.
-  const svcClient = createSupabaseServiceRoleClient();
-
-  // Resolve operational scope (direct + delegated reports) for non-admin users.
-  // Use scope-specific queries so delegation scope filtering is accurate.
-  const needsLeaveScope = includeTimeOff && !canViewAllTimeOff(roles);
-  const needsExpenseScope = includeManagerExpenses && !superAdmin;
-
-  let leaveReportIds: string[] | null = null;
-  let expenseReportIds: string[] | null = null;
-
-  if (needsLeaveScope && needsExpenseScope) {
-    // Fetch both scopes in parallel.
-    const [leaveScope, expenseScope] = await Promise.all([
-      getEffectiveApproverScope({ supabase, orgId: profile.org_id, userId: profile.id, scope: "leave" }),
-      getEffectiveApproverScope({ supabase, orgId: profile.org_id, userId: profile.id, scope: "expense" })
-    ]);
-    leaveReportIds = [...leaveScope.directReportIds, ...leaveScope.delegatedReportIds];
-    expenseReportIds = [...expenseScope.directReportIds, ...expenseScope.delegatedReportIds];
-  } else if (needsLeaveScope) {
-    const leaveScope = await getEffectiveApproverScope({ supabase, orgId: profile.org_id, userId: profile.id, scope: "leave" });
-    leaveReportIds = [...leaveScope.directReportIds, ...leaveScope.delegatedReportIds];
-  } else if (needsExpenseScope) {
-    const expenseScope = await getEffectiveApproverScope({ supabase, orgId: profile.org_id, userId: profile.id, scope: "expense" });
-    expenseReportIds = [...expenseScope.directReportIds, ...expenseScope.delegatedReportIds];
+    return jsonResponse<ApprovalsCountsData>(200, {
+      data,
+      error: null,
+      meta: buildMeta()
+    }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
+  } catch {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Unable to load approvals counts."
+      },
+      meta: buildMeta()
+    });
   }
-
-  const [timeOffCount, managerExpenseCount, additionalExpenseCount, financeExpenseCount] = await Promise.all([
-    includeTimeOff
-      ? countPendingLeaveRequests({
-          supabase: svcClient,
-          orgId: profile.org_id,
-          employeeIds: canViewAllTimeOff(roles) ? null : leaveReportIds
-        })
-      : Promise.resolve(0),
-    includeManagerExpenses
-      ? countExpensesByStatus({
-          supabase: svcClient,
-          orgId: profile.org_id,
-          status: "pending",
-          employeeIds: superAdmin ? null : expenseReportIds
-        })
-      : Promise.resolve(0),
-    (includeManagerExpenses || includeFinanceExpenses)
-      ? countAdditionalExpenses({
-          supabase: svcClient,
-          orgId: profile.org_id,
-          userId: profile.id
-        })
-      : Promise.resolve(0),
-    includeFinanceExpenses
-      ? countExpensesByStatus({
-          supabase: svcClient,
-          orgId: profile.org_id,
-          status: "manager_approved",
-          employeeIds: null
-        })
-      : Promise.resolve(0)
-  ]);
-
-  const expensesCount = managerExpenseCount + additionalExpenseCount + financeExpenseCount;
-  const total = timeOffCount + expensesCount;
-
-  return jsonResponse<ApprovalsCountsResponseData>(200, {
-    data: {
-      timeOff: timeOffCount,
-      expenses: expensesCount,
-      managerExpenses: managerExpenseCount,
-      additionalExpenses: additionalExpenseCount,
-      financeExpenses: financeExpenseCount,
-      total
-    },
-    error: null,
-    meta: buildMeta()
-  }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
 }

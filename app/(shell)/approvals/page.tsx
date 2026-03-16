@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 
+import { fetchApprovalsCountsData } from "../../../lib/approvals/fetch-approvals-counts";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
@@ -72,12 +73,23 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
   const resolvedSearchParams = await searchParams;
   const requestedTab = resolveRequestedTab(resolvedSearchParams);
 
+  // Server-fetch approval counts so tab badges render in the initial HTML.
+  // If the fetch fails, render without initialData — the client will retry via API.
+  let initialCountsData;
+
+  try {
+    initialCountsData = await fetchApprovalsCountsData(session.profile);
+  } catch {
+    // Graceful degradation: client will fetch on mount
+  }
+
   return (
     <ApprovalsClient
       requestedTab={requestedTab}
       userRoles={roles}
       canReviewTimeOff={canReviewTimeOff}
       canReviewExpenses={canReviewExpenses}
+      initialCountsData={initialCountsData}
     />
   );
 }
