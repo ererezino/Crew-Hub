@@ -1,21 +1,42 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const PRODUCTION_PROJECT_REF = "xmeruhyybvyosqxfleiu";
 
-function getEnvironmentLabel(): string | null {
+/**
+ * Derive the environment label purely from build-time env vars (stable
+ * across SSR and CSR) and, for the LOCAL vs STAGING distinction, defer
+ * to a client-only effect so SSR and hydration always agree.
+ */
+function isNonProduction(): boolean {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  if (supabaseUrl.includes(PRODUCTION_PROJECT_REF)) return null;
+  return !supabaseUrl.includes(PRODUCTION_PROJECT_REF);
+}
 
+function getStaticLabel(): string | null {
+  if (!isNonProduction()) return null;
   const vercelEnv = process.env.NEXT_PUBLIC_VERCEL_ENV;
   if (vercelEnv === "preview") return "PREVIEW";
-  if (typeof window !== "undefined" && window.location.hostname === "localhost") return "LOCAL";
-  return "STAGING";
+  // LOCAL vs STAGING is resolved client-side to avoid hydration mismatch
+  return null;
 }
 
 export function EnvironmentBanner() {
-  const label = getEnvironmentLabel();
+  const staticLabel = getStaticLabel();
+  const [label, setLabel] = useState<string | null>(staticLabel);
+
+  // Resolve LOCAL vs STAGING after mount (window is available)
+  useEffect(() => {
+    if (!isNonProduction()) return;
+    if (staticLabel) return; // already resolved (e.g. PREVIEW)
+
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      setLabel("LOCAL");
+    } else {
+      setLabel("STAGING");
+    }
+  }, [staticLabel]);
 
   useEffect(() => {
     if (!label) return;
