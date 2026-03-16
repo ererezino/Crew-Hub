@@ -5670,6 +5670,12 @@
   "crewGames": {
     "pageTitle": "Crew Games",
     "pageDescription": "Games Night and Presentation Night — results, leaderboards, and fun.",
+    "loading": "Loading…",
+    "eventNotFound": "Event not found.",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "deleting": "Deleting…",
+    "delete": "Delete",
     "tab": {
       "gamesNight": "Games Night",
       "presentationNight": "Presentation Night"
@@ -5686,7 +5692,10 @@
       "addAdjustment": "Add adjustment",
       "pointsDelta": "Points (+/-)",
       "reason": "Reason",
-      "adjustmentSaved": "Leaderboard adjustment saved."
+      "adjustmentSaved": "Leaderboard adjustment saved.",
+      "showTop10": "Show top 10",
+      "showAll": "Show all ({count})",
+      "save": "Save"
     },
     "event": {
       "upcoming": "Upcoming",
@@ -5717,7 +5726,16 @@
       "resultsPublished": "Results published and announcement sent.",
       "pastEvents": "Past Events",
       "nextUp": "Next Up",
-      "latestResults": "Latest Results"
+      "latestResults": "Latest Results",
+      "upcomingHint": "Setting status to Upcoming will announce this event to the entire company.",
+      "createEvent": "Create Event",
+      "saveChanges": "Save Changes",
+      "game": "Game:",
+      "viewResults": "View Results",
+      "edit": "Edit",
+      "results": "Results",
+      "openFeaturedGame": "Open {game}",
+      "presenters": "Presenters"
     },
     "results": {
       "title": "Results",
@@ -5732,7 +5750,9 @@
       "unmapped": "Not identified",
       "saved": "Results saved.",
       "winner": "Winner",
-      "noResults": "No results posted yet."
+      "noResults": "No results posted yet.",
+      "playerIdx": "Player {idx}",
+      "saveResults": "Save Results"
     },
     "presenters": {
       "title": "Presenters",
@@ -5746,7 +5766,10 @@
       "uploadSlides": "Upload slides",
       "removeSlides": "Remove slides",
       "noPresenters": "No presenters added yet.",
-      "saved": "Presenters saved."
+      "saved": "Presenters saved.",
+      "presenterIdx": "Presenter {idx}",
+      "savePresenters": "Save Presenters",
+      "slidesLabel": "Slides"
     },
     "upload": {
       "eventImage": "Event Image",

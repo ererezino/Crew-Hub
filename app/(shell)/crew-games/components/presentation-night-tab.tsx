@@ -220,14 +220,14 @@ export function PresentationNightTab({ orgId, currentUserId, isAdmin }: Presenta
             type="button"
             className="slide-panel-backdrop"
             onClick={() => setDeleteConfirmId(null)}
-            aria-label="Cancel"
+            aria-label={t("cancel")}
           />
           <div className="crew-games-confirm-dialog" role="alertdialog" aria-modal="true">
             <h3 className="section-title">{t("event.deleteConfirmTitle")}</h3>
             <p className="settings-card-description">{t("event.deleteConfirmDescription")}</p>
             <div className="crew-games-confirm-actions">
               <button type="button" className="button" onClick={() => setDeleteConfirmId(null)}>
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -235,7 +235,7 @@ export function PresentationNightTab({ orgId, currentUserId, isAdmin }: Presenta
                 disabled={mutations.isSaving}
                 onClick={() => handleDeleteEvent(deleteConfirmId)}
               >
-                {mutations.isSaving ? "Deleting…" : "Delete"}
+                {mutations.isSaving ? t("deleting") : t("delete")}
               </button>
             </div>
           </div>
@@ -305,6 +305,7 @@ function PresentationHero({
   onEdit: () => void;
   onEditPresenters: () => void;
 }) {
+  const t = useTranslations("crewGames");
   const { presenters } = useCrewGameEventDetail(event.id);
   const winner = presenters.find((p) => p.isWinner);
 
@@ -313,7 +314,7 @@ function PresentationHero({
       <div className="crew-games-hero-content">
         <div className="crew-games-hero-meta">
           <StatusBadge tone={statusTone(event.status)}>
-            {event.status}
+            {t(`event.${event.status}`)}
           </StatusBadge>
           <span className="crew-games-hero-date">
             <Calendar size={14} aria-hidden="true" />
@@ -332,9 +333,9 @@ function PresentationHero({
             <div>
               <p className="crew-games-winner-name">{winner.employeeName}</p>
               {winner.talkTitle ? (
-                <p className="crew-games-winner-talk">"{winner.talkTitle}"</p>
+                <p className="crew-games-winner-talk">&ldquo;{winner.talkTitle}&rdquo;</p>
               ) : null}
-              <p className="crew-games-winner-votes">{winner.voteCount} votes</p>
+              <p className="crew-games-winner-votes">{winner.voteCount} {t("presenters.votes").toLowerCase()}</p>
             </div>
           </div>
         ) : null}
@@ -349,7 +350,7 @@ function PresentationHero({
                   <a
                     href={`/api/v1/crew-games/download?path=${encodeURIComponent(p.slidePath)}`}
                     className="crew-games-slide-link"
-                    title="Download slides"
+                    title={t("presenters.downloadSlides")}
                   >
                     <Download size={12} aria-hidden="true" />
                   </a>
@@ -362,10 +363,10 @@ function PresentationHero({
         {isAdmin ? (
           <div className="crew-games-hero-admin">
             <button type="button" className="button button-ghost" onClick={onEdit}>
-              <Edit2 size={14} aria-hidden="true" /> Edit
+              <Edit2 size={14} aria-hidden="true" /> {t("event.edit")}
             </button>
             <button type="button" className="button button-ghost" onClick={onEditPresenters}>
-              <Mic2 size={14} aria-hidden="true" /> Presenters
+              <Mic2 size={14} aria-hidden="true" /> {t("event.presenters")}
             </button>
           </div>
         ) : null}
@@ -393,6 +394,8 @@ function PresentationEventCard({
   onEditPresenters: () => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations("crewGames");
+
   return (
     <div className="crew-games-event-card dashboard-panel">
       <button
@@ -403,7 +406,7 @@ function PresentationEventCard({
       >
         <div className="crew-games-event-card-info">
           <StatusBadge tone={statusTone(event.status)}>
-            {event.status}
+            {t(`event.${event.status}`)}
           </StatusBadge>
           <span className="crew-games-event-card-title">{event.title}</span>
           <span className="crew-games-event-card-date">
@@ -443,6 +446,7 @@ function PresentationCardBody({
   onEditPresenters: () => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations("crewGames");
   const { presenters } = useCrewGameEventDetail(event.id);
 
   return (
@@ -464,17 +468,17 @@ function PresentationCardBody({
               </div>
               <div className="crew-games-presenter-meta">
                 {p.isWinner ? (
-                  <StatusBadge tone="success">Winner</StatusBadge>
+                  <StatusBadge tone="success">{t("presenters.winner")}</StatusBadge>
                 ) : null}
-                <span className="crew-games-presenter-votes">{p.voteCount} votes</span>
+                <span className="crew-games-presenter-votes">{p.voteCount} {t("presenters.votes").toLowerCase()}</span>
                 {p.slidePath ? (
                   <a
                     href={`/api/v1/crew-games/download?path=${encodeURIComponent(p.slidePath)}`}
                     className="button button-ghost button-sm"
-                    title="Download slides"
+                    title={t("presenters.downloadSlides")}
                   >
                     <Download size={14} aria-hidden="true" />
-                    Slides
+                    {t("presenters.slidesLabel")}
                   </a>
                 ) : null}
               </div>
@@ -485,17 +489,17 @@ function PresentationCardBody({
 
       {event.highlights ? (
         <p className="crew-games-event-card-highlights">
-          <strong>Highlights:</strong> {event.highlights}
+          <strong>{t("event.highlights")}</strong> {event.highlights}
         </p>
       ) : null}
 
       {isAdmin ? (
         <div className="crew-games-event-card-actions">
           <button type="button" className="button button-ghost" onClick={onEdit}>
-            <Edit2 size={14} aria-hidden="true" /> Edit
+            <Edit2 size={14} aria-hidden="true" /> {t("event.edit")}
           </button>
           <button type="button" className="button button-ghost" onClick={onEditPresenters}>
-            <Mic2 size={14} aria-hidden="true" /> Presenters
+            <Mic2 size={14} aria-hidden="true" /> {t("event.presenters")}
           </button>
           <button type="button" className="table-row-action table-row-action-danger" onClick={onDelete}>
             <Trash2 size={14} aria-hidden="true" />

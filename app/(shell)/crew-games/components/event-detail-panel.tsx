@@ -14,11 +14,11 @@ export function EventDetailPanel({ eventId }: EventDetailPanelProps) {
   const { event, results, presenters, isLoading } = useCrewGameEventDetail(eventId);
 
   if (isLoading) {
-    return <p className="crew-games-empty-hint">Loading…</p>;
+    return <p className="crew-games-empty-hint">{t("loading")}</p>;
   }
 
   if (!event) {
-    return <p className="crew-games-empty-hint">Event not found.</p>;
+    return <p className="crew-games-empty-hint">{t("eventNotFound")}</p>;
   }
 
   const isGamesNight = event.eventType === "games_night";

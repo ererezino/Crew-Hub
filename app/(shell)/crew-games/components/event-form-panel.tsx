@@ -16,12 +16,13 @@ type EventFormPanelProps = {
 
 export function EventFormPanel({
   eventType,
-  orgId,
+  orgId: _orgId,
   existingEvent,
   onSaved,
   onCancel
 }: EventFormPanelProps) {
   const t = useTranslations("crewGames.event");
+  const tCommon = useTranslations("crewGames");
   const mutations = useCrewGamesMutations();
 
   const isEdit = Boolean(existingEvent);
@@ -117,7 +118,7 @@ export function EventFormPanel({
         </select>
         {status === "upcoming" && !existingEvent?.publishedAt ? (
           <p className="form-field-hint">
-            Setting status to Upcoming will announce this event to the entire company.
+            {t("upcomingHint")}
           </p>
         ) : null}
       </div>
@@ -189,7 +190,6 @@ export function EventFormPanel({
           onChange={(e) => setHighlights(e.target.value)}
           rows={3}
           maxLength={5000}
-          placeholder="Fun moments, memorable quotes, or notes from the night…"
         />
       </div>
 
@@ -197,10 +197,10 @@ export function EventFormPanel({
 
       <div className="slide-panel-actions">
         <button type="button" className="button" onClick={onCancel}>
-          Cancel
+          {tCommon("cancel")}
         </button>
         <button type="submit" className="button button-primary" disabled={mutations.isSaving}>
-          {mutations.isSaving ? "Saving…" : isEdit ? "Save Changes" : "Create Event"}
+          {mutations.isSaving ? tCommon("saving") : isEdit ? t("saveChanges") : t("createEvent")}
         </button>
       </div>
     </form>

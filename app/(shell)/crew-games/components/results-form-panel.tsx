@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { useCrewGameEventDetail, useCrewGamesMutations } from "../../../../hooks/use-crew-games";
@@ -36,29 +36,29 @@ type ResultsFormPanelProps = {
 
 export function ResultsFormPanel({ eventId, orgId, onSaved, onCancel }: ResultsFormPanelProps) {
   const t = useTranslations("crewGames.results");
+  const tCommon = useTranslations("crewGames");
   const { results: existingResults, isLoading } = useCrewGameEventDetail(eventId);
   const mutations = useCrewGamesMutations();
   const [rows, setRows] = useState<ResultRow[]>([newRow()]);
   const [error, setError] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
 
   // Pre-fill from existing results
   useEffect(() => {
-    if (initialized || isLoading) return;
+    if (initializedRef.current || isLoading) return;
+    initializedRef.current = true;
     if (existingResults.length > 0) {
-      setRows(
-        existingResults.map((r) => ({
-          key: r.id,
-          nickname: r.nickname,
-          employeeId: r.employeeId ?? "",
-          score: r.score !== null ? String(r.score) : "",
-          placement: r.placement !== null ? String(r.placement) : "",
-          pointsAwarded: String(r.pointsAwarded)
-        }))
-      );
+      const mapped = existingResults.map((r) => ({
+        key: r.id,
+        nickname: r.nickname,
+        employeeId: r.employeeId ?? "",
+        score: r.score !== null ? String(r.score) : "",
+        placement: r.placement !== null ? String(r.placement) : "",
+        pointsAwarded: String(r.pointsAwarded)
+      }));
+      queueMicrotask(() => setRows(mapped));
     }
-    setInitialized(true);
-  }, [existingResults, isLoading, initialized]);
+  }, [existingResults, isLoading]);
 
   const addRow = useCallback(() => {
     setRows((prev) => [...prev, newRow()]);
@@ -101,7 +101,7 @@ export function ResultsFormPanel({ eventId, orgId, onSaved, onCancel }: ResultsF
   };
 
   if (isLoading) {
-    return <p className="crew-games-empty-hint">Loading…</p>;
+    return <p className="crew-games-empty-hint">{tCommon("loading")}</p>;
   }
 
   return (
@@ -110,7 +110,7 @@ export function ResultsFormPanel({ eventId, orgId, onSaved, onCancel }: ResultsF
         {rows.map((row, idx) => (
           <div key={row.key} className="crew-games-result-row">
             <div className="crew-games-result-row-header">
-              <span className="form-label">Player {idx + 1}</span>
+              <span className="form-label">{t("playerIdx", { idx: idx + 1 })}</span>
               {rows.length > 1 ? (
                 <button
                   type="button"
@@ -189,10 +189,10 @@ export function ResultsFormPanel({ eventId, orgId, onSaved, onCancel }: ResultsF
 
       <div className="slide-panel-actions">
         <button type="button" className="button" onClick={onCancel}>
-          Cancel
+          {tCommon("cancel")}
         </button>
         <button type="submit" className="button button-primary" disabled={mutations.isSaving}>
-          {mutations.isSaving ? "Saving…" : "Save Results"}
+          {mutations.isSaving ? tCommon("saving") : t("saveResults")}
         </button>
       </div>
     </form>

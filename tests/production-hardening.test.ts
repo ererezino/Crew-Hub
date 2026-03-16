@@ -353,7 +353,8 @@ describe("Production Hardening", () => {
         "analytics",
         "signatures",
         "surveys",
-        "notifications"
+        "notifications",
+        "crew_games"
       ];
 
       for (const id of expectedModuleIds) {

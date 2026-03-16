@@ -208,7 +208,7 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
                 >
                   <ExternalLink size={14} aria-hidden="true" />
                   {heroEvent.featuredGame
-                    ? `Open ${heroEvent.featuredGame.slice(0, 30)}`
+                    ? t("event.openFeaturedGame", { game: heroEvent.featuredGame.slice(0, 30) })
                     : t("links.openGame")}
                 </a>
               ) : null}
@@ -320,7 +320,7 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
             type="button"
             className="slide-panel-backdrop"
             onClick={() => setDeleteConfirmId(null)}
-            aria-label="Cancel"
+            aria-label={t("cancel")}
           />
           <div className="crew-games-confirm-dialog" role="alertdialog" aria-modal="true">
             <h3 className="section-title">{t("event.deleteConfirmTitle")}</h3>
@@ -331,7 +331,7 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
                 className="button"
                 onClick={() => setDeleteConfirmId(null)}
               >
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 type="button"
@@ -339,7 +339,7 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
                 disabled={mutations.isSaving}
                 onClick={() => handleDeleteEvent(deleteConfirmId)}
               >
-                {mutations.isSaving ? "Deleting…" : "Delete"}
+                {mutations.isSaving ? t("deleting") : t("delete")}
               </button>
             </div>
           </div>
@@ -430,6 +430,8 @@ function EventCard({
   onDelete,
   onViewDetail
 }: EventCardProps) {
+  const t = useTranslations("crewGames");
+
   return (
     <div className="crew-games-event-card dashboard-panel">
       <button
@@ -440,7 +442,7 @@ function EventCard({
       >
         <div className="crew-games-event-card-info">
           <StatusBadge tone={statusTone(event.status)}>
-            {event.status}
+            {t(`event.${event.status}`)}
           </StatusBadge>
           <span className="crew-games-event-card-title">{event.title}</span>
           <span className="crew-games-event-card-date">
@@ -458,7 +460,7 @@ function EventCard({
         <div className="crew-games-event-card-body">
           {event.featuredGame ? (
             <p className="crew-games-event-card-game">
-              <strong>Game:</strong> {event.featuredGame}
+              <strong>{t("event.game")}</strong> {event.featuredGame}
             </p>
           ) : null}
           {event.description ? (
@@ -466,7 +468,7 @@ function EventCard({
           ) : null}
           {event.highlights ? (
             <p className="crew-games-event-card-highlights">
-              <strong>Highlights:</strong> {event.highlights}
+              <strong>{t("event.highlights")}</strong> {event.highlights}
             </p>
           ) : null}
 
@@ -480,7 +482,7 @@ function EventCard({
                 className="button button-subtle"
               >
                 <ExternalLink size={14} aria-hidden="true" />
-                Join Google Meet
+                {t("links.joinMeet")}
               </a>
             ) : null}
             {event.kahootLink ? (
@@ -491,7 +493,7 @@ function EventCard({
                 className="button button-subtle"
               >
                 <ExternalLink size={14} aria-hidden="true" />
-                Open Kahoot
+                {t("links.openKahoot")}
               </a>
             ) : null}
             {event.altGameLink ? (
@@ -503,23 +505,23 @@ function EventCard({
               >
                 <ExternalLink size={14} aria-hidden="true" />
                 {event.featuredGame
-                  ? `Open ${event.featuredGame.slice(0, 30)}`
-                  : "Open Game"}
+                  ? t("event.openFeaturedGame", { game: event.featuredGame.slice(0, 30) })
+                  : t("links.openGame")}
               </a>
             ) : null}
           </div>
 
           <div className="crew-games-event-card-actions">
             <button type="button" className="button" onClick={onViewDetail}>
-              View Results
+              {t("event.viewResults")}
             </button>
             {isAdmin ? (
               <>
                 <button type="button" className="button button-ghost" onClick={onEdit}>
-                  <Edit2 size={14} aria-hidden="true" /> Edit
+                  <Edit2 size={14} aria-hidden="true" /> {t("event.edit")}
                 </button>
                 <button type="button" className="button button-ghost" onClick={onPostResults}>
-                  <Trophy size={14} aria-hidden="true" /> Results
+                  <Trophy size={14} aria-hidden="true" /> {t("event.results")}
                 </button>
                 <button type="button" className="table-row-action table-row-action-danger" onClick={onDelete}>
                   <Trash2 size={14} aria-hidden="true" />

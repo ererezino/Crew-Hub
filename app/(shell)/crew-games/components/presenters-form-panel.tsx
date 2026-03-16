@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 
 import { useCrewGameEventDetail, useCrewGamesMutations } from "../../../../hooks/use-crew-games";
@@ -49,31 +49,31 @@ export function PresentersFormPanel({
   onCancel
 }: PresentersFormPanelProps) {
   const t = useTranslations("crewGames.presenters");
+  const tCommon = useTranslations("crewGames");
   const tUpload = useTranslations("crewGames.upload");
   const { presenters: existing, isLoading } = useCrewGameEventDetail(eventId);
   const mutations = useCrewGamesMutations();
   const [rows, setRows] = useState<PresenterRow[]>([newPresenterRow()]);
   const [error, setError] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (initialized || isLoading) return;
+    if (initializedRef.current || isLoading) return;
+    initializedRef.current = true;
     if (existing.length > 0) {
-      setRows(
-        existing.map((p) => ({
-          key: p.id,
-          employeeId: p.employeeId,
-          talkTitle: p.talkTitle ?? "",
-          slidePath: p.slidePath ?? "",
-          slideFilename: p.slideFilename ?? "",
-          voteCount: String(p.voteCount),
-          isWinner: p.isWinner,
-          pendingFile: null
-        }))
-      );
+      const mapped = existing.map((p) => ({
+        key: p.id,
+        employeeId: p.employeeId,
+        talkTitle: p.talkTitle ?? "",
+        slidePath: p.slidePath ?? "",
+        slideFilename: p.slideFilename ?? "",
+        voteCount: String(p.voteCount),
+        isWinner: p.isWinner,
+        pendingFile: null
+      }));
+      queueMicrotask(() => setRows(mapped));
     }
-    setInitialized(true);
-  }, [existing, isLoading, initialized]);
+  }, [existing, isLoading]);
 
   const addRow = useCallback(() => {
     setRows((prev) => [...prev, newPresenterRow()]);
@@ -158,7 +158,7 @@ export function PresentersFormPanel({
   };
 
   if (isLoading) {
-    return <p className="crew-games-empty-hint">Loading…</p>;
+    return <p className="crew-games-empty-hint">{tCommon("loading")}</p>;
   }
 
   return (
@@ -167,7 +167,7 @@ export function PresentersFormPanel({
         {rows.map((row, idx) => (
           <div key={row.key} className="crew-games-result-row">
             <div className="crew-games-result-row-header">
-              <span className="form-label">Presenter {idx + 1}</span>
+              <span className="form-label">{t("presenterIdx", { idx: idx + 1 })}</span>
               {rows.length > 1 ? (
                 <button
                   type="button"
@@ -181,7 +181,7 @@ export function PresentersFormPanel({
             </div>
 
             <div className="form-field">
-              <label className="form-label">{t("title") || "Presenter"}</label>
+              <label className="form-label">{t("title")}</label>
               <EmployeePickerField
                 orgId={orgId}
                 value={row.employeeId}
@@ -219,7 +219,7 @@ export function PresentersFormPanel({
                     checked={row.isWinner}
                     onChange={(e) => updateRow(row.key, "isWinner", e.target.checked)}
                   />
-                  Winner
+                  {t("winner")}
                 </label>
               </div>
             </div>
@@ -297,10 +297,10 @@ export function PresentersFormPanel({
 
       <div className="slide-panel-actions">
         <button type="button" className="button" onClick={onCancel}>
-          Cancel
+          {tCommon("cancel")}
         </button>
         <button type="submit" className="button button-primary" disabled={mutations.isSaving}>
-          {mutations.isSaving ? "Saving…" : "Save Presenters"}
+          {mutations.isSaving ? tCommon("saving") : t("savePresenters")}
         </button>
       </div>
     </form>

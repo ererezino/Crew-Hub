@@ -320,7 +320,8 @@ describe("Phase 4 — Core Flow Deep Hardening", () => {
         "payments/[id]/retry/route.ts",
         "payments/batch/route.ts",
         "payments/webhook/route.ts",
-        "people/[id]/finalise-offboarding/route.ts"
+        "people/[id]/finalise-offboarding/route.ts",
+        "crew-games/upload/route.ts"
       ]);
 
       const missingValidation = mutationRoutes.filter((file) => {

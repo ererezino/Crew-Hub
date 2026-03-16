@@ -15,7 +15,7 @@ type EmployeePickerFieldProps = {
 };
 
 export function EmployeePickerField({
-  orgId,
+  orgId: _orgId,
   value,
   onChange,
   placeholder = "Select crew member…"

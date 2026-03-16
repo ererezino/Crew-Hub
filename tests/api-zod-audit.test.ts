@@ -10,7 +10,10 @@ const ZOD_AUDIT_WAIVERS: Record<string, string> = {
   "me/data-export/route.ts": "GET-only endpoint with no user input — reads authenticated user data.",
   "the-crew/route.ts": "GET-only endpoint with no user input — returns visible crew members for the authenticated org.",
   "delegations/route.ts": "Zod validation via createDelegationSchema imported from _helpers.ts.",
-  "people/[id]/finalise-offboarding/route.ts": "No request body — action is determined by URL path param only."
+  "people/[id]/finalise-offboarding/route.ts": "No request body — action is determined by URL path param only.",
+  "crew-games/download/route.ts": "GET with query params, not JSON body.",
+  "crew-games/employees/route.ts": "GET-only endpoint with no user input.",
+  "crew-games/upload/route.ts": "FormData upload, not JSON body."
 };
 
 function collectRouteFiles(directory: string): string[] {

@@ -128,11 +128,11 @@ export function LeaderboardSection({
         >
           {showAll ? (
             <>
-              <ChevronUp size={14} aria-hidden="true" /> Show top 10
+              <ChevronUp size={14} aria-hidden="true" /> {t("showTop10")}
             </>
           ) : (
             <>
-              <ChevronDown size={14} aria-hidden="true" /> Show all ({leaderboard.length})
+              <ChevronDown size={14} aria-hidden="true" /> {t("showAll", { count: leaderboard.length })}
             </>
           )}
         </button>
@@ -169,6 +169,7 @@ type AdjustmentFormProps = {
 
 function AdjustmentForm({ orgId, season, onSaved, onCancel }: AdjustmentFormProps) {
   const t = useTranslations("crewGames.leaderboard");
+  const tCommon = useTranslations("crewGames");
   const mutations = useCrewGamesMutations();
   const [employeeId, setEmployeeId] = useState("");
   const [pointsDelta, setPointsDelta] = useState("");
@@ -241,10 +242,10 @@ function AdjustmentForm({ orgId, season, onSaved, onCancel }: AdjustmentFormProp
 
       <div className="slide-panel-actions">
         <button type="button" className="button" onClick={onCancel}>
-          Cancel
+          {tCommon("cancel")}
         </button>
         <button type="submit" className="button button-primary" disabled={mutations.isSaving}>
-          {mutations.isSaving ? "Saving…" : "Save"}
+          {mutations.isSaving ? tCommon("saving") : t("save")}
         </button>
       </div>
     </form>

@@ -134,7 +134,7 @@ export async function GET(request: Request) {
 
   // Fetch profiles for all employees in the leaderboard
   const employeeIds = [...leaderboardMap.keys()];
-  let profileMap: Record<string, { full_name: string; avatar_url: string | null }> = {};
+  const profileMap: Record<string, { full_name: string; avatar_url: string | null }> = {};
 
   if (employeeIds.length > 0) {
     const { data: profiles } = await supabase

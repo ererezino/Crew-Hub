@@ -5660,6 +5660,12 @@
   "crewGames": {
     "pageTitle": "Jeux d'équipe",
     "pageDescription": "Soirée jeux et soirée présentation — résultats, classements et fun.",
+    "loading": "Chargement…",
+    "eventNotFound": "Événement introuvable.",
+    "cancel": "Annuler",
+    "saving": "Enregistrement…",
+    "deleting": "Suppression…",
+    "delete": "Supprimer",
     "tab": {
       "gamesNight": "Soirée jeux",
       "presentationNight": "Soirée présentation"
@@ -5676,7 +5682,10 @@
       "addAdjustment": "Ajouter un ajustement",
       "pointsDelta": "Points (+/-)",
       "reason": "Raison",
-      "adjustmentSaved": "Ajustement du classement enregistré."
+      "adjustmentSaved": "Ajustement du classement enregistré.",
+      "showTop10": "Afficher le top 10",
+      "showAll": "Afficher tout ({count})",
+      "save": "Enregistrer"
     },
     "event": {
       "upcoming": "À venir",
@@ -5707,7 +5716,16 @@
       "resultsPublished": "Résultats publiés et annonce envoyée.",
       "pastEvents": "Événements passés",
       "nextUp": "Prochain",
-      "latestResults": "Derniers résultats"
+      "latestResults": "Derniers résultats",
+      "upcomingHint": "Passer le statut à À venir annoncera cet événement à toute l'entreprise.",
+      "createEvent": "Créer l'événement",
+      "saveChanges": "Enregistrer les modifications",
+      "game": "Jeu :",
+      "viewResults": "Voir les résultats",
+      "edit": "Modifier",
+      "results": "Résultats",
+      "openFeaturedGame": "Ouvrir {game}",
+      "presenters": "Présentateurs"
     },
     "results": {
       "title": "Résultats",
@@ -5722,7 +5740,9 @@
       "unmapped": "Non identifié",
       "saved": "Résultats enregistrés.",
       "winner": "Gagnant",
-      "noResults": "Aucun résultat publié."
+      "noResults": "Aucun résultat publié.",
+      "playerIdx": "Joueur {idx}",
+      "saveResults": "Enregistrer les résultats"
     },
     "presenters": {
       "title": "Présentateurs",
@@ -5736,7 +5756,10 @@
       "uploadSlides": "Téléverser les diapositives",
       "removeSlides": "Supprimer les diapositives",
       "noPresenters": "Aucun présentateur ajouté.",
-      "saved": "Présentateurs enregistrés."
+      "saved": "Présentateurs enregistrés.",
+      "presenterIdx": "Présentateur {idx}",
+      "savePresenters": "Enregistrer les présentateurs",
+      "slidesLabel": "Diapositives"
     },
     "upload": {
       "eventImage": "Image de l'événement",
