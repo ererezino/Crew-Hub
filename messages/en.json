@@ -140,6 +140,7 @@
     "signatures": "Signatures",
     "rolesAccess": "Roles & access",
     "auditLog": "Audit log",
+    "crewGames": "Crew Games",
     "expenseRouting": "Expense Routing",
     "myProfile": "My Profile",
     "settings": "Settings",
@@ -166,6 +167,7 @@
       "signatures": "Request, sign, and track documents with signer timelines",
       "rolesAccess": "Default role permissions and per-person overrides",
       "auditLog": "Who did what, when, and to which record",
+      "crewGames": "Games Night and Presentation Night — results, leaderboards, and fun",
       "expenseRouting": "Configure additional approval routing rules for expenses",
       "settings": "Manage your profile, preferences, and security",
       "support": "Get help and support"
@@ -5663,6 +5665,102 @@
       "deactivateDescription": "This rule will stop matching new expenses. Existing expenses already routed by this rule will not be affected.",
       "deactivateConfirm": "Deactivate",
       "reactivate": "Reactivate"
+    }
+  },
+  "crewGames": {
+    "pageTitle": "Crew Games",
+    "pageDescription": "Games Night and Presentation Night — results, leaderboards, and fun.",
+    "tab": {
+      "gamesNight": "Games Night",
+      "presentationNight": "Presentation Night"
+    },
+    "leaderboard": {
+      "title": "YTD Leaderboard",
+      "rank": "Rank",
+      "player": "Player",
+      "points": "Points",
+      "gamesPlayed": "Played",
+      "wins": "Wins",
+      "empty": "No leaderboard data yet. Results from completed Games Nights will appear here.",
+      "adjustments": "Leaderboard Adjustments",
+      "addAdjustment": "Add adjustment",
+      "pointsDelta": "Points (+/-)",
+      "reason": "Reason",
+      "adjustmentSaved": "Leaderboard adjustment saved."
+    },
+    "event": {
+      "upcoming": "Upcoming",
+      "completed": "Completed",
+      "draft": "Draft",
+      "createGamesNight": "New Games Night",
+      "createPresentationNight": "New Presentation Night",
+      "editEvent": "Edit Event",
+      "deleteEvent": "Delete Event",
+      "deleteConfirmTitle": "Delete Event",
+      "deleteConfirmDescription": "This will permanently delete this event and all associated results. This cannot be undone.",
+      "title": "Title",
+      "date": "Date",
+      "status": "Status",
+      "description": "Description",
+      "meetLink": "Google Meet Link",
+      "kahootLink": "Kahoot Link",
+      "altGameLink": "Alternate Game Link",
+      "featuredGame": "Featured Game",
+      "highlights": "Highlights & Moments",
+      "noEvents": "No events yet",
+      "noEventsDescription": "Games Nights and Presentation Nights will appear here once created.",
+      "noPastEvents": "No past events yet.",
+      "created": "Event created.",
+      "updated": "Event updated.",
+      "deleted": "Event deleted.",
+      "published": "Event published and announcement sent.",
+      "resultsPublished": "Results published and announcement sent.",
+      "pastEvents": "Past Events",
+      "nextUp": "Next Up",
+      "latestResults": "Latest Results"
+    },
+    "results": {
+      "title": "Results",
+      "postResults": "Post Results",
+      "editResults": "Edit Results",
+      "nickname": "Nickname",
+      "player": "Player",
+      "score": "Score",
+      "placement": "Place",
+      "points": "Points",
+      "addRow": "Add player",
+      "unmapped": "Not identified",
+      "saved": "Results saved.",
+      "winner": "Winner",
+      "noResults": "No results posted yet."
+    },
+    "presenters": {
+      "title": "Presenters",
+      "addPresenter": "Add presenter",
+      "editPresenters": "Edit Presenters",
+      "talkTitle": "Talk Title",
+      "votes": "Votes",
+      "winner": "Winner",
+      "slides": "Slides",
+      "downloadSlides": "Download slides",
+      "uploadSlides": "Upload slides",
+      "removeSlides": "Remove slides",
+      "noPresenters": "No presenters added yet.",
+      "saved": "Presenters saved."
+    },
+    "upload": {
+      "eventImage": "Event Image",
+      "uploadImage": "Upload image",
+      "removeImage": "Remove image",
+      "imageHint": "PNG, JPEG, or WebP. Max 5 MB.",
+      "slidesHint": "PDF or PPTX. Max 25 MB.",
+      "fileTooLarge": "File is too large.",
+      "invalidFileType": "This file type is not allowed."
+    },
+    "links": {
+      "joinMeet": "Join Google Meet",
+      "openKahoot": "Open Kahoot",
+      "openGame": "Open Game"
     }
   }
 }

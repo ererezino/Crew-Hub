@@ -26,7 +26,9 @@ export const NOTIFICATION_TYPES = [
   "document_expiry_warning",
   "compliance_policy_acknowledgment",
   "schedule_published",
-  "status_change"
+  "status_change",
+  "crew_games_event",
+  "crew_games_results"
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

@@ -84,6 +84,7 @@ const DEFAULT_NAV_ROLE_OVERRIDES: Readonly<Record<string, readonly UserRole[]>> 
   "/approvals": APPROVAL_ROLES,
   "/people": ["HR_ADMIN", "SUPER_ADMIN"],
   "/the-crew": ALL_ROLES,
+  "/crew-games": ALL_ROLES,
   "/scheduling": SCHEDULING_ROLES,
   "/scheduling/manage": SCHEDULING_MANAGE_ROLES,
   "/onboarding": MANAGE_GROUP_ROLES,

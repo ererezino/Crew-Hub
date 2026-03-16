@@ -155,7 +155,8 @@ export type ModuleId =
   | "signatures"
   | "surveys"
   | "notifications"
-  | "the_crew";
+  | "the_crew"
+  | "crew_games";
 
 export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   // Core pilot modules — LIVE
@@ -195,7 +196,10 @@ export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   analytics: "ADMIN_ONLY",
 
   // Social team page
-  the_crew: "LIVE"
+  the_crew: "LIVE",
+
+  // Culture & games
+  crew_games: "LIVE"
 };
 
 // ---------------------------------------------------------------------------

@@ -128,6 +128,7 @@
     "learning": "Formation",
     "approvals": "Approbations",
     "theCrew": "L'équipe",
+    "crewGames": "Jeux d'équipe",
     "people": "Personnel",
     "scheduling": "Planification",
     "onboarding": "Intégration",
@@ -166,6 +167,7 @@
       "signatures": "Demandez, signez et suivez les documents avec chronologie des signataires",
       "rolesAccess": "Permissions par défaut des rôles et dérogations individuelles",
       "auditLog": "Qui a fait quoi, quand et sur quel enregistrement",
+      "crewGames": "Soirées jeux et présentations — résultats, classements et moments fun",
       "expenseRouting": "Configurer les règles de routage d'approbation pour les dépenses",
       "settings": "Gérez votre profil, vos préférences et votre sécurité",
       "support": "Obtenir de l'aide et du support"
@@ -5653,6 +5655,102 @@
       "deactivateDescription": "Cette règle ne correspondra plus aux nouvelles dépenses. Les dépenses déjà routées par cette règle ne seront pas affectées.",
       "deactivateConfirm": "Désactiver",
       "reactivate": "Réactiver"
+    }
+  },
+  "crewGames": {
+    "pageTitle": "Jeux d'équipe",
+    "pageDescription": "Soirée jeux et soirée présentation — résultats, classements et fun.",
+    "tab": {
+      "gamesNight": "Soirée jeux",
+      "presentationNight": "Soirée présentation"
+    },
+    "leaderboard": {
+      "title": "Classement de l'année",
+      "rank": "Rang",
+      "player": "Joueur",
+      "points": "Points",
+      "gamesPlayed": "Joués",
+      "wins": "Victoires",
+      "empty": "Aucune donnée de classement. Les résultats des soirées jeux complétées apparaîtront ici.",
+      "adjustments": "Ajustements du classement",
+      "addAdjustment": "Ajouter un ajustement",
+      "pointsDelta": "Points (+/-)",
+      "reason": "Raison",
+      "adjustmentSaved": "Ajustement du classement enregistré."
+    },
+    "event": {
+      "upcoming": "À venir",
+      "completed": "Terminé",
+      "draft": "Brouillon",
+      "createGamesNight": "Nouvelle soirée jeux",
+      "createPresentationNight": "Nouvelle soirée présentation",
+      "editEvent": "Modifier l'événement",
+      "deleteEvent": "Supprimer l'événement",
+      "deleteConfirmTitle": "Supprimer l'événement",
+      "deleteConfirmDescription": "Cela supprimera définitivement cet événement et tous les résultats associés. Cette action est irréversible.",
+      "title": "Titre",
+      "date": "Date",
+      "status": "Statut",
+      "description": "Description",
+      "meetLink": "Lien Google Meet",
+      "kahootLink": "Lien Kahoot",
+      "altGameLink": "Lien de jeu alternatif",
+      "featuredGame": "Jeu en vedette",
+      "highlights": "Moments forts",
+      "noEvents": "Aucun événement",
+      "noEventsDescription": "Les soirées jeux et soirées présentation apparaîtront ici une fois créées.",
+      "noPastEvents": "Aucun événement passé.",
+      "created": "Événement créé.",
+      "updated": "Événement mis à jour.",
+      "deleted": "Événement supprimé.",
+      "published": "Événement publié et annonce envoyée.",
+      "resultsPublished": "Résultats publiés et annonce envoyée.",
+      "pastEvents": "Événements passés",
+      "nextUp": "Prochain",
+      "latestResults": "Derniers résultats"
+    },
+    "results": {
+      "title": "Résultats",
+      "postResults": "Publier les résultats",
+      "editResults": "Modifier les résultats",
+      "nickname": "Pseudonyme",
+      "player": "Joueur",
+      "score": "Score",
+      "placement": "Place",
+      "points": "Points",
+      "addRow": "Ajouter un joueur",
+      "unmapped": "Non identifié",
+      "saved": "Résultats enregistrés.",
+      "winner": "Gagnant",
+      "noResults": "Aucun résultat publié."
+    },
+    "presenters": {
+      "title": "Présentateurs",
+      "addPresenter": "Ajouter un présentateur",
+      "editPresenters": "Modifier les présentateurs",
+      "talkTitle": "Titre de la présentation",
+      "votes": "Votes",
+      "winner": "Gagnant",
+      "slides": "Diapositives",
+      "downloadSlides": "Télécharger les diapositives",
+      "uploadSlides": "Téléverser les diapositives",
+      "removeSlides": "Supprimer les diapositives",
+      "noPresenters": "Aucun présentateur ajouté.",
+      "saved": "Présentateurs enregistrés."
+    },
+    "upload": {
+      "eventImage": "Image de l'événement",
+      "uploadImage": "Téléverser une image",
+      "removeImage": "Supprimer l'image",
+      "imageHint": "PNG, JPEG ou WebP. Max 5 Mo.",
+      "slidesHint": "PDF ou PPTX. Max 25 Mo.",
+      "fileTooLarge": "Le fichier est trop volumineux.",
+      "invalidFileType": "Ce type de fichier n'est pas autorisé."
+    },
+    "links": {
+      "joinMeet": "Rejoindre Google Meet",
+      "openKahoot": "Ouvrir Kahoot",
+      "openGame": "Ouvrir le jeu"
     }
   }
 }

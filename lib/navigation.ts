@@ -73,6 +73,15 @@ export const NAV_GROUPS: NavGroup[] = [
         description: "Meet your teammates — photos, bios, and what makes everyone tick",
         shortcut: "G W",
         moduleId: "the_crew"
+      },
+      {
+        label: "Crew Games",
+        labelKey: "crewGames",
+        href: "/crew-games",
+        icon: "Gamepad2",
+        description: "Games Night and Presentation Night — results, leaderboards, and fun",
+        shortcut: "G G",
+        moduleId: "crew_games"
       }
     ]
   },
