@@ -13,12 +13,10 @@ import {
   Trash2
 } from "lucide-react";
 
-import { EmptyState } from "../../../../components/shared/empty-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import {
   useCrewGameEvents,
-  useCrewGamesLeaderboard,
   useCrewGamesMutations
 } from "../../../../hooks/use-crew-games";
 import type { CrewNightEvent } from "../../../../types/crew-games";
@@ -49,10 +47,30 @@ function statusTone(status: string) {
   return "draft" as const;
 }
 
+function eventImageUrl(path: string): string {
+  return `/api/v1/crew-games/download?path=${encodeURIComponent(path)}&inline=true`;
+}
+
+/** Group events by year from eventDate, returning entries sorted descending by year. */
+function groupByYear(events: CrewNightEvent[]): [string, CrewNightEvent[]][] {
+  const map = new Map<string, CrewNightEvent[]>();
+  for (const ev of events) {
+    const year = ev.eventDate.slice(0, 4);
+    const arr = map.get(year);
+    if (arr) {
+      arr.push(ev);
+    } else {
+      map.set(year, [ev]);
+    }
+  }
+  return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+}
+
+const EVENTS_PER_GROUP = 8;
+
 export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabProps) {
   const t = useTranslations("crewGames");
   const { events, isLoading, refresh } = useCrewGameEvents("games_night");
-  const { leaderboard, adjustments, season, refresh: refreshLeaderboard } = useCrewGamesLeaderboard();
   const mutations = useCrewGamesMutations();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -62,6 +80,7 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({});
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -84,6 +103,11 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
 
   const heroEvent = upcomingEvents[0] ?? completedEvents[0] ?? null;
 
+  const completedByYear = useMemo(
+    () => groupByYear(completedEvents),
+    [completedEvents]
+  );
+
   const handleEventCreated = useCallback(() => {
     setIsCreateOpen(false);
     refresh();
@@ -93,16 +117,14 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
   const handleEventUpdated = useCallback(() => {
     setEditingEvent(null);
     refresh();
-    refreshLeaderboard();
     showToast(t("event.updated"));
-  }, [refresh, refreshLeaderboard, showToast, t]);
+  }, [refresh, showToast, t]);
 
   const handleResultsSaved = useCallback(() => {
     setResultsEventId(null);
     refresh();
-    refreshLeaderboard();
     showToast(t("results.saved"));
-  }, [refresh, refreshLeaderboard, showToast, t]);
+  }, [refresh, showToast, t]);
 
   const handleDeleteEvent = useCallback(
     async (id: string) => {
@@ -110,14 +132,17 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
         await mutations.deleteEvent(id);
         setDeleteConfirmId(null);
         refresh();
-        refreshLeaderboard();
         showToast(t("event.deleted"));
       } catch {
         showToast("Failed to delete event.");
       }
     },
-    [mutations, refresh, refreshLeaderboard, showToast, t]
+    [mutations, refresh, showToast, t]
   );
+
+  const toggleYearExpanded = useCallback((year: string) => {
+    setExpandedYears((prev) => ({ ...prev, [year]: !prev[year] }));
+  }, []);
 
   if (isLoading) {
     return (
@@ -156,7 +181,26 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
 
       {/* Hero section */}
       {heroEvent ? (
-        <section className="crew-games-hero" aria-label={heroEvent.title}>
+        <section
+          className="crew-games-hero"
+          aria-label={heroEvent.title}
+          style={
+            heroEvent.eventImagePath
+              ? {
+                  position: "relative" as const,
+                  overflow: "hidden" as const
+                }
+              : undefined
+          }
+        >
+          {heroEvent.eventImagePath ? (
+            <div
+              className="crew-games-hero-image-bg"
+              style={{
+                backgroundImage: `url(${eventImageUrl(heroEvent.eventImagePath)})`
+              }}
+            />
+          ) : null}
           <div className="crew-games-hero-content">
             <div className="crew-games-hero-meta">
               <StatusBadge tone={statusTone(heroEvent.status)}>
@@ -169,7 +213,7 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
             </div>
             <h2 className="crew-games-hero-title">{heroEvent.title}</h2>
             {heroEvent.featuredGame ? (
-              <p className="crew-games-hero-game">{heroEvent.featuredGame}</p>
+              <span className="crew-games-hero-game">{heroEvent.featuredGame}</span>
             ) : null}
             {heroEvent.description ? (
               <p className="crew-games-hero-description">{heroEvent.description}</p>
@@ -243,15 +287,8 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
 
       {/* Leaderboard */}
       <LeaderboardSection
-        leaderboard={leaderboard}
-        adjustments={adjustments}
-        season={season}
         isAdmin={isAdmin}
         orgId={orgId}
-        onAdjustmentAdded={() => {
-          refreshLeaderboard();
-          showToast(t("leaderboard.adjustmentSaved"));
-        }}
       />
 
       {/* Draft events (admin only) */}
@@ -278,39 +315,73 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
         </section>
       ) : null}
 
-      {/* Past events */}
-      {completedEvents.length > 0 ? (
+      {/* Past events — grouped by year */}
+      {completedByYear.length > 0 ? (
         <section className="crew-games-section">
           <h3 className="section-title">{t("event.pastEvents")}</h3>
-          <div className="crew-games-event-list">
-            {completedEvents.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                isAdmin={isAdmin}
-                isExpanded={expandedEventId === event.id}
-                onToggleExpand={() =>
-                  setExpandedEventId(expandedEventId === event.id ? null : event.id)
-                }
-                onEdit={() => setEditingEvent(event)}
-                onPostResults={() => setResultsEventId(event.id)}
-                onDelete={() => setDeleteConfirmId(event.id)}
-                onViewDetail={() => setDetailEventId(event.id)}
-              />
-            ))}
-          </div>
+          {completedByYear.map(([year, yearEvents]) => {
+            const isYearExpanded = expandedYears[year] ?? false;
+            const visibleEvents = isYearExpanded
+              ? yearEvents
+              : yearEvents.slice(0, EVENTS_PER_GROUP);
+            const hasMore = yearEvents.length > EVENTS_PER_GROUP && !isYearExpanded;
+
+            return (
+              <div key={year}>
+                <div className="crew-games-archive-year">{year}</div>
+                <div className="crew-games-event-list">
+                  {visibleEvents.map((event) => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      isAdmin={isAdmin}
+                      isExpanded={expandedEventId === event.id}
+                      onToggleExpand={() =>
+                        setExpandedEventId(
+                          expandedEventId === event.id ? null : event.id
+                        )
+                      }
+                      onEdit={() => setEditingEvent(event)}
+                      onPostResults={() => setResultsEventId(event.id)}
+                      onDelete={() => setDeleteConfirmId(event.id)}
+                      onViewDetail={() => setDetailEventId(event.id)}
+                    />
+                  ))}
+                </div>
+                {hasMore ? (
+                  <button
+                    type="button"
+                    className="button button-ghost crew-games-show-all"
+                    onClick={() => toggleYearExpanded(year)}
+                  >
+                    <ChevronDown size={14} aria-hidden="true" />
+                    {t("loadMore")}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
         </section>
       ) : null}
 
       {/* Empty state */}
       {events.length === 0 && !heroEvent ? (
-        <EmptyState
-          title={t("event.noEvents")}
-          description={t("event.noEventsDescription")}
-          icon={<Trophy size={32} aria-hidden="true" />}
-          ctaLabel={isAdmin ? t("event.createGamesNight") : undefined}
-          onCtaClick={isAdmin ? () => setIsCreateOpen(true) : undefined}
-        />
+        <div className="crew-games-empty-state">
+          <Trophy size={32} aria-hidden="true" className="crew-games-empty-state-icon" />
+          <p className="crew-games-empty-state-title">{t("noEventsYet")}</p>
+          <p className="crew-games-empty-state-description">{t("noEventsDesc")}</p>
+          {isAdmin ? (
+            <button
+              type="button"
+              className="button button-primary"
+              style={{ marginTop: "var(--space-4)" }}
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus size={16} aria-hidden="true" />
+              {t("event.createGamesNight")}
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {/* Delete confirmation */}
@@ -441,6 +512,13 @@ function EventCard({
         aria-expanded={isExpanded}
       >
         <div className="crew-games-event-card-info">
+          {event.eventImagePath ? (
+            <img
+              src={eventImageUrl(event.eventImagePath)}
+              alt=""
+              className="crew-games-event-card-thumb"
+            />
+          ) : null}
           <StatusBadge tone={statusTone(event.status)}>
             {t(`event.${event.status}`)}
           </StatusBadge>

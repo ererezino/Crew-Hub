@@ -56,9 +56,16 @@ export async function GET(request: Request) {
   const segments = filePath.split("/");
   const filename = segments[segments.length - 1] ?? "download";
 
+  const inline = url.searchParams.get("inline") === "true";
+
   const headers = new Headers();
   headers.set("Content-Type", data.type || "application/octet-stream");
-  headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+  headers.set(
+    "Content-Disposition",
+    inline
+      ? `inline; filename="${filename}"`
+      : `attachment; filename="${filename}"`
+  );
 
   return new NextResponse(data, { status: 200, headers });
 }

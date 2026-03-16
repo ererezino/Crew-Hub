@@ -5780,6 +5780,15 @@
       "fileTooLarge": "File is too large.",
       "invalidFileType": "This file type is not allowed."
     },
+    "eventImage": "Event image",
+    "uploadImage": "Drop an image or click to upload",
+    "removeImage": "Remove image",
+    "loadMore": "Load more",
+    "season": "Season",
+    "noLeaderboardData": "No leaderboard data yet.",
+    "noEventsYet": "No events yet",
+    "noEventsDesc": "Events will appear here once created.",
+    "backdatedHint": "Backdated event — will appear in the archive.",
     "links": {
       "joinMeet": "Join Google Meet",
       "openKahoot": "Open Kahoot",

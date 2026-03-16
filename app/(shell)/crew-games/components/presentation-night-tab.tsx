@@ -14,7 +14,6 @@ import {
   Trophy
 } from "lucide-react";
 
-import { EmptyState } from "../../../../components/shared/empty-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import {
@@ -48,6 +47,27 @@ function statusTone(status: string) {
   return "draft" as const;
 }
 
+function eventImageUrl(path: string): string {
+  return `/api/v1/crew-games/download?path=${encodeURIComponent(path)}&inline=true`;
+}
+
+/** Group events by year from eventDate, returning entries sorted descending by year. */
+function groupByYear(events: CrewNightEvent[]): [string, CrewNightEvent[]][] {
+  const map = new Map<string, CrewNightEvent[]>();
+  for (const ev of events) {
+    const year = ev.eventDate.slice(0, 4);
+    const arr = map.get(year);
+    if (arr) {
+      arr.push(ev);
+    } else {
+      map.set(year, [ev]);
+    }
+  }
+  return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+}
+
+const EVENTS_PER_GROUP = 8;
+
 export function PresentationNightTab({ orgId, currentUserId, isAdmin }: PresentationNightTabProps) {
   const t = useTranslations("crewGames");
   const { events, isLoading, refresh } = useCrewGameEvents("presentation_night");
@@ -59,6 +79,7 @@ export function PresentationNightTab({ orgId, currentUserId, isAdmin }: Presenta
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({});
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -79,6 +100,11 @@ export function PresentationNightTab({ orgId, currentUserId, isAdmin }: Presenta
   );
 
   const heroEvent = upcomingEvents[0] ?? completedEvents[0] ?? null;
+
+  const completedByYear = useMemo(
+    () => groupByYear(completedEvents),
+    [completedEvents]
+  );
 
   const handleEventCreated = useCallback(() => {
     setIsCreateOpen(false);
@@ -111,6 +137,10 @@ export function PresentationNightTab({ orgId, currentUserId, isAdmin }: Presenta
     },
     [mutations, refresh, showToast, t]
   );
+
+  const toggleYearExpanded = useCallback((year: string) => {
+    setExpandedYears((prev) => ({ ...prev, [year]: !prev[year] }));
+  }, []);
 
   if (isLoading) {
     return (
@@ -179,38 +209,72 @@ export function PresentationNightTab({ orgId, currentUserId, isAdmin }: Presenta
         </section>
       ) : null}
 
-      {/* Past events */}
-      {completedEvents.length > 0 ? (
+      {/* Past events — grouped by year */}
+      {completedByYear.length > 0 ? (
         <section className="crew-games-section">
           <h3 className="section-title">{t("event.pastEvents")}</h3>
-          <div className="crew-games-event-list">
-            {completedEvents.map((event) => (
-              <PresentationEventCard
-                key={event.id}
-                event={event}
-                isAdmin={isAdmin}
-                isExpanded={expandedEventId === event.id}
-                onToggleExpand={() =>
-                  setExpandedEventId(expandedEventId === event.id ? null : event.id)
-                }
-                onEdit={() => setEditingEvent(event)}
-                onEditPresenters={() => setPresentersEventId(event.id)}
-                onDelete={() => setDeleteConfirmId(event.id)}
-              />
-            ))}
-          </div>
+          {completedByYear.map(([year, yearEvents]) => {
+            const isYearExpanded = expandedYears[year] ?? false;
+            const visibleEvents = isYearExpanded
+              ? yearEvents
+              : yearEvents.slice(0, EVENTS_PER_GROUP);
+            const hasMore = yearEvents.length > EVENTS_PER_GROUP && !isYearExpanded;
+
+            return (
+              <div key={year}>
+                <div className="crew-games-archive-year">{year}</div>
+                <div className="crew-games-event-list">
+                  {visibleEvents.map((event) => (
+                    <PresentationEventCard
+                      key={event.id}
+                      event={event}
+                      isAdmin={isAdmin}
+                      isExpanded={expandedEventId === event.id}
+                      onToggleExpand={() =>
+                        setExpandedEventId(
+                          expandedEventId === event.id ? null : event.id
+                        )
+                      }
+                      onEdit={() => setEditingEvent(event)}
+                      onEditPresenters={() => setPresentersEventId(event.id)}
+                      onDelete={() => setDeleteConfirmId(event.id)}
+                    />
+                  ))}
+                </div>
+                {hasMore ? (
+                  <button
+                    type="button"
+                    className="button button-ghost crew-games-show-all"
+                    onClick={() => toggleYearExpanded(year)}
+                  >
+                    <ChevronDown size={14} aria-hidden="true" />
+                    {t("loadMore")}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
         </section>
       ) : null}
 
       {/* Empty state */}
       {events.length === 0 ? (
-        <EmptyState
-          title={t("event.noEvents")}
-          description={t("event.noEventsDescription")}
-          icon={<Mic2 size={32} aria-hidden="true" />}
-          ctaLabel={isAdmin ? t("event.createPresentationNight") : undefined}
-          onCtaClick={isAdmin ? () => setIsCreateOpen(true) : undefined}
-        />
+        <div className="crew-games-empty-state">
+          <Mic2 size={32} aria-hidden="true" className="crew-games-empty-state-icon" />
+          <p className="crew-games-empty-state-title">{t("noEventsYet")}</p>
+          <p className="crew-games-empty-state-description">{t("noEventsDesc")}</p>
+          {isAdmin ? (
+            <button
+              type="button"
+              className="button button-primary"
+              style={{ marginTop: "var(--space-4)" }}
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus size={16} aria-hidden="true" />
+              {t("event.createPresentationNight")}
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {/* Delete confirmation */}
@@ -310,7 +374,23 @@ function PresentationHero({
   const winner = presenters.find((p) => p.isWinner);
 
   return (
-    <section className="crew-games-hero crew-games-hero-presentation" aria-label={event.title}>
+    <section
+      className="crew-games-hero crew-games-hero-presentation"
+      aria-label={event.title}
+      style={
+        event.eventImagePath
+          ? { position: "relative" as const, overflow: "hidden" as const }
+          : undefined
+      }
+    >
+      {event.eventImagePath ? (
+        <div
+          className="crew-games-hero-image-bg"
+          style={{
+            backgroundImage: `url(${eventImageUrl(event.eventImagePath)})`
+          }}
+        />
+      ) : null}
       <div className="crew-games-hero-content">
         <div className="crew-games-hero-meta">
           <StatusBadge tone={statusTone(event.status)}>
@@ -330,7 +410,7 @@ function PresentationHero({
         {winner ? (
           <div className="crew-games-winner-showcase">
             <Trophy size={20} aria-hidden="true" className="crew-games-winner-icon" />
-            <div>
+            <div className="crew-games-winner-info">
               <p className="crew-games-winner-name">{winner.employeeName}</p>
               {winner.talkTitle ? (
                 <p className="crew-games-winner-talk">&ldquo;{winner.talkTitle}&rdquo;</p>
@@ -405,6 +485,13 @@ function PresentationEventCard({
         aria-expanded={isExpanded}
       >
         <div className="crew-games-event-card-info">
+          {event.eventImagePath ? (
+            <img
+              src={eventImageUrl(event.eventImagePath)}
+              alt=""
+              className="crew-games-event-card-thumb"
+            />
+          ) : null}
           <StatusBadge tone={statusTone(event.status)}>
             {t(`event.${event.status}`)}
           </StatusBadge>
