@@ -19,8 +19,6 @@ export type SessionProfile = {
   full_name: string;
   avatar_url: string | null;
   department: string | null;
-  phone: string | null;
-  notification_preferences: Record<string, unknown> | null;
   roles: UserRole[];
   manager_id: string | null;
   team_lead_id: string | null;
@@ -29,23 +27,13 @@ export type SessionProfile = {
   employment_type: string | null;
   status: "active" | "inactive" | "onboarding" | "offboarding";
   preferred_locale: string;
-  bio: string | null;
-  pronouns: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_phone: string | null;
-  emergency_contact_relationship: string | null;
-  social_linkedin: string | null;
-  social_twitter: string | null;
-  social_instagram: string | null;
-  social_github: string | null;
-  social_website: string | null;
-  favorite_music: string | null;
-  favorite_books: string | null;
-  favorite_sports: string | null;
 };
+
+export type SessionStatus = "ok" | "no_profile" | "inactive" | "mfa_required" | "mfa_setup_required";
 
 export type AuthenticatedSession = {
   userId: string;
+  sessionStatus: SessionStatus;
   profile: SessionProfile | null;
   org: SessionOrg | null;
 };
@@ -113,13 +101,11 @@ function cloneSession(
 
   return {
     userId: session.userId,
+    sessionStatus: session.sessionStatus,
     profile: session.profile
       ? {
           ...session.profile,
-          roles: [...session.profile.roles],
-          notification_preferences: session.profile.notification_preferences
-            ? { ...session.profile.notification_preferences }
-            : null
+          roles: [...session.profile.roles]
         }
       : null,
     org: session.org
@@ -168,14 +154,16 @@ function hasVerifiedTotpFactor(
   );
 }
 
-async function isMfaVerified(
+type MfaCheckResult = "verified" | "setup_required" | "verification_required";
+
+async function checkMfaStatus(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   user: { id: string; factors?: { factor_type?: string; status?: string }[] }
-): Promise<boolean> {
+): Promise<MfaCheckResult> {
   const cachedVerification = getCachedMfaVerification(user.id);
 
-  if (cachedVerification !== null) {
-    return cachedVerification;
+  if (cachedVerification === true) {
+    return "verified";
   }
 
   let hasVerifiedTotp = hasVerifiedTotpFactor(user.factors);
@@ -185,7 +173,7 @@ async function isMfaVerified(
 
     if (factorsError) {
       setCachedMfaVerification(user.id, false);
-      return false;
+      return "setup_required";
     }
 
     hasVerifiedTotp = hasVerifiedTotpFactor(factorsData?.all);
@@ -193,7 +181,7 @@ async function isMfaVerified(
 
   if (!hasVerifiedTotp) {
     setCachedMfaVerification(user.id, false);
-    return false;
+    return "setup_required";
   }
 
   const { data: aalData, error: aalError } =
@@ -201,7 +189,7 @@ async function isMfaVerified(
 
   const isVerified = !aalError && aalData?.currentLevel === "aal2";
   setCachedMfaVerification(user.id, isVerified);
-  return isVerified;
+  return isVerified ? "verified" : "verification_required";
 }
 
 const getAuthenticatedSessionInternal = cache(
@@ -230,27 +218,45 @@ const getAuthenticatedSessionInternal = cache(
       return cachedSession;
     }
 
-    if (requireMfa) {
-      const mfaVerified = await isMfaVerified(supabase, user);
-
-      if (!mfaVerified) {
-        writeSessionCache(sessionCacheKey, null);
-        return null;
-      }
-    }
-
-    const { data: profileData, error: profileError } = await supabase
+    // Run MFA check and profile fetch in parallel — they are independent after getUser().
+    // On happy path (99%+), this saves one full RTT (~200ms).
+    // On MFA failure, the profile fetch was wasted work — acceptable trade-off.
+    const profilePromise = supabase
       .from("profiles")
       .select(
-        "id, org_id, email, full_name, avatar_url, department, phone, notification_preferences, roles, manager_id, team_lead_id, country_code, start_date, employment_type, status, preferred_locale, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_website, favorite_music, favorite_books, favorite_sports"
+        "id, org_id, email, full_name, avatar_url, department, roles, manager_id, team_lead_id, country_code, start_date, employment_type, status, preferred_locale"
       )
       .eq("id", user.id)
       .is("deleted_at", null)
       .single();
 
-    if (profileError || !profileData) {
-      const unresolvedProfileSession = {
+    const mfaPromise = requireMfa
+      ? checkMfaStatus(supabase, user)
+      : Promise.resolve("verified" as MfaCheckResult);
+
+    const [{ data: profileData, error: profileError }, mfaResult] = await Promise.all([
+      profilePromise,
+      mfaPromise
+    ]);
+
+    // Evaluate MFA result first — if MFA fails, skip profile processing
+    if (requireMfa && mfaResult !== "verified") {
+      const mfaSessionStatus: SessionStatus =
+        mfaResult === "setup_required" ? "mfa_setup_required" : "mfa_required";
+      const mfaFailedSession: AuthenticatedSession = {
         userId: user.id,
+        sessionStatus: mfaSessionStatus,
+        profile: null,
+        org: null
+      };
+      writeSessionCache(sessionCacheKey, mfaFailedSession);
+      return mfaFailedSession;
+    }
+
+    if (profileError || !profileData) {
+      const unresolvedProfileSession: AuthenticatedSession = {
+        userId: user.id,
+        sessionStatus: "no_profile",
         profile: null,
         org: null
       };
@@ -261,8 +267,14 @@ const getAuthenticatedSessionInternal = cache(
     const roles = normalizeUserRoles(profileData.roles);
 
     if (profileData.status === "inactive") {
-      writeSessionCache(sessionCacheKey, null);
-      return null;
+      const inactiveSession: AuthenticatedSession = {
+        userId: user.id,
+        sessionStatus: "inactive",
+        profile: null,
+        org: null
+      };
+      writeSessionCache(sessionCacheKey, inactiveSession);
+      return inactiveSession;
     }
 
     const profile: SessionProfile = {
@@ -272,8 +284,6 @@ const getAuthenticatedSessionInternal = cache(
       full_name: profileData.full_name,
       avatar_url: profileData.avatar_url,
       department: profileData.department,
-      phone: profileData.phone,
-      notification_preferences: profileData.notification_preferences,
       roles,
       manager_id: profileData.manager_id,
       team_lead_id: profileData.team_lead_id ?? null,
@@ -281,25 +291,13 @@ const getAuthenticatedSessionInternal = cache(
       start_date: profileData.start_date,
       employment_type: profileData.employment_type,
       status: profileData.status,
-      preferred_locale: profileData.preferred_locale ?? "en",
-      bio: profileData.bio ?? null,
-      pronouns: profileData.pronouns ?? null,
-      emergency_contact_name: profileData.emergency_contact_name ?? null,
-      emergency_contact_phone: profileData.emergency_contact_phone ?? null,
-      emergency_contact_relationship: profileData.emergency_contact_relationship ?? null,
-      social_linkedin: profileData.social_linkedin ?? null,
-      social_twitter: profileData.social_twitter ?? null,
-      social_instagram: profileData.social_instagram ?? null,
-      social_github: profileData.social_github ?? null,
-      social_website: profileData.social_website ?? null,
-      favorite_music: profileData.favorite_music ?? null,
-      favorite_books: profileData.favorite_books ?? null,
-      favorite_sports: profileData.favorite_sports ?? null
+      preferred_locale: profileData.preferred_locale ?? "en"
     };
 
     if (!includeOrg) {
-      const sessionWithoutOrg = {
+      const sessionWithoutOrg: AuthenticatedSession = {
         userId: user.id,
+        sessionStatus: "ok",
         profile,
         org: null
       };
@@ -314,8 +312,9 @@ const getAuthenticatedSessionInternal = cache(
       .single();
 
     if (orgError || !orgData) {
-      const sessionWithoutResolvedOrg = {
+      const sessionWithoutResolvedOrg: AuthenticatedSession = {
         userId: user.id,
+        sessionStatus: "ok",
         profile,
         org: null
       };
@@ -331,8 +330,9 @@ const getAuthenticatedSessionInternal = cache(
     });
     Sentry.setUser({ id: profile.id });
 
-    const resolvedSession = {
+    const resolvedSession: AuthenticatedSession = {
       userId: user.id,
+      sessionStatus: "ok",
       profile,
       org: orgData
     };
@@ -348,4 +348,42 @@ export async function getAuthenticatedSession(
   const requireMfa = options.requireMfa !== false;
 
   return getAuthenticatedSessionInternal(includeOrg, requireMfa);
+}
+
+export type SettingsProfileFields = {
+  phone: string | null;
+  notification_preferences: Record<string, unknown> | null;
+  bio: string | null;
+  pronouns: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  emergency_contact_relationship: string | null;
+  social_linkedin: string | null;
+  social_twitter: string | null;
+  social_instagram: string | null;
+  social_github: string | null;
+  social_website: string | null;
+  favorite_music: string | null;
+  favorite_books: string | null;
+  favorite_sports: string | null;
+};
+
+export async function getSettingsProfileFields(
+  userId: string
+): Promise<SettingsProfileFields | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "phone, notification_preferences, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_website, favorite_music, favorite_books, favorite_sports"
+    )
+    .eq("id", userId)
+    .is("deleted_at", null)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as SettingsProfileFields;
 }

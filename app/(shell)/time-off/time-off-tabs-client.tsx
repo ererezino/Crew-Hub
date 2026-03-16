@@ -1,6 +1,5 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -8,12 +7,14 @@ import { useEffect, useMemo, useState } from "react";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { PageHeader } from "../../../components/shared/page-header";
 import type { UserRole } from "../../../lib/navigation";
+import type { TimeOffSummaryResponseData } from "../../../types/time-off";
 import { TimeOffCalendarClient } from "./calendar/calendar-client";
 import { TimeOffClient } from "./time-off-client";
 
 type TimeOffTabsClientProps = {
   requestedTab: string;
   userRoles: UserRole[];
+  initialSummaryData?: TimeOffSummaryResponseData;
 };
 
 function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
@@ -26,7 +27,7 @@ function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
   return "my-requests";
 }
 
-export function TimeOffTabsClient({ requestedTab, userRoles }: TimeOffTabsClientProps) {
+export function TimeOffTabsClient({ requestedTab, userRoles, initialSummaryData }: TimeOffTabsClientProps) {
   const tNav = useTranslations('nav');
   const t = useTranslations('timeOffPage');
   const pathname = usePathname();
@@ -85,19 +86,10 @@ export function TimeOffTabsClient({ requestedTab, userRoles }: TimeOffTabsClient
         userRoles={userRoles}
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.section
-          key={activeTab}
-          className="tab-content-layout"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-        >
-          {activeTab === "my-requests" ? <TimeOffClient embedded /> : null}
-          {activeTab === "calendar" ? <TimeOffCalendarClient embedded userRoles={userRoles} /> : null}
-        </motion.section>
-      </AnimatePresence>
+      <section key={activeTab} className="tab-content-layout">
+        {activeTab === "my-requests" ? <TimeOffClient embedded initialSummaryData={initialSummaryData} /> : null}
+        {activeTab === "calendar" ? <TimeOffCalendarClient embedded userRoles={userRoles} /> : null}
+      </section>
     </>
   );
 }

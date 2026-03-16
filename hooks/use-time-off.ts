@@ -121,7 +121,10 @@ async function fetchAfkLogs(signal: AbortSignal): Promise<AfkLogsResponseData> {
   return payload.data;
 }
 
-export function useTimeOffSummary(query: SummaryQuery = {}): UseFetchState<TimeOffSummaryResponseData> {
+export function useTimeOffSummary(
+  query: SummaryQuery = {},
+  initialData?: TimeOffSummaryResponseData
+): UseFetchState<TimeOffSummaryResponseData> {
   const year = query.year;
   const month = query.month;
 
@@ -137,6 +140,7 @@ export function useTimeOffSummary(query: SummaryQuery = {}): UseFetchState<TimeO
   const queryResult = useQuery({
     queryKey: ["time-off-summary", year ?? "current", month ?? "current"],
     queryFn: ({ signal }) => fetchSummary(endpoint, signal),
+    initialData,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 1,

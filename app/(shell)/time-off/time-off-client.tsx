@@ -41,7 +41,8 @@ import type {
   LeaveBalance,
   LeaveRequestRecord,
   LeaveRequestStatus,
-  TimeOffRequestMutationResponse
+  TimeOffRequestMutationResponse,
+  TimeOffSummaryResponseData
 } from "../../../types/time-off";
 import { AUTO_GRANTED_LEAVE_TYPES, UNLIMITED_LEAVE_TYPES } from "../../../types/time-off";
 import { CalendarOff } from "lucide-react";
@@ -296,7 +297,13 @@ function TimeOffSkeleton() {
   );
 }
 
-export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
+export function TimeOffClient({
+  embedded = false,
+  initialSummaryData
+}: {
+  embedded?: boolean;
+  initialSummaryData?: TimeOffSummaryResponseData;
+}) {
   const t = useTranslations('timeOff');
   const tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
@@ -326,10 +333,13 @@ export function TimeOffClient({ embedded = false }: { embedded?: boolean }) {
 
   const afkQuery = useAfkLogs();
 
-  const summaryQuery = useTimeOffSummary({
-    month: activeMonth,
-    year: Number.parseInt(activeMonth.slice(0, 4), 10)
-  });
+  const summaryQuery = useTimeOffSummary(
+    {
+      month: activeMonth,
+      year: Number.parseInt(activeMonth.slice(0, 4), 10)
+    },
+    initialSummaryData
+  );
 
   const availableLeaveTypes = useMemo(() => {
     const policyTypes = summaryQuery.data?.policies.map((policy) => policy.leaveType) ?? [];
