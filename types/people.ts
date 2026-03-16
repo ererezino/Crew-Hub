@@ -133,6 +133,8 @@ export type PreStartContract = {
   status: ContractStatus;
   storagePath: string | null;
   fileName: string | null;
+  signatureRequestId: string | null;
+  signatureRequestStatus: string | null;
   sentAt: string | null;
   signedAt: string | null;
   voidedAt: string | null;

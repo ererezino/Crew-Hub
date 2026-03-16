@@ -5061,7 +5061,9 @@
       "rescindSuccess": "Offer rescinded for {name}.",
       "rescindFailed": "Unable to rescind offer.",
       "contractAddFailed": "Unable to add contract.",
-      "contractUpdateFailed": "Unable to update contract."
+      "contractUpdateFailed": "Unable to update contract.",
+      "sentForSignature": "Contract sent for signature.",
+      "sendForSignatureFailed": "Unable to send for signature."
     },
     "contracts": {
       "title": "Contracts",
@@ -5080,6 +5082,13 @@
       "removeFile": "Remove",
       "pdfOnly": "PDF only, max 10 MB",
       "signedNoReplace": "Document locked (contract signed)",
+      "sendForSignature": "Send for signature",
+      "sigBadge": {
+        "awaitingSignature": "Awaiting signature",
+        "signed": "E-signed",
+        "declined": "Signature declined",
+        "requestVoided": "Signature request voided"
+      },
       "status": {
         "draft": "Draft",
         "sent": "Sent",

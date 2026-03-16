@@ -5052,7 +5052,9 @@
       "rescindFailed": "Impossible d'annuler l'offre.",
       "unableToCreatePerson": "Impossible de créer la personne.",
       "contractAddFailed": "Impossible d'ajouter le contrat.",
-      "contractUpdateFailed": "Impossible de mettre à jour le contrat."
+      "contractUpdateFailed": "Impossible de mettre à jour le contrat.",
+      "sentForSignature": "Contrat envoyé pour signature.",
+      "sendForSignatureFailed": "Impossible d'envoyer pour signature."
     },
     "contracts": {
       "title": "Contrats",
@@ -5071,6 +5073,13 @@
       "removeFile": "Retirer",
       "pdfOnly": "PDF uniquement, 10 Mo max",
       "signedNoReplace": "Document verrouillé (contrat signé)",
+      "sendForSignature": "Envoyer pour signature",
+      "sigBadge": {
+        "awaitingSignature": "En attente de signature",
+        "signed": "Signé électroniquement",
+        "declined": "Signature refusée",
+        "requestVoided": "Demande de signature annulée"
+      },
       "status": {
         "draft": "Brouillon",
         "sent": "Envoyé",

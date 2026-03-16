@@ -50,7 +50,10 @@ function deriveContractStatus(row: {
   return "draft";
 }
 
-function mapContractRow(row: Record<string, unknown>): PreStartContract {
+function mapContractRow(
+  row: Record<string, unknown>,
+  signatureRequestStatus?: string | null
+): PreStartContract {
   const sentAt = (row.sent_at as string) ?? null;
   const signedAt = (row.signed_at as string) ?? null;
   const voidedAt = (row.voided_at as string) ?? null;
@@ -63,6 +66,8 @@ function mapContractRow(row: Record<string, unknown>): PreStartContract {
     status: deriveContractStatus({ sent_at: sentAt, signed_at: signedAt, voided_at: voidedAt }),
     storagePath: (row.storage_path as string) ?? null,
     fileName: (row.file_name as string) ?? null,
+    signatureRequestId: (row.signature_request_id as string) ?? null,
+    signatureRequestStatus: signatureRequestStatus ?? null,
     sentAt,
     signedAt,
     voidedAt,
@@ -266,9 +271,31 @@ export async function GET(
     });
   }
 
-  const mapped: PreStartContract[] = (contracts ?? []).map((c) =>
-    mapContractRow(c as Record<string, unknown>)
-  );
+  // Resolve signature request statuses for linked contracts
+  const sigReqIds = (contracts ?? [])
+    .map((c) => (c as Record<string, unknown>).signature_request_id as string | null)
+    .filter((id): id is string => !!id);
+
+  let sigReqStatusById = new Map<string, string>();
+
+  if (sigReqIds.length > 0) {
+    const { data: sigReqs } = await svc
+      .from("signature_requests")
+      .select("id, status")
+      .in("id", sigReqIds);
+
+    if (sigReqs) {
+      sigReqStatusById = new Map(
+        sigReqs.map((r) => [(r as Record<string, unknown>).id as string, (r as Record<string, unknown>).status as string])
+      );
+    }
+  }
+
+  const mapped: PreStartContract[] = (contracts ?? []).map((c) => {
+    const row = c as Record<string, unknown>;
+    const sigReqId = row.signature_request_id as string | null;
+    return mapContractRow(row, sigReqId ? (sigReqStatusById.get(sigReqId) ?? null) : null);
+  });
 
   return jsonResponse<{ contracts: PreStartContract[] }>(200, {
     data: { contracts: mapped },
@@ -593,6 +620,32 @@ export async function PUT(
   }
 
   const existingRow = existing as Record<string, unknown>;
+
+  // ── Linked-contract manual mutation guard ─────────────────────────────
+  // When a contract is linked to a signature request, signedAt and sentAt
+  // are system-managed. Reject manual edits to those fields.
+  if (existingRow.signature_request_id) {
+    if (parsed.data.signedAt !== undefined) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "LINKED_CONTRACT_IMMUTABLE",
+          message: "Cannot manually change signed date on a contract linked to a signature request."
+        },
+        meta: buildMeta()
+      });
+    }
+    if (parsed.data.sentAt !== undefined) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "LINKED_CONTRACT_IMMUTABLE",
+          message: "Cannot manually change sent date on a contract linked to a signature request."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
 
   // ── Signed-contract document replacement guard ────────────────────────
   if (file && existingRow.signed_at && !existingRow.voided_at) {

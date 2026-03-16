@@ -549,6 +549,7 @@ export function PeopleClient({
   const [isAddingContract, setIsAddingContract] = useState(false);
   const [updatingContractId, setUpdatingContractId] = useState<string | null>(null);
   const [downloadingContractId, setDownloadingContractId] = useState<string | null>(null);
+  const [sendingForSignatureId, setSendingForSignatureId] = useState<string | null>(null);
   const newContractFileRef = useRef<HTMLInputElement>(null);
   const replaceFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -1024,6 +1025,29 @@ export function PeopleClient({
       // Clear the file input
       const ref = replaceFileRefs.current[contractId];
       if (ref) ref.value = "";
+    }
+  }, [editPerson, td]);
+
+  const handleSendForSignature = useCallback(async (contractId: string) => {
+    if (!editPerson) return;
+    setSendingForSignatureId(contractId);
+    try {
+      const response = await fetch(`/api/v1/people/${editPerson.id}/contracts/${contractId}/send-for-signature`, {
+        method: "POST"
+      });
+      const payload = await response.json();
+      if (response.ok && payload.data?.contract) {
+        setContracts((prev) =>
+          prev.map((c) => (c.id === contractId ? (payload.data.contract as PreStartContract) : c))
+        );
+        addToast("success", td('toast.sentForSignature'));
+      } else {
+        addToast("error", humanizeError(payload?.error?.message ?? td('toast.sendForSignatureFailed')));
+      }
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : td('toast.sendForSignatureFailed'));
+    } finally {
+      setSendingForSignatureId(null);
     }
   }, [editPerson, td]);
 
@@ -2293,6 +2317,27 @@ export function PeopleClient({
                           </span>
                           <span style={{ fontWeight: 500 }}>{contract.title}</span>
                         </div>
+                        {/* Signature status badge (secondary indicator for linked contracts) */}
+                        {contract.signatureRequestId ? (
+                          <div style={{ marginTop: "var(--space-1)" }}>
+                            <span
+                              className={
+                                `role-tag ${
+                                  contract.signatureRequestStatus === "completed" ? "role-tag-success"
+                                  : contract.signatureRequestStatus === "declined" ? "role-tag-danger"
+                                  : contract.signatureRequestStatus === "voided" ? "role-tag-danger"
+                                  : "role-tag-info"
+                                }`
+                              }
+                              style={{ fontSize: "0.6rem" }}
+                            >
+                              {contract.signatureRequestStatus === "completed" ? t('contracts.sigBadge.signed')
+                                : contract.signatureRequestStatus === "declined" ? t('contracts.sigBadge.declined')
+                                : contract.signatureRequestStatus === "voided" ? t('contracts.sigBadge.requestVoided')
+                                : t('contracts.sigBadge.awaitingSignature')}
+                            </span>
+                          </div>
+                        ) : null}
                         {contract.notes ? (
                           <p className="text-muted" style={{ fontSize: "var(--text-xs)", margin: "var(--space-1) 0 0 0" }}>
                             {contract.notes}
@@ -2346,8 +2391,20 @@ export function PeopleClient({
                         ) : null}
 
                         {contract.status !== "voided" ? (
-                          <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
-                            {contract.status === "draft" ? (
+                          <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)", flexWrap: "wrap" }}>
+                            {/* Send for signature: shown when document attached, not signed, not voided, not already linked */}
+                            {!contract.signatureRequestId && contract.fileName && contract.status !== "signed" ? (
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                disabled={sendingForSignatureId === contract.id}
+                                onClick={() => void handleSendForSignature(contract.id)}
+                              >
+                                {sendingForSignatureId === contract.id ? "…" : t('contracts.sendForSignature')}
+                              </button>
+                            ) : null}
+                            {/* Manual sent/signed controls — hidden when linked to a signature request */}
+                            {!contract.signatureRequestId && contract.status === "draft" ? (
                               <button
                                 type="button"
                                 className="table-row-action"
@@ -2357,7 +2414,7 @@ export function PeopleClient({
                                 {t('contracts.markSent')}
                               </button>
                             ) : null}
-                            {contract.status === "draft" || contract.status === "sent" ? (
+                            {!contract.signatureRequestId && (contract.status === "draft" || contract.status === "sent") ? (
                               <button
                                 type="button"
                                 className="table-row-action"

@@ -555,6 +555,47 @@ export async function POST(
     });
   }
 
+  // Auto-sign pre-start contracts linked to this completed signature request.
+  // Idempotent: only sets signed_at if not already set and not voided.
+  if (!hasPendingRows) {
+    try {
+      const { data: linkedContracts } = await serviceRoleClient
+        .from("pre_start_contracts")
+        .select("id, signed_at, voided_at")
+        .eq("signature_request_id", parsedRequestRow.data.id);
+
+      if (linkedContracts && linkedContracts.length > 0) {
+        for (const lc of linkedContracts) {
+          const lcRow = lc as Record<string, unknown>;
+          // Idempotent: skip if already signed or voided
+          if (lcRow.signed_at || lcRow.voided_at) continue;
+
+          await serviceRoleClient
+            .from("pre_start_contracts")
+            .update({ signed_at: signedAt })
+            .eq("id", lcRow.id as string)
+            .is("signed_at", null)
+            .is("voided_at", null);
+
+          await logAudit({
+            action: "updated",
+            tableName: "pre_start_contracts",
+            recordId: lcRow.id as string,
+            newValue: {
+              event: "auto_signed_via_esignature",
+              signatureRequestId: parsedRequestRow.data.id,
+              signedAt
+            }
+          });
+        }
+      }
+    } catch {
+      console.error("Unable to auto-sign pre-start contract for signature request.", {
+        requestId: parsedRequestRow.data.id
+      });
+    }
+  }
+
   return jsonResponse<SignSignatureResponseData>(200, {
     data: {
       requestId: parsedRequestRow.data.id,
