@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { logAudit } from "../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { fetchExpensesData } from "../../../../lib/expenses/fetch-expenses-data";
 import { sendExpenseSubmittedEmail } from "../../../../lib/notifications/email";
 import { createBulkNotifications } from "../../../../lib/notifications/service";
 import {
@@ -9,10 +10,8 @@ import {
   isAllowedReceiptUpload,
   isIsoMonth,
   MAX_RECEIPT_FILE_BYTES,
-  monthDateRange,
   normalizeCurrency,
   sanitizeFileName,
-  summarizeExpenses,
   RECEIPTS_BUCKET_NAME
 } from "../../../../lib/expenses";
 import { validateUploadMagicBytes } from "../../../../lib/security/upload-signatures";
@@ -22,7 +21,6 @@ import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/servic
 import type { ExpenseMutationResponseData, ExpensesListResponseData } from "../../../../types/expenses";
 import {
   buildMeta,
-  collectProfileIds,
   expenseCategorySchema,
   expenseRowSchema,
   expenseSelectColumns,
@@ -31,7 +29,6 @@ import {
   profileRowSchema,
   toExpenseRecord
 } from "./_helpers";
-import { loadLatestExpenseCommentStates } from "./_comment-state";
 
 const listQuerySchema = z.object({
   status: expenseStatusSchema.optional(),
@@ -112,41 +109,18 @@ export async function GET(request: Request) {
     });
   }
 
-  const query = parsedQuery.data;
-  const supabase = await createSupabaseServerClient();
+  try {
+    const data = await fetchExpensesData(session.profile, {
+      status: parsedQuery.data.status,
+      month: parsedQuery.data.month
+    });
 
-  let expenseQuery = supabase
-    .from("expenses")
-    .select(expenseSelectColumns)
-    .eq("org_id", session.profile.org_id)
-    .is("deleted_at", null)
-    .order("expense_date", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (query.status) {
-    expenseQuery = expenseQuery.eq("status", query.status);
-  }
-
-  if (query.month) {
-    const range = monthDateRange(query.month);
-
-    if (!range) {
-      return jsonResponse<null>(422, {
-        data: null,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Month must be in YYYY-MM format."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    expenseQuery = expenseQuery.gte("expense_date", range.startDate).lte("expense_date", range.endDate);
-  }
-
-  const { data: rawExpenses, error: expensesError } = await expenseQuery;
-
-  if (expensesError) {
+    return jsonResponse<ExpensesListResponseData>(200, {
+      data,
+      error: null,
+      meta: buildMeta()
+    }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
+  } catch {
     return jsonResponse<null>(500, {
       data: null,
       error: {
@@ -156,100 +130,6 @@ export async function GET(request: Request) {
       meta: buildMeta()
     });
   }
-
-  const parsedExpenses = z.array(expenseRowSchema).safeParse(rawExpenses ?? []);
-
-  if (!parsedExpenses.success) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "EXPENSES_PARSE_FAILED",
-        message: "Expense records are not in the expected shape."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  const latestCommentStates = await loadLatestExpenseCommentStates({
-    supabase,
-    orgId: session.profile.org_id,
-    expenseIds: parsedExpenses.data.map((row) => row.id)
-  });
-
-  const commentAuthorIds = [...new Set(
-    [...latestCommentStates.values()]
-      .map((state) => state.updatedBy)
-      .filter((id): id is string => Boolean(id))
-  )];
-
-  const profileIds = [...new Set([...collectProfileIds(parsedExpenses.data), ...commentAuthorIds])];
-  let profileById = new Map<string, z.infer<typeof profileRowSchema>>();
-
-  if (profileIds.length > 0) {
-    const { data: rawProfiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id, full_name, department, country_code, manager_id")
-      .eq("org_id", session.profile.org_id)
-      .is("deleted_at", null)
-      .in("id", profileIds);
-
-    if (profilesError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "EXPENSE_PROFILES_FETCH_FAILED",
-          message: "Unable to resolve expense profile metadata."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    const parsedProfiles = z.array(profileRowSchema).safeParse(rawProfiles ?? []);
-
-    if (!parsedProfiles.success) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "EXPENSE_PROFILES_PARSE_FAILED",
-          message: "Expense profile metadata is not in the expected shape."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
-  }
-
-  const expenses = parsedExpenses.data.map((row) => {
-    const baseExpense = toExpenseRecord(row, profileById);
-    const commentState = latestCommentStates.get(row.id);
-
-    if (!commentState) {
-      return baseExpense;
-    }
-
-    return {
-      ...baseExpense,
-      infoRequestState: commentState.state,
-      infoRequestUpdatedAt: commentState.updatedAt,
-      infoRequestUpdatedByName: commentState.updatedBy
-        ? profileById.get(commentState.updatedBy)?.full_name ?? null
-        : null
-    };
-  });
-  const summary = summarizeExpenses(expenses);
-
-  const responseData: ExpensesListResponseData = {
-    expenses,
-    summary,
-    month: query.month ?? null
-  };
-
-  return jsonResponse<ExpensesListResponseData>(200, {
-    data: responseData,
-    error: null,
-    meta: buildMeta()
-  }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
 }
 
 export async function POST(request: Request) {

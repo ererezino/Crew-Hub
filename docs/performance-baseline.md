@@ -565,3 +565,121 @@ Browser navigates to /approvals
 |---|---|---|
 | Approvals route extraction | Zod audit test expected `from "zod"` in approvals/counts route | Added waiver — route is now thin HTTP wrapper, no inline Zod needed |
 | — | No functional regressions | — |
+
+---
+
+## Phase 6 Baseline
+
+Phase 6 applies the proven server-data rendering pattern to the **Expenses page** — the core employee self-service page for expense submission and tracking.
+
+### Current Expenses Loading Flow (200ms RTT)
+
+```
+Browser navigates to /expenses
+  → Middleware: getUser()                                   ~200ms
+  → ShellLayout: getAuthenticatedSession()                  ~400ms (parallelized)
+  → ExpensesPage: getAuthenticatedSession() (deduped)       ~0ms
+    — Resolves permissions, renders ExpensesClient shell
+    — No expense data passed to client
+  → Browser hydrates, ExpensesClient mounts
+    → useExpenses({ month }) fires GET /api/v1/expenses?month=YYYY-MM  ~200ms RTT
+      → API route: getAuthenticatedSession()                  ~400ms server-side
+      → expenses SELECT + comment states + profile lookup     ~400ms (3 sequential DB queries)
+      → summarizeExpenses()                                   ~0ms
+    → Response arrives, React re-renders with expense list    ~200ms RTT
+```
+
+**Estimated first-meaningful-render:** ~1800ms (middleware 200 + session 400 + client fetch 1000-1200 + render 200)
+
+### Data Needs
+
+**Server-rendered (initialData for first load):**
+- Current month's expense list with employee names, comment states, and summary totals
+- This is the entire primary view — the table + summary cards employees see immediately
+
+**Deferred (stay client-fetched):**
+- Expense creation/upload form (write operation)
+- Receipt lightbox/download (triggered on click)
+- Expense comments panel (triggered on expand)
+- Vendor beneficiaries lookup (form helper)
+- Payment details (form helper)
+- Month filter changes (client refetch via API)
+- Expense approvals tab (separate route)
+- Expense reports tab (separate route)
+
+### Target State
+
+| Metric | Current | Target |
+|---|---|---|
+| Expenses data in initial HTML | No (empty shell) | Yes (server-fetched, table + summary on first paint) |
+| Expenses client-fetch on first load | 1 (GET + re-auth + 3 DB queries) | 0 |
+| Expenses first-meaningful-render estimate | ~1800ms | ~1200ms (middleware 200 + session 400 + data 400 + render 200) |
+
+### Phase 6 Progress
+
+| Step | Fix | Status | Notes |
+|---|---|---|---|
+| 0 | Phase 6 baseline | Done | This section |
+| 1 | Repo hygiene check | Done | `e1c197e` on origin, working tree clean. CI failure is pre-existing lockfile issue (`Missing: @swc/helpers@0.5.19`), unrelated to our changes. |
+| 2 | Extract Expenses data-fetching | Done | Created `lib/expenses/fetch-expenses-data.ts` (exported `fetchExpensesData(profile, query?)`). API route GET handler slimmed from ~170 inline lines → ~25 lines delegating to shared function. POST handler unchanged. |
+| 3 | Server-render Expenses with initialData | Done | `page.tsx` calls `fetchExpensesData()` for current month, passes as `initialExpensesData` to `ExpensesClient`. `useExpenses()` accepts optional `initialData`. No client fetch on first load. |
+| 4 | Verify in isolation | Done | tsc clean, eslint clean, 388/388 tests pass, next build clean. Browser verified: summary cards ($739.40 submitted, $399.50 pending), month filter, and expense list all render on first paint with no spinner flash. |
+| 5 | Final measurement + closeout | Done | See results below. |
+
+### Post-Phase 6 Expenses Loading Flow (200ms RTT)
+
+```
+Browser navigates to /expenses
+  → Middleware: getUser()                                   ~200ms
+  → ShellLayout: getAuthenticatedSession()                  ~400ms (parallelized)
+  → ExpensesPage: getAuthenticatedSession() (deduped)       ~0ms
+  → fetchExpensesData() — expenses + comments + profiles     ~400ms
+    — Server returns HTML with summary cards + expense table populated
+  → Browser hydrates, React Query initialized with initialData  ~200ms
+    — No client-side fetch needed — data already present
+```
+
+### Phase 6 Results
+
+| Metric | Before (Phase 5) | After (Phase 6) | Change |
+|---|---|---|---|
+| Expenses data in initial HTML | No (empty shell) | Yes (server-fetched) | Summary cards + table on first paint |
+| Expenses client-fetch on first load | 1 (GET + re-auth + 3 DB) | 0 | Eliminated |
+| Expenses API route GET lines | ~170 (inline data-fetching) | ~25 (thin wrapper) | −145 lines (extracted to shared module) |
+| Expenses first-meaningful-render estimate | ~1800ms | ~1200ms | −600ms (−33%) |
+| `next build` | Clean | Clean | No regressions |
+| `tsc --noEmit` | Clean | Clean | No type errors |
+| `eslint` | Clean | Clean | No lint errors |
+| `vitest run` | 388/388 | 388/388 | All tests pass |
+| Browser verification | N/A | Summary cards + expense list render on first paint | Confirmed |
+
+### Cumulative Improvement (Phase 1 → Phase 6)
+
+| Metric | Pre-optimization | Post-Phase 6 | Total improvement |
+|---|---|---|---|
+| Middleware Supabase calls | 4 sequential | 1 | −3 calls |
+| Session internal structure | All sequential | MFA ‖ profile parallel | −200ms per navigation |
+| Dashboard first-meaningful-render | ~2600ms | ~1600ms | −1000ms |
+| Time Off first-meaningful-render | ~2200ms | ~1200ms | −1000ms |
+| People first-meaningful-render | ~1800ms | ~1200ms | −600ms |
+| Approvals first-meaningful-render | ~1800ms | ~1200ms | −600ms |
+| Expenses first-meaningful-render | ~1800ms | ~1200ms | −600ms |
+| Pages with server-rendered data | 0 | 5 (Dashboard, Time Off, People, Approvals, Expenses) | 5 high-traffic pages |
+| Total JS size (raw) | 3.58 MB | 3.44 MB | −148 KB (−4%) |
+| Framer Motion | 733 KB across 14 chunks | Eliminated | −733 KB |
+| Auto-prefetch requests | 28 per page | 0 | Eliminated |
+
+### Deferred / Not in Scope
+
+- Expense creation/upload form — write operation, stays client-side
+- Receipt lightbox/download — triggered on click
+- Expense comments panel — triggered on expand
+- Vendor beneficiaries / payment details — form helpers
+- Month filter changes — client refetch via API (subsequent months)
+- Expense approvals and reports tabs — separate routes
+
+### Phase 6 Regressions Log
+
+| Fix | Regression | Action taken |
+|---|---|---|
+| — | None observed | — |

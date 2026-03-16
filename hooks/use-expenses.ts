@@ -25,6 +25,7 @@ type UseFetchState<T> = {
 type ExpensesQuery = {
   status?: ExpenseStatus;
   month?: string;
+  initialData?: ExpensesListResponseData;
 };
 
 type ExpenseApprovalsQuery = {
@@ -153,6 +154,7 @@ export function useExpenses(query: ExpensesQuery = {}): UseFetchState<ExpensesLi
   const queryResult = useQuery({
     queryKey: ["expenses", query.status ?? "all", query.month ?? "all"],
     queryFn: ({ signal }) => fetchExpenses(endpoint, signal),
+    initialData: query.initialData,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 1,

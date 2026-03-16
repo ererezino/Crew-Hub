@@ -54,6 +54,7 @@ import type {
   ExpenseCommentsResponse,
   ExpenseReceiptSignedUrlResponse,
   ExpenseRecord,
+  ExpensesListResponseData,
   ExpenseType,
   UpdateExpenseResponse
 } from "../../../types/expenses";
@@ -626,11 +627,13 @@ function ReceiptLightbox({
 export function ExpensesClient({
   currentUserId,
   canViewReports,
-  showEmployeeColumn
+  showEmployeeColumn,
+  initialExpensesData
 }: {
   currentUserId: string;
   canViewReports: boolean;
   showEmployeeColumn: boolean;
+  initialExpensesData?: ExpensesListResponseData;
 }) {
   const t = useTranslations('expenses');
   const tCommon = useTranslations('common');
@@ -638,7 +641,7 @@ export function ExpensesClient({
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 
   const [month, setMonth] = useState(currentMonthKey());
-  const expensesQuery = useExpenses({ month });
+  const expensesQuery = useExpenses({ month, initialData: initialExpensesData });
   const vendorBeneficiaries = useVendorBeneficiaries();
   const mePaymentDetails = useMePaymentDetails();
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
