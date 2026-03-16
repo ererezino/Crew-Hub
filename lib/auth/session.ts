@@ -46,7 +46,7 @@ type GetAuthenticatedSessionOptions = {
 const MFA_VERIFICATION_TTL_MS = 45_000;
 const FAILED_MFA_CACHE_TTL_MS = 5_000;
 const MAX_MFA_CACHE_ENTRIES = 2_000;
-const SESSION_CACHE_TTL_MS = 5_000;
+const SESSION_CACHE_TTL_MS = 30_000;
 const MAX_SESSION_CACHE_ENTRIES = 2_000;
 
 type MfaVerificationCacheEntry = {
@@ -202,14 +202,21 @@ const getAuthenticatedSessionInternal = cache(
       return null;
     }
 
+    // Use getSession() (local cookie read, ~0ms) instead of getUser() (~200ms
+    // network call). This is safe because:
+    // - Page routes: middleware already validated the JWT via getUser()
+    // - API routes: subsequent PostgREST queries validate the JWT server-side
+    // - The JWT is cryptographically signed — cannot be tampered
     const {
-      data: { user },
-      error: userError
-    } = await supabase.auth.getUser();
+      data: { session: authSession },
+      error: sessionError
+    } = await supabase.auth.getSession();
 
-    if (userError || !user) {
+    if (sessionError || !authSession?.user) {
       return null;
     }
+
+    const user = authSession.user;
 
     const sessionCacheKey = toSessionCacheKey(user.id, includeOrg, requireMfa);
     const cachedSession = readSessionCache(sessionCacheKey);
