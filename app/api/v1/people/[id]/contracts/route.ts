@@ -3,12 +3,22 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
 import {
+  CONTRACT_DOCUMENTS_BUCKET,
+  MAX_CONTRACT_FILE_BYTES,
+  ALLOWED_CONTRACT_EXTENSIONS,
+  isAllowedContractUpload,
+  sanitizeFileName
+} from "../../../../../../lib/contracts";
+import {
   buildMeta,
   jsonResponse
 } from "../../../../../../lib/people/shared";
 import { hasRole } from "../../../../../../lib/roles";
+import { validateUploadMagicBytes } from "../../../../../../lib/security/upload-signatures";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ContractStatus, PreStartContract } from "../../../../../../types/people";
+
+// ── Schemas ─────────────────────────────────────────────────────────────────
 
 const paramsSchema = z.object({
   id: z.string().uuid("Person id must be a valid UUID.")
@@ -26,6 +36,8 @@ const updateContractSchema = z.object({
   signedAt: z.string().datetime("Signed date must be a valid ISO timestamp.").nullable().optional(),
   voidedAt: z.string().datetime("Voided date must be a valid ISO timestamp.").nullable().optional()
 });
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 function deriveContractStatus(row: {
   sent_at: string | null;
@@ -49,12 +61,156 @@ function mapContractRow(row: Record<string, unknown>): PreStartContract {
     title: row.title as string,
     notes: (row.notes as string) ?? null,
     status: deriveContractStatus({ sent_at: sentAt, signed_at: signedAt, voided_at: voidedAt }),
+    storagePath: (row.storage_path as string) ?? null,
+    fileName: (row.file_name as string) ?? null,
     sentAt,
     signedAt,
     voidedAt,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string
   };
+}
+
+/**
+ * Parse the request body. Supports both multipart form data (when a file
+ * may be attached) and plain JSON (backward-compatible for callers that
+ * do not upload files).
+ */
+async function parseRequestBody(
+  request: Request
+): Promise<{ fields: Record<string, string>; file: File | null } | null> {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (contentType.includes("multipart/form-data")) {
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch {
+      return null;
+    }
+
+    const fields: Record<string, string> = {};
+    let file: File | null = null;
+
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        file = value;
+      } else {
+        fields[key] = value;
+      }
+    }
+
+    return { fields, file };
+  }
+
+  // Fall back to JSON body (backward-compatible)
+  try {
+    const json = await request.json();
+    if (json && typeof json === "object" && !Array.isArray(json)) {
+      const fields: Record<string, string> = {};
+      for (const [key, value] of Object.entries(json as Record<string, unknown>)) {
+        if (value === null) {
+          fields[key] = "__null__";
+        } else if (value !== undefined) {
+          fields[key] = String(value);
+        }
+      }
+      return { fields, file: null };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convert flat string fields back to a typed object for Zod validation.
+ * Handles the __null__ sentinel for explicit nulls from JSON fallback.
+ */
+function fieldsToObject(fields: Record<string, string>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    result[key] = value === "__null__" ? null : value;
+  }
+  return result;
+}
+
+/**
+ * Validate an uploaded file. Returns an error message string if invalid, null if valid.
+ */
+async function validateContractFile(file: File): Promise<string | null> {
+  if (file.size <= 0) {
+    return "Uploaded file is empty.";
+  }
+
+  if (file.size > MAX_CONTRACT_FILE_BYTES) {
+    return `File exceeds the 10 MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB).`;
+  }
+
+  if (!isAllowedContractUpload(file.name, file.type)) {
+    return "Only PDF files are allowed.";
+  }
+
+  const magicBytesResult = await validateUploadMagicBytes({
+    file,
+    fileName: file.name,
+    allowedExtensions: ALLOWED_CONTRACT_EXTENSIONS
+  });
+
+  if (!magicBytesResult.valid) {
+    return magicBytesResult.message ?? "File failed validation.";
+  }
+
+  return null;
+}
+
+/**
+ * Upload a file to the contract-documents bucket. Returns the storage path.
+ */
+async function uploadContractFile(
+  orgId: string,
+  personId: string,
+  contractId: string,
+  file: File
+): Promise<{ storagePath: string; error: string | null }> {
+  const svc = createSupabaseServiceRoleClient();
+  const timestamp = Date.now();
+  const safeName = sanitizeFileName(file.name);
+  const storagePath = `${orgId}/${personId}/${contractId}/${timestamp}-${safeName}`;
+
+  const { error } = await svc.storage
+    .from(CONTRACT_DOCUMENTS_BUCKET)
+    .upload(storagePath, file, {
+      upsert: false,
+      contentType: file.type || "application/octet-stream"
+    });
+
+  if (error) {
+    return { storagePath: "", error: `Storage upload failed: ${error.message}` };
+  }
+
+  return { storagePath, error: null };
+}
+
+/**
+ * Delete a file from the contract-documents bucket. Logs but does not throw on failure.
+ */
+async function deleteContractFile(storagePath: string): Promise<void> {
+  try {
+    const svc = createSupabaseServiceRoleClient();
+    const { error } = await svc.storage
+      .from(CONTRACT_DOCUMENTS_BUCKET)
+      .remove([storagePath]);
+
+    if (error) {
+      console.error("Failed to delete old contract document from storage.", {
+        storagePath,
+        message: error.message
+      });
+    }
+  } catch (err) {
+    console.error("Unexpected error deleting contract document.", { storagePath, err });
+  }
 }
 
 // ── GET /api/v1/people/[id]/contracts ────────────────────────────────────
@@ -157,18 +313,18 @@ export async function POST(
     });
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
+  const parsed_body = await parseRequestBody(request);
+  if (!parsed_body) {
     return jsonResponse<null>(400, {
       data: null,
-      error: { code: "BAD_REQUEST", message: "Invalid JSON body." },
+      error: { code: "BAD_REQUEST", message: "Invalid request body." },
       meta: buildMeta()
     });
   }
 
-  const parsed = createContractSchema.safeParse(body);
+  const { fields, file } = parsed_body;
+  const parsed = createContractSchema.safeParse(fieldsToObject(fields));
+
   if (!parsed.success) {
     return jsonResponse<null>(422, {
       data: null,
@@ -178,6 +334,18 @@ export async function POST(
       },
       meta: buildMeta()
     });
+  }
+
+  // Validate the file if one was provided
+  if (file) {
+    const fileError = await validateContractFile(file);
+    if (fileError) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: { code: "VALIDATION_ERROR", message: fileError },
+        meta: buildMeta()
+      });
+    }
   }
 
   const svc = createSupabaseServiceRoleClient();
@@ -201,6 +369,7 @@ export async function POST(
     });
   }
 
+  // Insert contract row (without document columns first to get the ID)
   const { data: inserted, error: insertError } = await svc
     .from("pre_start_contracts")
     .insert({
@@ -220,6 +389,79 @@ export async function POST(
     });
   }
 
+  const contractId = (inserted as Record<string, unknown>).id as string;
+
+  // Upload file if provided
+  if (file) {
+    const { storagePath, error: uploadError } = await uploadContractFile(
+      orgId,
+      personId,
+      contractId,
+      file
+    );
+
+    if (uploadError) {
+      // Clean up the inserted contract row since file upload failed
+      await svc.from("pre_start_contracts").delete().eq("id", contractId);
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "INTERNAL_ERROR", message: uploadError },
+        meta: buildMeta()
+      });
+    }
+
+    // Update the contract row with document info
+    const { error: patchError } = await svc
+      .from("pre_start_contracts")
+      .update({
+        storage_path: storagePath,
+        file_name: file.name
+      })
+      .eq("id", contractId);
+
+    if (patchError) {
+      // Clean up orphaned file
+      await deleteContractFile(storagePath);
+      await svc.from("pre_start_contracts").delete().eq("id", contractId);
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "INTERNAL_ERROR", message: "Failed to save document reference." },
+        meta: buildMeta()
+      });
+    }
+
+    // Re-fetch the updated row
+    const { data: refreshed } = await svc
+      .from("pre_start_contracts")
+      .select("*")
+      .eq("id", contractId)
+      .single();
+
+    if (refreshed) {
+      const contract = mapContractRow(refreshed as Record<string, unknown>);
+
+      await logAudit({
+        action: "created",
+        tableName: "pre_start_contracts",
+        recordId: contract.id,
+        newValue: {
+          personId,
+          personName: (personRow as Record<string, unknown>).full_name as string,
+          title: contract.title,
+          status: contract.status,
+          fileName: contract.fileName,
+          documentAttached: true
+        }
+      });
+
+      return jsonResponse<{ contract: PreStartContract }>(201, {
+        data: { contract },
+        error: null,
+        meta: buildMeta()
+      });
+    }
+  }
+
   const contract = mapContractRow(inserted as Record<string, unknown>);
 
   await logAudit({
@@ -230,7 +472,8 @@ export async function POST(
       personId,
       personName: (personRow as Record<string, unknown>).full_name as string,
       title: contract.title,
-      status: contract.status
+      status: contract.status,
+      documentAttached: false
     }
   });
 
@@ -244,6 +487,7 @@ export async function POST(
 // ── PUT /api/v1/people/[id]/contracts ────────────────────────────────────
 //
 // Updates a specific contract. The contract ID is passed in the body.
+// Supports optional PDF document attachment via multipart form data.
 
 export async function PUT(
   request: Request,
@@ -279,22 +523,19 @@ export async function PUT(
     });
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
+  const parsed_body = await parseRequestBody(request);
+  if (!parsed_body) {
     return jsonResponse<null>(400, {
       data: null,
-      error: { code: "BAD_REQUEST", message: "Invalid JSON body." },
+      error: { code: "BAD_REQUEST", message: "Invalid request body." },
       meta: buildMeta()
     });
   }
 
-  const rawBody = body && typeof body === "object" && !Array.isArray(body)
-    ? (body as Record<string, unknown>)
-    : null;
+  const { fields, file } = parsed_body;
+  const rawBody = fieldsToObject(fields);
 
-  if (!rawBody || typeof rawBody.contractId !== "string") {
+  if (!rawBody.contractId || typeof rawBody.contractId !== "string") {
     return jsonResponse<null>(422, {
       data: null,
       error: {
@@ -318,6 +559,18 @@ export async function PUT(
     });
   }
 
+  // Validate the file if provided
+  if (file) {
+    const fileError = await validateContractFile(file);
+    if (fileError) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: { code: "VALIDATION_ERROR", message: fileError },
+        meta: buildMeta()
+      });
+    }
+  }
+
   const svc = createSupabaseServiceRoleClient();
   const orgId = session.profile.org_id;
   const personId = parsedParams.data.id;
@@ -339,6 +592,21 @@ export async function PUT(
     });
   }
 
+  const existingRow = existing as Record<string, unknown>;
+
+  // ── Signed-contract document replacement guard ────────────────────────
+  if (file && existingRow.signed_at && !existingRow.voided_at) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "SIGNED_CONTRACT_IMMUTABLE",
+        message: "Cannot replace document on a signed contract. Void this contract and create a new one."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // Build metadata update values
   const updateValues: Record<string, unknown> = {};
 
   if (parsed.data.title !== undefined) {
@@ -357,6 +625,38 @@ export async function PUT(
     updateValues.voided_at = parsed.data.voidedAt;
   }
 
+  // ── Handle file upload (replacement) ──────────────────────────────────
+  let newStoragePath: string | null = null;
+
+  if (file) {
+    const { storagePath, error: uploadError } = await uploadContractFile(
+      orgId,
+      personId,
+      contractId,
+      file
+    );
+
+    if (uploadError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "INTERNAL_ERROR", message: uploadError },
+        meta: buildMeta()
+      });
+    }
+
+    newStoragePath = storagePath;
+
+    // Delete the old file (best-effort, does not block the update)
+    const oldPath = existingRow.storage_path as string | null;
+    if (oldPath) {
+      await deleteContractFile(oldPath);
+    }
+
+    updateValues.storage_path = storagePath;
+    updateValues.file_name = file.name;
+  }
+
+  // If no metadata changes and no file, reject
   if (Object.keys(updateValues).length === 0) {
     return jsonResponse<null>(400, {
       data: null,
@@ -375,6 +675,10 @@ export async function PUT(
     .single();
 
   if (updateError || !updated) {
+    // Clean up newly uploaded file if DB update failed
+    if (newStoragePath) {
+      await deleteContractFile(newStoragePath);
+    }
     return jsonResponse<null>(500, {
       data: null,
       error: { code: "INTERNAL_ERROR", message: "Failed to update contract." },
@@ -382,8 +686,22 @@ export async function PUT(
     });
   }
 
-  const oldContract = mapContractRow(existing as Record<string, unknown>);
+  const oldContract = mapContractRow(existingRow);
   const newContract = mapContractRow(updated as Record<string, unknown>);
+
+  const auditNewValue: Record<string, unknown> = {
+    title: newContract.title,
+    status: newContract.status,
+    sentAt: newContract.sentAt,
+    signedAt: newContract.signedAt,
+    voidedAt: newContract.voidedAt
+  };
+
+  if (file) {
+    auditNewValue.fileName = newContract.fileName;
+    auditNewValue.documentReplaced = !!oldContract.storagePath;
+    auditNewValue.documentAttached = !oldContract.storagePath;
+  }
 
   await logAudit({
     action: "updated",
@@ -394,15 +712,10 @@ export async function PUT(
       status: oldContract.status,
       sentAt: oldContract.sentAt,
       signedAt: oldContract.signedAt,
-      voidedAt: oldContract.voidedAt
+      voidedAt: oldContract.voidedAt,
+      fileName: oldContract.fileName
     },
-    newValue: {
-      title: newContract.title,
-      status: newContract.status,
-      sentAt: newContract.sentAt,
-      signedAt: newContract.signedAt,
-      voidedAt: newContract.voidedAt
-    }
+    newValue: auditNewValue
   });
 
   return jsonResponse<{ contract: PreStartContract }>(200, {

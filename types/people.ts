@@ -131,6 +131,8 @@ export type PreStartContract = {
   title: string;
   notes: string | null;
   status: ContractStatus;
+  storagePath: string | null;
+  fileName: string | null;
   sentAt: string | null;
   signedAt: string | null;
   voidedAt: string | null;
