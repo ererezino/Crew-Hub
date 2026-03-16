@@ -154,7 +154,10 @@ export async function POST(
   const supabase = await createSupabaseServerClient();
   const serviceRoleClient = createSupabaseServiceRoleClient();
 
-  const { data: rawRequestRow, error: requestError } = await supabase
+  // Use service-role for reads: signature rows may have been created by the
+  // send-for-signature endpoint (service-role), so user-level RLS may not
+  // grant SELECT. Auth is already verified via getAuthenticatedSession().
+  const { data: rawRequestRow, error: requestError } = await serviceRoleClient
     .from("signature_requests")
     .select("id, org_id, status, title, created_by")
     .eq("id", parsedParams.data.requestId)
@@ -201,7 +204,7 @@ export async function POST(
     });
   }
 
-  const { data: rawSignerRow, error: signerError } = await supabase
+  const { data: rawSignerRow, error: signerError } = await serviceRoleClient
     .from("signature_signers")
     .select("id, status")
     .eq("signature_request_id", parsedRequestRow.data.id)
@@ -339,7 +342,7 @@ export async function POST(
       ? parsedBody.data.signatureText ?? session.profile.full_name
       : null;
 
-  const { error: updateSignerError } = await supabase
+  const { error: updateSignerError } = await serviceRoleClient
     .from("signature_signers")
     .update({
       status: "signed",

@@ -58,6 +58,8 @@ export async function POST(
     });
   }
 
+  // Service-role for all DB operations. The sign route also uses service-role
+  // for its reads, so RLS context is consistent end-to-end.
   const svc = createSupabaseServiceRoleClient();
   const orgId = session.profile.org_id;
   const { id: personId, contractId } = parsedParams.data;
@@ -259,7 +261,7 @@ export async function POST(
     .single();
 
   if (linkError || !updatedContract) {
-    // Linking failed — clean up signature artifacts
+    // Linking failed — clean up signature artifacts (use service-role for cleanup reliability)
     await svc.from("signature_signers").delete().eq("signature_request_id", requestId);
     await svc.from("signature_requests").update({ deleted_at: now }).eq("id", requestId);
     await svc.from("documents").update({ deleted_at: now }).eq("id", documentId);
