@@ -132,6 +132,48 @@ export async function POST(
     });
   }
 
+  // ── 0b. Contract prerequisite guard ────────────────────────────────────
+  //
+  // If the person has any non-voided contracts, all must be signed before
+  // onboarding can begin. If zero contracts exist, proceed normally.
+
+  const { data: unsignedContracts, error: contractQueryError } = await svc
+    .from("pre_start_contracts")
+    .select("id, title")
+    .eq("org_id", orgId)
+    .eq("person_id", personId)
+    .is("voided_at", null)
+    .is("signed_at", null);
+
+  if (contractQueryError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "CONTRACT_CHECK_FAILED",
+        message: "Unable to verify contract status."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (unsignedContracts && unsignedContracts.length > 0) {
+    const titles = unsignedContracts.map((c) => (c as Record<string, unknown>).title as string);
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "UNSIGNED_CONTRACTS",
+        message: `Cannot begin onboarding — ${unsignedContracts.length} unsigned contract${unsignedContracts.length > 1 ? "s remain" : " remains"}: ${titles.join(", ")}.`,
+        details: {
+          unsignedContracts: unsignedContracts.map((c) => ({
+            id: (c as Record<string, unknown>).id as string,
+            title: (c as Record<string, unknown>).title as string
+          }))
+        }
+      },
+      meta: buildMeta()
+    });
+  }
+
   // ── 1. Activate auth user ────────────────────────────────────────────
   //
   // Pre-start people already have a placeholder auth user (unconfirmed
