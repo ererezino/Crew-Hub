@@ -19,6 +19,7 @@ import {
   profileRowSchema,
   mapProfileRow
 } from "../../../../lib/people/shared";
+import { fetchPeopleData } from "../../../../lib/people/fetch-people-data";
 import { deriveSystemPassword } from "../../../../lib/auth/system-password";
 import { createNotification } from "../../../../lib/notifications/service";
 import { createOnboardingInstance } from "../../../../lib/onboarding/create-instance";
@@ -101,18 +102,6 @@ function canManagePeople(userRoles: readonly UserRole[]): boolean {
   return hasRole(userRoles, "SUPER_ADMIN");
 }
 
-function canViewAllPeople(userRoles: readonly UserRole[]): boolean {
-  return (
-    hasRole(userRoles, "HR_ADMIN") ||
-    hasRole(userRoles, "FINANCE_ADMIN") ||
-    hasRole(userRoles, "SUPER_ADMIN")
-  );
-}
-
-function canViewReports(userRoles: readonly UserRole[]): boolean {
-  return hasRole(userRoles, "MANAGER") || hasRole(userRoles, "TEAM_LEAD") || canViewAllPeople(userRoles);
-}
-
 function normalizeCountryCode(value: string | undefined): string | null {
   if (!value || value.trim().length === 0) {
     return null;
@@ -168,207 +157,24 @@ export async function GET(request: Request) {
     });
   }
 
-  const query = parsedQuery.data;
-  const profile = session.profile;
-  const supabase = await createSupabaseServerClient();
+  try {
+    const data = await fetchPeopleData(session.profile, parsedQuery.data);
 
-  let scope = query.scope;
-
-  if (scope === "all" && !canViewAllPeople(profile.roles)) {
-    scope = canViewReports(profile.roles) ? "reports" : "me";
-  }
-
-  if (scope === "reports" && !canViewReports(profile.roles)) {
-    scope = "me";
-  }
-
-  let reportsUserIds: string[] = [];
-
-  if (scope === "reports") {
-    if (hasRole(profile.roles, "MANAGER")) {
-      const { data: reportRows, error: reportError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("org_id", profile.org_id)
-        .is("deleted_at", null)
-        .eq("manager_id", profile.id);
-
-      if (reportError) {
-        return jsonResponse<null>(500, {
-          data: null,
-          error: {
-            code: "REPORTS_FETCH_FAILED",
-            message: "Unable to load manager reports."
-          },
-          meta: buildMeta()
-        });
-      }
-
-      reportsUserIds = [
-        profile.id,
-        ...(reportRows ?? [])
-          .map((row) => row.id)
-          .filter((value): value is string => typeof value === "string")
-      ];
-    } else if (hasRole(profile.roles, "TEAM_LEAD") && profile.department) {
-      const { data: deptRows, error: deptError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("org_id", profile.org_id)
-        .is("deleted_at", null)
-        .ilike("department", profile.department);
-
-      if (deptError) {
-        return jsonResponse<null>(500, {
-          data: null,
-          error: {
-            code: "REPORTS_FETCH_FAILED",
-            message: "Unable to load department members."
-          },
-          meta: buildMeta()
-        });
-      }
-
-      reportsUserIds = [
-        profile.id,
-        ...(deptRows ?? [])
-          .map((row) => row.id)
-          .filter((value): value is string => typeof value === "string")
-      ];
-    }
-  }
-
-  const PEOPLE_SELECT_FULL =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, directory_visible, schedule_type, weekend_shift_hours, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
-  const PEOPLE_SELECT_COMPAT =
-    "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, directory_visible, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, favorite_music, favorite_books, favorite_sports, privacy_settings, social_linkedin, social_twitter, social_instagram, social_github, social_website, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
-
-  async function runPeopleQuery(selectString: string) {
-    let q = supabase
-      .from("profiles")
-      .select(selectString)
-      .eq("org_id", profile.org_id)
-      .is("deleted_at", null)
-      .order("full_name", { ascending: true })
-      .limit(query.limit);
-
-    if (scope === "me") {
-      q = q.eq("id", profile.id);
-    }
-
-    if (scope === "reports") {
-      q = q.in("id", reportsUserIds.length > 0 ? reportsUserIds : [profile.id]);
-    }
-
-    return q;
-  }
-
-  let { data: rawPeople, error: peopleError } = await runPeopleQuery(PEOPLE_SELECT_FULL);
-
-  // Fallback: if the query fails (e.g. schedule_type/weekend_shift_hours columns
-  // don't exist yet), retry without those columns
-  if (peopleError) {
-    const fallback = await runPeopleQuery(PEOPLE_SELECT_COMPAT);
-    rawPeople = fallback.data;
-    peopleError = fallback.error;
-  }
-
-  if (peopleError) {
+    return jsonResponse<PeopleListResponseData>(200, {
+      data,
+      error: null,
+      meta: buildMeta()
+    }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
+  } catch (error) {
     return jsonResponse<null>(500, {
       data: null,
       error: {
         code: "PEOPLE_FETCH_FAILED",
-        message: "Unable to load people records."
+        message: error instanceof Error ? error.message : "Unable to load people records."
       },
       meta: buildMeta()
     });
   }
-
-  const parsedPeople = z.array(profileRowSchema).safeParse(rawPeople ?? []);
-
-  if (!parsedPeople.success) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "PEOPLE_PARSE_FAILED",
-        message: "People data is not in the expected shape."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  const lookupIds = [
-    ...new Set(
-      parsedPeople.data
-        .flatMap((row) => [row.manager_id, row.team_lead_id ?? null])
-        .filter((value): value is string => Boolean(value))
-    )
-  ];
-
-  let nameById = new Map<string, string>();
-
-  if (lookupIds.length > 0) {
-    const { data: nameRows, error: namesError } = await supabase
-      .from("profiles")
-      .select("id, full_name")
-      .eq("org_id", profile.org_id)
-      .is("deleted_at", null)
-      .in("id", lookupIds);
-
-    if (namesError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: {
-          code: "MANAGERS_FETCH_FAILED",
-          message: "Unable to load manager details."
-        },
-        meta: buildMeta()
-      });
-    }
-
-    nameById = new Map(
-      (nameRows ?? [])
-        .filter(
-          (row): row is { id: string; full_name: string } =>
-            typeof row?.id === "string" && typeof row?.full_name === "string"
-        )
-        .map((row) => [row.id, row.full_name])
-    );
-  }
-
-  /* Fetch crew tags from payment details for all loaded profiles */
-  const profileIds = parsedPeople.data.map((row) => row.id);
-  let crewTagById = new Map<string, string>();
-
-  if (profileIds.length > 0 && canViewAllPeople(profile.roles)) {
-    const { data: paymentRows } = await supabase
-      .from("employee_payment_details")
-      .select("employee_id, crew_tag")
-      .eq("org_id", profile.org_id)
-      .in("employee_id", profileIds)
-      .not("crew_tag", "is", null);
-
-    if (paymentRows) {
-      crewTagById = new Map(
-        paymentRows
-          .filter(
-            (row): row is { employee_id: string; crew_tag: string } =>
-              typeof row?.employee_id === "string" && typeof row?.crew_tag === "string"
-          )
-          .map((row) => [row.employee_id, row.crew_tag])
-      );
-    }
-  }
-
-  const people = parsedPeople.data.map((row) =>
-    mapProfileRow(row, nameById, crewTagById.get(row.id) ?? null)
-  );
-
-  return jsonResponse<PeopleListResponseData>(200, {
-    data: { people },
-    error: null,
-    meta: buildMeta()
-  }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
 }
 
 export async function POST(request: Request) {

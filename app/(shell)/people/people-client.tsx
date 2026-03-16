@@ -25,6 +25,7 @@ import {
   type EmploymentType,
   type PeopleCreateResponse,
   type PeopleInviteResponse,
+  type PeopleListResponseData,
   type PeoplePasswordResetResponse,
   type PeopleUpdateResponse,
   type PersonRecord,
@@ -51,6 +52,8 @@ type PeopleClientProps = {
   embedded?: boolean;
   /** Called once on mount so the parent tabs wrapper can trigger create / bulk-upload. */
   onRegisterActions?: (actions: { openCreate: () => void; openBulkUpload: () => void }) => void;
+  /** Server-fetched initial data to avoid client-fetch waterfall on first load. */
+  initialPeopleData?: PeopleListResponseData;
 };
 
 type ToastMessage = {
@@ -463,7 +466,8 @@ export function PeopleClient({
   canResetAuthenticator,
   isAdmin = false,
   embedded = false,
-  onRegisterActions
+  onRegisterActions,
+  initialPeopleData
 }: PeopleClientProps) {
   const t = useTranslations('people');
   const tCommon = useTranslations('common');
@@ -505,7 +509,8 @@ export function PeopleClient({
   }, [t]);
 
   const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({
-    scope: initialScope
+    scope: initialScope,
+    initialData: initialPeopleData
   });
 
   const { presenceMap } = usePresence(isAdmin === true);

@@ -4,6 +4,7 @@ import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { getAuthenticatedSession } from "../../../lib/auth/session";
 import type { UserRole } from "../../../lib/navigation";
+import { fetchPeopleData } from "../../../lib/people/fetch-people-data";
 import { hasRole } from "../../../lib/roles";
 import { PeopleClient } from "./people-client";
 import { PeopleTabsClient } from "./people-tabs-client";
@@ -64,6 +65,16 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   const isSuperAdmin = hasRole(roles, "SUPER_ADMIN");
   const scope = resolveScope(roles);
 
+  // Server-fetch people data for the default scope so it's in the initial HTML.
+  // If the fetch fails, render without initialData — the client will retry via API.
+  let initialPeopleData;
+
+  try {
+    initialPeopleData = await fetchPeopleData(session.profile, { scope });
+  } catch {
+    // Graceful degradation: client will fetch on mount
+  }
+
   // Super Admins get the tabbed view with org chart access
   if (isSuperAdmin) {
     const resolvedSearchParams = await searchParams;
@@ -81,6 +92,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
         canResetAuthenticator={canResetAuthenticator}
         isAdmin={isAdmin}
         isSuperAdmin={isSuperAdmin}
+        initialPeopleData={initialPeopleData}
       />
     );
   }
@@ -95,6 +107,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
       canEditPeople={canEditPeople}
       canResetAuthenticator={canResetAuthenticator}
       isAdmin={isAdmin}
+      initialPeopleData={initialPeopleData}
     />
   );
 }

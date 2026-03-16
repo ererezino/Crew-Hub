@@ -7,6 +7,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { PageHeader } from "../../../components/shared/page-header";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import type { UserRole } from "../../../lib/navigation";
+import type { PeopleListResponseData } from "../../../types/people";
 import { PeopleClient } from "./people-client";
 
 const OrgChartClient = lazy(() =>
@@ -30,6 +31,7 @@ type PeopleTabsClientProps = {
   canResetAuthenticator: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  initialPeopleData?: PeopleListResponseData;
 };
 
 function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
@@ -50,7 +52,8 @@ export function PeopleTabsClient({
   canEditPeople,
   canResetAuthenticator,
   isAdmin,
-  isSuperAdmin
+  isSuperAdmin,
+  initialPeopleData
 }: PeopleTabsClientProps) {
   const tNav = useTranslations("nav");
   const t = useTranslations("people");
@@ -163,6 +166,7 @@ export function PeopleTabsClient({
             isAdmin={isAdmin}
             embedded
             onRegisterActions={handleRegisterActions}
+            initialPeopleData={initialPeopleData}
           />
         ) : null}
 

@@ -342,3 +342,117 @@ Browser navigates to /time-off
 | Fix | Regression | Action taken |
 |---|---|---|
 | — | None observed | — |
+
+---
+
+## Phase 4 Baseline
+
+Phase 4 applies the proven server-data rendering pattern to the **People page** — the most-used admin/manager page after Dashboard.
+
+### Current People Loading Flow (200ms RTT)
+
+```
+Browser navigates to /people
+  → Middleware: getUser()                                   ~200ms
+  → ShellLayout: getAuthenticatedSession()                  ~400ms (parallelized in Phase 3)
+  → PeoplePage: getAuthenticatedSession() (deduped)         ~0ms
+    — Resolves scope, permissions, renders PeopleClient shell
+    — No people data passed to client
+  → Browser hydrates, PeopleClient mounts
+    → usePeople({ scope }) fires GET /api/v1/people?scope=X  ~200ms RTT
+      → API route: getAuthenticatedSession()                  ~400ms server-side
+      → 1-3 DB queries:
+        1. profiles SELECT (all/reports/me scope)             ~200ms
+        2. manager/team lead name lookup (if any IDs)         ~200ms
+        3. crew tag lookup (admin only)                       ~200ms
+      → Response arrives, React re-renders with data           ~200ms RTT
+```
+
+**Estimated first-meaningful-render:** ~1800ms (middleware 200 + session 400 + client fetch 800-1200 + render 200)
+
+### What should be server-rendered vs deferred
+
+**Server-rendered (initialData for first load):**
+- The main People list for the user's scope (all/reports/me) with manager names and crew tags resolved
+- This is the entire primary view — the table/list that employees see immediately
+
+**Deferred (stay client-fetched):**
+- Org chart tab (lazy-loaded, super admin only)
+- Delegations tab (lazy-loaded, super admin only)
+- Person detail panels (opened on click)
+- Create/invite/bulk-upload flows (write operations)
+
+### Target State
+
+| Metric | Current | Target |
+|---|---|---|
+| People data in initial HTML | No (empty shell) | Yes (server-fetched, passed as initialData) |
+| People client-fetch on first load | 1 (GET + re-auth + 1-3 DB) | 0 |
+| People first-meaningful-render estimate | ~1800ms | ~1200ms (middleware 200 + session 400 + data 400 + render 200) |
+
+### Phase 4 Progress
+
+| Step | Fix | Status | Notes |
+|---|---|---|---|
+| 0 | Phase 4 baseline | Done | This section |
+| 1 | Repo hygiene check | Done | 32 modified + 1 untracked file from Phase 1/2 found uncommitted. Committed as `260c2e7`, pushed. Working tree clean before Phase 4 work began. |
+| 2 | Extract People data-fetching | Done | Created `lib/people/fetch-people-data.ts` (exported `fetchPeopleData(profile, query?)`). API route GET handler slimmed — now just HTTP wrapper with query validation. Removed unused `canViewReports`/`canViewAllPeople` from route. |
+| 3 | Server-render People with initialData | Done | `page.tsx` calls `fetchPeopleData()` server-side, passes to both `PeopleTabsClient` (super admin) and `PeopleClient` (others). `usePeople()` accepts optional `initialData`. No client fetch on first load. |
+| 4 | Verify in isolation | Done | tsc clean, eslint clean, 388/388 tests pass, next build clean. Browser verified: People table renders with full data on first paint, no spinner flash. |
+| 5 | Final measurement + closeout | Done | See results below. |
+
+### Post-Phase 4 People Loading Flow (200ms RTT)
+
+```
+Browser navigates to /people
+  → Middleware: getUser()                                   ~200ms
+  → ShellLayout: getAuthenticatedSession()                  ~400ms (parallelized)
+  → PeoplePage: getAuthenticatedSession() (deduped)         ~0ms
+  → fetchPeopleData() — 1-3 DB queries server-side          ~400ms
+    — Server returns HTML with full people table data embedded
+  → Browser hydrates, React Query initialized with initialData  ~200ms
+    — No client-side fetch needed — data already present
+```
+
+### Phase 4 Results
+
+| Metric | Before (Phase 3) | After (Phase 4) | Change |
+|---|---|---|---|
+| People data in initial HTML | No (empty shell) | Yes (server-fetched) | Eliminated loading state flash |
+| People client-fetch on first load | 1 (GET + re-auth + 1-3 DB) | 0 | Eliminated |
+| People API route GET lines | ~230 (inline data-fetching) | ~50 (thin wrapper) | −180 lines (extracted to shared module) |
+| People first-meaningful-render estimate | ~1800ms | ~1200ms | −600ms (−33%) |
+| Total JS size (raw) | 3,606,405 bytes | 3,606,639 bytes | +234 bytes (negligible — new import) |
+| Total static JS files | 90 | 90 | No change |
+| `next build` | Clean | Clean | No regressions |
+| `tsc --noEmit` | Clean | Clean | No type errors |
+| `eslint` | Clean | Clean | No lint errors |
+| `vitest run` | 388/388 | 388/388 | All tests pass |
+| Browser verification | N/A | People table renders with data on first paint | Confirmed |
+
+### Cumulative Improvement (Phase 1 → Phase 4)
+
+| Metric | Pre-optimization | Post-Phase 4 | Total improvement |
+|---|---|---|---|
+| Middleware Supabase calls | 4 sequential | 1 | −3 calls |
+| Session internal structure | All sequential | MFA ‖ profile parallel | −200ms per navigation |
+| Dashboard first-meaningful-render | ~2600ms | ~1600ms | −1000ms |
+| Time Off first-meaningful-render | ~2200ms | ~1200ms | −1000ms |
+| People first-meaningful-render | ~1800ms | ~1200ms | −600ms |
+| Pages with server-rendered data | 0 | 3 (Dashboard, Time Off, People) | 3 high-traffic pages |
+| Total JS size (raw) | 3.58 MB | 3.44 MB | −148 KB (−4%) |
+| Framer Motion | 733 KB across 14 chunks | Eliminated | −733 KB |
+| Auto-prefetch requests | 28 per page | 0 | Eliminated |
+
+### Deferred / Not in Scope
+
+- Org Chart tab (lazy-loaded, super admin only) — stays client-fetched
+- Delegations tab (lazy-loaded, super admin only) — stays client-fetched
+- Person detail panels (opened on click) — stays client-fetched
+- Create/invite/bulk-upload flows — write operations, not applicable
+
+### Phase 4 Regressions Log
+
+| Fix | Regression | Action taken |
+|---|---|---|
+| — | None observed | — |

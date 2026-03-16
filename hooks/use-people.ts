@@ -16,6 +16,7 @@ type PeopleScope = "all" | "reports" | "me";
 type UsePeopleOptions = {
   scope?: PeopleScope;
   enabled?: boolean;
+  initialData?: PeopleQueryData;
 };
 
 type UsePeopleResult = {
@@ -59,6 +60,7 @@ export function usePeople(options: UsePeopleOptions = {}): UsePeopleResult {
   const query = useQuery({
     queryKey,
     queryFn: ({ signal }) => fetchPeople(endpoint, signal),
+    initialData: options.initialData,
     enabled,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
