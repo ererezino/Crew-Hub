@@ -189,9 +189,11 @@ export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   team_hub: "LIMITED_PILOT",
   performance: "LIMITED_PILOT",
 
+  // Live — fully deployed and audited
+  signatures: "LIVE",
+
   // Hidden from pilot nav — accessible via direct URL only
   learning: "UNAVAILABLE",
-  signatures: "UNAVAILABLE",
   surveys: "UNAVAILABLE",
   analytics: "ADMIN_ONLY",
 

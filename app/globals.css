@@ -3823,17 +3823,6 @@ button.att-img-link {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  opacity: 0;
-  transform: translateY(2px);
-  pointer-events: none;
-  transition: opacity var(--transition-hover), transform var(--transition-hover);
-}
-
-.data-table-row:hover .documents-row-actions,
-.data-table-row:focus-within .documents-row-actions {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
 }
 
 .policy-detail-grid {
@@ -10730,9 +10719,6 @@ button.att-img-link {
   }
 
   .documents-row-actions {
-    opacity: 1;
-    transform: none;
-    pointer-events: auto;
     flex-wrap: wrap;
   }
 
