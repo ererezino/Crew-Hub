@@ -5781,7 +5781,9 @@
     "backdatedHint": "Événement antidaté — apparaîtra dans les archives.",
     "links": {
       "joinMeet": "Rejoindre Google Meet",
+      "googleMeet": "Google Meet",
       "openKahoot": "Ouvrir Kahoot",
+      "kahoot": "Kahoot",
       "openGame": "Ouvrir le jeu"
     }
   }

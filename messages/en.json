@@ -5791,7 +5791,9 @@
     "backdatedHint": "Backdated event — will appear in the archive.",
     "links": {
       "joinMeet": "Join Google Meet",
+      "googleMeet": "Google Meet",
       "openKahoot": "Open Kahoot",
+      "kahoot": "Kahoot",
       "openGame": "Open Game"
     }
   }

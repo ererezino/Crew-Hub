@@ -17910,6 +17910,324 @@ html.dark .crew-games-event-card-winner-badge {
   margin-top: var(--space-2);
 }
 
+/* ── Platform action buttons ── */
+.crew-games-platform-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--transition-hover), border-color var(--transition-hover),
+    box-shadow var(--transition-hover);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+/* Google Meet — teal brand */
+.crew-games-platform-meet {
+  background: rgba(0, 137, 123, 0.10);
+  border: 1px solid rgba(0, 137, 123, 0.25);
+  color: #00897B;
+}
+
+.crew-games-platform-meet:hover {
+  background: rgba(0, 137, 123, 0.18);
+  border-color: rgba(0, 137, 123, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 137, 123, 0.12);
+}
+
+html.dark .crew-games-platform-meet {
+  background: rgba(0, 137, 123, 0.12);
+  border-color: rgba(0, 137, 123, 0.3);
+  color: #5EEAD4;
+}
+
+html.dark .crew-games-platform-meet:hover {
+  background: rgba(0, 137, 123, 0.22);
+  border-color: rgba(0, 137, 123, 0.45);
+}
+
+/* On dark hero — override for white-on-dark context */
+.crew-games-hero .crew-games-platform-meet {
+  background: rgba(94, 234, 212, 0.15);
+  border-color: rgba(94, 234, 212, 0.3);
+  color: #5EEAD4;
+}
+
+.crew-games-hero .crew-games-platform-meet:hover {
+  background: rgba(94, 234, 212, 0.25);
+  border-color: rgba(94, 234, 212, 0.45);
+  box-shadow: 0 2px 12px rgba(94, 234, 212, 0.15);
+}
+
+/* Kahoot — purple brand */
+.crew-games-platform-kahoot {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: #7C3AED;
+}
+
+.crew-games-platform-kahoot:hover {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.35);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.12);
+}
+
+html.dark .crew-games-platform-kahoot {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.25);
+  color: #C4B5FD;
+}
+
+html.dark .crew-games-platform-kahoot:hover {
+  background: rgba(139, 92, 246, 0.22);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.crew-games-hero .crew-games-platform-kahoot {
+  background: rgba(196, 181, 253, 0.15);
+  border-color: rgba(196, 181, 253, 0.3);
+  color: #C4B5FD;
+}
+
+.crew-games-hero .crew-games-platform-kahoot:hover {
+  background: rgba(196, 181, 253, 0.25);
+  border-color: rgba(196, 181, 253, 0.45);
+  box-shadow: 0 2px 12px rgba(196, 181, 253, 0.15);
+}
+
+/* Alt game — orange/amber brand */
+.crew-games-platform-game {
+  background: rgba(253, 139, 5, 0.08);
+  border: 1px solid rgba(253, 139, 5, 0.2);
+  color: #D97706;
+}
+
+.crew-games-platform-game:hover {
+  background: rgba(253, 139, 5, 0.15);
+  border-color: rgba(253, 139, 5, 0.35);
+  box-shadow: 0 2px 8px rgba(253, 139, 5, 0.12);
+}
+
+html.dark .crew-games-platform-game {
+  background: rgba(253, 139, 5, 0.12);
+  border-color: rgba(253, 139, 5, 0.25);
+  color: #FDE68A;
+}
+
+html.dark .crew-games-platform-game:hover {
+  background: rgba(253, 139, 5, 0.22);
+  border-color: rgba(253, 139, 5, 0.4);
+}
+
+.crew-games-hero .crew-games-platform-game {
+  background: rgba(253, 222, 130, 0.15);
+  border-color: rgba(253, 222, 130, 0.3);
+  color: #FDE68A;
+}
+
+.crew-games-hero .crew-games-platform-game:hover {
+  background: rgba(253, 222, 130, 0.25);
+  border-color: rgba(253, 222, 130, 0.45);
+  box-shadow: 0 2px 12px rgba(253, 222, 130, 0.15);
+}
+
+/* ── Podium ── */
+.crew-games-podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0; /* flush — no gap between pedestal blocks */
+  padding: var(--space-6) var(--space-4) var(--space-2);
+}
+
+/* Each column: info above + pedestal block below */
+.crew-games-podium-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.crew-games-podium-col-1 { order: 2; width: 140px; }
+.crew-games-podium-col-2 { order: 1; width: 120px; }
+.crew-games-podium-col-3 { order: 3; width: 120px; }
+
+.crew-games-podium-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-bottom: var(--space-3);
+}
+
+/* Trophy on 1st place */
+.crew-games-podium-trophy {
+  color: #F59E0B;
+  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.35));
+  margin-bottom: var(--space-1);
+}
+
+/* Podium avatars */
+.crew-games-podium-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.crew-games-podium-avatar-1 {
+  width: 56px;
+  height: 56px;
+  font-size: 1.25rem;
+  background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+  color: #92400E;
+  border: 3px solid #F59E0B;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+}
+
+.crew-games-podium-avatar-2 {
+  width: 48px;
+  height: 48px;
+  font-size: 1.0625rem;
+  background: linear-gradient(135deg, #F1F5F9, #E2E8F0);
+  color: #475569;
+  border: 2px solid #94A3B8;
+  box-shadow: 0 2px 8px rgba(148, 163, 184, 0.2);
+}
+
+.crew-games-podium-avatar-3 {
+  width: 48px;
+  height: 48px;
+  font-size: 1.0625rem;
+  background: linear-gradient(135deg, #FEF3E2, #FDE8C8);
+  color: #78350F;
+  border: 2px solid #D97706;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.15);
+}
+
+.crew-games-podium-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  text-align: center;
+  line-height: 1.3;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-games-podium-col-1 .crew-games-podium-name {
+  font-size: 0.9375rem;
+  max-width: 140px;
+}
+
+.crew-games-podium-score {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pedestal blocks — connected, 3D depth, bold numbers */
+.crew-games-podium-block {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+/* 3D depth — right edge shadow on each block */
+.crew-games-podium-block::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  border-radius: 0 var(--radius-sm) 0 0;
+  opacity: 0.25;
+  background: #000;
+}
+
+/* Left block (2nd) gets depth on the right side */
+.crew-games-podium-block-2::after {
+  right: 0;
+}
+
+/* Center block (1st) — depth on both sides via additional pseudo */
+.crew-games-podium-block-1::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 0;
+  bottom: 0;
+  width: 6px;
+  border-radius: var(--radius-sm) 0 0 0;
+  opacity: 0.12;
+  background: #000;
+}
+
+/* Right block (3rd) — depth on left */
+.crew-games-podium-block-3::after {
+  right: auto;
+  left: 0;
+  border-radius: var(--radius-sm) 0 0 0;
+}
+
+.crew-games-podium-placement {
+  font-weight: 900;
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  opacity: 0.85;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 1st place — gold, tallest */
+.crew-games-podium-block-1 {
+  height: 110px;
+  background: linear-gradient(180deg, #FDE68A 0%, #F59E0B 60%, #D97706 100%);
+  color: #FFFFFF;
+  box-shadow: 0 -4px 20px rgba(245, 158, 11, 0.25);
+}
+
+/* 2nd place — silver */
+.crew-games-podium-block-2 {
+  height: 80px;
+  background: linear-gradient(180deg, #E2E8F0 0%, #94A3B8 60%, #64748B 100%);
+  color: #FFFFFF;
+}
+
+/* 3rd place — bronze, shortest */
+.crew-games-podium-block-3 {
+  height: 60px;
+  background: linear-gradient(180deg, #FDE8C8 0%, #D97706 60%, #B45309 100%);
+  color: #FFFFFF;
+}
+
+/* Podium on dark hero */
+.crew-games-hero .crew-games-podium-name {
+  color: #FFFFFF;
+}
+
+.crew-games-hero .crew-games-podium-score {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.crew-games-hero .crew-games-podium-trophy {
+  color: #FDE68A;
+  filter: drop-shadow(0 2px 6px rgba(253, 230, 138, 0.5));
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   .crew-games-hero-content {
@@ -17927,6 +18245,52 @@ html.dark .crew-games-event-card-winner-badge {
   .crew-games-event-card-thumb,
   .crew-games-event-card-thumb-placeholder {
     display: none;
+  }
+
+  /* Podium responsive */
+  .crew-games-podium {
+    padding: var(--space-4) var(--space-2) var(--space-1);
+  }
+
+  .crew-games-podium-col-1 { width: 110px; }
+  .crew-games-podium-col-2 { width: 95px; }
+  .crew-games-podium-col-3 { width: 95px; }
+
+  .crew-games-podium-trophy { transform: scale(0.8); }
+
+  .crew-games-podium-avatar-1 {
+    width: 44px;
+    height: 44px;
+    font-size: 1rem;
+  }
+
+  .crew-games-podium-avatar-2,
+  .crew-games-podium-avatar-3 {
+    width: 38px;
+    height: 38px;
+    font-size: 0.875rem;
+  }
+
+  .crew-games-podium-block-1 { height: 84px; }
+  .crew-games-podium-block-2 { height: 60px; }
+  .crew-games-podium-block-3 { height: 46px; }
+
+  .crew-games-podium-placement { font-size: 1.5rem; }
+
+  .crew-games-podium-name {
+    font-size: 0.6875rem;
+    max-width: 85px;
+  }
+
+  .crew-games-podium-col-1 .crew-games-podium-name {
+    font-size: 0.75rem;
+    max-width: 100px;
+  }
+
+  /* Platform buttons responsive */
+  .crew-games-platform-btn {
+    font-size: 0.75rem;
+    padding: var(--space-1) var(--space-3);
   }
 }
 .form-field-hint { font-size: 0.75rem; color: var(--text-tertiary); margin-top: var(--space-1); }

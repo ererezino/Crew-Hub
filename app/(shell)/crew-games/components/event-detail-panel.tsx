@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useCrewGameEventDetail } from "../../../../hooks/use-crew-games";
+import { PodiumDisplay } from "./podium-display";
 
 type EventDetailPanelProps = {
   eventId: string;
@@ -30,13 +31,17 @@ export function EventDetailPanel({ eventId }: EventDetailPanelProps) {
         <p className="crew-games-detail-date">{event.eventDate}</p>
       </div>
 
-      {/* Games Night results table */}
+      {/* Games Night results */}
       {isGamesNight ? (
         <div className="crew-games-detail-section">
           <h4 className="form-label">{t("results.title")}</h4>
           {results.length === 0 ? (
             <p className="crew-games-empty-hint">{t("results.noResults")}</p>
           ) : (
+            <>
+            {/* Podium — celebratory top-3 showcase */}
+            <PodiumDisplay results={results} />
+
             <div className="data-table-container">
               <table className="crew-games-leaderboard-table">
                 <thead>
@@ -79,6 +84,7 @@ export function EventDetailPanel({ eventId }: EventDetailPanelProps) {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       ) : null}

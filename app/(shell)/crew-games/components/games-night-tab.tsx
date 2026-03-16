@@ -6,9 +6,11 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  ExternalLink,
+  Gamepad2,
   Plus,
   Trophy,
+  Video,
+  Zap,
   Edit2,
   Trash2
 } from "lucide-react";
@@ -21,6 +23,7 @@ import {
 } from "../../../../hooks/use-crew-games";
 import type { CrewNightEvent } from "../../../../types/crew-games";
 import { EventFormPanel } from "./event-form-panel";
+import { EventPodium } from "./event-podium";
 import { ResultsFormPanel } from "./results-form-panel";
 import { LeaderboardSection } from "./leaderboard-section";
 import { EventDetailPanel } from "./event-detail-panel";
@@ -219,17 +222,22 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
               <p className="crew-games-hero-description">{heroEvent.description}</p>
             ) : null}
 
-            {/* Link buttons */}
+            {/* Podium — completed hero events */}
+            {heroEvent.status === "completed" ? (
+              <EventPodium eventId={heroEvent.id} />
+            ) : null}
+
+            {/* Platform action buttons */}
             <div className="crew-games-hero-links">
               {heroEvent.meetLink ? (
                 <a
                   href={heroEvent.meetLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="button button-subtle"
+                  className="crew-games-platform-btn crew-games-platform-meet"
                 >
-                  <ExternalLink size={14} aria-hidden="true" />
-                  {t("links.joinMeet")}
+                  <Video size={16} aria-hidden="true" />
+                  <span>{t("links.googleMeet")}</span>
                 </a>
               ) : null}
               {heroEvent.kahootLink ? (
@@ -237,10 +245,10 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
                   href={heroEvent.kahootLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="button button-subtle"
+                  className="crew-games-platform-btn crew-games-platform-kahoot"
                 >
-                  <ExternalLink size={14} aria-hidden="true" />
-                  {t("links.openKahoot")}
+                  <Zap size={16} aria-hidden="true" />
+                  <span>{t("links.kahoot")}</span>
                 </a>
               ) : null}
               {heroEvent.altGameLink ? (
@@ -248,12 +256,14 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
                   href={heroEvent.altGameLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="button button-subtle"
+                  className="crew-games-platform-btn crew-games-platform-game"
                 >
-                  <ExternalLink size={14} aria-hidden="true" />
-                  {heroEvent.featuredGame
-                    ? t("event.openFeaturedGame", { game: heroEvent.featuredGame.slice(0, 30) })
-                    : t("links.openGame")}
+                  <Gamepad2 size={16} aria-hidden="true" />
+                  <span>
+                    {heroEvent.featuredGame
+                      ? heroEvent.featuredGame.slice(0, 30)
+                      : t("links.openGame")}
+                  </span>
                 </a>
               ) : null}
             </div>
@@ -550,17 +560,22 @@ function EventCard({
             </p>
           ) : null}
 
-          {/* Links */}
+          {/* Podium for completed events */}
+          {event.status === "completed" ? (
+            <EventPodium eventId={event.id} />
+          ) : null}
+
+          {/* Platform action links */}
           <div className="crew-games-hero-links" style={{ marginTop: "var(--space-2)" }}>
             {event.meetLink ? (
               <a
                 href={event.meetLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="button button-subtle"
+                className="crew-games-platform-btn crew-games-platform-meet"
               >
-                <ExternalLink size={14} aria-hidden="true" />
-                {t("links.joinMeet")}
+                <Video size={14} aria-hidden="true" />
+                <span>{t("links.googleMeet")}</span>
               </a>
             ) : null}
             {event.kahootLink ? (
@@ -568,10 +583,10 @@ function EventCard({
                 href={event.kahootLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="button button-subtle"
+                className="crew-games-platform-btn crew-games-platform-kahoot"
               >
-                <ExternalLink size={14} aria-hidden="true" />
-                {t("links.openKahoot")}
+                <Zap size={14} aria-hidden="true" />
+                <span>{t("links.kahoot")}</span>
               </a>
             ) : null}
             {event.altGameLink ? (
@@ -579,12 +594,14 @@ function EventCard({
                 href={event.altGameLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="button button-subtle"
+                className="crew-games-platform-btn crew-games-platform-game"
               >
-                <ExternalLink size={14} aria-hidden="true" />
-                {event.featuredGame
-                  ? t("event.openFeaturedGame", { game: event.featuredGame.slice(0, 30) })
-                  : t("links.openGame")}
+                <Gamepad2 size={14} aria-hidden="true" />
+                <span>
+                  {event.featuredGame
+                    ? event.featuredGame.slice(0, 30)
+                    : t("links.openGame")}
+                </span>
               </a>
             ) : null}
           </div>
