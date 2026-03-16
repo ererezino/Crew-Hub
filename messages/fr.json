@@ -5065,6 +5065,12 @@
       "markSent": "Marquer envoyé",
       "markSigned": "Marquer signé",
       "void": "Annuler",
+      "attachPdf": "Joindre un PDF (facultatif)",
+      "replacePdf": "Remplacer le PDF",
+      "download": "Télécharger",
+      "removeFile": "Retirer",
+      "pdfOnly": "PDF uniquement, 10 Mo max",
+      "signedNoReplace": "Document verrouillé (contrat signé)",
       "status": {
         "draft": "Brouillon",
         "sent": "Envoyé",

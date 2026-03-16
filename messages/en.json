@@ -5074,6 +5074,12 @@
       "markSent": "Mark sent",
       "markSigned": "Mark signed",
       "void": "Void",
+      "attachPdf": "Attach PDF (optional)",
+      "replacePdf": "Replace PDF",
+      "download": "Download",
+      "removeFile": "Remove",
+      "pdfOnly": "PDF only, max 10 MB",
+      "signedNoReplace": "Document locked (contract signed)",
       "status": {
         "draft": "Draft",
         "sent": "Sent",

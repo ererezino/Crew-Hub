@@ -545,8 +545,12 @@ export function PeopleClient({
   const [isLoadingContracts, setIsLoadingContracts] = useState(false);
   const [newContractTitle, setNewContractTitle] = useState("");
   const [newContractNotes, setNewContractNotes] = useState("");
+  const [newContractFile, setNewContractFile] = useState<File | null>(null);
   const [isAddingContract, setIsAddingContract] = useState(false);
   const [updatingContractId, setUpdatingContractId] = useState<string | null>(null);
+  const [downloadingContractId, setDownloadingContractId] = useState<string | null>(null);
+  const newContractFileRef = useRef<HTMLInputElement>(null);
+  const replaceFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Invite state
   const [invitingId, setInvitingId] = useState<string | null>(null);
@@ -909,19 +913,35 @@ export function PeopleClient({
     if (!editPerson || !newContractTitle.trim()) return;
     setIsAddingContract(true);
     try {
-      const response = await fetch(`/api/v1/people/${editPerson.id}/contracts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newContractTitle.trim(),
-          notes: newContractNotes.trim() || null
-        })
-      });
+      let response: Response;
+
+      if (newContractFile) {
+        const formData = new FormData();
+        formData.append("title", newContractTitle.trim());
+        if (newContractNotes.trim()) formData.append("notes", newContractNotes.trim());
+        formData.append("document", newContractFile);
+        response = await fetch(`/api/v1/people/${editPerson.id}/contracts`, {
+          method: "POST",
+          body: formData
+        });
+      } else {
+        response = await fetch(`/api/v1/people/${editPerson.id}/contracts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: newContractTitle.trim(),
+            notes: newContractNotes.trim() || null
+          })
+        });
+      }
+
       const payload = await response.json();
       if (response.ok && payload.data?.contract) {
         setContracts((prev) => [payload.data.contract as PreStartContract, ...prev]);
         setNewContractTitle("");
         setNewContractNotes("");
+        setNewContractFile(null);
+        if (newContractFileRef.current) newContractFileRef.current.value = "";
       } else {
         addToast("error", humanizeError(payload?.error?.message ?? td('toast.contractAddFailed')));
       }
@@ -930,7 +950,7 @@ export function PeopleClient({
     } finally {
       setIsAddingContract(false);
     }
-  }, [editPerson, newContractTitle, newContractNotes, td]);
+  }, [editPerson, newContractTitle, newContractNotes, newContractFile, td]);
 
   const handleUpdateContract = useCallback(async (contractId: string, update: Record<string, unknown>) => {
     if (!editPerson) return;
@@ -953,6 +973,57 @@ export function PeopleClient({
       addToast("error", error instanceof Error ? error.message : td('toast.contractUpdateFailed'));
     } finally {
       setUpdatingContractId(null);
+    }
+  }, [editPerson, td]);
+
+  const handleDownloadContract = useCallback(async (contractId: string) => {
+    if (!editPerson) return;
+    setDownloadingContractId(contractId);
+    try {
+      const response = await fetch(`/api/v1/people/${editPerson.id}/contracts/${contractId}/document`);
+      const payload = await response.json();
+      if (response.ok && payload.data?.url) {
+        window.open(payload.data.url, "_blank");
+      } else if (response.status === 404) {
+        addToast("info", payload.error?.message ?? "No document attached.");
+      } else {
+        addToast("error", humanizeError(payload?.error?.message ?? "Unable to download document."));
+      }
+    } catch {
+      addToast("error", "Unable to download document.");
+    } finally {
+      setDownloadingContractId(null);
+    }
+  }, [editPerson]);
+
+  const handleReplaceDocument = useCallback(async (contractId: string, file: File) => {
+    if (!editPerson) return;
+    setUpdatingContractId(contractId);
+    try {
+      const formData = new FormData();
+      formData.append("contractId", contractId);
+      formData.append("document", file);
+
+      const response = await fetch(`/api/v1/people/${editPerson.id}/contracts`, {
+        method: "PUT",
+        body: formData
+      });
+      const payload = await response.json();
+      if (response.ok && payload.data?.contract) {
+        setContracts((prev) =>
+          prev.map((c) => (c.id === contractId ? (payload.data.contract as PreStartContract) : c))
+        );
+        addToast("success", "Document updated.");
+      } else {
+        addToast("error", humanizeError(payload?.error?.message ?? td('toast.contractUpdateFailed')));
+      }
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : td('toast.contractUpdateFailed'));
+    } finally {
+      setUpdatingContractId(null);
+      // Clear the file input
+      const ref = replaceFileRefs.current[contractId];
+      if (ref) ref.value = "";
     }
   }, [editPerson, td]);
 
@@ -2227,6 +2298,53 @@ export function PeopleClient({
                             {contract.notes}
                           </p>
                         ) : null}
+
+                        {/* Document info + download */}
+                        {contract.fileName ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginTop: "var(--space-1)", fontSize: "var(--text-xs)" }}>
+                            <span style={{ color: "var(--text-muted)" }}>
+                              {contract.fileName}
+                            </span>
+                            <button
+                              type="button"
+                              className="table-row-action"
+                              style={{ fontSize: "var(--text-xs)" }}
+                              disabled={downloadingContractId === contract.id}
+                              onClick={() => void handleDownloadContract(contract.id)}
+                            >
+                              {downloadingContractId === contract.id ? "…" : t('contracts.download')}
+                            </button>
+                            {/* Replace button — not for signed contracts */}
+                            {contract.status === "signed" ? (
+                              <span className="text-muted" style={{ fontSize: "var(--text-xs)", fontStyle: "italic" }}>
+                                {t('contracts.signedNoReplace')}
+                              </span>
+                            ) : (
+                              <>
+                                <input
+                                  ref={(el) => { replaceFileRefs.current[contract.id] = el; }}
+                                  type="file"
+                                  accept=".pdf,application/pdf"
+                                  style={{ display: "none" }}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) void handleReplaceDocument(contract.id, file);
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="table-row-action"
+                                  style={{ fontSize: "var(--text-xs)" }}
+                                  disabled={updatingContractId === contract.id}
+                                  onClick={() => replaceFileRefs.current[contract.id]?.click()}
+                                >
+                                  {t('contracts.replacePdf')}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ) : null}
+
                         {contract.status !== "voided" ? (
                           <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-1)" }}>
                             {contract.status === "draft" ? (
@@ -2281,6 +2399,43 @@ export function PeopleClient({
                     rows={2}
                     style={{ fontSize: "var(--text-sm)", resize: "vertical" }}
                   />
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <input
+                      ref={newContractFileRef}
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: "none" }}
+                      onChange={(e) => setNewContractFile(e.target.files?.[0] ?? null)}
+                    />
+                    <button
+                      type="button"
+                      className="table-row-action"
+                      style={{ fontSize: "var(--text-xs)" }}
+                      onClick={() => newContractFileRef.current?.click()}
+                    >
+                      {t('contracts.attachPdf')}
+                    </button>
+                    {newContractFile ? (
+                      <span style={{ fontSize: "var(--text-xs)", display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
+                        <span style={{ color: "var(--text-muted)" }}>{newContractFile.name}</span>
+                        <button
+                          type="button"
+                          className="table-row-action table-row-action-warning"
+                          style={{ fontSize: "var(--text-xs)" }}
+                          onClick={() => {
+                            setNewContractFile(null);
+                            if (newContractFileRef.current) newContractFileRef.current.value = "";
+                          }}
+                        >
+                          {t('contracts.removeFile')}
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="text-muted" style={{ fontSize: "var(--text-xs)" }}>
+                        {t('contracts.pdfOnly')}
+                      </span>
+                    )}
+                  </div>
                   <button
                     type="button"
                     className="button"
