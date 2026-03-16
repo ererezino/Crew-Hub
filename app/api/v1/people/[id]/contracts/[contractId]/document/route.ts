@@ -19,6 +19,8 @@ const paramsSchema = z.object({
 });
 
 // ── GET /api/v1/people/[id]/contracts/[contractId]/document ─────────────
+// Note: pre_start_contracts does not use soft-delete (no deleted_at column).
+// Contracts are voided via voided_at timestamp, not deleted.
 
 export async function GET(
   _request: Request,
