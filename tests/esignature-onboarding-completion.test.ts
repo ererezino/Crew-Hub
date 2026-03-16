@@ -135,43 +135,52 @@ function setupMocks(opts: {
   instanceType: "onboarding" | "offboarding";
   employeeId: string;
 }) {
-  // Regular supabase client (used for reads and signer update)
-  const supabaseCalls: string[] = [];
-  supabaseFromMock.mockImplementation((table: string) => {
-    supabaseCalls.push(table);
-    if (table === "signature_requests") {
-      return chainable({
-        data: {
-          id: REQUEST_ID,
-          org_id: ORG_ID,
-          status: "pending",
-          title: "Test Document",
-          created_by: USER_ID
-        },
-        error: null
-      });
-    }
-    if (table === "signature_signers") {
-      return chainable({
-        data: { id: SIGNER_ID, status: "pending" },
-        error: null
-      });
-    }
+  // Regular supabase client — no longer used for reads (switched to service-role).
+  // Keep mock for any remaining user-level calls.
+  supabaseFromMock.mockImplementation(() => {
     return chainable({ data: null, error: null });
   });
 
-  // Service role client (used for writes and post-sign queries)
-  const serviceRoleCalls: string[] = [];
+  // Service role client (used for reads, writes, and post-sign queries).
+  // Signature reads (request + signer) now go through service-role.
+  let signatureSignersCallCount = 0;
+  let signatureRequestsCallCount = 0;
   let onboardingTaskCallCount = 0;
 
   serviceRoleFromMock.mockImplementation((table: string) => {
-    serviceRoleCalls.push(table);
 
     if (table === "signature_signers") {
-      // Check for pending signers — return none (all signed)
+      signatureSignersCallCount++;
+      if (signatureSignersCallCount === 1) {
+        // First call: initial signer lookup by request + user
+        return chainable({
+          data: { id: SIGNER_ID, status: "pending" },
+          error: null
+        });
+      }
+      if (signatureSignersCallCount === 2) {
+        // Second call: signer UPDATE (status → signed)
+        return chainable({ data: null, error: null });
+      }
+      // Third+ call: pending signers check — return none (all signed)
       return chainable({ data: [], error: null });
     }
     if (table === "signature_requests") {
+      signatureRequestsCallCount++;
+      if (signatureRequestsCallCount === 1) {
+        // First call: initial request read
+        return chainable({
+          data: {
+            id: REQUEST_ID,
+            org_id: ORG_ID,
+            status: "pending",
+            title: "Test Document",
+            created_by: USER_ID
+          },
+          error: null
+        });
+      }
+      // Subsequent calls: request UPDATE (status → completed)
       return chainable({ data: null, error: null });
     }
     if (table === "signature_events") {
@@ -212,6 +221,10 @@ function setupMocks(opts: {
         },
         error: null
       });
+    }
+    if (table === "pre_start_contracts") {
+      // Auto-sign hook: return empty (no linked contracts in these tests)
+      return chainable({ data: [], error: null });
     }
     return chainable({ data: null, error: null });
   });

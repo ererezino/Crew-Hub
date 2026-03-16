@@ -7,7 +7,6 @@ import { sendOnboardingCompleteEmail } from "../../../../../../lib/notifications
 import { createNotification } from "../../../../../../lib/notifications/service";
 import { completeOnboarding } from "../../../../../../lib/onboarding/auto-transition";
 import { hasRole } from "../../../../../../lib/roles";
-import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
@@ -151,7 +150,6 @@ export async function POST(
     });
   }
 
-  const supabase = await createSupabaseServerClient();
   const serviceRoleClient = createSupabaseServiceRoleClient();
 
   // Use service-role for reads: signature rows may have been created by the
