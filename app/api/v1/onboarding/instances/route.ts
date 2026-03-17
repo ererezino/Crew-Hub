@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
 import { sendOnboardingStartedEmail } from "../../../../../lib/notifications/email";
@@ -154,7 +155,7 @@ export async function GET(request: Request) {
   const userRoles = session.profile.roles;
   let scope = query.scope;
 
-  if (scope === "all" && !canViewAllScope(userRoles)) {
+  if (scope === "all" && !(await checkApiAccess("/onboarding", session.profile))) {
     scope = canViewReportsScope(userRoles) ? "reports" : "me";
   }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import type { UserRole } from "../../../../../lib/navigation";
 import {
@@ -56,7 +57,7 @@ export async function GET() {
     });
   }
 
-  if (!canViewAtRisk(session.profile.roles)) {
+  if (!(await checkApiAccess("/onboarding", session.profile))) {
     return jsonResponse<null>(403, {
       data: null,
       error: {

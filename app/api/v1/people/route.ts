@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { getAuthMutationBlockReason } from "../../../../lib/auth/auth-mutation-guard";
 import {
@@ -158,7 +159,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await fetchPeopleData(session.profile, parsedQuery.data);
+    const hasConfigAccess = await checkApiAccess("/people", session.profile);
+    const data = await fetchPeopleData(session.profile, parsedQuery.data, hasConfigAccess);
 
     return jsonResponse<PeopleListResponseData>(200, {
       data,

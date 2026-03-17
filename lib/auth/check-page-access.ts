@@ -19,7 +19,7 @@ import {
 } from "../access-control";
 import type { UserRole } from "../navigation";
 import { hasRole } from "../roles";
-import { createSupabaseServerClient } from "../supabase/server";
+import { createSupabaseServiceRoleClient } from "../supabase/service-role";
 import { getAuthenticatedSession, type SessionProfile } from "./session";
 
 type NavAccessRow = {
@@ -41,7 +41,7 @@ type PageAccessResult = {
  */
 const fetchNavAccessConfig = cache(
   async (orgId: string): Promise<NavAccessRow[]> => {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabaseServiceRoleClient();
 
     const { data, error } = await supabase
       .from("navigation_access_config")

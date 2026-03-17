@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { normalizeUserRoles, type UserRole } from "../../../../lib/navigation";
+import { checkApiAccess } from "../../../../lib/auth/check-api-access";
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../types/auth";
@@ -1017,9 +1018,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const normalizedRoles = normalizeUserRoles(session.profile.roles);
-
-  if (!canViewAnalytics(normalizedRoles)) {
+  if (!(await checkApiAccess("/analytics", session.profile))) {
     return jsonResponse<null>(403, {
       data: null,
       error: {

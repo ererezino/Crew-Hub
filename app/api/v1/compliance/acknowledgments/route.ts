@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { canManageCompliance } from "../../../../../lib/compliance";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
@@ -42,7 +43,7 @@ export async function GET() {
     });
   }
 
-  if (!canManageCompliance(session.profile.roles)) {
+  if (!(await checkApiAccess("/compliance", session.profile))) {
     return jsonResponse<null>(403, {
       data: null,
       error: { code: "FORBIDDEN", message: "Admin access required." },

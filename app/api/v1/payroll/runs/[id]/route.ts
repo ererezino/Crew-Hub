@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { adjustmentTotal, deductionTotal } from "../../../../../../lib/payroll/runs";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
@@ -139,7 +140,7 @@ export async function GET(
     });
   }
 
-  if (!canViewPayroll(session.profile.roles)) {
+  if (!(await checkApiAccess("/payroll", session.profile))) {
     return jsonResponse<null>(403, {
       data: null,
       error: {

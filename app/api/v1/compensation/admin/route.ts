@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import {
   fetchAdminCompensationEmployees,
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
     });
   }
 
-  if (!canViewOrgCompensation(session.profile.roles)) {
+  if (!(await checkApiAccess("/admin/compensation", session.profile))) {
     return jsonResponse<null>(403, {
       data: null,
       error: {

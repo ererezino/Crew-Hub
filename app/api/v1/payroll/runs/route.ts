@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
 import { currentMonthPeriod, getCurrencyTotal } from "../../../../../lib/payroll/runs";
@@ -94,7 +95,7 @@ export async function GET() {
     });
   }
 
-  if (!canViewPayroll(session.profile.roles)) {
+  if (!(await checkApiAccess("/payroll", session.profile))) {
     return jsonResponse<null>(403, {
       data: null,
       error: {

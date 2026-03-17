@@ -41,13 +41,14 @@ export type PeopleQuery = {
  */
 export async function fetchPeopleData(
   profile: SessionProfile,
-  query: PeopleQuery = {}
+  query: PeopleQuery = {},
+  hasConfigAccess = false
 ): Promise<PeopleListResponseData> {
   const limit = query.limit ?? 250;
   let scope = query.scope ?? "all";
 
   // Enforce scope access rules
-  if (scope === "all" && !canViewAllPeople(profile.roles)) {
+  if (scope === "all" && !canViewAllPeople(profile.roles) && !hasConfigAccess) {
     scope = canViewReports(profile.roles) ? "reports" : "me";
   }
 

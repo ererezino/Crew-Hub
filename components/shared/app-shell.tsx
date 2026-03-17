@@ -913,13 +913,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
   }, [accessConfigQuery.data, currentUserRoles, fallbackAllowedRouteKeys]);
 
   const navigationGroups = useMemo(() => {
-    return NAV_GROUPS.filter((group) => {
-      if (!group.requiredRoles || group.requiredRoles.length === 0) {
-        return true;
-      }
-
-      return hasAnyRole(currentUserRoles, group.requiredRoles);
-    })
+    return NAV_GROUPS
       .map((group) => ({
         ...group,
         items: group.items.filter(
@@ -935,7 +929,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
         key: getSidebarGroupStorageKey(group, index),
         domId: getSidebarGroupId(group, index)
       }));
-  }, [allowedRouteKeys, currentUserRoles]);
+  }, [allowedRouteKeys]);
 
   const commandRoutes = useMemo(
     () => ROUTE_ITEMS.filter((route) => allowedRouteKeys.has(route.href)),

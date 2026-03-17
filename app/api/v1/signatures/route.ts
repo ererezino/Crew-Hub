@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { logAudit } from "../../../../lib/audit";
 import { createBulkNotifications } from "../../../../lib/notifications/service";
@@ -192,7 +193,7 @@ export async function GET(request: Request) {
   const query = parsedQuery.data;
   const profile = session.profile;
   const supabase = await createSupabaseServerClient();
-  const canViewAll = isSignatureAdmin(profile.roles);
+  const canViewAll = await checkApiAccess("/signatures", profile);
   const scope = query.scope === "all" && canViewAll ? "all" : "mine";
 
   let requestQuery = supabase

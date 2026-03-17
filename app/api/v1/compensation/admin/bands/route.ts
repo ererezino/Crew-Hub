@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../lib/audit";
 import { fetchCompensationBandsData } from "../../../../../../lib/compensation-bands-store";
@@ -229,7 +230,7 @@ export async function GET() {
     });
   }
 
-  if (!canManageCompensation(session.profile.roles)) {
+  if (!(await checkApiAccess("/admin/compensation", session.profile))) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
