@@ -83,9 +83,9 @@ export function CreatePayrollRunClient() {
   const [createRunDirty, setCreateRunDirty] = useState(false);
   useUnsavedGuard(createRunDirty);
 
-  const activeContractorCount = useMemo(
-    () => dashboardQuery.data?.metrics.activeContractorCount ?? 0,
-    [dashboardQuery.data?.metrics.activeContractorCount]
+  const eligibleEmployeeCount = useMemo(
+    () => dashboardQuery.data?.metrics.eligibleEmployeeCount ?? 0,
+    [dashboardQuery.data?.metrics.eligibleEmployeeCount]
   );
 
   const getFormErrors = useMemo(
@@ -213,7 +213,7 @@ export function CreatePayrollRunClient() {
           <article className="settings-card">
             <h2 className="section-title">{t('eligibilitySnapshot')}</h2>
             <p className="settings-card-description">
-              {t('eligibilityDescription', { count: activeContractorCount })}
+              {t('eligibilityDescription', { count: eligibleEmployeeCount })}
             </p>
             <StatusBadge tone="info">{t('contractorMode')}</StatusBadge>
           </article>

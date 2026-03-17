@@ -140,7 +140,7 @@ export function PayrollDashboardClient({
             <article className="metric-card">
               <p className="metric-label">{t('contractors')}</p>
               <p className="metric-value numeric">
-                {runsQuery.data.metrics.activeContractorCount}
+                {runsQuery.data.metrics.eligibleEmployeeCount}
               </p>
               <p className="metric-hint">{t('contractorsHint')}</p>
             </article>

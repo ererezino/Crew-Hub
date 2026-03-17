@@ -59,7 +59,7 @@ export type PayrollRunDashboardMetrics = {
   latestTotalCostAmount: number;
   latestEmployeeCount: number;
   nextPayDate: string | null;
-  activeContractorCount: number;
+  eligibleEmployeeCount: number;
 };
 
 export type PayrollRunsDashboardResponseData = {
@@ -148,7 +148,7 @@ export type CreatePayrollRunPayload = {
 
 export type CreatePayrollRunResponseData = {
   run: PayrollRunSummary;
-  activeContractorCount: number;
+  eligibleEmployeeCount: number;
 };
 
 export type CalculatePayrollRunResponseData = {

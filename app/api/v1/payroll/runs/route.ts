@@ -55,7 +55,7 @@ function ensureDateValues(
   return null;
 }
 
-async function countActiveContractors({
+async function countEligibleEmployees({
   supabase,
   orgId
 }: {
@@ -66,13 +66,15 @@ async function countActiveContractors({
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("org_id", orgId)
-    .eq("employment_type", "contractor")
-    .eq("payroll_mode", "contractor_usd_no_withholding")
+    .in("payroll_mode", [
+      "contractor_usd_no_withholding",
+      "employee_local_withholding"
+    ])
     .eq("status", "active")
     .is("deleted_at", null);
 
   if (error) {
-    throw new Error(`Unable to count active contractors: ${error.message}`);
+    throw new Error(`Unable to count eligible employees: ${error.message}`);
   }
 
   return count ?? 0;
@@ -106,7 +108,7 @@ export async function GET() {
   try {
     const supabase = await createSupabaseServerClient();
 
-    const [{ data: rawRuns, error: runsError }, activeContractorCount] = await Promise.all([
+    const [{ data: rawRuns, error: runsError }, eligibleEmployeeCount] = await Promise.all([
       supabase
         .from("payroll_runs")
         .select(
@@ -116,7 +118,7 @@ export async function GET() {
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(50),
-      countActiveContractors({ supabase, orgId: session.profile.org_id })
+      countEligibleEmployees({ supabase, orgId: session.profile.org_id })
     ]);
 
     if (runsError) {
@@ -196,7 +198,7 @@ export async function GET() {
         latestTotalCostAmount: latestRun ? getCurrencyTotal(latestRun.totalNet, "USD") : 0,
         latestEmployeeCount: latestRun?.employeeCount ?? 0,
         nextPayDate,
-        activeContractorCount
+        eligibleEmployeeCount
       },
       runs
     };
@@ -334,7 +336,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const activeContractorCount = await countActiveContractors({
+    const eligibleEmployeeCount = await countEligibleEmployees({
       supabase,
       orgId: session.profile.org_id
     });
@@ -355,7 +357,7 @@ export async function POST(request: Request) {
 
     const responseData: CreatePayrollRunResponseData = {
       run: runSummary,
-      activeContractorCount
+      eligibleEmployeeCount
     };
 
     return jsonResponse<CreatePayrollRunResponseData>(201, {
