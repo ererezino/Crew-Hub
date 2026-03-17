@@ -88,7 +88,7 @@ function formatAmountRange(
   }
 
   if (minAmount !== null && maxAmount !== null) {
-    return `${(minAmount / 100).toLocaleString()} – ${(maxAmount / 100).toLocaleString()}`;
+    return `${(minAmount / 100).toLocaleString()} - ${(maxAmount / 100).toLocaleString()}`;
   }
 
   if (minAmount !== null) {

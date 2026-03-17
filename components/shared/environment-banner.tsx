@@ -65,7 +65,7 @@ export function EnvironmentBanner() {
         pointerEvents: "none",
       }}
     >
-      {`${label} ENVIRONMENT — Not production`}
+      {`${label} ENVIRONMENT - Not production`}
     </div>
   );
 }

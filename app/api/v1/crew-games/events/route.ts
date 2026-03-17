@@ -258,7 +258,7 @@ async function sendEventAnnouncement(orgId: string, event: CrewNightEvent): Prom
 
   const title = `${typeLabel}: ${event.title}`;
   const body = snippet
-    ? `${event.eventDate} — ${snippet}`
+    ? `${event.eventDate}: ${snippet}`
     : event.eventDate;
 
   await createBulkNotifications({

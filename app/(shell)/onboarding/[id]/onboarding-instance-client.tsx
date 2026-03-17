@@ -240,7 +240,7 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
   return (
     <>
       <PageHeader
-        title={`${detail.instance.employeeName} — ${toSentenceCase(detail.instance.type)}`}
+        title={`${detail.instance.employeeName} - ${toSentenceCase(detail.instance.type)}`}
         description={t("template", { name: detail.instance.templateName })}
       />
 

@@ -149,7 +149,7 @@
     "settings": "Settings",
     "support": "Help & Support",
     "description": {
-      "home": "Your personal home in Crew Hub — see what needs attention and jump to your most-used actions",
+      "home": "Your personal home in Crew Hub. See what needs attention and jump to your most-used actions",
       "announcements": "Company announcements and updates",
       "timeOff": "Request time off, check balances, and track approval status",
       "myPay": "Pay statements, payout setup, and compensation in one view",
@@ -157,7 +157,7 @@
       "expenses": "Submit expenses, upload receipts, and track reimbursement",
       "learning": "Courses, certificates, and surveys assigned to you",
       "approvals": "Review and act on pending team requests",
-      "theCrew": "Meet your teammates — photos, bios, and what makes everyone tick",
+      "theCrew": "Meet your teammates: photos, bios, and what makes everyone tick",
       "people": "Manage employee records, roles, and access",
       "scheduling": "Build, publish, and manage team shift schedules",
       "onboarding": "Launch onboarding plans, track progress, and resolve blockers",
@@ -170,7 +170,7 @@
       "signatures": "Request, sign, and track documents with signer timelines",
       "rolesAccess": "Default role permissions and per-person overrides",
       "auditLog": "Who did what, when, and to which record",
-      "crewGames": "Games Night and Presentation Night — results, leaderboards, and fun",
+      "crewGames": "Games Night and Presentation Night: results, leaderboards, and fun",
       "expenseRouting": "Configure additional approval routing rules for expenses",
       "settings": "Manage your profile, preferences, and security",
       "support": "Get help and support"
@@ -217,7 +217,7 @@
       "daysSuffix": "days",
       "backToDropdown": "Back to dropdown",
       "afkPlaceholder": "e.g. Stepping out to fix Gabby's car",
-      "oooPlaceholder": "e.g. Taking my leave — back next Monday"
+      "oooPlaceholder": "e.g. Taking my leave, back next Monday"
     },
     "duration": {
       "min15": "15 min",
@@ -284,6 +284,7 @@
     "dismiss": "Mark as read",
     "sourceAnnouncement": "Announcement",
     "emptyMessage": "All caught up. No new notifications.",
+    "showMore": "{count, plural, one {# more notification} other {# more notifications}}",
     "filesAttached": "{count, plural, one {# file attached} other {# files attached}}",
     "action": {
       "done": "{label} done",
@@ -470,7 +471,7 @@
       "allPublishedSummary": "All published schedules",
       "dragHelper": "Drag and drop any shift to a new day to reschedule it.",
       "scheduleLabel": "Schedule",
-      "scheduleDateRange": "{name} — {startDate} to {endDate}"
+      "scheduleDateRange": "{name}: {startDate} to {endDate}"
     },
     "myCalendar": {
       "dayMon": "Mon",
@@ -827,7 +828,7 @@
       "socialTiktokLabel": "TikTok",
       "socialWebsiteLabel": "Website",
       "favoritesTitle": "Favorites",
-      "favoritesDescription": "Completely optional. Share a few things you enjoy — these appear on your Crew profile and help teammates find common ground.",
+      "favoritesDescription": "Completely optional. Share a few things you enjoy; these appear on your Crew profile and help teammates find common ground.",
       "favoriteMusicLabel": "Music",
       "favoriteBooksLabel": "Books",
       "favoriteSportsLabel": "Sports"
@@ -884,7 +885,7 @@
       "notEnrolledDescription": "Your authenticator has not been set up yet. You will be prompted to set it up the next time you sign in.",
       "resetContact": "Need to reset your authenticator? Contact your admin.",
       "passkey": "Passkey",
-      "passkeyEnrolledDescription": "{count, plural, one {You have # passkey enrolled. Sign in with one tap — no codes needed.} other {You have # passkeys enrolled. Sign in with one tap — no codes needed.}}",
+      "passkeyEnrolledDescription": "{count, plural, one {You have # passkey enrolled. Sign in with one tap, no codes needed.} other {You have # passkeys enrolled. Sign in with one tap, no codes needed.}}",
       "passkeyNotEnrolledDescription": "Add a passkey to skip typing codes when your session expires. We recommend saving it in 1Password so it syncs across devices.",
       "addPasskey": "Add passkey",
       "addAnotherPasskey": "Add another",
@@ -1105,9 +1106,11 @@
     "featureQuestionsBody": "Some features are marked Pilot, Coming Soon, or Preview. These labels show the current availability status. Ask your manager or admin if you have questions about what's available.",
     "accountAccess": "Account & Access",
     "accountAccessBody": "Need a password reset, role change, or help with access issues? Reach out to Operations directly.",
+    "basecampNote": "Basecamp is monitored for urgent internal access issues.",
     "dataPrivacy": "Data & Privacy",
     "dataPrivacyBody": "For data export requests, account deletion, or privacy questions, see our",
-    "privacyPolicy": "Privacy Policy"
+    "privacyPolicy": "Privacy Policy",
+    "dataExportHint": "If you need a data export, request it from Settings > Data export."
   },
   "peoplePage": {
     "profileTitle": "People",
@@ -1378,7 +1381,7 @@
     "welcomeTitle": "Welcome to your onboarding journey!",
     "welcomeSubtitle": "Work through each section at your own pace. Your team is preparing everything you need.",
     "completedTitle": "Onboarding complete!",
-    "completedSubtitle": "Congratulations — you're all set! Welcome to the team.",
+    "completedSubtitle": "Congratulations, you're all set! Welcome to the team.",
     "yourProgress": "Your progress",
     "opsProgressLabel": "Your team's preparation",
     "unavailable": "My onboarding data is unavailable",
@@ -1409,7 +1412,7 @@
     "offboardingWelcomeTitle": "Your offboarding checklist",
     "offboardingWelcomeSubtitle": "Complete each section before your last working day. Your team is handling the rest.",
     "offboardingCompletedTitle": "Offboarding complete",
-    "offboardingCompletedSubtitle": "All tasks are done. Thank you for your contributions — we wish you well.",
+    "offboardingCompletedSubtitle": "All tasks are done. Thank you for your contributions, and we wish you well.",
     "lastWorkingDay": "Last working day: {date}",
     "awaitingLastDay": "All tasks are complete. Your offboarding will finalise on your last working day.",
     "offboardingNoInstance": "No offboarding assigned yet",
@@ -2258,7 +2261,7 @@
     "mobileMoneyNumberLabel": "Mobile money number",
     "crewTagLabel": "Crew Tag",
     "crewTagPlaceholder": "username",
-    "crewTagHint": "Your Accrue username — e.g. @zino.doe",
+    "crewTagHint": "Your Accrue username, e.g. @zino.doe",
     "saveDetails": "Save payment details",
     "saving": "Saving...",
     "toastSaved": "Payment details saved. Changes will apply after a 2-hour hold.",
@@ -3055,7 +3058,7 @@
     "travelLetters": {
       "errorTitle": "Travel letters unavailable",
       "emptyTitle": "No travel letter requests",
-      "emptyDescription": "Need a letter for a visa, holiday, remote work abroad, or business travel? Request one here — Operations will draft it and a co-founder will sign it.",
+      "emptyDescription": "Need a letter for a visa, holiday, remote work abroad, or business travel? Request one here. Operations will draft it and a co-founder will sign it.",
       "travelDates": "Travel dates",
       "purpose": "Purpose",
       "requested": "Requested",
@@ -3292,7 +3295,7 @@
       "confirmLabel": "Approve step 1"
     },
     "confirmApproveFinal": {
-      "title": "Final approval — are you sure?",
+      "title": "Final approval: are you sure?",
       "description": "Final approval locks this payroll run. Items become immutable and payment statements can be generated. This action cannot be undone without a Super Admin reopening the run.",
       "confirmLabel": "Yes, final-approve this run"
     },
@@ -3537,7 +3540,7 @@
       "highOverlap": "High team overlap",
       "membersAway": "{count, plural, one {# team member away} other {# team members away}}",
       "membersOffDuringDates": "{count, plural, one {# team member off during these dates} other {# team members off during these dates}}",
-      "highOverlapWithCount": "{count, plural, one {High team overlap — # team member away} other {High team overlap — # team members away}}",
+      "highOverlapWithCount": "{count, plural, one {High team overlap: # team member away} other {High team overlap: # team members away}}",
       "memberDetail": "{leaveType} · {dateRange}"
     }
   },
@@ -3771,7 +3774,7 @@
       "changePhoto": "Change profile photo"
     },
     "inviteLink": {
-      "label": "Invite link — copy and share this link directly with {name}:",
+      "label": "Invite link: copy and share this link directly with {name}.",
       "copyLink": "Copy Link",
       "copied": "Copied!",
       "copiedToClipboard": "Invite link copied to clipboard."
@@ -4195,7 +4198,7 @@
       "onboarding": "Onboarding only",
       "offboarding": "Offboarding only"
     },
-    "awaitingLastDay": "All tasks complete — awaiting last working day"
+    "awaitingLastDay": "All tasks complete, awaiting last working day"
   },
   "compensationBands": {
     "pageTitle": "Compensation Bands",
@@ -5055,7 +5058,7 @@
       "preStart": "Pre-start",
       "newHire": "New hire",
       "existingEmployee": "Existing employee",
-      "preStartHint": "Pre-start creates a profile only — no account, no onboarding. Use this for people who have accepted an offer but haven't started yet.",
+      "preStartHint": "Pre-start creates a profile only, no account, no onboarding. Use this for people who have accepted an offer but haven't started yet.",
       "newHireHint": "New hires get an onboarding checklist and welcome email.",
       "existingEmployeeHint": "Existing team members get a profile only.",
       "emailLabel": "Email",
@@ -5302,8 +5305,8 @@
       "newHire": {
         "preheader": "Your Crew Hub account is ready",
         "subject": "Welcome to Accrue, {name}",
-        "body1": "Welcome to Accrue — we're excited to have you join the crew!",
-        "body2": "Your Crew Hub account is ready. Crew Hub is home base — it's where you'll find your onboarding journey, your team, pay, time off, and documents all in one place.",
+        "body1": "Welcome to Accrue! We're excited to have you join the crew.",
+        "body2": "Your Crew Hub account is ready. Crew Hub is home base; it's where you'll find your onboarding journey, your team, pay, time off, and documents all in one place.",
         "body3": "To get started, tap the button below to set up your login. Once you're in, your onboarding journey will guide you through everything step by step:",
         "cta": "Set Up Your Account",
         "closing": "If anything feels off or you have questions, reach out to your manager or the Operations team.",
@@ -5684,7 +5687,7 @@
     "emptyDescription": "Create a delegation to set up approval coverage when someone is away.",
     "sidePanelDescription": "Configure who can approve on behalf of someone else.",
     "tableAriaLabel": "Delegations table",
-    "expiredCannotReactivate": "Expired — create a new delegation with updated dates.",
+    "expiredCannotReactivate": "Expired. Create a new delegation with updated dates.",
     "filter": {
       "active": "Active",
       "expired": "Expired",
@@ -5756,7 +5759,7 @@
     "pageTitle": "Expense Routing Rules",
     "pageDescription": "Configure rules that route expenses to additional approvers before finance review.",
     "accessDenied": "You do not have permission to manage expense routing rules.",
-    "firstMatchInfo": "Rules are evaluated in priority order. The first matching rule wins — only one additional approver is assigned per expense.",
+    "firstMatchInfo": "Rules are evaluated in priority order. The first matching rule wins; only one additional approver is assigned per expense.",
     "addRule": "Add Rule",
     "editRule": "Edit Rule",
     "createRule": "Create Rule",
@@ -5817,7 +5820,7 @@
   },
   "crewGames": {
     "pageTitle": "Crew Games",
-    "pageDescription": "Games Night and Presentation Night — results, leaderboards, and fun.",
+    "pageDescription": "Games Night and Presentation Night: results, leaderboards, and fun.",
     "loading": "Loading…",
     "eventNotFound": "Event not found.",
     "cancel": "Cancel",
@@ -5936,7 +5939,7 @@
     "noLeaderboardData": "No leaderboard data yet.",
     "noEventsYet": "No events yet",
     "noEventsDesc": "Events will appear here once created.",
-    "backdatedHint": "Backdated event — will appear in the archive.",
+    "backdatedHint": "Backdated event. It will appear in the archive.",
     "links": {
       "joinMeet": "Join Google Meet",
       "googleMeet": "Google Meet",
@@ -5969,7 +5972,7 @@
     "errorsFound": "{count, plural, one {# validation error} other {# validation errors}}",
     "andMoreErrors": "...and {count} more errors",
     "duplicatesFound": "{count, plural, one {# duplicate email} other {# duplicate emails}}",
-    "conflictsFound": "{count, plural, one {# conflict — existing item} other {# conflicts — existing items}}",
+    "conflictsFound": "{count, plural, one {# conflict with an existing item} other {# conflicts with existing items}}",
     "conflictsBlockedDescription": "These employees already have payroll items in this run. Import is blocked by default. To proceed, you must explicitly confirm that you want to overwrite the existing data. This action cannot be undone.",
     "confirmOverwrite": "I understand and want to overwrite the existing payroll items listed above.",
     "preview": {

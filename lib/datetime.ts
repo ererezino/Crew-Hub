@@ -86,7 +86,7 @@ export function formatDateRange(startDate: string, endDate: string, locale?: Sup
   const end = toDate(endDate + "T00:00:00Z");
 
   if (!start || !end) {
-    return `${startDate} – ${endDate}`;
+    return `${startDate} - ${endDate}`;
   }
 
   if (startDate === endDate) {
@@ -101,9 +101,9 @@ export function formatDateRange(startDate: string, endDate: string, locale?: Sup
   if (sameMonth && sameYear) {
     const month = start.toLocaleDateString(tag, { month: "long", timeZone: "UTC" });
     if (locale === "fr") {
-      return `${start.getUTCDate()}–${end.getUTCDate()} ${month} ${start.getUTCFullYear()}`;
+      return `${start.getUTCDate()}-${end.getUTCDate()} ${month} ${start.getUTCFullYear()}`;
     }
-    return `${month} ${start.getUTCDate()}–${end.getUTCDate()}, ${start.getUTCFullYear()}`;
+    return `${month} ${start.getUTCDate()}-${end.getUTCDate()}, ${start.getUTCFullYear()}`;
   }
 
   if (sameYear) {
@@ -118,12 +118,12 @@ export function formatDateRange(startDate: string, endDate: string, locale?: Sup
       timeZone: "UTC"
     });
     if (locale === "fr") {
-      return `${startStr} – ${endStr} ${start.getUTCFullYear()}`;
+      return `${startStr} - ${endStr} ${start.getUTCFullYear()}`;
     }
-    return `${startStr} – ${endStr}, ${start.getUTCFullYear()}`;
+    return `${startStr} - ${endStr}, ${start.getUTCFullYear()}`;
   }
 
-  return `${formatDateShort(startDate, locale)} – ${formatDateShort(endDate, locale)}`;
+  return `${formatDateShort(startDate, locale)} - ${formatDateShort(endDate, locale)}`;
 }
 
 /** Alias kept for backward compatibility. */

@@ -1137,7 +1137,7 @@ export function TimeOffClient({
                 {afkQuery.data.logs.map((log) => (
                   <tr key={log.id} className="data-table-row">
                     <td>{formatSingleDateHuman(log.date, locale)}</td>
-                    <td className="numeric">{log.startTime} – {log.endTime}</td>
+                    <td className="numeric">{log.startTime} - {log.endTime}</td>
                     <td className="numeric">
                       {log.durationMinutes >= 60
                         ? `${Math.floor(log.durationMinutes / 60)}h ${log.durationMinutes % 60}m`

@@ -254,7 +254,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         data: null,
         error: {
           code: "CONFLICT",
-          message: `An active temporary delegation for ${principal.full_name} → ${delegate.full_name} already covers ${ov.starts_at} – ${ov.ends_at}, which overlaps with the requested dates.`
+          message: `An active temporary delegation for ${principal.full_name} → ${delegate.full_name} already covers ${ov.starts_at} - ${ov.ends_at}, which overlaps with the requested dates.`
         },
         meta: buildMeta()
       });

@@ -6,7 +6,7 @@ import { getTranslations } from "next-intl/server";
 import { PageHeader } from "../../../components/shared/page-header";
 
 export const metadata: Metadata = {
-  title: "Help & Support — Crew Hub"
+  title: "Help & Support - Crew Hub"
 };
 
 /* ── Inline Lucide-style SVG icons (server-component safe) ── */
@@ -71,7 +71,7 @@ export default async function SupportPage() {
       title: t("accountAccess"),
       body: (
         <>
-          {t('accountAccessBody')} {`Basecamp is monitored for urgent internal access issues.`}
+          {t('accountAccessBody')} {t('basecampNote')}
         </>
       )
     },
@@ -87,7 +87,7 @@ export default async function SupportPage() {
           >
             {t('privacyPolicy')}
           </Link>
-          . {"If you need a data export, request it from Settings > Data export."}
+          . {t('dataExportHint')}
         </>
       )
     }

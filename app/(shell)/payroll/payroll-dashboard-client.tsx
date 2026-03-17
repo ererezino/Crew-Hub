@@ -52,10 +52,10 @@ function formatPeriodLabel(start: string, end: string, locale: AppLocale): strin
   const endDate = new Date(`${end}T00:00:00.000Z`);
 
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return `${start} – ${end}`;
+    return `${start} - ${end}`;
   }
 
-  return `${formatDate(startDate, locale)} – ${formatDate(endDate, locale)}`;
+  return `${formatDate(startDate, locale)} - ${formatDate(endDate, locale)}`;
 }
 
 export function PayrollDashboardClient({

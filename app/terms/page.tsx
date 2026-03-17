@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Crew Hub"
+  title: "Terms of Service - Crew Hub"
 };
 
 export default function TermsPage() {
@@ -45,7 +45,7 @@ export default function TermsPage() {
           <p>
             Crew Hub is a workforce management platform that provides HR, payroll, time tracking,
             performance management, and related services. Some features may be in limited pilot,
-            preview, or coming soon status — these are clearly labeled in the application.
+            preview, or coming soon status. These are clearly labeled in the application.
           </p>
         </section>
 

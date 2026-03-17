@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Crew Hub"
+  title: "Privacy Policy - Crew Hub"
 };
 
 export default function PrivacyPage() {
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
           <ul style={{ paddingLeft: 20, marginTop: 8 }}>
             <li>Your employer (the organization using Crew Hub)</li>
             <li>Infrastructure providers (Supabase/AWS, Vercel, Resend) for service operation</li>
-            <li>Error tracking (Sentry) for application reliability — no PII is included</li>
+            <li>Error tracking (Sentry) for application reliability; no PII is included</li>
           </ul>
         </section>
 

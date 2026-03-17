@@ -50,7 +50,7 @@ function ScopePills({ scopes }: { scopes: string[] }) {
 }
 
 function formatDateRange(startsAt: string | null, endsAt: string | null): string {
-  if (!startsAt && !endsAt) return "—";
+  if (!startsAt && !endsAt) return "-";
 
   const formatDate = (d: string) => {
     const [year, month, day] = d.split("-");
@@ -58,7 +58,7 @@ function formatDateRange(startsAt: string | null, endsAt: string | null): string
   };
 
   if (startsAt && endsAt) {
-    return `${formatDate(startsAt)} – ${formatDate(endsAt)}`;
+    return `${formatDate(startsAt)} - ${formatDate(endsAt)}`;
   }
   if (startsAt) return `From ${formatDate(startsAt)}`;
   return `Until ${formatDate(endsAt!)}`;

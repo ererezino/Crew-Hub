@@ -43,7 +43,7 @@ export function LeaderboardSection({
       <div className="crew-games-section-header">
         <h3 className="section-title">
           <Trophy size={18} aria-hidden="true" style={{ marginRight: "var(--space-2)" }} />
-          {t("title")} — {season}
+          {t("title")} - {season}
         </h3>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
           {/* Season selector */}

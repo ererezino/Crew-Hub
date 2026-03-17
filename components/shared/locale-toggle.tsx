@@ -24,6 +24,7 @@ export function LocaleToggle({ profileLocale }: LocaleToggleProps) {
   const t = useTranslations("locale");
   const [isPending, startTransition] = useTransition();
   const [isOpen, setIsOpen] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
   const hasSynced = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -148,15 +149,16 @@ export function LocaleToggle({ profileLocale }: LocaleToggleProps) {
     hasSynced.current = true;
 
     startTransition(async () => {
+      setFeedback(null);
       const result = await updateLocale(targetLocale);
 
       if (result.ok) {
         router.refresh();
       } else if (result.cookieSet) {
         router.refresh();
-        // TODO: show toast warning via t("changeFailedPartial")
+        setFeedback(t("changeFailedPartial"));
       } else {
-        // TODO: show toast error via t("changeFailed")
+        setFeedback(t("changeFailed"));
       }
     });
   }
@@ -244,6 +246,9 @@ export function LocaleToggle({ profileLocale }: LocaleToggleProps) {
               </button>
             );
           })}
+          {feedback ? (
+            <p className="locale-dropdown-feedback" role="alert">{feedback}</p>
+          ) : null}
         </div>
       ) : null}
     </div>

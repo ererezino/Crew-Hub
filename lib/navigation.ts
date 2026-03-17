@@ -54,7 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
         labelKey: "home",
         href: "/dashboard",
         icon: "LayoutDashboard",
-        description: "Your personal home in Crew Hub — see what needs attention and jump to your most-used actions",
+        description: "Your personal home in Crew Hub: see what needs attention and jump to your most-used actions",
         shortcut: "G H"
       },
       {
@@ -70,7 +70,7 @@ export const NAV_GROUPS: NavGroup[] = [
         labelKey: "theCrew",
         href: "/the-crew",
         icon: "Heart",
-        description: "Meet your teammates — photos, bios, and what makes everyone tick",
+        description: "Meet your teammates: photos, bios, and what makes everyone tick",
         shortcut: "G W",
         moduleId: "the_crew"
       },
@@ -79,7 +79,7 @@ export const NAV_GROUPS: NavGroup[] = [
         labelKey: "crewGames",
         href: "/crew-games",
         icon: "Gamepad2",
-        description: "Games Night and Presentation Night — results, leaderboards, and fun",
+        description: "Games Night and Presentation Night: results, leaderboards, and fun",
         shortcut: "G G",
         moduleId: "crew_games"
       }

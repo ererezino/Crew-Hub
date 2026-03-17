@@ -114,17 +114,17 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       const res = await fetch("/api/v1/the-crew", { cache: "no-store" });
       const payload = (await res.json()) as { data?: CrewListResponseData | null; error?: { message: string } | null };
       if (!res.ok || !payload.data) {
-        setError(payload.error?.message ?? "Unable to load crew.");
+        setError(payload.error?.message ?? t("loadError"));
         return;
       }
       setMembers(payload.data.members);
       setTotalCount(payload.data.totalCount);
     } catch {
-      setError("Unable to load crew.");
+      setError(t("loadError"));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { void fetchCrew(); }, [fetchCrew]);
 

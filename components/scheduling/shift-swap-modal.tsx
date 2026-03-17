@@ -185,7 +185,7 @@ export function ShiftSwapModal({
         {/* Header */}
         <h2 className="modal-title">{t("swapModal.title")}</h2>
         <p className="settings-card-description">
-          {formatDate(anchorShift.shiftDate)} &middot; {formatTime(anchorShift.startTime)} – {formatTime(anchorShift.endTime)}
+          {formatDate(anchorShift.shiftDate)} &middot; {formatTime(anchorShift.startTime)} - {formatTime(anchorShift.endTime)}
         </p>
 
         {/* Scope selector */}
@@ -245,7 +245,7 @@ export function ShiftSwapModal({
             <ul className="swap-affected-list">
               {affected.map((s) => (
                 <li key={s.id}>
-                  {formatDate(s.shiftDate)} &middot; {formatTime(s.startTime)} – {formatTime(s.endTime)}
+                  {formatDate(s.shiftDate)} &middot; {formatTime(s.startTime)} - {formatTime(s.endTime)}
                 </li>
               ))}
             </ul>

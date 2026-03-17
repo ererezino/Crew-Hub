@@ -147,7 +147,7 @@
     "settings": "Paramètres",
     "support": "Aide et support",
     "description": {
-      "home": "Votre espace personnel dans Crew Hub — voyez ce qui nécessite votre attention et accédez à vos actions fréquentes",
+      "home": "Votre espace personnel dans Crew Hub : voyez ce qui nécessite votre attention et accédez à vos actions fréquentes",
       "announcements": "Annonces et mises à jour de l'entreprise",
       "timeOff": "Demandez des congés, consultez vos soldes et suivez l'état de vos demandes",
       "myPay": "Relevés de paie, configuration des versements et rémunération en un coup d'œil",
@@ -155,7 +155,7 @@
       "expenses": "Soumettez vos dépenses, téléchargez vos reçus et suivez les remboursements",
       "learning": "Formations, certificats et sondages qui vous sont assignés",
       "approvals": "Examinez et traitez les demandes en attente de votre équipe",
-      "theCrew": "Découvrez vos collègues — photos, bios et ce qui les passionne",
+      "theCrew": "Découvrez vos collègues : photos, bios et ce qui les passionne",
       "people": "Gérez les dossiers, rôles et accès des employés",
       "scheduling": "Créez, publiez et gérez les horaires de votre équipe",
       "onboarding": "Lancez des plans d'intégration, suivez la progression et résolvez les blocages",
@@ -168,7 +168,7 @@
       "signatures": "Demandez, signez et suivez les documents avec chronologie des signataires",
       "rolesAccess": "Permissions par défaut des rôles et dérogations individuelles",
       "auditLog": "Qui a fait quoi, quand et sur quel enregistrement",
-      "crewGames": "Soirées jeux et présentations — résultats, classements et moments fun",
+      "crewGames": "Soirées jeux et présentations : résultats, classements et moments fun",
       "expenseRouting": "Configurer les règles de routage d'approbation pour les dépenses",
       "settings": "Gérez votre profil, vos préférences et votre sécurité",
       "support": "Obtenir de l'aide et du support"
@@ -215,7 +215,7 @@
       "daysSuffix": "jours",
       "backToDropdown": "Retour à la liste",
       "afkPlaceholder": "ex. Sorti réparer la voiture de Gabby",
-      "oooPlaceholder": "ex. En congé — de retour lundi prochain"
+      "oooPlaceholder": "ex. En congé, de retour lundi prochain"
     },
     "duration": {
       "min15": "15 min",
@@ -282,6 +282,7 @@
     "dismiss": "Fermer",
     "sourceAnnouncement": "Annonce",
     "emptyMessage": "Vous êtes à jour. Aucune nouvelle notification.",
+    "showMore": "{count, plural, one {# notification de plus} other {# notifications de plus}}",
     "filesAttached": "{count, plural, one {# fichier joint} other {# fichiers joints}}",
     "action": {
       "done": "{label} effectué",
@@ -467,7 +468,7 @@
       "allPublishedSummary": "Tous les horaires publiés",
       "dragHelper": "Glissez-déposez un quart vers un nouveau jour pour le reprogrammer.",
       "scheduleLabel": "Horaire",
-      "scheduleDateRange": "{name} — {startDate} au {endDate}"
+      "scheduleDateRange": "{name} : {startDate} au {endDate}"
     },
     "myCalendar": {
       "dayMon": "Lun",
@@ -836,8 +837,8 @@
       "permissionStatus": "Statut de la permission :",
       "permUnsupported": "Non pris en charge",
       "permGranted": "Accordée",
-      "permBlocked": "Bloquée — cliquez sur l'icône de cadenas dans la barre d'adresse pour autoriser les notifications",
-      "permNotGranted": "Pas encore accordée — cochez la case ci-dessus pour activer",
+      "permBlocked": "Bloquée : cliquez sur l'icône de cadenas dans la barre d'adresse pour autoriser les notifications",
+      "permNotGranted": "Pas encore accordée : cochez la case ci-dessus pour activer",
       "saveNotifications": "Enregistrer les notifications",
       "saved": "Paramètres de notification enregistrés.",
       "unableToUpdate": "Impossible de mettre à jour les paramètres de notification.",
@@ -877,7 +878,7 @@
       "notEnrolledDescription": "Votre authentificateur n'a pas encore été configuré. Vous serez invité à le configurer lors de votre prochaine connexion.",
       "resetContact": "Besoin de réinitialiser votre authentificateur ? Contactez votre administrateur.",
       "passkey": "Clé d'accès",
-      "passkeyEnrolledDescription": "{count, plural, one {Vous avez # clé d'accès enregistrée. Connectez-vous en un clic — sans code.} other {Vous avez # clés d'accès enregistrées. Connectez-vous en un clic — sans code.}}",
+      "passkeyEnrolledDescription": "{count, plural, one {Vous avez # clé d'accès enregistrée. Connectez-vous en un clic, sans code.} other {Vous avez # clés d'accès enregistrées. Connectez-vous en un clic, sans code.}}",
       "passkeyNotEnrolledDescription": "Ajoutez une clé d'accès pour ne plus taper de codes à l'expiration de votre session. Nous recommandons de l'enregistrer dans 1Password pour la synchroniser sur tous vos appareils.",
       "addPasskey": "Ajouter une clé d'accès",
       "addAnotherPasskey": "En ajouter une autre",
@@ -1184,9 +1185,11 @@
     "featureQuestionsBody": "Certaines fonctionnalités sont marquées Pilote, Bientôt disponible ou Aperçu. Ces étiquettes indiquent l'état de disponibilité actuel. Contactez votre responsable ou administrateur pour toute question.",
     "accountAccess": "Compte et accès",
     "accountAccessBody": "Besoin d'une réinitialisation de mot de passe, d'un changement de rôle ou d'aide pour un problème d'accès ? Contactez directement l'équipe Operations.",
+    "basecampNote": "Basecamp est surveillé pour les problèmes urgents d'accès interne.",
     "dataPrivacy": "Données et confidentialité",
     "dataPrivacyBody": "Pour les demandes d'export de données, la suppression de compte ou les questions de confidentialité, consultez notre",
-    "privacyPolicy": "Politique de confidentialité"
+    "privacyPolicy": "Politique de confidentialité",
+    "dataExportHint": "Si vous avez besoin d'un export de données, demandez-le dans Paramètres > Export de données."
   },
   "peoplePage": {
     "profileTitle": "Personnel",
@@ -1482,7 +1485,7 @@
     "offboardingWelcomeTitle": "Votre liste de départ",
     "offboardingWelcomeSubtitle": "Complétez chaque section avant votre dernier jour de travail. Votre équipe s'occupe du reste.",
     "offboardingCompletedTitle": "Départ finalisé",
-    "offboardingCompletedSubtitle": "Toutes les tâches sont terminées. Merci pour vos contributions — nous vous souhaitons le meilleur.",
+    "offboardingCompletedSubtitle": "Toutes les tâches sont terminées. Merci pour vos contributions; nous vous souhaitons le meilleur.",
     "lastWorkingDay": "Dernier jour de travail : {date}",
     "awaitingLastDay": "Toutes les tâches sont terminées. Votre départ sera finalisé à votre dernier jour de travail.",
     "offboardingNoInstance": "Aucune instance de départ assignée",
@@ -2329,7 +2332,7 @@
     "mobileMoneyNumberLabel": "Numéro de mobile money",
     "crewTagLabel": "Crew Tag",
     "crewTagPlaceholder": "nom d'utilisateur",
-    "crewTagHint": "Votre nom d'utilisateur Accrue — ex. @zino.doe",
+    "crewTagHint": "Votre nom d'utilisateur Accrue, ex. @zino.doe",
     "saveDetails": "Enregistrer les détails de paiement",
     "saving": "Enregistrement...",
     "toastSaved": "Détails de paiement enregistrés. Les modifications s'appliqueront après 48 heures.",
@@ -3263,7 +3266,7 @@
       "teamCoverageDescription": "Pour assurer la continuité pendant votre absence, vérifiez qui d'autre est en congé à la même période.",
       "viewAvailability": "Voir les disponibilités",
       "useItTitle": "À utiliser avant la fin de l'année",
-      "useItDescription": "Les jours de congé non utilisés expirent le 31 décembre de chaque année — ne les laissez pas se perdre ! Que ce soit un coucher de soleil sur la plage ou une escapade enneigée, nous serions ravis que vous profitiez du temps que vous avez mérité."
+      "useItDescription": "Les jours de congé non utilisés expirent le 31 décembre de chaque année : ne les laissez pas se perdre ! Que ce soit un coucher de soleil sur la plage ou une escapade enneigée, nous serions ravis que vous profitiez du temps que vous avez mérité."
     },
     "balances": {
       "unlimited": "Illimité",
@@ -3273,7 +3276,7 @@
       "available": "Disponible",
       "depleted": "Épuisé",
       "daysLabel": "{days} jours",
-      "balanceExpiry": "Solde {year} — les jours non utilisés expirent le 31 déc.",
+      "balanceExpiry": "Solde {year} : les jours non utilisés expirent le 31 déc.",
       "allocated": "Attribués",
       "used": "Utilisés",
       "scheduled": "Planifiés",
@@ -3409,7 +3412,7 @@
       "highOverlap": "Chevauchement important",
       "membersAway": "{count, plural, one {# membre absent} other {# membres absents}}",
       "membersOffDuringDates": "{count, plural, one {# membre de l'équipe absent pendant ces dates} other {# membres de l'équipe absents pendant ces dates}}",
-      "highOverlapWithCount": "{count, plural, one {Chevauchement important — # membre absent} other {Chevauchement important — # membres absents}}",
+      "highOverlapWithCount": "{count, plural, one {Chevauchement important : # membre absent} other {Chevauchement important : # membres absents}}",
       "memberDetail": "{leaveType} · {dateRange}"
     }
   },
@@ -3643,7 +3646,7 @@
       "changePhoto": "Changer la photo de profil"
     },
     "inviteLink": {
-      "label": "Lien d'invitation — copiez et partagez ce lien directement avec {name} :",
+      "label": "Lien d'invitation : copiez et partagez ce lien directement avec {name}.",
       "copyLink": "Copier le lien",
       "copied": "Copié !",
       "copiedToClipboard": "Lien d'invitation copié dans le presse-papiers."
@@ -4067,7 +4070,7 @@
       "onboarding": "Intégration uniquement",
       "offboarding": "Départ uniquement"
     },
-    "awaitingLastDay": "Toutes les tâches terminées — en attente du dernier jour de travail"
+    "awaitingLastDay": "Toutes les tâches terminées, en attente du dernier jour de travail"
   },
   "compensationBands": {
     "pageTitle": "Grilles de rémunération",
@@ -4154,7 +4157,7 @@
       "newBand": "Nouvelle grille",
       "noTitle": "Sans titre",
       "overviewAriaLabel": "Vue d’ensemble des grilles de rémunération",
-      "rangeTo": "–",
+      "rangeTo": "-",
       "starts": "Début {date}",
       "viewProfile": "Voir le profil"
     },
@@ -4928,7 +4931,7 @@
       "employeeTypeLabel": "Type d’employé",
       "hireTypeLabel": "Type d’embauche",
       "preStart": "Pré-embauche",
-      "preStartHint": "Pré-embauche crée un profil uniquement — pas de compte, pas d’intégration. Utilisez ceci pour les personnes qui ont accepté une offre mais n’ont pas encore commencé.",
+      "preStartHint": "Pré-embauche crée un profil uniquement : pas de compte, pas d’intégration. Utilisez ceci pour les personnes qui ont accepté une offre mais n’ont pas encore commencé.",
       "employmentTypeLabel": "Type d’emploi",
       "existingEmployee": "Employé existant",
       "existingEmployeeHint": "Les membres existants reçoivent uniquement un profil.",
@@ -5172,8 +5175,8 @@
       "newHire": {
         "preheader": "Votre compte Crew Hub est prêt",
         "subject": "Bienvenue chez Accrue, {name}",
-        "body1": "Bienvenue chez Accrue — nous sommes ravis de vous accueillir dans l'équipe !",
-        "body2": "Votre compte Crew Hub est prêt. Crew Hub est votre point de départ — vous y trouverez votre parcours d'intégration, votre équipe, votre paie, vos congés et vos documents, le tout au même endroit.",
+        "body1": "Bienvenue chez Accrue, nous sommes ravis de vous accueillir dans l'équipe !",
+        "body2": "Votre compte Crew Hub est prêt. Crew Hub est votre point de départ : vous y trouverez votre parcours d'intégration, votre équipe, votre paie, vos congés et vos documents, le tout au même endroit.",
         "body3": "Pour commencer, appuyez sur le bouton ci-dessous pour configurer votre connexion. Une fois connecté, votre parcours d'intégration vous guidera étape par étape :",
         "cta": "Configurer votre compte",
         "closing": "Si quelque chose ne va pas ou si vous avez des questions, contactez votre responsable ou l'équipe des opérations.",
@@ -5554,7 +5557,7 @@
     "emptyDescription": "Créez une délégation pour configurer la couverture d'approbation en cas d'absence.",
     "sidePanelDescription": "Configurez qui peut approuver au nom de quelqu'un d'autre.",
     "tableAriaLabel": "Tableau des délégations",
-    "expiredCannotReactivate": "Expirée — créez une nouvelle délégation avec des dates mises à jour.",
+    "expiredCannotReactivate": "Expirée : créez une nouvelle délégation avec des dates mises à jour.",
     "filter": {
       "active": "Actives",
       "expired": "Expirées",
@@ -5626,7 +5629,7 @@
     "pageTitle": "Règles de routage des dépenses",
     "pageDescription": "Configurez les règles qui dirigent les dépenses vers des approbateurs supplémentaires avant la revue financière.",
     "accessDenied": "Vous n'avez pas la permission de gérer les règles de routage des dépenses.",
-    "firstMatchInfo": "Les règles sont évaluées par ordre de priorité. La première règle correspondante l'emporte — un seul approbateur supplémentaire est assigné par dépense.",
+    "firstMatchInfo": "Les règles sont évaluées par ordre de priorité. La première règle correspondante l'emporte : un seul approbateur supplémentaire est assigné par dépense.",
     "addRule": "Ajouter une règle",
     "editRule": "Modifier la règle",
     "createRule": "Créer une règle",
@@ -5687,7 +5690,7 @@
   },
   "crewGames": {
     "pageTitle": "Jeux d'équipe",
-    "pageDescription": "Soirée jeux et soirée présentation — résultats, classements et fun.",
+    "pageDescription": "Soirée jeux et soirée présentation : résultats, classements et fun.",
     "loading": "Chargement…",
     "eventNotFound": "Événement introuvable.",
     "cancel": "Annuler",
@@ -5806,7 +5809,7 @@
     "noLeaderboardData": "Aucune donnée de classement.",
     "noEventsYet": "Pas encore d'événements",
     "noEventsDesc": "Les événements apparaîtront ici une fois créés.",
-    "backdatedHint": "Événement antidaté — apparaîtra dans les archives.",
+    "backdatedHint": "Événement antidaté, apparaîtra dans les archives.",
     "links": {
       "joinMeet": "Rejoindre Google Meet",
       "googleMeet": "Google Meet",

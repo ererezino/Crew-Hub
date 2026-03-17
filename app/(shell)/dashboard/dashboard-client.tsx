@@ -595,7 +595,7 @@ function UpcomingShiftsWidget({ data }: { data: DashboardResponseData }) {
         {data.upcomingShifts.map((s) => (
           <li key={s.id} className="dashboard-widget-list-item">
             <span className="numeric">{formatDate(s.date, locale)}</span>
-            <span className="numeric">{s.startTime} – {s.endTime}</span>
+            <span className="numeric">{s.startTime} - {s.endTime}</span>
           </li>
         ))}
       </ul>

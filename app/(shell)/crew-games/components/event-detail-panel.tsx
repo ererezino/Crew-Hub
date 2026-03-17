@@ -66,7 +66,7 @@ export function EventDetailPanel({ eventId }: EventDetailPanelProps) {
                             r.placement
                           )
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </td>
                       <td>{r.nickname}</td>
@@ -77,7 +77,7 @@ export function EventDetailPanel({ eventId }: EventDetailPanelProps) {
                           </span>
                         )}
                       </td>
-                      <td>{r.score !== null ? r.score : "—"}</td>
+                      <td>{r.score !== null ? r.score : "-"}</td>
                       <td className="crew-games-lb-points">{r.pointsAwarded}</td>
                     </tr>
                   ))}

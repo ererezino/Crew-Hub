@@ -339,7 +339,7 @@ export async function POST(request: NextRequest) {
         data: null,
         error: {
           code: "CONFLICT",
-          message: `An active temporary delegation for ${principal.full_name} → ${delegate.full_name} already covers ${existing.starts_at} – ${existing.ends_at}, which overlaps with the requested dates.`
+          message: `An active temporary delegation for ${principal.full_name} → ${delegate.full_name} already covers ${existing.starts_at} - ${existing.ends_at}, which overlaps with the requested dates.`
         },
         meta: buildMeta()
       });

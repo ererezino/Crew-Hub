@@ -9556,6 +9556,17 @@ button.att-img-link {
   font-size: var(--text-sm);
 }
 
+.notification-show-more {
+  text-align: center;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border-default);
+}
+
+.notification-show-more .table-row-action {
+  font-size: var(--text-sm);
+  color: var(--accent);
+}
+
 /* User Menu Dropdown */
 
 .user-menu {
@@ -16787,6 +16798,16 @@ html.dark .dashboard-audit-table {
   height: 1rem;
   flex-shrink: 0;
   color: var(--accent);
+}
+
+.locale-dropdown-feedback {
+  font-size: 0.75rem;
+  padding: var(--space-2) var(--space-3);
+  color: var(--status-error-text);
+  background: var(--status-error-bg);
+  border-radius: var(--radius-default);
+  margin: var(--space-1) var(--space-2) var(--space-2);
+  line-height: 1.4;
 }
 
 /* ── Settings language preference ──────────────────────────────── */

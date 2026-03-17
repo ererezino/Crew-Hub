@@ -162,7 +162,7 @@ export async function POST(
       data: null,
       error: {
         code: "UNSIGNED_CONTRACTS",
-        message: `Cannot begin onboarding — ${unsignedContracts.length} unsigned contract${unsignedContracts.length > 1 ? "s remain" : " remains"}: ${titles.join(", ")}.`,
+        message: `Cannot begin onboarding: ${unsignedContracts.length} unsigned contract${unsignedContracts.length > 1 ? "s remain" : " remains"}: ${titles.join(", ")}.`,
         details: {
           unsignedContracts: unsignedContracts.map((c) => ({
             id: (c as Record<string, unknown>).id as string,

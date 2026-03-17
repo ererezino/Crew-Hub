@@ -950,7 +950,7 @@ export function PeopleOverviewClient({
             ) : null}
 
             <dt>{t('basicInfo.joined')}</dt>
-            <dd>{person.startDate ? formatDate(person.startDate, locale) : "—"}</dd>
+            <dd>{person.startDate ? formatDate(person.startDate, locale) : "-"}</dd>
 
             {person.managerName ? (
               <>
@@ -1104,7 +1104,7 @@ export function PeopleOverviewClient({
               </dd>
 
               <dt>{t('systemInfo.joinedCompany')}</dt>
-              <dd>{person.startDate ? formatDate(person.startDate, locale) : "—"}</dd>
+              <dd>{person.startDate ? formatDate(person.startDate, locale) : "-"}</dd>
 
               <dt>{t('systemInfo.addedToCrewHub')}</dt>
               <dd>{formatDate(person.createdAt, locale)}</dd>
@@ -1119,7 +1119,7 @@ export function PeopleOverviewClient({
               </dd>
 
               <dt>{t('systemInfo.accountSetupDate')}</dt>
-              <dd>{person.accountSetupAt ? formatDate(person.accountSetupAt, locale) : "—"}</dd>
+              <dd>{person.accountSetupAt ? formatDate(person.accountSetupAt, locale) : "-"}</dd>
 
               <dt>{t('systemInfo.lastSignIn')}</dt>
               <dd>{person.lastSeenAt ? formatRelativeTime(person.lastSeenAt) : t('systemInfo.never')}</dd>

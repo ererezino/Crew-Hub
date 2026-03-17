@@ -373,7 +373,7 @@ export function TeamScheduleCalendar({
                       role={isSelectable ? "button" : undefined}
                       tabIndex={isSelectable ? 0 : undefined}
                       style={isSelectable ? { cursor: "pointer" } : undefined}
-                      title={`${shift.employeeName ?? t("calendar.openShift")} · ${formatTime(shift.startTime)}–${formatTime(shift.endTime)}`}
+                      title={`${shift.employeeName ?? t("calendar.openShift")} · ${formatTime(shift.startTime)}-${formatTime(shift.endTime)}`}
                     >
                       <span className="teamcal-shift-name">{shift.employeeName ?? t("calendar.openShift")}</span>
                       <span className="teamcal-shift-time">

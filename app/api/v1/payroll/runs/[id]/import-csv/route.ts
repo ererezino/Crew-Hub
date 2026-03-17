@@ -597,7 +597,7 @@ export async function POST(
       payment_status: "pending",
       notes: row.notes,
       flagged: true,
-      flag_reason: "Imported from CSV — run Calculate to apply withholding rules."
+      flag_reason: "Imported from CSV. Run Calculate to apply withholding rules."
     };
   });
 

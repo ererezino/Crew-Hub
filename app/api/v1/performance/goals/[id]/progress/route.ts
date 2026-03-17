@@ -122,7 +122,7 @@ export async function PATCH(
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: parsed.error.issues[0]?.message ?? "Progress must be 0–100."
+        message: parsed.error.issues[0]?.message ?? "Progress must be 0-100."
       },
       meta: buildMeta()
     });

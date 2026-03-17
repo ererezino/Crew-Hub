@@ -129,10 +129,10 @@ function PresenceEntryRow({
       const ms = computeDurationMs(entry.lastSeenAt, serverTime);
       const dur = formatDuration(ms);
       secondaryText = `Last seen ${dur} ago`;
-      dotTooltip = `Offline — Last seen ${dur} ago`;
+      dotTooltip = `Offline - Last seen ${dur} ago`;
     } else {
       secondaryText = "Never seen";
-      dotTooltip = "Offline — Never seen";
+      dotTooltip = "Offline - Never seen";
     }
   }
 

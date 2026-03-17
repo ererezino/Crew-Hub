@@ -237,7 +237,7 @@ export function MyScheduleCalendar({ shifts, onShiftClick }: MyScheduleCalendarP
                     type="button"
                     className={`mycal-shift ${statusIndicatorClass(shift.status)}`}
                     onClick={() => onShiftClick(shift)}
-                    title={`${formatTime(shift.startTime)} – ${formatTime(shift.endTime)} (${shift.status})`}
+                    title={`${formatTime(shift.startTime)} - ${formatTime(shift.endTime)} (${shift.status})`}
                   >
                     <span className="mycal-shift-time">
                       {formatTime(shift.startTime)} – {formatTime(shift.endTime)}

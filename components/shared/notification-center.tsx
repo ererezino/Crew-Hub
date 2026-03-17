@@ -412,6 +412,7 @@ export function NotificationCenter() {
           {!isLoading && !errorMessage ? (
             <>
               {visibleItems.length > 0 ? (
+                <>
                 <ul className="notification-list">
                   {visibleItems.map((item) => (
                     <li
@@ -476,6 +477,18 @@ export function NotificationCenter() {
                     </li>
                   ))}
                 </ul>
+                {totalCount > PREVIEW_LIMIT ? (
+                  <div className="notification-show-more">
+                    <Link
+                      href="/announcements"
+                      className="table-row-action"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      {t("showMore", { count: totalCount - PREVIEW_LIMIT })}
+                    </Link>
+                  </div>
+                ) : null}
+                </>
               ) : (
                 <p className="notification-footer">
                   {t("emptyMessage")}

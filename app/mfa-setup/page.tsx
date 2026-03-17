@@ -285,7 +285,7 @@ export default function MfaSetupPage() {
             {passkeysEnabled ? (
               <>
                 <p style={{ color: "var(--text-secondary)", marginBottom: 20 }}>
-                  Great — your account is now secured with authenticator codes.
+                  Great, your account is now secured with authenticator codes.
                   Next, you can add a passkey to make future sign-ins even faster.
                 </p>
                 <button
@@ -319,7 +319,7 @@ export default function MfaSetupPage() {
           <>
             <p style={{ color: "var(--text-secondary)", marginBottom: 16 }}>
               Your session expires after 45 minutes of inactivity for security.
-              Adding a passkey means signing back in takes <strong>one tap</strong> — no codes needed.
+              Adding a passkey means signing back in takes <strong>one tap</strong>, no codes needed.
             </p>
 
             <div
@@ -395,8 +395,8 @@ export default function MfaSetupPage() {
                 What&apos;s a passkey?
               </p>
               <p style={{ marginBottom: 12 }}>
-                A passkey lets you sign in with your fingerprint, face, or device screen lock —
-                no codes needed. It&apos;s faster and more secure than typing a 6-digit code.
+                A passkey lets you sign in with your fingerprint, face, or device screen lock.
+                No codes needed. It&apos;s faster and more secure than typing a 6-digit code.
               </p>
 
               <p style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 }}>
@@ -417,8 +417,8 @@ export default function MfaSetupPage() {
                   Your authenticator code is already saved if you scanned the QR with 1Password
                 </li>
                 <li style={{ marginBottom: 6 }}>
-                  When prompted to create a passkey, choose &ldquo;Save in 1Password&rdquo; —
-                  your passkey syncs across all your devices
+                  When prompted to create a passkey, choose &ldquo;Save in 1Password&rdquo;.
+                  Your passkey syncs across all your devices
                 </li>
                 <li>
                   Need help? Ask your admin or check 1Password&apos;s setup guide

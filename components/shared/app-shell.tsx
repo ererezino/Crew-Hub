@@ -558,7 +558,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                           className="status-custom-days-input"
                           min={1}
                           max={10}
-                          placeholder="1–10"
+                          placeholder="1-10"
                           value={statusCustomDays}
                           onChange={(e) => setStatusCustomDays(e.target.value)}
                           onKeyDown={(e) => {
@@ -663,18 +663,6 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
           </div>
 
           <div className="user-menu-divider" />
-
-          <Link
-            href="/settings?tab=profile"
-            className="user-menu-item"
-            onClick={() => setIsOpen(false)}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" className="user-menu-item-icon">
-              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.6" fill="none" />
-              <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-            </svg>
-            {t("userMenu.myProfile")}
-          </Link>
 
           <Link
             href="/settings"
