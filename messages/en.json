@@ -3139,7 +3139,8 @@
       "markProcessing": "Mark as processing",
       "markCompleted": "Mark as completed",
       "reopenRun": "Reopen run",
-      "marking": "Updating..."
+      "marking": "Updating...",
+      "importCsv": "Import CSV"
     },
     "approval": {
       "title": "Approval workflow",
@@ -3288,6 +3289,7 @@
       "runReopened": "Run reopened and returned to calculated state.",
       "runMarkedProcessing": "Run marked as processing.",
       "runMarkedCompleted": "Run marked as completed.",
+      "csvImportComplete": "CSV data imported. Run Calculate to apply withholding rules.",
       "adjustmentApplied": "Payroll adjustment applied.",
       "unableToAddAdjustment": "Unable to add payroll adjustment."
     },

@@ -11,6 +11,7 @@ import { z } from "zod";
 
 type AppLocale = "en" | "fr";
 
+import { CsvImportDialog } from "../../../../../components/payroll/csv-import-dialog";
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
@@ -244,6 +245,7 @@ export function PayrollRunDetailClient({
   const [isReopenDialogOpen, setIsReopenDialogOpen] = useState(false);
   const [reopenReason, setReopenReason] = useState("");
   const [reopenReasonError, setReopenReasonError] = useState<string | null>(null);
+  const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const { confirm, confirmDialog } = useConfirmAction();
 
@@ -271,6 +273,7 @@ export function PayrollRunDetailClient({
   const isPendingFirst = run?.status === "pending_first_approval";
   const isPendingFinal = run?.status === "pending_final_approval";
   const canCalculateRun = canManage && (run?.status === "draft" || isCalculated);
+  const canImportCsv = canManage && (run?.status === "draft" || isCalculated);
   const canGenerateStatements = canManage && isApproved;
   const canAdjustItems = canManage && isCalculated;
   const canSubmitForApproval = canManage && isCalculated;
@@ -593,8 +596,23 @@ export function PayrollRunDetailClient({
         title={t('title')}
         description={t('description')}
         actions={
-          canCalculateRun || canGenerateStatements ? (
+          canCalculateRun || canImportCsv || canGenerateStatements ? (
             <>
+              {canImportCsv ? (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setIsCsvImportOpen(true)}
+                  disabled={
+                    isCalculating ||
+                    isGeneratingStatements ||
+                    activeRunAction !== null
+                  }
+                >
+                  {t('actions.importCsv')}
+                </button>
+              ) : null}
+
               {canCalculateRun ? (
                 <button
                   type="button"
@@ -1442,6 +1460,16 @@ export function PayrollRunDetailClient({
       ) : null}
 
       {confirmDialog}
+
+      <CsvImportDialog
+        isOpen={isCsvImportOpen}
+        runId={runId}
+        onClose={() => setIsCsvImportOpen(false)}
+        onImportComplete={() => {
+          runQuery.refresh();
+          showToast("success", td("toast.csvImportComplete"));
+        }}
+      />
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite" aria-label={t('title')}>
