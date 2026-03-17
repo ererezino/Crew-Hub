@@ -47,15 +47,29 @@ export async function GET() {
     (f) => f.status === "verified"
   );
 
+  /* Count verified WebAuthn (passkey) factors if any exist */
+  const allFactors = ((factorsData as { all?: Array<{
+    id: string;
+    status?: string;
+    factor_type?: string;
+  }> } | null)?.all ?? []);
+  const verifiedPasskeys = allFactors.filter(
+    (f) => f.status === "verified" && f.factor_type === "webauthn"
+  );
+
   return jsonResponse<{
     enrolled: boolean;
     factorCount: number;
     factorIds: string[];
+    passkeyCount: number;
+    passkeyIds: string[];
   }>(200, {
     data: {
       enrolled: verifiedFactors.length > 0,
       factorCount: verifiedFactors.length,
-      factorIds: verifiedFactors.map((f) => f.id)
+      factorIds: verifiedFactors.map((f) => f.id),
+      passkeyCount: verifiedPasskeys.length,
+      passkeyIds: verifiedPasskeys.map((f) => f.id)
     },
     error: null,
     meta: buildMeta()

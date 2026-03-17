@@ -12,8 +12,10 @@ import {
 import { z } from "zod";
 
 import { OtpInput } from "../../components/shared/otp-input";
+import { getModuleState } from "../../lib/feature-state";
 
 const emailSchema = z.string().trim().min(1).email();
+const passkeysEnabled = getModuleState("passkeys") === "LIVE";
 
 type LoginStep = "email" | "code";
 
@@ -64,6 +66,8 @@ function LoginForm() {
   const [totpCode, setTotpCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [hasPasskey, setHasPasskey] = useState(false);
+  const [passkeySigningIn, setPasskeySigningIn] = useState(false);
 
   const acceptedEmailRef = useRef<string>("");
   const checkingRef = useRef(false);
@@ -77,6 +81,7 @@ function LoginForm() {
         setStep("email");
         setTotpCode("");
         setSubmitError(null);
+        setHasPasskey(false);
       }
 
       if (submitError) {
@@ -110,10 +115,17 @@ function LoginForm() {
       });
 
       if (res.ok) {
-        const json = (await res.json()) as { data?: { emailAccepted?: boolean } | null };
+        const json = (await res.json()) as {
+          data?: { emailAccepted?: boolean; hasPasskey?: boolean } | null;
+        };
         if (json.data?.emailAccepted) {
           acceptedEmailRef.current = trimmed.toLowerCase();
           setStep("code");
+
+          /* When passkeys are live and user has one, surface the passkey option */
+          if (passkeysEnabled && json.data.hasPasskey) {
+            setHasPasskey(true);
+          }
         }
       }
     } catch {
@@ -122,6 +134,84 @@ function LoginForm() {
       checkingRef.current = false;
     }
   }, [email]);
+
+  /**
+   * Passkey sign-in — uses WebAuthn MFA authenticate flow.
+   *
+   * Flow: email-only check → server returns AAL1 session via system password →
+   * client calls mfa.webauthn.authenticate() to elevate to AAL2.
+   * This only activates when the passkeys feature flag is LIVE.
+   */
+  const signInWithPasskey = useCallback(async () => {
+    if (!passkeysEnabled) return;
+
+    setPasskeySigningIn(true);
+    setSubmitError(null);
+
+    try {
+      /* Ask backend to create an AAL1 session for passkey-based MFA elevation */
+      const res = await fetch("/api/v1/auth/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), usePasskey: true })
+      });
+
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        setSubmitError(
+          json?.error?.message ?? "Passkey sign-in failed. Try your authenticator code instead."
+        );
+        setPasskeySigningIn(false);
+        return;
+      }
+
+      /* Trigger WebAuthn browser prompt to complete AAL2 */
+      const { createSupabaseBrowserClient } = await import("../../lib/supabase/client");
+      const supabase = createSupabaseBrowserClient();
+      const wa = supabase.auth.mfa.webauthn;
+
+      /* Get the WebAuthn factor ID from the session */
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      const webauthnFactors = ((factorsData as { all?: Array<{
+        id: string;
+        status?: string;
+        factor_type?: string;
+      }> } | null)?.all ?? []).filter(
+        (f) => f.status === "verified" && f.factor_type === "webauthn"
+      );
+
+      if (webauthnFactors.length === 0) {
+        setSubmitError("No passkey found. Use your authenticator code instead.");
+        setPasskeySigningIn(false);
+        return;
+      }
+
+      const authResult = await wa.authenticate({
+        factorId: webauthnFactors[0].id,
+        webauthn: {
+          rpId: window.location.hostname,
+          rpOrigins: [window.location.origin]
+        }
+      });
+
+      if (authResult.error) {
+        setSubmitError("Passkey sign-in failed. Try your authenticator code instead.");
+        setPasskeySigningIn(false);
+        return;
+      }
+
+      /* Audit — fire and forget */
+      fetch("/api/v1/audit/login", { method: "POST", keepalive: true }).catch(() => undefined);
+
+      router.replace(getRedirectTarget());
+      router.refresh();
+    } catch {
+      setSubmitError("Passkey sign-in was cancelled. Try your authenticator code instead.");
+      setPasskeySigningIn(false);
+    }
+  }, [email, router]);
 
   /* Full sign-in */
   const signIn = useCallback(async () => {
@@ -165,6 +255,8 @@ function LoginForm() {
     }
   };
 
+  const isAnySubmitting = isSubmitting || passkeySigningIn;
+
   return (
     <main className="standalone-page auth-page">
       <section className="standalone-card auth-card" aria-label="Crew Hub login form">
@@ -190,9 +282,34 @@ function LoginForm() {
               autoComplete="email"
               value={email}
               onChange={handleEmailChange}
-              disabled={isSubmitting}
+              disabled={isAnySubmitting}
             />
           </label>
+
+          {/* ── Passkey-first prompt (when user has a passkey enrolled) ── */}
+          {step === "code" && hasPasskey && passkeysEnabled ? (
+            <div style={{ marginBottom: 4 }}>
+              <button
+                type="button"
+                className="button button-cta auth-submit"
+                onClick={signInWithPasskey}
+                disabled={isAnySubmitting}
+                style={{ width: "100%", marginBottom: 8 }}
+              >
+                {passkeySigningIn ? "Signing in..." : "Sign in with passkey"}
+              </button>
+              <p
+                style={{
+                  textAlign: "center",
+                  fontSize: 13,
+                  color: "var(--text-muted)",
+                  margin: "8px 0"
+                }}
+              >
+                or enter your authenticator code
+              </p>
+            </div>
+          ) : null}
 
           {step === "code" ? (
             <div className="form-field">
@@ -200,7 +317,7 @@ function LoginForm() {
               <OtpInput
                 value={totpCode}
                 onChange={handleTotpChange}
-                disabled={isSubmitting}
+                disabled={isAnySubmitting}
                 hasError={Boolean(submitError)}
               />
             </div>
@@ -212,7 +329,7 @@ function LoginForm() {
             </p>
           ) : null}
 
-          <button type="submit" className="button button-cta auth-submit" disabled={isSubmitting}>
+          <button type="submit" className="button button-cta auth-submit" disabled={isAnySubmitting}>
             {isSubmitting ? "Signing in..." : "Sign in"}
           </button>
         </form>

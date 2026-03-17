@@ -13,11 +13,14 @@ import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { getCountryOptions } from "../../../lib/countries";
+import { getModuleState } from "../../../lib/feature-state";
 import { LOCALE_META, SUPPORTED_LOCALES, type AppLocale } from "../../../i18n/locales";
 import { updateLocale } from "../../../lib/i18n/update-locale";
 import type { UserRole } from "../../../lib/navigation";
 import { type NotificationPreferences, type SettingsTab } from "../../../types/settings";
 import { AuditLogViewer } from "./audit-log-viewer";
+
+const passkeysEnabled = getModuleState("passkeys") === "LIVE";
 
 const BROWSER_PUSH_PREF_KEY = "crewhub-browser-push-enabled";
 
@@ -303,16 +306,62 @@ export function SettingsClient({
   const [mfaEnrolled, setMfaEnrolled] = useState<boolean | null>(null);
   const [isMfaLoading, setIsMfaLoading] = useState(false);
 
+  // Passkey state (only active when passkeys feature is LIVE)
+  const [passkeyCount, setPasskeyCount] = useState(0);
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+  const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [passkeyMessage, setPasskeyMessage] = useState<string | null>(null);
+
   const fetchMfaStatus = useCallback(() => {
     setIsMfaLoading(true);
     fetch("/api/v1/me/mfa")
       .then((res) => res.json())
-      .then((data: { data?: { enrolled?: boolean } }) => {
+      .then((data: { data?: { enrolled?: boolean; passkeyCount?: number } }) => {
         setMfaEnrolled(data.data?.enrolled ?? false);
+        if (passkeysEnabled) {
+          setPasskeyCount(data.data?.passkeyCount ?? 0);
+        }
       })
       .catch(() => setMfaEnrolled(null))
       .finally(() => setIsMfaLoading(false));
   }, []);
+
+  const handleAddPasskey = useCallback(async () => {
+    if (!passkeysEnabled) return;
+    setIsPasskeyLoading(true);
+    setPasskeyError(null);
+    setPasskeyMessage(null);
+
+    try {
+      const { createSupabaseBrowserClient } = await import("../../../lib/supabase/client");
+      const supabase = createSupabaseBrowserClient();
+      const wa = supabase.auth.mfa.webauthn;
+
+      const result = await wa.register({
+        friendlyName: "Crew Hub Passkey",
+        webauthn: {
+          rpId: window.location.hostname,
+          rpOrigins: [window.location.origin]
+        }
+      });
+
+      if (result.error) {
+        setPasskeyError(
+          result.error instanceof Error
+            ? result.error.message
+            : t('security.passkeyRegisterFailed')
+        );
+        return;
+      }
+
+      setPasskeyMessage(t('security.passkeyAdded'));
+      fetchMfaStatus();
+    } catch {
+      setPasskeyError(t('security.passkeyCancelled'));
+    } finally {
+      setIsPasskeyLoading(false);
+    }
+  }, [fetchMfaStatus, t]);
 
   useEffect(() => {
     if (activeTab !== "security") return;
@@ -1255,6 +1304,42 @@ export function SettingsClient({
                 ) : null}
               </div>
             </div>
+
+            {passkeysEnabled ? (
+              <div className="security-action-row">
+                <div className="security-action-copy">
+                  <p className="form-label">{t('security.passkey')}</p>
+                  <p className="settings-card-description">
+                    {isMfaLoading
+                      ? t('security.checkingStatus')
+                      : passkeyCount > 0
+                        ? t('security.passkeyEnrolledDescription', { count: passkeyCount })
+                        : t('security.passkeyNotEnrolledDescription')}
+                  </p>
+                  {passkeyError ? (
+                    <p className="form-submit-error" role="alert" style={{ marginTop: "var(--space-2)", fontSize: 13 }}>
+                      {passkeyError}
+                    </p>
+                  ) : null}
+                  {passkeyMessage ? (
+                    <p className="settings-feedback" style={{ marginTop: "var(--space-2)" }}>
+                      {passkeyMessage}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  className="button"
+                  onClick={handleAddPasskey}
+                  disabled={isPasskeyLoading || isMfaLoading}
+                >
+                  {isPasskeyLoading
+                    ? tCommon('saving')
+                    : passkeyCount > 0
+                      ? t('security.addAnotherPasskey')
+                      : t('security.addPasskey')}
+                </button>
+              </div>
+            ) : null}
 
             <div className="security-action-row">
               <div className="security-action-copy">

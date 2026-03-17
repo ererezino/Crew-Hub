@@ -11,6 +11,7 @@ import { DecisionCard } from "../../../components/dashboard/decision-card";
 import { DashboardSkeleton } from "../../../components/dashboard/dashboard-skeleton";
 import { HealthAlerts } from "../../../components/dashboard/health-alerts";
 import { ManagerOnboardingWidget, OnboardingBanner } from "../../../components/dashboard/onboarding-banner";
+import { PasskeyNudgeBanner } from "../../../components/dashboard/passkey-nudge-banner";
 import { SetupChecklist } from "../../../components/dashboard/setup-checklist";
 import { WidgetErrorBoundary } from "../../../components/dashboard/widget-error-boundary";
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -1016,6 +1017,7 @@ function DashboardContent({ initialData }: { initialData?: DashboardResponseData
         />
       ) : null}
       <GreetingCard data={data} />
+      <PasskeyNudgeBanner />
       {shouldShowManagerOnboarding ? (
         <ManagerOnboardingWidget reports={data.managerOnboarding!} />
       ) : null}

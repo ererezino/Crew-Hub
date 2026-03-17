@@ -156,7 +156,8 @@ export type ModuleId =
   | "surveys"
   | "notifications"
   | "the_crew"
-  | "crew_games";
+  | "crew_games"
+  | "passkeys";
 
 export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   // Core pilot modules — LIVE
@@ -201,7 +202,10 @@ export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   the_crew: "LIVE",
 
   // Culture & games
-  crew_games: "LIVE"
+  crew_games: "LIVE",
+
+  // Passkey MFA — waiting for Supabase hosted WebAuthn support
+  passkeys: "COMING_SOON"
 };
 
 // ---------------------------------------------------------------------------
