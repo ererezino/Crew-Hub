@@ -588,6 +588,27 @@ export async function PUT(
         .signOut(personId, "global")
         .catch(() => undefined);
     }
+
+    /* Revoke all sessions when roles change (prevents stale privilege) */
+    if (
+      payload.roles !== undefined &&
+      JSON.stringify(existingRoles) !== JSON.stringify(nextRoles) &&
+      personId !== session.profile.id
+    ) {
+      await serviceRoleClient.auth.admin
+        .signOut(personId, "global")
+        .catch(() => undefined);
+    }
+
+    /* Revoke all sessions when offboarding begins */
+    if (
+      payload.status === "offboarding" &&
+      parsedExistingProfile.data.status !== "offboarding"
+    ) {
+      await serviceRoleClient.auth.admin
+        .signOut(personId, "global")
+        .catch(() => undefined);
+    }
   }
 
   /* Handle crew_tag upsert into employee_payment_details */

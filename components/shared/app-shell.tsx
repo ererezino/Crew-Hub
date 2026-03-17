@@ -785,17 +785,31 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
     return () => window.removeEventListener("crew-hub:badge-refresh", handler);
   }, [queryClient]);
 
-  /* ── Presence heartbeat ──
+  /* ── Presence heartbeat + session timeout enforcement ──
    * Pings /api/v1/me/heartbeat every 30s regardless of tab visibility.
-   * Includes isActive flag based on mouse/keyboard activity. */
+   * Includes isActive flag based on mouse/keyboard activity.
+   * Enforces idle timeout (45m) and absolute session lifetime (12h). */
   const { getAndResetActivityFlag, getInactiveDurationMs } = useActivityTracker();
 
   useEffect(() => {
     const HEARTBEAT_INTERVAL_MS = 30_000;
+    const IDLE_TIMEOUT_MS = 45 * 60 * 1000; // 45 minutes — auto-sign-out on inactivity
+    const ABSOLUTE_SESSION_LIFETIME_MS = 12 * 60 * 60 * 1000; // 12 hours — force re-login
     const IDLE_RECOVERY_THRESHOLD_MS = 4 * 60 * 1000; // 4 min — send immediate heartbeat on activity resume
     const IMMEDIATE_HEARTBEAT_COOLDOWN_MS = 5_000; // don't spam immediate heartbeats
+    const sessionStartedAt = Date.now();
     let lastHeartbeatAt = 0;
     let stopped = false;
+
+    const forceSignOut = (reason: "idle" | "expired") => {
+      if (stopped) return;
+      stopped = true;
+      void fetch("/api/auth/sign-out", { method: "POST" })
+        .catch(() => {})
+        .finally(() => {
+          window.location.href = `/login?reason=${reason}`;
+        });
+    };
 
     const sendHeartbeat = (isActive: boolean) => {
       if (stopped) return;
@@ -814,6 +828,19 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
 
     /* Regular interval — fires in both visible and hidden tabs */
     const intervalId = window.setInterval(() => {
+      /* Enforce absolute session lifetime */
+      if (Date.now() - sessionStartedAt >= ABSOLUTE_SESSION_LIFETIME_MS) {
+        forceSignOut("expired");
+        return;
+      }
+
+      /* Enforce idle timeout */
+      const idleMs = getInactiveDurationMs();
+      if (idleMs >= IDLE_TIMEOUT_MS) {
+        forceSignOut("idle");
+        return;
+      }
+
       sendHeartbeat(getAndResetActivityFlag());
     }, HEARTBEAT_INTERVAL_MS);
 

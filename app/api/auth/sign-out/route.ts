@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "../../../../lib/supabase/server";
 
 export async function POST() {
   const supabase = await createSupabaseServerClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "global" });
 
   return NextResponse.json({ success: true }, { status: 200 });
 }

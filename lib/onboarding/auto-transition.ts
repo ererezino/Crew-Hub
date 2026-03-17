@@ -231,6 +231,11 @@ export async function completeOffboarding({
       instanceId
     });
 
+    /* Revoke all sessions so the offboarded user is signed out everywhere */
+    await supabase.auth.admin
+      .signOut(employeeId, "global")
+      .catch(() => undefined);
+
     await logAudit({
       action: "updated",
       tableName: "profiles",

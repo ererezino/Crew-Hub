@@ -42,12 +42,22 @@ const INVITE_ERROR_MESSAGES: Record<string, string> = {
     "Your account has been disabled. Contact your admin for help."
 };
 
+const SESSION_REASON_MESSAGES: Record<string, string> = {
+  idle: "You were signed out due to inactivity. Please sign in again.",
+  expired: "Your session has expired. Please sign in again."
+};
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const urlError = searchParams.get("error");
-  const inviteBanner = urlError ? INVITE_ERROR_MESSAGES[urlError] ?? null : null;
+  const urlReason = searchParams.get("reason");
+  const inviteBanner = urlError
+    ? INVITE_ERROR_MESSAGES[urlError] ?? null
+    : urlReason
+      ? SESSION_REASON_MESSAGES[urlReason] ?? null
+      : null;
 
   const [step, setStep] = useState<LoginStep>("email");
   const [email, setEmail] = useState("");

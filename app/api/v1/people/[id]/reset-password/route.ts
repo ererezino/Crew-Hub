@@ -192,6 +192,12 @@ export async function POST(
     });
   }
 
+  /* ── Revoke all existing sessions so the user must re-authenticate ── */
+
+  await adminClient.auth.admin
+    .signOut(personId, "global")
+    .catch(() => undefined);
+
   /* ── Clear account_setup_at so the user goes through setup again ── */
 
   const { error: profileUpdateError } = await adminClient
