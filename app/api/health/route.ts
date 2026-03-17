@@ -10,7 +10,7 @@ type HealthCheck = {
   timestamp: string;
   checks: {
     database: { status: HealthStatus; latencyMs: number | null };
-    environment: { status: HealthStatus; missing: string[] };
+    environment: { status: HealthStatus };
   };
 };
 
@@ -21,19 +21,10 @@ const REQUIRED_ENV_VARS = [
   "AUTH_SYSTEM_SECRET"
 ];
 
-const OPTIONAL_ENV_VARS = [
-  "RESEND_API_KEY",
-  "RESEND_FROM",
-  "PAYMENT_ENCRYPTION_KEY",
-  "CRON_SECRET",
-  "SENTRY_DSN"
-];
-
 const startTime = Date.now();
 
 export async function GET() {
   const missingRequired = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
-  const missingOptional = OPTIONAL_ENV_VARS.filter((v) => !process.env[v]);
 
   let dbStatus: HealthStatus = "unhealthy";
   let dbLatency: number | null = null;
@@ -63,6 +54,8 @@ export async function GET() {
         ? "degraded"
         : "healthy";
 
+  /* Do NOT expose env var names, missing vars, or internal details
+     to unauthenticated callers. Only return pass/fail status. */
   const health: HealthCheck = {
     status: overallStatus,
     version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
@@ -70,13 +63,7 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     checks: {
       database: { status: dbStatus, latencyMs: dbLatency },
-      environment: {
-        status: envStatus,
-        missing: [
-          ...missingRequired.map((v) => `${v} (required)`),
-          ...missingOptional.map((v) => `${v} (optional)`)
-        ]
-      }
+      environment: { status: envStatus }
     }
   };
 
