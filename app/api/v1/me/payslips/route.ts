@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import type {
   MePayslipsResponseData,
@@ -145,6 +146,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createSupabaseServerClient();
+    const serviceClient = createSupabaseServiceRoleClient();
 
     const [{ data: rawYearRows, error: yearsError }, { data: rawRows, error: rowsError }] =
       await Promise.all([
@@ -155,7 +157,7 @@ export async function GET(request: Request) {
           .eq("employee_id", session.profile.id)
           .is("deleted_at", null)
           .order("pay_period", { ascending: false }),
-        supabase
+        serviceClient
           .from("payslips")
           .select(
             "id, payroll_item_id, pay_period, file_path, generated_at, emailed_at, viewed_at, payroll_item:payroll_items!inner(gross_amount, net_amount, currency, deductions, withholding_applied, payment_reference)"
