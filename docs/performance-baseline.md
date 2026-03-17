@@ -683,3 +683,130 @@ Browser navigates to /expenses
 | Fix | Regression | Action taken |
 |---|---|---|
 | — | None observed | — |
+
+---
+
+## Phase 7 Baseline
+
+Phase 7 targets the **remaining shared auth/session latency tax** that every authenticated page still pays on every navigation.
+
+### Current Auth/Session Flow After Phase 6 (200ms RTT)
+
+```
+Every authenticated page load:
+  → Middleware: supabase.auth.getUser()                    ~200ms (network call to Supabase Auth)
+  → Session layer: supabase.auth.getUser()                 ~200ms (DUPLICATE network call)
+  → Session layer: Promise.all([
+      checkMfaStatus(),                                    ~0ms (cached 45s) / ~400ms (uncached)
+      profiles.select()                                    ~200ms
+    ])                                                     ~200ms (parallel, MFA usually cached)
+  → Session layer: orgs.select() (if includeOrg)           ~200ms (settings page only)
+  → Session cache: 5s TTL                                  Helps only for sub-5s re-navigations
+```
+
+### Remaining Bottlenecks Identified
+
+| Bottleneck | Impact | Frequency |
+|---|---|---|
+| Duplicate `getUser()` — middleware already validated JWT, session layer calls it again | ~200ms wasted per page load | Every page load |
+| Session cache TTL 5s — too short for typical navigation patterns | Cache misses on most navigations | Every navigation >5s apart |
+| MFA factors lost without `getUser()` | `listFactors()` fallback needed | Once per 45s (MFA cache) |
+
+### What Is Safe to Optimize
+
+1. **Replace `getUser()` with `getSession()` in session layer** — `getSession()` reads the JWT from cookies locally (~0ms). Safe because:
+   - Page routes: middleware already validated the JWT via `getUser()`
+   - API routes: PostgREST validates the JWT on every DB query
+   - JWT is cryptographically signed — cannot be tampered
+   - MFA check already handles missing `user.factors` (falls back to `listFactors()`, cached 45s)
+
+2. **Bump session cache TTL from 5s → 30s** — extends the fast window for rapid navigations. Safe because:
+   - Profile/role changes propagate within 30s — acceptable for admin operations
+   - MFA has its own 45s cache — unchanged
+   - Inactive user detection delayed by at most 30s — acceptable
+
+### Target State
+
+| Metric | Current | Target |
+|---|---|---|
+| Session layer auth call | `getUser()` (~200ms network) | `getSession()` (~0ms local) |
+| Session cache TTL | 5s | 30s |
+| Auth latency per fresh page load | ~600ms (middleware 200 + session getUser 200 + profile 200) | ~400ms (middleware 200 + session getSession 0 + profile 200) |
+| Auth latency within 30s window | ~200ms (middleware only, 5s cache hit) | ~200ms (middleware only, 30s cache hit) |
+
+### Phase 7 Progress
+
+| Step | Fix | Status | Notes |
+|---|---|---|---|
+| 0 | Phase 7 baseline | Done | This section |
+| 1 | Repo hygiene check | Done | `bdc2324` on origin (Phase 6), CI failed on pre-existing banner lint error (not Phase 6 related). Working tree had banner fix from earlier. |
+| 2 | Fix banner lint error | Done | Replaced `useState` + `useEffect` with `useSyncExternalStore` — no `setState` in effect. |
+| 3 | Replace `getUser()` with `getSession()` | Done | Session layer now uses `getSession()` (local cookie read). Comment explains safety rationale. |
+| 4 | Bump session cache TTL 5s → 30s | Done | Extends fast window for rapid navigations. |
+| 5 | Verify in isolation | Done | tsc clean, eslint clean, 388/388 tests pass, next build clean. |
+| 6 | Final measurement + closeout | Done | See results below. |
+
+### Post-Phase 7 Auth/Session Flow (200ms RTT)
+
+```
+Every authenticated page load:
+  → Middleware: supabase.auth.getUser()                    ~200ms (network call — validates JWT)
+  → Session layer: supabase.auth.getSession()              ~0ms (local cookie read — no network)
+  → Session layer: Promise.all([
+      checkMfaStatus(),                                    ~0ms (cached 45s) / ~400ms (uncached)
+      profiles.select()                                    ~200ms
+    ])                                                     ~200ms (parallel, MFA usually cached)
+  → Session cache: 30s TTL                                 Covers typical navigation patterns
+```
+
+**Fresh page load (no cache):** middleware 200ms + getSession 0ms + profile 200ms = **~400ms** (was ~600ms)
+**Navigation within 30s:** middleware 200ms + cache hit 0ms = **~200ms** (was ~200ms only within 5s)
+
+### Phase 7 Results
+
+| Metric | Before (Phase 6) | After (Phase 7) | Change |
+|---|---|---|---|
+| Session layer auth call | `getUser()` (~200ms network) | `getSession()` (~0ms local) | −200ms per fresh page load |
+| Session cache TTL | 5s | 30s | 6x longer fast window |
+| Auth latency per fresh page load | ~600ms | ~400ms | −200ms (−33%) |
+| Fast-cache navigation window | 5s | 30s | Covers typical browsing patterns |
+| All 5 server-rendered pages improved | ~1200ms first render | ~1000ms first render | −200ms each |
+| Dashboard first-meaningful-render | ~1600ms | ~1400ms | −200ms |
+| Banner lint error | CI failure | Fixed (useSyncExternalStore) | CI unblocked |
+| `next build` | Clean | Clean | No regressions |
+| `tsc --noEmit` | Clean | Clean | No type errors |
+| `eslint` | Clean (locally) | Clean | Banner lint fixed |
+| `vitest run` | 388/388 | 388/388 | All tests pass |
+
+### Cumulative Improvement (Phase 1 → Phase 7)
+
+| Metric | Pre-optimization | Post-Phase 7 | Total improvement |
+|---|---|---|---|
+| Middleware Supabase calls | 4 sequential | 1 | −3 calls |
+| Session layer auth call | `getUser()` (~200ms) | `getSession()` (~0ms) | −200ms per navigation |
+| Session internal structure | All sequential | MFA ‖ profile parallel | −200ms per navigation |
+| Session cache TTL | N/A | 30s | 30s fast window |
+| Dashboard first-meaningful-render | ~2600ms | ~1400ms | −1200ms (−46%) |
+| Time Off first-meaningful-render | ~2200ms | ~1000ms | −1200ms (−55%) |
+| People first-meaningful-render | ~1800ms | ~1000ms | −800ms (−44%) |
+| Approvals first-meaningful-render | ~1800ms | ~1000ms | −800ms (−44%) |
+| Expenses first-meaningful-render | ~1800ms | ~1000ms | −800ms (−44%) |
+| Pages with server-rendered data | 0 | 5 | 5 high-traffic pages |
+| Total JS size (raw) | 3.58 MB | 3.44 MB | −148 KB (−4%) |
+| Framer Motion | 733 KB across 14 chunks | Eliminated | −733 KB |
+| Auto-prefetch requests | 28 per page | 0 | Eliminated |
+
+### Deferred / Not in Scope
+
+- Middleware `getUser()` (~200ms) — cannot be eliminated without weakening JWT validation on login redirects
+- Further session cache TTL increase beyond 30s — diminishing returns, risk of stale auth state
+- Edge-based session caching — would require architecture change
+
+### Phase 7 Regressions Log
+
+| Fix | Regression | Action taken |
+|---|---|---|
+| Banner useSyncExternalStore | None — same behavior, lint-clean | — |
+| getSession() replacing getUser() | user.factors no longer available | Existing fallback to listFactors() handles this; cached 45s |
+| Session cache TTL 5s → 30s | Profile/role changes delayed up to 30s | Acceptable for admin operations |
+| — | No functional regressions | — |
