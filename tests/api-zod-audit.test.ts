@@ -15,7 +15,8 @@ const ZOD_AUDIT_WAIVERS: Record<string, string> = {
   "crew-games/employees/route.ts": "GET-only endpoint with no user input.",
   "crew-games/upload/route.ts": "FormData upload, not JSON body.",
   "dashboard/route.ts": "Zod validation via fetchDashboardData imported from lib/dashboard/fetch-dashboard-data.ts.",
-  "approvals/counts/route.ts": "Thin HTTP wrapper — data-fetching and validation in lib/approvals/fetch-approvals-counts.ts."
+  "approvals/counts/route.ts": "Thin HTTP wrapper — data-fetching and validation in lib/approvals/fetch-approvals-counts.ts.",
+  "payroll/runs/[id]/import-csv/route.ts": "CSV import uses manual field validation via parseIntegerAmount from _helpers.ts."
 };
 
 function collectRouteFiles(directory: string): string[] {

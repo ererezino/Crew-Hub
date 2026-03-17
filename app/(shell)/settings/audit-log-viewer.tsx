@@ -76,12 +76,20 @@ function toDisplayValue(value: unknown): string {
   }
 }
 
+function safeRecord(value: Record<string, unknown> | null): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value;
+}
+
 function diffValues(
   oldValue: Record<string, unknown> | null,
   newValue: Record<string, unknown> | null
 ): DiffLine[] {
-  const previous = oldValue ?? {};
-  const next = newValue ?? {};
+  const previous = safeRecord(oldValue);
+  const next = safeRecord(newValue);
 
   const keys = [...new Set([...Object.keys(previous), ...Object.keys(next)])].sort();
 
@@ -434,7 +442,16 @@ export function AuditLogViewer() {
               <tbody>
                 {responseData.entries.map((entry) => {
                   const isExpanded = Boolean(expandedRows[entry.id]);
-                  const diffLines = diffValues(entry.oldValue, entry.newValue);
+
+                  let diffLines: DiffLine[] = [];
+
+                  if (isExpanded) {
+                    try {
+                      diffLines = diffValues(entry.oldValue, entry.newValue);
+                    } catch {
+                      diffLines = [];
+                    }
+                  }
 
                   return (
                     <Fragment key={entry.id}>

@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { DocumentUploadPanel } from "../../../components/shared/document-upload-panel";
+import { DocumentViewer } from "../../../components/shared/document-viewer";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
@@ -177,6 +178,13 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [versionTarget, setVersionTarget] = useState<DocumentRecord | null>(null);
   const [isOpeningFileById, setIsOpeningFileById] = useState<Record<string, boolean>>({});
+  const [viewerDoc, setViewerDoc] = useState<{
+    url: string;
+    title: string;
+    fileName: string;
+    mimeType: string;
+    documentId: string;
+  } | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Policy detail panel state
@@ -292,7 +300,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
     );
   };
 
-  const handleOpenFile = async (documentId: string) => {
+  const handleOpenFile = async (documentId: string, document?: DocumentRecord) => {
     setIsOpeningFileById((currentState) => ({
       ...currentState,
       [documentId]: true
@@ -310,7 +318,23 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         return;
       }
 
-      window.open(payload.data.url, "_blank", "noopener,noreferrer");
+      const mime = document?.mimeType ?? "";
+      const isViewable =
+        mime === "application/pdf" ||
+        mime.startsWith("image/") ||
+        !mime;
+
+      if (isViewable && document) {
+        setViewerDoc({
+          url: payload.data.url,
+          title: document.title,
+          fileName: document.fileName,
+          mimeType: mime,
+          documentId
+        });
+      } else {
+        window.open(payload.data.url, "_blank", "noopener,noreferrer");
+      }
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : td('toastOpenError'));
     } finally {
@@ -319,6 +343,27 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         delete nextState[documentId];
         return nextState;
       });
+    }
+  };
+
+  const handleRefreshViewerUrl = async (): Promise<string | null> => {
+    if (!viewerDoc) return null;
+
+    try {
+      const response = await fetch(`/api/v1/documents/${viewerDoc.documentId}/download`, {
+        method: "GET"
+      });
+
+      const payload = (await response.json()) as DocumentSignedUrlResponse;
+
+      if (!response.ok || !payload.data?.url) return null;
+
+      setViewerDoc((prev) =>
+        prev ? { ...prev, url: payload.data!.url } : null
+      );
+      return payload.data.url;
+    } catch {
+      return null;
     }
   };
 
@@ -532,7 +577,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                         <button
                           type="button"
                           className="table-row-action"
-                          onClick={() => handleOpenFile(document.id)}
+                          onClick={() => handleOpenFile(document.id, document)}
                           disabled={Boolean(isOpeningFileById[document.id])}
                         >
                           {isOpeningFileById[document.id] ? t('opening') : t('open')}
@@ -810,7 +855,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
               <button
                 type="button"
                 className="button button-accent"
-                onClick={() => handleOpenFile(policyDetail.id)}
+                onClick={() => handleOpenFile(policyDetail.id, policyDetail)}
                 disabled={Boolean(isOpeningFileById[policyDetail.id])}
               >
                 {isOpeningFileById[policyDetail.id] ? t('opening') : t('openFile')}
@@ -855,6 +900,17 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         tone="danger"
         reverseEmphasis
         isConfirming={isDeleting}
+      />
+
+      {/* ── Document Viewer ── */}
+      <DocumentViewer
+        isOpen={viewerDoc !== null}
+        title={viewerDoc?.title ?? ""}
+        documentUrl={viewerDoc?.url ?? null}
+        fileName={viewerDoc?.fileName}
+        mimeType={viewerDoc?.mimeType}
+        onClose={() => setViewerDoc(null)}
+        onRefreshUrl={handleRefreshViewerUrl}
       />
     </>
   );

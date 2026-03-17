@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
 import { DocumentUploadPanel } from "../../../../components/shared/document-upload-panel";
+import { DocumentViewer } from "../../../../components/shared/document-viewer";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
@@ -193,6 +194,13 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [versionTarget, setVersionTarget] = useState<DocumentRecord | null>(null);
   const [isOpeningFileById, setIsOpeningFileById] = useState<Record<string, boolean>>({});
+  const [viewerDoc, setViewerDoc] = useState<{
+    url: string;
+    title: string;
+    fileName: string;
+    mimeType: string;
+    documentId: string;
+  } | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Travel support form state
@@ -269,7 +277,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
     refresh();
   };
 
-  const handleOpenFile = async (documentId: string) => {
+  const handleOpenFile = async (documentId: string, document?: DocumentRecord) => {
     setIsOpeningFileById((currentState) => ({
       ...currentState,
       [documentId]: true
@@ -287,7 +295,23 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         return;
       }
 
-      window.open(payload.data.url, "_blank", "noopener,noreferrer");
+      const mime = document?.mimeType ?? "";
+      const isViewable =
+        mime === "application/pdf" ||
+        mime.startsWith("image/") ||
+        !mime; // default to in-app viewer when mime unknown
+
+      if (isViewable && document) {
+        setViewerDoc({
+          url: payload.data.url,
+          title: document.title,
+          fileName: document.fileName,
+          mimeType: mime,
+          documentId
+        });
+      } else {
+        window.open(payload.data.url, "_blank", "noopener,noreferrer");
+      }
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : t('toast.unableToOpenDocument'));
     } finally {
@@ -298,6 +322,27 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
       });
     }
   };
+
+  const handleRefreshViewerUrl = useCallback(async (): Promise<string | null> => {
+    if (!viewerDoc) return null;
+
+    try {
+      const response = await fetch(`/api/v1/documents/${viewerDoc.documentId}/download`, {
+        method: "GET"
+      });
+
+      const payload = (await response.json()) as DocumentSignedUrlResponse;
+
+      if (!response.ok || !payload.data?.url) return null;
+
+      setViewerDoc((prev) =>
+        prev ? { ...prev, url: payload.data!.url } : null
+      );
+      return payload.data.url;
+    } catch {
+      return null;
+    }
+  }, [viewerDoc]);
 
   // Travel support handlers
   const openTravelPanel = useCallback(() => {
@@ -619,7 +664,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                         <button
                           type="button"
                           className="table-row-action"
-                          onClick={() => handleOpenFile(document.id)}
+                          onClick={() => handleOpenFile(document.id, document)}
                           disabled={Boolean(isOpeningFileById[document.id])}
                         >
                           {isOpeningFileById[document.id] ? t('actions.opening') : t('actions.open')}
@@ -704,7 +749,7 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                               <button
                                 type="button"
                                 className="table-row-action"
-                                onClick={() => handleOpenFile(document.id)}
+                                onClick={() => handleOpenFile(document.id, document)}
                                 disabled={Boolean(isOpeningFileById[document.id])}
                               >
                                 {isOpeningFileById[document.id] ? t('actions.opening') : t('actions.open')}
@@ -1168,6 +1213,17 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
           ))}
         </div>
       ) : null}
+
+      {/* ── Document Viewer ── */}
+      <DocumentViewer
+        isOpen={viewerDoc !== null}
+        title={viewerDoc?.title ?? ""}
+        documentUrl={viewerDoc?.url ?? null}
+        fileName={viewerDoc?.fileName}
+        mimeType={viewerDoc?.mimeType}
+        onClose={() => setViewerDoc(null)}
+        onRefreshUrl={handleRefreshViewerUrl}
+      />
     </>
   );
 }

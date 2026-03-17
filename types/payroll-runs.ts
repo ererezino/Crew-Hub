@@ -177,7 +177,7 @@ export type AddPayrollAdjustmentResponseData = {
 };
 
 export type PayrollRunActionPayload = {
-  action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel";
+  action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed";
   reason?: string | null;
 };
 
@@ -191,3 +191,46 @@ export type CreatePayrollRunResponse = ApiResponse<CreatePayrollRunResponseData>
 export type CalculatePayrollRunResponse = ApiResponse<CalculatePayrollRunResponseData>;
 export type AddPayrollAdjustmentResponse = ApiResponse<AddPayrollAdjustmentResponseData>;
 export type PayrollRunActionResponse = ApiResponse<PayrollRunActionResponseData>;
+
+/* ------------------------------------------------------------------ */
+/*  CSV Import types                                                   */
+/* ------------------------------------------------------------------ */
+
+export type CsvImportPreviewRow = {
+  rowNumber: number;
+  employeeEmail: string;
+  employeeId: string;
+  employeeName: string;
+  baseSalary: number;
+  currency: string;
+  allowances: { label: string; amount: number }[];
+  bonus: { label: string; amount: number } | null;
+  deduction: { label: string; amount: number } | null;
+  notes: string | null;
+  hasConflict: boolean;
+};
+
+export type CsvImportError = {
+  row: number;
+  field: string;
+  message: string;
+};
+
+export type CsvImportSummary = {
+  totalRows: number;
+  validCount: number;
+  errorCount: number;
+  duplicateCount: number;
+  conflictCount: number;
+};
+
+export type CsvImportPreviewResponseData = {
+  validRows: CsvImportPreviewRow[];
+  errors: CsvImportError[];
+  duplicates: string[];
+  conflicts: string[];
+  summary: CsvImportSummary;
+  committed: boolean;
+};
+
+export type CsvImportPreviewResponse = ApiResponse<CsvImportPreviewResponseData>;

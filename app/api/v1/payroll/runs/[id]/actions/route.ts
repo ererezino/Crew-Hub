@@ -18,7 +18,7 @@ import {
 } from "../../../_helpers";
 
 const actionBodySchema = z.object({
-  action: z.enum(["submit", "approve_first", "approve_final", "reject", "cancel"]),
+  action: z.enum(["submit", "approve_first", "approve_final", "reject", "cancel", "reopen", "mark_processing", "mark_completed"]),
   reason: z.string().trim().max(500).optional().nullable()
 });
 
@@ -104,6 +104,17 @@ export async function POST(
 
   const action = parsedBody.data.action;
   const reason = parsedBody.data.reason?.trim() || null;
+
+  if (action === "reopen" && !reason) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "A reason for reopening is required."
+      },
+      meta: buildMeta()
+    });
+  }
 
   if (action === "reject" && !reason) {
     return jsonResponse<null>(422, {
@@ -449,6 +460,112 @@ export async function POST(
       nextNotes = reason ?? parsedRun.data.notes;
     }
 
+    if (action === "reopen") {
+      if (!canFinalApprove(profile.roles)) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only Super Admin can reopen payroll runs."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      if (parsedRun.data.status !== "approved" && parsedRun.data.status !== "processing") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message: "Only approved or processing runs can be reopened."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      nextStatus = "calculated";
+      nextFirstApprovedBy = null;
+      nextFirstApprovedAt = null;
+      nextFinalApprovedBy = null;
+      nextFinalApprovedAt = null;
+      nextSnapshot = {
+        ...previousSnapshot,
+        reopenedAt: nowIso,
+        reopenedBy: profile.id,
+        reopenedByName: profile.full_name,
+        reopenReason: reason,
+        locked: false
+      };
+      nextNotes = reason;
+    }
+
+    if (action === "mark_processing") {
+      if (!canSubmit(profile.roles)) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only Finance Admin and Super Admin can mark runs as processing."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      if (parsedRun.data.status !== "approved") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message: "Only approved runs can be marked as processing."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      nextStatus = "processing";
+      nextSnapshot = {
+        ...previousSnapshot,
+        processingStartedAt: nowIso,
+        processingStartedBy: profile.id
+      };
+    }
+
+    if (action === "mark_completed") {
+      if (!canSubmit(profile.roles)) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "Only Finance Admin and Super Admin can mark runs as completed."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      if (parsedRun.data.status !== "processing") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message: "Only processing runs can be marked as completed."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      nextStatus = "completed";
+      nextSnapshot = {
+        ...previousSnapshot,
+        completedAt: nowIso,
+        completedBy: profile.id,
+        completedByName: profile.full_name,
+        completionNotes: reason
+      };
+      if (reason) {
+        nextNotes = reason;
+      }
+    }
+
     const { data: updatedRun, error: updateError } = await supabase
       .from("payroll_runs")
       .update({
@@ -504,6 +621,43 @@ export async function POST(
         reason
       }
     });
+
+    if (action === "reopen" && nextStatus === "calculated") {
+      const { data: adminRows, error: adminRowsError } = await supabase
+        .from("profiles")
+        .select("id, roles")
+        .eq("org_id", profile.org_id)
+        .is("deleted_at", null);
+
+      if (!adminRowsError && adminRows) {
+        const adminRecipientIds = [...new Set(
+          adminRows
+            .filter(
+              (row): row is { id: string; roles: string[] } =>
+                typeof row?.id === "string" &&
+                Array.isArray(row?.roles) &&
+                (row.roles.includes("FINANCE_ADMIN") || row.roles.includes("SUPER_ADMIN"))
+            )
+            .map((row) => row.id)
+        )];
+
+        if (adminRecipientIds.length > 0) {
+          const payPeriodLabel = formatPayPeriodLabel(
+            parsedUpdated.data.pay_period_start,
+            parsedUpdated.data.pay_period_end
+          );
+
+          await createBulkNotifications({
+            orgId: profile.org_id,
+            userIds: adminRecipientIds,
+            type: "payroll_approved",
+            title: "Payroll reopened",
+            body: `Payroll for ${payPeriodLabel} has been reopened by a Super Admin. All approvals have been cleared.`,
+            link: "/payroll"
+          });
+        }
+      }
+    }
 
     if (action === "approve_final" && nextStatus === "approved") {
       const payPeriodLabel = formatPayPeriodLabel(

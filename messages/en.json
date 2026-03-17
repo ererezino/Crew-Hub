@@ -3135,7 +3135,11 @@
       "approveStep1": "Approve step 1",
       "approveFinal": "Approve final",
       "cancelling": "Cancelling...",
-      "cancelRun": "Cancel run"
+      "cancelRun": "Cancel run",
+      "markProcessing": "Mark as processing",
+      "markCompleted": "Mark as completed",
+      "reopenRun": "Reopen run",
+      "marking": "Updating..."
     },
     "approval": {
       "title": "Approval workflow",
@@ -3148,7 +3152,9 @@
     },
     "locked": {
       "title": "Payroll locked",
-      "description": "Final approval completed. Snapshot is immutable and edits are blocked."
+      "description": "Final approval completed. Snapshot is immutable and edits are blocked.",
+      "processingDescription": "Payments are currently being processed.",
+      "completedDescription": "All payments completed. This run is finalized."
     },
     "flagged": {
       "flaggedItems": "{count, plural, one {# flagged item} other {# flagged items}}",
@@ -3227,6 +3233,40 @@
       "reasonRequired": "Rejection reason is required.",
       "reasonTooLong": "Rejection reason must be 500 characters or fewer."
     },
+    "confirmSubmit": {
+      "title": "Submit for approval?",
+      "description": "This run will be submitted for first approval. Ensure all items and adjustments are reviewed.",
+      "confirmLabel": "Submit for approval"
+    },
+    "confirmApproveFirst": {
+      "title": "Approve step 1?",
+      "description": "Your first approval will advance this run to final approval. This cannot be undone without rejection.",
+      "confirmLabel": "Approve step 1"
+    },
+    "confirmApproveFinal": {
+      "title": "Final approval — are you sure?",
+      "description": "Final approval locks this payroll run. Items become immutable and payment statements can be generated. This action cannot be undone without a Super Admin reopening the run.",
+      "confirmLabel": "Yes, final-approve this run"
+    },
+    "reopenDialog": {
+      "title": "Reopen payroll run?",
+      "description": "Reopening reverts the run to calculated status. All approvals will be cleared and must be redone. Only use this for genuine corrections.",
+      "reasonLabel": "Reason for reopening",
+      "reopening": "Reopening...",
+      "confirmReopen": "Reopen run",
+      "reasonRequired": "A reason for reopening is required.",
+      "reasonTooLong": "Reason must be 500 characters or fewer."
+    },
+    "confirmMarkProcessing": {
+      "title": "Mark as processing?",
+      "description": "This indicates that payments are being processed. The run will remain locked.",
+      "confirmLabel": "Mark as processing"
+    },
+    "confirmMarkCompleted": {
+      "title": "Mark payroll as completed?",
+      "description": "This confirms all payments have been sent and the run is finalized. This is the final state.",
+      "confirmLabel": "Mark as completed"
+    },
     "cancelDialog": {
       "title": "Cancel payroll run?",
       "description": "This run will move to cancelled status and cannot continue through approvals.",
@@ -3245,8 +3285,18 @@
       "finalApprovalComplete": "Final approval complete. Payroll is now locked.",
       "runRejected": "Run rejected and returned to calculated state.",
       "runCancelled": "Run cancelled.",
+      "runReopened": "Run reopened and returned to calculated state.",
+      "runMarkedProcessing": "Run marked as processing.",
+      "runMarkedCompleted": "Run marked as completed.",
       "adjustmentApplied": "Payroll adjustment applied.",
       "unableToAddAdjustment": "Unable to add payroll adjustment."
+    },
+    "paymentStatus": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "paid": "Paid",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
     },
     "dismissToast": "Dismiss toast"
   },
@@ -5819,5 +5869,54 @@
       "kahoot": "Kahoot",
       "openGame": "Open Game"
     }
+  },
+  "csvImport": {
+    "title": "Import payroll from CSV",
+    "description": "Upload a CSV file with employee payroll data. The file will be validated and you can preview all rows before committing.",
+    "downloadTemplate": "Download CSV template",
+    "selectFile": "Select CSV file",
+    "uploading": "Validating...",
+    "uploadAndPreview": "Upload and preview",
+    "backToUpload": "Back to upload",
+    "committing": "Importing...",
+    "commitImport": "Import {count, plural, one {# row} other {# rows}}",
+    "commitSuccess": "Import complete",
+    "commitSuccessDescription": "Successfully imported {count, plural, one {# payroll row} other {# payroll rows}}. Run calculate to apply withholding rules.",
+    "summary": {
+      "totalRows": "Total rows",
+      "valid": "Valid",
+      "errors": "Errors",
+      "duplicates": "Duplicates",
+      "conflicts": "Existing items"
+    },
+    "errorsFound": "{count, plural, one {# validation error} other {# validation errors}}",
+    "andMoreErrors": "...and {count} more errors",
+    "duplicatesFound": "{count, plural, one {# duplicate email} other {# duplicate emails}}",
+    "conflictsFound": "{count, plural, one {# existing item will be overwritten} other {# existing items will be overwritten}}",
+    "conflictsDescription": "These employees already have items in this payroll run. Importing will overwrite their existing data.",
+    "preview": {
+      "employee": "Employee",
+      "baseSalary": "Base salary",
+      "allowances": "Allowances",
+      "bonus": "Bonus",
+      "deduction": "Deduction",
+      "notes": "Notes"
+    },
+    "errors": {
+      "notCsv": "File must be a .csv file.",
+      "tooLarge": "File is too large. Maximum size is 2 MB.",
+      "uploadFailed": "Unable to upload CSV file.",
+      "commitFailed": "Unable to import payroll data."
+    }
+  },
+  "documentViewer": {
+    "openNewTab": "Open in new tab",
+    "download": "Download",
+    "print": "Print",
+    "close": "Close",
+    "loading": "Loading document...",
+    "unsupportedType": "This file type cannot be previewed in the browser.",
+    "downloadInstead": "Download to view this file.",
+    "loadError": "Unable to load document. Try downloading instead."
   }
 }

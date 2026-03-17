@@ -2,7 +2,7 @@ import { hasRole } from "../roles";
 import type { PayrollRunStatus } from "../../types/payroll-runs";
 import type { UserRole } from "../navigation";
 
-export type PayrollApprovalAction = "submit" | "approve_first" | "approve_final" | "reject" | "cancel";
+export type PayrollApprovalAction = "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed";
 
 export type PayrollApprovalInput = {
   action: PayrollApprovalAction;
@@ -36,11 +36,27 @@ function canFinalApprove(roles: readonly UserRole[]): boolean {
 }
 
 export function evaluatePayrollApprovalAction(input: PayrollApprovalInput): PayrollApprovalDecision {
-  if (input.status === "approved") {
+  if (input.status === "approved" && input.action !== "reopen" && input.action !== "mark_processing") {
     return {
       allowed: false,
       code: "PAYROLL_LOCKED",
       message: "Payroll locked. Approved runs cannot be modified."
+    };
+  }
+
+  if (input.status === "processing" && input.action !== "reopen" && input.action !== "mark_completed") {
+    return {
+      allowed: false,
+      code: "PAYROLL_LOCKED",
+      message: "Payroll locked. Processing runs cannot be modified."
+    };
+  }
+
+  if (input.status === "completed") {
+    return {
+      allowed: false,
+      code: "PAYROLL_LOCKED",
+      message: "Payroll locked. Completed runs cannot be modified."
     };
   }
 
@@ -182,6 +198,60 @@ export function evaluatePayrollApprovalAction(input: PayrollApprovalInput): Payr
         allowed: false,
         code: "INVALID_STATE",
         message: "Run is already cancelled."
+      };
+    }
+  }
+
+  if (input.action === "reopen") {
+    if (!canFinalApprove(input.actorRoles)) {
+      return {
+        allowed: false,
+        code: "FORBIDDEN",
+        message: "Only Super Admin can reopen payroll runs."
+      };
+    }
+
+    if (input.status !== "approved" && input.status !== "processing") {
+      return {
+        allowed: false,
+        code: "INVALID_STATE",
+        message: "Only approved or processing runs can be reopened."
+      };
+    }
+  }
+
+  if (input.action === "mark_processing") {
+    if (!canSubmit(input.actorRoles)) {
+      return {
+        allowed: false,
+        code: "FORBIDDEN",
+        message: "Only Finance Admin and Super Admin can mark runs as processing."
+      };
+    }
+
+    if (input.status !== "approved") {
+      return {
+        allowed: false,
+        code: "INVALID_STATE",
+        message: "Only approved runs can be marked as processing."
+      };
+    }
+  }
+
+  if (input.action === "mark_completed") {
+    if (!canSubmit(input.actorRoles)) {
+      return {
+        allowed: false,
+        code: "FORBIDDEN",
+        message: "Only Finance Admin and Super Admin can mark runs as completed."
+      };
+    }
+
+    if (input.status !== "processing") {
+      return {
+        allowed: false,
+        code: "INVALID_STATE",
+        message: "Only processing runs can be marked as completed."
       };
     }
   }

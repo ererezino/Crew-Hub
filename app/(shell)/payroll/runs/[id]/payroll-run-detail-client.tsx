@@ -105,8 +105,19 @@ function itemTableSkeleton() {
 function paymentStatusTone(
   status: PayrollRunItem["paymentStatus"]
 ): "success" | "error" | "processing" | "warning" | "draft" {
-  void status;
-  return "draft";
+  switch (status) {
+    case "paid":
+      return "success";
+    case "processing":
+      return "processing";
+    case "failed":
+      return "error";
+    case "cancelled":
+      return "warning";
+    case "pending":
+    default:
+      return "draft";
+  }
 }
 
 function signedAmountPrefix(amount: number | null): string {
@@ -219,7 +230,7 @@ export function PayrollRunDetailClient({
   const [isCalculating, setIsCalculating] = useState(false);
   const [isGeneratingStatements, setIsGeneratingStatements] = useState(false);
   const [activeRunAction, setActiveRunAction] = useState<
-    null | "submit" | "approve_first" | "approve_final" | "reject" | "cancel"
+    null | "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed"
   >(null);
   const [adjustmentItemId, setAdjustmentItemId] = useState<string | null>(null);
   const [adjustmentValues, setAdjustmentValues] = useState<AdjustmentFormValues>(
@@ -230,6 +241,9 @@ export function PayrollRunDetailClient({
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectReasonError, setRejectReasonError] = useState<string | null>(null);
+  const [isReopenDialogOpen, setIsReopenDialogOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenReasonError, setReopenReasonError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const { confirm, confirmDialog } = useConfirmAction();
 
@@ -251,6 +265,8 @@ export function PayrollRunDetailClient({
   }, [runQuery.data?.run?.totalGross]);
   const run = runQuery.data?.run ?? null;
   const isApproved = run?.status === "approved";
+  const isProcessing = run?.status === "processing";
+  const isCompleted = run?.status === "completed";
   const isCalculated = run?.status === "calculated";
   const isPendingFirst = run?.status === "pending_first_approval";
   const isPendingFinal = run?.status === "pending_final_approval";
@@ -275,7 +291,10 @@ export function PayrollRunDetailClient({
       run?.firstApprovedBy !== viewerUserId);
   const canCancelRun =
     canManage &&
-    (run ? run.status !== "approved" && run.status !== "cancelled" : false);
+    (run ? run.status !== "approved" && run.status !== "cancelled" && run.status !== "processing" && run.status !== "completed" : false);
+  const canReopenRun = canFinalApprove && (isApproved || isProcessing);
+  const canMarkProcessing = canManage && isApproved;
+  const canMarkCompleted = canManage && isProcessing;
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -362,7 +381,7 @@ export function PayrollRunDetailClient({
   };
 
   const performRunAction = async (
-    action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel",
+    action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed",
     reason: string | null = null
   ) => {
     setActiveRunAction(action);
@@ -396,6 +415,12 @@ export function PayrollRunDetailClient({
         showToast("info", td("toast.runRejected"));
       } else if (action === "cancel") {
         showToast("info", td("toast.runCancelled"));
+      } else if (action === "reopen") {
+        showToast("info", td("toast.runReopened"));
+      } else if (action === "mark_processing") {
+        showToast("success", td("toast.runMarkedProcessing"));
+      } else if (action === "mark_completed") {
+        showToast("success", td("toast.runMarkedCompleted"));
       }
 
       if (action === "approve_final") {
@@ -496,6 +521,55 @@ export function PayrollRunDetailClient({
       setRejectReason("");
       setRejectReasonError(null);
     }
+  };
+
+  const submitReopenReason = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedReason = reopenReason.trim();
+
+    if (!trimmedReason) {
+      setReopenReasonError(td("reopenDialog.reasonRequired"));
+      return;
+    }
+
+    if (trimmedReason.length > 500) {
+      setReopenReasonError(td("reopenDialog.reasonTooLong"));
+      return;
+    }
+
+    setReopenReasonError(null);
+    const success = await performRunAction("reopen", trimmedReason);
+
+    if (success) {
+      setIsReopenDialogOpen(false);
+      setReopenReason("");
+      setReopenReasonError(null);
+    }
+  };
+
+  const markProcessing = async () => {
+    const confirmed = await confirm({
+      title: td("confirmMarkProcessing.title"),
+      description: td("confirmMarkProcessing.description"),
+      confirmLabel: td("confirmMarkProcessing.confirmLabel"),
+      tone: "default"
+    });
+
+    if (!confirmed) return;
+    await performRunAction("mark_processing");
+  };
+
+  const markCompleted = async () => {
+    const confirmed = await confirm({
+      title: td("confirmMarkCompleted.title"),
+      description: td("confirmMarkCompleted.description"),
+      confirmLabel: td("confirmMarkCompleted.confirmLabel"),
+      tone: "danger"
+    });
+
+    if (!confirmed) return;
+    await performRunAction("mark_completed");
   };
 
   const cancelRun = async () => {
@@ -697,8 +771,14 @@ export function PayrollRunDetailClient({
                   type="button"
                   className="button"
                   disabled={activeRunAction !== null || isCalculating}
-                  onClick={() => {
-                    void performRunAction("submit");
+                  onClick={async () => {
+                    const confirmed = await confirm({
+                      title: td("confirmSubmit.title"),
+                      description: td("confirmSubmit.description"),
+                      confirmLabel: td("confirmSubmit.confirmLabel"),
+                      tone: "default"
+                    });
+                    if (confirmed) void performRunAction("submit");
                   }}
                 >
                   {activeRunAction === "submit" ? t('actions.submitting') : t('actions.submitForApproval')}
@@ -710,8 +790,14 @@ export function PayrollRunDetailClient({
                   type="button"
                   className="button button-primary"
                   disabled={activeRunAction !== null}
-                  onClick={() => {
-                    void performRunAction("approve_first");
+                  onClick={async () => {
+                    const confirmed = await confirm({
+                      title: td("confirmApproveFirst.title"),
+                      description: td("confirmApproveFirst.description"),
+                      confirmLabel: td("confirmApproveFirst.confirmLabel"),
+                      tone: "default"
+                    });
+                    if (confirmed) void performRunAction("approve_first");
                   }}
                 >
                   {activeRunAction === "approve_first" ? t('actions.approving') : t('actions.approveStep1')}
@@ -723,8 +809,14 @@ export function PayrollRunDetailClient({
                   type="button"
                   className="button button-primary"
                   disabled={activeRunAction !== null}
-                  onClick={() => {
-                    void performRunAction("approve_final");
+                  onClick={async () => {
+                    const confirmed = await confirm({
+                      title: td("confirmApproveFinal.title"),
+                      description: td("confirmApproveFinal.description"),
+                      confirmLabel: td("confirmApproveFinal.confirmLabel"),
+                      tone: "danger"
+                    });
+                    if (confirmed) void performRunAction("approve_final");
                   }}
                 >
                   {activeRunAction === "approve_final" ? t('actions.approving') : t('actions.approveFinal')}
@@ -758,10 +850,51 @@ export function PayrollRunDetailClient({
                   {activeRunAction === "cancel" ? t('actions.cancelling') : t('actions.cancelRun')}
                 </button>
               ) : null}
+
+              {canMarkProcessing ? (
+                <button
+                  type="button"
+                  className="button"
+                  disabled={activeRunAction !== null}
+                  onClick={() => {
+                    void markProcessing();
+                  }}
+                >
+                  {activeRunAction === "mark_processing" ? td('actions.marking') : td('actions.markProcessing')}
+                </button>
+              ) : null}
+
+              {canMarkCompleted ? (
+                <button
+                  type="button"
+                  className="button button-primary"
+                  disabled={activeRunAction !== null}
+                  onClick={() => {
+                    void markCompleted();
+                  }}
+                >
+                  {activeRunAction === "mark_completed" ? td('actions.marking') : td('actions.markCompleted')}
+                </button>
+              ) : null}
+
+              {canReopenRun ? (
+                <button
+                  type="button"
+                  className="button button-subtle button-danger"
+                  disabled={activeRunAction !== null}
+                  onClick={() => {
+                    setReopenReasonError(null);
+                    setReopenReason("");
+                    setIsReopenDialogOpen(true);
+                  }}
+                >
+                  {td('actions.reopenRun')}
+                </button>
+              ) : null}
             </div>
           </section>
 
-          {isApproved ? (
+          {(isApproved || isProcessing || isCompleted) ? (
             <section className="payroll-lock-banner" aria-label={t('locked.title')}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -776,7 +909,7 @@ export function PayrollRunDetailClient({
               <div>
                 <p className="section-title">{t('locked.title')}</p>
                 <p className="settings-card-description">
-                  {t('locked.description')}
+                  {isCompleted ? t('locked.completedDescription') : isProcessing ? t('locked.processingDescription') : t('locked.description')}
                 </p>
               </div>
             </section>
@@ -880,7 +1013,7 @@ export function PayrollRunDetailClient({
                         <td>
                           <span className="payment-status-inline">
                             <StatusBadge tone={paymentStatusTone(item.paymentStatus)}>
-                              {t('disbursementStatus')}
+                              {td(`paymentStatus.${item.paymentStatus}`)}
                             </StatusBadge>
                           </span>
                         </td>
@@ -1232,6 +1365,72 @@ export function PayrollRunDetailClient({
                   onClick={() => {
                     setIsRejectDialogOpen(false);
                     setRejectReasonError(null);
+                  }}
+                >
+                  {tCommon('cancel')}
+                </button>
+              </div>
+            </form>
+          </article>
+        </section>
+      ) : null}
+
+      {isReopenDialogOpen ? (
+        <section className="payroll-reject-dialog" aria-label={td('reopenDialog.title')}>
+          <button
+            type="button"
+            className="payroll-reject-backdrop"
+            aria-label={tCommon('close')}
+            onClick={() => {
+              if (activeRunAction) {
+                return;
+              }
+
+              setIsReopenDialogOpen(false);
+              setReopenReasonError(null);
+            }}
+          />
+          <article className="payroll-reject-panel">
+            <h2 className="section-title">{td('reopenDialog.title')}</h2>
+            <p className="settings-card-description">
+              {td('reopenDialog.description')}
+            </p>
+
+            <form className="settings-form" onSubmit={submitReopenReason} noValidate>
+              <label className="form-field" htmlFor="reopen-reason">
+                <span className="form-label">{td('reopenDialog.reasonLabel')}</span>
+                <textarea
+                  id="reopen-reason"
+                  className={reopenReasonError ? "form-input form-input-error" : "form-input"}
+                  value={reopenReason}
+                  onChange={(event) => {
+                    setReopenReason(event.currentTarget.value);
+                    if (reopenReasonError) {
+                      setReopenReasonError(null);
+                    }
+                  }}
+                  rows={4}
+                />
+                {reopenReasonError ? (
+                  <p className="form-field-error">{reopenReasonError}</p>
+                ) : null}
+              </label>
+
+              <div className="settings-actions">
+                <button
+                  type="submit"
+                  className="button button-danger"
+                  disabled={activeRunAction === "reopen"}
+                >
+                  {activeRunAction === "reopen" ? td('reopenDialog.reopening') : td('reopenDialog.confirmReopen')}
+                </button>
+                <button
+                  type="button"
+                  className="button button-subtle"
+                  disabled={activeRunAction === "reopen"}
+                  onClick={() => {
+                    setIsReopenDialogOpen(false);
+                    setReopenReasonError(null);
                   }}
                 >
                   {tCommon('cancel')}
