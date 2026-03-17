@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { checkPageAccess } from "../../../../../lib/auth/check-page-access";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { PayrollRunDetailClient } from "./payroll-run-detail-client";
@@ -11,26 +11,18 @@ type PayrollRunDetailPageProps = {
   params: Promise<{ id: string }>;
 };
 
-function canViewPayroll(roles: readonly UserRole[]): boolean {
-  return (
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN")
-  );
-}
-
 function canManagePayroll(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export default async function PayrollRunDetailPage({ params }: PayrollRunDetailPageProps) {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/payroll");
   const { id } = await params;
   const t = await getTranslations("payrollPage");
   const tCommon = await getTranslations("common");
   const tSettings = await getTranslations("payrollSettings");
 
-  if (!session?.profile) {
+  if (!profile) {
     return (
       <>
         <PageHeader
@@ -47,7 +39,7 @@ export default async function PayrollRunDetailPage({ params }: PayrollRunDetailP
     );
   }
 
-  if (!canViewPayroll(session.profile.roles)) {
+  if (!allowed) {
     return (
       <>
         <PageHeader
@@ -65,9 +57,9 @@ export default async function PayrollRunDetailPage({ params }: PayrollRunDetailP
   return (
     <PayrollRunDetailClient
       runId={id}
-      viewerUserId={session.profile.id}
-      canManage={canManagePayroll(session.profile.roles)}
-      canFinalApprove={hasRole(session.profile.roles, "SUPER_ADMIN")}
+      viewerUserId={profile.id}
+      canManage={canManagePayroll(profile.roles)}
+      canFinalApprove={hasRole(profile.roles, "SUPER_ADMIN")}
     />
   );
 }

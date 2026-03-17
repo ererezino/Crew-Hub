@@ -8,7 +8,7 @@ import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
 import { PageHeader } from "../../../components/shared/page-header";
 import type { UserRole } from "../../../lib/navigation";
-import { hasRole } from "../../../lib/roles";
+
 import { SchedulingCalendarClient } from "./calendar/scheduling-calendar-client";
 import { SchedulingManageClient } from "./manage/scheduling-manage-client";
 import { SchedulingClient } from "./scheduling-client";
@@ -19,9 +19,8 @@ type SchedulingTabsClientProps = {
   userRoles: UserRole[];
   userDepartment?: string | null;
   currentUserId: string;
+  canManageSchedules: boolean;
 };
-
-const CS_DEPARTMENT = "Customer Success";
 
 function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
   const visibleKeys = new Set(tabs.map((tab) => tab.key));
@@ -38,22 +37,15 @@ export function SchedulingTabsClient({
   requestedScheduleId,
   userRoles,
   userDepartment,
-  currentUserId
+  currentUserId,
+  canManageSchedules
 }: SchedulingTabsClientProps) {
   const t = useTranslations("scheduling");
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const isCSTeam = userDepartment === CS_DEPARTMENT;
-  const isSuperAdmin = hasRole(userRoles, "SUPER_ADMIN");
-
-  const canManage =
-    isSuperAdmin ||
-    (isCSTeam && (
-      hasRole(userRoles, "TEAM_LEAD") ||
-      hasRole(userRoles, "MANAGER")
-    ));
+  const canManage = canManageSchedules;
 
   const tabs = useMemo<PageTab[]>(
     () => {

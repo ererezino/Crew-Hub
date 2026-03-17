@@ -88,6 +88,7 @@
       "profileSetupRequired": "Configuration du profil requise",
       "profileSetupRequiredBody": "Votre compte est authentifié, mais aucun profil n'a encore été trouvé.",
       "accessDenied": "Accès refusé",
+      "accessDeniedBody": "Vous n'avez pas la permission de voir cette page. Contactez votre administrateur si vous pensez qu'il s'agit d'une erreur.",
       "openSettings": "Ouvrir les paramètres"
     },
     "featureBanner": {
@@ -281,6 +282,7 @@
     "dismiss": "Fermer",
     "sourceAnnouncement": "Annonce",
     "emptyMessage": "Vous êtes à jour. Aucune nouvelle notification.",
+    "filesAttached": "{count, plural, one {# fichier joint} other {# fichiers joints}}",
     "action": {
       "done": "{label} effectué",
       "failed": "L'action a échoué",

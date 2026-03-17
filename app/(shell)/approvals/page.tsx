@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { fetchApprovalsCountsData } from "../../../lib/approvals/fetch-approvals-counts";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../lib/auth/session";
+import { checkPageAccess } from "../../../lib/auth/check-page-access";
 import { hasRole } from "../../../lib/roles";
 
 import { ApprovalsClient } from "./approvals-client";
@@ -23,10 +23,10 @@ function resolveRequestedTab(searchParams: Record<string, string | string[] | un
 }
 
 export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps) {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/approvals");
   const tNav = await getTranslations('nav');
 
-  if (!session?.profile) {
+  if (!profile) {
     const t = await getTranslations('common');
     return (
       <>
@@ -42,19 +42,7 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
     );
   }
 
-  const roles = session.profile.roles;
-
-  const canReviewTimeOff =
-    hasRole(roles, "TEAM_LEAD") ||
-    hasRole(roles, "MANAGER") ||
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN");
-  const canReviewExpenses =
-    hasRole(roles, "TEAM_LEAD") ||
-    hasRole(roles, "MANAGER") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN");
-  if (!canReviewTimeOff && !canReviewExpenses) {
+  if (!allowed) {
     const tApprovals = await getTranslations('approvalsPage');
     return (
       <>
@@ -70,6 +58,19 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
     );
   }
 
+  const roles = profile.roles;
+
+  const canReviewTimeOff =
+    hasRole(roles, "TEAM_LEAD") ||
+    hasRole(roles, "MANAGER") ||
+    hasRole(roles, "HR_ADMIN") ||
+    hasRole(roles, "SUPER_ADMIN");
+  const canReviewExpenses =
+    hasRole(roles, "TEAM_LEAD") ||
+    hasRole(roles, "MANAGER") ||
+    hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "SUPER_ADMIN");
+
   const resolvedSearchParams = await searchParams;
   const requestedTab = resolveRequestedTab(resolvedSearchParams);
 
@@ -78,7 +79,7 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
   let initialCountsData;
 
   try {
-    initialCountsData = await fetchApprovalsCountsData(session.profile);
+    initialCountsData = await fetchApprovalsCountsData(profile);
   } catch {
     // Graceful degradation: client will fetch on mount
   }

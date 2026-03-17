@@ -1,14 +1,14 @@
 import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../components/shared/empty-state";
-import { getAuthenticatedSession } from "../../../lib/auth/session";
+import { checkPageAccess } from "../../../lib/auth/check-page-access";
 import { hasRole } from "../../../lib/roles";
 import { OnboardingClient } from "./onboarding-client";
 
 export default async function OnboardingPage() {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/onboarding");
 
-  if (!session?.profile) {
+  if (!profile) {
     const t = await getTranslations('common');
     return (
       <EmptyState
@@ -18,12 +18,7 @@ export default async function OnboardingPage() {
     );
   }
 
-  const userRoles = session.profile.roles;
-  const canViewAll = hasRole(userRoles, "HR_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
-  const canViewReports =
-    canViewAll || hasRole(userRoles, "MANAGER");
-
-  if (!canViewReports) {
+  if (!allowed) {
     const tOnboarding = await getTranslations('onboardingPage');
     return (
       <EmptyState
@@ -34,6 +29,9 @@ export default async function OnboardingPage() {
       />
     );
   }
+
+  const userRoles = profile.roles;
+  const canViewAll = hasRole(userRoles, "HR_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
 
   return (
     <OnboardingClient

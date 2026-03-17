@@ -2,24 +2,15 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../lib/auth/session";
-import { normalizeUserRoles, type UserRole } from "../../../lib/navigation";
-import { hasRole } from "../../../lib/roles";
+import { checkPageAccess } from "../../../lib/auth/check-page-access";
+import { normalizeUserRoles } from "../../../lib/navigation";
 import { AnalyticsClient } from "./analytics-client";
 
-function canViewAnalytics(roles: readonly UserRole[]): boolean {
-  return (
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN")
-  );
-}
-
 export default async function AnalyticsPage() {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/analytics");
   const tNav = await getTranslations('nav');
 
-  if (!session?.profile) {
+  if (!profile) {
     const t = await getTranslations('common');
     return (
       <>
@@ -35,9 +26,7 @@ export default async function AnalyticsPage() {
     );
   }
 
-  const userRoles = normalizeUserRoles(session.profile.roles);
-
-  if (!canViewAnalytics(userRoles)) {
+  if (!allowed) {
     const t = await getTranslations('common');
     const tAnalytics = await getTranslations('analyticsPage');
     return (
@@ -53,6 +42,8 @@ export default async function AnalyticsPage() {
       </>
     );
   }
+
+  const userRoles = normalizeUserRoles(profile.roles);
 
   return <AnalyticsClient userRoles={userRoles} />;
 }

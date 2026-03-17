@@ -90,6 +90,7 @@
       "profileSetupRequired": "Profile setup is required",
       "profileSetupRequiredBody": "Your account is authenticated, but no profile record was found yet.",
       "accessDenied": "Access denied",
+      "accessDeniedBody": "You do not have permission to view this page. Contact your administrator if you believe this is an error.",
       "openSettings": "Open settings"
     },
     "featureBanner": {
@@ -283,6 +284,7 @@
     "dismiss": "Mark as read",
     "sourceAnnouncement": "Announcement",
     "emptyMessage": "All caught up. No new notifications.",
+    "filesAttached": "{count, plural, one {# file attached} other {# files attached}}",
     "action": {
       "done": "{label} done",
       "failed": "Action failed",

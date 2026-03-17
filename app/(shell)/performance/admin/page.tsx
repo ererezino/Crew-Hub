@@ -2,16 +2,15 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../../lib/auth/session";
-import { hasRole } from "../../../../lib/roles";
+import { checkPageAccess } from "../../../../lib/auth/check-page-access";
 import { AdminPerformanceClient } from "./performance-admin-client";
 
 export default async function PerformanceAdminPage() {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/performance");
   const t = await getTranslations("performanceAdmin");
   const tCommon = await getTranslations("common");
 
-  if (!session?.profile) {
+  if (!profile) {
     return (
       <>
         <PageHeader
@@ -26,11 +25,7 @@ export default async function PerformanceAdminPage() {
     );
   }
 
-  const canManagePerformance =
-    hasRole(session.profile.roles, "HR_ADMIN") ||
-    hasRole(session.profile.roles, "SUPER_ADMIN");
-
-  if (!canManagePerformance) {
+  if (!allowed) {
     return (
       <>
         <PageHeader

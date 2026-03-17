@@ -56,7 +56,6 @@ type SettingsClientProps = {
   };
   canManageOrganization: boolean;
   canViewAudit: boolean;
-  canViewTimePolicies: boolean;
 };
 
 type ProfileFormValues = {

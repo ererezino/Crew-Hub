@@ -219,7 +219,7 @@ export function NotificationCenter() {
       const imageAtts = a.attachments.filter((att) => att.mimeType.startsWith("image/"));
       const nonImageCount = a.attachments.length - imageAtts.length;
       const attachmentHint = nonImageCount > 0
-        ? ` · ${nonImageCount} ${nonImageCount === 1 ? "file" : "files"} attached`
+        ? ` · ${t("filesAttached", { count: nonImageCount })}`
         : "";
       items.push({
         id: a.id,
@@ -367,7 +367,7 @@ export function NotificationCenter() {
         <section
           className="notification-dropdown"
           role="menu"
-          aria-label="Notifications"
+          aria-label={t("title")}
         >
           <div className="notification-dropdown-header">
             <p className="section-title">{t("title")}</p>

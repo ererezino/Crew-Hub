@@ -3,28 +3,20 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../lib/auth/session";
+import { checkPageAccess } from "../../../lib/auth/check-page-access";
 import type { UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
 import { PayrollDashboardClient } from "./payroll-dashboard-client";
-
-function canViewPayroll(roles: readonly UserRole[]): boolean {
-  return (
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN")
-  );
-}
 
 function canManagePayroll(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export default async function PayrollPage() {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/payroll");
   const tNav = await getTranslations('nav');
 
-  if (!session?.profile) {
+  if (!profile) {
     const t = await getTranslations('common');
     return (
       <>
@@ -40,7 +32,7 @@ export default async function PayrollPage() {
     );
   }
 
-  if (!canViewPayroll(session.profile.roles)) {
+  if (!allowed) {
     const t = await getTranslations('common');
     const tPayroll = await getTranslations('payrollPage');
     return (
@@ -61,7 +53,7 @@ export default async function PayrollPage() {
 
   return (
     <PayrollDashboardClient
-      canManage={canManagePayroll(session.profile.roles)}
+      canManage={canManagePayroll(profile.roles)}
       createRunHref="/payroll/runs/new"
       settingsHref="/payroll/settings/deductions"
       headerActions={
@@ -69,7 +61,7 @@ export default async function PayrollPage() {
           <Link className="button button-subtle" href="/payroll/settings/deductions">
             {tPayroll('withholdingSettings')}
           </Link>
-          {canManagePayroll(session.profile.roles) ? (
+          {canManagePayroll(profile.roles) ? (
             <Link className="button button-accent" href="/payroll/runs/new">
               {tPayroll('createPayrollRun')}
             </Link>

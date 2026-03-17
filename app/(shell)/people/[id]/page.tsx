@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
+import { checkPageAccess } from "../../../../lib/auth/check-page-access";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
@@ -29,15 +30,6 @@ function resolveTab(searchParams: Record<string, string | string[] | undefined>)
   }
 
   return "overview";
-}
-
-function canViewPeopleProfile(roles: readonly UserRole[]): boolean {
-  return (
-    hasRole(roles, "MANAGER") ||
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN")
-  );
 }
 
 function canViewCompensation(roles: readonly UserRole[]): boolean {
@@ -92,8 +84,21 @@ export default async function PeopleProfilePage({
     );
   }
 
-  const isSelf = parsedId.data === session.profile.id;
-  const hasPeopleAccess = canViewPeopleProfile(session.profile.roles) || isSelf;
+  const profile = session.profile;
+  const isSelf = parsedId.data === profile.id;
+
+  // Managers/Team Leads can always view individual profiles (for direct reports).
+  // Other roles need People module access via access config.
+  // Self-view is always allowed.
+  const isManagerOrLead =
+    hasRole(profile.roles, "MANAGER") || hasRole(profile.roles, "TEAM_LEAD");
+
+  let hasPeopleAccess = isSelf || isManagerOrLead;
+
+  if (!hasPeopleAccess) {
+    const { allowed } = await checkPageAccess("/people");
+    hasPeopleAccess = allowed;
+  }
 
   if (!hasPeopleAccess) {
     return (
@@ -112,7 +117,7 @@ export default async function PeopleProfilePage({
 
   const resolvedSearchParams = await searchParams;
   const requestedTab = resolveTab(resolvedSearchParams);
-  const hasCompensationAccess = canViewCompensation(session.profile.roles) || isSelf;
+  const hasCompensationAccess = canViewCompensation(profile.roles) || isSelf;
   const activeTab: PeopleTab = hasCompensationAccess ? requestedTab : "overview";
 
   return (
@@ -156,14 +161,14 @@ export default async function PeopleProfilePage({
           employeeId={parsedId.data}
           isSelf={isSelf}
           isAdmin={
-            hasRole(session.profile.roles, "HR_ADMIN") ||
-            hasRole(session.profile.roles, "FINANCE_ADMIN") ||
-            hasRole(session.profile.roles, "SUPER_ADMIN")
+            hasRole(profile.roles, "HR_ADMIN") ||
+            hasRole(profile.roles, "FINANCE_ADMIN") ||
+            hasRole(profile.roles, "SUPER_ADMIN")
           }
-          isSuperAdmin={hasRole(session.profile.roles, "SUPER_ADMIN")}
+          isSuperAdmin={hasRole(profile.roles, "SUPER_ADMIN")}
           canInitiateOffboarding={
-            hasRole(session.profile.roles, "HR_ADMIN") ||
-            hasRole(session.profile.roles, "SUPER_ADMIN")
+            hasRole(profile.roles, "HR_ADMIN") ||
+            hasRole(profile.roles, "SUPER_ADMIN")
           }
         />
       ) : null}

@@ -115,7 +115,8 @@ describe("Phase 4 — Core Flow Deep Hardening", () => {
       "me/route.ts",                 // May use alternative auth pattern
       "payments/[id]/retry/route.ts",  // Disabled payment stub
       "payments/batch/route.ts",       // Disabled payment stub
-      "payments/webhook/route.ts"      // External webhook (uses webhook secret)
+      "payments/webhook/route.ts",      // External webhook (uses webhook secret)
+      "admin/role-permissions/route.ts"  // Deprecated tombstone (returns 410 Gone)
     ]);
 
     it("every non-exempt route imports getAuthenticatedSession", () => {

@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../lib/auth/session";
+import { checkPageAccess } from "../../../lib/auth/check-page-access";
 import type { UserRole } from "../../../lib/navigation";
 import { fetchPeopleData } from "../../../lib/people/fetch-people-data";
 import { hasRole } from "../../../lib/roles";
@@ -40,9 +40,9 @@ function resolveRequestedTab(searchParams: Record<string, string | string[] | un
 }
 
 export default async function PeoplePage({ searchParams }: PeoplePageProps) {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/people");
 
-  if (!session?.profile) {
+  if (!profile) {
     const t = await getTranslations('common');
     const tNav = await getTranslations('nav');
     return (
@@ -56,7 +56,21 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
     );
   }
 
-  const roles = session.profile.roles;
+  if (!allowed) {
+    const t = await getTranslations('common');
+    const tNav = await getTranslations('nav');
+    return (
+      <>
+        <PageHeader title={tNav('people')} description={tNav('description.people')} />
+        <EmptyState
+          title={t('emptyState.accessDenied')}
+          description="You don't have access to the people directory. Contact your admin if you need access."
+        />
+      </>
+    );
+  }
+
+  const roles = profile.roles;
   const canCreatePeople = hasRole(roles, "SUPER_ADMIN");
   const canInvitePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const canEditPeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
@@ -70,7 +84,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   let initialPeopleData;
 
   try {
-    initialPeopleData = await fetchPeopleData(session.profile, { scope });
+    initialPeopleData = await fetchPeopleData(profile, { scope });
   } catch {
     // Graceful degradation: client will fetch on mount
   }
@@ -84,7 +98,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
       <PeopleTabsClient
         requestedTab={requestedTab}
         userRoles={roles}
-        currentUserId={session.profile.id}
+        currentUserId={profile.id}
         initialScope={scope}
         canCreatePeople={canCreatePeople}
         canInvitePeople={canInvitePeople}
@@ -100,7 +114,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   // Non-Super-Admins get the existing directory view without tabs
   return (
     <PeopleClient
-      currentUserId={session.profile.id}
+      currentUserId={profile.id}
       initialScope={scope}
       canCreatePeople={canCreatePeople}
       canInvitePeople={canInvitePeople}

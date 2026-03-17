@@ -2,8 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../lib/auth/session";
-import { hasRole } from "../../../lib/roles";
+import { checkPageAccess, checkPageAccessForProfile } from "../../../lib/auth/check-page-access";
 import { SchedulingTabsClient } from "./scheduling-tabs-client";
 
 type SchedulingPageProps = {
@@ -30,13 +29,11 @@ function resolveRequestedScheduleId(searchParams: Record<string, string | string
   return rawScheduleId;
 }
 
-const CS_DEPARTMENT = "Customer Success";
-
 export default async function SchedulingPage({ searchParams }: SchedulingPageProps) {
-  const session = await getAuthenticatedSession();
   const t = await getTranslations("scheduling");
+  const { allowed, profile } = await checkPageAccess("/scheduling");
 
-  if (!session?.profile) {
+  if (!profile) {
     return (
       <EmptyState
         title={t("profileUnavailable")}
@@ -45,10 +42,7 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     );
   }
 
-  const isSuperAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
-  const isCSTeam = session.profile.department === CS_DEPARTMENT;
-
-  if (!isSuperAdmin && !isCSTeam) {
+  if (!allowed) {
     return (
       <>
         <PageHeader
@@ -63,15 +57,19 @@ export default async function SchedulingPage({ searchParams }: SchedulingPagePro
     );
   }
 
-  const resolvedSearchParams = await searchParams;
+  const [resolvedSearchParams, canManageSchedules] = await Promise.all([
+    searchParams,
+    checkPageAccessForProfile("/scheduling/manage", profile)
+  ]);
 
   return (
     <SchedulingTabsClient
       requestedTab={resolveRequestedTab(resolvedSearchParams)}
       requestedScheduleId={resolveRequestedScheduleId(resolvedSearchParams)}
-      userRoles={session.profile.roles}
-      userDepartment={session.profile.department}
-      currentUserId={session.profile.id}
+      userRoles={profile.roles}
+      userDepartment={profile.department}
+      currentUserId={profile.id}
+      canManageSchedules={canManageSchedules}
     />
   );
 }

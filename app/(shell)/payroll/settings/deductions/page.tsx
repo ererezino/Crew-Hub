@@ -2,31 +2,23 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../../../lib/auth/session";
-import { loadNigeriaRuleConfig } from "../../../../../lib/payroll/engines/nigeria";
+import { checkPageAccess } from "../../../../../lib/auth/check-page-access";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
+import { loadNigeriaRuleConfig } from "../../../../../lib/payroll/engines/nigeria";
 import { DeductionsSettingsClient } from "./settings-client";
-
-function canViewPayroll(roles: readonly UserRole[]): boolean {
-  return (
-    hasRole(roles, "HR_ADMIN") ||
-    hasRole(roles, "FINANCE_ADMIN") ||
-    hasRole(roles, "SUPER_ADMIN")
-  );
-}
 
 function canEditNigeriaRules(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export default async function PayrollDeductionsSettingsPage() {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/payroll");
   const t = await getTranslations("payrollPage");
   const tSettings = await getTranslations("payrollSettings");
   const tCommon = await getTranslations("common");
 
-  if (!session?.profile) {
+  if (!profile) {
     return (
       <>
         <PageHeader
@@ -43,7 +35,7 @@ export default async function PayrollDeductionsSettingsPage() {
     );
   }
 
-  if (!canViewPayroll(session.profile.roles)) {
+  if (!allowed) {
     return (
       <>
         <PageHeader
@@ -63,7 +55,7 @@ export default async function PayrollDeductionsSettingsPage() {
 
   try {
     nigeriaConfig = await loadNigeriaRuleConfig({
-      orgId: session.profile.org_id
+      orgId: profile.org_id
     });
   } catch (error) {
     nigeriaConfigError =
@@ -82,7 +74,7 @@ export default async function PayrollDeductionsSettingsPage() {
       <DeductionsSettingsClient
         initialNigeriaConfig={nigeriaConfig}
         initialNigeriaConfigError={nigeriaConfigError}
-        canEditNigeria={canEditNigeriaRules(session.profile.roles)}
+        canEditNigeria={canEditNigeriaRules(profile.roles)}
       />
     </>
   );

@@ -2,16 +2,16 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
-import { getAuthenticatedSession } from "../../../lib/auth/session";
+import { checkPageAccess } from "../../../lib/auth/check-page-access";
 import { normalizeUserRoles } from "../../../lib/navigation";
 import { canManageCompliance } from "../../../lib/compliance";
 import { ComplianceClient } from "./compliance-client";
 import { ComplianceEmployeeClient } from "./compliance-employee-client";
 
 export default async function CompliancePage() {
-  const session = await getAuthenticatedSession();
+  const { allowed, profile } = await checkPageAccess("/compliance");
 
-  if (!session?.profile) {
+  if (!profile) {
     const t = await getTranslations('common');
     const tNav = await getTranslations('nav');
     return (
@@ -28,11 +28,28 @@ export default async function CompliancePage() {
     );
   }
 
-  const userRoles = normalizeUserRoles(session.profile.roles);
+  if (!allowed) {
+    const t = await getTranslations('common');
+    const tNav = await getTranslations('nav');
+    return (
+      <>
+        <PageHeader
+          title={tNav('compliance')}
+          description={tNav('description.compliance')}
+        />
+        <EmptyState
+          title={t('emptyState.accessDenied')}
+          description={t('emptyState.accessDeniedBody')}
+        />
+      </>
+    );
+  }
+
+  const userRoles = normalizeUserRoles(profile.roles);
   const isAdmin = canManageCompliance(userRoles);
 
   if (!isAdmin) {
-    return <ComplianceEmployeeClient userId={session.profile.id} />;
+    return <ComplianceEmployeeClient userId={profile.id} />;
   }
 
   return <ComplianceClient />;

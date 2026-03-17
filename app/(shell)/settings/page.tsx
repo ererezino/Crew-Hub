@@ -66,10 +66,6 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   const canManageOrganization = hasRole(session.profile.roles, "SUPER_ADMIN");
   const canViewAudit =
     hasRole(session.profile.roles, "HR_ADMIN") ||
-    hasRole(session.profile.roles, "FINANCE_ADMIN") ||
-    hasRole(session.profile.roles, "SUPER_ADMIN");
-  const canViewTimePolicies =
-    hasRole(session.profile.roles, "HR_ADMIN") ||
     hasRole(session.profile.roles, "SUPER_ADMIN");
 
   return (
@@ -113,7 +109,6 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
         }}
         canManageOrganization={canManageOrganization}
         canViewAudit={canViewAudit}
-        canViewTimePolicies={canViewTimePolicies}
       />
     </>
   );

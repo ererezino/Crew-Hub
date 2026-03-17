@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { hasRole } from "../../../../lib/roles";
 import { MyDocumentsClient } from "./my-documents-client";
 
 export default async function MyDocumentsPage() {
@@ -17,8 +18,8 @@ export default async function MyDocumentsPage() {
     );
   }
 
-  const isSuperAdmin = session.profile.roles.includes("SUPER_ADMIN");
-  const isHrAdmin = session.profile.roles.includes("HR_ADMIN");
+  const isSuperAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
+  const isHrAdmin = hasRole(session.profile.roles, "HR_ADMIN");
 
   return (
     <MyDocumentsClient

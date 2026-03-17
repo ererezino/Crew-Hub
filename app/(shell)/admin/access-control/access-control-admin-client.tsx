@@ -1,12 +1,17 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { NavIcon } from "../../../../components/shared/nav-icon";
 import { PageHeader } from "../../../../components/shared/page-header";
+import type {
+  AdminAccessConfigResponseData,
+  NavigationAccessConfigRecord,
+  DashboardWidgetConfigRecord
+} from "../../../../types/access-control";
 
-/* ── Module registry (matches navigation.ts) ── */
+/* ── Module registry (matches navigation.ts nav items) ── */
 
 type ModuleDef = {
   key: string;
@@ -36,8 +41,18 @@ const ALL_MODULES: ModuleDef[] = [
   { key: "/signatures", labelKey: "modSignatures", icon: "PenTool", categoryKey: "catOperations" }
 ];
 
+const MODULE_KEYS_SET = new Set(ALL_MODULES.map((m) => m.key));
 const MODULE_BY_KEY = new Map(ALL_MODULES.map((m) => [m.key, m]));
 const CATEGORY_KEYS = ["catCore", "catMyWork", "catTeam", "catFinance", "catOperations"] as const;
+
+const ALL_ROLE_KEYS = [
+  "EMPLOYEE",
+  "TEAM_LEAD",
+  "MANAGER",
+  "HR_ADMIN",
+  "FINANCE_ADMIN",
+  "SUPER_ADMIN"
+] as const;
 
 /* ── Role configuration ── */
 
@@ -101,37 +116,70 @@ const ROLES: RoleDef[] = [
   }
 ];
 
-const DEFAULT_ROLE_MODULES: Record<string, string[]> = {
-  EMPLOYEE: [
-    "/dashboard", "/announcements", "/time-off", "/me/pay",
-    "/documents", "/expenses", "/learning"
-  ],
-  TEAM_LEAD: [
-    "/dashboard", "/announcements", "/time-off", "/me/pay",
-    "/documents", "/expenses", "/learning",
-    "/approvals", "/people", "/scheduling", "/team-hub"
-  ],
-  MANAGER: [
-    "/dashboard", "/announcements", "/time-off", "/me/pay",
-    "/documents", "/expenses", "/learning",
-    "/approvals", "/people", "/scheduling", "/onboarding", "/team-hub"
-  ],
-  HR_ADMIN: [
-    "/dashboard", "/announcements", "/time-off", "/me/pay",
-    "/documents", "/expenses", "/learning",
-    "/approvals", "/people", "/scheduling", "/onboarding", "/team-hub",
-    "/performance", "/compliance", "/analytics", "/signatures"
-  ],
-  FINANCE_ADMIN: [
-    "/dashboard", "/announcements", "/time-off", "/me/pay",
-    "/documents", "/expenses", "/learning",
-    "/approvals", "/people",
-    "/payroll", "/admin/compensation", "/analytics"
-  ],
-  SUPER_ADMIN: ALL_MODULES.map((m) => m.key)
-};
-
 /* ── Helpers ── */
+
+/**
+ * Derive role → enabled module keys from nav-item-centric config.
+ * A role has a module enabled if that role appears in the module's visibleToRoles.
+ */
+function deriveRoleModulesFromNavConfig(
+  navigation: NavigationAccessConfigRecord[]
+): Record<string, Set<string>> {
+  const result: Record<string, Set<string>> = {};
+
+  for (const roleDef of ROLES) {
+    result[roleDef.role] = new Set<string>();
+  }
+
+  for (const navItem of navigation) {
+    if (!MODULE_KEYS_SET.has(navItem.navItemKey)) continue;
+    for (const role of navItem.visibleToRoles) {
+      if (result[role]) {
+        result[role].add(navItem.navItemKey);
+      }
+    }
+  }
+
+  // SUPER_ADMIN always has all modules
+  result["SUPER_ADMIN"] = new Set(ALL_MODULES.map((m) => m.key));
+
+  return result;
+}
+
+/**
+ * Build updated navigation payload from role-centric changes.
+ * Takes the full nav config and applies role→module changes,
+ * preserving per-person overrides (granted/revoked employee IDs).
+ */
+function buildNavigationPayload(
+  roleModules: Record<string, Set<string>>,
+  existingNavigation: NavigationAccessConfigRecord[]
+) {
+  const existingByKey = new Map(
+    existingNavigation.map((row) => [row.navItemKey, row] as const)
+  );
+
+  return ALL_MODULES.map((mod) => {
+    const existing = existingByKey.get(mod.key);
+
+    // Compute visibleToRoles: collect all non-SUPER_ADMIN roles that have this module checked
+    const visibleToRoles: string[] = [];
+    for (const roleKey of ALL_ROLE_KEYS) {
+      if (roleKey === "SUPER_ADMIN") continue; // SUPER_ADMIN is implicit, not stored
+      if (roleModules[roleKey]?.has(mod.key)) {
+        visibleToRoles.push(roleKey);
+      }
+    }
+
+    return {
+      navItemKey: mod.key,
+      visibleToRoles,
+      // Preserve per-person overrides
+      grantedEmployeeIds: existing?.grantedEmployeeIds ?? [],
+      revokedEmployeeIds: existing?.revokedEmployeeIds ?? []
+    };
+  });
+}
 
 function groupByCategory(
   moduleKeys: string[],
@@ -153,16 +201,19 @@ function groupByCategory(
 /* ── Component ── */
 
 export function AccessControlAdminClient() {
-  const t = useTranslations('accessControl');
-  const tCommon = useTranslations('common');
-  // Dynamic key lookup for data-driven labels (roles, modules, categories)
+  const t = useTranslations("accessControl");
+  const tCommon = useTranslations("common");
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 
-  /* role → enabled module keys (starts with defaults, overwritten by API) */
+  // Full API data (nav + widget records), kept in sync with saves
+  const navRecordsRef = useRef<NavigationAccessConfigRecord[]>([]);
+  const widgetRecordsRef = useRef<DashboardWidgetConfigRecord[]>([]);
+
+  // Role → enabled module keys (derived from nav config on load, updated on edit)
   const [roleModules, setRoleModules] = useState<Record<string, Set<string>>>(() => {
     const initial: Record<string, Set<string>> = {};
     for (const r of ROLES) {
-      initial[r.role] = new Set(DEFAULT_ROLE_MODULES[r.role] ?? []);
+      initial[r.role] = new Set<string>();
     }
     return initial;
   });
@@ -170,42 +221,48 @@ export function AccessControlAdminClient() {
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [_loadedFromApi, setLoadedFromApi] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  /* Fetch saved config on mount */
+  /* Fetch real access config on mount */
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
-        const res = await fetch("/api/v1/admin/role-permissions");
+        const res = await fetch("/api/v1/admin/access-config");
         if (!res.ok) return;
-        const json = (await res.json()) as {
-          data?: { configs?: { role: string; modules: string[] }[] } | null;
-        };
-        const configs = json?.data?.configs;
-        if (!Array.isArray(configs) || cancelled) return;
 
-        setRoleModules((prev) => {
-          const next = { ...prev };
-          for (const cfg of configs) {
-            if (cfg.role && Array.isArray(cfg.modules)) {
-              next[cfg.role] = new Set(cfg.modules);
-            }
-          }
-          return next;
-        });
-        setLoadedFromApi(true);
+        const json = (await res.json()) as {
+          data?: AdminAccessConfigResponseData | null;
+        };
+
+        if (!json?.data || cancelled) return;
+
+        const { navigation, widgets } = json.data;
+
+        navRecordsRef.current = navigation;
+        widgetRecordsRef.current = widgets;
+
+        const derived = deriveRoleModulesFromNavConfig(navigation);
+        setRoleModules(derived);
+        setLoaded(true);
       } catch {
-        /* Use defaults */
+        /* Use empty state on failure */
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const startEditing = useCallback((role: string) => {
-    setEditingRole(role);
-    setEditDraft(new Set(roleModules[role] ?? []));
-  }, [roleModules]);
+  const startEditing = useCallback(
+    (role: string) => {
+      setEditingRole(role);
+      setEditDraft(new Set(roleModules[role] ?? []));
+    },
+    [roleModules]
+  );
 
   const cancelEditing = useCallback(() => {
     setEditingRole(null);
@@ -227,19 +284,56 @@ export function AccessControlAdminClient() {
   const saveChanges = useCallback(async () => {
     if (!editingRole) return;
     setSaving(true);
+
     try {
-      await fetch("/api/v1/admin/role-permissions", {
+      // Apply the edit to the role→modules state
+      const updatedRoleModules = {
+        ...roleModules,
+        [editingRole]: new Set(editDraft)
+      };
+
+      // Build full navigation payload from role-centric state
+      const navigationPayload = buildNavigationPayload(
+        updatedRoleModules,
+        navRecordsRef.current
+      );
+
+      // Build widget payload (pass through unchanged)
+      const widgetPayload = widgetRecordsRef.current.map((w) => ({
+        widgetKey: w.widgetKey,
+        visibleToRoles: w.visibleToRoles
+      }));
+
+      const res = await fetch("/api/v1/admin/access-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          role: editingRole,
-          modules: Array.from(editDraft)
+          navigation: navigationPayload,
+          widgets: widgetPayload
         })
       });
-      setRoleModules((prev) => ({
-        ...prev,
-        [editingRole]: new Set(editDraft)
-      }));
+
+      if (!res.ok) {
+        throw new Error("Save failed");
+      }
+
+      const json = (await res.json()) as {
+        data?: AdminAccessConfigResponseData | null;
+      };
+
+      if (json?.data) {
+        // Update refs with fresh server data
+        navRecordsRef.current = json.data.navigation;
+        widgetRecordsRef.current = json.data.widgets;
+
+        // Re-derive role modules from server response
+        const derived = deriveRoleModulesFromNavConfig(json.data.navigation);
+        setRoleModules(derived);
+      } else {
+        // Optimistic update if server didn't return fresh data
+        setRoleModules(updatedRoleModules);
+      }
+
       setEditingRole(null);
       setEditDraft(new Set());
     } catch {
@@ -247,22 +341,19 @@ export function AccessControlAdminClient() {
     } finally {
       setSaving(false);
     }
-  }, [editingRole, editDraft]);
+  }, [editingRole, editDraft, roleModules]);
 
   return (
     <>
-      <PageHeader
-        title={t('title')}
-        description={t('description')}
-      />
+      <PageHeader title={t("title")} description={t("description")} />
 
       <div className="rac-page">
         {/* ── Role Permission Cards ── */}
         <section className="rac-section">
           <div className="rac-section-header">
-            <h3 className="rac-section-title">{t('rolePermissions')}</h3>
+            <h3 className="rac-section-title">{t("rolePermissions")}</h3>
             <p className="rac-section-subtitle">
-              {t.rich('rolePermissionsDescription', {
+              {t.rich("rolePermissionsDescription", {
                 strong: (chunks) => <strong>{chunks}</strong>
               })}
             </p>
@@ -280,12 +371,13 @@ export function AccessControlAdminClient() {
                 <article
                   key={roleDef.role}
                   className={`rac-card ${isEditing ? "rac-card-editing" : ""}`}
-                  style={{
-                    "--rac-accent": roleDef.accent,
-                    "--rac-accent-light": roleDef.accentLight
-                  } as React.CSSProperties}
+                  style={
+                    {
+                      "--rac-accent": roleDef.accent,
+                      "--rac-accent-light": roleDef.accentLight
+                    } as React.CSSProperties
+                  }
                 >
-                  {/* Accent bar */}
                   <div className="rac-card-accent" />
 
                   <div className="rac-card-content">
@@ -296,17 +388,21 @@ export function AccessControlAdminClient() {
                       </div>
                       <div className="rac-card-header-text">
                         <h4 className="rac-card-name">{td(roleDef.labelKey)}</h4>
-                        <p className="rac-card-desc">{td(roleDef.descriptionKey)}</p>
+                        <p className="rac-card-desc">
+                          {td(roleDef.descriptionKey)}
+                        </p>
                       </div>
-                      {!isSuperAdmin && !isEditing ? (
+                      {!isSuperAdmin && !isEditing && loaded ? (
                         <button
                           type="button"
                           className="rac-edit-btn"
                           onClick={() => startEditing(roleDef.role)}
-                          aria-label={t('editPermissions', { role: td(roleDef.labelKey) })}
+                          aria-label={t("editPermissions", {
+                            role: td(roleDef.labelKey)
+                          })}
                         >
                           <NavIcon name="Pencil" size={14} />
-                          {t('edit')}
+                          {t("edit")}
                         </button>
                       ) : null}
                     </div>
@@ -317,25 +413,37 @@ export function AccessControlAdminClient() {
                         {isSuperAdmin ? (
                           <div className="rac-super-admin-badge">
                             <NavIcon name="Crown" size={16} />
-                            <span>{t('fullAccess', { count: ALL_MODULES.length })}</span>
+                            <span>
+                              {t("fullAccess", { count: ALL_MODULES.length })}
+                            </span>
                           </div>
                         ) : (
-                          Array.from(grouped.entries()).map(([categoryKey, { categoryLabel, modules: mods }]) => {
-                            if (mods.length === 0) return null;
-                            return (
-                              <div key={categoryKey} className="rac-module-group">
-                                <span className="rac-module-group-label">{categoryLabel}</span>
-                                <div className="rac-module-list">
-                                  {mods.map((mod) => (
-                                    <span key={mod.key} className="rac-module-pill">
-                                      <NavIcon name={mod.icon} size={13} />
-                                      {td(mod.labelKey)}
-                                    </span>
-                                  ))}
+                          Array.from(grouped.entries()).map(
+                            ([categoryKey, { categoryLabel, modules: mods }]) => {
+                              if (mods.length === 0) return null;
+                              return (
+                                <div
+                                  key={categoryKey}
+                                  className="rac-module-group"
+                                >
+                                  <span className="rac-module-group-label">
+                                    {categoryLabel}
+                                  </span>
+                                  <div className="rac-module-list">
+                                    {mods.map((mod) => (
+                                      <span
+                                        key={mod.key}
+                                        className="rac-module-pill"
+                                      >
+                                        <NavIcon name={mod.icon} size={13} />
+                                        {td(mod.labelKey)}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })
+                              );
+                            }
+                          )
                         )}
                       </div>
                     ) : null}
@@ -344,10 +452,14 @@ export function AccessControlAdminClient() {
                     {isEditing ? (
                       <div className="rac-card-edit">
                         {CATEGORY_KEYS.map((categoryKey) => {
-                          const catModules = ALL_MODULES.filter((m) => m.categoryKey === categoryKey);
+                          const catModules = ALL_MODULES.filter(
+                            (m) => m.categoryKey === categoryKey
+                          );
                           return (
                             <div key={categoryKey} className="rac-edit-group">
-                              <span className="rac-module-group-label">{td(categoryKey)}</span>
+                              <span className="rac-module-group-label">
+                                {td(categoryKey)}
+                              </span>
                               <div className="rac-edit-items">
                                 {catModules.map((mod) => {
                                   const checked = editDraft.has(mod.key);
@@ -380,14 +492,14 @@ export function AccessControlAdminClient() {
                             disabled={saving}
                           >
                             <NavIcon name="Check" size={14} />
-                            {saving ? t('saving') : t('saveChanges')}
+                            {saving ? t("saving") : t("saveChanges")}
                           </button>
                           <button
                             type="button"
                             className="rac-cancel-btn"
                             onClick={cancelEditing}
                           >
-                            {tCommon('cancel')}
+                            {tCommon("cancel")}
                           </button>
                         </div>
                       </div>
@@ -397,7 +509,9 @@ export function AccessControlAdminClient() {
                     {!isEditing ? (
                       <div className="rac-card-footer">
                         <span className="rac-module-count">
-                          {isSuperAdmin ? t('unrestricted') : t('moduleCount', { count: totalModules })}
+                          {isSuperAdmin
+                            ? t("unrestricted")
+                            : t("moduleCount", { count: totalModules })}
                         </span>
                       </div>
                     ) : null}
@@ -411,19 +525,17 @@ export function AccessControlAdminClient() {
         {/* ── Per-Person Overrides ── */}
         <section className="rac-section">
           <div className="rac-section-header">
-            <h3 className="rac-section-title">{t('overridesTitle')}</h3>
-            <p className="rac-section-subtitle">
-              {t('overridesDescription')}
-            </p>
+            <h3 className="rac-section-title">{t("overridesTitle")}</h3>
+            <p className="rac-section-subtitle">{t("overridesDescription")}</p>
           </div>
 
           <div className="rac-overrides-empty">
             <div className="rac-overrides-empty-icon">
               <NavIcon name="ShieldOff" size={28} />
             </div>
-            <p className="rac-overrides-empty-title">{t('noOverrides')}</p>
+            <p className="rac-overrides-empty-title">{t("noOverrides")}</p>
             <p className="rac-overrides-empty-desc">
-              {t('noOverridesDescription')}
+              {t("noOverridesDescription")}
             </p>
           </div>
         </section>
