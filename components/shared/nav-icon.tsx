@@ -72,6 +72,7 @@ import {
   Filter,
   RefreshCw,
   Gamepad2,
+  Route,
   type LucideIcon,
 } from "lucide-react";
 
@@ -147,6 +148,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   Filter,
   RefreshCw,
   Gamepad2,
+  Route,
 };
 
 type NavIconProps = {

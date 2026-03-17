@@ -44,6 +44,7 @@ type SettingsClientProps = {
     socialTwitter: string;
     socialInstagram: string;
     socialGithub: string;
+    socialTiktok: string;
     socialWebsite: string;
     favoriteMusic: string;
     favoriteBooks: string;
@@ -71,6 +72,7 @@ type ProfileFormValues = {
   socialTwitter: string;
   socialInstagram: string;
   socialGithub: string;
+  socialTiktok: string;
   socialWebsite: string;
   favoriteMusic: string;
   favoriteBooks: string;
@@ -82,7 +84,8 @@ const SOCIAL_PREFIXES = {
   linkedin: "https://linkedin.com/in/",
   twitter: "https://x.com/",
   instagram: "https://instagram.com/",
-  github: "https://github.com/"
+  github: "https://github.com/",
+  tiktok: "https://tiktok.com/@"
 } as const;
 
 /** Strip a known prefix (case-insensitive) to show just the username in the input */
@@ -258,6 +261,7 @@ export function SettingsClient({
     socialTwitter: stripSocialPrefix(profile.socialTwitter, SOCIAL_PREFIXES.twitter),
     socialInstagram: stripSocialPrefix(profile.socialInstagram, SOCIAL_PREFIXES.instagram),
     socialGithub: stripSocialPrefix(profile.socialGithub, SOCIAL_PREFIXES.github),
+    socialTiktok: stripSocialPrefix(profile.socialTiktok, SOCIAL_PREFIXES.tiktok),
     socialWebsite: stripSocialPrefix(profile.socialWebsite, "https://"),
     favoriteMusic: profile.favoriteMusic,
     favoriteBooks: profile.favoriteBooks,
@@ -497,6 +501,7 @@ export function SettingsClient({
           socialTwitter: buildSocialUrl(profileValues.socialTwitter, SOCIAL_PREFIXES.twitter),
           socialInstagram: buildSocialUrl(profileValues.socialInstagram, SOCIAL_PREFIXES.instagram),
           socialGithub: buildSocialUrl(profileValues.socialGithub, SOCIAL_PREFIXES.github),
+          socialTiktok: buildSocialUrl(profileValues.socialTiktok, SOCIAL_PREFIXES.tiktok),
           socialWebsite: buildSocialUrl(profileValues.socialWebsite, "https://")
         })
       });
@@ -778,22 +783,6 @@ export function SettingsClient({
                 <input id="profile-email" className="form-input" value={profile.email} disabled />
               </label>
 
-              <label className="form-field" htmlFor="profile-pronouns">
-                <span className="form-label">{t('profile.pronounsLabel')}</span>
-                <input
-                  id="profile-pronouns"
-                  className="form-input"
-                  maxLength={50}
-                  placeholder={t('profile.pronounsPlaceholder')}
-                  value={profileValues.pronouns}
-                  onChange={(event) => {
-                    const nextValues = { ...profileValues, pronouns: event.currentTarget.value };
-                    setProfileValues(nextValues);
-                    setFormDirty(true);
-                  }}
-                />
-              </label>
-
               <label className="form-field" htmlFor="profile-country">
                 <span className="form-label">{t('profile.countryLabel')}</span>
                 <select
@@ -905,6 +894,23 @@ export function SettingsClient({
                       />
                     </div>
                   </label>
+                  <label className="form-field" htmlFor="profile-social-tiktok">
+                    <span className="form-label-sm">{t('profile.socialTiktokLabel')}</span>
+                    <div className="input-with-addon">
+                      <span className="input-addon">{"tiktok.com/@"}</span>
+                      <input
+                        id="profile-social-tiktok"
+                        className="form-input input-addon-field"
+                        maxLength={100}
+                        placeholder="yourhandle"
+                        value={profileValues.socialTiktok}
+                        onChange={(event) => {
+                          setProfileValues({ ...profileValues, socialTiktok: event.currentTarget.value });
+                          setFormDirty(true);
+                        }}
+                      />
+                    </div>
+                  </label>
                   <label className="form-field" htmlFor="profile-social-website">
                     <span className="form-label-sm">{t('profile.socialWebsiteLabel')}</span>
                     <div className="input-with-addon">
@@ -929,7 +935,7 @@ export function SettingsClient({
               <fieldset className="form-field">
                 <legend className="form-label">{t('profile.favoritesTitle')}</legend>
                 <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
-                  {t('profile.favoritesDescription')}
+                  <strong>{t('profile.favoritesDescription')}</strong>
                 </p>
                 <div className="settings-emergency-fields">
                   <label className="form-field" htmlFor="profile-fav-music">
@@ -982,6 +988,9 @@ export function SettingsClient({
                   {t('profile.emergencyContactTitle')}
                   <span className="form-required-indicator"> *</span>
                 </legend>
+                <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
+                  {t('profile.emergencyContactDescription')}
+                </p>
                 <div className="settings-emergency-fields">
                   <label className="form-field" htmlFor="profile-ec-name">
                     <span className="form-label-sm">{t('profile.emergencyContactNameLabel')}</span>

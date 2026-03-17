@@ -35,6 +35,7 @@ const profileSchema = z.object({
   socialTwitter: optionalUrl,
   socialInstagram: optionalUrl,
   socialGithub: optionalUrl,
+  socialTiktok: optionalUrl,
   socialWebsite: optionalUrl,
   /* Favorites (The Crew) */
   favoriteMusic: z.string().trim().max(200, "Favorite music is too long").optional(),
@@ -55,6 +56,7 @@ type ProfileResponseData = {
   socialTwitter: string | null;
   socialInstagram: string | null;
   socialGithub: string | null;
+  socialTiktok: string | null;
   socialWebsite: string | null;
   favoriteMusic: string | null;
   favoriteBooks: string | null;
@@ -129,6 +131,7 @@ export async function PATCH(request: Request) {
       social_twitter: parsed.data.socialTwitter ?? null,
       social_instagram: parsed.data.socialInstagram ?? null,
       social_github: parsed.data.socialGithub ?? null,
+      social_tiktok: parsed.data.socialTiktok ?? null,
       social_website: parsed.data.socialWebsite ?? null,
       favorite_music: parsed.data.favoriteMusic ?? null,
       favorite_books: parsed.data.favoriteBooks ?? null,
@@ -138,7 +141,7 @@ export async function PATCH(request: Request) {
     .select(
       `full_name, avatar_url, phone, bio, pronouns,
        emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
-       social_linkedin, social_twitter, social_instagram, social_github, social_website,
+       social_linkedin, social_twitter, social_instagram, social_github, social_tiktok, social_website,
        favorite_music, favorite_books, favorite_sports`
     )
     .single();
@@ -168,6 +171,7 @@ export async function PATCH(request: Request) {
       socialTwitter: data.social_twitter,
       socialInstagram: data.social_instagram,
       socialGithub: data.social_github,
+      socialTiktok: data.social_tiktok,
       socialWebsite: data.social_website,
       favoriteMusic: data.favorite_music,
       favoriteBooks: data.favorite_books,

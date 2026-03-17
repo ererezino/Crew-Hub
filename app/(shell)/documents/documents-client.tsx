@@ -3,6 +3,7 @@
 import { type FormEvent, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
+import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { DocumentUploadPanel } from "../../../components/shared/document-upload-panel";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
@@ -190,6 +191,10 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   const [isSubmittingSigReq, setIsSubmittingSigReq] = useState(false);
   const [sigReqError, setSigReqError] = useState<string | null>(null);
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<DocumentRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   type SignerOption = { id: string; fullName: string; department: string | null; title: string | null };
   const signerPeople = usePeople({
     scope: "all",
@@ -314,6 +319,28 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
         delete nextState[documentId];
         return nextState;
       });
+    }
+  };
+
+  const handleDeleteDocument = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/v1/documents/${deleteTarget.id}`, {
+        method: "DELETE"
+      });
+      const payload = (await response.json()) as { error: { message: string } | null };
+      if (!response.ok) {
+        showToast("error", payload.error?.message ?? "Unable to delete document.");
+        return;
+      }
+      setDocuments((current) => current.filter((d) => d.id !== deleteTarget.id));
+      showToast("success", `"${deleteTarget.title}" has been deleted.`);
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : "Unable to delete document.");
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -532,6 +559,15 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
                             }}
                           >
                             {t('requestSignature')}
+                          </button>
+                        ) : null}
+                        {canManageDocuments ? (
+                          <button
+                            type="button"
+                            className="table-row-action table-row-action-warning"
+                            onClick={() => setDeleteTarget(document)}
+                          >
+                            {t('delete')}
                           </button>
                         ) : null}
                       </div>
@@ -808,6 +844,18 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
           ))}
         </div>
       ) : null}
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        title={td('deleteDialog.title')}
+        description={deleteTarget ? td('deleteDialog.description', { title: deleteTarget.title }) : ""}
+        confirmLabel={isDeleting ? td('deleteDialog.deleting') : td('deleteDialog.confirm')}
+        onConfirm={handleDeleteDocument}
+        onCancel={() => setDeleteTarget(null)}
+        tone="danger"
+        reverseEmphasis
+        isConfirming={isDeleting}
+      />
     </>
   );
 }

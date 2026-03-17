@@ -101,6 +101,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           socialTwitter: settingsFields?.social_twitter ?? "",
           socialInstagram: settingsFields?.social_instagram ?? "",
           socialGithub: settingsFields?.social_github ?? "",
+          socialTiktok: settingsFields?.social_tiktok ?? "",
           socialWebsite: settingsFields?.social_website ?? "",
           favoriteMusic: settingsFields?.favorite_music ?? "",
           favoriteBooks: settingsFields?.favorite_books ?? "",

@@ -17,6 +17,7 @@ const moderateSchema = z.object({
   socialTwitter: z.string().max(255).nullable().optional(),
   socialInstagram: z.string().max(255).nullable().optional(),
   socialGithub: z.string().max(255).nullable().optional(),
+  socialTiktok: z.string().max(255).nullable().optional(),
   socialWebsite: z.string().max(255).nullable().optional(),
   favoriteMusic: z.string().max(500).nullable().optional(),
   favoriteBooks: z.string().max(500).nullable().optional(),
@@ -117,6 +118,10 @@ export async function PATCH(
   if (parsed.data.socialGithub !== undefined) {
     updates.social_github = parsed.data.socialGithub;
     changedFields.push("social_github");
+  }
+  if (parsed.data.socialTiktok !== undefined) {
+    updates.social_tiktok = parsed.data.socialTiktok;
+    changedFields.push("social_tiktok");
   }
   if (parsed.data.socialWebsite !== undefined) {
     updates.social_website = parsed.data.socialWebsite;

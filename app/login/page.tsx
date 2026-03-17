@@ -335,7 +335,10 @@ function LoginForm() {
         </form>
 
         <p className="auth-footer-link auth-footer-hint">
-          Lost access? Contact your admin.
+          Lost access?{" "}
+          <a href="mailto:operations@useaccrue.com" className="auth-footer-mailto">
+            Contact your admin.
+          </a>
         </p>
       </section>
     </main>

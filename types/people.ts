@@ -216,6 +216,7 @@ export type CrewMember = {
   socialTwitter: string | null;
   socialInstagram: string | null;
   socialGithub: string | null;
+  socialTiktok: string | null;
   socialWebsite: string | null;
 };
 

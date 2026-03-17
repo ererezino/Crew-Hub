@@ -69,6 +69,7 @@ function getSocials(member: CrewMember): SocialEntry[] {
   if (member.socialTwitter) entries.push({ key: "twitter", url: member.socialTwitter, label: "Twitter / X", icon: "𝕏" });
   if (member.socialInstagram) entries.push({ key: "instagram", url: member.socialInstagram, label: "Instagram", icon: "📷" });
   if (member.socialGithub) entries.push({ key: "github", url: member.socialGithub, label: "GitHub", icon: "⌨" });
+  if (member.socialTiktok) entries.push({ key: "tiktok", url: member.socialTiktok, label: "TikTok", icon: "♪" });
   if (member.socialWebsite) entries.push({ key: "website", url: member.socialWebsite, label: "Website", icon: "🌐" });
   return entries;
 }
@@ -251,6 +252,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       socialTwitter: member.socialTwitter ?? "",
       socialInstagram: member.socialInstagram ?? "",
       socialGithub: member.socialGithub ?? "",
+      socialTiktok: member.socialTiktok ?? "",
       socialWebsite: member.socialWebsite ?? "",
       favoriteMusic: member.favoriteMusic ?? "",
       favoriteBooks: member.favoriteBooks ?? "",
@@ -271,6 +273,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
       if (modValues.socialTwitter !== (moderatingMember.socialTwitter ?? "")) body.socialTwitter = modValues.socialTwitter || null;
       if (modValues.socialInstagram !== (moderatingMember.socialInstagram ?? "")) body.socialInstagram = modValues.socialInstagram || null;
       if (modValues.socialGithub !== (moderatingMember.socialGithub ?? "")) body.socialGithub = modValues.socialGithub || null;
+      if (modValues.socialTiktok !== (moderatingMember.socialTiktok ?? "")) body.socialTiktok = modValues.socialTiktok || null;
       if (modValues.socialWebsite !== (moderatingMember.socialWebsite ?? "")) body.socialWebsite = modValues.socialWebsite || null;
       if (modValues.favoriteMusic !== (moderatingMember.favoriteMusic ?? "")) body.favoriteMusic = modValues.favoriteMusic || null;
       if (modValues.favoriteBooks !== (moderatingMember.favoriteBooks ?? "")) body.favoriteBooks = modValues.favoriteBooks || null;
@@ -663,6 +666,10 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
             <label className="form-field">
               <span className="form-label-sm">{t("moderate.githubLabel")}</span>
               <input className="form-input" maxLength={255} value={modValues.socialGithub ?? ""} onChange={(e) => setModValues({ ...modValues, socialGithub: e.currentTarget.value })} />
+            </label>
+            <label className="form-field">
+              <span className="form-label-sm">{t("moderate.tiktokLabel")}</span>
+              <input className="form-input" maxLength={255} value={modValues.socialTiktok ?? ""} onChange={(e) => setModValues({ ...modValues, socialTiktok: e.currentTarget.value })} />
             </label>
             <label className="form-field">
               <span className="form-label-sm">{t("moderate.websiteLabel")}</span>

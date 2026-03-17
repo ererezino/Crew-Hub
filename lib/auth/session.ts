@@ -369,6 +369,7 @@ export type SettingsProfileFields = {
   social_twitter: string | null;
   social_instagram: string | null;
   social_github: string | null;
+  social_tiktok: string | null;
   social_website: string | null;
   favorite_music: string | null;
   favorite_books: string | null;
@@ -382,7 +383,7 @@ export async function getSettingsProfileFields(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "phone, notification_preferences, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_website, favorite_music, favorite_books, favorite_sports"
+      "phone, notification_preferences, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_tiktok, social_website, favorite_music, favorite_books, favorite_sports"
     )
     .eq("id", userId)
     .is("deleted_at", null)

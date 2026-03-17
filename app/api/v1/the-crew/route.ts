@@ -40,7 +40,7 @@ export async function GET() {
     .select(
       `id, full_name, title, department, avatar_url, bio, pronouns,
        country_code, start_date, favorite_music, favorite_books, favorite_sports,
-       social_linkedin, social_twitter, social_instagram, social_github, social_website,
+       social_linkedin, social_twitter, social_instagram, social_github, social_tiktok, social_website,
        privacy_settings, status, directory_visible`
     )
     .eq("org_id", orgId)
@@ -86,6 +86,7 @@ export async function GET() {
       socialTwitter: row.social_twitter as string | null,
       socialInstagram: row.social_instagram as string | null,
       socialGithub: row.social_github as string | null,
+      socialTiktok: row.social_tiktok as string | null,
       socialWebsite: row.social_website as string | null
     };
   });
