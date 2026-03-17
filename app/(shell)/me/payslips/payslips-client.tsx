@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useState } from "react";
 
 import { DeltaBadge } from "../../../../components/dashboard/delta-badge";
+import { DocumentViewer } from "../../../../components/shared/document-viewer";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
@@ -432,49 +433,54 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
         </section>
       ) : null}
 
-      {activeStatementId ? (
-        <section className="settings-card payslip-viewer-card" aria-label={t('viewerTitle')}>
-          <header className="payslip-viewer-header">
-            <div>
-              <h2 className="section-title">
-                {viewerPayPeriod
-                  ? t('viewerTitleWithPeriod', { period: formatPayPeriod(viewerPayPeriod, locale) })
-                  : t('viewerTitle')}
-              </h2>
-              <p className="settings-card-description">
-                {t('viewerDescription')}
-              </p>
-            </div>
-            <button
-              type="button"
-              className="button button-subtle"
-              onClick={() => {
-                setActiveStatementId(null);
-                setViewerUrl(null);
-                setViewerPayPeriod(null);
-              }}
-            >
-              {t('closeViewer')}
-            </button>
-          </header>
-
-          {isViewerLoading ? <div className="payslip-viewer-skeleton" aria-hidden="true" /> : null}
-
-          {!isViewerLoading && viewerUrl ? (
-            <iframe
-              className="payslip-viewer-frame"
-              src={viewerUrl}
-              title={t('viewerTitle')}
-            />
-          ) : null}
-
-          {!isViewerLoading && !viewerUrl ? (
-            <p className="settings-card-description">
-              {t('viewerUnavailable')}
-            </p>
-          ) : null}
-        </section>
-      ) : null}
+      <DocumentViewer
+        isOpen={activeStatementId !== null && !isViewerLoading}
+        title={
+          viewerPayPeriod
+            ? t('viewerTitleWithPeriod', { period: formatPayPeriod(viewerPayPeriod, locale) })
+            : t('viewerTitle')
+        }
+        documentUrl={viewerUrl}
+        fileName={
+          viewerPayPeriod
+            ? `payslip-${viewerPayPeriod}.pdf`
+            : "payslip.pdf"
+        }
+        mimeType="application/pdf"
+        onClose={() => {
+          setActiveStatementId(null);
+          setViewerUrl(null);
+          setViewerPayPeriod(null);
+        }}
+        onRefreshUrl={
+          activeStatementId
+            ? async () => {
+                const activeStatement = statements.find(
+                  (s) => s.id === activeStatementId
+                );
+                if (!activeStatement) return null;
+                const searchParams = new URLSearchParams({
+                  usage: "view",
+                  expiresIn: "240"
+                });
+                try {
+                  const response = await fetch(
+                    `/api/v1/me/payslips/${activeStatement.id}/download?${searchParams.toString()}`
+                  );
+                  const payload =
+                    (await response.json()) as PaymentStatementSignedUrlResponse;
+                  if (response.ok && payload.data?.url) {
+                    setViewerUrl(payload.data.url);
+                    return payload.data.url;
+                  }
+                } catch {
+                  // refresh failed
+                }
+                return null;
+              }
+            : undefined
+        }
+      />
 
       {toasts.length > 0 ? (
         <section className="toast-region" aria-live="polite" aria-label={t('toastAriaLabel')}>

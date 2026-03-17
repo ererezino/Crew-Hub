@@ -823,7 +823,7 @@ export function SettingsClient({
               <fieldset className="form-field">
                 <legend className="form-label">{t('profile.socialLinksTitle')}</legend>
                 <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
-                  {t('profile.socialLinksDescription')}
+                  <strong>{t('profile.socialLinksDescription')}</strong>
                 </p>
                 <div className="settings-emergency-fields">
                   <label className="form-field" htmlFor="profile-social-linkedin">
@@ -989,7 +989,7 @@ export function SettingsClient({
                   <span className="form-required-indicator"> *</span>
                 </legend>
                 <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
-                  {t('profile.emergencyContactDescription')}
+                  <strong>{t('profile.emergencyContactDescription')}</strong>
                 </p>
                 <div className="settings-emergency-fields">
                   <label className="form-field" htmlFor="profile-ec-name">

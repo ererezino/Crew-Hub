@@ -10,7 +10,7 @@ import { PageHeader } from "../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { usePayrollRunsDashboard } from "../../../../../hooks/use-payroll-runs";
 import { useUnsavedGuard } from "../../../../../hooks/use-unsaved-guard";
-import { currentMonthPeriod } from "../../../../../lib/payroll/runs";
+import { currentMonthPeriod, monthPeriod } from "../../../../../lib/payroll/runs";
 import type {
   CreatePayrollRunPayload,
   CreatePayrollRunResponse
@@ -223,6 +223,33 @@ export function CreatePayrollRunClient() {
             <p className="settings-card-description">
               {t('runDetailsDescription')}
             </p>
+
+            <label className="form-field" htmlFor="quick-month">
+              <span className="form-label">{t('quickMonth')}</span>
+              <input
+                id="quick-month"
+                type="month"
+                className="form-input"
+                value={formValues.payPeriodStart.slice(0, 7)}
+                onChange={(event) => {
+                  const monthStr = event.currentTarget.value;
+                  if (!/^\d{4}-\d{2}$/.test(monthStr)) return;
+                  const [yearStr, monthNumStr] = monthStr.split("-");
+                  const y = Number.parseInt(yearStr ?? "", 10);
+                  const m = Number.parseInt(monthNumStr ?? "", 10);
+                  if (!Number.isFinite(y) || !Number.isFinite(m)) return;
+                  const period = monthPeriod(y, m);
+                  setFormValues((currentValues) => ({
+                    ...currentValues,
+                    payPeriodStart: period.payPeriodStart,
+                    payPeriodEnd: period.payPeriodEnd,
+                    payDate: period.payDate
+                  }));
+                  setCreateRunDirty(true);
+                }}
+              />
+              <p className="form-hint">{t('quickMonthHint')}</p>
+            </label>
 
             <div className="timeoff-form-grid">
               <label className="form-field" htmlFor="pay-period-start">

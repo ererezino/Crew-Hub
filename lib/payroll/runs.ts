@@ -127,6 +127,25 @@ export function currentMonthPeriod(now: Date = new Date()): {
   };
 }
 
+/**
+ * Compute period dates for an arbitrary year/month.
+ * month is 1-based (1 = January, 12 = December).
+ */
+export function monthPeriod(year: number, month: number): {
+  payPeriodStart: string;
+  payPeriodEnd: string;
+  payDate: string;
+} {
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const end = new Date(Date.UTC(year, month, 0));
+
+  return {
+    payPeriodStart: start.toISOString().slice(0, 10),
+    payPeriodEnd: end.toISOString().slice(0, 10),
+    payDate: end.toISOString().slice(0, 10)
+  };
+}
+
 export function adjustmentTotal(adjustments: readonly PayrollRunAdjustment[]): number {
   return adjustments.reduce((sum, adjustment) => sum + Math.trunc(adjustment.amount), 0);
 }
