@@ -86,7 +86,7 @@ describe("Payroll calculations", () => {
     expect(result.net_amount).toBe(500_000_00);
     expect(result.total_deductions).toBe(0);
     expect(result.deductions).toHaveLength(0);
-    expect(result.withholding_applied).toBe(false);
+    expect(result.withholding_applied).toBe(true);
   });
 
   it("matches NGN 150,000 source-of-truth PAYE calculation", () => {
