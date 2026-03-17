@@ -45,50 +45,55 @@ import {
 /* ── Greeting helpers ── */
 
 function greetingIcon(tod: "morning" | "afternoon" | "evening") {
-  if (tod === "morning") return <Sunrise size={18} />;
-  if (tod === "afternoon") return <Sun size={18} />;
-  return <Sunset size={18} />;
-}
-
-/* ── Quick Actions Row ── */
-
-function QuickActionsRow() {
-  const t = useTranslations('dashboard');
-  return (
-    <div className="home-quick-actions" role="list" aria-label={t('quickActions.ariaLabel')}>
-      <Link href="/time-off" className="home-quick-action-card" role="listitem">
-        <span className="home-quick-action-icon"><Calendar size={20} /></span>
-        <span className="home-quick-action-label">{t('quickActions.requestTimeOff')}</span>
-      </Link>
-      <Link href="/expenses" className="home-quick-action-card" role="listitem">
-        <span className="home-quick-action-icon"><Receipt size={20} /></span>
-        <span className="home-quick-action-label">{t('quickActions.submitExpense')}</span>
-      </Link>
-      <Link href="/me/pay?tab=payslips" className="home-quick-action-card" role="listitem">
-        <span className="home-quick-action-icon"><FileText size={20} /></span>
-        <span className="home-quick-action-label">{t('quickActions.viewPayslips')}</span>
-      </Link>
-    </div>
-  );
+  if (tod === "morning") return <Sunrise size={16} />;
+  if (tod === "afternoon") return <Sun size={16} />;
+  return <Sunset size={16} />;
 }
 
 /* ══════════════════════════════════════════════
-   GREETING CARDS — one per persona
+   GREETING HERO — clean, minimal for all roles
    ══════════════════════════════════════════════ */
 
-function NewHireGreeting({ data }: { data: DashboardResponseData }) {
+function GreetingHero({ data }: { data: DashboardResponseData }) {
   const t = useTranslations('dashboard');
+
+  const isNewHire = data.persona === "new_hire";
+
   return (
     <section className="home-welcome-hero dashboard-fade-in">
       <div className="home-welcome-content">
+        {!isNewHire ? (
+          <p className="home-welcome-eyebrow">
+            {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
+          </p>
+        ) : null}
+
         <h1 className="home-welcome-title">
-          {t('newHire.welcome', { org: data.org?.name ?? t('newHire.yourTeam'), firstName: data.greeting.firstName })}
+          {isNewHire
+            ? t('newHire.welcome', { org: data.org?.name ?? t('newHire.yourTeam'), firstName: data.greeting.firstName })
+            : `${data.greeting.firstName}.`
+          }
         </h1>
-        {data.org?.description ? (
+
+        {isNewHire && data.org?.description ? (
           <p className="home-welcome-subtitle">{data.org.description}</p>
         ) : null}
 
-        {data.managerInfo ? (
+        {!isNewHire && data.persona === "employee" && (() => {
+          const annualLeave = data.leaveBalance?.byType.find(
+            (b) => b.leaveType.toLowerCase().includes("annual") || b.leaveType.toLowerCase().includes("vacation")
+          );
+          const totalLeave = data.leaveBalance?.totalAvailable ?? 0;
+          if (annualLeave) {
+            return <p className="home-welcome-subtitle">{t('employee.annualLeaveAvailable', { count: annualLeave.available })}</p>;
+          }
+          if (totalLeave > 0) {
+            return <p className="home-welcome-subtitle">{t('employee.leaveAvailable', { count: totalLeave })}</p>;
+          }
+          return null;
+        })()}
+
+        {isNewHire && data.managerInfo ? (
           <div className="dashboard-manager-callout">
             {data.managerInfo.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -112,115 +117,48 @@ function NewHireGreeting({ data }: { data: DashboardResponseData }) {
             </span>
           </div>
         ) : null}
-
       </div>
     </section>
   );
 }
 
-function EmployeeGreeting({ data }: { data: DashboardResponseData }) {
+/* ══════════════════════════════════════════════
+   QUICK ACTIONS — compact pill row
+   ══════════════════════════════════════════════ */
+
+function QuickActionsRow() {
   const t = useTranslations('dashboard');
-  const totalLeave = data.leaveBalance?.totalAvailable ?? 0;
-  const annualLeave = data.leaveBalance?.byType.find(
-    (b) => b.leaveType.toLowerCase().includes("annual") || b.leaveType.toLowerCase().includes("vacation")
-  );
-
   return (
-    <section className="home-welcome-hero dashboard-fade-in">
-      <div className="home-welcome-content">
-        <p className="home-welcome-eyebrow">
-          {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
-        </p>
-        <h1 className="home-welcome-title">
-          {data.greeting.firstName}.
-        </h1>
-        {annualLeave ? (
-          <p className="home-welcome-subtitle">
-            {t('employee.annualLeaveAvailable', { count: annualLeave.available })}
-          </p>
-        ) : totalLeave > 0 ? (
-          <p className="home-welcome-subtitle">
-            {t('employee.leaveAvailable', { count: totalLeave })}
-          </p>
-        ) : null}
-      </div>
-      <QuickActionsRow />
-    </section>
+    <div className="home-quick-actions" role="list" aria-label={t('quickActions.ariaLabel')}>
+      <Link href="/time-off" className="home-quick-action-card" role="listitem">
+        <span className="home-quick-action-icon"><Calendar size={16} /></span>
+        <span className="home-quick-action-label">{t('quickActions.requestTimeOff')}</span>
+      </Link>
+      <Link href="/expenses" className="home-quick-action-card" role="listitem">
+        <span className="home-quick-action-icon"><Receipt size={16} /></span>
+        <span className="home-quick-action-label">{t('quickActions.submitExpense')}</span>
+      </Link>
+      <Link href="/me/pay?tab=payslips" className="home-quick-action-card" role="listitem">
+        <span className="home-quick-action-icon"><FileText size={16} /></span>
+        <span className="home-quick-action-label">{t('quickActions.viewPayslips')}</span>
+      </Link>
+    </div>
   );
 }
 
-function ManagerGreeting({ data }: { data: DashboardResponseData }) {
-  const t = useTranslations('dashboard');
-  const approvals = data.pendingApprovals;
+/* ══════════════════════════════════════════════
+   METRICS STRIP — extracted from admin heroes
+   ══════════════════════════════════════════════ */
 
-  return (
-    <section className="home-welcome-hero dashboard-fade-in">
-      <div className="home-welcome-content">
-        <p className="home-welcome-eyebrow">
-          {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
-        </p>
-        <h1 className="home-welcome-title">
-          {data.greeting.firstName}.
-        </h1>
-
-        {approvals && approvals.total > 0 ? (
-          <div className="dashboard-approval-callout">
-            <div className="dashboard-approval-callout-body">
-              <p className="dashboard-approval-count numeric">
-                {t('manager.itemsWaiting', { count: approvals.total })}
-              </p>
-              <p className="settings-card-description numeric">
-                {approvals.leave > 0 ? t('manager.leaveCount', { count: approvals.leave }) : ""}
-                {approvals.leave > 0 && approvals.expenses > 0 ? ", " : ""}
-                {approvals.expenses > 0 ? t('manager.expenseCount', { count: approvals.expenses }) : ""}
-              </p>
-            </div>
-            <Link href="/approvals" className="button button-accent">
-              {t('manager.reviewNow')} <ArrowRight size={14} />
-            </Link>
-          </div>
-        ) : (
-          <div className="dashboard-all-caught-up">
-            <CheckCircle size={20} />
-            <span>{t('manager.allCaughtUp')}</span>
-          </div>
-        )}
-      </div>
-      <QuickActionsRow />
-    </section>
-  );
-}
-
-function HrAdminGreeting({ data }: { data: DashboardResponseData }) {
+function HrMetricsStrip({ data }: { data: DashboardResponseData }) {
   const t = useTranslations('dashboard');
   const hc = data.headcount;
   const ob = data.onboardingStatus;
   const cd = data.complianceDeadlines;
   const rc = data.activeReviewCycles;
 
-  let ctaHref = "/analytics";
-  let ctaLabel = t('hrAdmin.viewAnalytics');
-  if (cd && cd.overdue > 0) {
-    ctaHref = "/compliance";
-    ctaLabel = t('hrAdmin.reviewCompliance');
-  } else if (cd && cd.thisMonth > 0) {
-    ctaHref = "/compliance";
-    ctaLabel = t('hrAdmin.viewCompliance');
-  } else if (ob && ob.overdue > 0) {
-    ctaHref = "/onboarding";
-    ctaLabel = t('hrAdmin.viewOnboarding');
-  }
-
   return (
-    <section className="home-welcome-hero dashboard-fade-in">
-      <div className="home-welcome-content">
-        <p className="home-welcome-eyebrow">
-          {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
-        </p>
-        <h1 className="home-welcome-title">
-          {data.greeting.firstName}.
-        </h1>
-      </div>
+    <section className="dashboard-metrics-strip">
       <div className="metric-grid">
         <article className="metric-card">
           <p className="metric-label">{t('hrAdmin.activePeople')}</p>
@@ -252,14 +190,11 @@ function HrAdminGreeting({ data }: { data: DashboardResponseData }) {
           <p className="metric-value numeric">{rc ?? 0}</p>
         </article>
       </div>
-      <Link href={ctaHref} className="button button-accent" style={{ marginTop: "var(--space-4)" }}>
-        {ctaLabel} <ArrowRight size={14} />
-      </Link>
     </section>
   );
 }
 
-function FinanceAdminGreeting({ data }: { data: DashboardResponseData }) {
+function FinanceMetricsStrip({ data }: { data: DashboardResponseData }) {
   const t = useTranslations('dashboard');
   const locale = useLocale() as AppLocale;
   const payroll = data.payroll;
@@ -273,23 +208,8 @@ function FinanceAdminGreeting({ data }: { data: DashboardResponseData }) {
     return "draft" as const;
   })();
 
-  let ctaHref = "/payroll";
-  let ctaLabel = t('financeAdmin.goToPayroll');
-  if (expenses && expenses.financeStage > 0) {
-    ctaHref = "/approvals";
-    ctaLabel = t('financeAdmin.reviewExpenses');
-  }
-
   return (
-    <section className="home-welcome-hero dashboard-fade-in">
-      <div className="home-welcome-content">
-        <p className="home-welcome-eyebrow">
-          {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
-        </p>
-        <h1 className="home-welcome-title">
-          {data.greeting.firstName}.
-        </h1>
-      </div>
+    <section className="dashboard-metrics-strip">
       <div className="dashboard-finance-summary">
         <article className="metric-card">
           <p className="metric-label">{t('financeAdmin.lastPayrollRun')}</p>
@@ -311,34 +231,19 @@ function FinanceAdminGreeting({ data }: { data: DashboardResponseData }) {
           <p className="metric-value numeric">{expenses?.financeStage ?? 0}</p>
         </article>
       </div>
-      <Link href={ctaHref} className="button button-accent" style={{ marginTop: "var(--space-4)" }}>
-        {ctaLabel} <ArrowRight size={14} />
-      </Link>
     </section>
   );
 }
 
-function SuperAdminGreeting({ data }: { data: DashboardResponseData }) {
+function SuperAdminMetricsStrip({ data }: { data: DashboardResponseData }) {
   const t = useTranslations('dashboard');
-  const tCommon = useTranslations('common');
-  const locale = useLocale() as AppLocale;
   const hc = data.headcount;
   const approvals = data.pendingApprovals;
   const payroll = data.payroll;
   const cd = data.complianceDeadlines;
-  const expenseSpendSummary = data.expenseSpendSummary;
 
   return (
-    <section className="home-welcome-hero dashboard-fade-in">
-      <div className="home-welcome-content">
-        <p className="home-welcome-eyebrow">
-          {greetingIcon(data.greeting.timeOfDay)} {t(`greeting.${data.greeting.timeOfDay}` as never)}
-        </p>
-        <h1 className="home-welcome-title">
-          {data.greeting.firstName}.
-        </h1>
-      </div>
-
+    <section className="dashboard-metrics-strip">
       <div className="metric-grid">
         <article className="metric-card">
           <p className="metric-label">{t('superAdmin.headcount')}</p>
@@ -382,64 +287,143 @@ function SuperAdminGreeting({ data }: { data: DashboardResponseData }) {
           )}
         </article>
       </div>
-
-      {expenseSpendSummary ? (
-        <article className="metric-card" style={{ marginTop: "var(--space-4)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", alignItems: "center" }}>
-            <p className="metric-label">{t('superAdmin.expenseSnapshot')}</p>
-            {expenseSpendSummary.mixedCurrency ? (
-              <span className="settings-card-description">{t('superAdmin.primaryCurrencyView')}</span>
-            ) : null}
-          </div>
-          <div className="dashboard-pipeline" style={{ marginTop: "var(--space-2)" }}>
-            <div className="dashboard-pipeline-stage">
-              <span className="metric-label">{t('superAdmin.thisMonth')}</span>
-              <span className="metric-value">
-                <CurrencyDisplay
-                  amount={expenseSpendSummary.monthToDate}
-                  currency={expenseSpendSummary.currency}
-                />
-              </span>
-            </div>
-            <ChevronRight size={14} className="dashboard-pipeline-arrow" />
-            <div className="dashboard-pipeline-stage">
-              <span className="metric-label">{t('superAdmin.yearToDate')}</span>
-              <span className="metric-value">
-                <CurrencyDisplay
-                  amount={expenseSpendSummary.yearToDate}
-                  currency={expenseSpendSummary.currency}
-                />
-              </span>
-            </div>
-          </div>
-        </article>
-      ) : null}
-
-      {data.recentAuditLog && data.recentAuditLog.length > 0 ? (
-        <div className="dashboard-audit-feed">
-          <div className="dashboard-audit-feed-header">
-            <h3 className="section-title">
-              <Activity size={14} /> {t('superAdmin.recentAuditLog')}
-            </h3>
-            <Link href="/settings?tab=audit" className="announcement-widget-link">
-              {tCommon('viewAll')} <ChevronRight size={14} />
-            </Link>
-          </div>
-          <ul className="dashboard-audit-list">
-            {data.recentAuditLog.map((entry) => (
-              <li key={entry.id} className="dashboard-audit-item">
-                <span className="dashboard-audit-actor">{entry.actorName}</span>
-                <span className="dashboard-audit-action">{entry.action}</span>
-                <span className="dashboard-audit-table">{entry.tableName}</span>
-                <time className="dashboard-audit-time settings-card-description">
-                  {formatRelativeTime(entry.timestamp, locale)}
-                </time>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </section>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   ADMIN CTA BANNERS — separated from hero
+   ══════════════════════════════════════════════ */
+
+function HrAdminCTA({ data }: { data: DashboardResponseData }) {
+  const t = useTranslations('dashboard');
+  const cd = data.complianceDeadlines;
+  const ob = data.onboardingStatus;
+
+  let ctaHref = "/analytics";
+  let ctaLabel = t('hrAdmin.viewAnalytics');
+  if (cd && cd.overdue > 0) {
+    ctaHref = "/compliance";
+    ctaLabel = t('hrAdmin.reviewCompliance');
+  } else if (cd && cd.thisMonth > 0) {
+    ctaHref = "/compliance";
+    ctaLabel = t('hrAdmin.viewCompliance');
+  } else if (ob && ob.overdue > 0) {
+    ctaHref = "/onboarding";
+    ctaLabel = t('hrAdmin.viewOnboarding');
+  }
+
+  return (
+    <div className="dashboard-action-banner">
+      <span className="settings-card-description">
+        {cd && cd.overdue > 0
+          ? t('hrAdmin.overdue', { count: cd.overdue })
+          : t('hrAdmin.viewAnalytics')}
+      </span>
+      <Link href={ctaHref} className="button button-accent">
+        {ctaLabel} <ArrowRight size={14} />
+      </Link>
+    </div>
+  );
+}
+
+function FinanceAdminCTA({ data }: { data: DashboardResponseData }) {
+  const t = useTranslations('dashboard');
+  const expenses = data.pendingExpenseApprovals;
+
+  let ctaHref = "/payroll";
+  let ctaLabel = t('financeAdmin.goToPayroll');
+  if (expenses && expenses.financeStage > 0) {
+    ctaHref = "/approvals";
+    ctaLabel = t('financeAdmin.reviewExpenses');
+  }
+
+  return (
+    <div className="dashboard-action-banner">
+      <span className="settings-card-description">
+        {expenses && expenses.financeStage > 0
+          ? t('financeAdmin.pendingExpenseApprovals')
+          : t('financeAdmin.goToPayroll')}
+      </span>
+      <Link href={ctaHref} className="button button-accent">
+        {ctaLabel} <ArrowRight size={14} />
+      </Link>
+    </div>
+  );
+}
+
+function ManagerApprovalBanner({ data }: { data: DashboardResponseData }) {
+  const t = useTranslations('dashboard');
+  const approvals = data.pendingApprovals;
+
+  if (!approvals || approvals.total === 0) {
+    return (
+      <div className="dashboard-all-caught-up">
+        <CheckCircle size={18} />
+        <span>{t('manager.allCaughtUp')}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dashboard-approval-callout">
+      <div className="dashboard-approval-callout-body">
+        <p className="dashboard-approval-count numeric">
+          {t('manager.itemsWaiting', { count: approvals.total })}
+        </p>
+        <p className="settings-card-description numeric">
+          {approvals.leave > 0 ? t('manager.leaveCount', { count: approvals.leave }) : ""}
+          {approvals.leave > 0 && approvals.expenses > 0 ? ", " : ""}
+          {approvals.expenses > 0 ? t('manager.expenseCount', { count: approvals.expenses }) : ""}
+        </p>
+      </div>
+      <Link href="/approvals" className="button button-accent">
+        {t('manager.reviewNow')} <ArrowRight size={14} />
+      </Link>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   EXPENSE SNAPSHOT — super admin, below metrics
+   ══════════════════════════════════════════════ */
+
+function ExpenseSnapshot({ data }: { data: DashboardResponseData }) {
+  const t = useTranslations('dashboard');
+  const expenseSpendSummary = data.expenseSpendSummary;
+
+  if (!expenseSpendSummary) return null;
+
+  return (
+    <article className="metric-card" style={{ marginBottom: "var(--space-3)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", alignItems: "center" }}>
+        <p className="metric-label">{t('superAdmin.expenseSnapshot')}</p>
+        {expenseSpendSummary.mixedCurrency ? (
+          <span className="settings-card-description">{t('superAdmin.primaryCurrencyView')}</span>
+        ) : null}
+      </div>
+      <div className="dashboard-pipeline" style={{ marginTop: "var(--space-2)" }}>
+        <div className="dashboard-pipeline-stage">
+          <span className="metric-label">{t('superAdmin.thisMonth')}</span>
+          <span className="metric-value">
+            <CurrencyDisplay
+              amount={expenseSpendSummary.monthToDate}
+              currency={expenseSpendSummary.currency}
+            />
+          </span>
+        </div>
+        <ChevronRight size={14} className="dashboard-pipeline-arrow" />
+        <div className="dashboard-pipeline-stage">
+          <span className="metric-label">{t('superAdmin.yearToDate')}</span>
+          <span className="metric-value">
+            <CurrencyDisplay
+              amount={expenseSpendSummary.yearToDate}
+              currency={expenseSpendSummary.currency}
+            />
+          </span>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -882,26 +866,37 @@ function PendingDecisionsWidget({ data }: { data: DashboardResponseData }) {
 }
 
 /* ══════════════════════════════════════════════
-   GREETING CARD SWITCH
+   AUDIT FEED WIDGET — for super admin
    ══════════════════════════════════════════════ */
 
-function GreetingCard({ data }: { data: DashboardResponseData }) {
-  switch (data.persona) {
-    case "new_hire":
-      return <NewHireGreeting data={data} />;
-    case "employee":
-      return <EmployeeGreeting data={data} />;
-    case "manager":
-      return <ManagerGreeting data={data} />;
-    case "hr_admin":
-      return <HrAdminGreeting data={data} />;
-    case "finance_admin":
-      return <FinanceAdminGreeting data={data} />;
-    case "super_admin":
-      return <SuperAdminGreeting data={data} />;
-    default:
-      return <EmployeeGreeting data={data} />;
-  }
+function AuditFeedWidget({ data }: { data: DashboardResponseData }) {
+  const t = useTranslations('dashboard');
+  const tCommon = useTranslations('common');
+  const locale = useLocale() as AppLocale;
+
+  if (!data.recentAuditLog || data.recentAuditLog.length === 0) return null;
+
+  return (
+    <WidgetCard
+      title={t('superAdmin.recentAuditLog')}
+      icon={<Activity size={14} />}
+      viewAllHref="/settings?tab=audit"
+      fullWidth
+    >
+      <ul className="dashboard-audit-list">
+        {data.recentAuditLog.map((entry) => (
+          <li key={entry.id} className="dashboard-audit-item">
+            <span className="dashboard-audit-actor">{entry.actorName}</span>
+            <span className="dashboard-audit-action">{entry.action}</span>
+            <span className="dashboard-audit-table">{entry.tableName}</span>
+            <time className="dashboard-audit-time settings-card-description">
+              {formatRelativeTime(entry.timestamp, locale)}
+            </time>
+          </li>
+        ))}
+      </ul>
+    </WidgetCard>
+  );
 }
 
 /* ══════════════════════════════════════════════
@@ -911,18 +906,15 @@ function GreetingCard({ data }: { data: DashboardResponseData }) {
 function WidgetGrid({ data }: { data: DashboardResponseData }) {
   return (
     <div className="dashboard-widget-grid">
-      {/* Universal widgets (all roles) */}
-      <WidgetErrorBoundary title="Announcements">
-        <AnnouncementsWidget data={data} />
+      {/* Manager+ action widgets first */}
+      <WidgetErrorBoundary title="Pending decisions">
+        <PendingDecisionsWidget data={data} />
       </WidgetErrorBoundary>
-      <WidgetErrorBoundary title="Team on leave today">
-        <TeamOnLeaveWidget data={data} />
-      </WidgetErrorBoundary>
-      <WidgetErrorBoundary title="Upcoming holidays">
-        <UpcomingHolidaysWidget data={data} />
+      <WidgetErrorBoundary title="Pending approvals">
+        <PendingApprovalsWidget data={data} />
       </WidgetErrorBoundary>
 
-      {/* Employee+ widgets */}
+      {/* Employee personal widgets */}
       <WidgetErrorBoundary title="My leave balance">
         <LeaveBalanceWidget data={data} />
       </WidgetErrorBoundary>
@@ -933,30 +925,34 @@ function WidgetGrid({ data }: { data: DashboardResponseData }) {
         <UpcomingShiftsWidget data={data} />
       </WidgetErrorBoundary>
 
-      {/* Manager+ widgets */}
-      <WidgetErrorBoundary title="Pending approvals">
-        <PendingApprovalsWidget data={data} />
+      {/* Universal informational widgets */}
+      <WidgetErrorBoundary title="Announcements">
+        <AnnouncementsWidget data={data} />
       </WidgetErrorBoundary>
-      <WidgetErrorBoundary title="Pending decisions">
-        <PendingDecisionsWidget data={data} />
+      <WidgetErrorBoundary title="Team on leave today">
+        <TeamOnLeaveWidget data={data} />
+      </WidgetErrorBoundary>
+      <WidgetErrorBoundary title="Upcoming holidays">
+        <UpcomingHolidaysWidget data={data} />
       </WidgetErrorBoundary>
 
-      {/* HR Admin+ widgets */}
+      {/* Admin-specific widgets */}
       <WidgetErrorBoundary title="Expiring documents">
         <ExpiringDocumentsWidget data={data} />
       </WidgetErrorBoundary>
-
-      {/* Finance Admin+ widgets */}
       <WidgetErrorBoundary title="Payroll status">
         <PayrollStatusWidget data={data} />
       </WidgetErrorBoundary>
       <WidgetErrorBoundary title="Expense pipeline">
         <ExpensePipelineWidget data={data} />
       </WidgetErrorBoundary>
-
-      {/* Super Admin widgets */}
       <WidgetErrorBoundary title="Compliance health">
         <ComplianceHealthWidget data={data} />
+      </WidgetErrorBoundary>
+
+      {/* Super admin audit feed */}
+      <WidgetErrorBoundary title="Audit feed">
+        <AuditFeedWidget data={data} />
       </WidgetErrorBoundary>
     </div>
   );
@@ -1008,7 +1004,10 @@ function DashboardContent({ initialData }: { initialData?: DashboardResponseData
 
   return (
     <div className="home-page">
+      {/* Setup checklist for super admin */}
       {data.persona === "super_admin" && <SetupChecklist />}
+
+      {/* Onboarding banner for new hires */}
       {shouldShowOnboardingBanner ? (
         <OnboardingBanner
           progressPercent={onboardingProgressPercent}
@@ -1016,12 +1015,39 @@ function DashboardContent({ initialData }: { initialData?: DashboardResponseData
           completedTasks={onboardingProgress.tasksCompleted}
         />
       ) : null}
-      <GreetingCard data={data} />
+
+      {/* Clean greeting hero — all roles */}
+      <GreetingHero data={data} />
+
+      {/* Role-specific metrics strip — separated from hero */}
+      {data.persona === "hr_admin" && <HrMetricsStrip data={data} />}
+      {data.persona === "finance_admin" && <FinanceMetricsStrip data={data} />}
+      {data.persona === "super_admin" && <SuperAdminMetricsStrip data={data} />}
+
+      {/* Expense snapshot for super admin */}
+      {data.persona === "super_admin" && <ExpenseSnapshot data={data} />}
+
+      {/* Quick actions for employee/manager */}
+      {(data.persona === "employee" || data.persona === "manager") && <QuickActionsRow />}
+
+      {/* Manager approval banner */}
+      {data.persona === "manager" && <ManagerApprovalBanner data={data} />}
+
+      {/* Admin CTA banners */}
+      {data.persona === "hr_admin" && <HrAdminCTA data={data} />}
+      {data.persona === "finance_admin" && <FinanceAdminCTA data={data} />}
+
       <PasskeyNudgeBanner />
+
+      {/* Manager onboarding widget */}
       {shouldShowManagerOnboarding ? (
         <ManagerOnboardingWidget reports={data.managerOnboarding!} />
       ) : null}
+
+      {/* Health alerts for admins */}
       {showHealthAlerts ? <HealthAlerts alerts={data.healthAlerts!} /> : null}
+
+      {/* Widget grid */}
       <WidgetGrid data={data} />
     </div>
   );

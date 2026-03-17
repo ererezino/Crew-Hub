@@ -81,15 +81,17 @@ export async function GET(request: Request, context: RouteContext) {
 
   const supabase = await createSupabaseServerClient();
   const isSuperAdmin = session.profile.roles.includes("SUPER_ADMIN");
+  const isHrAdmin = session.profile.roles.includes("HR_ADMIN");
+  const isAdmin = isSuperAdmin || isHrAdmin;
 
   let fetchQuery = supabase
     .from("travel_support_requests")
-    .select("id, employee_id, destination_country, document_path, status")
+    .select("id, employee_id, destination_country, destination_countries, document_path, status")
     .eq("id", parsedParams.data.id)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null);
 
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     fetchQuery = fetchQuery.eq("employee_id", session.profile.id);
   }
 

@@ -27,11 +27,13 @@ export type TravelSupportLetterPdfInput = {
   department: string | null;
   startDate: string | null;
   destinationCountry: string;
+  destinationCountries?: string[];
   embassyName: string;
   embassyAddress: string | null;
   travelStartDate: string;
   travelEndDate: string;
   purpose: string;
+  letterBody?: string | null;
   approverName: string;
   approverTitle: string | null;
   issueDate: string;
@@ -122,6 +124,17 @@ function TravelSupportLetterDocument(props: TravelSupportLetterPdfInput) {
   const deptText = props.department ? ` in the ${props.department} department` : "";
   const sinceText = formatStartDate(props.startDate);
 
+  // Resolve destination countries display
+  const countries = props.destinationCountries && props.destinationCountries.length > 0
+    ? props.destinationCountries
+    : [props.destinationCountry];
+  const countriesText = countries.length === 1
+    ? countries[0]
+    : `${countries.slice(0, -1).join(", ")} and ${countries[countries.length - 1]}`;
+
+  // If HR drafted a custom letter body, render those paragraphs instead of the default
+  const hasCustomBody = props.letterBody && props.letterBody.trim().length > 0;
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -142,29 +155,41 @@ function TravelSupportLetterDocument(props: TravelSupportLetterPdfInput) {
 
         <Text style={styles.bodyParagraph}>Dear Sir/Madam,</Text>
 
-        <Text style={styles.bodyParagraph}>
-          This letter is to confirm that {props.employeeName} is currently employed at
-          Accrue{titleText}{deptText} since {sinceText}.
-        </Text>
+        {hasCustomBody ? (
+          <>
+            {props.letterBody!.split("\n\n").map((paragraph, index) => (
+              <Text key={`body-${index}`} style={styles.bodyParagraph}>
+                {paragraph.trim()}
+              </Text>
+            ))}
+          </>
+        ) : (
+          <>
+            <Text style={styles.bodyParagraph}>
+              This letter is to confirm that {props.employeeName} is currently employed at
+              Accrue{titleText}{deptText} since {sinceText}.
+            </Text>
 
-        <Text style={styles.bodyParagraph}>
-          {props.employeeName} will be traveling to {props.destinationCountry} from{" "}
-          {formatLetterDate(props.travelStartDate)} to{" "}
-          {formatLetterDate(props.travelEndDate)} for the following purpose:{" "}
-          {props.purpose}.
-        </Text>
+            <Text style={styles.bodyParagraph}>
+              {props.employeeName} will be traveling to {countriesText} from{" "}
+              {formatLetterDate(props.travelStartDate)} to{" "}
+              {formatLetterDate(props.travelEndDate)} for the following purpose:{" "}
+              {props.purpose}.
+            </Text>
 
-        <Text style={styles.bodyParagraph}>
-          We kindly request that you grant {props.employeeName} the necessary travel
-          documentation and/or visa to facilitate this trip. Accrue fully supports this
-          travel and confirms that {props.employeeName} will continue to be employed upon
-          their return.
-        </Text>
+            <Text style={styles.bodyParagraph}>
+              We kindly request that you grant {props.employeeName} the necessary travel
+              documentation and/or visa to facilitate this trip. Accrue fully supports this
+              travel and confirms that {props.employeeName} will continue to be employed upon
+              their return.
+            </Text>
 
-        <Text style={styles.bodyParagraph}>
-          Should you require any further information or verification, please do not
-          hesitate to contact us at {ACCRUE_EMAIL}.
-        </Text>
+            <Text style={styles.bodyParagraph}>
+              Should you require any further information or verification, please do not
+              hesitate to contact us at {ACCRUE_EMAIL}.
+            </Text>
+          </>
+        )}
 
         <View style={styles.closingBlock}>
           <Text style={styles.closingText}>Yours faithfully,</Text>

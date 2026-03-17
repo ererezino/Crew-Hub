@@ -1,6 +1,6 @@
 import type { ApiResponse } from "./auth";
 
-export const TRAVEL_LETTER_STATUSES = ["pending", "approved", "rejected"] as const;
+export const TRAVEL_LETTER_STATUSES = ["pending", "hr_draft", "pending_signature", "approved", "rejected"] as const;
 
 export type TravelLetterStatus = (typeof TRAVEL_LETTER_STATUSES)[number];
 
@@ -10,6 +10,7 @@ export type TravelSupportRequest = {
   employeeId: string;
   employeeName: string | null;
   destinationCountry: string;
+  destinationCountries: string[];
   embassyName: string;
   embassyAddress: string | null;
   travelStartDate: string;
@@ -23,13 +24,17 @@ export type TravelSupportRequest = {
   rejectedBy: string | null;
   rejectedAt: string | null;
   rejectionReason: string | null;
+  hrDraftedBy: string | null;
+  hrDraftedAt: string | null;
+  letterBody: string | null;
   documentPath: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export type TravelSupportCreatePayload = {
-  destinationCountry: string;
+  destinationCountry?: string;
+  destinationCountries?: string[];
   embassyName: string;
   embassyAddress?: string;
   travelStartDate: string;
@@ -90,4 +95,13 @@ export type TravelSupportApprovePayload = {
   action: "approve";
   entityCountry: string;
   entityAddress: string;
+};
+
+export type TravelSupportHrDraftPayload = {
+  action: "hr_draft";
+  letterBody: string;
+};
+
+export type TravelSupportSubmitForSignaturePayload = {
+  action: "submit_for_signature";
 };

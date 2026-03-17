@@ -18,11 +18,13 @@ export default async function MyDocumentsPage() {
   }
 
   const isSuperAdmin = session.profile.roles.includes("SUPER_ADMIN");
+  const isHrAdmin = session.profile.roles.includes("HR_ADMIN");
 
   return (
     <MyDocumentsClient
       currentUserId={session.profile.id}
       isSuperAdmin={isSuperAdmin}
+      isHrAdmin={isHrAdmin}
     />
   );
 }

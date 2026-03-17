@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { createBulkNotifications } from "../../../../lib/notifications/service";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
+import { logAudit } from "../../../../lib/audit";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../types/auth";
 import type {
@@ -31,18 +32,22 @@ const travelSupportRowSchema = z.object({
   org_id: z.string().uuid(),
   employee_id: z.string().uuid(),
   destination_country: z.string(),
+  destination_countries: z.array(z.string()).default([]),
   embassy_name: z.string(),
   embassy_address: z.string().nullable(),
   travel_start_date: z.string(),
   travel_end_date: z.string(),
   purpose: z.string(),
   additional_notes: z.string().nullable(),
-  status: z.enum(["pending", "approved", "rejected"]),
+  status: z.enum(["pending", "hr_draft", "pending_signature", "approved", "rejected"]),
   approved_by: z.string().uuid().nullable(),
   approved_at: z.string().nullable(),
   rejected_by: z.string().uuid().nullable(),
   rejected_at: z.string().nullable(),
   rejection_reason: z.string().nullable(),
+  hr_drafted_by: z.string().uuid().nullable(),
+  hr_drafted_at: z.string().nullable(),
+  letter_body: z.string().nullable(),
   document_path: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string()
@@ -53,6 +58,7 @@ const selectColumns = [
   "org_id",
   "employee_id",
   "destination_country",
+  "destination_countries",
   "embassy_name",
   "embassy_address",
   "travel_start_date",
@@ -65,6 +71,9 @@ const selectColumns = [
   "rejected_by",
   "rejected_at",
   "rejection_reason",
+  "hr_drafted_by",
+  "hr_drafted_at",
+  "letter_body",
   "document_path",
   "created_at",
   "updated_at"
@@ -85,6 +94,9 @@ function toTravelSupportRequest(
     employeeId: row.employee_id,
     employeeName: employee?.full_name ?? null,
     destinationCountry: row.destination_country,
+    destinationCountries: row.destination_countries.length > 0
+      ? row.destination_countries
+      : [row.destination_country],
     embassyName: row.embassy_name,
     embassyAddress: row.embassy_address,
     travelStartDate: row.travel_start_date,
@@ -98,6 +110,9 @@ function toTravelSupportRequest(
     rejectedBy: row.rejected_by,
     rejectedAt: row.rejected_at,
     rejectionReason: row.rejection_reason,
+    hrDraftedBy: row.hr_drafted_by,
+    hrDraftedAt: row.hr_drafted_at,
+    letterBody: row.letter_body,
     documentPath: row.document_path,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -107,14 +122,18 @@ function toTravelSupportRequest(
 /* ── Validation ── */
 
 const createPayloadSchema = z.object({
-  destinationCountry: z.string().trim().min(1, "Destination country is required.").max(200),
+  destinationCountry: z.string().trim().min(1).max(200).optional(),
+  destinationCountries: z.array(z.string().trim().min(1).max(200)).min(1, "At least one destination country is required.").optional(),
   embassyName: z.string().trim().min(1, "Embassy/organization name is required.").max(500),
   embassyAddress: z.string().trim().max(1000).optional(),
   travelStartDate: z.iso.date(),
   travelEndDate: z.iso.date(),
   purpose: z.string().trim().min(1, "Purpose of travel is required.").max(2000),
   additionalNotes: z.string().trim().max(2000).optional()
-});
+}).refine(
+  (data) => (data.destinationCountries && data.destinationCountries.length > 0) || (data.destinationCountry && data.destinationCountry.length > 0),
+  { message: "At least one destination country is required." }
+);
 
 /* ── GET: List travel support requests ── */
 
@@ -134,6 +153,8 @@ export async function GET(request: Request) {
 
   const supabase = await createSupabaseServerClient();
   const isSuperAdmin = session.profile.roles.includes("SUPER_ADMIN");
+  const isHrAdmin = session.profile.roles.includes("HR_ADMIN");
+  const isAdmin = isSuperAdmin || isHrAdmin;
 
   const { searchParams } = new URL(request.url);
   const statusFilter = searchParams.get("status");
@@ -145,11 +166,13 @@ export async function GET(request: Request) {
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
-  if (!isSuperAdmin) {
+  if (!isAdmin) {
     query = query.eq("employee_id", session.profile.id);
   }
 
-  if (statusFilter && ["pending", "approved", "rejected"].includes(statusFilter)) {
+  const validStatuses = ["pending", "hr_draft", "pending_signature", "approved", "rejected"];
+
+  if (statusFilter && validStatuses.includes(statusFilter)) {
     query = query.eq("status", statusFilter);
   }
 
@@ -271,11 +294,18 @@ export async function POST(request: Request) {
 
   const supabase = await createSupabaseServerClient();
 
+  // Resolve destination countries (support both old singular and new plural)
+  const countries: string[] = parsed.data.destinationCountries && parsed.data.destinationCountries.length > 0
+    ? parsed.data.destinationCountries.map((c) => c.trim())
+    : [parsed.data.destinationCountry?.trim() ?? ""];
+  const primaryCountry = countries[0] ?? "";
+
   const insertPayload = {
     id: crypto.randomUUID(),
     org_id: session.profile.org_id,
     employee_id: session.profile.id,
-    destination_country: parsed.data.destinationCountry.trim(),
+    destination_country: primaryCountry,
+    destination_countries: countries,
     embassy_name: parsed.data.embassyName.trim(),
     embassy_address: parsed.data.embassyAddress?.trim() || null,
     travel_start_date: parsed.data.travelStartDate,
@@ -320,27 +350,64 @@ export async function POST(request: Request) {
 
   const travelRequest = toTravelSupportRequest(parsedRow.data, profileById);
 
-  // Notify SUPER_ADMIN users
+  // Audit log
+  await logAudit({
+    action: "created",
+    tableName: "travel_support_requests",
+    recordId: insertPayload.id,
+    newValue: { status: "pending", destination_countries: countries }
+  });
+
+  // Notify HR_ADMIN users (they draft the letter next)
   const serviceClient = createSupabaseServiceRoleClient();
-  const { data: adminProfiles } = await serviceClient
+  const { data: hrAdminProfiles } = await serviceClient
+    .from("profiles")
+    .select("id")
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
+    .contains("roles", ["HR_ADMIN"]);
+
+  if (hrAdminProfiles && hrAdminProfiles.length > 0) {
+    const hrAdminIds = hrAdminProfiles
+      .map((p: { id: string }) => p.id)
+      .filter((id: string) => id !== session.profile!.id);
+
+    if (hrAdminIds.length > 0) {
+      await createBulkNotifications({
+        orgId: session.profile.org_id,
+        userIds: hrAdminIds,
+        type: "travel_letter_submitted",
+        title: `Travel support request from ${session.profile.full_name}`,
+        body: `${session.profile.full_name} has requested a travel support letter for ${countries.join(", ")}.`,
+        link: "/me/documents"
+      });
+    }
+  }
+
+  // Also notify SUPER_ADMIN users
+  const { data: superAdminProfiles } = await serviceClient
     .from("profiles")
     .select("id")
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
     .contains("roles", ["SUPER_ADMIN"]);
 
-  if (adminProfiles && adminProfiles.length > 0) {
-    const adminIds = adminProfiles
+  if (superAdminProfiles && superAdminProfiles.length > 0) {
+    const superAdminIds = superAdminProfiles
       .map((p: { id: string }) => p.id)
       .filter((id: string) => id !== session.profile!.id);
 
-    if (adminIds.length > 0) {
+    // Exclude IDs already notified as HR_ADMIN
+    const hrSet = new Set(hrAdminProfiles?.map((p: { id: string }) => p.id) ?? []);
+    const uniqueSuperAdminIds = superAdminIds.filter((id: string) => !hrSet.has(id));
+
+    if (uniqueSuperAdminIds.length > 0) {
       await createBulkNotifications({
         orgId: session.profile.org_id,
-        userIds: adminIds,
+        userIds: uniqueSuperAdminIds,
         type: "travel_letter_submitted",
         title: `Travel support request from ${session.profile.full_name}`,
-        body: `${session.profile.full_name} has requested a travel support letter for ${parsed.data.destinationCountry}.`,
+        body: `${session.profile.full_name} has requested a travel support letter for ${countries.join(", ")}.`,
         link: "/me/documents"
       });
     }

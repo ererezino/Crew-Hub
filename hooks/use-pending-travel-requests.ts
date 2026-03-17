@@ -15,6 +15,12 @@ type UsePendingTravelRequestsResult = {
   refresh: () => void;
 };
 
+/**
+ * Fetches travel support requests that need admin action.
+ * HR_ADMIN sees: pending (needs drafting)
+ * SUPER_ADMIN sees: pending_signature (needs signing), plus pending for direct approval
+ * The component handles filtering by role.
+ */
 export function usePendingTravelRequests(): UsePendingTravelRequestsResult {
   const [requests, setRequests] = useState<TravelSupportRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -29,7 +35,8 @@ export function usePendingTravelRequests(): UsePendingTravelRequestsResult {
       setErrorMessage(null);
 
       try {
-        const response = await fetchWithRetry("/api/v1/travel-support?status=pending", abortController.signal);
+        // Fetch all non-terminal requests for admin views
+        const response = await fetchWithRetry("/api/v1/travel-support", abortController.signal);
 
         const payload = (await response.json()) as TravelSupportListResponse;
 
@@ -41,7 +48,11 @@ export function usePendingTravelRequests(): UsePendingTravelRequestsResult {
           return;
         }
 
-        setRequests(payload.data.requests);
+        // Filter to actionable statuses: pending, hr_draft, pending_signature
+        const actionable = payload.data.requests.filter(
+          (r) => ["pending", "hr_draft", "pending_signature"].includes(r.status)
+        );
+        setRequests(actionable);
       } catch (error) {
         if (abortController.signal.aborted) return;
         setRequests([]);

@@ -41,6 +41,7 @@ type AppLocale = "en" | "fr";
 type MyDocumentsClientProps = {
   currentUserId: string;
   isSuperAdmin: boolean;
+  isHrAdmin: boolean;
 };
 
 type MyDocumentsTab = "all" | "id_document" | "tax_form" | "travel_letters";
@@ -133,6 +134,10 @@ function getTravelStatusTone(status: TravelSupportRequest["status"]): StatusTone
       return "success";
     case "rejected":
       return "error";
+    case "hr_draft":
+      return "draft";
+    case "pending_signature":
+      return "processing";
     case "pending":
     default:
       return "pending";
@@ -154,7 +159,7 @@ function MyDocumentsSkeleton() {
   );
 }
 
-export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsClientProps) {
+export function MyDocumentsClient({ currentUserId, isSuperAdmin, isHrAdmin }: MyDocumentsClientProps) {
   const t = useTranslations('myDocuments');
   const tCommon = useTranslations('common');
   const locale = useLocale() as AppLocale;
@@ -220,6 +225,13 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
   const [rejectionReason, setRejectionReason] = useState("");
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectionError, setRejectionError] = useState<string | null>(null);
+
+  // HR draft state
+  const [draftTarget, setDraftTarget] = useState<TravelSupportRequest | null>(null);
+  const [draftLetterBody, setDraftLetterBody] = useState("");
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [isSubmittingForSignature, setIsSubmittingForSignature] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   const visibleDocuments = useMemo(() => {
     if (activeTab === "travel_letters") return [];
@@ -368,8 +380,15 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
       setIsSubmittingTravel(true);
       setTravelFormError(null);
 
+      // Parse comma-separated countries into an array
+      const countries = travelForm.destinationCountry
+        .split(",")
+        .map((c) => c.trim())
+        .filter((c) => c.length > 0);
+
       const payload: TravelSupportCreatePayload = {
-        destinationCountry: travelForm.destinationCountry.trim(),
+        destinationCountries: countries,
+        destinationCountry: countries[0] ?? travelForm.destinationCountry.trim(),
         embassyName: travelForm.embassyName.trim(),
         embassyAddress: travelForm.embassyAddress.trim() || undefined,
         travelStartDate: travelForm.travelStartDate,
@@ -559,6 +578,96 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
     [rejectionTarget, rejectionReason, refreshPending, refreshTravel, showToast]
   );
 
+  // HR: open draft panel
+  const openDraftPanel = useCallback((req: TravelSupportRequest) => {
+    setDraftTarget(req);
+    setDraftLetterBody(req.letterBody ?? "");
+    setDraftError(null);
+  }, []);
+
+  const handleSaveDraft = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+
+      if (!draftTarget) return;
+
+      setIsSavingDraft(true);
+      setDraftError(null);
+
+      try {
+        const response = await fetch(`/api/v1/travel-support/${draftTarget.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "hr_draft",
+            letterBody: draftLetterBody.trim()
+          })
+        });
+
+        const result = (await response.json()) as TravelSupportUpdateResponse;
+
+        if (!response.ok || !result.data) {
+          setDraftError(result.error?.message ?? t('toast.unableToSaveDraft'));
+          return;
+        }
+
+        showToast("success", t('toast.travelDraftSaved'));
+        refreshPending();
+        refreshTravel();
+        // Keep panel open so user can continue editing or submit for signature
+        setDraftTarget(result.data.request);
+        setDraftLetterBody(result.data.request.letterBody ?? "");
+      } catch (error) {
+        setDraftError(
+          error instanceof Error ? error.message : t('toast.unableToSaveDraft')
+        );
+      } finally {
+        setIsSavingDraft(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
+    [draftTarget, draftLetterBody, refreshPending, refreshTravel, showToast]
+  );
+
+  const handleSubmitForSignature = useCallback(
+    async () => {
+      if (!draftTarget) return;
+
+      setIsSubmittingForSignature(true);
+      setDraftError(null);
+
+      try {
+        const response = await fetch(`/api/v1/travel-support/${draftTarget.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "submit_for_signature"
+          })
+        });
+
+        const result = (await response.json()) as TravelSupportUpdateResponse;
+
+        if (!response.ok || !result.data) {
+          setDraftError(result.error?.message ?? t('toast.unableToSubmitForSignature'));
+          return;
+        }
+
+        setDraftTarget(null);
+        showToast("success", t('toast.travelSubmittedForSignature'));
+        refreshPending();
+        refreshTravel();
+      } catch (error) {
+        setDraftError(
+          error instanceof Error ? error.message : t('toast.unableToSubmitForSignature')
+        );
+      } finally {
+        setIsSubmittingForSignature(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- t is a stable ref from useTranslations
+    [draftTarget, refreshPending, refreshTravel, showToast]
+  );
+
   const countryOptions = useMemo(() => {
     const saved = new Set(letterheadEntities.map((e) => e.country));
     const all = new Set([...ENTITY_COUNTRIES, ...saved]);
@@ -567,6 +676,17 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
 
   const showDocumentsView = activeTab !== "travel_letters";
   const showTravelView = activeTab === "travel_letters";
+  const isAdmin = isSuperAdmin || isHrAdmin;
+
+  // Split pending requests for admin views
+  const hrDraftRequests = useMemo(
+    () => pendingRequests.filter((r) => r.status === "pending" || r.status === "hr_draft"),
+    [pendingRequests]
+  );
+  const signatureRequests = useMemo(
+    () => pendingRequests.filter((r) => r.status === "pending_signature"),
+    [pendingRequests]
+  );
 
   return (
     <>
@@ -804,7 +924,9 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                   <header className="travel-letter-card-header">
                     <div className="travel-letter-card-title-row">
                       <h3 className="travel-letter-card-title">
-                        {req.destinationCountry}
+                        {req.destinationCountries.length > 1
+                          ? req.destinationCountries.join(", ")
+                          : req.destinationCountry}
                       </h3>
                       <StatusBadge tone={getTravelStatusTone(req.status)}>
                         {tdCommon(`status.${req.status}`)}
@@ -866,22 +988,27 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         </>
       ) : null}
 
-      {/* ── Admin: Pending Approvals ── */}
-      {isSuperAdmin && showTravelView && !isPendingLoading && pendingRequests.length > 0 ? (
-        <section className="admin-approvals-section" aria-label={t('adminApprovals.title')}>
-          <h2 className="admin-approvals-heading">{t('adminApprovals.title')}</h2>
+      {/* ── HR Admin: Requests Needing Draft ── */}
+      {isAdmin && showTravelView && !isPendingLoading && hrDraftRequests.length > 0 ? (
+        <section className="admin-approvals-section" aria-label={t('hrDraftSection.title')}>
+          <h2 className="admin-approvals-heading">{t('hrDraftSection.title')}</h2>
           <p className="admin-approvals-description">
-            {t('adminApprovals.description')}
+            {t('hrDraftSection.description')}
           </p>
           <div className="travel-letter-list">
-            {pendingRequests.map((req) => (
-              <article key={`pending-${req.id}`} className="travel-letter-card travel-letter-card-pending">
+            {hrDraftRequests.map((req) => (
+              <article key={`draft-${req.id}`} className="travel-letter-card travel-letter-card-pending">
                 <header className="travel-letter-card-header">
                   <div className="travel-letter-card-title-row">
                     <h3 className="travel-letter-card-title">
-                      {req.employeeName ?? "Employee"} &rarr; {req.destinationCountry}
+                      {req.employeeName ?? "Employee"} &rarr;{" "}
+                      {req.destinationCountries.length > 1
+                        ? req.destinationCountries.join(", ")
+                        : req.destinationCountry}
                     </h3>
-                    <StatusBadge tone="pending">{tCommon('status.pending')}</StatusBadge>
+                    <StatusBadge tone={getTravelStatusTone(req.status)}>
+                      {tdCommon(`status.${req.status}`)}
+                    </StatusBadge>
                   </div>
                   <p className="travel-letter-card-subtitle">{req.embassyName}</p>
                 </header>
@@ -909,17 +1036,82 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
                 <div className="travel-letter-card-actions">
                   <button
                     type="button"
-                    className="button button-success-outline"
-                    onClick={() => openApprovePanel(req)}
+                    className="button button-accent"
+                    onClick={() => openDraftPanel(req)}
                   >
-                    {tCommon('status.approved')}
+                    {req.status === "hr_draft" ? t('draftPanel.saveDraft') : t('draftPanel.title')}
                   </button>
                   <button
                     type="button"
                     className="button button-danger-outline"
                     onClick={() => openRejectPanel(req)}
                   >
-                    {tCommon('status.rejected')}
+                    {t('rejectPanel.rejectRequest')}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ── SUPER_ADMIN: Pending Signature ── */}
+      {isSuperAdmin && showTravelView && !isPendingLoading && signatureRequests.length > 0 ? (
+        <section className="admin-approvals-section" aria-label={t('signatureSection.title')}>
+          <h2 className="admin-approvals-heading">{t('signatureSection.title')}</h2>
+          <p className="admin-approvals-description">
+            {t('signatureSection.description')}
+          </p>
+          <div className="travel-letter-list">
+            {signatureRequests.map((req) => (
+              <article key={`sig-${req.id}`} className="travel-letter-card travel-letter-card-pending">
+                <header className="travel-letter-card-header">
+                  <div className="travel-letter-card-title-row">
+                    <h3 className="travel-letter-card-title">
+                      {req.employeeName ?? "Employee"} &rarr;{" "}
+                      {req.destinationCountries.length > 1
+                        ? req.destinationCountries.join(", ")
+                        : req.destinationCountry}
+                    </h3>
+                    <StatusBadge tone="processing">{tdCommon('status.pending_signature')}</StatusBadge>
+                  </div>
+                  <p className="travel-letter-card-subtitle">{req.embassyName}</p>
+                </header>
+
+                <div className="travel-letter-card-details">
+                  <div className="travel-letter-card-detail">
+                    <span className="travel-letter-detail-label">{t('travelLetters.travelDates')}</span>
+                    <span>
+                      {formatTravelDate(req.travelStartDate, locale)} &ndash;{" "}
+                      {formatTravelDate(req.travelEndDate, locale)}
+                    </span>
+                  </div>
+                  <div className="travel-letter-card-detail">
+                    <span className="travel-letter-detail-label">{t('travelLetters.purpose')}</span>
+                    <span>{req.purpose}</span>
+                  </div>
+                  {req.letterBody ? (
+                    <div className="travel-letter-card-detail">
+                      <span className="travel-letter-detail-label">{t('approvePanel.letterPreviewLabel')}</span>
+                      <span className="travel-letter-body-preview">{req.letterBody.slice(0, 200)}{req.letterBody.length > 200 ? "..." : ""}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="travel-letter-card-actions">
+                  <button
+                    type="button"
+                    className="button button-success-outline"
+                    onClick={() => openApprovePanel(req)}
+                  >
+                    {t('approvePanel.approveAndGenerate')}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-danger-outline"
+                    onClick={() => openRejectPanel(req)}
+                  >
+                    {t('rejectPanel.rejectRequest')}
                   </button>
                 </div>
               </article>
@@ -934,7 +1126,12 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         title={t('approvePanel.title')}
         description={
           approvalTarget
-            ? t('approvePanel.description', { employeeName: approvalTarget.employeeName ?? "Employee", country: approvalTarget.destinationCountry })
+            ? t('approvePanel.description', {
+                employeeName: approvalTarget.employeeName ?? "Employee",
+                country: approvalTarget.destinationCountries.length > 1
+                  ? approvalTarget.destinationCountries.join(", ")
+                  : approvalTarget.destinationCountry
+              })
             : ""
         }
         onClose={() => setApprovalTarget(null)}
@@ -942,6 +1139,15 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         <form className="slide-panel-form-wrapper" onSubmit={handleApprove} noValidate>
           {approvalError ? (
             <div className="form-error-banner">{approvalError}</div>
+          ) : null}
+
+          {approvalTarget?.letterBody ? (
+            <div className="form-field">
+              <span className="form-label">{t('approvePanel.letterPreviewLabel')}</span>
+              <div className="travel-letter-body-preview form-static-text">
+                {approvalTarget.letterBody}
+              </div>
+            </div>
           ) : null}
 
           <label className="form-field" htmlFor="entity-country">
@@ -1002,7 +1208,12 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         title={t('rejectPanel.title')}
         description={
           rejectionTarget
-            ? t('rejectPanel.description', { employeeName: rejectionTarget.employeeName ?? "Employee", country: rejectionTarget.destinationCountry })
+            ? t('rejectPanel.description', {
+                employeeName: rejectionTarget.employeeName ?? "Employee",
+                country: rejectionTarget.destinationCountries.length > 1
+                  ? rejectionTarget.destinationCountries.join(", ")
+                  : rejectionTarget.destinationCountry
+              })
             : ""
         }
         onClose={() => setRejectionTarget(null)}
@@ -1045,6 +1256,87 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
         </form>
       </SlidePanel>
 
+      {/* ── HR: Draft Panel ── */}
+      <SlidePanel
+        isOpen={draftTarget !== null}
+        title={t('draftPanel.title')}
+        description={
+          draftTarget
+            ? t('draftPanel.description', {
+                employeeName: draftTarget.employeeName ?? "Employee",
+                country: draftTarget.destinationCountries.length > 1
+                  ? draftTarget.destinationCountries.join(", ")
+                  : draftTarget.destinationCountry
+              })
+            : ""
+        }
+        onClose={() => setDraftTarget(null)}
+      >
+        <form className="slide-panel-form-wrapper" onSubmit={handleSaveDraft} noValidate>
+          {draftError ? (
+            <div className="form-error-banner">{draftError}</div>
+          ) : null}
+
+          <div className="travel-letter-card-details">
+            <div className="travel-letter-card-detail">
+              <span className="travel-letter-detail-label">{t('travelLetters.travelDates')}</span>
+              <span>
+                {draftTarget ? formatTravelDate(draftTarget.travelStartDate, locale) : ""} &ndash;{" "}
+                {draftTarget ? formatTravelDate(draftTarget.travelEndDate, locale) : ""}
+              </span>
+            </div>
+            <div className="travel-letter-card-detail">
+              <span className="travel-letter-detail-label">{t('travelLetters.purpose')}</span>
+              <span>{draftTarget?.purpose}</span>
+            </div>
+          </div>
+
+          <label className="form-field" htmlFor="draft-letter-body">
+            <span className="form-label">{t('draftPanel.letterBody')}</span>
+            <textarea
+              id="draft-letter-body"
+              className="form-input"
+              rows={12}
+              required
+              maxLength={10000}
+              placeholder={t('draftPanel.letterBodyPlaceholder')}
+              value={draftLetterBody}
+              onChange={(e) => setDraftLetterBody(e.currentTarget.value)}
+            />
+            <span className="form-hint">
+              {t('draftPanel.letterBodyHint')}
+            </span>
+          </label>
+
+          <div className="slide-panel-actions">
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => setDraftTarget(null)}
+            >
+              {tCommon('cancel')}
+            </button>
+            <button
+              type="submit"
+              className="button"
+              disabled={isSavingDraft || !draftLetterBody.trim()}
+            >
+              {isSavingDraft ? t('draftPanel.saving') : t('draftPanel.saveDraft')}
+            </button>
+            {draftTarget?.status === "hr_draft" && draftTarget?.letterBody ? (
+              <button
+                type="button"
+                className="button button-accent"
+                disabled={isSubmittingForSignature || !draftLetterBody.trim()}
+                onClick={handleSubmitForSignature}
+              >
+                {isSubmittingForSignature ? t('draftPanel.submittingForSignature') : t('draftPanel.submitForSignature')}
+              </button>
+            ) : null}
+          </div>
+        </form>
+      </SlidePanel>
+
       {/* ── Upload Panel ── */}
       {isPanelOpen ? (
         <DocumentUploadPanel
@@ -1073,17 +1365,18 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin }: MyDocumentsCl
           ) : null}
 
           <label className="form-field" htmlFor="travel-destination">
-            <span className="form-label">{t('requestPanel.destinationCountry')}</span>
+            <span className="form-label">{t('requestPanel.destinationCountries')}</span>
             <input
               id="travel-destination"
               className="form-input"
               type="text"
               required
-              maxLength={200}
+              maxLength={500}
               placeholder={t('requestPanel.destinationPlaceholder')}
               value={travelForm.destinationCountry}
               onChange={(e) => handleTravelFormChange("destinationCountry", e.currentTarget.value)}
             />
+            <span className="form-hint">{t('requestPanel.destinationCountriesHint')}</span>
           </label>
 
           <label className="form-field" htmlFor="travel-embassy">
