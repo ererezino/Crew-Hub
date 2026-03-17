@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { DOCUMENT_BUCKET_NAME } from "../../../../../../../lib/documents";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../../types/auth";
 import type { PaymentStatementSignedUrlResponseData } from "../../../../../../../types/payslips";
 
@@ -117,7 +118,8 @@ export async function GET(request: Request, context: RouteContext) {
         }
       : undefined;
 
-  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+  const storageClient = createSupabaseServiceRoleClient();
+  const { data: signedUrlData, error: signedUrlError } = await storageClient.storage
     .from(DOCUMENT_BUCKET_NAME)
     .createSignedUrl(payslipRow.file_path, query.expiresIn, signedUrlOptions);
 

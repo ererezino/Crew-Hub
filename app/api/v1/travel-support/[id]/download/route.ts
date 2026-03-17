@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { DOCUMENT_BUCKET_NAME } from "../../../../../../lib/documents";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
 import type { TravelSupportDownloadResponseData } from "../../../../../../types/travel-support";
 
@@ -131,11 +132,15 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const query = parsedQuery.data;
-  const downloadName = `travel-support-letter-${row.destination_country.toLowerCase().replace(/\s+/g, "-")}.pdf`;
+  const countries = row.destination_countries?.length
+    ? row.destination_countries.join("-").toLowerCase().replace(/\s+/g, "-")
+    : row.destination_country.toLowerCase().replace(/\s+/g, "-");
+  const downloadName = `travel-support-letter-${countries}.pdf`;
   const signedUrlOptions =
     query.usage === "download" ? { download: downloadName } : undefined;
 
-  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+  const storageClient = createSupabaseServiceRoleClient();
+  const { data: signedUrlData, error: signedUrlError } = await storageClient.storage
     .from(DOCUMENT_BUCKET_NAME)
     .createSignedUrl(row.document_path, query.expiresIn, signedUrlOptions);
 

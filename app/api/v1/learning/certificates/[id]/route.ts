@@ -4,6 +4,7 @@ import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { DOCUMENT_BUCKET_NAME } from "../../../../../../lib/documents";
 import { canManageLearningAssignments } from "../../../../../../lib/learning";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { LearningCertificateResponseData } from "../../../../../../types/learning";
 import { buildMeta, jsonResponse } from "../../_helpers";
 
@@ -115,7 +116,8 @@ export async function GET(
         }
       : undefined;
 
-  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+  const storageClient = createSupabaseServiceRoleClient();
+  const { data: signedUrlData, error: signedUrlError } = await storageClient.storage
     .from(DOCUMENT_BUCKET_NAME)
     .createSignedUrl(assignmentRow.certificate_url, query.expiresIn, signedUrlOptions);
 

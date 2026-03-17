@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { RECEIPTS_BUCKET_NAME } from "../../../../../../lib/expenses";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ExpenseReceiptSignedUrlResponseData } from "../../../../../../types/expenses";
 import { buildMeta, jsonResponse } from "../../_helpers";
 
@@ -76,7 +77,8 @@ export async function GET(
   }
 
   const expiresInSeconds = 60;
-  const { data: signedUrlResult, error: signedUrlError } = await supabase.storage
+  const storageClient = createSupabaseServiceRoleClient();
+  const { data: signedUrlResult, error: signedUrlError } = await storageClient.storage
     .from(RECEIPTS_BUCKET_NAME)
     .createSignedUrl(parsedExpense.data.receipt_file_path, expiresInSeconds);
 

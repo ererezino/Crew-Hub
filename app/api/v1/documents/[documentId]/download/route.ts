@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { DOCUMENT_BUCKET_NAME } from "../../../../../../lib/documents";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
 import type { DocumentSignedUrlResponseData } from "../../../../../../types/documents";
 
@@ -106,7 +107,8 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const expiresIn = parsedQuery.data.expiresIn;
-  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+  const storageClient = createSupabaseServiceRoleClient();
+  const { data: signedUrlData, error: signedUrlError } = await storageClient.storage
     .from(DOCUMENT_BUCKET_NAME)
     .createSignedUrl(documentRow.file_path, expiresIn);
 
