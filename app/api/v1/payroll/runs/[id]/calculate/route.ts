@@ -373,24 +373,41 @@ export async function POST(
         );
         const payCurrency = normalizeCurrencyCode(employee.primary_currency ?? "USD");
 
-        const calculated = await calculatePayrollItem({
-          employee: {
-            id: employee.id,
-            org_id: profile.org_id,
-            payroll_mode: employee.payroll_mode,
-            country_code: employee.country_code
-          },
-          monthly_gross_amount: grossAmount,
-          monthly_base_salary_amount: baseSalaryAmount,
-          currency,
-          allowances: normalizedAllowances.map((allowance) => ({
-            label: allowance.label,
-            amount: allowance.amount,
-            currency: allowance.currency,
-            is_taxable: allowance.isTaxable
-          })),
-          effective_date: parsedRun.data.pay_period_end
-        });
+        let calculated: Awaited<ReturnType<typeof calculatePayrollItem>>;
+        let calcError: string | null = null;
+
+        try {
+          calculated = await calculatePayrollItem({
+            employee: {
+              id: employee.id,
+              org_id: profile.org_id,
+              payroll_mode: employee.payroll_mode,
+              country_code: employee.country_code
+            },
+            monthly_gross_amount: grossAmount,
+            monthly_base_salary_amount: baseSalaryAmount,
+            currency,
+            allowances: normalizedAllowances.map((allowance) => ({
+              label: allowance.label,
+              amount: allowance.amount,
+              currency: allowance.currency,
+              is_taxable: allowance.isTaxable
+            })),
+            effective_date: parsedRun.data.pay_period_end
+          });
+        } catch (err) {
+          calcError = err instanceof Error ? err.message : String(err);
+          calculated = {
+            gross_amount: grossAmount,
+            deductions: [],
+            employer_contributions: [],
+            total_deductions: 0,
+            total_employer_contributions: 0,
+            net_amount: grossAmount,
+            withholding_applied: true,
+            withholding_note: calcError
+          };
+        }
 
         const mappedDeductions = calculated.deductions.map((row) => ({
           ruleType: row.rule_type,
@@ -417,6 +434,10 @@ export async function POST(
 
         if (!compensation) {
           flagReasons.push("No compensation record");
+        }
+
+        if (calcError) {
+          flagReasons.push(`Calculation error: ${calcError}`);
         }
 
         if (

@@ -187,6 +187,20 @@ function absoluteAmount(amount: number | null): number {
   return Math.abs(amount);
 }
 
+/** Map snake_case PayrollRunStatus → camelCase i18n key under statusTimeline */
+function statusToTimelineKey(status: PayrollRunStatus): string {
+  const map: Record<string, string> = {
+    draft: "draft",
+    calculated: "calculated",
+    pending_first_approval: "pendingFirstApproval",
+    pending_final_approval: "pendingFinalApproval",
+    approved: "approved",
+    processing: "processing",
+    completed: "completed",
+  };
+  return map[status] ?? status;
+}
+
 function summarizeStatusStep(
   runStatus: PayrollRunStatus
 ): {
@@ -857,7 +871,7 @@ export function PayrollRunDetailClient({
                 className={`payroll-status-step payroll-status-step-${step.state}`}
               >
                 <span className="payroll-status-step-dot" />
-                <p className="payroll-status-step-label">{td(`statusTimeline.${step.step}`)}</p>
+                <p className="payroll-status-step-label">{td(`statusTimeline.${statusToTimelineKey(step.step)}`)}</p>
               </article>
             ))}
           </section>
@@ -867,7 +881,7 @@ export function PayrollRunDetailClient({
               <p className="metric-label">{t('metrics.status')}</p>
               <p className="metric-value">
                 <StatusBadge tone={toneForPayrollRunStatus(runQuery.data.run.status)}>
-                  {td(`statusTimeline.${runQuery.data.run.status}`)}
+                  {td(`statusTimeline.${statusToTimelineKey(runQuery.data.run.status)}`)}
                 </StatusBadge>
               </p>
               <p className="metric-hint">
@@ -914,7 +928,7 @@ export function PayrollRunDetailClient({
             <div className="payroll-approval-header">
               <h2 className="section-title">{t('approval.title')}</h2>
               <StatusBadge tone={toneForPayrollRunStatus(runQuery.data.run.status)}>
-                {td(`statusTimeline.${runQuery.data.run.status}`)}
+                {td(`statusTimeline.${statusToTimelineKey(runQuery.data.run.status)}`)}
               </StatusBadge>
             </div>
 

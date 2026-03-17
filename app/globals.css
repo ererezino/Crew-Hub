@@ -8257,48 +8257,93 @@ button.att-img-link {
   height: 19rem;
 }
 
+/* Horizontal stepper timeline */
 .payroll-status-timeline {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
   background: var(--bg-canvas);
-  padding: var(--space-3);
-  display: grid;
-  gap: var(--space-2);
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .payroll-status-step {
-  display: grid;
-  justify-items: center;
-  gap: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Connecting line between steps */
+.payroll-status-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 0.34rem;
+  left: calc(50% + 0.5rem);
+  right: calc(-50% + 0.5rem);
+  height: 2px;
+  background: var(--border-default);
+}
+
+.payroll-status-step-complete:not(:last-child)::after {
+  background: var(--status-success-text);
 }
 
 .payroll-status-step-dot {
   width: 0.68rem;
   height: 0.68rem;
   border-radius: 999px;
-  border: 1px solid var(--border-default);
-  background: var(--bg-subtle);
+  border: 2px solid var(--border-default);
+  background: var(--bg-canvas);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .payroll-status-step-label {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--text-secondary);
+  margin-top: var(--space-1);
+  line-height: 1.3;
+  max-width: 5.5rem;
 }
 
 .payroll-status-step-complete .payroll-status-step-dot {
-  border-color: var(--status-success-border);
+  border-color: var(--status-success-text);
   background: var(--status-success-text);
 }
 
 .payroll-status-step-active .payroll-status-step-dot {
-  border-color: var(--status-info-border);
+  border-color: var(--status-info-text);
   background: var(--status-info-text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-info-text) 20%, transparent);
 }
 
 .payroll-status-step-active .payroll-status-step-label {
   color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* On narrow screens, give steps a minimum width so the stepper scrolls horizontally */
+@media (max-width: 640px) {
+  .payroll-status-timeline {
+    padding: var(--space-3) var(--space-2);
+    gap: 0;
+  }
+
+  .payroll-status-step {
+    min-width: 4.5rem;
+  }
+
+  .payroll-status-step-label {
+    font-size: 0.625rem;
+    max-width: 4rem;
+  }
 }
 
 .payroll-run-summary-grid {
@@ -10534,10 +10579,6 @@ button.att-img-link {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .payroll-status-timeline {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
   .payroll-item-detail-grid {
     grid-template-columns: 1fr;
   }
@@ -11022,10 +11063,6 @@ button.att-img-link {
   .expenses-report-row-copy {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .payroll-status-timeline {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .payroll-approval-header {

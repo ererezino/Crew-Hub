@@ -23,7 +23,7 @@ export async function calculatePayrollItem(
       total_deductions: 0,
       total_employer_contributions: 0,
       net_amount: params.monthly_gross_amount,
-      withholding_applied: false,
+      withholding_applied: true,
       withholding_note: "Contractor. Taxes not withheld."
     };
   }

@@ -48,7 +48,7 @@
       "pending": "Pending",
       "approved": "Approved",
       "rejected": "Rejected",
-      "hr_draft": "HR Draft",
+      "hr_draft": "Ops Draft",
       "pending_signature": "Pending Signature",
       "cancelled": "Cancelled",
       "draft": "Draft",
@@ -3040,7 +3040,7 @@
     "travelLetters": {
       "errorTitle": "Travel letters unavailable",
       "emptyTitle": "No travel letter requests",
-      "emptyDescription": "Request a travel support letter for your next trip. HR will draft the letter and a co-founder will sign it.",
+      "emptyDescription": "Request a travel support letter for your next trip. Operations will draft the letter and a co-founder will sign it.",
       "travelDates": "Travel dates",
       "purpose": "Purpose",
       "requested": "Requested",
@@ -3052,7 +3052,7 @@
     },
     "requestPanel": {
       "title": "Request Travel Support Letter",
-      "description": "Submit a request for a travel support letter. HR will draft the letter and a co-founder will review and sign it.",
+      "description": "Submit a request for a travel support letter. Operations will draft the letter and a co-founder will review and sign it.",
       "destinationCountries": "Destination Countries",
       "destinationCountriesHint": "Enter countries separated by commas (e.g. United Kingdom, France)",
       "destinationCountry": "Destination Country",
@@ -3082,7 +3082,7 @@
     },
     "signatureSection": {
       "title": "Pending Signature",
-      "description": "These travel support letters have been drafted by HR and are ready for your review and signature."
+      "description": "These travel support letters have been drafted by Operations and are ready for your review and signature."
     },
     "draftPanel": {
       "title": "Draft Travel Letter",
@@ -3119,7 +3119,7 @@
       "documentVersionUploaded": "Document version uploaded.",
       "documentUploaded": "Document uploaded.",
       "unableToOpenDocument": "Unable to open document.",
-      "travelRequestSubmitted": "Travel support letter request submitted. HR will draft the letter.",
+      "travelRequestSubmitted": "Travel support letter request submitted. Operations will draft the letter.",
       "unableToSubmitTravel": "Unable to submit travel letter request.",
       "unableToDownloadLetter": "Unable to download travel letter.",
       "travelDraftSaved": "Letter draft saved.",
