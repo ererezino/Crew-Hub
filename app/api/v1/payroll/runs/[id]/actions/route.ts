@@ -232,6 +232,31 @@ export async function POST(
         });
       }
 
+      /* Defense-in-depth: block submission if any items still need
+       * withholding calculation (e.g. imported from CSV but not yet
+       * recalculated).  The CSV import route already resets the run to
+       * "draft" to force recalculation, but this guards against any code
+       * path that could leave uncalculated items in a calculated run. */
+      const { count: uncalcCount } = await supabase
+        .from("payroll_items")
+        .select("id", { count: "exact", head: true })
+        .eq("payroll_run_id", runId)
+        .eq("org_id", profile.org_id)
+        .eq("withholding_applied", false)
+        .is("deleted_at", null);
+
+      if (uncalcCount && uncalcCount > 0) {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message:
+              "Some payroll items have not had withholding rules applied. Run Calculate before submitting."
+          },
+          meta: buildMeta()
+        });
+      }
+
       nextStatus = "pending_first_approval";
       nextFirstApprovedBy = null;
       nextFirstApprovedAt = null;

@@ -18448,6 +18448,31 @@ html.dark .crew-games-platform-game:hover {
   font-size: var(--text-xs);
 }
 
+.csv-import-conflict-warning {
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+.csv-import-overwrite-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  background: var(--color-error-bg, #fef2f2);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-error);
+  cursor: pointer;
+}
+
+.csv-import-overwrite-toggle input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 .csv-import-success {
   display: flex;
   flex-direction: column;

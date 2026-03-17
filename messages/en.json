@@ -5885,7 +5885,7 @@
     "committing": "Importing...",
     "commitImport": "Import {count, plural, one {# row} other {# rows}}",
     "commitSuccess": "Import complete",
-    "commitSuccessDescription": "Successfully imported {count, plural, one {# payroll row} other {# payroll rows}}. Run calculate to apply withholding rules.",
+    "commitSuccessDescription": "Successfully imported {count, plural, one {# payroll row} other {# payroll rows}}. The run has been reset to draft. You must run Calculate to apply withholding rules before the run can be submitted for approval.",
     "summary": {
       "totalRows": "Total rows",
       "valid": "Valid",
@@ -5896,8 +5896,9 @@
     "errorsFound": "{count, plural, one {# validation error} other {# validation errors}}",
     "andMoreErrors": "...and {count} more errors",
     "duplicatesFound": "{count, plural, one {# duplicate email} other {# duplicate emails}}",
-    "conflictsFound": "{count, plural, one {# existing item will be overwritten} other {# existing items will be overwritten}}",
-    "conflictsDescription": "These employees already have items in this payroll run. Importing will overwrite their existing data.",
+    "conflictsFound": "{count, plural, one {# conflict — existing item} other {# conflicts — existing items}}",
+    "conflictsBlockedDescription": "These employees already have payroll items in this run. Import is blocked by default. To proceed, you must explicitly confirm that you want to overwrite the existing data. This action cannot be undone.",
+    "confirmOverwrite": "I understand and want to overwrite the existing payroll items listed above.",
     "preview": {
       "employee": "Employee",
       "baseSalary": "Base salary",

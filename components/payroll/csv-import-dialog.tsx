@@ -103,6 +103,7 @@ export function CsvImportDialog({
       setIsCommitting(false);
       setErrorMessage(null);
       setPreviewData(null);
+      setOverwriteConfirmed(false);
     }
   }, [isOpen]);
 
@@ -168,6 +169,10 @@ export function CsvImportDialog({
     [file, runId, t]
   );
 
+  const [overwriteConfirmed, setOverwriteConfirmed] = useState(false);
+
+  const hasConflicts = (previewData?.summary.conflictCount ?? 0) > 0;
+
   const commitImport = useCallback(async () => {
     if (!file) {
       return;
@@ -180,8 +185,13 @@ export function CsvImportDialog({
       const formData = new FormData();
       formData.append("file", file);
 
+      const params = new URLSearchParams({ commit: "true" });
+      if (hasConflicts && overwriteConfirmed) {
+        params.set("overwrite", "true");
+      }
+
       const response = await fetch(
-        `/api/v1/payroll/runs/${runId}/import-csv?commit=true`,
+        `/api/v1/payroll/runs/${runId}/import-csv?${params.toString()}`,
         {
           method: "POST",
           body: formData
@@ -205,7 +215,7 @@ export function CsvImportDialog({
     } finally {
       setIsCommitting(false);
     }
-  }, [file, runId, t, onImportComplete]);
+  }, [file, runId, t, onImportComplete, hasConflicts, overwriteConfirmed]);
 
   const handleClose = () => {
     if (isUploading || isCommitting) {
@@ -391,18 +401,28 @@ export function CsvImportDialog({
             ) : null}
 
             {previewData.conflicts.length > 0 ? (
-              <details className="csv-import-errors-section">
+              <details className="csv-import-errors-section" open>
                 <summary className="csv-import-errors-summary">
-                  <StatusBadge tone="warning">
+                  <StatusBadge tone="error">
                     {t("conflictsFound", { count: previewData.conflicts.length })}
                   </StatusBadge>
                 </summary>
-                <p className="settings-card-description">{t("conflictsDescription")}</p>
+                <p className="settings-card-description csv-import-conflict-warning">
+                  {t("conflictsBlockedDescription")}
+                </p>
                 <ul className="csv-import-errors-list">
                   {previewData.conflicts.map((email) => (
                     <li key={`conflict-${email}`}>{email}</li>
                   ))}
                 </ul>
+                <label className="csv-import-overwrite-toggle">
+                  <input
+                    type="checkbox"
+                    checked={overwriteConfirmed}
+                    onChange={(e) => setOverwriteConfirmed(e.currentTarget.checked)}
+                  />
+                  <span>{t("confirmOverwrite")}</span>
+                </label>
               </details>
             ) : null}
 
@@ -496,11 +516,12 @@ export function CsvImportDialog({
               </button>
               <button
                 type="button"
-                className="button button-accent"
+                className={`button ${hasConflicts && overwriteConfirmed ? "button-danger" : "button-accent"}`}
                 onClick={commitImport}
                 disabled={
                   isCommitting ||
-                  previewData.summary.validCount === 0
+                  previewData.summary.validCount === 0 ||
+                  (hasConflicts && !overwriteConfirmed)
                 }
               >
                 {isCommitting

@@ -514,6 +514,22 @@ export async function POST(
     });
   }
 
+  /* Block commit when conflicts exist unless explicit overwrite is requested */
+  const allowOverwrite = url.searchParams.get("overwrite") === "true";
+  const conflictsExist = validRows.some((row) => row.hasConflict);
+
+  if (conflictsExist && !allowOverwrite) {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "CONFLICTS_REQUIRE_OVERWRITE",
+        message:
+          "Import would overwrite existing payroll items. Re-submit with explicit overwrite confirmation to proceed."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const serviceClient = createSupabaseServiceRoleClient();
 
   const itemsToUpsert = validRows.map((row) => {
@@ -599,7 +615,10 @@ export async function POST(
     });
   }
 
-  /* Update run employee count */
+  /* Update run: employee count + force status back to draft.
+   * Imported items have withholding_applied: false, so the run MUST be
+   * recalculated before it can be submitted for approval.  Resetting to
+   * "draft" makes this structurally impossible to bypass. */
   const { count: itemCount } = await serviceClient
     .from("payroll_items")
     .select("id", { count: "exact", head: true })
@@ -609,6 +628,7 @@ export async function POST(
   await serviceClient
     .from("payroll_runs")
     .update({
+      status: "draft",
       employee_count: itemCount ?? validRows.length
     })
     .eq("id", runId)
