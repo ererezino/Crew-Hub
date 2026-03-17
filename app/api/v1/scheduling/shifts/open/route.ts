@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import { parseInteger } from "../../../../../../lib/scheduling";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
@@ -71,6 +72,17 @@ export async function GET(request: Request) {
       error: {
         code: "UNAUTHORIZED",
         message: "You must be logged in to view open shifts."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!(await checkApiAccess("/scheduling", session.profile))) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You do not have access to scheduling."
       },
       meta: buildMeta()
     });

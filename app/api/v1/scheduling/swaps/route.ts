@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
 import { sendSwapRequestedEmail } from "../../../../../lib/notifications/email";
@@ -183,6 +184,17 @@ export async function GET(request: Request) {
     });
   }
 
+  if (!(await checkApiAccess("/scheduling", session.profile))) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You do not have access to scheduling."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const parsedQuery = querySchema.safeParse(
     Object.fromEntries(new URL(request.url).searchParams.entries())
   );
@@ -358,6 +370,17 @@ export async function POST(request: Request) {
       error: {
         code: "UNAUTHORIZED",
         message: "You must be logged in to request a shift swap."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!(await checkApiAccess("/scheduling", session.profile))) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You do not have access to scheduling."
       },
       meta: buildMeta()
     });

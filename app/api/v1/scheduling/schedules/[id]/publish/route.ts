@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkApiAccess } from "../../../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
 import { formatDateRange } from "../../../../../../../lib/datetime";
@@ -51,6 +52,17 @@ export async function POST(
       error: {
         code: "UNAUTHORIZED",
         message: "You must be logged in to publish schedules."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!(await checkApiAccess("/scheduling", session.profile))) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You do not have access to scheduling."
       },
       meta: buildMeta()
     });
