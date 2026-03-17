@@ -111,7 +111,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/the-crew");
+      const res = await fetch("/api/v1/the-crew", { cache: "no-store" });
       const payload = (await res.json()) as { data?: CrewListResponseData | null; error?: { message: string } | null };
       if (!res.ok || !payload.data) {
         setError(payload.error?.message ?? "Unable to load crew.");

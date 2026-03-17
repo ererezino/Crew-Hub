@@ -95,5 +95,5 @@ export async function GET() {
     data: { members, departmentCounts, totalCount: members.length },
     error: null,
     meta: buildMeta()
-  }, { "Cache-Control": "private, max-age=120, stale-while-revalidate=300" });
+  }, { "Cache-Control": "private, no-cache" });
 }
