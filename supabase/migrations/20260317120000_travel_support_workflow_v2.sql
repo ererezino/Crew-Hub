@@ -17,21 +17,26 @@ ALTER TABLE public.travel_support_requests
   ADD COLUMN IF NOT EXISTS letter_body TEXT;
 
 -- 4. Drop the old enum type constraint and replace with text + check
--- First, change the column type from enum to text
+-- Drop the default first (it may reference the enum type)
+ALTER TABLE public.travel_support_requests
+  ALTER COLUMN status DROP DEFAULT;
+
+-- Convert column from enum to text
 ALTER TABLE public.travel_support_requests
   ALTER COLUMN status TYPE TEXT USING status::TEXT;
 
--- Drop the old enum type (cascade drops nothing since the column is already text)
+-- Now safe to drop the old enum type
 DROP TYPE IF EXISTS travel_letter_status;
 
--- Add a check constraint for the expanded statuses
+-- Drop any old check constraint
 ALTER TABLE public.travel_support_requests
   DROP CONSTRAINT IF EXISTS travel_support_requests_status_check;
 
+-- Add a check constraint for the expanded statuses
 ALTER TABLE public.travel_support_requests
   ADD CONSTRAINT travel_support_requests_status_check
   CHECK (status IN ('pending', 'hr_draft', 'pending_signature', 'approved', 'rejected'));
 
--- 5. Default remains 'pending'
+-- 5. Restore default as 'pending'
 ALTER TABLE public.travel_support_requests
   ALTER COLUMN status SET DEFAULT 'pending';
