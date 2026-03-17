@@ -54,16 +54,10 @@ const ALL_ROLES = USER_ROLES as readonly UserRole[];
 const ADMIN_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"];
 const SUPER_ONLY: readonly UserRole[] = ["SUPER_ADMIN"];
 const SCHEDULING_ROLES: readonly UserRole[] = [
-  "EMPLOYEE",
-  "MANAGER",
-  "TEAM_LEAD",
-  "FINANCE_ADMIN",
   "HR_ADMIN",
   "SUPER_ADMIN"
 ];
 const SCHEDULING_MANAGE_ROLES: readonly UserRole[] = [
-  "MANAGER",
-  "TEAM_LEAD",
   "HR_ADMIN",
   "SUPER_ADMIN"
 ];

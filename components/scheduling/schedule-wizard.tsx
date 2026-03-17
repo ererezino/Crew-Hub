@@ -100,21 +100,21 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
   const currentStepIndex = STEPS.indexOf(step);
   const isCustomPeriod = months === 0;
 
-  // Auto-select Customer Success members the first time the roster step appears
-  const [csAutoSelected, setCsAutoSelected] = useState(false);
+  // Auto-select Operations (pilot) members the first time the roster step appears
+  const [pilotAutoSelected, setPilotAutoSelected] = useState(false);
 
-  if (step === "roster" && !csAutoSelected && rosterSelected.size === 0 && employees.length > 0) {
-    const csDept = "customer success";
+  if (step === "roster" && !pilotAutoSelected && rosterSelected.size === 0 && employees.length > 0) {
+    const pilotDept = "operations";
     const preselected = new Map<string, RosterSelection>();
     for (const emp of employees) {
-      if (emp.department?.toLowerCase() === csDept) {
+      if (emp.department?.toLowerCase() === pilotDept) {
         preselected.set(emp.id, { employeeId: emp.id, weekendHours: emp.weekendShiftHours });
       }
     }
     if (preselected.size > 0) {
       setRosterSelected(preselected);
     }
-    setCsAutoSelected(true);
+    setPilotAutoSelected(true);
   }
 
   const canProceed = useMemo(() => {
@@ -350,7 +350,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
       setCustomEndDate(getDefaultCustomEnd());
       setRosterSelected(new Map());
       setPreviewData(null);
-      setCsAutoSelected(false);
+      setPilotAutoSelected(false);
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -367,7 +367,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     setCustomEndDate(getDefaultCustomEnd());
     setRosterSelected(new Map());
     setPreviewData(null);
-    setCsAutoSelected(false);
+    setPilotAutoSelected(false);
     onClose();
   }, [onClose]);
 

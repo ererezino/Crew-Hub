@@ -26,17 +26,16 @@ type TeamSetupPanelProps = {
 };
 
 const WEEKEND_HOURS_OPTIONS: WeekendHourOption[] = ["8", "4", "3", "2"];
-const CUSTOMER_SUCCESS_DEPARTMENTS = new Set([
-  "customer success",
-  "customer support"
+const PILOT_DEPARTMENTS = new Set([
+  "operations"
 ]);
 
-function isCustomerSuccessDepartment(department: string | null | undefined): boolean {
+function isPilotDepartment(department: string | null | undefined): boolean {
   if (!department) {
     return false;
   }
 
-  return CUSTOMER_SUCCESS_DEPARTMENTS.has(department.trim().toLowerCase());
+  return PILOT_DEPARTMENTS.has(department.trim().toLowerCase());
 }
 
 function normalizeTeamSetupType(
@@ -96,11 +95,11 @@ export function TeamSetupPanel({
 
   const visibleMembers = useMemo(() => {
     const prioritized = [...activeMembers].sort((left, right) => {
-      const leftIsCustomerSuccess = isCustomerSuccessDepartment(left.department);
-      const rightIsCustomerSuccess = isCustomerSuccessDepartment(right.department);
+      const leftIsPilot = isPilotDepartment(left.department);
+      const rightIsPilot = isPilotDepartment(right.department);
 
-      if (leftIsCustomerSuccess !== rightIsCustomerSuccess) {
-        return leftIsCustomerSuccess ? -1 : 1;
+      if (leftIsPilot !== rightIsPilot) {
+        return leftIsPilot ? -1 : 1;
       }
 
       return left.fullName.localeCompare(right.fullName);
@@ -118,16 +117,16 @@ export function TeamSetupPanel({
     });
   }, [activeMembers, normalizedQuery]);
 
-  const { customerSuccessMembers, otherMembers } = useMemo(() => {
-    const customerSuccess = visibleMembers.filter((member) =>
-      isCustomerSuccessDepartment(member.department)
+  const { pilotMembers, otherMembers } = useMemo(() => {
+    const pilot = visibleMembers.filter((member) =>
+      isPilotDepartment(member.department)
     );
     const others = visibleMembers.filter(
-      (member) => !isCustomerSuccessDepartment(member.department)
+      (member) => !isPilotDepartment(member.department)
     );
 
     return {
-      customerSuccessMembers: customerSuccess,
+      pilotMembers: pilot,
       otherMembers: others
     };
   }, [visibleMembers]);
@@ -386,14 +385,14 @@ export function TeamSetupPanel({
         </div>
       ) : (
         <div className="schedule-team-setup-list">
-          {customerSuccessMembers.length > 0 ? (
+          {pilotMembers.length > 0 ? (
             <section className="schedule-team-setup-group">
               <div className="schedule-team-setup-group-header">
                 <h4 className="schedule-team-setup-group-title">
                   {t("teamSetup.customerSuccessGroup")}
                 </h4>
               </div>
-              {customerSuccessMembers.map((member) => renderMemberRow(member))}
+              {pilotMembers.map((member) => renderMemberRow(member))}
             </section>
           ) : null}
 

@@ -15402,6 +15402,377 @@ html.dark .dashboard-audit-table {
   line-height: 1.5;
 }
 
+/* Override section header row */
+.rac-section-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+/* Override toast */
+.rac-override-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-default);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-4);
+}
+
+.rac-override-toast-success {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border: 1px solid var(--status-success-border);
+}
+
+.rac-override-toast-error {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border: 1px solid var(--status-error-border);
+}
+
+/* Add override form */
+.rac-override-add-form {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.rac-override-add-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.rac-override-add-title {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* Type toggle */
+.rac-override-type-toggle {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.rac-override-type-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-default);
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rac-override-type-btn:hover {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.rac-override-type-btn.active {
+  background: var(--bg-secondary);
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+/* Override form fields */
+.rac-override-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rac-override-field-label {
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* Selected people badges */
+.rac-override-selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.rac-override-selected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 8px 2px 2px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.rac-override-selected-badge-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.rac-override-selected-badge-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  margin-left: var(--space-1);
+}
+
+.rac-override-selected-badge-remove:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Search results dropdown */
+.rac-override-search-results {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+}
+
+.rac-override-search-result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.rac-override-search-result:hover {
+  background: var(--bg-secondary);
+}
+
+.rac-override-search-result + .rac-override-search-result {
+  border-top: 1px solid var(--border-default);
+}
+
+.rac-override-search-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.rac-override-search-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rac-override-search-name {
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.rac-override-search-meta {
+  font-size: var(--font-xs);
+  color: var(--text-tertiary);
+}
+
+.rac-override-no-results {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: var(--font-sm);
+  margin: 0;
+}
+
+/* Existing overrides list */
+.rac-override-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.rac-override-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.rac-override-group-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+}
+
+.rac-override-group-title {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.rac-override-group-desc {
+  font-size: var(--font-xs);
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.rac-override-module-block {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.rac-override-module-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-default);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.rac-override-people {
+  display: flex;
+  flex-direction: column;
+}
+
+.rac-override-person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.rac-override-person + .rac-override-person {
+  border-top: 1px solid var(--border-default);
+}
+
+.rac-override-person-grant {
+  /* subtle green tint */
+}
+
+.rac-override-person-revoke {
+  /* subtle red tint */
+}
+
+.rac-override-person-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.rac-override-person-grant .rac-override-person-avatar {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.rac-override-person-revoke .rac-override-person-avatar {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}
+
+.rac-override-person-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rac-override-person-name {
+  font-size: var(--font-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.rac-override-person-meta {
+  font-size: var(--font-xs);
+  color: var(--text-tertiary);
+}
+
+.rac-override-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-default);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.rac-override-remove-btn:hover {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border-color: var(--status-error-border);
+}
+
+.rac-override-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ─── Team Hub Page ─── */
 
 .thub-grid {

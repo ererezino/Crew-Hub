@@ -15,7 +15,7 @@ import {
   isWidgetVisibleForUser,
   sanitizeRoles
 } from "../../../../../lib/access-control";
-import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import type { MeAccessConfigResponseData } from "../../../../../types/access-control";
 
@@ -68,7 +68,7 @@ export async function GET() {
     }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" });
   }
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceRoleClient();
 
   const [navResult, widgetResult] = await Promise.all([
     supabase

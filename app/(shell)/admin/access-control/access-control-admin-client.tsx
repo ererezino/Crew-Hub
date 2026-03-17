@@ -1,11 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { NavIcon } from "../../../../components/shared/nav-icon";
 import { PageHeader } from "../../../../components/shared/page-header";
 import type {
+  AccessControlProfileOption,
   AdminAccessConfigResponseData,
   NavigationAccessConfigRecord,
   DashboardWidgetConfigRecord
@@ -116,12 +117,16 @@ const ROLES: RoleDef[] = [
   }
 ];
 
+/* ── Override types ── */
+
+type OverrideEntry = {
+  moduleKey: string;
+  employeeId: string;
+  type: "grant" | "revoke";
+};
+
 /* ── Helpers ── */
 
-/**
- * Derive role → enabled module keys from nav-item-centric config.
- * A role has a module enabled if that role appears in the module's visibleToRoles.
- */
 function deriveRoleModulesFromNavConfig(
   navigation: NavigationAccessConfigRecord[]
 ): Record<string, Set<string>> {
@@ -140,17 +145,11 @@ function deriveRoleModulesFromNavConfig(
     }
   }
 
-  // SUPER_ADMIN always has all modules
   result["SUPER_ADMIN"] = new Set(ALL_MODULES.map((m) => m.key));
 
   return result;
 }
 
-/**
- * Build updated navigation payload from role-centric changes.
- * Takes the full nav config and applies role→module changes,
- * preserving per-person overrides (granted/revoked employee IDs).
- */
 function buildNavigationPayload(
   roleModules: Record<string, Set<string>>,
   existingNavigation: NavigationAccessConfigRecord[]
@@ -162,10 +161,9 @@ function buildNavigationPayload(
   return ALL_MODULES.map((mod) => {
     const existing = existingByKey.get(mod.key);
 
-    // Compute visibleToRoles: collect all non-SUPER_ADMIN roles that have this module checked
     const visibleToRoles: string[] = [];
     for (const roleKey of ALL_ROLE_KEYS) {
-      if (roleKey === "SUPER_ADMIN") continue; // SUPER_ADMIN is implicit, not stored
+      if (roleKey === "SUPER_ADMIN") continue;
       if (roleModules[roleKey]?.has(mod.key)) {
         visibleToRoles.push(roleKey);
       }
@@ -174,9 +172,40 @@ function buildNavigationPayload(
     return {
       navItemKey: mod.key,
       visibleToRoles,
-      // Preserve per-person overrides
       grantedEmployeeIds: existing?.grantedEmployeeIds ?? [],
       revokedEmployeeIds: existing?.revokedEmployeeIds ?? []
+    };
+  });
+}
+
+function buildNavigationPayloadWithOverrides(
+  roleModules: Record<string, Set<string>>,
+  existingNavigation: NavigationAccessConfigRecord[],
+  overrideEdits: {
+    grants: Map<string, Set<string>>;
+    revokes: Map<string, Set<string>>;
+  }
+) {
+  const existingByKey = new Map(
+    existingNavigation.map((row) => [row.navItemKey, row] as const)
+  );
+
+  return ALL_MODULES.map((mod) => {
+    const existing = existingByKey.get(mod.key);
+
+    const visibleToRoles: string[] = [];
+    for (const roleKey of ALL_ROLE_KEYS) {
+      if (roleKey === "SUPER_ADMIN") continue;
+      if (roleModules[roleKey]?.has(mod.key)) {
+        visibleToRoles.push(roleKey);
+      }
+    }
+
+    return {
+      navItemKey: mod.key,
+      visibleToRoles,
+      grantedEmployeeIds: Array.from(overrideEdits.grants.get(mod.key) ?? existing?.grantedEmployeeIds ?? []),
+      revokedEmployeeIds: Array.from(overrideEdits.revokes.get(mod.key) ?? existing?.revokedEmployeeIds ?? [])
     };
   });
 }
@@ -198,6 +227,29 @@ function groupByCategory(
   return groups;
 }
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0]![0]?.toUpperCase() ?? "?";
+  return `${parts[0]![0] ?? ""}${parts[parts.length - 1]![0] ?? ""}`.toUpperCase();
+}
+
+function deriveOverrides(
+  navigation: NavigationAccessConfigRecord[]
+): OverrideEntry[] {
+  const entries: OverrideEntry[] = [];
+  for (const nav of navigation) {
+    if (!MODULE_KEYS_SET.has(nav.navItemKey)) continue;
+    for (const empId of nav.grantedEmployeeIds) {
+      entries.push({ moduleKey: nav.navItemKey, employeeId: empId, type: "grant" });
+    }
+    for (const empId of nav.revokedEmployeeIds) {
+      entries.push({ moduleKey: nav.navItemKey, employeeId: empId, type: "revoke" });
+    }
+  }
+  return entries;
+}
+
 /* ── Component ── */
 
 export function AccessControlAdminClient() {
@@ -205,11 +257,10 @@ export function AccessControlAdminClient() {
   const tCommon = useTranslations("common");
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 
-  // Full API data (nav + widget records), kept in sync with saves
   const navRecordsRef = useRef<NavigationAccessConfigRecord[]>([]);
   const widgetRecordsRef = useRef<DashboardWidgetConfigRecord[]>([]);
+  const [employees, setEmployees] = useState<AccessControlProfileOption[]>([]);
 
-  // Role → enabled module keys (derived from nav config on load, updated on edit)
   const [roleModules, setRoleModules] = useState<Record<string, Set<string>>>(() => {
     const initial: Record<string, Set<string>> = {};
     for (const r of ROLES) {
@@ -222,6 +273,24 @@ export function AccessControlAdminClient() {
   const [editDraft, setEditDraft] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+
+  // Override UI state
+  const [overrides, setOverrides] = useState<OverrideEntry[]>([]);
+  const [addingOverride, setAddingOverride] = useState(false);
+  const [overrideType, setOverrideType] = useState<"grant" | "revoke">("grant");
+  const [overrideModule, setOverrideModule] = useState("");
+  const [overrideSearch, setOverrideSearch] = useState("");
+  const [overrideSelectedIds, setOverrideSelectedIds] = useState<Set<string>>(new Set());
+  const [overrideSaving, setOverrideSaving] = useState(false);
+  const [overrideToast, setOverrideToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const employeeById = useMemo(() => {
+    const map = new Map<string, AccessControlProfileOption>();
+    for (const emp of employees) {
+      map.set(emp.id, emp);
+    }
+    return map;
+  }, [employees]);
 
   /* Fetch real access config on mount */
   useEffect(() => {
@@ -242,9 +311,11 @@ export function AccessControlAdminClient() {
 
         navRecordsRef.current = navigation;
         widgetRecordsRef.current = widgets;
+        setEmployees(json.data.employees);
 
         const derived = deriveRoleModulesFromNavConfig(navigation);
         setRoleModules(derived);
+        setOverrides(deriveOverrides(navigation));
         setLoaded(true);
       } catch {
         /* Use empty state on failure */
@@ -255,6 +326,13 @@ export function AccessControlAdminClient() {
       cancelled = true;
     };
   }, []);
+
+  // Auto-clear toast
+  useEffect(() => {
+    if (!overrideToast) return;
+    const timer = setTimeout(() => setOverrideToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [overrideToast]);
 
   const startEditing = useCallback(
     (role: string) => {
@@ -286,19 +364,16 @@ export function AccessControlAdminClient() {
     setSaving(true);
 
     try {
-      // Apply the edit to the role→modules state
       const updatedRoleModules = {
         ...roleModules,
         [editingRole]: new Set(editDraft)
       };
 
-      // Build full navigation payload from role-centric state
       const navigationPayload = buildNavigationPayload(
         updatedRoleModules,
         navRecordsRef.current
       );
 
-      // Build widget payload (pass through unchanged)
       const widgetPayload = widgetRecordsRef.current.map((w) => ({
         widgetKey: w.widgetKey,
         visibleToRoles: w.visibleToRoles
@@ -322,15 +397,14 @@ export function AccessControlAdminClient() {
       };
 
       if (json?.data) {
-        // Update refs with fresh server data
         navRecordsRef.current = json.data.navigation;
         widgetRecordsRef.current = json.data.widgets;
+        setEmployees(json.data.employees);
 
-        // Re-derive role modules from server response
         const derived = deriveRoleModulesFromNavConfig(json.data.navigation);
         setRoleModules(derived);
+        setOverrides(deriveOverrides(json.data.navigation));
       } else {
-        // Optimistic update if server didn't return fresh data
         setRoleModules(updatedRoleModules);
       }
 
@@ -342,6 +416,269 @@ export function AccessControlAdminClient() {
       setSaving(false);
     }
   }, [editingRole, editDraft, roleModules]);
+
+  /* ── Override management ── */
+
+  const grantOverrides = useMemo(() => overrides.filter((o) => o.type === "grant"), [overrides]);
+  const revokeOverrides = useMemo(() => overrides.filter((o) => o.type === "revoke"), [overrides]);
+  const hasOverrides = overrides.length > 0;
+
+  // Group overrides by module for display
+  const grantsByModule = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const o of grantOverrides) {
+      const list = map.get(o.moduleKey) ?? [];
+      list.push(o.employeeId);
+      map.set(o.moduleKey, list);
+    }
+    return map;
+  }, [grantOverrides]);
+
+  const revokesByModule = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const o of revokeOverrides) {
+      const list = map.get(o.moduleKey) ?? [];
+      list.push(o.employeeId);
+      map.set(o.moduleKey, list);
+    }
+    return map;
+  }, [revokeOverrides]);
+
+  // Employees already in the selected module+type
+  const existingIdsForSelection = useMemo(() => {
+    if (!overrideModule) return new Set<string>();
+    const source = overrideType === "grant" ? grantsByModule : revokesByModule;
+    return new Set(source.get(overrideModule) ?? []);
+  }, [overrideModule, overrideType, grantsByModule, revokesByModule]);
+
+  // Filtered employees for the add-override search
+  const filteredEmployees = useMemo(() => {
+    if (!overrideModule) return [];
+    const query = overrideSearch.trim().toLowerCase();
+    return employees.filter((emp) => {
+      // Don't show employees already in this override
+      if (existingIdsForSelection.has(emp.id)) return false;
+      // Don't show already-selected
+      if (overrideSelectedIds.has(emp.id)) return false;
+      if (!query) return true;
+      return (
+        emp.fullName.toLowerCase().includes(query) ||
+        emp.email.toLowerCase().includes(query) ||
+        (emp.department?.toLowerCase().includes(query) ?? false)
+      );
+    });
+  }, [employees, overrideModule, overrideSearch, existingIdsForSelection, overrideSelectedIds]);
+
+  const resetAddForm = useCallback(() => {
+    setAddingOverride(false);
+    setOverrideType("grant");
+    setOverrideModule("");
+    setOverrideSearch("");
+    setOverrideSelectedIds(new Set());
+  }, []);
+
+  const saveOverride = useCallback(async () => {
+    if (!overrideModule || overrideSelectedIds.size === 0) return;
+    setOverrideSaving(true);
+
+    try {
+      // Build updated grants/revokes maps from current nav records
+      const grants = new Map<string, Set<string>>();
+      const revokes = new Map<string, Set<string>>();
+
+      for (const nav of navRecordsRef.current) {
+        if (!MODULE_KEYS_SET.has(nav.navItemKey)) continue;
+        grants.set(nav.navItemKey, new Set(nav.grantedEmployeeIds));
+        revokes.set(nav.navItemKey, new Set(nav.revokedEmployeeIds));
+      }
+
+      // Apply the new overrides
+      const targetMap = overrideType === "grant" ? grants : revokes;
+      const oppositeMap = overrideType === "grant" ? revokes : grants;
+      const existing = targetMap.get(overrideModule) ?? new Set<string>();
+      const opposite = oppositeMap.get(overrideModule) ?? new Set<string>();
+
+      for (const empId of overrideSelectedIds) {
+        existing.add(empId);
+        // Remove from the opposite list if present
+        opposite.delete(empId);
+      }
+
+      targetMap.set(overrideModule, existing);
+      oppositeMap.set(overrideModule, opposite);
+
+      const navigationPayload = buildNavigationPayloadWithOverrides(
+        roleModules,
+        navRecordsRef.current,
+        { grants, revokes }
+      );
+
+      const widgetPayload = widgetRecordsRef.current.map((w) => ({
+        widgetKey: w.widgetKey,
+        visibleToRoles: w.visibleToRoles
+      }));
+
+      const res = await fetch("/api/v1/admin/access-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          navigation: navigationPayload,
+          widgets: widgetPayload
+        })
+      });
+
+      if (!res.ok) throw new Error("Save failed");
+
+      const json = (await res.json()) as {
+        data?: AdminAccessConfigResponseData | null;
+      };
+
+      if (json?.data) {
+        navRecordsRef.current = json.data.navigation;
+        widgetRecordsRef.current = json.data.widgets;
+        setEmployees(json.data.employees);
+        const derived = deriveRoleModulesFromNavConfig(json.data.navigation);
+        setRoleModules(derived);
+        setOverrides(deriveOverrides(json.data.navigation));
+      }
+
+      resetAddForm();
+      setOverrideToast({ type: "success", message: td("overrideSaved") });
+    } catch {
+      setOverrideToast({ type: "error", message: td("overrideSaveFailed") });
+    } finally {
+      setOverrideSaving(false);
+    }
+  }, [overrideModule, overrideSelectedIds, overrideType, roleModules, resetAddForm, td]);
+
+  const removeOverride = useCallback(async (entry: OverrideEntry) => {
+    setOverrideSaving(true);
+
+    try {
+      const grants = new Map<string, Set<string>>();
+      const revokes = new Map<string, Set<string>>();
+
+      for (const nav of navRecordsRef.current) {
+        if (!MODULE_KEYS_SET.has(nav.navItemKey)) continue;
+        grants.set(nav.navItemKey, new Set(nav.grantedEmployeeIds));
+        revokes.set(nav.navItemKey, new Set(nav.revokedEmployeeIds));
+      }
+
+      const targetMap = entry.type === "grant" ? grants : revokes;
+      const existing = targetMap.get(entry.moduleKey);
+      if (existing) {
+        existing.delete(entry.employeeId);
+      }
+
+      const navigationPayload = buildNavigationPayloadWithOverrides(
+        roleModules,
+        navRecordsRef.current,
+        { grants, revokes }
+      );
+
+      const widgetPayload = widgetRecordsRef.current.map((w) => ({
+        widgetKey: w.widgetKey,
+        visibleToRoles: w.visibleToRoles
+      }));
+
+      const res = await fetch("/api/v1/admin/access-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          navigation: navigationPayload,
+          widgets: widgetPayload
+        })
+      });
+
+      if (!res.ok) throw new Error("Save failed");
+
+      const json = (await res.json()) as {
+        data?: AdminAccessConfigResponseData | null;
+      };
+
+      if (json?.data) {
+        navRecordsRef.current = json.data.navigation;
+        widgetRecordsRef.current = json.data.widgets;
+        setEmployees(json.data.employees);
+        const derived = deriveRoleModulesFromNavConfig(json.data.navigation);
+        setRoleModules(derived);
+        setOverrides(deriveOverrides(json.data.navigation));
+      }
+
+      setOverrideToast({ type: "success", message: td("overrideRemoved") });
+    } catch {
+      setOverrideToast({ type: "error", message: td("overrideSaveFailed") });
+    } finally {
+      setOverrideSaving(false);
+    }
+  }, [roleModules, td]);
+
+  const renderOverrideGroup = (
+    type: "grant" | "revoke",
+    groupMap: Map<string, string[]>,
+    sectionTitle: string,
+    sectionDesc: string,
+    icon: string,
+    badgeClass: string
+  ) => {
+    if (groupMap.size === 0) return null;
+
+    return (
+      <div className="rac-override-group">
+        <div className="rac-override-group-header">
+          <NavIcon name={icon} size={16} />
+          <div>
+            <h4 className="rac-override-group-title">{sectionTitle}</h4>
+            <p className="rac-override-group-desc">{sectionDesc}</p>
+          </div>
+        </div>
+
+        {Array.from(groupMap.entries()).map(([moduleKey, empIds]) => {
+          const mod = MODULE_BY_KEY.get(moduleKey);
+          if (!mod) return null;
+
+          return (
+            <div key={moduleKey} className="rac-override-module-block">
+              <div className="rac-override-module-label">
+                <NavIcon name={mod.icon} size={14} />
+                <span>{td(mod.labelKey)}</span>
+              </div>
+              <div className="rac-override-people">
+                {empIds.map((empId) => {
+                  const emp = employeeById.get(empId);
+                  if (!emp) return null;
+                  return (
+                    <div key={empId} className={`rac-override-person ${badgeClass}`}>
+                      <span className="rac-override-person-avatar">
+                        {getInitials(emp.fullName)}
+                      </span>
+                      <div className="rac-override-person-info">
+                        <span className="rac-override-person-name">{emp.fullName}</span>
+                        <span className="rac-override-person-meta">
+                          {emp.department ?? emp.email}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="rac-override-remove-btn"
+                        onClick={() => {
+                          void removeOverride({ moduleKey, employeeId: empId, type });
+                        }}
+                        disabled={overrideSaving}
+                        aria-label={`${td("removeOverride")} ${emp.fullName}`}
+                      >
+                        <NavIcon name="X" size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -407,7 +744,7 @@ export function AccessControlAdminClient() {
                       ) : null}
                     </div>
 
-                    {/* Module list — read mode */}
+                    {/* Module list -- read mode */}
                     {!isEditing ? (
                       <div className="rac-card-modules">
                         {isSuperAdmin ? (
@@ -448,7 +785,7 @@ export function AccessControlAdminClient() {
                       </div>
                     ) : null}
 
-                    {/* Module list — edit mode */}
+                    {/* Module list -- edit mode */}
                     {isEditing ? (
                       <div className="rac-card-edit">
                         {CATEGORY_KEYS.map((categoryKey) => {
@@ -525,19 +862,215 @@ export function AccessControlAdminClient() {
         {/* ── Per-Person Overrides ── */}
         <section className="rac-section">
           <div className="rac-section-header">
-            <h3 className="rac-section-title">{t("overridesTitle")}</h3>
-            <p className="rac-section-subtitle">{t("overridesDescription")}</p>
+            <div className="rac-section-header-row">
+              <div>
+                <h3 className="rac-section-title">{t("overridesTitle")}</h3>
+                <p className="rac-section-subtitle">{t("overridesDescription")}</p>
+              </div>
+              {loaded && !addingOverride ? (
+                <button
+                  type="button"
+                  className="rac-save-btn"
+                  onClick={() => setAddingOverride(true)}
+                >
+                  <NavIcon name="Plus" size={14} />
+                  {t("addGrant")}
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          <div className="rac-overrides-empty">
-            <div className="rac-overrides-empty-icon">
-              <NavIcon name="ShieldOff" size={28} />
+          {/* Toast */}
+          {overrideToast ? (
+            <div className={`rac-override-toast rac-override-toast-${overrideToast.type}`}>
+              <NavIcon name={overrideToast.type === "success" ? "Check" : "AlertCircle"} size={16} />
+              <span>{overrideToast.message}</span>
             </div>
-            <p className="rac-overrides-empty-title">{t("noOverrides")}</p>
-            <p className="rac-overrides-empty-desc">
-              {t("noOverridesDescription")}
-            </p>
-          </div>
+          ) : null}
+
+          {/* Add override form */}
+          {addingOverride ? (
+            <div className="rac-override-add-form">
+              <div className="rac-override-add-header">
+                <h4 className="rac-override-add-title">
+                  {overrideType === "grant" ? t("addGrant") : t("addRevoke")}
+                </h4>
+              </div>
+
+              {/* Type toggle */}
+              <div className="rac-override-type-toggle">
+                <button
+                  type="button"
+                  className={`rac-override-type-btn ${overrideType === "grant" ? "active" : ""}`}
+                  onClick={() => {
+                    setOverrideType("grant");
+                    setOverrideSelectedIds(new Set());
+                  }}
+                >
+                  <NavIcon name="UserPlus" size={14} />
+                  {t("addGrant")}
+                </button>
+                <button
+                  type="button"
+                  className={`rac-override-type-btn ${overrideType === "revoke" ? "active" : ""}`}
+                  onClick={() => {
+                    setOverrideType("revoke");
+                    setOverrideSelectedIds(new Set());
+                  }}
+                >
+                  <NavIcon name="UserMinus" size={14} />
+                  {t("addRevoke")}
+                </button>
+              </div>
+
+              {/* Module selector */}
+              <div className="rac-override-field">
+                <label className="rac-override-field-label">{t("selectModule")}</label>
+                <select
+                  className="form-input"
+                  value={overrideModule}
+                  onChange={(e) => {
+                    setOverrideModule(e.target.value);
+                    setOverrideSelectedIds(new Set());
+                    setOverrideSearch("");
+                  }}
+                >
+                  <option value="">{t("selectModule")}</option>
+                  {ALL_MODULES.map((mod) => (
+                    <option key={mod.key} value={mod.key}>{td(mod.labelKey)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Person search + selection */}
+              {overrideModule ? (
+                <div className="rac-override-field">
+                  <label className="rac-override-field-label">{t("selectPerson")}</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder={td("selectPerson")}
+                    value={overrideSearch}
+                    onChange={(e) => setOverrideSearch(e.target.value)}
+                  />
+
+                  {/* Selected people */}
+                  {overrideSelectedIds.size > 0 ? (
+                    <div className="rac-override-selected-list">
+                      {Array.from(overrideSelectedIds).map((empId) => {
+                        const emp = employeeById.get(empId);
+                        if (!emp) return null;
+                        return (
+                          <span key={empId} className="rac-override-selected-badge">
+                            <span className="rac-override-selected-badge-avatar">
+                              {getInitials(emp.fullName)}
+                            </span>
+                            {emp.fullName}
+                            <button
+                              type="button"
+                              className="rac-override-selected-badge-remove"
+                              onClick={() => {
+                                setOverrideSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  next.delete(empId);
+                                  return next;
+                                });
+                              }}
+                              aria-label={`Remove ${emp.fullName}`}
+                            >
+                              <NavIcon name="X" size={12} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {/* Search results */}
+                  {(overrideSearch.trim() || overrideSelectedIds.size === 0) ? (
+                    <div className="rac-override-search-results">
+                      {filteredEmployees.slice(0, 8).map((emp) => (
+                        <button
+                          key={emp.id}
+                          type="button"
+                          className="rac-override-search-result"
+                          onClick={() => {
+                            setOverrideSelectedIds((prev) => new Set([...prev, emp.id]));
+                            setOverrideSearch("");
+                          }}
+                        >
+                          <span className="rac-override-search-avatar">
+                            {getInitials(emp.fullName)}
+                          </span>
+                          <div className="rac-override-search-info">
+                            <span className="rac-override-search-name">{emp.fullName}</span>
+                            <span className="rac-override-search-meta">
+                              {emp.department ? `${emp.department} · ` : ""}{emp.roles.join(", ")}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                      {filteredEmployees.length === 0 && overrideSearch.trim() ? (
+                        <p className="rac-override-no-results">{t("noMatchingMembers")}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {/* Form actions */}
+              <div className="rac-edit-actions">
+                <button
+                  type="button"
+                  className="rac-save-btn"
+                  onClick={() => { void saveOverride(); }}
+                  disabled={overrideSaving || !overrideModule || overrideSelectedIds.size === 0}
+                >
+                  <NavIcon name="Check" size={14} />
+                  {overrideSaving ? t("saving") : t("saveChanges")}
+                </button>
+                <button
+                  type="button"
+                  className="rac-cancel-btn"
+                  onClick={resetAddForm}
+                >
+                  {tCommon("cancel")}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Existing overrides display */}
+          {hasOverrides ? (
+            <div className="rac-override-list">
+              {renderOverrideGroup(
+                "grant",
+                grantsByModule,
+                td("grantedSection"),
+                td("grantedDescription"),
+                "UserPlus",
+                "rac-override-person-grant"
+              )}
+              {renderOverrideGroup(
+                "revoke",
+                revokesByModule,
+                td("revokedSection"),
+                td("revokedDescription"),
+                "UserMinus",
+                "rac-override-person-revoke"
+              )}
+            </div>
+          ) : !addingOverride ? (
+            <div className="rac-overrides-empty">
+              <div className="rac-overrides-empty-icon">
+                <NavIcon name="ShieldOff" size={28} />
+              </div>
+              <p className="rac-overrides-empty-title">{t("noOverrides")}</p>
+              <p className="rac-overrides-empty-desc">
+                {t("noOverridesDescription")}
+              </p>
+            </div>
+          ) : null}
         </section>
       </div>
     </>

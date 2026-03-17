@@ -60,7 +60,7 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
   const [searchQuery, setSearchQuery] = useState("");
 
   // Show all employees regardless of track — any team member might need
-  // to chip in for customer success weeks or help with support workload
+  // to chip in for operations weeks or help with scheduling coverage
   const eligible = employees;
 
   const filtered = useMemo(() => {
@@ -141,17 +141,17 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
           const entry = selected.get(emp.id);
           const flag = getCountryFlag(emp.countryCode);
 
-          // Show a section divider between Customer Success and other departments
-          const csDept = "customer success";
+          // Show a section divider between Operations (pilot) and other departments
+          const pilotDept = "operations";
           const prevDept = idx > 0 ? filtered[idx - 1]?.department : null;
-          const isFirstNonCS =
+          const isFirstNonPilot =
             idx > 0 &&
-            emp.department?.toLowerCase() !== csDept &&
-            prevDept?.toLowerCase() === csDept;
+            emp.department?.toLowerCase() !== pilotDept &&
+            prevDept?.toLowerCase() === pilotDept;
 
           return (
             <div key={emp.id}>
-              {isFirstNonCS ? (
+              {isFirstNonPilot ? (
                 <div className="schedule-roster-divider">
                   <span className="schedule-roster-divider-label">{t("roster.otherTeamMembers")}</span>
                 </div>
