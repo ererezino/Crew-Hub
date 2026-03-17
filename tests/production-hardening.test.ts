@@ -356,7 +356,8 @@ describe("Production Hardening", () => {
         "signatures",
         "surveys",
         "notifications",
-        "crew_games"
+        "crew_games",
+        "passkeys"
       ];
 
       for (const id of expectedModuleIds) {
