@@ -60,7 +60,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   const canCreatePeople = hasRole(roles, "SUPER_ADMIN");
   const canInvitePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const canEditPeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
-  const canResetAuthenticator = hasRole(roles, "SUPER_ADMIN");
+  const canResetAuthenticator = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const isAdmin = hasRole(roles, "HR_ADMIN") || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
   const isSuperAdmin = hasRole(roles, "SUPER_ADMIN");
   const scope = resolveScope(roles);

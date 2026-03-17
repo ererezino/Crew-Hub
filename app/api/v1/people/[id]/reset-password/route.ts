@@ -67,12 +67,15 @@ export async function POST(
     });
   }
 
-  if (!hasRole(session.profile.roles, "SUPER_ADMIN")) {
+  if (
+    !hasRole(session.profile.roles, "SUPER_ADMIN") &&
+    !hasRole(session.profile.roles, "HR_ADMIN")
+  ) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only Super Admin can reset authenticator access."
+        message: "Only Super Admin or HR Admin can reset authenticator access."
       },
       meta: buildMeta()
     });
