@@ -179,7 +179,8 @@ export async function PATCH(
   const { error: updateError } = await serviceClient
     .from("profiles")
     .update(updates)
-    .eq("id", targetId);
+    .eq("id", targetId)
+    .eq("org_id", profile.org_id);
 
   if (updateError) {
     return jsonResponse<null>(500, {

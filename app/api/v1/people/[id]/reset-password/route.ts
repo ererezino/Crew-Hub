@@ -203,7 +203,8 @@ export async function POST(
   const { error: profileUpdateError } = await adminClient
     .from("profiles")
     .update({ account_setup_at: null })
-    .eq("id", personId);
+    .eq("id", personId)
+    .eq("org_id", session.profile.org_id);
 
   if (profileUpdateError) {
     return jsonResponse<null>(500, {

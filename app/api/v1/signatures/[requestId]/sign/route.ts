@@ -563,7 +563,8 @@ export async function POST(
       const { data: linkedContracts } = await serviceRoleClient
         .from("pre_start_contracts")
         .select("id, signed_at, voided_at")
-        .eq("signature_request_id", parsedRequestRow.data.id);
+        .eq("signature_request_id", parsedRequestRow.data.id)
+        .eq("org_id", session.profile.org_id);
 
       if (linkedContracts && linkedContracts.length > 0) {
         for (const lc of linkedContracts) {
