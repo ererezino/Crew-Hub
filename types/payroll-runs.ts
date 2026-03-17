@@ -234,3 +234,22 @@ export type CsvImportPreviewResponseData = {
 };
 
 export type CsvImportPreviewResponse = ApiResponse<CsvImportPreviewResponseData>;
+
+/* ------------------------------------------------------------------ */
+/*  Manual payroll item edit types                                     */
+/* ------------------------------------------------------------------ */
+
+export type EditPayrollItemPayload = {
+  baseSalaryAmount?: number;
+  allowances?: { label: string; amount: number; currency: string; isTaxable: boolean }[];
+  currency?: string;
+  reason: string;
+};
+
+export type EditPayrollItemResponseData = {
+  itemId: string;
+  updatedFields: string[];
+  runStatusReset: boolean;
+};
+
+export type EditPayrollItemResponse = ApiResponse<EditPayrollItemResponseData>;

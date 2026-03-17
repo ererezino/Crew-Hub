@@ -48,6 +48,8 @@
       "pending": "Pending",
       "approved": "Approved",
       "rejected": "Rejected",
+      "hr_draft": "HR Draft",
+      "pending_signature": "Pending Signature",
       "cancelled": "Cancelled",
       "draft": "Draft",
       "published": "Published",
@@ -3038,19 +3040,23 @@
     "travelLetters": {
       "errorTitle": "Travel letters unavailable",
       "emptyTitle": "No travel letter requests",
-      "emptyDescription": "Request a travel support letter for your next trip. Letters are signed by a co-founder.",
+      "emptyDescription": "Request a travel support letter for your next trip. HR will draft the letter and a co-founder will sign it.",
       "travelDates": "Travel dates",
       "purpose": "Purpose",
       "requested": "Requested",
       "approvedBy": "Approved by",
       "reviewedBy": "Reviewed by",
-      "reason": "Reason"
+      "draftedBy": "Drafted by",
+      "reason": "Reason",
+      "countries": "Destinations"
     },
     "requestPanel": {
       "title": "Request Travel Support Letter",
-      "description": "Submit a request for a travel support letter. A co-founder will review and sign it.",
+      "description": "Submit a request for a travel support letter. HR will draft the letter and a co-founder will review and sign it.",
+      "destinationCountries": "Destination Countries",
+      "destinationCountriesHint": "Enter countries separated by commas (e.g. United Kingdom, France)",
       "destinationCountry": "Destination Country",
-      "destinationPlaceholder": "e.g. United Kingdom",
+      "destinationPlaceholder": "e.g. United Kingdom, France",
       "embassyName": "Embassy / Organization Name",
       "embassyNamePlaceholder": "e.g. British High Commission, Abuja",
       "embassyAddress": "Embassy / Organization Address",
@@ -3070,16 +3076,36 @@
       "title": "Pending Approvals",
       "description": "Travel support requests awaiting your review."
     },
+    "hrDraftSection": {
+      "title": "Requests Needing Draft",
+      "description": "These travel support requests need a letter draft before they can be signed."
+    },
+    "signatureSection": {
+      "title": "Pending Signature",
+      "description": "These travel support letters have been drafted by HR and are ready for your review and signature."
+    },
+    "draftPanel": {
+      "title": "Draft Travel Letter",
+      "description": "Write or edit the letter body for {employeeName}'s travel support letter to {country}.",
+      "letterBody": "Letter Body",
+      "letterBodyPlaceholder": "Write the full body of the travel support letter. This will appear in the final PDF.",
+      "letterBodyHint": "Use double line breaks to separate paragraphs. The greeting, closing, and signature will be added automatically.",
+      "saving": "Saving Draft...",
+      "saveDraft": "Save Draft",
+      "submittingForSignature": "Submitting...",
+      "submitForSignature": "Submit for Signature"
+    },
     "approvePanel": {
-      "title": "Approve Travel Letter",
-      "description": "Approve {employeeName}'s travel letter for {country}. Select the issuing entity.",
+      "title": "Approve & Sign Travel Letter",
+      "description": "Approve {employeeName}'s travel letter for {country}. Select the issuing entity and sign.",
+      "letterPreviewLabel": "Letter Body (drafted by HR)",
       "issuingEntityCountry": "Issuing Entity Country",
       "selectCountry": "Select a country...",
       "entityAddress": "Entity Address",
       "entityAddressPlaceholder": "Full address for the letterhead",
       "entityAddressHint": "This address will appear on the letterhead and be saved for future use.",
-      "approving": "Approving...",
-      "approveAndGenerate": "Approve & Generate PDF"
+      "approving": "Signing & Generating...",
+      "approveAndGenerate": "Sign & Generate PDF"
     },
     "rejectPanel": {
       "title": "Reject Travel Letter",
@@ -3093,10 +3119,14 @@
       "documentVersionUploaded": "Document version uploaded.",
       "documentUploaded": "Document uploaded.",
       "unableToOpenDocument": "Unable to open document.",
-      "travelRequestSubmitted": "Travel support letter request submitted.",
+      "travelRequestSubmitted": "Travel support letter request submitted. HR will draft the letter.",
       "unableToSubmitTravel": "Unable to submit travel letter request.",
       "unableToDownloadLetter": "Unable to download travel letter.",
-      "travelApproved": "Travel support letter approved and generated.",
+      "travelDraftSaved": "Letter draft saved.",
+      "unableToSaveDraft": "Unable to save letter draft.",
+      "travelSubmittedForSignature": "Letter submitted for co-founder signature.",
+      "unableToSubmitForSignature": "Unable to submit letter for signature.",
+      "travelApproved": "Travel support letter signed and generated.",
       "unableToApprove": "Unable to approve request.",
       "travelRejected": "Travel support request rejected.",
       "unableToReject": "Unable to reject request."
@@ -3293,7 +3323,9 @@
       "runMarkedCompleted": "Run marked as completed.",
       "csvImportComplete": "CSV data imported. Run Calculate to apply withholding rules.",
       "adjustmentApplied": "Payroll adjustment applied.",
-      "unableToAddAdjustment": "Unable to add payroll adjustment."
+      "unableToAddAdjustment": "Unable to add payroll adjustment.",
+      "editItemSuccess": "Payroll item updated. Run Calculate to apply withholding rules.",
+      "editItemFailed": "Unable to update payroll item."
     },
     "paymentStatus": {
       "pending": "Pending",
@@ -3302,7 +3334,31 @@
       "failed": "Failed",
       "cancelled": "Cancelled"
     },
-    "dismissToast": "Dismiss toast"
+    "dismissToast": "Dismiss toast",
+    "editItem": {
+      "editButton": "Edit",
+      "title": "Edit payroll item",
+      "description": "Changes will reset withholding and require recalculation.",
+      "baseSalaryField": "Base salary (smallest unit)",
+      "currencyField": "Currency (3-letter ISO code)",
+      "allowancesTitle": "Allowances",
+      "allowanceLabel": "Label",
+      "allowanceAmount": "Amount (smallest unit)",
+      "allowanceTaxable": "Taxable",
+      "addAllowance": "Add allowance",
+      "removeAllowance": "Remove",
+      "reasonField": "Reason for edit (required)",
+      "saving": "Saving...",
+      "saveChanges": "Save changes",
+      "manuallyEdited": "Manually edited",
+      "reasonRequired": "A reason for the edit is required.",
+      "reasonTooLong": "Reason must be 500 characters or fewer.",
+      "baseSalaryPositive": "Base salary must be a positive whole number.",
+      "currencyInvalid": "Currency must be a 3-letter ISO code (e.g., NGN, USD).",
+      "allowanceLabelRequired": "Allowance label is required.",
+      "allowanceAmountInvalid": "Allowance amount must be a non-negative whole number.",
+      "noFieldsChanged": "No fields were changed."
+    }
   },
   "timeOff": {
     "title": "Time Off",

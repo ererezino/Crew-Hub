@@ -30,7 +30,9 @@ import type { GeneratePayslipsResponse } from "../../../../../types/payslips";
 import type {
   AddPayrollAdjustmentResponse,
   CalculatePayrollRunResponse,
+  EditPayrollItemResponse,
   PayrollAdjustmentType,
+  PayrollRunAllowance,
   PayrollRunItem,
   PayrollRunActionResponse,
   PayrollRunStatus
@@ -81,6 +83,54 @@ const INITIAL_ADJUSTMENT_VALUES: AdjustmentFormValues = {
   amount: "",
   notes: ""
 };
+
+type EditFormAllowance = {
+  key: string;
+  label: string;
+  amount: string;
+  isTaxable: boolean;
+};
+
+type EditFormValues = {
+  baseSalaryAmount: string;
+  currency: string;
+  allowances: EditFormAllowance[];
+  reason: string;
+};
+
+type EditFormErrors = {
+  baseSalaryAmount?: string;
+  currency?: string;
+  allowances?: string;
+  reason?: string;
+};
+
+function createEditFormKey() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function editFormFromItem(item: PayrollRunItem): EditFormValues {
+  return {
+    baseSalaryAmount: String(item.baseSalaryAmount),
+    currency: item.currency,
+    allowances: item.allowances.map((a) => ({
+      key: createEditFormKey(),
+      label: a.label,
+      amount: String(a.amount),
+      isTaxable: a.isTaxable
+    })),
+    reason: ""
+  };
+}
+
+const CURRENCY_REGEX = /^[A-Z]{3}$/;
+
+function isManuallyEdited(item: PayrollRunItem): boolean {
+  return item.flagged && (item.flagReason?.includes("Manually edited") ?? false);
+}
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -246,6 +296,10 @@ export function PayrollRunDetailClient({
   const [reopenReason, setReopenReason] = useState("");
   const [reopenReasonError, setReopenReasonError] = useState<string | null>(null);
   const [isCsvImportOpen, setIsCsvImportOpen] = useState(false);
+  const [editItemId, setEditItemId] = useState<string | null>(null);
+  const [editFormValues, setEditFormValues] = useState<EditFormValues | null>(null);
+  const [editFormErrors, setEditFormErrors] = useState<EditFormErrors>({});
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const { confirm, confirmDialog } = useConfirmAction();
 
@@ -298,6 +352,7 @@ export function PayrollRunDetailClient({
   const canReopenRun = canFinalApprove && (isApproved || isProcessing);
   const canMarkProcessing = canManage && isApproved;
   const canMarkCompleted = canManage && isProcessing;
+  const canEditItems = canManage && (run?.status === "draft" || isCalculated);
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -444,6 +499,142 @@ export function PayrollRunDetailClient({
     setAdjustmentItemId(item.id);
     setAdjustmentValues(INITIAL_ADJUSTMENT_VALUES);
     setAdjustmentErrors({});
+  };
+
+  const openEditPanel = (item: PayrollRunItem) => {
+    setEditItemId(item.id);
+    setEditFormValues(editFormFromItem(item));
+    setEditFormErrors({});
+  };
+
+  const closeEditPanel = () => {
+    setEditItemId(null);
+    setEditFormValues(null);
+    setEditFormErrors({});
+  };
+
+  const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!editItemId || !editFormValues) {
+      return;
+    }
+
+    /* Validate */
+    const errors: EditFormErrors = {};
+    const trimmedReason = editFormValues.reason.trim();
+
+    if (!trimmedReason) {
+      errors.reason = td("editItem.reasonRequired");
+    } else if (trimmedReason.length > 500) {
+      errors.reason = td("editItem.reasonTooLong");
+    }
+
+    const baseSalaryInt = /^-?\d+$/.test(editFormValues.baseSalaryAmount.trim())
+      ? Number.parseInt(editFormValues.baseSalaryAmount.trim(), 10)
+      : null;
+
+    if (baseSalaryInt === null || baseSalaryInt <= 0 || !Number.isSafeInteger(baseSalaryInt)) {
+      errors.baseSalaryAmount = td("editItem.baseSalaryPositive");
+    }
+
+    if (!CURRENCY_REGEX.test(editFormValues.currency.trim().toUpperCase())) {
+      errors.currency = td("editItem.currencyInvalid");
+    }
+
+    for (const allowance of editFormValues.allowances) {
+      if (!allowance.label.trim()) {
+        errors.allowances = td("editItem.allowanceLabelRequired");
+        break;
+      }
+      const aInt = /^-?\d+$/.test(allowance.amount.trim())
+        ? Number.parseInt(allowance.amount.trim(), 10)
+        : null;
+      if (aInt === null || aInt < 0 || !Number.isSafeInteger(aInt)) {
+        errors.allowances = td("editItem.allowanceAmountInvalid");
+        break;
+      }
+    }
+
+    setEditFormErrors(errors);
+
+    if (Object.values(errors).some(Boolean)) {
+      return;
+    }
+
+    /* Build payload — only send changed fields */
+    const currentItem = sortedItems.find((item) => item.id === editItemId);
+    if (!currentItem) return;
+
+    const payload: Record<string, unknown> = {
+      reason: trimmedReason
+    };
+
+    if (baseSalaryInt !== currentItem.baseSalaryAmount) {
+      payload.baseSalaryAmount = baseSalaryInt;
+    }
+
+    const normalizedCurrency = editFormValues.currency.trim().toUpperCase();
+    if (normalizedCurrency !== currentItem.currency) {
+      payload.currency = normalizedCurrency;
+    }
+
+    const newAllowances = editFormValues.allowances.map((a) => ({
+      label: a.label.trim(),
+      amount: Number.parseInt(a.amount.trim(), 10),
+      currency: normalizedCurrency,
+      isTaxable: a.isTaxable
+    }));
+
+    const allowancesChanged =
+      newAllowances.length !== currentItem.allowances.length ||
+      newAllowances.some(
+        (a, i) =>
+          a.label !== currentItem.allowances[i]?.label ||
+          a.amount !== currentItem.allowances[i]?.amount ||
+          a.isTaxable !== currentItem.allowances[i]?.isTaxable
+      );
+
+    if (allowancesChanged) {
+      payload.allowances = newAllowances;
+    }
+
+    /* Must have at least one changed field */
+    if (!payload.baseSalaryAmount && !payload.currency && !payload.allowances) {
+      setEditFormErrors({ reason: td("editItem.noFieldsChanged") });
+      return;
+    }
+
+    setIsSubmittingEdit(true);
+
+    try {
+      const response = await fetch(
+        `/api/v1/payroll/runs/${runId}/items/${editItemId}/edit`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      const result = (await response.json()) as EditPayrollItemResponse;
+
+      if (!response.ok || !result.data) {
+        showToast("error", result.error?.message ?? td("toast.editItemFailed"));
+        return;
+      }
+
+      showToast("success", td("toast.editItemSuccess"));
+      closeEditPanel();
+      runQuery.refresh();
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : td("toast.editItemFailed")
+      );
+    } finally {
+      setIsSubmittingEdit(false);
+    }
   };
 
   const submitAdjustment = async (event: FormEvent<HTMLFormElement>) => {
@@ -989,7 +1180,23 @@ export function PayrollRunDetailClient({
                       >
                         <td>
                           <p>{item.fullName}</p>
-                          {item.flagged ? (
+                          {isManuallyEdited(item) ? (
+                            <p className="settings-card-description">
+                              <span className="payroll-edited-badge">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                  <path
+                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 1 1 3.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                                {td('editItem.manuallyEdited')}
+                              </span>
+                            </p>
+                          ) : item.flagged ? (
                             <p className="settings-card-description">
                               <StatusBadge tone="warning">{td('flagged.flaggedItems', { count: 1 })}</StatusBadge>
                             </p>
@@ -1037,6 +1244,22 @@ export function PayrollRunDetailClient({
                         </td>
                         <td className="table-row-action-cell">
                           <div className="payroll-row-actions">
+                            {canEditItems ? (
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => {
+                                  if (editItemId === item.id) {
+                                    closeEditPanel();
+                                  } else {
+                                    openEditPanel(item);
+                                    setExpandedItemId(item.id);
+                                  }
+                                }}
+                              >
+                                {td('editItem.editButton')}
+                              </button>
+                            ) : null}
                             <button
                               type="button"
                               className="table-row-action"
@@ -1314,6 +1537,180 @@ export function PayrollRunDetailClient({
                                   )}
                                 </article>
                               </div>
+
+                              {editItemId === item.id && editFormValues ? (
+                                <form
+                                  className="payroll-item-edit-form settings-form"
+                                  onSubmit={submitEdit}
+                                  noValidate
+                                >
+                                  <h3 className="section-title">{td('editItem.title')}</h3>
+                                  <p className="settings-card-description">{td('editItem.description')}</p>
+
+                                  <label className="form-field" htmlFor={`edit-base-salary-${item.id}`}>
+                                    <span className="form-label">{td('editItem.baseSalaryField')}</span>
+                                    <input
+                                      id={`edit-base-salary-${item.id}`}
+                                      className={editFormErrors.baseSalaryAmount ? "form-input form-input-error" : "form-input"}
+                                      value={editFormValues.baseSalaryAmount}
+                                      onChange={(event) =>
+                                        setEditFormValues((current) =>
+                                          current ? { ...current, baseSalaryAmount: event.currentTarget.value } : current
+                                        )
+                                      }
+                                    />
+                                    {editFormErrors.baseSalaryAmount ? (
+                                      <p className="form-field-error">{editFormErrors.baseSalaryAmount}</p>
+                                    ) : null}
+                                  </label>
+
+                                  <label className="form-field" htmlFor={`edit-currency-${item.id}`}>
+                                    <span className="form-label">{td('editItem.currencyField')}</span>
+                                    <input
+                                      id={`edit-currency-${item.id}`}
+                                      className={editFormErrors.currency ? "form-input form-input-error" : "form-input"}
+                                      value={editFormValues.currency}
+                                      maxLength={3}
+                                      onChange={(event) =>
+                                        setEditFormValues((current) =>
+                                          current ? { ...current, currency: event.currentTarget.value.toUpperCase() } : current
+                                        )
+                                      }
+                                    />
+                                    {editFormErrors.currency ? (
+                                      <p className="form-field-error">{editFormErrors.currency}</p>
+                                    ) : null}
+                                  </label>
+
+                                  <div className="payroll-item-edit-allowances">
+                                    <p className="form-label">{td('editItem.allowancesTitle')}</p>
+                                    {editFormValues.allowances.map((allowance, allowanceIndex) => (
+                                      <div key={allowance.key} className="payroll-item-edit-allowance-row">
+                                        <input
+                                          className="form-input"
+                                          placeholder={td('editItem.allowanceLabel')}
+                                          value={allowance.label}
+                                          onChange={(event) =>
+                                            setEditFormValues((current) => {
+                                              if (!current) return current;
+                                              const updated = [...current.allowances];
+                                              updated[allowanceIndex] = { ...updated[allowanceIndex], label: event.currentTarget.value };
+                                              return { ...current, allowances: updated };
+                                            })
+                                          }
+                                        />
+                                        <input
+                                          className="form-input"
+                                          placeholder={td('editItem.allowanceAmount')}
+                                          value={allowance.amount}
+                                          onChange={(event) =>
+                                            setEditFormValues((current) => {
+                                              if (!current) return current;
+                                              const updated = [...current.allowances];
+                                              updated[allowanceIndex] = { ...updated[allowanceIndex], amount: event.currentTarget.value };
+                                              return { ...current, allowances: updated };
+                                            })
+                                          }
+                                        />
+                                        <label className="payroll-item-edit-taxable-label">
+                                          <input
+                                            type="checkbox"
+                                            checked={allowance.isTaxable}
+                                            onChange={(event) =>
+                                              setEditFormValues((current) => {
+                                                if (!current) return current;
+                                                const updated = [...current.allowances];
+                                                updated[allowanceIndex] = { ...updated[allowanceIndex], isTaxable: event.currentTarget.checked };
+                                                return { ...current, allowances: updated };
+                                              })
+                                            }
+                                          />
+                                          {td('editItem.allowanceTaxable')}
+                                        </label>
+                                        <button
+                                          type="button"
+                                          className="button button-subtle"
+                                          onClick={() =>
+                                            setEditFormValues((current) => {
+                                              if (!current) return current;
+                                              return {
+                                                ...current,
+                                                allowances: current.allowances.filter(
+                                                  (_, idx) => idx !== allowanceIndex
+                                                )
+                                              };
+                                            })
+                                          }
+                                        >
+                                          {td('editItem.removeAllowance')}
+                                        </button>
+                                      </div>
+                                    ))}
+                                    {editFormErrors.allowances ? (
+                                      <p className="form-field-error">{editFormErrors.allowances}</p>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      className="button button-subtle"
+                                      onClick={() =>
+                                        setEditFormValues((current) => {
+                                          if (!current) return current;
+                                          return {
+                                            ...current,
+                                            allowances: [
+                                              ...current.allowances,
+                                              {
+                                                key: createEditFormKey(),
+                                                label: "",
+                                                amount: "0",
+                                                isTaxable: true
+                                              }
+                                            ]
+                                          };
+                                        })
+                                      }
+                                    >
+                                      {td('editItem.addAllowance')}
+                                    </button>
+                                  </div>
+
+                                  <label className="form-field" htmlFor={`edit-reason-${item.id}`}>
+                                    <span className="form-label">{td('editItem.reasonField')}</span>
+                                    <textarea
+                                      id={`edit-reason-${item.id}`}
+                                      className={editFormErrors.reason ? "form-input form-input-error" : "form-input"}
+                                      rows={3}
+                                      value={editFormValues.reason}
+                                      onChange={(event) =>
+                                        setEditFormValues((current) =>
+                                          current ? { ...current, reason: event.currentTarget.value } : current
+                                        )
+                                      }
+                                    />
+                                    {editFormErrors.reason ? (
+                                      <p className="form-field-error">{editFormErrors.reason}</p>
+                                    ) : null}
+                                  </label>
+
+                                  <div className="settings-actions">
+                                    <button
+                                      type="submit"
+                                      className="button button-accent"
+                                      disabled={isSubmittingEdit}
+                                    >
+                                      {isSubmittingEdit ? td('editItem.saving') : td('editItem.saveChanges')}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="button button-subtle"
+                                      disabled={isSubmittingEdit}
+                                      onClick={closeEditPanel}
+                                    >
+                                      {tCommon('cancel')}
+                                    </button>
+                                  </div>
+                                </form>
+                              ) : null}
                             </section>
                           </td>
                         </tr>
