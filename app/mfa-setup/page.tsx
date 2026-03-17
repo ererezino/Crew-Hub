@@ -92,6 +92,11 @@ export default function MfaSetupPage() {
     }
   };
 
+  const goToDashboard = useCallback(() => {
+    router.replace("/dashboard");
+    router.refresh();
+  }, [router]);
+
   const handlePasskeyEnroll = useCallback(async () => {
     if (!passkeysEnabled) return;
     setLoading(true);
@@ -126,12 +131,7 @@ export default function MfaSetupPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const goToDashboard = () => {
-    router.replace("/dashboard");
-    router.refresh();
-  };
+  }, [goToDashboard]);
 
   useEffect(() => {
     let cancelled = false;

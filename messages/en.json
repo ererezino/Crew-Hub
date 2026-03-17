@@ -661,6 +661,11 @@
       "yearToDate": "Year to date",
       "recentAuditLog": "Recent audit log"
     },
+    "passkeyNudge": {
+      "title": "Sign in faster with a passkey",
+      "description": "Skip typing codes every time your session expires. We recommend saving your passkey in 1Password so it syncs across devices.",
+      "addPasskey": "Add passkey"
+    },
     "widget": {
       "announcements": "Announcements",
       "noAnnouncements": "No announcements yet.",

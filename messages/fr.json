@@ -660,6 +660,11 @@
       "yearToDate": "Cumul annuel",
       "recentAuditLog": "Journal d'audit récent"
     },
+    "passkeyNudge": {
+      "title": "Connectez-vous plus vite avec une clé d'accès",
+      "description": "Plus besoin de saisir un code à chaque expiration de session. Nous recommandons d'enregistrer votre clé d'accès dans 1Password pour la synchroniser sur tous vos appareils.",
+      "addPasskey": "Ajouter une clé d'accès"
+    },
     "widget": {
       "announcements": "Annonces",
       "noAnnouncements": "Aucune annonce pour le moment.",

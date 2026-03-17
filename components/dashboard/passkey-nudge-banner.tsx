@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { ShieldCheck, X } from "lucide-react";
 
@@ -17,6 +18,7 @@ const passkeysEnabled = getModuleState("passkeys") === "LIVE";
  * - Dismissible per-device (localStorage)
  */
 export function PasskeyNudgeBanner() {
+  const t = useTranslations("dashboard.passkeyNudge");
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -73,11 +75,10 @@ export function PasskeyNudgeBanner() {
       <ShieldCheck size={20} style={{ flexShrink: 0, color: "var(--color-accent)" }} />
       <div style={{ flex: 1 }}>
         <p style={{ margin: 0, fontWeight: 600, color: "var(--text-primary)" }}>
-          Sign in faster with a passkey
+          {t("title")}
         </p>
         <p style={{ margin: "2px 0 0", color: "var(--text-secondary)", fontSize: 13 }}>
-          Skip typing codes every time your session expires.
-          We recommend saving your passkey in <strong>1Password</strong> so it syncs across devices.
+          {t("description")}
         </p>
       </div>
       <Link
@@ -85,7 +86,7 @@ export function PasskeyNudgeBanner() {
         className="button button-accent"
         style={{ flexShrink: 0, fontSize: 13, padding: "6px 14px" }}
       >
-        Add passkey
+        {t("addPasskey")}
       </Link>
       <button
         type="button"
