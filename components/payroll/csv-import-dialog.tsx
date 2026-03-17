@@ -301,7 +301,7 @@ export function CsvImportDialog({
 
             {file ? (
               <p className="csv-import-file-info">
-                {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                {t("fileSize", { name: file.name, size: (file.size / 1024).toFixed(1) })}
               </p>
             ) : null}
 
@@ -371,7 +371,7 @@ export function CsvImportDialog({
                 <ul className="csv-import-errors-list">
                   {previewData.errors.slice(0, 50).map((error, index) => (
                     <li key={`error-${index}`}>
-                      <span className="numeric">Row {error.row}</span>
+                      <span className="numeric">{t("errorRow", { row: error.row })}</span>
                       <span className="csv-import-error-field">{error.field}</span>
                       <span>{error.message}</span>
                     </li>

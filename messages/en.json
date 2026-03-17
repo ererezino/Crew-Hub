@@ -5949,6 +5949,8 @@
       "duplicates": "Duplicates",
       "conflicts": "Existing items"
     },
+    "fileSize": "{name} ({size} KB)",
+    "errorRow": "Row {row}",
     "errorsFound": "{count, plural, one {# validation error} other {# validation errors}}",
     "andMoreErrors": "...and {count} more errors",
     "duplicatesFound": "{count, plural, one {# duplicate email} other {# duplicate emails}}",
