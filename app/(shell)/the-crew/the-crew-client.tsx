@@ -368,14 +368,20 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
     );
   };
 
-  const renderSkeleton = () => (
-    <div className="crew-card-skeleton">
-      <div className="crew-skeleton-photo" />
-      <div className="crew-skeleton-caption">
-        <div className="crew-skeleton-line" />
-        <div className="crew-skeleton-line" />
-        <div className="crew-skeleton-line" />
-      </div>
+  const renderSkeletonGrid = () => (
+    <div className="crew-grid" aria-hidden="true">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div key={i} className="crew-card crew-card-skeleton">
+          <div className="crew-card-photo-wrap">
+            <div className="crew-skeleton-photo" />
+          </div>
+          <div className="crew-card-body">
+            <div className="crew-skeleton-line crew-skeleton-name" />
+            <div className="crew-skeleton-line crew-skeleton-title" />
+            <div className="crew-skeleton-line crew-skeleton-dept" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 
@@ -451,11 +457,7 @@ export function TheCrewClient({ currentUserId, isAdmin }: TheCrewClientProps) {
 
       {/* ── Loading / Error / Empty / Grid ── */}
       {isLoading ? (
-        <div className="crew-grid">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i}>{renderSkeleton()}</div>
-          ))}
-        </div>
+        renderSkeletonGrid()
       ) : error ? (
         <div className="crew-empty">
           <p>{error}</p>
