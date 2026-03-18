@@ -137,7 +137,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const svcClient = createSupabaseServiceRoleClient();
   const { data: auditRow } = await svcClient
     .from("audit_log")
-    .select("actor_id")
+    .select("actor_user_id")
     .eq("table_name", "compensation_records")
     .eq("record_id", parsedParams.data.recordId)
     .eq("action", "created")
@@ -145,7 +145,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .limit(1)
     .maybeSingle();
 
-  const createdBy = auditRow?.actor_id ?? null;
+  const createdBy = auditRow?.actor_user_id ?? null;
 
   const parsedExisting = salaryRecordRowSchema.safeParse({
     ...existingRow,

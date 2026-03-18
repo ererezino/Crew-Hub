@@ -8,7 +8,6 @@ import { COMPENSATION_EMPLOYMENT_TYPES, COMPENSATION_PAY_FREQUENCIES } from "../
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import {
   buildMeta,
-  canApproveSalary,
   canManageCompensation,
   ensureEffectiveWindow,
   ensureEmployeeInOrg,
@@ -24,8 +23,7 @@ const createSalarySchema = z.object({
   payFrequency: z.enum(COMPENSATION_PAY_FREQUENCIES),
   employmentType: z.enum(COMPENSATION_EMPLOYMENT_TYPES),
   effectiveFrom: z.iso.date(),
-  effectiveTo: z.iso.date().nullable().optional(),
-  approve: z.boolean().optional().default(false)
+  effectiveTo: z.iso.date().nullable().optional()
 });
 
 export async function POST(request: Request) {
@@ -119,17 +117,6 @@ export async function POST(request: Request) {
     });
   }
 
-  if (payload.approve && !canApproveSalary(session.profile.roles)) {
-    return jsonResponse<null>(403, {
-      data: null,
-      error: {
-        code: "FORBIDDEN",
-        message: "Only Finance Approver or Super Admin can approve salary records."
-      },
-      meta: buildMeta()
-    });
-  }
-
   const supabase = await createSupabaseServerClient();
 
   const employee = await ensureEmployeeInOrg({
@@ -160,9 +147,9 @@ export async function POST(request: Request) {
       employment_type: payload.employmentType,
       effective_from: payload.effectiveFrom,
       effective_to: effectiveTo,
-      salary_status: payload.approve ? "approved" : "pending",
-      approved_by: payload.approve ? session.profile.id : null,
-      approved_at: payload.approve ? new Date().toISOString() : null
+      salary_status: "pending",
+      approved_by: null,
+      approved_at: null
     })
     .select("id")
     .single();

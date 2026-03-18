@@ -63,7 +63,6 @@ type SalaryFormValues = {
   employmentType: (typeof COMPENSATION_EMPLOYMENT_TYPES)[number];
   effectiveFrom: string;
   effectiveTo: string;
-  approve: boolean;
 };
 
 type AllowanceFormValues = {
@@ -106,8 +105,7 @@ const salaryFormSchema = z
       .string()
       .trim()
       .regex(isoDatePattern, "Effective from date must be in YYYY-MM-DD format."),
-    effectiveTo: z.string().trim(),
-    approve: z.boolean()
+    effectiveTo: z.string().trim()
   })
   .superRefine((values, context) => {
     if (values.effectiveTo.length > 0 && !isoDatePattern.test(values.effectiveTo)) {
@@ -253,8 +251,7 @@ function validateSalary(values: SalaryFormValues): SalaryFormErrors {
     payFrequency: fieldErrors.payFrequency?.[0],
     employmentType: fieldErrors.employmentType?.[0],
     effectiveFrom: fieldErrors.effectiveFrom?.[0],
-    effectiveTo: fieldErrors.effectiveTo?.[0],
-    approve: fieldErrors.approve?.[0]
+    effectiveTo: fieldErrors.effectiveTo?.[0]
   };
 }
 
@@ -302,15 +299,14 @@ function validateEquity(values: EquityFormValues): EquityFormErrors {
   };
 }
 
-function initialSalaryForm(canApprove: boolean): SalaryFormValues {
+function initialSalaryForm(): SalaryFormValues {
   return {
     baseSalaryAmount: "",
     currency: "USD",
     payFrequency: "monthly",
     employmentType: "contractor",
     effectiveFrom: todayIsoDate(),
-    effectiveTo: "",
-    approve: canApprove
+    effectiveTo: ""
   };
 }
 
@@ -404,7 +400,7 @@ export function AdminCompensationClient({
 
   const [isSalaryPanelOpen, setIsSalaryPanelOpen] = useState(false);
   const [salaryFormValues, setSalaryFormValues] = useState<SalaryFormValues>(
-    initialSalaryForm(canApprove)
+    initialSalaryForm()
   );
   const [salaryFormErrors, setSalaryFormErrors] = useState<SalaryFormErrors>({});
   const [isSubmittingSalary, setIsSubmittingSalary] = useState(false);
@@ -531,7 +527,7 @@ export function AdminCompensationClient({
   };
 
   const resetSalaryPanel = () => {
-    setSalaryFormValues(initialSalaryForm(canApprove));
+    setSalaryFormValues(initialSalaryForm());
     setSalaryFormErrors({});
     setIsSalaryPanelOpen(false);
   };
@@ -580,8 +576,7 @@ export function AdminCompensationClient({
           payFrequency: salaryFormValues.payFrequency,
           employmentType: salaryFormValues.employmentType,
           effectiveFrom: salaryFormValues.effectiveFrom,
-          effectiveTo: salaryFormValues.effectiveTo || null,
-          approve: canApprove ? salaryFormValues.approve : false
+          effectiveTo: salaryFormValues.effectiveTo || null
         })
       });
 
@@ -931,7 +926,7 @@ export function AdminCompensationClient({
                 className="button button-accent"
                 onClick={() => {
                   setSalaryFormValues({
-                    ...initialSalaryForm(canApprove),
+                    ...initialSalaryForm(),
                     currency: selectedEmployee.primaryCurrency,
                     employmentType: selectedEmployee.employmentType
                   });
@@ -1475,26 +1470,6 @@ export function AdminCompensationClient({
               <p className="form-field-error">{salaryFormErrors.effectiveTo}</p>
             ) : null}
           </label>
-
-          {canApprove ? (
-            <label className="settings-checkbox" htmlFor="salary-approve">
-              <input
-                id="salary-approve"
-                type="checkbox"
-                checked={salaryFormValues.approve}
-                onChange={(event) => {
-                  const nextValues = {
-                    ...salaryFormValues,
-                    approve: event.currentTarget.checked
-                  };
-
-                  setSalaryFormValues(nextValues);
-                  setSalaryFormErrors(validateSalary(nextValues));
-                }}
-              />
-              <span>{t('salaryPanel.approveCheckbox')}</span>
-            </label>
-          ) : null}
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={resetSalaryPanel}>

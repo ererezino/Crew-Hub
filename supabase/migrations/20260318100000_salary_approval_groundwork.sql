@@ -14,12 +14,14 @@ alter table public.compensation_records
 alter table public.compensation_records
   add column if not exists approved_at timestamptz;
 
--- Backfill: any record that already has approved_by set is considered approved.
+-- Backfill: ALL existing salary records are grandfathered as approved.
+-- Before this migration, there was no approval lifecycle — every record fed
+-- into payroll unconditionally. Marking them all as approved preserves that
+-- behaviour and prevents active employees from losing salary inputs.
 update public.compensation_records
   set salary_status = 'approved',
-      approved_at = updated_at
-  where approved_by is not null
-    and salary_status = 'pending';
+      approved_at = coalesce(updated_at, now())
+  where salary_status = 'pending';
 
 -- ── 2. Index for payroll calculation: only approved salaries feed into payroll ──
 
