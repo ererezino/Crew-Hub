@@ -5,10 +5,10 @@ import type { PaymentMethod } from "../../types/payment-details";
 import { sendPaymentDetailsUpdatedEmail } from "./email";
 
 /**
- * Notify HR/admin when an employee updates their payment details.
+ * Notify finance staff when an employee updates their payment details.
  * Delegates to the branded email template via sendPaymentDetailsUpdatedEmail.
  */
-export async function notifyHrPaymentDetailsChanged({
+export async function notifyPaymentDetailsChanged({
   orgId,
   employeeName,
   employeeEmail,

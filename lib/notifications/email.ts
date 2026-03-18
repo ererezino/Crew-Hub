@@ -1174,9 +1174,10 @@ export async function sendPaymentDetailsUpdatedEmail({
     if (isEmailFlowSuspended("paymentDetailsUpdated")) return;
     if (!isEmailEnabled("paymentDetailsUpdated")) return;
 
-    const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
+    const financeEmails = await fetchEmailsByRole({ orgId, role: "FINANCE_ADMIN" });
+    const approverEmails = await fetchEmailsByRole({ orgId, role: "FINANCE_APPROVER" });
     const adminEmails = await fetchEmailsByRole({ orgId, role: "SUPER_ADMIN" });
-    const recipients = [...new Set([...hrEmails, ...adminEmails])];
+    const recipients = [...new Set([...financeEmails, ...approverEmails, ...adminEmails])];
 
     if (recipients.length === 0) return;
 
