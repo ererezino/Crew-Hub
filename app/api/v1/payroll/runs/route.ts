@@ -146,23 +146,23 @@ export async function GET() {
       });
     }
 
-    const initiatedByIds = [
+    const actorIds = [
       ...new Set(
         parsedRuns.data
-          .map((row) => row.initiated_by)
+          .flatMap((row) => [row.initiated_by, row.first_approved_by, row.final_approved_by])
           .filter((value): value is string => typeof value === "string")
       )
     ];
-    const initiatedByNameById = new Map<string, string>();
+    const actorNameById = new Map<string, string>();
 
-    if (initiatedByIds.length > 0) {
-      const { data: rawInitiators, error: initiatorError } = await supabase
+    if (actorIds.length > 0) {
+      const { data: rawActors, error: actorError } = await supabase
         .from("profiles")
         .select("id, full_name")
         .eq("org_id", session.profile.org_id)
-        .in("id", initiatedByIds);
+        .in("id", actorIds);
 
-      if (initiatorError) {
+      if (actorError) {
         return jsonResponse<null>(500, {
           data: null,
           error: {
@@ -173,15 +173,22 @@ export async function GET() {
         });
       }
 
-      for (const row of rawInitiators ?? []) {
+      for (const row of rawActors ?? []) {
         if (typeof row.id === "string" && typeof row.full_name === "string") {
-          initiatedByNameById.set(row.id, row.full_name);
+          actorNameById.set(row.id, row.full_name);
         }
       }
     }
 
     const runs = parsedRuns.data.map((row) =>
-      toPayrollRunSummary(row, row.initiated_by ? initiatedByNameById.get(row.initiated_by) ?? "Unknown user" : null)
+      toPayrollRunSummary(
+        row,
+        row.initiated_by ? actorNameById.get(row.initiated_by) ?? "Unknown user" : null,
+        {
+          firstApprovedByName: row.first_approved_by ? actorNameById.get(row.first_approved_by) ?? null : null,
+          finalApprovedByName: row.final_approved_by ? actorNameById.get(row.final_approved_by) ?? null : null
+        }
+      )
     );
 
     const latestRun = runs[0] ?? null;

@@ -190,7 +190,13 @@ export async function GET(
       });
     }
 
-    const [{ data: rawItems, error: itemsError }, { data: rawInitiator, error: initiatorError }] =
+    // Collect unique user IDs for initiator + approvers to resolve names in one query
+    const userIdsToResolve = new Set<string>();
+    if (parsedRun.data.initiated_by) userIdsToResolve.add(parsedRun.data.initiated_by);
+    if (parsedRun.data.first_approved_by) userIdsToResolve.add(parsedRun.data.first_approved_by);
+    if (parsedRun.data.final_approved_by) userIdsToResolve.add(parsedRun.data.final_approved_by);
+
+    const [{ data: rawItems, error: itemsError }, { data: rawActorProfiles, error: actorError }] =
       await Promise.all([
         supabase
           .from("payroll_items")
@@ -201,17 +207,20 @@ export async function GET(
           .eq("payroll_run_id", runId)
           .is("deleted_at", null)
           .order("created_at", { ascending: true }),
-        parsedRun.data.initiated_by
+        userIdsToResolve.size > 0
           ? supabase
               .from("profiles")
               .select("id, full_name")
               .eq("org_id", session.profile.org_id)
-              .eq("id", parsedRun.data.initiated_by)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null })
+              .in("id", [...userIdsToResolve])
+          : Promise.resolve({ data: [] as Array<{ id: string; full_name: string }>, error: null })
       ]);
 
-    if (itemsError || initiatorError) {
+    const actorNameById = new Map(
+      (rawActorProfiles ?? []).map((p: { id: string; full_name: string }) => [p.id, p.full_name])
+    );
+
+    if (itemsError || actorError) {
       return jsonResponse<null>(500, {
         data: null,
         error: {
@@ -399,7 +408,15 @@ export async function GET(
 
     const runSummary = toPayrollRunSummary(
       parsedRun.data,
-      rawInitiator?.full_name ?? null
+      parsedRun.data.initiated_by ? actorNameById.get(parsedRun.data.initiated_by) ?? null : null,
+      {
+        firstApprovedByName: parsedRun.data.first_approved_by
+          ? actorNameById.get(parsedRun.data.first_approved_by) ?? null
+          : null,
+        finalApprovedByName: parsedRun.data.final_approved_by
+          ? actorNameById.get(parsedRun.data.final_approved_by) ?? null
+          : null
+      }
     );
 
     const responseData: PayrollRunDetailResponseData = {

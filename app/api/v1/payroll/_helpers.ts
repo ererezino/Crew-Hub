@@ -135,7 +135,8 @@ export function toSnapshot(value: unknown): Record<string, unknown> {
 
 export function toPayrollRunSummary(
   row: z.infer<typeof payrollRunRowSchema>,
-  initiatedByName: string | null
+  initiatedByName: string | null,
+  approverNames?: { firstApprovedByName?: string | null; finalApprovedByName?: string | null }
 ): PayrollRunSummary {
   return {
     id: row.id,
@@ -147,8 +148,10 @@ export function toPayrollRunSummary(
     initiatedBy: row.initiated_by,
     initiatedByName,
     firstApprovedBy: row.first_approved_by,
+    firstApprovedByName: approverNames?.firstApprovedByName ?? null,
     firstApprovedAt: row.first_approved_at,
     finalApprovedBy: row.final_approved_by,
+    finalApprovedByName: approverNames?.finalApprovedByName ?? null,
     finalApprovedAt: row.final_approved_at,
     totalGross: toCurrencyTotals(row.total_gross),
     totalNet: toCurrencyTotals(row.total_net),

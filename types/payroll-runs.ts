@@ -40,8 +40,10 @@ export type PayrollRunSummary = {
   initiatedBy: string | null;
   initiatedByName: string | null;
   firstApprovedBy: string | null;
+  firstApprovedByName: string | null;
   firstApprovedAt: string | null;
   finalApprovedBy: string | null;
+  finalApprovedByName: string | null;
   finalApprovedAt: string | null;
   totalGross: PayrollCurrencyTotals;
   totalNet: PayrollCurrencyTotals;

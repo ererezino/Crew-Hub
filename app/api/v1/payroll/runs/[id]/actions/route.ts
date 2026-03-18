@@ -736,7 +736,15 @@ export async function POST(
       parsedUpdated.data,
       parsedUpdated.data.initiated_by === profile.id
         ? profile.full_name
-        : null
+        : null,
+      {
+        firstApprovedByName: parsedUpdated.data.first_approved_by === profile.id
+          ? profile.full_name
+          : null,
+        finalApprovedByName: parsedUpdated.data.final_approved_by === profile.id
+          ? profile.full_name
+          : null
+      }
     );
 
     return jsonResponse<{ run: PayrollRunSummary }>(200, {

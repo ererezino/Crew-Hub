@@ -940,7 +940,7 @@ export function PayrollRunDetailClient({
                     <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
                     <p className="settings-card-description">
                       {t.rich('approval.approvedByAt', {
-                        name: runQuery.data.run.firstApprovedBy ?? "--",
+                        name: runQuery.data.run.firstApprovedByName ?? "--",
                         date: formatDate(runQuery.data.run.firstApprovedAt, locale),
                         time: (chunks) => (
                           <time
@@ -967,7 +967,7 @@ export function PayrollRunDetailClient({
                     <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
                     <p className="settings-card-description">
                       {t.rich('approval.approvedByAt', {
-                        name: runQuery.data.run.finalApprovedBy ?? "--",
+                        name: runQuery.data.run.finalApprovedByName ?? "--",
                         date: formatDate(runQuery.data.run.finalApprovedAt, locale),
                         time: (chunks) => (
                           <time
