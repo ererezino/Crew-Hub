@@ -22,6 +22,18 @@ export function canManageCompensation(roles: readonly UserRole[]): boolean {
   );
 }
 
+/**
+ * Salary approval: FINANCE_APPROVER or SUPER_ADMIN.
+ * Separation of duties: the creator of the record must not be the approver.
+ */
+export function canApproveSalary(roles: readonly UserRole[]): boolean {
+  return hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
+}
+
+/**
+ * Equity grant approval: SUPER_ADMIN only.
+ * This is intentionally more restrictive than salary approval.
+ */
 export function canApproveCompensation(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "SUPER_ADMIN");
 }

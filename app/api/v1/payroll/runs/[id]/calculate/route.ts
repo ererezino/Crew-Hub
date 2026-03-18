@@ -219,6 +219,7 @@ export async function POST(
               "id, employee_id, base_salary_amount, currency, effective_from, effective_to, updated_at"
             )
             .eq("org_id", profile.org_id)
+            .eq("salary_status", "approved")
             .is("deleted_at", null)
             .in("employee_id", eligibleEmployeeIds)
             .lte("effective_from", parsedRun.data.pay_period_end)

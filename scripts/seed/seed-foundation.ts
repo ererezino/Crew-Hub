@@ -3760,7 +3760,9 @@ async function upsertSeedCompensation(
       employment_type: compensation.employmentType,
       effective_from: effectiveFrom,
       effective_to: effectiveTo,
+      salary_status: approvedById ? "approved" as const : "pending" as const,
       approved_by: approvedById,
+      approved_at: approvedById ? new Date().toISOString() : null,
       deleted_at: null
     };
 

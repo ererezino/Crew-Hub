@@ -342,7 +342,11 @@ function initialEquityForm(canApprove: boolean): EquityFormValues {
   };
 }
 
-function salaryApprovalTone(approvedBy: string | null) {
+function salaryApprovalTone(salaryStatus: string) {
+  return salaryStatus === "approved" ? "success" : "pending";
+}
+
+function equityApprovalTone(approvedBy: string | null) {
   return approvedBy ? "success" : "pending";
 }
 
@@ -951,8 +955,8 @@ export function AdminCompensationClient({
                       />
                     </p>
                   </div>
-                  <StatusBadge tone={salaryApprovalTone(currentSalary.approvedBy)}>
-                    {currentSalary.approvedBy ? t('salary.approved') : t('salary.pendingApproval')}
+                  <StatusBadge tone={salaryApprovalTone(currentSalary.salaryStatus)}>
+                    {currentSalary.salaryStatus === "approved" ? t('salary.approved') : t('salary.pendingApproval')}
                   </StatusBadge>
                 </header>
 
@@ -1028,8 +1032,8 @@ export function AdminCompensationClient({
                         </td>
                         <td>{formatPayFrequencyLabel(record.payFrequency)}</td>
                         <td>
-                          <StatusBadge tone={salaryApprovalTone(record.approvedBy)}>
-                            {record.approvedBy ? t('salary.approved') : t('salary.pending')}
+                          <StatusBadge tone={salaryApprovalTone(record.salaryStatus)}>
+                            {record.salaryStatus === "approved" ? t('salary.approved') : t('salary.pending')}
                           </StatusBadge>
                         </td>
                         <td className="table-row-action-cell">
@@ -1041,14 +1045,14 @@ export function AdminCompensationClient({
                                 onClick={() =>
                                   handleSalaryApproval(
                                     record.id,
-                                    record.approvedBy ? "revoke" : "approve"
+                                    record.salaryStatus === "approved" ? "revoke" : "approve"
                                   )
                                 }
                                 disabled={isUpdatingSalaryApprovalId === record.id}
                               >
                                 {isUpdatingSalaryApprovalId === record.id
                                   ? tCommon('working')
-                                  : record.approvedBy
+                                  : record.salaryStatus === "approved"
                                     ? t('salary.revoke')
                                     : t('salary.approve')}
                               </button>
@@ -1266,7 +1270,7 @@ export function AdminCompensationClient({
                             </div>
                           </td>
                           <td>
-                            <StatusBadge tone={salaryApprovalTone(grant.approvedBy)}>
+                            <StatusBadge tone={equityApprovalTone(grant.approvedBy)}>
                               {grant.approvedBy ? t('equity.approved') : t('equity.pending')}
                             </StatusBadge>
                           </td>

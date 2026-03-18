@@ -8,7 +8,7 @@ import { COMPENSATION_EMPLOYMENT_TYPES, COMPENSATION_PAY_FREQUENCIES } from "../
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import {
   buildMeta,
-  canApproveCompensation,
+  canApproveSalary,
   canManageCompensation,
   ensureEffectiveWindow,
   ensureEmployeeInOrg,
@@ -119,12 +119,12 @@ export async function POST(request: Request) {
     });
   }
 
-  if (payload.approve && !canApproveCompensation(session.profile.roles)) {
+  if (payload.approve && !canApproveSalary(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only SUPER_ADMIN can approve salary changes."
+        message: "Only Finance Approver or Super Admin can approve salary records."
       },
       meta: buildMeta()
     });
@@ -160,7 +160,9 @@ export async function POST(request: Request) {
       employment_type: payload.employmentType,
       effective_from: payload.effectiveFrom,
       effective_to: effectiveTo,
-      approved_by: payload.approve ? session.profile.id : null
+      salary_status: payload.approve ? "approved" : "pending",
+      approved_by: payload.approve ? session.profile.id : null,
+      approved_at: payload.approve ? new Date().toISOString() : null
     })
     .select("id")
     .single();
@@ -208,7 +210,9 @@ export async function POST(request: Request) {
       employmentType: salaryRecord.employmentType,
       effectiveFrom: salaryRecord.effectiveFrom,
       effectiveTo: salaryRecord.effectiveTo,
-      approvedBy: salaryRecord.approvedBy
+      salaryStatus: salaryRecord.salaryStatus,
+      approvedBy: salaryRecord.approvedBy,
+      approvedAt: salaryRecord.approvedAt
     }
   });
 

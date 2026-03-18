@@ -44,6 +44,9 @@ export const EQUITY_GRANT_STATUSES = [
 
 export type EquityGrantStatus = (typeof EQUITY_GRANT_STATUSES)[number];
 
+export const SALARY_STATUSES = ["pending", "approved"] as const;
+export type SalaryStatus = (typeof SALARY_STATUSES)[number];
+
 export type CompensationEmployeeSummary = {
   id: string;
   fullName: string;
@@ -65,8 +68,10 @@ export type CompensationRecord = {
   employmentType: CompensationEmploymentType;
   effectiveFrom: string;
   effectiveTo: string | null;
+  salaryStatus: SalaryStatus;
   approvedBy: string | null;
   approvedByName: string | null;
+  approvedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

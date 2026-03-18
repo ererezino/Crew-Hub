@@ -4784,7 +4784,12 @@
       "approve": "Approuver",
       "revoke": "Révoquer",
       "copyId": "Copier l'ID",
-      "idCopied": "ID de l'enregistrement salarial copié."
+      "idCopied": "ID de l'enregistrement salarial copié.",
+      "separationOfDuties": "Vous ne pouvez pas approuver un enregistrement salarial que vous avez créé.",
+      "alreadyApproved": "Cet enregistrement salarial est déjà approuvé.",
+      "notYetApproved": "Cet enregistrement salarial n'est pas encore approuvé.",
+      "approvedByOn": "Approuvé par {name} le {date}",
+      "pendingApprovalHint": "Nécessite l'approbation d'un approbateur financier ou d'un super administrateur avant utilisation dans la paie."
     },
     "allowance": {
       "ariaLabel": "Section indemnités",

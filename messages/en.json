@@ -4912,7 +4912,12 @@
       "approve": "Approve",
       "revoke": "Revoke",
       "copyId": "Copy ID",
-      "idCopied": "Salary record ID copied."
+      "idCopied": "Salary record ID copied.",
+      "separationOfDuties": "You cannot approve a salary record you created.",
+      "alreadyApproved": "This salary record is already approved.",
+      "notYetApproved": "This salary record is not approved yet.",
+      "approvedByOn": "Approved by {name} on {date}",
+      "pendingApprovalHint": "Requires Finance Approver or Super Admin approval before payroll can use this record."
     },
     "allowance": {
       "ariaLabel": "Allowance section",

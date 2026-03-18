@@ -9,6 +9,7 @@ import {
   COMPENSATION_PAY_FREQUENCIES,
   EQUITY_GRANT_STATUSES,
   EQUITY_GRANT_TYPES,
+  SALARY_STATUSES,
   type AdminCompensationEmployeeOption,
   type AllowanceRecord,
   type CompensationEmployeeSummary,
@@ -38,7 +39,9 @@ const compensationRecordRowSchema = z.object({
   employment_type: z.enum(COMPENSATION_EMPLOYMENT_TYPES),
   effective_from: z.string(),
   effective_to: z.string().nullable(),
+  salary_status: z.enum(SALARY_STATUSES),
   approved_by: z.string().uuid().nullable(),
+  approved_at: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -138,7 +141,7 @@ export async function fetchCompensationSnapshot({
     supabase
       .from("compensation_records")
       .select(
-        "id, employee_id, org_id, base_salary_amount, currency, pay_frequency, employment_type, effective_from, effective_to, approved_by, created_at, updated_at"
+        "id, employee_id, org_id, base_salary_amount, currency, pay_frequency, employment_type, effective_from, effective_to, salary_status, approved_by, approved_at, created_at, updated_at"
       )
       .eq("org_id", orgId)
       .eq("employee_id", employeeId)
@@ -227,8 +230,10 @@ export async function fetchCompensationSnapshot({
     employmentType: row.employment_type,
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to,
+    salaryStatus: row.salary_status,
     approvedBy: row.approved_by,
     approvedByName: row.approved_by ? actorMap.get(row.approved_by) ?? "Unknown user" : null,
+    approvedAt: row.approved_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }));

@@ -3,11 +3,12 @@ import { z } from "zod";
 import { logAudit } from "../../../../../../../lib/audit";
 import { fetchCompensationSnapshot } from "../../../../../../../lib/compensation-store";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import type { CompensationMutationResponseData } from "../../../../../../../types/compensation";
 import {
   buildMeta,
-  canApproveCompensation,
+  canApproveSalary,
   jsonResponse
 } from "../../_helpers";
 
@@ -28,7 +29,9 @@ const actionSchema = z.object({
 const salaryRecordRowSchema = z.object({
   id: z.string().uuid(),
   employee_id: z.string().uuid(),
+  salary_status: z.enum(["pending", "approved"]),
   approved_by: z.string().uuid().nullable(),
+  created_by: z.string().uuid().nullable(),
   base_salary_amount: z.union([z.string(), z.number()]),
   currency: z.string(),
   pay_frequency: z.string(),
@@ -51,12 +54,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
-  if (!canApproveCompensation(session.profile.roles)) {
+  if (!canApproveSalary(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only SUPER_ADMIN can approve salary records."
+        message: "Only Finance Approver or Super Admin can approve salary records."
       },
       meta: buildMeta()
     });
@@ -105,10 +108,12 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const supabase = await createSupabaseServerClient();
 
+  // Use service-role client for the fetch to bypass RLS and get created_by
+  // (created_by is tracked via Supabase's auth.uid() at insert time, stored in audit)
   const { data: existingRow, error: fetchError } = await supabase
     .from("compensation_records")
     .select(
-      "id, employee_id, approved_by, base_salary_amount, currency, pay_frequency, employment_type, effective_from, effective_to"
+      "id, employee_id, salary_status, approved_by, base_salary_amount, currency, pay_frequency, employment_type, effective_from, effective_to"
     )
     .eq("id", parsedParams.data.recordId)
     .eq("org_id", session.profile.org_id)
@@ -126,7 +131,26 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
-  const parsedExisting = salaryRecordRowSchema.safeParse(existingRow);
+  // We need the created_by from the audit log to enforce separation of duties.
+  // The compensation_records table doesn't have a created_by column, so we look
+  // it up from the audit trail (the user who inserted the record).
+  const svcClient = createSupabaseServiceRoleClient();
+  const { data: auditRow } = await svcClient
+    .from("audit_log")
+    .select("actor_id")
+    .eq("table_name", "compensation_records")
+    .eq("record_id", parsedParams.data.recordId)
+    .eq("action", "created")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  const createdBy = auditRow?.actor_id ?? null;
+
+  const parsedExisting = salaryRecordRowSchema.safeParse({
+    ...existingRow,
+    created_by: createdBy
+  });
 
   if (!parsedExisting.success) {
     return jsonResponse<null>(404, {
@@ -139,13 +163,53 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
-  const nextApprovedBy =
-    parsedBody.data.action === "approve" ? session.profile.id : null;
+  const isApproveAction = parsedBody.data.action === "approve";
+
+  // ── Separation of duties: creator cannot approve their own record ──
+  if (isApproveAction && parsedExisting.data.created_by === session.profile.id) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message:
+          "You cannot approve a salary record you created. A different Finance Approver or Super Admin must approve it."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // ── Guard: don't re-approve an already-approved record ──
+  if (isApproveAction && parsedExisting.data.salary_status === "approved") {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "CONFLICT",
+        message: "This salary record is already approved."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // ── Guard: don't revoke a pending record ──
+  if (!isApproveAction && parsedExisting.data.salary_status === "pending") {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "CONFLICT",
+        message: "This salary record is not approved yet."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const now = new Date().toISOString();
 
   const { error: updateError } = await supabase
     .from("compensation_records")
     .update({
-      approved_by: nextApprovedBy
+      salary_status: isApproveAction ? "approved" : "pending",
+      approved_by: isApproveAction ? session.profile.id : null,
+      approved_at: isApproveAction ? now : null
     })
     .eq("id", parsedExisting.data.id)
     .eq("org_id", session.profile.org_id);
@@ -181,14 +245,17 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   await logAudit({
-    action: parsedBody.data.action === "approve" ? "approved" : "updated",
+    action: isApproveAction ? "approved" : "updated",
     tableName: "compensation_records",
     recordId: salaryRecord.id,
     oldValue: {
+      salaryStatus: parsedExisting.data.salary_status,
       approvedBy: parsedExisting.data.approved_by
     },
     newValue: {
-      approvedBy: salaryRecord.approvedBy
+      salaryStatus: salaryRecord.salaryStatus,
+      approvedBy: salaryRecord.approvedBy,
+      approvedAt: salaryRecord.approvedAt
     }
   });
 

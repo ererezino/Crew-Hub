@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { checkPageAccess } from "../../../../lib/auth/check-page-access";
-import { hasRole } from "../../../../lib/roles";
+import { canApprovePayroll } from "../../../../lib/roles";
 import { AdminCompensationClient } from "./admin-compensation-client";
 
 type AdminCompensationPageProps = {
@@ -65,7 +65,7 @@ export default async function AdminCompensationPage({
   return (
     <AdminCompensationClient
       initialEmployeeId={employeeId}
-      canApprove={hasRole(profile.roles, "SUPER_ADMIN")}
+      canApprove={canApprovePayroll(profile.roles)}
     />
   );
 }
