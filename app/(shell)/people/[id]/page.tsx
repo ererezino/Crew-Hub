@@ -89,12 +89,14 @@ export default async function PeopleProfilePage({
   const isSelf = parsedId.data === profile.id;
 
   // Managers/Team Leads can always view individual profiles (for direct reports).
+  // Finance roles can view individual profiles (for compensation/payment review).
   // Other roles need People module access via access config.
   // Self-view is always allowed.
   const isManagerOrLead =
     hasRole(profile.roles, "MANAGER") || hasRole(profile.roles, "TEAM_LEAD");
+  const hasFinanceAccess = canViewCompensation(profile.roles);
 
-  let hasPeopleAccess = isSelf || isManagerOrLead;
+  let hasPeopleAccess = isSelf || isManagerOrLead || hasFinanceAccess;
 
   if (!hasPeopleAccess) {
     const { allowed } = await checkPageAccess("/people");

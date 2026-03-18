@@ -1345,6 +1345,20 @@
     "noTimelineEventsTitle": "No compensation timeline events",
     "noTimelineEventsDescription": "Timeline events will appear after compensation changes are recorded."
   },
+  "compensationPaymentDetails": {
+    "heading": "Payment Details",
+    "description": "Payout destination on file for this employee.",
+    "methodLabel": "Method",
+    "destinationLabel": "Destination",
+    "currencyLabel": "Currency",
+    "holdLabel": "Hold status",
+    "verified": "Verified",
+    "pendingVerification": "Pending verification",
+    "holdActiveStatus": "Hold active",
+    "noHold": "No hold",
+    "noDetailsTitle": "No payment details on file",
+    "noDetailsDescription": "This employee has not configured a payout destination yet."
+  },
   "compliancePage": {
     "dataUnavailable": "Compliance data unavailable",
     "unableToLoad": "Unable to load compliance data.",

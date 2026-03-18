@@ -1424,6 +1424,20 @@
     "noTimelineEventsTitle": "Aucun événement de rémunération",
     "noTimelineEventsDescription": "Les événements apparaîtront après l'enregistrement de modifications de rémunération."
   },
+  "compensationPaymentDetails": {
+    "heading": "Coordonnées de paiement",
+    "description": "Destination de paiement enregistrée pour cet employé.",
+    "methodLabel": "Méthode",
+    "destinationLabel": "Destination",
+    "currencyLabel": "Devise",
+    "holdLabel": "Statut de blocage",
+    "verified": "Vérifié",
+    "pendingVerification": "En attente de vérification",
+    "holdActiveStatus": "Blocage actif",
+    "noHold": "Aucun blocage",
+    "noDetailsTitle": "Aucune coordonnée de paiement",
+    "noDetailsDescription": "Cet employé n'a pas encore configuré de destination de paiement."
+  },
   "compliancePage": {
     "dataUnavailable": "Données de conformité indisponibles",
     "unableToLoad": "Impossible de charger les données de conformité.",
