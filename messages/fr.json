@@ -1163,6 +1163,7 @@
     "modPerformance": "Performance",
     "modCompliance": "Conformité",
     "modAnalytics": "Analytiques",
+    "modDocumentManagement": "Gestion des documents",
     "modSignatures": "Signatures",
     "roleEmployee": "Employé",
     "roleEmployeeDesc": "Accès standard pour chaque membre de l'équipe",

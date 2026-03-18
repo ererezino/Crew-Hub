@@ -26,7 +26,7 @@ const ALL_MODULES: ModuleDef[] = [
   { key: "/announcements", labelKey: "modNotifications", icon: "Bell", categoryKey: "catCore" },
   { key: "/time-off", labelKey: "modTimeOff", icon: "CalendarOff", categoryKey: "catMyWork" },
   { key: "/me/pay", labelKey: "modMyPay", icon: "Wallet", categoryKey: "catMyWork" },
-  { key: "/documents", labelKey: "modDocuments", icon: "FileText", categoryKey: "catMyWork" },
+  { key: "/me/documents", labelKey: "modDocuments", icon: "FileText", categoryKey: "catMyWork" },
   { key: "/expenses", labelKey: "modExpenses", icon: "Receipt", categoryKey: "catMyWork" },
   { key: "/learning", labelKey: "modLearning", icon: "GraduationCap", categoryKey: "catMyWork" },
   { key: "/approvals", labelKey: "modApprovals", icon: "CheckCircle", categoryKey: "catTeam" },
@@ -39,6 +39,7 @@ const ALL_MODULES: ModuleDef[] = [
   { key: "/performance", labelKey: "modPerformance", icon: "Star", categoryKey: "catOperations" },
   { key: "/compliance", labelKey: "modCompliance", icon: "ShieldCheck", categoryKey: "catOperations" },
   { key: "/analytics", labelKey: "modAnalytics", icon: "BarChart3", categoryKey: "catOperations" },
+  { key: "/documents", labelKey: "modDocumentManagement", icon: "FolderOpen", categoryKey: "catOperations" },
   { key: "/signatures", labelKey: "modSignatures", icon: "PenTool", categoryKey: "catOperations" }
 ];
 

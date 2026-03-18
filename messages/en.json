@@ -1084,6 +1084,7 @@
     "modPerformance": "Performance",
     "modCompliance": "Compliance",
     "modAnalytics": "Analytics",
+    "modDocumentManagement": "Document management",
     "modSignatures": "Signatures",
     "roleEmployee": "Employee",
     "roleEmployeeDesc": "Standard access for every crew member",
