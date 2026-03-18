@@ -87,6 +87,15 @@ const AUDIT_ACCOUNTS = [
     roles: ["FINANCE_ADMIN"],
     countryCode: "KE",
     timezone: "Africa/Nairobi"
+  },
+  {
+    email: "financeapprover@accrue.test",
+    fullName: "Amina Osei",
+    title: "Chief Financial Officer",
+    department: "Finance",
+    roles: ["FINANCE_APPROVER"],
+    countryCode: "GH",
+    timezone: "Africa/Accra"
   }
 ];
 

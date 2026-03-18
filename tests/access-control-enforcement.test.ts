@@ -22,14 +22,14 @@ import type { UserRole } from "../lib/navigation";
 describe("Default nav item visibility by role", () => {
   const CONFIGURABLE_ITEMS: Record<string, UserRole[]> = {
     "/people": ["HR_ADMIN", "SUPER_ADMIN"],
-    "/payroll": ["FINANCE_ADMIN", "HR_ADMIN", "SUPER_ADMIN"],
-    "/analytics": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+    "/payroll": ["FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
+    "/analytics": ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
     "/compliance": ["HR_ADMIN", "SUPER_ADMIN"],
     "/performance": ["HR_ADMIN", "SUPER_ADMIN"],
     "/signatures": ["HR_ADMIN", "SUPER_ADMIN"],
-    "/approvals": ["MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+    "/approvals": ["MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
     "/onboarding": ["MANAGER", "HR_ADMIN", "SUPER_ADMIN"],
-    "/admin/compensation": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+    "/admin/compensation": ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
     "/admin/access-control": ["SUPER_ADMIN"]
   };
 

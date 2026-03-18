@@ -132,6 +132,7 @@ export function canViewTeamSchedules(userRoles: readonly UserRole[]): boolean {
     userRoles.includes("MANAGER") ||
     userRoles.includes("HR_ADMIN") ||
     userRoles.includes("FINANCE_ADMIN") ||
+    userRoles.includes("FINANCE_APPROVER") ||
     userRoles.includes("SUPER_ADMIN")
   );
 }

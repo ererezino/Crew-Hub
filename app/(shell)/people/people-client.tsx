@@ -481,6 +481,7 @@ export function PeopleClient({
     MANAGER: tcd('role.MANAGER'),
     HR_ADMIN: tcd('role.HR_ADMIN'),
     FINANCE_ADMIN: tcd('role.FINANCE_ADMIN'),
+    FINANCE_APPROVER: tcd('role.FINANCE_APPROVER'),
     SUPER_ADMIN: tcd('role.SUPER_ADMIN')
   };
 

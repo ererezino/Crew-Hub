@@ -60,6 +60,7 @@ function getRoleLabels(
     MANAGER: t("invite.roleManager"),
     HR_ADMIN: t("invite.roleHrAdmin"),
     FINANCE_ADMIN: t("invite.roleFinanceAdmin"),
+    FINANCE_APPROVER: t("invite.roleFinanceApprover"),
     SUPER_ADMIN: t("invite.roleSuperAdmin")
   };
 }

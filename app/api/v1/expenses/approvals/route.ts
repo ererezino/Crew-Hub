@@ -157,7 +157,7 @@ async function listFinanceAdminIds({
   }
 
   return parsedRows.data
-    .filter((row) => row.roles?.includes("FINANCE_ADMIN"))
+    .filter((row) => row.roles?.includes("FINANCE_ADMIN") || row.roles?.includes("FINANCE_APPROVER"))
     .map((row) => row.id);
 }
 

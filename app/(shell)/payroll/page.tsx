@@ -9,7 +9,7 @@ import { hasRole } from "../../../lib/roles";
 import { PayrollDashboardClient } from "./payroll-dashboard-client";
 
 function canManagePayroll(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export default async function PayrollPage() {

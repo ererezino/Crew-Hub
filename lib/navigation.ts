@@ -4,6 +4,7 @@ export const USER_ROLES = [
   "MANAGER",
   "HR_ADMIN",
   "FINANCE_ADMIN",
+  "FINANCE_APPROVER",
   "SUPER_ADMIN"
 ] as const;
 
@@ -135,7 +136,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Team",
     labelKey: "team",
-    requiredRoles: ["MANAGER", "TEAM_LEAD", "HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+    requiredRoles: ["MANAGER", "TEAM_LEAD", "HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
     items: [
       {
         label: "Approvals",
@@ -176,7 +177,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Finance",
     labelKey: "finance",
-    requiredRoles: ["FINANCE_ADMIN", "HR_ADMIN", "SUPER_ADMIN"],
+    requiredRoles: ["FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
     items: [
       {
         label: "Payroll",

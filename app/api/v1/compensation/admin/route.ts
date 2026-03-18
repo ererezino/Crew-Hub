@@ -29,6 +29,7 @@ function canViewOrgCompensation(roles: readonly UserRole[]): boolean {
   return (
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN")
   );
 }

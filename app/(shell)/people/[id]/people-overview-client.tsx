@@ -309,6 +309,7 @@ export function PeopleOverviewClient({
     MANAGER: tCommon('role.manager'),
     HR_ADMIN: tCommon('role.hrAdmin'),
     FINANCE_ADMIN: tCommon('role.financeAdmin'),
+    FINANCE_APPROVER: tCommon('role.financeApprover'),
     SUPER_ADMIN: tCommon('role.superAdmin')
   }), [tCommon]);
 

@@ -53,6 +53,7 @@ const ALL_ROLE_KEYS = [
   "MANAGER",
   "HR_ADMIN",
   "FINANCE_ADMIN",
+  "FINANCE_APPROVER",
   "SUPER_ADMIN"
 ] as const;
 
@@ -107,6 +108,14 @@ const ROLES: RoleDef[] = [
     icon: "Coins",
     accent: "#ca8a04",
     accentLight: "#fefce8"
+  },
+  {
+    role: "FINANCE_APPROVER",
+    labelKey: "roleFinanceApprover",
+    descriptionKey: "roleFinanceApproverDesc",
+    icon: "BadgeCheck",
+    accent: "#b45309",
+    accentLight: "#fffbeb"
   },
   {
     role: "SUPER_ADMIN",

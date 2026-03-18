@@ -35,6 +35,7 @@ export async function GET() {
     hasRole(roles, "MANAGER") ||
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN");
 
   if (!canReview) {
@@ -49,7 +50,10 @@ export async function GET() {
       },
       error: null,
       meta: buildMeta()
-    }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
+    }, {
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+      "Vary": "Cookie"
+    });
   }
 
   try {
@@ -59,7 +63,10 @@ export async function GET() {
       data,
       error: null,
       meta: buildMeta()
-    }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
+    }, {
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+      "Vary": "Cookie"
+    });
   } catch {
     return jsonResponse<null>(500, {
       data: null,

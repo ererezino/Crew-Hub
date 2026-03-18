@@ -44,7 +44,11 @@ function canManagerApproveExpenses(profile: SessionProfile): boolean {
 }
 
 function canFinanceApproveExpenses(profile: SessionProfile): boolean {
-  return hasRole(profile.roles, "FINANCE_ADMIN") || hasRole(profile.roles, "SUPER_ADMIN");
+  return (
+    hasRole(profile.roles, "FINANCE_ADMIN") ||
+    hasRole(profile.roles, "FINANCE_APPROVER") ||
+    hasRole(profile.roles, "SUPER_ADMIN")
+  );
 }
 
 /* ── Count helpers ── */

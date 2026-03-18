@@ -758,10 +758,11 @@ export async function sendExpenseApprovedEmail({
     if (!isEmailEnabled("expenseApproved")) return;
 
     const employee = await fetchRecipientProfile({ orgId, userId });
-    const financeEmails = await fetchEmailsByRole({
-      orgId,
-      role: "FINANCE_ADMIN"
-    });
+    const [financeAdminEmails, financeApproverEmails] = await Promise.all([
+      fetchEmailsByRole({ orgId, role: "FINANCE_ADMIN" }),
+      fetchEmailsByRole({ orgId, role: "FINANCE_APPROVER" })
+    ]);
+    const financeEmails = [...new Set([...financeAdminEmails, ...financeApproverEmails])];
     const appUrl = resolveAppUrl();
 
     // Template 10: to Employee
@@ -2281,14 +2282,12 @@ export async function sendPayrollApprovedEmail({
   try {
     if (!isEmailEnabled("payrollApproval")) return;
 
-    const financeEmails = await fetchEmailsByRole({
-      orgId,
-      role: "FINANCE_ADMIN"
-    });
-    const adminEmails = await fetchEmailsByRole({
-      orgId,
-      role: "SUPER_ADMIN"
-    });
+    const [financeAdminEmails, financeApproverEmails, adminEmails] = await Promise.all([
+      fetchEmailsByRole({ orgId, role: "FINANCE_ADMIN" }),
+      fetchEmailsByRole({ orgId, role: "FINANCE_APPROVER" }),
+      fetchEmailsByRole({ orgId, role: "SUPER_ADMIN" })
+    ]);
+    const financeEmails = [...new Set([...financeAdminEmails, ...financeApproverEmails])];
     const approver = await fetchRecipientProfile({ orgId, userId });
     const appUrl = resolveAppUrl();
 

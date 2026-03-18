@@ -62,12 +62,13 @@ export function canViewPayments(roles: readonly UserRole[]): boolean {
   return (
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN")
   );
 }
 
 export function canManagePayments(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 function parseAmount(value: number | string): number {

@@ -69,12 +69,14 @@
       "MANAGER": "Responsable",
       "HR_ADMIN": "Admin RH",
       "FINANCE_ADMIN": "Admin financier",
+      "FINANCE_APPROVER": "Approbateur financier",
       "SUPER_ADMIN": "Super admin",
       "employee": "Employé",
       "teamLead": "Chef d'équipe",
       "manager": "Responsable",
       "hrAdmin": "Administrateur RH",
       "financeAdmin": "Administrateur financier",
+      "financeApprover": "Approbateur financier",
       "superAdmin": "Super administrateur"
     },
     "employment": {
@@ -237,6 +239,7 @@
     },
     "roleBadge": {
       "superAdmin": "Super admin",
+      "financeApprover": "Approbateur financier",
       "hrFinanceAdmin": "Admin RH et financier",
       "hrAdmin": "Admin RH",
       "financeAdmin": "Admin financier",
@@ -666,6 +669,13 @@
       "lastPayrollRun": "Dernière paie",
       "noRunsYet": "Aucune paie effectuée",
       "pendingExpenseApprovals": "Dépenses en attente (finance)",
+      "goToPayroll": "Aller à la paie",
+      "reviewExpenses": "Traiter les dépenses"
+    },
+    "financeApprover": {
+      "lastPayrollRun": "Dernière paie",
+      "noRunsYet": "Aucune paie effectuée",
+      "pendingExpenseApprovals": "Dépenses en attente",
       "goToPayroll": "Aller à la paie",
       "reviewExpenses": "Traiter les dépenses"
     },
@@ -1175,6 +1185,8 @@
     "roleHrAdminDesc": "Opérations complètes de gestion du personnel et conformité",
     "roleFinanceAdmin": "Admin finance",
     "roleFinanceAdminDesc": "Paie, rémunération et supervision financière",
+    "roleFinanceApprover": "Approbateur financier",
+    "roleFinanceApproverDesc": "Approuve les lots de paie et les changements de salaire",
     "roleSuperAdmin": "Super admin",
     "roleSuperAdminDesc": "Accès illimité à tous les modules"
   },
@@ -2198,6 +2210,7 @@
       "roleManager": "Responsable",
       "roleHrAdmin": "Admin RH",
       "roleFinanceAdmin": "Admin Finance",
+      "roleFinanceApprover": "Approbateur financier",
       "roleSuperAdmin": "Super Admin",
       "managerLabel": "Chef d'équipe / Responsable",
       "managerSearchPlaceholder": "Rechercher par nom ou e-mail",
@@ -2248,6 +2261,7 @@
       "roleManager": "Responsable",
       "roleHrAdmin": "Admin RH",
       "roleFinanceAdmin": "Admin Finance",
+      "roleFinanceApprover": "Approbateur financier",
       "roleSuperAdmin": "Super Admin",
       "tableAriaLabel": "Tableau des utilisateurs",
       "colName": "Nom",
@@ -3897,6 +3911,7 @@
     "role": {
       "employee": "Employé",
       "financeAdmin": "Administrateur financier",
+      "financeApprover": "Approbateur financier",
       "hrAdmin": "Administrateur RH",
       "manager": "Responsable",
       "superAdmin": "Super administrateur",

@@ -28,7 +28,6 @@ const HR_ADMIN_ADDITIONAL_ACCESS = [
   "/compliance",
   "/admin/users",
   "/admin/compensation",
-  "/admin/payment-details",
   "/expenses/reports"
 ] as const;
 
@@ -39,7 +38,16 @@ const FINANCE_ADMIN_ADDITIONAL_ACCESS = [
   "/approvals",
   "/admin/users",
   "/admin/compensation",
-  "/admin/payment-details",
+  "/expenses/reports"
+] as const;
+
+const FINANCE_APPROVER_ADDITIONAL_ACCESS = [
+  "/analytics",
+  "/payroll",
+  "/compliance",
+  "/approvals",
+  "/admin/users",
+  "/admin/compensation",
   "/expenses/reports"
 ] as const;
 
@@ -58,6 +66,7 @@ export const DEFAULT_ROLE_ACCESS: Record<UserRole, string[]> = {
     ...HR_ADMIN_ADDITIONAL_ACCESS
   ],
   FINANCE_ADMIN: [...EMPLOYEE_DEFAULT_ACCESS, ...FINANCE_ADMIN_ADDITIONAL_ACCESS],
+  FINANCE_APPROVER: [...EMPLOYEE_DEFAULT_ACCESS, ...FINANCE_APPROVER_ADDITIONAL_ACCESS],
   SUPER_ADMIN: ["*"]
 };
 

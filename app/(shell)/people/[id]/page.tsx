@@ -36,6 +36,7 @@ function canViewCompensation(roles: readonly UserRole[]): boolean {
   return (
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN")
   );
 }
@@ -163,6 +164,7 @@ export default async function PeopleProfilePage({
           isAdmin={
             hasRole(profile.roles, "HR_ADMIN") ||
             hasRole(profile.roles, "FINANCE_ADMIN") ||
+            hasRole(profile.roles, "FINANCE_APPROVER") ||
             hasRole(profile.roles, "SUPER_ADMIN")
           }
           isSuperAdmin={hasRole(profile.roles, "SUPER_ADMIN")}

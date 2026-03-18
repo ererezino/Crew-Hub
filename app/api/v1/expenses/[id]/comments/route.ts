@@ -73,6 +73,7 @@ function canAdminViewExpense(roles: readonly UserRole[]): boolean {
   return (
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN")
   );
 }
@@ -99,7 +100,7 @@ function canRequestExpenseInfo({
   }
 
   if (FINANCE_THREAD_STATUSES.has(status)) {
-    return isSuperAdmin || hasRole(roles, "FINANCE_ADMIN");
+    return isSuperAdmin || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER");
   }
 
   return false;
@@ -903,7 +904,7 @@ export async function POST(
   const isFinanceStageRequester =
     parsedRequest.payload.action === "request_info" &&
     FINANCE_THREAD_STATUSES.has(expense.status) &&
-    (hasRole(session.profile.roles, "FINANCE_ADMIN") || isSuperAdmin);
+    (hasRole(session.profile.roles, "FINANCE_ADMIN") || hasRole(session.profile.roles, "FINANCE_APPROVER") || isSuperAdmin);
 
   if (parsedRequest.payload.action === "request_info") {
     const employeeNotificationBody = isFinanceStageRequester

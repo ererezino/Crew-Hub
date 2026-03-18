@@ -40,6 +40,7 @@ function canViewAnalytics(userRoles: readonly UserRole[]): boolean {
   return (
     hasRole(userRoles, "HR_ADMIN") ||
     hasRole(userRoles, "FINANCE_ADMIN") ||
+    hasRole(userRoles, "FINANCE_APPROVER") ||
     hasRole(userRoles, "SUPER_ADMIN")
   );
 }

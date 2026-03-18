@@ -32,11 +32,11 @@ function formatPayPeriodLabel(startDate: string, endDate: string): string {
 }
 
 function canSubmit(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 function canFirstApprove(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 function canFinalApprove(roles: readonly UserRole[]): boolean {
@@ -661,7 +661,7 @@ export async function POST(
               (row): row is { id: string; roles: string[] } =>
                 typeof row?.id === "string" &&
                 Array.isArray(row?.roles) &&
-                (row.roles.includes("FINANCE_ADMIN") || row.roles.includes("SUPER_ADMIN"))
+                (row.roles.includes("FINANCE_ADMIN") || row.roles.includes("FINANCE_APPROVER") || row.roles.includes("SUPER_ADMIN"))
             )
             .map((row) => row.id)
         )];
@@ -708,7 +708,7 @@ export async function POST(
               (row): row is { id: string; roles: string[] } =>
                 typeof row?.id === "string" &&
                 Array.isArray(row?.roles) &&
-                (row.roles.includes("FINANCE_ADMIN") || row.roles.includes("SUPER_ADMIN"))
+                (row.roles.includes("FINANCE_ADMIN") || row.roles.includes("FINANCE_APPROVER") || row.roles.includes("SUPER_ADMIN"))
             )
             .map((row) => row.id)
         )];

@@ -18,6 +18,7 @@ const ROLE_LABELS_EN: Record<string, string> = {
   MANAGER: "Manager",
   HR_ADMIN: "HR admin",
   FINANCE_ADMIN: "Finance admin",
+  FINANCE_APPROVER: "Finance approver",
   SUPER_ADMIN: "Super admin"
 };
 
@@ -27,6 +28,7 @@ const ROLE_LABELS_FR: Record<string, string> = {
   MANAGER: "Responsable",
   HR_ADMIN: "Admin RH",
   FINANCE_ADMIN: "Admin financier",
+  FINANCE_APPROVER: "Approbateur financier",
   SUPER_ADMIN: "Super admin"
 };
 

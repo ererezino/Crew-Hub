@@ -71,12 +71,14 @@
       "MANAGER": "Manager",
       "HR_ADMIN": "HR admin",
       "FINANCE_ADMIN": "Finance admin",
+      "FINANCE_APPROVER": "Finance approver",
       "SUPER_ADMIN": "Super admin",
       "employee": "Employee",
       "teamLead": "Team Lead",
       "manager": "Manager",
       "hrAdmin": "HR Admin",
       "financeAdmin": "Finance Admin",
+      "financeApprover": "Finance Approver",
       "superAdmin": "Super Admin"
     },
     "employment": {
@@ -239,6 +241,7 @@
     },
     "roleBadge": {
       "superAdmin": "Super Admin",
+      "financeApprover": "Finance Approver",
       "hrFinanceAdmin": "HR & Finance Admin",
       "hrAdmin": "HR Admin",
       "financeAdmin": "Finance Admin",
@@ -672,6 +675,13 @@
       "goToPayroll": "Go to payroll",
       "reviewExpenses": "Review expenses"
     },
+    "financeApprover": {
+      "lastPayrollRun": "Last payroll run",
+      "noRunsYet": "No runs yet",
+      "pendingExpenseApprovals": "Pending expense approvals",
+      "goToPayroll": "Go to payroll",
+      "reviewExpenses": "Review expenses"
+    },
     "superAdmin": {
       "headcount": "Headcount",
       "newThisMonth": "+{count} this month",
@@ -1096,6 +1106,8 @@
     "roleHrAdminDesc": "Full people operations and compliance",
     "roleFinanceAdmin": "Finance Admin",
     "roleFinanceAdminDesc": "Payroll, compensation, and financial oversight",
+    "roleFinanceApprover": "Finance Approver",
+    "roleFinanceApproverDesc": "Approves payroll batches and salary changes",
     "roleSuperAdmin": "Super Admin",
     "roleSuperAdminDesc": "Unrestricted access to every module"
   },
@@ -2127,6 +2139,7 @@
       "roleManager": "Manager",
       "roleHrAdmin": "HR Admin",
       "roleFinanceAdmin": "Finance Admin",
+      "roleFinanceApprover": "Finance Approver",
       "roleSuperAdmin": "Super Admin",
       "managerLabel": "Team Lead / Manager",
       "managerSearchPlaceholder": "Search by name or email",
@@ -2177,6 +2190,7 @@
       "roleManager": "Manager",
       "roleHrAdmin": "HR Admin",
       "roleFinanceAdmin": "Finance Admin",
+      "roleFinanceApprover": "Finance Approver",
       "roleSuperAdmin": "Super Admin",
       "tableAriaLabel": "Admin users table",
       "colName": "Name",
@@ -4025,6 +4039,7 @@
     "role": {
       "employee": "Employee",
       "financeAdmin": "Finance Admin",
+      "financeApprover": "Finance Approver",
       "hrAdmin": "HR Admin",
       "manager": "Manager",
       "superAdmin": "Super Admin",

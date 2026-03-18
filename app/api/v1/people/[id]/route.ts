@@ -216,7 +216,7 @@ export async function PUT(
     : existingRoles;
   const actorIsSuperAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
 
-  const highRiskRoles = new Set<AppRole>(["SUPER_ADMIN", "HR_ADMIN", "FINANCE_ADMIN"]);
+  const highRiskRoles = new Set<AppRole>(["SUPER_ADMIN", "HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER"]);
   const existingHighRiskRoleKey = existingRoles
     .filter((role): role is AppRole => highRiskRoles.has(role))
     .sort()
@@ -252,6 +252,40 @@ export async function PUT(
       error: {
         code: "FORBIDDEN",
         message: "Only a Super Admin can assign the Super Admin role."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // Prevent non-SUPER_ADMIN from assigning FINANCE_APPROVER role
+  if (
+    nextRoles.includes("FINANCE_APPROVER") &&
+    !existingRoles.includes("FINANCE_APPROVER") &&
+    !actorIsSuperAdmin
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only a Super Admin can assign the Finance Approver role."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // Prevent a SUPER_ADMIN from granting FINANCE_APPROVER to themselves.
+  // Separation of duties: the person who controls platform access must not
+  // also hold financial approval authority.
+  if (
+    nextRoles.includes("FINANCE_APPROVER") &&
+    !existingRoles.includes("FINANCE_APPROVER") &&
+    personId === session.profile.id
+  ) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You cannot assign the Finance Approver role to yourself."
       },
       meta: buildMeta()
     });

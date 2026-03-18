@@ -55,12 +55,13 @@ function canViewPayrollSettings(roles: readonly UserRole[]): boolean {
   return (
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN")
   );
 }
 
 function canManagePayrollSettings(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export async function GET() {

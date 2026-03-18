@@ -24,15 +24,15 @@ export type PayrollApprovalDecision =
     };
 
 function canSubmit(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 function canFirstApprove(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 function canFinalApprove(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export function evaluatePayrollApprovalAction(input: PayrollApprovalInput): PayrollApprovalDecision {

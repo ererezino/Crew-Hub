@@ -23,6 +23,7 @@ function getRoleLabel(role: AppRole, t: ReturnType<typeof useTranslations<"admin
     case "MANAGER": return t("directory.roleManager");
     case "HR_ADMIN": return t("directory.roleHrAdmin");
     case "FINANCE_ADMIN": return t("directory.roleFinanceAdmin");
+    case "FINANCE_APPROVER": return t("directory.roleFinanceApprover");
     case "SUPER_ADMIN": return t("directory.roleSuperAdmin");
   }
 }

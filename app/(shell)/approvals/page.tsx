@@ -69,6 +69,7 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
     hasRole(roles, "TEAM_LEAD") ||
     hasRole(roles, "MANAGER") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN");
 
   const resolvedSearchParams = await searchParams;

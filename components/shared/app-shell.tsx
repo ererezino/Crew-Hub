@@ -55,6 +55,7 @@ const APPROVAL_GROUP_ROLES: readonly UserRole[] = [
   "TEAM_LEAD",
   "HR_ADMIN",
   "FINANCE_ADMIN",
+  "FINANCE_APPROVER",
   "SUPER_ADMIN"
 ];
 
@@ -385,6 +386,7 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
 
   const roleBadge = useMemo(() => {
     if (hasRole(roles, "SUPER_ADMIN")) return t("roleBadge.superAdmin");
+    if (hasRole(roles, "FINANCE_APPROVER")) return t("roleBadge.financeApprover");
     if (hasRole(roles, "HR_ADMIN") && hasRole(roles, "FINANCE_ADMIN")) return t("roleBadge.hrFinanceAdmin");
     if (hasRole(roles, "HR_ADMIN")) return t("roleBadge.hrAdmin");
     if (hasRole(roles, "FINANCE_ADMIN")) return t("roleBadge.financeAdmin");

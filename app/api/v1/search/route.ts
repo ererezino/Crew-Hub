@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
   const searchTerm = `%${q}%`;
   const profile = session.profile;
   const roles: readonly UserRole[] = profile.roles;
-  const isAdmin = hasAnyRole(roles, ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"]);
+  const isAdmin = hasAnyRole(roles, ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"]);
   const isManager = hasRole(roles, "MANAGER");
 
   const supabase = await createSupabaseServerClient();

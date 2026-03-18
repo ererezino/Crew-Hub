@@ -48,6 +48,7 @@ function getFirstName(fullName: string): string {
 
 function getRoleBadge(roles: readonly UserRole[]): string {
   if (hasRole(roles, "SUPER_ADMIN")) return "Super Admin";
+  if (hasRole(roles, "FINANCE_APPROVER")) return "Finance Approver";
   if (hasRole(roles, "HR_ADMIN") && hasRole(roles, "FINANCE_ADMIN")) return "HR Admin + Finance Admin";
   if (hasRole(roles, "HR_ADMIN")) return "HR Admin";
   if (hasRole(roles, "FINANCE_ADMIN")) return "Finance Admin";
