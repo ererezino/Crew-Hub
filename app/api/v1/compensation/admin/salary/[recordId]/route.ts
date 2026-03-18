@@ -3,7 +3,6 @@ import { z } from "zod";
 import { logAudit } from "../../../../../../../lib/audit";
 import { fetchCompensationSnapshot } from "../../../../../../../lib/compensation-store";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
-import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import type { CompensationMutationResponseData } from "../../../../../../../types/compensation";
 import {
@@ -108,12 +107,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const supabase = await createSupabaseServerClient();
 
-  // Use service-role client for the fetch to bypass RLS and get created_by
-  // (created_by is tracked via Supabase's auth.uid() at insert time, stored in audit)
   const { data: existingRow, error: fetchError } = await supabase
     .from("compensation_records")
     .select(
-      "id, employee_id, salary_status, approved_by, base_salary_amount, currency, pay_frequency, employment_type, effective_from, effective_to"
+      "id, employee_id, salary_status, approved_by, created_by, base_salary_amount, currency, pay_frequency, employment_type, effective_from, effective_to"
     )
     .eq("id", parsedParams.data.recordId)
     .eq("org_id", session.profile.org_id)
@@ -131,26 +128,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
-  // We need the created_by from the audit log to enforce separation of duties.
-  // The compensation_records table doesn't have a created_by column, so we look
-  // it up from the audit trail (the user who inserted the record).
-  const svcClient = createSupabaseServiceRoleClient();
-  const { data: auditRow } = await svcClient
-    .from("audit_log")
-    .select("actor_user_id")
-    .eq("table_name", "compensation_records")
-    .eq("record_id", parsedParams.data.recordId)
-    .eq("action", "created")
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  const createdBy = auditRow?.actor_user_id ?? null;
-
-  const parsedExisting = salaryRecordRowSchema.safeParse({
-    ...existingRow,
-    created_by: createdBy
-  });
+  const parsedExisting = salaryRecordRowSchema.safeParse(existingRow);
 
   if (!parsedExisting.success) {
     return jsonResponse<null>(404, {

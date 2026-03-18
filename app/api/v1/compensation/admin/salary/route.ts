@@ -148,6 +148,7 @@ export async function POST(request: Request) {
       effective_from: payload.effectiveFrom,
       effective_to: effectiveTo,
       salary_status: "pending",
+      created_by: session.profile.id,
       approved_by: null,
       approved_at: null
     })
