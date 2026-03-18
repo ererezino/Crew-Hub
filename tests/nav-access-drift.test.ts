@@ -50,21 +50,16 @@ describe("Nav visibility alignment (W2.6)", () => {
     expect(access).not.toContain("/onboarding");
   });
 
-  // ── TEAM_LEAD: still has legitimate nav items ──
+  // ── TEAM_LEAD: /scheduling moved to per-person overrides (W2.6) ──
 
-  it("TEAM_LEAD still sees /scheduling in nav visibility", () => {
+  it("TEAM_LEAD does NOT see /scheduling in default nav visibility", () => {
     const visible = navVisibleForRole("TEAM_LEAD");
-    expect(visible).toContain("/scheduling");
+    expect(visible).not.toContain("/scheduling");
   });
 
   it("TEAM_LEAD still sees /team-hub in nav visibility", () => {
     const visible = navVisibleForRole("TEAM_LEAD");
     expect(visible).toContain("/team-hub");
-  });
-
-  it("TEAM_LEAD still has /scheduling/manage in default role access", () => {
-    const access = defaultAccessForRole("TEAM_LEAD");
-    expect(access).toContain("/scheduling/manage");
   });
 
   // ── MANAGER: /people is admin-only, not part of MANAGER default access ──
@@ -140,9 +135,11 @@ describe("Nav visibility alignment (W2.6)", () => {
     expect(roles).toContain("HR_ADMIN");
   });
 
-  it("/scheduling visible-to-roles still includes TEAM_LEAD", () => {
+  it("/scheduling visible-to-roles does NOT include TEAM_LEAD (per-person override)", () => {
     const roles = getDefaultVisibleRolesForNavItem("/scheduling");
-    expect(roles).toContain("TEAM_LEAD");
+    expect(roles).not.toContain("TEAM_LEAD");
+    expect(roles).toContain("HR_ADMIN");
+    expect(roles).toContain("SUPER_ADMIN");
   });
 
   it("/team-hub visible-to-roles still includes TEAM_LEAD", () => {

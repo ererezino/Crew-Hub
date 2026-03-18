@@ -103,13 +103,13 @@ describe("Phase 3 — Product Truthfulness and Launch-Scope Honesty", () => {
       expect(content).toContain("SupportLink");
     });
 
-    it("Support page includes Basecamp contact", () => {
+    it("Support page includes Basecamp contact via i18n key", () => {
       const supportPath = path.join(
         ROOT,
         "app/(shell)/support/page.tsx"
       );
       const content = fs.readFileSync(supportPath, "utf-8");
-      expect(content).toContain("Basecamp");
+      expect(content).toContain("basecampNote");
     });
 
     it("Support page links to privacy policy", () => {

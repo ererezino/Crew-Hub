@@ -206,9 +206,9 @@ describe("Phase 6 — Privacy, Legal, and Data Rights", () => {
       expect(content).toContain("/privacy");
     });
 
-    it("mentions data export in support page", () => {
+    it("mentions data export in support page via i18n key", () => {
       const content = readFile("app/(shell)/support/page.tsx");
-      expect(content).toMatch(/data export/i);
+      expect(content).toContain("dataExportHint");
     });
 
     it("links to privacy policy from support page", () => {
