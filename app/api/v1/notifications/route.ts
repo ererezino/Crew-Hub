@@ -166,7 +166,10 @@ export async function GET(request: Request) {
     data: responseData,
     error: null,
     meta: buildMeta()
-  }, { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" });
+  }, {
+    "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
+    "Vary": "Cookie"
+  });
 }
 
 /**
