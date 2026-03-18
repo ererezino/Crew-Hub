@@ -13171,6 +13171,72 @@ html.dark .home-quote-text {
   color: var(--text-primary);
 }
 
+/* ── Manager onboarding widget ── */
+
+.manager-onboarding-widget {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.manager-onboarding-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.manager-onboarding-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.manager-onboarding-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.manager-onboarding-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.manager-onboarding-card-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.manager-onboarding-card-copy {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.manager-onboarding-card-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manager-onboarding-card-meta {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
 /* ── New hire — onboarding progress ── */
 
 .dashboard-onboarding-progress {

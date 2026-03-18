@@ -17,19 +17,6 @@ type ShiftEditValues = {
   endTime: string;
 };
 
-const SHIFT_EDIT_COPY = {
-  title: "Edit Shift",
-  description: "Update assignment, date, or hours for this shift.",
-  assignee: "Assigned crew member",
-  openShiftOption: "Open shift (unassigned)",
-  date: "Shift date",
-  startTime: "Start time",
-  endTime: "End time",
-  save: "Save Changes",
-  validationRequired: "Date and time are required.",
-  validationTimeRange: "Start time and end time cannot be identical."
-} as const;
-
 type ShiftEditModalProps = {
   isOpen: boolean;
   shift: ShiftRecord;
@@ -107,6 +94,7 @@ export function ShiftEditModal({
   onSubmit
 }: ShiftEditModalProps) {
   const tc = useTranslations("common");
+  const tSched = useTranslations("scheduling");
 
   const [employeeId, setEmployeeId] = useState(() => shift.employeeId ?? "");
   const [shiftDate, setShiftDate] = useState(() => shift.shiftDate);
@@ -170,7 +158,7 @@ export function ShiftEditModal({
         className="modal-dialog shift-edit-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={SHIFT_EDIT_COPY.title}
+        aria-label={tSched("shiftEditModal.title")}
         onClick={(event) => event.stopPropagation()}
         style={{
           display: "grid",
@@ -178,11 +166,11 @@ export function ShiftEditModal({
           width: "min(520px, 92vw)"
         }}
       >
-        <h2 className="modal-title">{SHIFT_EDIT_COPY.title}</h2>
-        <p className="settings-card-description">{SHIFT_EDIT_COPY.description}</p>
+        <h2 className="modal-title">{tSched("shiftEditModal.title")}</h2>
+        <p className="settings-card-description">{tSched("shiftEditModal.description")}</p>
 
         <label className="form-label" htmlFor="shift-edit-assignee">
-          {SHIFT_EDIT_COPY.assignee}
+          {tSched("shiftEditModal.assignee")}
         </label>
         <select
           id="shift-edit-assignee"
@@ -194,7 +182,7 @@ export function ShiftEditModal({
           }}
           disabled={isSubmitting}
         >
-          <option value="">{SHIFT_EDIT_COPY.openShiftOption}</option>
+          <option value="">{tSched("shiftEditModal.openShiftOption")}</option>
           {assignees.map((assignee) => (
             <option key={assignee.id} value={assignee.id}>
               {assignee.fullName}
@@ -210,7 +198,7 @@ export function ShiftEditModal({
           }}
         >
           <label className="form-label" htmlFor="shift-edit-date">
-            {SHIFT_EDIT_COPY.date}
+            {tSched("shiftEditModal.date")}
           </label>
           <input
             id="shift-edit-date"
@@ -237,7 +225,7 @@ export function ShiftEditModal({
         >
           <div style={{ minWidth: 0 }}>
             <label className="form-label" htmlFor="shift-edit-start-time">
-              {SHIFT_EDIT_COPY.startTime}
+              {tSched("shiftEditModal.startTime")}
             </label>
             <input
               id="shift-edit-start-time"
@@ -253,7 +241,7 @@ export function ShiftEditModal({
           </div>
           <div style={{ minWidth: 0 }}>
             <label className="form-label" htmlFor="shift-edit-end-time">
-              {SHIFT_EDIT_COPY.endTime}
+              {tSched("shiftEditModal.endTime")}
             </label>
             <input
               id="shift-edit-end-time"
@@ -286,11 +274,11 @@ export function ShiftEditModal({
             disabled={submitDisabled || isSubmitting}
             onClick={() => {
               if (!shiftDate || !startTime || !endTime) {
-                setError(SHIFT_EDIT_COPY.validationRequired);
+                setError(tSched("shiftEditModal.validationRequired"));
                 return;
               }
               if (startTime === endTime) {
-                setError(SHIFT_EDIT_COPY.validationTimeRange);
+                setError(tSched("shiftEditModal.validationTimeRange"));
                 return;
               }
               onSubmit({
@@ -301,7 +289,7 @@ export function ShiftEditModal({
               });
             }}
           >
-            {isSubmitting ? tc("saving") : SHIFT_EDIT_COPY.save}
+            {isSubmitting ? tc("saving") : tSched("shiftEditModal.save")}
           </button>
         </div>
       </section>

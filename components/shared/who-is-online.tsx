@@ -102,11 +102,14 @@ function PresenceEntryRow({
   serverTime,
   statusLabels,
   presenceLabels,
+  t,
 }: {
   entry: PresenceEntry;
   serverTime: string | null;
   statusLabels: Record<string, string>;
   presenceLabels: Record<PresenceState, string>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: any;
 }) {
   const hasManualStatus = entry.availabilityStatus === "afk" || entry.availabilityStatus === "ooo";
 
@@ -121,18 +124,18 @@ function PresenceEntryRow({
     } else {
       const ms = computeDurationMs(entry.awaySince, serverTime);
       const dur = formatDuration(ms);
-      secondaryText = `Away ${dur}`;
-      dotTooltip = `Away for ${dur}`;
+      secondaryText = t("awayDuration", { dur });
+      dotTooltip = t("awayForDuration", { dur });
     }
   } else if (entry.presence === "offline") {
     if (entry.lastSeenAt) {
       const ms = computeDurationMs(entry.lastSeenAt, serverTime);
       const dur = formatDuration(ms);
-      secondaryText = `Last seen ${dur} ago`;
-      dotTooltip = `Offline - Last seen ${dur} ago`;
+      secondaryText = t("lastSeen", { dur });
+      dotTooltip = t("offlineLastSeen", { dur });
     } else {
-      secondaryText = "Never seen";
-      dotTooltip = "Offline - Never seen";
+      secondaryText = t("neverSeen");
+      dotTooltip = t("offlineNeverSeen");
     }
   }
 
@@ -270,6 +273,7 @@ export function WhoIsOnline({ isSidebarCollapsed }: WhoIsOnlineProps) {
                 serverTime={serverTime}
                 statusLabels={statusLabels}
                 presenceLabels={presenceLabels}
+                t={t}
               />
             ))
           )}
@@ -300,6 +304,7 @@ export function WhoIsOnline({ isSidebarCollapsed }: WhoIsOnlineProps) {
                   serverTime={serverTime}
                   statusLabels={statusLabels}
                   presenceLabels={presenceLabels}
+                  t={t}
                 />
               ))}
             </ul>

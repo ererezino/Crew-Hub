@@ -72,8 +72,8 @@ export function ManagerOnboardingWidget({ reports }: ManagerOnboardingWidgetProp
   }
 
   return (
-    <section className="settings-card" aria-label={t("managerOnboarding.ariaLabel")}>
-      <header className="announcements-section-header">
+    <section className="manager-onboarding-widget" aria-label={t("managerOnboarding.ariaLabel")}>
+      <header className="manager-onboarding-header">
         <div>
           <h2 className="section-title">{t("managerOnboarding.title")}</h2>
           <p className="settings-card-description">
@@ -85,15 +85,15 @@ export function ManagerOnboardingWidget({ reports }: ManagerOnboardingWidgetProp
         </Link>
       </header>
 
-      <div className="documents-grid">
+      <div className="manager-onboarding-list">
         {reports.map((report) => {
           const completion = progressPercent(report.tasksCompleted, report.tasksTotal);
           const hasOverdue = report.overdueManagerTaskCount > 0;
 
           return (
-            <article key={report.instanceId} className="settings-card">
-              <div className="documents-row-actions" style={{ justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            <article key={report.instanceId} className="manager-onboarding-card">
+              <div className="manager-onboarding-card-row">
+                <div className="manager-onboarding-card-identity">
                   {report.employeeAvatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -107,9 +107,9 @@ export function ManagerOnboardingWidget({ reports }: ManagerOnboardingWidgetProp
                       {report.employeeName.charAt(0)}
                     </span>
                   )}
-                  <div className="documents-cell-copy">
-                    <p className="documents-cell-title">{report.employeeName}</p>
-                    <p className="documents-cell-description numeric">
+                  <div className="manager-onboarding-card-copy">
+                    <p className="manager-onboarding-card-name">{report.employeeName}</p>
+                    <p className="manager-onboarding-card-meta numeric">
                       {t("managerOnboarding.daySummary", { day: report.daysSinceStart, completed: report.tasksCompleted, total: report.tasksTotal })}
                     </p>
                   </div>
@@ -121,11 +121,7 @@ export function ManagerOnboardingWidget({ reports }: ManagerOnboardingWidgetProp
                 </StatusBadge>
               </div>
 
-              <div
-                className="onboarding-banner-progress-track"
-                aria-hidden="true"
-                style={{ marginTop: "var(--space-3)" }}
-              >
+              <div className="onboarding-banner-progress-track" aria-hidden="true">
                 <span
                   className="onboarding-banner-progress-fill"
                   style={{ width: `${completion}%` }}

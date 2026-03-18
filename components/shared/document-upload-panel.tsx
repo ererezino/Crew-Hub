@@ -26,15 +26,21 @@ import {
 } from "../../types/documents";
 import { SlidePanel } from "./slide-panel";
 
-const uploadFormSchema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(200, "Title is too long"),
-  description: z.string().trim().max(2000, "Description is too long"),
-  category: z.enum(DOCUMENT_CATEGORIES),
-  expiryDate: z.union([z.literal(""), z.iso.date()]),
-  countryCode: z.union([z.literal(""), z.string().trim().min(2).max(2)])
-});
+function createUploadFormSchema(messages: {
+  titleRequired: string;
+  titleTooLong: string;
+  descriptionTooLong: string;
+}) {
+  return z.object({
+    title: z.string().trim().min(1, messages.titleRequired).max(200, messages.titleTooLong),
+    description: z.string().trim().max(2000, messages.descriptionTooLong),
+    category: z.enum(DOCUMENT_CATEGORIES),
+    expiryDate: z.union([z.literal(""), z.iso.date()]),
+    countryCode: z.union([z.literal(""), z.string().trim().min(2).max(2)])
+  });
+}
 
-type UploadFormValues = z.infer<typeof uploadFormSchema>;
+type UploadFormValues = z.infer<ReturnType<typeof createUploadFormSchema>>;
 type UploadFormField = keyof UploadFormValues | "file";
 type UploadFormErrors = Partial<Record<UploadFormField, string>>;
 type UploadFormTouched = Record<UploadFormField, boolean>;
@@ -67,14 +73,23 @@ const ALL_TOUCHED: UploadFormTouched = {
   file: true
 };
 
-const countryOptions = [
-  { value: "", label: "No country" },
-  { value: "NG", label: "Nigeria" },
-  { value: "GH", label: "Ghana" },
-  { value: "KE", label: "Kenya" },
-  { value: "ZA", label: "South Africa" },
-  { value: "CA", label: "Canada" }
-] as const;
+function getCountryOptions(messages: {
+  noCountry: string;
+  nigeria: string;
+  ghana: string;
+  kenya: string;
+  southAfrica: string;
+  canada: string;
+}) {
+  return [
+    { value: "", label: messages.noCountry },
+    { value: "NG", label: messages.nigeria },
+    { value: "GH", label: messages.ghana },
+    { value: "KE", label: messages.kenya },
+    { value: "ZA", label: messages.southAfrica },
+    { value: "CA", label: messages.canada }
+  ];
+}
 
 const uploadAcceptValue = ALLOWED_DOCUMENT_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 
@@ -92,17 +107,20 @@ function hasAnyError(errors: UploadFormErrors): boolean {
   return Object.values(errors).some((error) => Boolean(error));
 }
 
-function validateFile(file: File | null): string | undefined {
+function validateFile(
+  file: File | null,
+  messages: { fileRequired: string; fileTooLarge: string; unsupportedFileType: string }
+): string | undefined {
   if (!file) {
-    return "A file is required.";
+    return messages.fileRequired;
   }
 
   if (file.size > MAX_DOCUMENT_FILE_BYTES) {
-    return "File exceeds the 25MB upload limit.";
+    return messages.fileTooLarge;
   }
 
   if (!isAllowedDocumentUpload(file.name, file.type)) {
-    return "Unsupported file type. Allowed: pdf, docx, doc, xlsx, xls, png, jpg.";
+    return messages.unsupportedFileType;
   }
 
   return undefined;
@@ -112,9 +130,16 @@ function getValidationErrors(
   values: UploadFormValues,
   touched: UploadFormTouched,
   allowedCategories: readonly DocumentCategory[],
-  selectedFile: File | null
+  selectedFile: File | null,
+  schema: ReturnType<typeof createUploadFormSchema>,
+  messages: {
+    categoryNotAllowed: string;
+    fileRequired: string;
+    fileTooLarge: string;
+    unsupportedFileType: string;
+  }
 ): UploadFormErrors {
-  const parsed = uploadFormSchema.safeParse(values);
+  const parsed = schema.safeParse(values);
   const nextErrors: UploadFormErrors = {};
 
   if (!parsed.success) {
@@ -128,11 +153,11 @@ function getValidationErrors(
   }
 
   if (touched.category && !allowedCategories.includes(values.category)) {
-    nextErrors.category = "Category is not allowed for this page.";
+    nextErrors.category = messages.categoryNotAllowed;
   }
 
   if (touched.file) {
-    nextErrors.file = validateFile(selectedFile);
+    nextErrors.file = validateFile(selectedFile, messages);
   }
 
   return nextErrors;
@@ -140,7 +165,8 @@ function getValidationErrors(
 
 function uploadWithProgress(
   formData: FormData,
-  onProgress: (progress: number) => void
+  onProgress: (progress: number) => void,
+  errorMessage: string
 ): Promise<{ status: number; payload: DocumentUploadResponse | null }> {
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
@@ -157,7 +183,7 @@ function uploadWithProgress(
     };
 
     request.onerror = () => {
-      reject(new Error("Upload request failed."));
+      reject(new Error(errorMessage));
     };
 
     request.onload = () => {
@@ -189,6 +215,40 @@ export function DocumentUploadPanel({
   existingDocument = null
 }: DocumentUploadPanelProps) {
   const t = useTranslations("documents");
+
+  const validationMessages = useMemo(
+    () => ({
+      titleRequired: t("uploadPanel.titleRequired"),
+      titleTooLong: t("uploadPanel.titleTooLong"),
+      descriptionTooLong: t("uploadPanel.descriptionTooLong"),
+      fileRequired: t("uploadPanel.fileRequired"),
+      fileTooLarge: t("uploadPanel.fileTooLarge"),
+      unsupportedFileType: t("uploadPanel.unsupportedFileType"),
+      categoryNotAllowed: t("uploadPanel.categoryNotAllowed"),
+      uploadFailed: t("uploadPanel.uploadFailed"),
+      unableToUpload: t("uploadPanel.unableToUpload")
+    }),
+    [t]
+  );
+
+  const uploadSchema = useMemo(
+    () => createUploadFormSchema(validationMessages),
+    [validationMessages]
+  );
+
+  const countryOptions = useMemo(
+    () =>
+      getCountryOptions({
+        noCountry: t("uploadPanel.countryNoCountry"),
+        nigeria: t("uploadPanel.countryNigeria"),
+        ghana: t("uploadPanel.countryGhana"),
+        kenya: t("uploadPanel.countryKenya"),
+        southAfrica: t("uploadPanel.countrySouthAfrica"),
+        canada: t("uploadPanel.countryCanada")
+      }),
+    [t]
+  );
+
   const [values, setValues] = useState<UploadFormValues>(createInitialValues(existingDocument));
   const [touched, setTouched] = useState<UploadFormTouched>(INITIAL_TOUCHED);
   const [errors, setErrors] = useState<UploadFormErrors>({});
@@ -228,7 +288,7 @@ export function DocumentUploadPanel({
       setValues(nextValues);
 
       if (touched[field]) {
-        setErrors(getValidationErrors(nextValues, touched, allowedCategories, selectedFile));
+        setErrors(getValidationErrors(nextValues, touched, allowedCategories, selectedFile, uploadSchema, validationMessages));
       }
 
       if (submitError) {
@@ -243,7 +303,7 @@ export function DocumentUploadPanel({
     };
 
     setTouched(nextTouched);
-    setErrors(getValidationErrors(values, nextTouched, allowedCategories, selectedFile));
+    setErrors(getValidationErrors(values, nextTouched, allowedCategories, selectedFile, uploadSchema, validationMessages));
   };
 
   const handleFileSelection = (file: File | null) => {
@@ -255,7 +315,7 @@ export function DocumentUploadPanel({
     };
 
     setTouched(nextTouched);
-    setErrors(getValidationErrors(values, nextTouched, allowedCategories, file));
+    setErrors(getValidationErrors(values, nextTouched, allowedCategories, file, uploadSchema, validationMessages));
     setSubmitError(null);
     setProgress(0);
   };
@@ -286,7 +346,7 @@ export function DocumentUploadPanel({
     event.preventDefault();
 
     setTouched(ALL_TOUCHED);
-    const nextErrors = getValidationErrors(values, ALL_TOUCHED, allowedCategories, selectedFile);
+    const nextErrors = getValidationErrors(values, ALL_TOUCHED, allowedCategories, selectedFile, uploadSchema, validationMessages);
     setErrors(nextErrors);
     setSubmitError(null);
 
@@ -316,11 +376,11 @@ export function DocumentUploadPanel({
     }
 
     try {
-      const result = await uploadWithProgress(formData, setProgress);
+      const result = await uploadWithProgress(formData, setProgress, validationMessages.uploadFailed);
 
       if (result.status < 200 || result.status > 299 || !result.payload?.data?.document) {
         const errorMessage =
-          result.payload?.error?.message ?? "Unable to upload document.";
+          result.payload?.error?.message ?? validationMessages.unableToUpload;
         setSubmitError(errorMessage);
         setIsSubmitting(false);
         return;
@@ -330,7 +390,7 @@ export function DocumentUploadPanel({
       setIsSubmitting(false);
       onClose();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Unable to upload document.");
+      setSubmitError(error instanceof Error ? error.message : validationMessages.unableToUpload);
       setIsSubmitting(false);
     }
   };

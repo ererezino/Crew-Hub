@@ -91,7 +91,7 @@ export function PasskeyNudgeBanner() {
       <button
         type="button"
         onClick={dismiss}
-        aria-label="Dismiss passkey nudge"
+        aria-label={t("dismissAriaLabel")}
         style={{
           background: "none",
           border: "none",
