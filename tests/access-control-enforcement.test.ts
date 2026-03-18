@@ -198,8 +198,9 @@ describe("defaultNavVisibilityForRoles", () => {
     expect(visible).toContain("/dashboard");
     expect(visible).toContain("/time-off");
     expect(visible).toContain("/me/pay");
-    expect(visible).toContain("/documents");
+    expect(visible).toContain("/me/documents");
     expect(visible).toContain("/expenses");
+    expect(visible).not.toContain("/documents");
     expect(visible).not.toContain("/people");
     expect(visible).not.toContain("/payroll");
     expect(visible).not.toContain("/analytics");

@@ -108,7 +108,7 @@ export const NAV_GROUPS: NavGroup[] = [
       {
         label: "Documents",
         labelKey: "documents",
-        href: "/documents",
+        href: "/me/documents",
         icon: "FileText",
         description: "Your documents, required records, and expiry reminders",
         shortcut: "G D"
@@ -235,6 +235,14 @@ export const NAV_GROUPS: NavGroup[] = [
         description: "Workforce and operations trends with filters and exports",
         shortcut: "G N",
         moduleId: "analytics"
+      },
+      {
+        label: "Document management",
+        labelKey: "documentManagement",
+        href: "/documents",
+        icon: "FolderOpen",
+        description: "Manage employee documents, policies, and organization records",
+        shortcut: "G O"
       },
       {
         label: "Signatures",

@@ -89,7 +89,9 @@ const DEFAULT_NAV_ROLE_OVERRIDES: Readonly<Record<string, readonly UserRole[]>> 
   "/payroll": ["FINANCE_ADMIN", "HR_ADMIN", "SUPER_ADMIN"],
   "/admin/access-control": ["SUPER_ADMIN"],
   "/performance": ["HR_ADMIN", "SUPER_ADMIN"],
+  "/documents": ["HR_ADMIN", "SUPER_ADMIN"],
   "/signatures": ["HR_ADMIN", "SUPER_ADMIN"],
+  "/me/documents": ALL_ROLES,
   "/expenses": ALL_ROLES,
   "/settings?tab=organization": SUPER_ONLY,
   "/settings?tab=audit": ["HR_ADMIN", "SUPER_ADMIN"]
