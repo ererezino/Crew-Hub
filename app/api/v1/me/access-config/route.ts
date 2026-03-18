@@ -65,7 +65,7 @@ export async function GET() {
       },
       error: null,
       meta: buildMeta()
-    }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" });
+    }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600", "Vary": "Cookie" });
   }
 
   const supabase = createSupabaseServiceRoleClient();
@@ -117,7 +117,7 @@ export async function GET() {
       },
       error: null,
       meta: buildMeta()
-    }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" });
+    }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600", "Vary": "Cookie" });
   }
 
   const navRowByKey = new Map(parsedNavRows.data.map((row) => [row.nav_item_key, row] as const));
@@ -162,5 +162,5 @@ export async function GET() {
     },
     error: null,
     meta: buildMeta()
-  }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" });
+  }, { "Cache-Control": "private, max-age=300, stale-while-revalidate=600", "Vary": "Cookie" });
 }

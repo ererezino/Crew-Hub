@@ -260,7 +260,8 @@ function getInitials(fullName: string): string {
 
 async function fetchMyAccessConfig() {
   const response = await fetch("/api/v1/me/access-config", {
-    method: "GET"
+    method: "GET",
+    cache: "no-store"
   });
   const payload = (await response.json()) as MeAccessConfigResponse;
 
@@ -739,7 +740,7 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
   }, [sidebarGroupState]);
 
   const accessConfigQuery = useQuery({
-    queryKey: ["me-access-config"],
+    queryKey: ["me-access-config", currentUserProfile?.email ?? "unknown"],
     queryFn: fetchMyAccessConfig,
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
