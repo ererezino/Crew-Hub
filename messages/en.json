@@ -3588,7 +3588,41 @@
       "historicalReviewed": "Historical run marked as reviewed.",
       "historicalAuthorized": "Historical run authorized for publication.",
       "historicalPublished": "Historical run published. Payslips are now visible to employees."
+    },
+    "viewToggle": {
+      "worksheet": "Worksheet",
+      "items": "Item detail"
     }
+  },
+  "payrollWorksheet": {
+    "title": "Monthly payroll worksheet",
+    "tabs": {
+      "worksheet": "Full worksheet",
+      "cycle1": "Cycle 1",
+      "cycle2": "Cycle 2"
+    },
+    "cycleInfo": "{label} — target pay date: {date}",
+    "cycleNotCreated": "This cycle has not been created yet.",
+    "col": {
+      "employee": "Employee",
+      "designation": "Designation",
+      "department": "Dept",
+      "monthlySalary": "Monthly salary",
+      "c1Included": "C1",
+      "c1Amount": "Cycle 1 amount",
+      "c1OtHours": "C1 OT hrs",
+      "c1Overtime": "C1 overtime",
+      "c2Included": "C2",
+      "c2Amount": "Cycle 2 amount",
+      "c2OtHours": "C2 OT hrs",
+      "c2Overtime": "C2 overtime",
+      "bonus": "Bonus",
+      "fees": "Fees",
+      "monthlyTotal": "Monthly total",
+      "comment": "Comment",
+      "exception": "Exception"
+    },
+    "totals": "{count, plural, one {# employee} other {# employees}}"
   },
   "timeOff": {
     "title": "Time Off",

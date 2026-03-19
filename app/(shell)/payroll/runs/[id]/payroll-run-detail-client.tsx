@@ -12,6 +12,7 @@ import { z } from "zod";
 type AppLocale = "en" | "fr";
 
 import { CsvImportDialog } from "../../../../../components/payroll/csv-import-dialog";
+import { PayrollWorksheet } from "../../../../../components/payroll/payroll-worksheet";
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
@@ -335,6 +336,7 @@ export function PayrollRunDetailClient({
   const [isCreatingAmendment, setIsCreatingAmendment] = useState(false);
   const [isPerformingHistoricalAction, setIsPerformingHistoricalAction] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [detailView, setDetailView] = useState<"worksheet" | "items">("worksheet");
   const [provenanceNote, setProvenanceNote] = useState("");
   const { confirm, confirmDialog } = useConfirmAction();
 
@@ -1796,6 +1798,34 @@ export function PayrollRunDetailClient({
               ctaHref="/payroll"
             />
           ) : (
+            <>
+              {/* View toggle: worksheet vs legacy items */}
+              <div className="payroll-view-toggle">
+                <button
+                  type="button"
+                  className={`payroll-view-toggle-btn${detailView === "worksheet" ? " active" : ""}`}
+                  onClick={() => setDetailView("worksheet")}
+                >
+                  {td("viewToggle.worksheet")}
+                </button>
+                <button
+                  type="button"
+                  className={`payroll-view-toggle-btn${detailView === "items" ? " active" : ""}`}
+                  onClick={() => setDetailView("items")}
+                >
+                  {td("viewToggle.items")}
+                </button>
+              </div>
+
+              {detailView === "worksheet" ? (
+                <PayrollWorksheet
+                  run={runQuery.data.run}
+                  items={sortedItems}
+                  cycles={activeCycles}
+                  canEdit={canEditItems}
+                  onItemUpdated={() => runQuery.refresh()}
+                />
+              ) : (
             <section className="data-table-container" aria-label={t('title')}>
               <p className="settings-card-description">
                 {t('disbursementNotice')}
@@ -2371,6 +2401,8 @@ export function PayrollRunDetailClient({
                 </tbody>
               </table>
             </section>
+              )}
+            </>
           )}
         </>
       ) : null}

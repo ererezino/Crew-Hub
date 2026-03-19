@@ -3477,7 +3477,41 @@
       "failed": "Échoué",
       "cancelled": "Annulé"
     },
-    "dismissToast": "Fermer la notification"
+    "dismissToast": "Fermer la notification",
+    "viewToggle": {
+      "worksheet": "Feuille de calcul",
+      "items": "Détail des éléments"
+    }
+  },
+  "payrollWorksheet": {
+    "title": "Feuille de paie mensuelle",
+    "tabs": {
+      "worksheet": "Feuille complète",
+      "cycle1": "Cycle 1",
+      "cycle2": "Cycle 2"
+    },
+    "cycleInfo": "{label} — date de paiement cible : {date}",
+    "cycleNotCreated": "Ce cycle n'a pas encore été créé.",
+    "col": {
+      "employee": "Employé",
+      "designation": "Poste",
+      "department": "Dept",
+      "monthlySalary": "Salaire mensuel",
+      "c1Included": "C1",
+      "c1Amount": "Montant cycle 1",
+      "c1OtHours": "Heures sup. C1",
+      "c1Overtime": "Heures sup. C1",
+      "c2Included": "C2",
+      "c2Amount": "Montant cycle 2",
+      "c2OtHours": "Heures sup. C2",
+      "c2Overtime": "Heures sup. C2",
+      "bonus": "Prime",
+      "fees": "Frais",
+      "monthlyTotal": "Total mensuel",
+      "comment": "Commentaire",
+      "exception": "Exception"
+    },
+    "totals": "{count, plural, one {# employé} other {# employés}}"
   },
   "timeOff": {
     "title": "Congés",

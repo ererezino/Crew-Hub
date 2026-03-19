@@ -19854,6 +19854,204 @@ html.dark .crew-games-platform-game:hover {
 }
 
 /* ══════════════════════════════════════════════════════
+   Payroll Worksheet — spreadsheet-like finance screen
+   ══════════════════════════════════════════════════════ */
+
+.payroll-view-toggle {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+
+.payroll-view-toggle-btn {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.payroll-view-toggle-btn:not(:last-child) {
+  border-right: 1px solid var(--border-default);
+}
+
+.payroll-view-toggle-btn:hover {
+  background: var(--bg-hover);
+}
+
+.payroll-view-toggle-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.payroll-worksheet {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.payroll-worksheet-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-default);
+  padding-bottom: 0;
+}
+
+.payroll-worksheet-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.payroll-worksheet-tab:hover {
+  color: var(--text-primary);
+}
+
+.payroll-worksheet-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.payroll-worksheet-tab .status-badge {
+  font-size: var(--text-xs);
+}
+
+.payroll-worksheet-cycle-info {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border-radius: var(--radius-default);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.payroll-worksheet-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.payroll-worksheet-table {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.payroll-worksheet-table th,
+.payroll-worksheet-table td {
+  padding: var(--space-1) var(--space-2);
+}
+
+.payroll-worksheet-table th {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.payroll-worksheet-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+}
+
+.payroll-worksheet-table thead .payroll-worksheet-sticky-col {
+  background: var(--bg-surface);
+}
+
+.payroll-worksheet-table tbody .payroll-worksheet-sticky-col {
+  background: var(--bg-canvas);
+}
+
+.payroll-worksheet-table .data-table-row:hover .payroll-worksheet-sticky-col {
+  background: var(--bg-hover);
+}
+
+.payroll-worksheet-employee-name {
+  display: block;
+  font-weight: 500;
+}
+
+.payroll-worksheet-username {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.payroll-worksheet-total-cell {
+  font-weight: 600;
+}
+
+.payroll-worksheet-text-cell {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payroll-worksheet-totals-row td {
+  border-top: 2px solid var(--border-default);
+  background: var(--bg-surface);
+  font-weight: 600;
+}
+
+.payroll-worksheet-totals-row .payroll-worksheet-sticky-col {
+  background: var(--bg-surface);
+}
+
+/* Editable cell styles */
+.worksheet-cell-editable {
+  cursor: pointer;
+  border-radius: var(--radius-default);
+  padding: 1px 4px;
+  transition: background 0.12s;
+}
+
+.worksheet-cell-editable:hover {
+  background: var(--bg-hover);
+  outline: 1px dashed var(--border-default);
+}
+
+.worksheet-cell-editable:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.worksheet-cell-saving {
+  opacity: 0.5;
+}
+
+.worksheet-cell-input {
+  width: 100%;
+  min-width: 60px;
+  max-width: 120px;
+  padding: 2px 4px;
+  font-size: var(--text-sm);
+  font-family: inherit;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.worksheet-cell-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* ══════════════════════════════════════════════════════
    Design Polish — Historical governance refinements
    ══════════════════════════════════════════════════════ */
 
