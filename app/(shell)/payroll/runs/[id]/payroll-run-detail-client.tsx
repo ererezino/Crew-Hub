@@ -205,6 +205,7 @@ function statusToTimelineKey(status: PayrollRunStatus): string {
     approved: "approved",
     processing: "processing",
     completed: "completed",
+    cancelled: "cancelled",
   };
   return map[status] ?? status;
 }
@@ -1405,7 +1406,7 @@ export function PayrollRunDetailClient({
               {canApproveRun ? (
                 <button
                   type="button"
-                  className="button button-primary"
+                  className="button button-approve"
                   disabled={activeRunAction !== null}
                   onClick={async () => {
                     const confirmed = await confirm({
@@ -1465,7 +1466,7 @@ export function PayrollRunDetailClient({
               {canMarkCompleted ? (
                 <button
                   type="button"
-                  className="button button-primary"
+                  className="button button-consequential"
                   disabled={activeRunAction !== null}
                   onClick={() => {
                     void markCompleted();
@@ -1561,10 +1562,10 @@ export function PayrollRunDetailClient({
                         </p>
                       ) : null}
                       {canManage && cycle.status === "draft" ? (
-                        <div className="settings-actions">
+                        <div className="payroll-cycle-actions">
                           <button
                             type="button"
-                            className="button button-primary"
+                            className="button button-accent"
                             disabled={activeCycleActionId !== null}
                             onClick={() => void markCycleReady(cycle.id)}
                           >
@@ -1572,10 +1573,10 @@ export function PayrollRunDetailClient({
                           </button>
                         </div>
                       ) : canManage && cycle.status === "ready" ? (
-                        <div className="settings-actions">
+                        <div className="payroll-cycle-actions">
                           <button
                             type="button"
-                            className="button"
+                            className="button button-subtle"
                             disabled={activeCycleActionId !== null}
                             onClick={() => void markCycleProcessing(cycle.id)}
                           >
@@ -1583,7 +1584,7 @@ export function PayrollRunDetailClient({
                           </button>
                           <button
                             type="button"
-                            className="button button-primary"
+                            className="button button-consequential"
                             disabled={activeCycleActionId !== null}
                             onClick={() => void markCyclePaid(cycle.id)}
                           >
@@ -1591,10 +1592,10 @@ export function PayrollRunDetailClient({
                           </button>
                         </div>
                       ) : canManage && cycle.status === "processing" ? (
-                        <div className="settings-actions">
+                        <div className="payroll-cycle-actions">
                           <button
                             type="button"
-                            className="button button-primary"
+                            className="button button-consequential"
                             disabled={activeCycleActionId !== null}
                             onClick={() => void markCyclePaid(cycle.id)}
                           >

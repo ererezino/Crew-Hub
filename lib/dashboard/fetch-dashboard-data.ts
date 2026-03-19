@@ -30,7 +30,8 @@ import type {
   DashboardPendingApprovals,
   DashboardResponseData,
   DashboardShiftItem,
-  DashboardTeamOnLeaveItem
+  DashboardTeamOnLeaveItem,
+  FinanceOversightData
 } from "../../types/dashboard";
 
 /* ── Helpers ── */
@@ -104,6 +105,7 @@ function buildEmptyResponse(persona: DashboardPersona, greeting: DashboardGreeti
     headcountByDept: null,
     recentAuditLog: null,
     complianceHealth: null,
+    financeOversight: null,
     healthAlerts: null
   };
 }
@@ -1181,6 +1183,193 @@ async function fetchComplianceHealth(
   }
 }
 
+/* ── Finance oversight aggregator ── */
+
+async function fetchFinanceOversight(
+  supabase: SupabaseClient,
+  orgId: string
+): Promise<FinanceOversightData> {
+  const empty: FinanceOversightData = {
+    pendingPayrollApprovals: [],
+    pendingSalaryApprovals: { count: 0 },
+    historicalAwaitingAction: [],
+    completionGaps: [],
+    payoutBlockers: [],
+    activeCycles: []
+  };
+
+  try {
+    const [
+      submittedRunsResult,
+      pendingSalaryResult,
+      historicalRunsResult,
+      stuckRunsResult,
+      flaggedRunsResult,
+      activeCyclesResult
+    ] = await Promise.all([
+      /* 1. Payroll runs awaiting approval (status = submitted) */
+      supabase
+        .from("payroll_runs")
+        .select("id, pay_period_start, pay_period_end, status, employee_count, submitted_at")
+        .eq("org_id", orgId)
+        .eq("status", "submitted")
+        .is("deleted_at", null)
+        .order("submitted_at", { ascending: false })
+        .limit(10),
+
+      /* 2. Pending salary approvals */
+      supabase
+        .from("compensation_records")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("salary_status", "pending")
+        .is("deleted_at", null),
+
+      /* 3. Historical runs needing review/authorize/publish */
+      supabase
+        .from("payroll_runs")
+        .select("id, pay_period_start, pay_period_end, reviewed_at, authorized_at, published_at")
+        .eq("org_id", orgId)
+        .eq("is_historical", true)
+        .is("deleted_at", null)
+        .or("reviewed_at.is.null,authorized_at.is.null,published_at.is.null")
+        .order("created_at", { ascending: false })
+        .limit(10),
+
+      /* 4. Completion gaps — runs stuck mid-flow (calculated/approved/processing but not progressing) */
+      supabase
+        .from("payroll_runs")
+        .select("id, pay_period_start, pay_period_end, status, created_at")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .in("status", ["calculated", "approved", "processing"])
+        .eq("is_historical", false)
+        .order("created_at", { ascending: true })
+        .limit(10),
+
+      /* 5. Runs with flagged items — payout blockers */
+      supabase
+        .from("payroll_items")
+        .select("payroll_run_id")
+        .eq("org_id", orgId)
+        .eq("flagged", true)
+        .is("deleted_at", null),
+
+      /* 6. Active (non-paid) cycles */
+      supabase
+        .from("payroll_cycles")
+        .select("id, payroll_run_id, label, status, total_net, currency, created_at, payroll_runs!inner(pay_period_start, pay_period_end)")
+        .eq("org_id", orgId)
+        .is("deleted_at", null)
+        .in("status", ["draft", "ready", "processing"])
+        .order("created_at", { ascending: false })
+        .limit(10)
+    ]);
+
+    /* 1. Pending payroll approvals */
+    if (submittedRunsResult.data) {
+      for (const row of submittedRunsResult.data) {
+        const period = (row.pay_period_end ?? row.pay_period_start ?? "") as string;
+        empty.pendingPayrollApprovals.push({
+          id: row.id as string,
+          payPeriod: period,
+          status: row.status as string,
+          employeeCount: (row.employee_count as number) ?? 0,
+          submittedAt: (row.submitted_at as string) ?? null
+        });
+      }
+    }
+
+    /* 2. Pending salary approvals */
+    empty.pendingSalaryApprovals = {
+      count: pendingSalaryResult.count ?? 0
+    };
+
+    /* 3. Historical runs */
+    if (historicalRunsResult.data) {
+      for (const row of historicalRunsResult.data) {
+        const period = ((row.pay_period_end ?? row.pay_period_start ?? "") as string);
+        let nextStep: "review" | "authorize" | "publish" = "review";
+        if (row.reviewed_at && !row.authorized_at) nextStep = "authorize";
+        else if (row.reviewed_at && row.authorized_at && !row.published_at) nextStep = "publish";
+        else if (row.reviewed_at && row.authorized_at && row.published_at) continue;
+
+        empty.historicalAwaitingAction.push({
+          id: row.id as string,
+          payPeriod: period,
+          nextStep
+        });
+      }
+    }
+
+    /* 4. Completion gaps */
+    if (stuckRunsResult.data) {
+      for (const row of stuckRunsResult.data) {
+        const period = ((row.pay_period_end ?? row.pay_period_start ?? "") as string);
+        empty.completionGaps.push({
+          id: row.id as string,
+          payPeriod: period,
+          status: row.status as string,
+          createdAt: (row.created_at as string) ?? ""
+        });
+      }
+    }
+
+    /* 5. Payout blockers — aggregate flagged items by run */
+    if (flaggedRunsResult.data) {
+      const flagsByRun = new Map<string, number>();
+      for (const row of flaggedRunsResult.data) {
+        const runId = row.payroll_run_id as string;
+        flagsByRun.set(runId, (flagsByRun.get(runId) ?? 0) + 1);
+      }
+
+      /* Only include runs that are in active statuses */
+      const activeRunIds = new Set<string>();
+      if (stuckRunsResult.data) {
+        for (const row of stuckRunsResult.data) {
+          activeRunIds.add(row.id as string);
+        }
+      }
+      if (submittedRunsResult.data) {
+        for (const row of submittedRunsResult.data) {
+          activeRunIds.add(row.id as string);
+        }
+      }
+
+      for (const [runId, count] of flagsByRun) {
+        if (activeRunIds.has(runId)) {
+          empty.payoutBlockers.push({
+            runId,
+            payPeriod: "",
+            flaggedCount: count
+          });
+        }
+      }
+    }
+
+    /* 6. Active cycles */
+    if (activeCyclesResult.data) {
+      for (const row of activeCyclesResult.data) {
+        const runData = row.payroll_runs as unknown as { pay_period_start?: string; pay_period_end?: string } | null;
+        const period = (runData?.pay_period_end ?? runData?.pay_period_start ?? "") as string;
+        empty.activeCycles.push({
+          runId: row.payroll_run_id as string,
+          cycleId: row.id as string,
+          label: (row.label as string) ?? null,
+          status: row.status as string,
+          totalNet: (row.total_net as number) ?? 0,
+          currency: (row.currency as string) ?? "NGN",
+          payPeriod: period
+        });
+      }
+    }
+
+    return empty;
+  } catch {
+    return empty;
+  }
+}
+
 /* ── Main orchestrator ── */
 
 export async function fetchDashboardData(
@@ -1194,6 +1383,8 @@ export async function fetchDashboardData(
 
   const roleBasedPersona: DashboardPersona | null = hasRole(roles, "SUPER_ADMIN")
     ? "super_admin"
+    : hasRole(roles, "FINANCE_APPROVER")
+    ? "finance_approver"
     : hasRole(roles, "FINANCE_ADMIN")
     ? "finance_admin"
     : hasRole(roles, "HR_ADMIN")
@@ -1365,6 +1556,29 @@ export async function fetchDashboardData(
       break;
     }
 
+    case "finance_approver": {
+      const [
+        payroll,
+        pendingExpenseApprovals,
+        expensePipeline,
+        financeOversight,
+        leaveBalance
+      ] = await Promise.all([
+        fetchPayrollStatus(supabase, profile.org_id),
+        fetchPendingExpenseApprovals(supabase, profile.org_id),
+        fetchExpensePipeline(supabase, profile.org_id),
+        fetchFinanceOversight(supabase, profile.org_id),
+        fetchLeaveBalance(supabase, profile.org_id, profile.id)
+      ]);
+
+      response.payroll = payroll;
+      response.pendingExpenseApprovals = pendingExpenseApprovals;
+      response.expensePipeline = expensePipeline;
+      response.financeOversight = financeOversight;
+      response.leaveBalance = leaveBalance;
+      break;
+    }
+
     case "finance_admin": {
       const [
         payroll,
@@ -1404,7 +1618,8 @@ export async function fetchDashboardData(
         recentAuditLog,
         expiringDocuments,
         leaveBalance,
-        healthAlerts
+        healthAlerts,
+        financeOversight
       ] = await Promise.all([
         fetchHeadcount(supabase, profile.org_id),
         fetchHeadcountBreakdowns(supabase, profile.org_id),
@@ -1417,7 +1632,8 @@ export async function fetchDashboardData(
         fetchRecentAuditLog(supabase, profile.org_id),
         fetchExpiringDocuments(supabase, profile.org_id),
         fetchLeaveBalance(supabase, profile.org_id, profile.id),
-        getOrgHealthAlerts(supabase, profile.org_id)
+        getOrgHealthAlerts(supabase, profile.org_id),
+        fetchFinanceOversight(supabase, profile.org_id)
       ]);
 
       response.headcount = headcount;
@@ -1433,6 +1649,7 @@ export async function fetchDashboardData(
       response.expiringDocuments = expiringDocuments;
       response.leaveBalance = leaveBalance;
       response.healthAlerts = healthAlerts;
+      response.financeOversight = financeOversight;
       break;
     }
   }

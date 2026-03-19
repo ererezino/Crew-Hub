@@ -141,6 +141,58 @@ export type DashboardAuditLogEntry = {
   timestamp: string;
 };
 
+/* ── Finance oversight types (FINANCE_APPROVER + SUPER_ADMIN) ── */
+
+export type OversightPayrollApproval = {
+  id: string;
+  payPeriod: string;
+  status: string;
+  employeeCount: number;
+  submittedAt: string | null;
+};
+
+export type OversightSalaryPending = {
+  count: number;
+};
+
+export type OversightHistoricalRun = {
+  id: string;
+  payPeriod: string;
+  nextStep: "review" | "authorize" | "publish";
+};
+
+export type OversightCompletionGap = {
+  id: string;
+  payPeriod: string;
+  status: string;
+  createdAt: string;
+};
+
+export type OversightPayoutBlocker = {
+  runId: string;
+  payPeriod: string;
+  flaggedCount: number;
+};
+
+export type OversightActiveCycle = {
+  runId: string;
+  cycleId: string;
+  label: string | null;
+  status: string;
+  totalNet: number;
+  currency: string;
+  payPeriod: string;
+};
+
+export type FinanceOversightData = {
+  pendingPayrollApprovals: OversightPayrollApproval[];
+  pendingSalaryApprovals: OversightSalaryPending;
+  historicalAwaitingAction: OversightHistoricalRun[];
+  completionGaps: OversightCompletionGap[];
+  payoutBlockers: OversightPayoutBlocker[];
+  activeCycles: OversightActiveCycle[];
+};
+
 /**
  * Persona-aware dashboard response.
  *
@@ -229,6 +281,9 @@ export type DashboardResponseData = {
     inProgress: number;
     overdue: number;
   } | null;
+
+  /* ── finance oversight (finance_approver + super_admin) ── */
+  financeOversight: FinanceOversightData | null;
 
   /* ── admin health alerts (super_admin + hr_admin) ── */
   healthAlerts: HealthAlert[] | null;

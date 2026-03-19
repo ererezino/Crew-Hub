@@ -19551,3 +19551,400 @@ html.dark .crew-games-platform-game:hover {
   justify-content: center;
   color: var(--text-muted);
 }
+
+/* ══════════════════════════════════════════════════════
+   Finance Oversight Dashboard
+   ══════════════════════════════════════════════════════ */
+
+.oversight-section {
+  margin-bottom: var(--space-5);
+}
+
+.oversight-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+  letter-spacing: -0.01em;
+}
+
+.oversight-all-clear {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-radius: var(--radius-card);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.oversight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 768px) {
+  .oversight-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oversight-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
+}
+
+.oversight-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.oversight-card-urgent {
+  border-left: 3px solid var(--color-accent);
+}
+
+.oversight-card-attention {
+  border-left: 3px solid var(--status-warning-text);
+}
+
+.oversight-card-warning {
+  border-left: 3px solid var(--status-pending-text);
+}
+
+.oversight-card-danger {
+  border-left: 3px solid var(--status-error-text);
+}
+
+.oversight-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oversight-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-default);
+  flex-shrink: 0;
+}
+
+.oversight-icon-urgent {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+}
+
+.oversight-icon-attention {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.oversight-icon-info {
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+}
+
+.oversight-icon-warning {
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+}
+
+.oversight-icon-danger {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}
+
+.oversight-card-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.oversight-card-count {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.oversight-card-description {
+  font-size: var(--text-sm);
+}
+
+.oversight-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.oversight-card-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  flex-wrap: wrap;
+}
+
+.oversight-item-period {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.oversight-item-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.oversight-item-action {
+  flex-shrink: 0;
+  margin-left: auto;
+  text-decoration: none;
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — My Pay card refinements
+   ══════════════════════════════════════════════════════ */
+
+/* Stronger month label hierarchy */
+.pay-month-card .section-title {
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Clearer amount hero */
+.pay-month-card .payslip-card-amount {
+  font-size: var(--text-2xl, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* Disbursement progress bar — thicker, more visible */
+.pay-month-progress-track {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.pay-month-progress-fill {
+  border-radius: 4px;
+}
+
+/* Paid months get subtle success accent */
+.pay-month-card:has(.status-badge-success) {
+  border-left: 3px solid var(--status-success-text);
+}
+
+/* Partial months get warning accent */
+.pay-month-card:has(.status-badge-warning) {
+  border-left: 3px solid var(--status-warning-text);
+}
+
+/* Pending months get muted accent */
+.pay-month-card:has(.status-badge-pending) {
+  border-left: 3px solid var(--status-pending-text);
+}
+
+/* Meta grid — tighter on mobile */
+@media (max-width: 640px) {
+  .payslip-card-meta {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Variance copy — more subtle */
+.payslip-variance-copy {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — Payroll run detail refinements
+   ══════════════════════════════════════════════════════ */
+
+/* Status timeline dots — cleaner sizing */
+.payroll-status-step-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.payroll-status-step-complete .payroll-status-step-dot {
+  background: var(--status-success-text);
+  border-color: var(--status-success-text);
+}
+
+.payroll-status-step-active .payroll-status-step-dot {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+/* Run summary metrics — stronger hierarchy */
+.payroll-run-summary-grid .metric-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--space-3) var(--space-4);
+}
+
+/* Cycle cards — distinct state treatment */
+.payroll-cycle-card {
+  border-radius: var(--radius-card);
+  padding: var(--space-3) var(--space-4);
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
+}
+
+.payroll-cycle-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Cycle action buttons — clearer hierarchy */
+.payroll-cycle-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.payroll-cycle-actions .button-accent {
+  font-weight: 600;
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — Historical governance refinements
+   ══════════════════════════════════════════════════════ */
+
+/* Historical step indicators — cleaner visual */
+.historical-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 80px;
+}
+
+.historical-step .status-badge {
+  font-size: var(--text-xs);
+}
+
+/* Publish confirmation — more prominent */
+.historical-confirm-dialog {
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  margin-top: var(--space-3);
+}
+
+/* Historical visibility status — clearer contrast */
+.historical-visibility-visible {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-radius: var(--radius-default);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.historical-visibility-hidden {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--status-draft-bg);
+  color: var(--status-draft-text);
+  border-radius: var(--radius-default);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — Button hierarchy & consequential actions
+   ══════════════════════════════════════════════════════ */
+
+/* High-consequence action buttons — visually distinct */
+.button-consequential {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border: 1px solid var(--status-error-border, var(--status-error-text));
+  font-weight: 600;
+}
+
+.button-consequential:hover {
+  background: var(--status-error-text);
+  color: white;
+}
+
+/* Approve action — success tone, not generic */
+.button-approve {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border: 1px solid var(--status-success-text);
+  font-weight: 600;
+}
+
+.button-approve:hover {
+  background: var(--status-success-text);
+  color: white;
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — Metric card refinements
+   ══════════════════════════════════════════════════════ */
+
+.metric-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+  line-height: 1.4;
+}
+
+/* Inline-style replacements for dashboard widgets */
+.oversight-expense-snapshot {
+  margin-bottom: var(--space-3);
+}
+
+.oversight-expense-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.oversight-expense-pipeline {
+  margin-top: var(--space-2);
+}
+
+.oversight-expiring-docs-desc {
+  margin-bottom: var(--space-2);
+}

@@ -39,7 +39,12 @@ import {
   ShieldCheck,
   BarChart3,
   ChevronRight,
-  Activity
+  Activity,
+  Banknote,
+  CircleDot,
+  History,
+  Zap,
+  Ban
 } from "lucide-react";
 
 /* ── Greeting helpers ── */
@@ -395,14 +400,14 @@ function ExpenseSnapshot({ data }: { data: DashboardResponseData }) {
   if (!expenseSpendSummary) return null;
 
   return (
-    <article className="metric-card" style={{ marginBottom: "var(--space-3)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", alignItems: "center" }}>
+    <article className="metric-card oversight-expense-snapshot">
+      <div className="oversight-expense-header">
         <p className="metric-label">{t('superAdmin.expenseSnapshot')}</p>
         {expenseSpendSummary.mixedCurrency ? (
           <span className="settings-card-description">{t('superAdmin.primaryCurrencyView')}</span>
         ) : null}
       </div>
-      <div className="dashboard-pipeline" style={{ marginTop: "var(--space-2)" }}>
+      <div className="dashboard-pipeline oversight-expense-pipeline">
         <div className="dashboard-pipeline-stage">
           <span className="metric-label">{t('superAdmin.thisMonth')}</span>
           <span className="metric-value">
@@ -633,7 +638,7 @@ function ExpiringDocumentsWidget({ data }: { data: DashboardResponseData }) {
 
   return (
     <WidgetCard title={t('widget.expiringDocuments')} icon={<AlertTriangle size={14} />} viewAllHref="/documents">
-      <p className="settings-card-description numeric" style={{ marginBottom: "var(--space-2)" }}>
+      <p className="settings-card-description numeric oversight-expiring-docs-desc">
         {t('widget.documentsExpiring', { count: data.expiringDocuments.count })}
       </p>
       <ul className="dashboard-widget-list">
@@ -866,6 +871,198 @@ function PendingDecisionsWidget({ data }: { data: DashboardResponseData }) {
 }
 
 /* ══════════════════════════════════════════════
+   FINANCE OVERSIGHT — FINANCE_APPROVER + SUPER_ADMIN
+   ══════════════════════════════════════════════ */
+
+function FinanceOversightSection({ data }: { data: DashboardResponseData }) {
+  const t = useTranslations('dashboard');
+  const td = t as (key: string, params?: Record<string, unknown>) => string;
+  const locale = useLocale() as AppLocale;
+  const oversight = data.financeOversight;
+
+  if (!oversight) return null;
+
+  const totalItems =
+    oversight.pendingPayrollApprovals.length +
+    oversight.pendingSalaryApprovals.count +
+    oversight.historicalAwaitingAction.length +
+    oversight.completionGaps.length +
+    oversight.payoutBlockers.length +
+    oversight.activeCycles.length;
+
+  return (
+    <section className="oversight-section" aria-label={td('financeOversight.title')}>
+      <h2 className="oversight-section-title">
+        <ShieldCheck size={16} /> {td('financeOversight.title')}
+      </h2>
+
+      {totalItems === 0 ? (
+        <div className="oversight-all-clear">
+          <CheckCircle size={18} />
+          <span>{td('financeOversight.noOversightItems')}</span>
+        </div>
+      ) : (
+        <div className="oversight-grid">
+          {/* 1. Awaiting Approval */}
+          {oversight.pendingPayrollApprovals.length > 0 ? (
+            <article className="oversight-card oversight-card-urgent">
+              <header className="oversight-card-header">
+                <span className="oversight-card-icon oversight-icon-urgent">
+                  <CheckCircle size={14} />
+                </span>
+                <h3 className="oversight-card-title">{td('financeOversight.awaitingApproval')}</h3>
+                <span className="oversight-card-count">{oversight.pendingPayrollApprovals.length}</span>
+              </header>
+              <ul className="oversight-card-list">
+                {oversight.pendingPayrollApprovals.map((run) => (
+                  <li key={run.id} className="oversight-card-item">
+                    <span className="oversight-item-period">{run.payPeriod}</span>
+                    <span className="oversight-item-meta settings-card-description">
+                      {td('financeOversight.employees', { count: run.employeeCount })}
+                    </span>
+                    <Link href={`/payroll/runs/${run.id}`} className="oversight-item-action button button-accent button-sm">
+                      {td('financeOversight.approveRun')}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
+
+          {/* 2. Salary Changes Pending */}
+          {oversight.pendingSalaryApprovals.count > 0 ? (
+            <article className="oversight-card oversight-card-attention">
+              <header className="oversight-card-header">
+                <span className="oversight-card-icon oversight-icon-attention">
+                  <Banknote size={14} />
+                </span>
+                <h3 className="oversight-card-title">{td('financeOversight.salaryChangesPending')}</h3>
+                <span className="oversight-card-count">{oversight.pendingSalaryApprovals.count}</span>
+              </header>
+              <p className="oversight-card-description settings-card-description">
+                {td('financeOversight.salaryChangesPendingDesc', { count: oversight.pendingSalaryApprovals.count })}
+              </p>
+              <Link href="/admin/compensation" className="oversight-item-action button button-subtle button-sm">
+                {td('financeOversight.viewSalary')} <ChevronRight size={12} />
+              </Link>
+            </article>
+          ) : null}
+
+          {/* 3. Historical Runs Awaiting Action */}
+          {oversight.historicalAwaitingAction.length > 0 ? (
+            <article className="oversight-card">
+              <header className="oversight-card-header">
+                <span className="oversight-card-icon oversight-icon-info">
+                  <History size={14} />
+                </span>
+                <h3 className="oversight-card-title">{td('financeOversight.historicalAwaitingAction')}</h3>
+                <span className="oversight-card-count">{oversight.historicalAwaitingAction.length}</span>
+              </header>
+              <ul className="oversight-card-list">
+                {oversight.historicalAwaitingAction.map((run) => (
+                  <li key={run.id} className="oversight-card-item">
+                    <span className="oversight-item-period">{run.payPeriod}</span>
+                    <StatusBadge tone={run.nextStep === "publish" ? "success" : run.nextStep === "authorize" ? "processing" : "draft"}>
+                      {td('financeOversight.nextStep', { step: toSentenceCase(run.nextStep) })}
+                    </StatusBadge>
+                    <Link href={`/payroll/runs/${run.id}`} className="oversight-item-action button button-subtle button-sm">
+                      {td('financeOversight.viewRun')}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
+
+          {/* 4. Completion Gaps */}
+          {oversight.completionGaps.length > 0 ? (
+            <article className="oversight-card oversight-card-warning">
+              <header className="oversight-card-header">
+                <span className="oversight-card-icon oversight-icon-warning">
+                  <CircleDot size={14} />
+                </span>
+                <h3 className="oversight-card-title">{td('financeOversight.completionGaps')}</h3>
+                <span className="oversight-card-count">{oversight.completionGaps.length}</span>
+              </header>
+              <ul className="oversight-card-list">
+                {oversight.completionGaps.map((run) => (
+                  <li key={run.id} className="oversight-card-item">
+                    <span className="oversight-item-period">{run.payPeriod}</span>
+                    <StatusBadge tone={run.status === "approved" ? "success" : run.status === "processing" ? "processing" : "draft"}>
+                      {toSentenceCase(run.status)}
+                    </StatusBadge>
+                    <span className="oversight-item-meta settings-card-description">
+                      {td('financeOversight.stuckSince', { date: formatRelativeTime(run.createdAt, locale) })}
+                    </span>
+                    <Link href={`/payroll/runs/${run.id}`} className="oversight-item-action button button-subtle button-sm">
+                      {td('financeOversight.viewRun')}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
+
+          {/* 5. Payout Blockers */}
+          {oversight.payoutBlockers.length > 0 ? (
+            <article className="oversight-card oversight-card-danger">
+              <header className="oversight-card-header">
+                <span className="oversight-card-icon oversight-icon-danger">
+                  <Ban size={14} />
+                </span>
+                <h3 className="oversight-card-title">{td('financeOversight.payoutBlockers')}</h3>
+                <span className="oversight-card-count">{oversight.payoutBlockers.length}</span>
+              </header>
+              <ul className="oversight-card-list">
+                {oversight.payoutBlockers.map((blocker) => (
+                  <li key={blocker.runId} className="oversight-card-item">
+                    <span className="oversight-item-meta settings-card-description">
+                      {td('financeOversight.flaggedItems', { count: blocker.flaggedCount })}
+                    </span>
+                    <Link href={`/payroll/runs/${blocker.runId}`} className="oversight-item-action button button-subtle button-sm">
+                      {td('financeOversight.viewRun')}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
+
+          {/* 6. Active Payout Cycles */}
+          {oversight.activeCycles.length > 0 ? (
+            <article className="oversight-card">
+              <header className="oversight-card-header">
+                <span className="oversight-card-icon oversight-icon-info">
+                  <Zap size={14} />
+                </span>
+                <h3 className="oversight-card-title">{td('financeOversight.activeCycles')}</h3>
+                <span className="oversight-card-count">{oversight.activeCycles.length}</span>
+              </header>
+              <ul className="oversight-card-list">
+                {oversight.activeCycles.map((cycle) => (
+                  <li key={cycle.cycleId} className="oversight-card-item">
+                    <span className="oversight-item-period">{cycle.label ?? cycle.payPeriod}</span>
+                    <StatusBadge tone={cycle.status === "processing" ? "processing" : cycle.status === "ready" ? "pending" : "draft"}>
+                      {toSentenceCase(cycle.status)}
+                    </StatusBadge>
+                    <span className="oversight-item-meta settings-card-description">
+                      <CurrencyDisplay amount={cycle.totalNet} currency={cycle.currency} />
+                    </span>
+                    <Link href={`/payroll/runs/${cycle.runId}`} className="oversight-item-action button button-subtle button-sm">
+                      {td('financeOversight.viewRun')}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════════
    AUDIT FEED WIDGET — for super admin
    ══════════════════════════════════════════════ */
 
@@ -1021,8 +1218,15 @@ function DashboardContent({ initialData }: { initialData?: DashboardResponseData
 
       {/* Role-specific metrics strip — separated from hero */}
       {data.persona === "hr_admin" && <HrMetricsStrip data={data} />}
-      {data.persona === "finance_admin" && <FinanceMetricsStrip data={data} />}
+      {(data.persona === "finance_admin" || data.persona === "finance_approver") && <FinanceMetricsStrip data={data} />}
       {data.persona === "super_admin" && <SuperAdminMetricsStrip data={data} />}
+
+      {/* Finance oversight — approver + super admin only */}
+      {(data.persona === "finance_approver" || data.persona === "super_admin") && (
+        <WidgetErrorBoundary title="Finance oversight">
+          <FinanceOversightSection data={data} />
+        </WidgetErrorBoundary>
+      )}
 
       {/* Expense snapshot for super admin */}
       {data.persona === "super_admin" && <ExpenseSnapshot data={data} />}
@@ -1035,7 +1239,7 @@ function DashboardContent({ initialData }: { initialData?: DashboardResponseData
 
       {/* Admin CTA banners */}
       {data.persona === "hr_admin" && <HrAdminCTA data={data} />}
-      {data.persona === "finance_admin" && <FinanceAdminCTA data={data} />}
+      {(data.persona === "finance_admin" || data.persona === "finance_approver") && <FinanceAdminCTA data={data} />}
 
       <PasskeyNudgeBanner />
 
