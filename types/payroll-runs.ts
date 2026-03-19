@@ -52,33 +52,51 @@ export type PayrollRunSummary = {
   employeeCount: number;
   snapshot: Record<string, unknown>;
   notes: string | null;
-  payrollCycleId: string | null;
-  runLabel: string | null;
+  runMonth: string | null;
+  publishedAt: string | null;
+  submittedAt: string | null;
+  rejectedAt: string | null;
+  rejectionReason: string | null;
+  completedAt: string | null;
+  amendmentOf: string | null;
+  lockedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-export type PayrollCycleFrequency = "weekly" | "biweekly" | "semi_monthly" | "monthly";
+export type PayrollCycleStatus = "draft" | "ready" | "processing" | "paid" | "failed" | "cancelled";
 
 export type PayrollCycle = {
   id: string;
+  payrollRunId: string;
   orgId: string;
-  name: string;
-  frequency: PayrollCycleFrequency;
-  anchorDay: number;
-  payDayOffset: number;
-  active: boolean;
+  label: string;
+  currency: string;
+  status: PayrollCycleStatus;
+  paidAt: string | null;
+  paidBy: string | null;
+  paymentSnapshot: Record<string, unknown>;
+  lockedAt: string | null;
+  totalGross: number;
+  totalNet: number;
+  totalDeductions: number;
+  employeeCount: number;
   createdAt: string;
   updatedAt: string;
 };
+
+export type PayrollCycleItemDisbursementStatus = "pending" | "processing" | "paid" | "failed";
 
 export type PayrollCycleItem = {
   id: string;
   payrollCycleId: string;
+  payrollItemId: string;
   employeeId: string;
   orgId: string;
-  effectiveFrom: string;
-  effectiveTo: string | null;
+  paymentDestinationSnapshot: Record<string, unknown>;
+  disbursementStatus: PayrollCycleItemDisbursementStatus;
+  disbursementReference: string | null;
+  disbursementAmount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -102,6 +120,8 @@ export type OvertimeEntry = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type PayslipStatementType = "native" | "historical";
 
 export type PayrollRunDashboardMetrics = {
   latestStatus: PayrollRunStatus | null;
@@ -170,6 +190,9 @@ export type PayrollRunItem = {
   paymentReference: string | null;
   paymentId: string | null;
   notes: string | null;
+  financeNotes: string | null;
+  correctionOf: string | null;
+  correctionReason: string | null;
   flagged: boolean;
   flagReason: string | null;
   previousRunId: string | null;

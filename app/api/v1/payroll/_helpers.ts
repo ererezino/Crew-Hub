@@ -59,8 +59,14 @@ export const payrollRunRowSchema = z.object({
   employee_count: z.number().int(),
   snapshot: z.unknown(),
   notes: z.string().nullable(),
-  payroll_cycle_id: z.string().uuid().nullable().optional().default(null),
-  run_label: z.string().nullable().optional().default(null),
+  run_month: z.string().nullable().optional().default(null),
+  published_at: z.string().nullable().optional().default(null),
+  submitted_at: z.string().nullable().optional().default(null),
+  rejected_at: z.string().nullable().optional().default(null),
+  rejection_reason: z.string().nullable().optional().default(null),
+  completed_at: z.string().nullable().optional().default(null),
+  amendment_of: z.string().uuid().nullable().optional().default(null),
+  locked_at: z.string().nullable().optional().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -162,8 +168,14 @@ export function toPayrollRunSummary(
     employeeCount: row.employee_count,
     snapshot: toSnapshot(row.snapshot),
     notes: row.notes,
-    payrollCycleId: row.payroll_cycle_id ?? null,
-    runLabel: row.run_label ?? null,
+    runMonth: row.run_month ?? null,
+    publishedAt: row.published_at ?? null,
+    submittedAt: row.submitted_at ?? null,
+    rejectedAt: row.rejected_at ?? null,
+    rejectionReason: row.rejection_reason ?? null,
+    completedAt: row.completed_at ?? null,
+    amendmentOf: row.amendment_of ?? null,
+    lockedAt: row.locked_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
