@@ -54,6 +54,20 @@ const payrollItemRowSchema = z.object({
   correction_reason: z.string().nullable().optional().default(null),
   flagged: z.boolean(),
   flag_reason: z.string().nullable(),
+  cycle_1_base_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_base_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_overtime_hours: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_overtime_hours: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_overtime_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_overtime_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_included: z.boolean().optional().default(true),
+  cycle_2_included: z.boolean().optional().default(true),
+  fees: z.union([z.number(), z.string()]).optional().default(0),
+  bonus: z.union([z.number(), z.string()]).optional().default(0),
+  comment: z.string().nullable().optional().default(null),
+  exception_reason: z.string().nullable().optional().default(null),
+  designation: z.string().nullable().optional().default(null),
+  accrue_username: z.string().nullable().optional().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -210,7 +224,7 @@ export async function GET(
         supabase
           .from("payroll_items")
           .select(
-            "id, payroll_run_id, employee_id, org_id, gross_amount, currency, pay_currency, base_salary_amount, allowances, adjustments, deductions, employer_contributions, net_amount, withholding_applied, payment_status, payment_reference, payment_id, notes, flagged, flag_reason, created_at, updated_at"
+            "id, payroll_run_id, employee_id, org_id, gross_amount, currency, pay_currency, base_salary_amount, allowances, adjustments, deductions, employer_contributions, overtime_amount, overtime_hours, net_amount, withholding_applied, payment_status, payment_reference, payment_id, notes, finance_notes, correction_of, correction_reason, flagged, flag_reason, cycle_1_base_amount, cycle_2_base_amount, cycle_1_overtime_hours, cycle_2_overtime_hours, cycle_1_overtime_amount, cycle_2_overtime_amount, cycle_1_included, cycle_2_included, fees, bonus, comment, exception_reason, designation, accrue_username, created_at, updated_at"
           )
           .eq("org_id", session.profile.org_id)
           .eq("payroll_run_id", runId)
@@ -422,6 +436,27 @@ export async function GET(
           previousNetAmount === null ? null : netAmount - previousNetAmount,
         deductionTotal: deductionTotal(deductions),
         adjustmentTotal: adjustmentTotal(adjustments),
+        cycle1BaseAmount: parseAmount(row.cycle_1_base_amount ?? 0),
+        cycle2BaseAmount: parseAmount(row.cycle_2_base_amount ?? 0),
+        cycle1OvertimeHours: Number(row.cycle_1_overtime_hours ?? 0),
+        cycle2OvertimeHours: Number(row.cycle_2_overtime_hours ?? 0),
+        cycle1OvertimeAmount: parseAmount(row.cycle_1_overtime_amount ?? 0),
+        cycle2OvertimeAmount: parseAmount(row.cycle_2_overtime_amount ?? 0),
+        cycle1Included: row.cycle_1_included ?? true,
+        cycle2Included: row.cycle_2_included ?? true,
+        fees: parseAmount(row.fees ?? 0),
+        bonus: parseAmount(row.bonus ?? 0),
+        comment: row.comment ?? null,
+        exceptionReason: row.exception_reason ?? null,
+        designation: row.designation ?? null,
+        accrueUsername: row.accrue_username ?? null,
+        monthlyTotal:
+          parseAmount(row.cycle_1_base_amount ?? 0)
+          + parseAmount(row.cycle_2_base_amount ?? 0)
+          + parseAmount(row.cycle_1_overtime_amount ?? 0)
+          + parseAmount(row.cycle_2_overtime_amount ?? 0)
+          + parseAmount(row.bonus ?? 0)
+          - parseAmount(row.fees ?? 0),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       };

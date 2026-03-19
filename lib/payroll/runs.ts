@@ -147,6 +147,84 @@ export function monthPeriod(year: number, month: number): {
   };
 }
 
+/**
+ * Return the first Friday of a given month (1-based).
+ * Used for Cycle 1 target pay date.
+ */
+export function firstFriday(year: number, month: number): string {
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  const dayOfWeek = date.getUTCDay(); // 0=Sun, 5=Fri
+  const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+  date.setUTCDate(1 + daysUntilFriday);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Return the third Friday of a given month (1-based).
+ * Used for Cycle 2 target pay date.
+ */
+export function thirdFriday(year: number, month: number): string {
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  const dayOfWeek = date.getUTCDay();
+  const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+  date.setUTCDate(1 + daysUntilFriday + 14);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Compute the semimonthly cycle dates for a given year/month.
+ */
+export function semiMonthlyCycleDates(year: number, month: number): {
+  cycle1Date: string;
+  cycle2Date: string;
+} {
+  return {
+    cycle1Date: firstFriday(year, month),
+    cycle2Date: thirdFriday(year, month)
+  };
+}
+
+/**
+ * Parse a run_month string (YYYY-MM) into year and month.
+ */
+export function parseRunMonth(runMonth: string): { year: number; month: number } | null {
+  const match = runMonth.match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  return { year: Number.parseInt(match[1], 10), month: Number.parseInt(match[2], 10) };
+}
+
+export function labelForPayrollCycleStatus(status: string): string {
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function toneForPayrollCycleStatus(status: string): StatusTone {
+  switch (status) {
+    case "draft":
+      return "draft";
+    case "submitted":
+      return "pending";
+    case "approved":
+      return "success";
+    case "rejected":
+      return "warning";
+    case "ready":
+      return "info";
+    case "processing":
+      return "processing";
+    case "paid":
+      return "success";
+    case "failed":
+      return "error";
+    case "cancelled":
+      return "error";
+    default:
+      return "draft";
+  }
+}
+
 export function adjustmentTotal(adjustments: readonly PayrollRunAdjustment[]): number {
   return adjustments.reduce((sum, adjustment) => sum + Math.trunc(adjustment.amount), 0);
 }

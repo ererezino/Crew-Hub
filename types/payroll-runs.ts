@@ -54,6 +54,8 @@ export type PayrollRunSummary = {
   snapshot: Record<string, unknown>;
   notes: string | null;
   runMonth: string | null;
+  cycle1Date: string | null;
+  cycle2Date: string | null;
   publishedAt: string | null;
   submittedAt: string | null;
   submittedBy: string | null;
@@ -83,21 +85,44 @@ export type HistoricalActionResponseData = {
   run: PayrollRunSummary;
 };
 
-export type PayrollCycleStatus = "draft" | "ready" | "processing" | "paid" | "failed" | "cancelled";
+export const PAYROLL_CYCLE_STATUSES = [
+  "draft",
+  "submitted",
+  "approved",
+  "rejected",
+  "ready",
+  "processing",
+  "paid",
+  "failed",
+  "cancelled"
+] as const;
+
+export type PayrollCycleStatus = (typeof PAYROLL_CYCLE_STATUSES)[number];
 
 export type PayrollCycle = {
   id: string;
   payrollRunId: string;
   orgId: string;
   label: string;
+  cycleNumber: number | null;
   currency: string;
   status: PayrollCycleStatus;
   targetPayDate: string | null;
   preparedAt: string | null;
   preparedBy: string | null;
+  submittedAt: string | null;
+  submittedBy: string | null;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  rejectedAt: string | null;
+  rejectedBy: string | null;
+  rejectionReason: string | null;
   paidAt: string | null;
   paidBy: string | null;
+  paymentReference: string | null;
+  paymentNote: string | null;
   paymentSnapshot: Record<string, unknown>;
+  approvalSnapshot: PayrollCycleApprovalSnapshot | null;
   reconciledAt: string | null;
   reconciledBy: string | null;
   reconciliationNotes: string | null;
@@ -105,9 +130,51 @@ export type PayrollCycle = {
   totalGross: number;
   totalNet: number;
   totalDeductions: number;
+  totalOvertime: number;
+  totalBonus: number;
+  totalFees: number;
   employeeCount: number;
   createdAt: string;
   updatedAt: string;
+};
+
+/** Frozen snapshot created at cycle submission time.
+ *  This is THE authoritative record — approval review, payment evidence,
+ *  CSV/PDF exports, and audit all read from this snapshot. */
+export type PayrollCycleApprovalSnapshot = {
+  cycleNumber: number;
+  cycleLabel: string;
+  targetPayDate: string;
+  submittedAt: string;
+  submittedBy: string;
+  submittedByName: string;
+  currency: string;
+  employeeCount: number;
+  totalGross: number;
+  totalNet: number;
+  totalDeductions: number;
+  totalOvertime: number;
+  totalBonus: number;
+  totalFees: number;
+  rows: PayrollCycleSnapshotRow[];
+};
+
+export type PayrollCycleSnapshotRow = {
+  employeeId: string;
+  employeeName: string;
+  designation: string | null;
+  department: string | null;
+  accrueUsername: string | null;
+  monthlySalary: number;
+  cycleBaseAmount: number;
+  overtimeHours: number;
+  overtimeRate: number;
+  overtimeAmount: number;
+  bonus: number;
+  fees: number;
+  finalPayable: number;
+  comment: string | null;
+  exceptionReason: string | null;
 };
 
 export type PayrollCycleItemDisbursementStatus = "pending" | "processing" | "paid" | "failed";
@@ -197,6 +264,8 @@ export type PayrollRunItem = {
   payrollRunId: string;
   employeeId: string;
   fullName: string;
+  designation: string | null;
+  accrueUsername: string | null;
   department: string | null;
   countryCode: string | null;
   grossAmount: number;
@@ -228,6 +297,20 @@ export type PayrollRunItem = {
   netVarianceAmount: number | null;
   deductionTotal: number;
   adjustmentTotal: number;
+  /* ── Semimonthly worksheet columns ─────────────────────────────── */
+  cycle1BaseAmount: number;
+  cycle2BaseAmount: number;
+  cycle1OvertimeHours: number;
+  cycle2OvertimeHours: number;
+  cycle1OvertimeAmount: number;
+  cycle2OvertimeAmount: number;
+  cycle1Included: boolean;
+  cycle2Included: boolean;
+  fees: number;
+  bonus: number;
+  comment: string | null;
+  exceptionReason: string | null;
+  monthlyTotal: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -386,3 +469,64 @@ export type EditPayrollItemResponseData = {
 };
 
 export type EditPayrollItemResponse = ApiResponse<EditPayrollItemResponseData>;
+
+/* ------------------------------------------------------------------ */
+/*  Cycle-level approval action types                                  */
+/* ------------------------------------------------------------------ */
+
+export type PayrollCycleActionType =
+  | "submit"
+  | "approve"
+  | "reject"
+  | "mark_ready"
+  | "mark_processing"
+  | "mark_paid";
+
+export type PayrollCycleActionPayload = {
+  action: PayrollCycleActionType;
+  reason?: string | null;
+  paymentReference?: string | null;
+  paymentNote?: string | null;
+};
+
+export type PayrollCycleActionResponseData = {
+  cycle: PayrollCycle;
+};
+
+export type PayrollCycleActionResponse = ApiResponse<PayrollCycleActionResponseData>;
+
+/* ------------------------------------------------------------------ */
+/*  Worksheet row edit types                                           */
+/* ------------------------------------------------------------------ */
+
+export type WorksheetRowEditPayload = {
+  cycle1BaseAmount?: number;
+  cycle2BaseAmount?: number;
+  cycle1OvertimeHours?: number;
+  cycle2OvertimeHours?: number;
+  cycle1Included?: boolean;
+  cycle2Included?: boolean;
+  fees?: number;
+  bonus?: number;
+  comment?: string | null;
+  exceptionReason?: string | null;
+};
+
+export type WorksheetRowEditResponseData = {
+  item: PayrollRunItem;
+};
+
+export type WorksheetRowEditResponse = ApiResponse<WorksheetRowEditResponseData>;
+
+/* ------------------------------------------------------------------ */
+/*  Cycle export types                                                 */
+/* ------------------------------------------------------------------ */
+
+export type CycleExportFormat = "csv" | "pdf";
+
+export type CycleExportResponseData = {
+  url: string;
+  format: CycleExportFormat;
+  cycleId: string;
+  generatedAt: string;
+};

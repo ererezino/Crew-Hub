@@ -1,8 +1,7 @@
 import { hasRole } from "../roles";
 import type { UserRole } from "../navigation";
 import type { PayrollApprovalDecision } from "./approval-policy";
-
-export type PayrollCycleStatus = "draft" | "ready" | "processing" | "paid" | "failed" | "cancelled";
+import type { PayrollCycleStatus } from "../../types/payroll-runs";
 
 // ── Prepare payout ──────────────────────────────────────────────────
 
@@ -27,12 +26,18 @@ export function evaluatePreparePayoutAction(input: PreparePayoutInput): PayrollA
     };
   }
 
-  // Multi-cycle: allow new cycles on approved or processing runs
-  if (input.runStatus !== "approved" && input.runStatus !== "processing") {
+  // Semimonthly model: cycles are auto-created with the run in draft/calculated state.
+  // Manual cycle creation is allowed on approved or processing runs (legacy compat).
+  if (
+    input.runStatus !== "draft" &&
+    input.runStatus !== "calculated" &&
+    input.runStatus !== "approved" &&
+    input.runStatus !== "processing"
+  ) {
     return {
       allowed: false,
       code: "INVALID_STATE",
-      message: "Only approved or processing runs can have payout cycles created."
+      message: "Payout cycles can only be created on draft, calculated, approved, or processing runs."
     };
   }
 
@@ -47,36 +52,58 @@ export function evaluatePreparePayoutAction(input: PreparePayoutInput): PayrollA
   return { allowed: true };
 }
 
-// ── Cycle action (mark_ready / mark_processing / mark_paid) ────────
+// ── Cycle action (submit / approve / reject / mark_ready / mark_processing / mark_paid) ──
 
-export type CycleActionType = "mark_ready" | "mark_processing" | "mark_paid";
+export type CycleActionType =
+  | "submit"
+  | "approve"
+  | "reject"
+  | "mark_ready"
+  | "mark_processing"
+  | "mark_paid";
 
 export type CycleActionInput = {
   action: CycleActionType;
   cycleStatus: PayrollCycleStatus;
+  actorId: string;
+  /** The user who submitted this cycle. Used for separation of duties. */
+  submittedBy: string | null;
   actorRoles: readonly UserRole[];
 };
 
-/** Valid transitions per action. */
+function isFinanceUser(roles: readonly UserRole[]): boolean {
+  return (
+    hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
+    hasRole(roles, "SUPER_ADMIN")
+  );
+}
+
+function canApproveCycle(roles: readonly UserRole[]): boolean {
+  return hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
+}
+
+/** Valid source statuses per action. */
 const CYCLE_ACTION_TRANSITIONS: Record<CycleActionType, readonly PayrollCycleStatus[]> = {
-  mark_ready: ["draft"],
+  submit: ["draft", "rejected"],
+  approve: ["submitted"],
+  reject: ["submitted"],
+  mark_ready: ["approved"],
   mark_processing: ["ready"],
-  mark_paid: ["ready", "processing"]
+  mark_paid: ["approved", "ready", "processing"]
 };
 
 const CYCLE_ACTION_LABELS: Record<CycleActionType, string> = {
+  submit: "submitted",
+  approve: "approved",
+  reject: "rejected",
   mark_ready: "ready",
   mark_processing: "processing",
   mark_paid: "paid"
 };
 
 export function evaluateCycleAction(input: CycleActionInput): PayrollApprovalDecision {
-  const isFinanceUser =
-    hasRole(input.actorRoles, "FINANCE_ADMIN") ||
-    hasRole(input.actorRoles, "FINANCE_APPROVER") ||
-    hasRole(input.actorRoles, "SUPER_ADMIN");
-
-  if (!isFinanceUser) {
+  if (!isFinanceUser(input.actorRoles)) {
     return {
       allowed: false,
       code: "FORBIDDEN",
@@ -84,6 +111,7 @@ export function evaluateCycleAction(input: CycleActionInput): PayrollApprovalDec
     };
   }
 
+  // Check valid status transition
   const validFrom = CYCLE_ACTION_TRANSITIONS[input.action];
   if (!validFrom.includes(input.cycleStatus)) {
     const target = CYCLE_ACTION_LABELS[input.action];
@@ -92,6 +120,26 @@ export function evaluateCycleAction(input: CycleActionInput): PayrollApprovalDec
       code: "INVALID_STATE",
       message: `Cannot mark cycle as ${target} from current status "${input.cycleStatus}".`
     };
+  }
+
+  // Approve/reject requires FINANCE_APPROVER or SUPER_ADMIN
+  if (input.action === "approve" || input.action === "reject") {
+    if (!canApproveCycle(input.actorRoles)) {
+      return {
+        allowed: false,
+        code: "FORBIDDEN",
+        message: "Only Finance Approver and Super Admin can approve or reject cycles."
+      };
+    }
+
+    // Separation of duties: submitter cannot approve/reject their own cycle
+    if (input.submittedBy && input.submittedBy === input.actorId) {
+      return {
+        allowed: false,
+        code: "FORBIDDEN",
+        message: "The person who submitted the cycle cannot approve or reject it."
+      };
+    }
   }
 
   return { allowed: true };
@@ -108,6 +156,8 @@ export function evaluateMarkCyclePaidAction(input: MarkCyclePaidInput): PayrollA
   return evaluateCycleAction({
     action: "mark_paid",
     cycleStatus: input.cycleStatus,
+    actorId: "",
+    submittedBy: null,
     actorRoles: input.actorRoles
   });
 }

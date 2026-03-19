@@ -184,9 +184,17 @@ export const NAV_GROUPS: NavGroup[] = [
         labelKey: "payroll",
         href: "/payroll",
         icon: "Banknote",
-        description: "Run payroll with staged approvals and clear payout status",
+        description: "Monthly payroll worksheet with semimonthly cycle approval",
         shortcut: "F P",
         moduleId: "payroll"
+      },
+      {
+        label: "Finance oversight",
+        labelKey: "financeOversight",
+        href: "/payroll/oversight",
+        icon: "ShieldAlert",
+        description: "Cycles awaiting approval, payout blockers, and audit status",
+        shortcut: "F O"
       },
       {
         label: "Compensation",
