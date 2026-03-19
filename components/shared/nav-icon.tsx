@@ -78,6 +78,7 @@ import {
   RefreshCw,
   Gamepad2,
   Route,
+  FolderOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -159,6 +160,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   RefreshCw,
   Gamepad2,
   Route,
+  FolderOpen,
 };
 
 type NavIconProps = {
