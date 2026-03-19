@@ -3204,8 +3204,8 @@
     "statusTimeline": {
       "draft": "Draft",
       "calculated": "Calculated",
-      "pendingFirstApproval": "Pending 1st Approval",
-      "pendingFinalApproval": "Pending Final Approval",
+      "submitted": "Submitted",
+      "rejected": "Rejected",
       "approved": "Approved",
       "processing": "Processing",
       "completed": "Completed"
@@ -3228,8 +3228,7 @@
       "submitting": "Submitting...",
       "submitForApproval": "Submit for approval",
       "approving": "Approving...",
-      "approveStep1": "Approve step 1",
-      "approveFinal": "Approve final",
+      "approve": "Approve",
       "cancelling": "Cancelling...",
       "cancelRun": "Cancel run",
       "markProcessing": "Mark as processing",
@@ -3240,10 +3239,9 @@
     },
     "approval": {
       "title": "Approval workflow",
-      "step1Title": "Step 1: First approval",
-      "step2Title": "Step 2: Final approval",
-      "awaitingFirst": "Awaiting first approval",
-      "awaitingFinal": "Awaiting final approval",
+      "approvalTitle": "Finance approval",
+      "awaitingApproval": "Awaiting approval",
+      "rejected": "Rejected",
       "notApprovedYet": "Not approved yet",
       "approvedByAt": "{name} at <time>{date}</time>"
     },
@@ -3332,18 +3330,13 @@
     },
     "confirmSubmit": {
       "title": "Submit for approval?",
-      "description": "This run will be submitted for first approval. Ensure all items and adjustments are reviewed.",
+      "description": "This run will be submitted for approval. Ensure all items and adjustments are reviewed.",
       "confirmLabel": "Submit for approval"
     },
-    "confirmApproveFirst": {
-      "title": "Approve step 1?",
-      "description": "Your first approval will advance this run to final approval. This cannot be undone without rejection.",
-      "confirmLabel": "Approve step 1"
-    },
-    "confirmApproveFinal": {
-      "title": "Final approval: are you sure?",
-      "description": "Final approval locks this payroll run. Items become immutable and payment statements can be generated. This action cannot be undone without a Super Admin reopening the run.",
-      "confirmLabel": "Yes, final-approve this run"
+    "confirmApprove": {
+      "title": "Approve this payroll run?",
+      "description": "Approval locks this payroll run. Items become immutable and payment statements can be generated. This cannot be undone without reopening.",
+      "confirmLabel": "Yes, approve this run"
     },
     "reopenDialog": {
       "title": "Reopen payroll run?",
@@ -3377,10 +3370,9 @@
       "noStatementsGenerated": "No payment statements were generated.",
       "statementsSkipped": "{count, plural, one {# statement skipped due to missing data or file upload issues.} other {# statements skipped due to missing data or file upload issues.}}",
       "unableToUpdateApproval": "Unable to update approval state.",
-      "submittedForApproval": "Run submitted for first approval.",
-      "firstApprovalComplete": "First approval complete. Awaiting final approval.",
-      "finalApprovalComplete": "Final approval complete. Payroll is now locked.",
-      "runRejected": "Run rejected and returned to calculated state.",
+      "submittedForApproval": "Run submitted for approval.",
+      "approvalComplete": "Payroll approved and locked.",
+      "runRejected": "Run rejected.",
       "runCancelled": "Run cancelled.",
       "runReopened": "Run reopened and returned to calculated state.",
       "runMarkedProcessing": "Run marked as processing.",

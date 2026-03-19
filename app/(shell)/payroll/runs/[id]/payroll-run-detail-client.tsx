@@ -62,8 +62,7 @@ type AdjustmentFormErrors = Partial<Record<AdjustmentFormField, string>>;
 const RUN_STATUS_FLOW: PayrollRunStatus[] = [
   "draft",
   "calculated",
-  "pending_first_approval",
-  "pending_final_approval",
+  "submitted",
   "approved",
   "processing",
   "completed"
@@ -193,8 +192,8 @@ function statusToTimelineKey(status: PayrollRunStatus): string {
   const map: Record<string, string> = {
     draft: "draft",
     calculated: "calculated",
-    pending_first_approval: "pendingFirstApproval",
-    pending_final_approval: "pendingFinalApproval",
+    submitted: "submitted",
+    rejected: "rejected",
     approved: "approved",
     processing: "processing",
     completed: "completed",
@@ -278,12 +277,12 @@ export function PayrollRunDetailClient({
   runId,
   viewerUserId,
   canManage,
-  canFinalApprove
+  canApprove
 }: {
   runId: string;
   viewerUserId: string;
   canManage: boolean;
-  canFinalApprove: boolean;
+  canApprove: boolean;
 }) {
   const t = useTranslations('payrollRunDetail');
   const tCommon = useTranslations('common');
@@ -296,7 +295,7 @@ export function PayrollRunDetailClient({
   const [isCalculating, setIsCalculating] = useState(false);
   const [isGeneratingStatements, setIsGeneratingStatements] = useState(false);
   const [activeRunAction, setActiveRunAction] = useState<
-    null | "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed"
+    null | "submit" | "approve" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed"
   >(null);
   const [adjustmentItemId, setAdjustmentItemId] = useState<string | null>(null);
   const [adjustmentValues, setAdjustmentValues] = useState<AdjustmentFormValues>(
@@ -339,35 +338,30 @@ export function PayrollRunDetailClient({
   const isProcessing = run?.status === "processing";
   const isCompleted = run?.status === "completed";
   const isCalculated = run?.status === "calculated";
-  const isPendingFirst = run?.status === "pending_first_approval";
-  const isPendingFinal = run?.status === "pending_final_approval";
-  const canCalculateRun = canManage && (run?.status === "draft" || isCalculated);
-  const canImportCsv = canManage && (run?.status === "draft" || isCalculated);
+  const isSubmitted = run?.status === "submitted";
+  const isRejected = run?.status === "rejected";
+  const canCalculateRun = canManage && (run?.status === "draft" || isCalculated || isRejected);
+  const canImportCsv = canManage && (run?.status === "draft" || isCalculated || isRejected);
   const canGenerateStatements = canManage && isApproved;
-  const canAdjustItems = canManage && isCalculated;
-  const canSubmitForApproval = canManage && isCalculated;
-  const canApproveFirst =
-    canManage &&
-    isPendingFirst &&
-    run?.initiatedBy !== viewerUserId;
-  const canApproveFinal =
-    canFinalApprove &&
-    isPendingFinal &&
-    run?.firstApprovedBy !== viewerUserId;
-  const canRejectAtCurrentStep =
-    (canManage &&
-      isPendingFirst &&
-      run?.initiatedBy !== viewerUserId) ||
-    (canFinalApprove &&
-      isPendingFinal &&
-      run?.firstApprovedBy !== viewerUserId);
+  const canAdjustItems = canManage && (isCalculated || isRejected);
+  const canSubmitForApproval = canManage && (isCalculated || isRejected);
+  /** Resolve who submitted the run for separation-of-duties checks. */
+  const runSubmittedBy: string | null = run?.submittedBy ?? run?.initiatedBy ?? null;
+  const canApproveRun =
+    canApprove &&
+    isSubmitted &&
+    runSubmittedBy !== viewerUserId;
+  const canRejectRun =
+    canApprove &&
+    isSubmitted &&
+    runSubmittedBy !== viewerUserId;
   const canCancelRun =
     canManage &&
     (run ? run.status !== "approved" && run.status !== "cancelled" && run.status !== "processing" && run.status !== "completed" : false);
-  const canReopenRun = canFinalApprove && (isApproved || isProcessing);
+  const canReopenRun = canApprove && (isApproved || isProcessing);
   const canMarkProcessing = canManage && isApproved;
   const canMarkCompleted = canManage && isProcessing;
-  const canEditItems = canManage && (run?.status === "draft" || isCalculated);
+  const canEditItems = canManage && (run?.status === "draft" || isCalculated || isRejected);
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -454,7 +448,7 @@ export function PayrollRunDetailClient({
   };
 
   const performRunAction = async (
-    action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed",
+    action: "submit" | "approve" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed",
     reason: string | null = null
   ) => {
     setActiveRunAction(action);
@@ -480,10 +474,8 @@ export function PayrollRunDetailClient({
 
       if (action === "submit") {
         showToast("success", td("toast.submittedForApproval"));
-      } else if (action === "approve_first") {
-        showToast("success", td("toast.firstApprovalComplete"));
-      } else if (action === "approve_final") {
-        showToast("success", td("toast.finalApprovalComplete"));
+      } else if (action === "approve") {
+        showToast("success", td("toast.approvalComplete"));
       } else if (action === "reject") {
         showToast("info", td("toast.runRejected"));
       } else if (action === "cancel") {
@@ -496,7 +488,7 @@ export function PayrollRunDetailClient({
         showToast("success", td("toast.runMarkedCompleted"));
       }
 
-      if (action === "approve_final") {
+      if (action === "approve") {
         setAdjustmentItemId(null);
       }
 
@@ -935,34 +927,7 @@ export function PayrollRunDetailClient({
 
             <div className="payroll-approval-steps">
               <article className="payroll-approval-step">
-                <p className="payroll-approval-step-title">{t('approval.step1Title')}</p>
-                {runQuery.data.run.firstApprovedAt ? (
-                  <>
-                    <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
-                    <p className="settings-card-description">
-                      {t.rich('approval.approvedByAt', {
-                        name: runQuery.data.run.firstApprovedByName ?? "--",
-                        date: formatDate(runQuery.data.run.firstApprovedAt, locale),
-                        time: (chunks) => (
-                          <time
-                            dateTime={runQuery.data?.run.firstApprovedAt ?? ""}
-                            title={formatDateTimeTooltip(runQuery.data?.run.firstApprovedAt ?? "", locale)}
-                          >
-                            {chunks}
-                          </time>
-                        )
-                      })}
-                    </p>
-                  </>
-                ) : (
-                  <StatusBadge tone={isPendingFirst ? "pending" : "draft"}>
-                    {isPendingFirst ? t('approval.awaitingFirst') : t('approval.notApprovedYet')}
-                  </StatusBadge>
-                )}
-              </article>
-
-              <article className="payroll-approval-step">
-                <p className="payroll-approval-step-title">{t('approval.step2Title')}</p>
+                <p className="payroll-approval-step-title">{t('approval.approvalTitle')}</p>
                 {runQuery.data.run.finalApprovedAt ? (
                   <>
                     <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
@@ -981,9 +946,16 @@ export function PayrollRunDetailClient({
                       })}
                     </p>
                   </>
+                ) : runQuery.data.run.rejectedAt ? (
+                  <>
+                    <StatusBadge tone="warning">{t('approval.rejected')}</StatusBadge>
+                    {runQuery.data.run.rejectionReason ? (
+                      <p className="settings-card-description">{runQuery.data.run.rejectionReason}</p>
+                    ) : null}
+                  </>
                 ) : (
-                  <StatusBadge tone={isPendingFinal ? "pending" : "draft"}>
-                    {isPendingFinal ? t('approval.awaitingFinal') : t('approval.notApprovedYet')}
+                  <StatusBadge tone={isSubmitted ? "pending" : "draft"}>
+                    {isSubmitted ? t('approval.awaitingApproval') : t('approval.notApprovedYet')}
                   </StatusBadge>
                 )}
               </article>
@@ -1009,45 +981,26 @@ export function PayrollRunDetailClient({
                 </button>
               ) : null}
 
-              {canApproveFirst ? (
+              {canApproveRun ? (
                 <button
                   type="button"
                   className="button button-primary"
                   disabled={activeRunAction !== null}
                   onClick={async () => {
                     const confirmed = await confirm({
-                      title: td("confirmApproveFirst.title"),
-                      description: td("confirmApproveFirst.description"),
-                      confirmLabel: td("confirmApproveFirst.confirmLabel"),
-                      tone: "default"
-                    });
-                    if (confirmed) void performRunAction("approve_first");
-                  }}
-                >
-                  {activeRunAction === "approve_first" ? t('actions.approving') : t('actions.approveStep1')}
-                </button>
-              ) : null}
-
-              {canApproveFinal ? (
-                <button
-                  type="button"
-                  className="button button-primary"
-                  disabled={activeRunAction !== null}
-                  onClick={async () => {
-                    const confirmed = await confirm({
-                      title: td("confirmApproveFinal.title"),
-                      description: td("confirmApproveFinal.description"),
-                      confirmLabel: td("confirmApproveFinal.confirmLabel"),
+                      title: td("confirmApprove.title"),
+                      description: td("confirmApprove.description"),
+                      confirmLabel: td("confirmApprove.confirmLabel"),
                       tone: "danger"
                     });
-                    if (confirmed) void performRunAction("approve_final");
+                    if (confirmed) void performRunAction("approve");
                   }}
                 >
-                  {activeRunAction === "approve_final" ? t('actions.approving') : t('actions.approveFinal')}
+                  {activeRunAction === "approve" ? t('actions.approving') : t('actions.approve')}
                 </button>
               ) : null}
 
-              {canRejectAtCurrentStep ? (
+              {canRejectRun ? (
                 <button
                   type="button"
                   className="button button-subtle"

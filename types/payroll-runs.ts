@@ -4,8 +4,8 @@ import type { DeductionRuleType } from "./payroll";
 export const PAYROLL_RUN_STATUSES = [
   "draft",
   "calculated",
-  "pending_first_approval",
-  "pending_final_approval",
+  "submitted",
+  "rejected",
   "approved",
   "processing",
   "completed",
@@ -55,6 +55,7 @@ export type PayrollRunSummary = {
   runMonth: string | null;
   publishedAt: string | null;
   submittedAt: string | null;
+  submittedBy: string | null;
   rejectedAt: string | null;
   rejectionReason: string | null;
   completedAt: string | null;
@@ -262,7 +263,7 @@ export type AddPayrollAdjustmentResponseData = {
 };
 
 export type PayrollRunActionPayload = {
-  action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed";
+  action: "submit" | "approve" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed";
   reason?: string | null;
 };
 

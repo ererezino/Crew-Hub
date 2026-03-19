@@ -12,13 +12,14 @@ import type { PayrollRunStatus, PayrollRunSummary } from "../../../../../../../t
 import {
   buildMeta,
   jsonResponse,
+  PAYROLL_RUN_SELECT_COLUMNS,
   payrollRunRowSchema,
   toPayrollRunSummary,
   toSnapshot
 } from "../../../_helpers";
 
 const actionBodySchema = z.object({
-  action: z.enum(["submit", "approve_first", "approve_final", "reject", "cancel", "reopen", "mark_processing", "mark_completed"]),
+  action: z.enum(["submit", "approve", "reject", "cancel", "reopen", "mark_processing", "mark_completed"]),
   reason: z.string().trim().max(500).optional().nullable()
 });
 
@@ -31,20 +32,12 @@ function formatPayPeriodLabel(startDate: string, endDate: string): string {
   }
 }
 
-function canSubmit(roles: readonly UserRole[]): boolean {
+function isFinanceUser(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
-function canFirstApprove(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
-}
-
-function canFinalApprove(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "SUPER_ADMIN");
-}
-
-function rejectionReasonRequiredMessage(): string {
-  return "Rejection reason is required.";
+function canApproveRole(roles: readonly UserRole[]): boolean {
+  return hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 function statusFromDecisionCode(
@@ -56,6 +49,7 @@ function statusFromDecisionCode(
 
   return 403;
 }
+
 
 export async function POST(
   request: Request,
@@ -121,7 +115,7 @@ export async function POST(
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: rejectionReasonRequiredMessage()
+        message: "Rejection reason is required."
       },
       meta: buildMeta()
     });
@@ -135,9 +129,7 @@ export async function POST(
 
     const { data: rawRun, error: runError } = await supabase
       .from("payroll_runs")
-      .select(
-        "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, created_at, updated_at"
-      )
+      .select(PAYROLL_RUN_SELECT_COLUMNS)
       .eq("org_id", profile.org_id)
       .eq("id", runId)
       .is("deleted_at", null)
@@ -167,12 +159,17 @@ export async function POST(
       });
     }
 
+    // Resolve submitted_by: prefer the dedicated column, fall back to snapshot.
+    const submittedBy: string | null =
+      parsedRun.data.submitted_by ??
+      (toSnapshot(parsedRun.data.snapshot)?.submittedBy as string | null) ??
+      null;
+
     const actionDecision = evaluatePayrollApprovalAction({
       action,
       status: parsedRun.data.status,
       actorId: profile.id,
-      initiatedBy: parsedRun.data.initiated_by,
-      firstApprovedBy: parsedRun.data.first_approved_by,
+      submittedBy,
       actorRoles: profile.roles
     });
 
@@ -197,25 +194,33 @@ export async function POST(
     let nextFinalApprovedBy: string | null = parsedRun.data.final_approved_by;
     let nextFinalApprovedAt: string | null = parsedRun.data.final_approved_at;
     let nextNotes = parsedRun.data.notes;
+    let nextSubmittedAt: string | null = parsedRun.data.submitted_at ?? null;
+    let nextSubmittedBy: string | null = submittedBy;
+    let nextRejectedAt: string | null = parsedRun.data.rejected_at ?? null;
+    let nextRejectedBy: string | null = parsedRun.data.rejected_by ?? null;
+    let nextRejectionReason: string | null = parsedRun.data.rejection_reason ?? null;
+    let nextCompletedAt: string | null = parsedRun.data.completed_at ?? null;
+    let nextLockedAt: string | null = parsedRun.data.locked_at ?? null;
 
+    // ── submit ──────────────────────────────────────────────────────
     if (action === "submit") {
-      if (!canSubmit(profile.roles)) {
+      if (!isFinanceUser(profile.roles)) {
         return jsonResponse<null>(403, {
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Only Finance Admin and Super Admin can submit payroll runs."
+            message: "Only Finance users can submit payroll runs."
           },
           meta: buildMeta()
         });
       }
 
-      if (parsedRun.data.status !== "calculated") {
+      if (parsedRun.data.status !== "calculated" && parsedRun.data.status !== "rejected") {
         return jsonResponse<null>(409, {
           data: null,
           error: {
             code: "INVALID_STATE",
-            message: "Only calculated runs can be submitted for approval."
+            message: "Only calculated or rejected runs can be submitted for approval."
           },
           meta: buildMeta()
         });
@@ -233,10 +238,7 @@ export async function POST(
       }
 
       /* Defense-in-depth: block submission if any items still need
-       * withholding calculation (e.g. imported from CSV but not yet
-       * recalculated).  The CSV import route already resets the run to
-       * "draft" to force recalculation, but this guards against any code
-       * path that could leave uncalculated items in a calculated run. */
+       * withholding calculation. */
       const { count: uncalcCount } = await supabase
         .from("payroll_items")
         .select("id", { count: "exact", head: true })
@@ -257,11 +259,18 @@ export async function POST(
         });
       }
 
-      nextStatus = "pending_first_approval";
+      nextStatus = "submitted";
+      nextSubmittedAt = nowIso;
+      nextSubmittedBy = profile.id;
+      // Clear any previous approval state.
       nextFirstApprovedBy = null;
       nextFirstApprovedAt = null;
       nextFinalApprovedBy = null;
       nextFinalApprovedAt = null;
+      // Clear previous rejection state on resubmission.
+      nextRejectedAt = null;
+      nextRejectedBy = null;
+      nextRejectionReason = null;
       nextSnapshot = {
         ...previousSnapshot,
         submittedAt: nowIso,
@@ -270,177 +279,100 @@ export async function POST(
       };
     }
 
-    if (action === "approve_first") {
-      if (!canFirstApprove(profile.roles)) {
+    // ── approve (single step) ───────────────────────────────────────
+    if (action === "approve") {
+      if (!canApproveRole(profile.roles)) {
         return jsonResponse<null>(403, {
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Only Finance Admin and Super Admin can first-approve payroll runs."
+            message: "Only Finance Approver and Super Admin can approve payroll runs."
           },
           meta: buildMeta()
         });
       }
 
-      if (parsedRun.data.status !== "pending_first_approval") {
+      if (parsedRun.data.status !== "submitted") {
         return jsonResponse<null>(409, {
           data: null,
           error: {
             code: "INVALID_STATE",
-            message: "Run must be pending first approval."
+            message: "Only submitted runs can be approved."
           },
           meta: buildMeta()
         });
       }
 
-      if (parsedRun.data.initiated_by === profile.id) {
+      if (submittedBy === profile.id) {
         return jsonResponse<null>(403, {
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Initiator cannot perform first approval."
-          },
-          meta: buildMeta()
-        });
-      }
-
-      nextStatus = "pending_final_approval";
-      nextFirstApprovedBy = profile.id;
-      nextFirstApprovedAt = nowIso;
-      nextFinalApprovedBy = null;
-      nextFinalApprovedAt = null;
-      nextSnapshot = {
-        ...previousSnapshot,
-        firstApprovedAt: nowIso,
-        firstApprovedBy: profile.id,
-        firstApprovedByName: profile.full_name
-      };
-    }
-
-    if (action === "approve_final") {
-      if (!canFinalApprove(profile.roles)) {
-        return jsonResponse<null>(403, {
-          data: null,
-          error: {
-            code: "FORBIDDEN",
-            message: "Only Super Admin can final-approve payroll runs."
-          },
-          meta: buildMeta()
-        });
-      }
-
-      if (parsedRun.data.status !== "pending_final_approval") {
-        return jsonResponse<null>(409, {
-          data: null,
-          error: {
-            code: "INVALID_STATE",
-            message: "Run must be pending final approval."
-          },
-          meta: buildMeta()
-        });
-      }
-
-      if (!parsedRun.data.first_approved_by) {
-        return jsonResponse<null>(409, {
-          data: null,
-          error: {
-            code: "INVALID_STATE",
-            message: "Run must have first approval before final approval."
-          },
-          meta: buildMeta()
-        });
-      }
-
-      if (parsedRun.data.first_approved_by === profile.id) {
-        return jsonResponse<null>(403, {
-          data: null,
-          error: {
-            code: "FORBIDDEN",
-            message: "Final approver must be different from first approver."
+            message: "The person who submitted the run cannot approve it."
           },
           meta: buildMeta()
         });
       }
 
       nextStatus = "approved";
+      // Write to final_approved_by/at to keep backward compat with existing snapshot consumers.
       nextFinalApprovedBy = profile.id;
       nextFinalApprovedAt = nowIso;
+      nextLockedAt = nowIso;
       nextSnapshot = {
         ...previousSnapshot,
-        finalApprovedAt: nowIso,
-        finalApprovedBy: profile.id,
-        finalApprovedByName: profile.full_name,
+        approvedAt: nowIso,
+        approvedBy: profile.id,
+        approvedByName: profile.full_name,
         lockedAt: nowIso,
         lockedBy: profile.id,
         locked: true
       };
     }
 
+    // ── reject ──────────────────────────────────────────────────────
     if (action === "reject") {
-      if (parsedRun.data.status !== "pending_first_approval" && parsedRun.data.status !== "pending_final_approval") {
-        return jsonResponse<null>(409, {
+      if (!canApproveRole(profile.roles)) {
+        return jsonResponse<null>(403, {
           data: null,
           error: {
-            code: "INVALID_STATE",
-            message: "Only pending approval runs can be rejected."
+            code: "FORBIDDEN",
+            message: "Only Finance Approver and Super Admin can reject payroll runs."
           },
           meta: buildMeta()
         });
       }
 
-      if (parsedRun.data.status === "pending_first_approval") {
-        if (!canFirstApprove(profile.roles)) {
-          return jsonResponse<null>(403, {
-            data: null,
-            error: {
-              code: "FORBIDDEN",
-              message: "Only Finance Admin and Super Admin can reject at first approval."
-            },
-            meta: buildMeta()
-          });
-        }
-
-        if (parsedRun.data.initiated_by === profile.id) {
-          return jsonResponse<null>(403, {
-            data: null,
-            error: {
-              code: "FORBIDDEN",
-              message: "Initiator cannot reject at first approval."
-            },
-            meta: buildMeta()
-          });
-        }
+      if (parsedRun.data.status !== "submitted") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message: "Only submitted runs can be rejected."
+          },
+          meta: buildMeta()
+        });
       }
 
-      if (parsedRun.data.status === "pending_final_approval") {
-        if (!canFinalApprove(profile.roles)) {
-          return jsonResponse<null>(403, {
-            data: null,
-            error: {
-              code: "FORBIDDEN",
-              message: "Only Super Admin can reject at final approval."
-            },
-            meta: buildMeta()
-          });
-        }
-
-        if (parsedRun.data.first_approved_by === profile.id) {
-          return jsonResponse<null>(403, {
-            data: null,
-            error: {
-              code: "FORBIDDEN",
-              message: "Final reviewer must be different from first approver."
-            },
-            meta: buildMeta()
-          });
-        }
+      if (submittedBy === profile.id) {
+        return jsonResponse<null>(403, {
+          data: null,
+          error: {
+            code: "FORBIDDEN",
+            message: "The person who submitted the run cannot reject it."
+          },
+          meta: buildMeta()
+        });
       }
 
-      nextStatus = "calculated";
+      nextStatus = "rejected";
       nextFirstApprovedBy = null;
       nextFirstApprovedAt = null;
       nextFinalApprovedBy = null;
       nextFinalApprovedAt = null;
+      nextRejectedAt = nowIso;
+      nextRejectedBy = profile.id;
+      nextRejectionReason = reason;
       nextSnapshot = {
         ...previousSnapshot,
         lastRejectedAt: nowIso,
@@ -451,13 +383,14 @@ export async function POST(
       nextNotes = reason;
     }
 
+    // ── cancel ──────────────────────────────────────────────────────
     if (action === "cancel") {
-      if (!canSubmit(profile.roles)) {
+      if (!isFinanceUser(profile.roles)) {
         return jsonResponse<null>(403, {
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Only Finance Admin and Super Admin can cancel payroll runs."
+            message: "Only Finance users can cancel payroll runs."
           },
           meta: buildMeta()
         });
@@ -485,13 +418,14 @@ export async function POST(
       nextNotes = reason ?? parsedRun.data.notes;
     }
 
+    // ── reopen ──────────────────────────────────────────────────────
     if (action === "reopen") {
-      if (!canFinalApprove(profile.roles)) {
+      if (!canApproveRole(profile.roles)) {
         return jsonResponse<null>(403, {
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Only Super Admin can reopen payroll runs."
+            message: "Only Finance Approver and Super Admin can reopen payroll runs."
           },
           meta: buildMeta()
         });
@@ -513,6 +447,10 @@ export async function POST(
       nextFirstApprovedAt = null;
       nextFinalApprovedBy = null;
       nextFinalApprovedAt = null;
+      nextSubmittedAt = null;
+      nextSubmittedBy = null;
+      nextLockedAt = null;
+      nextCompletedAt = null;
       nextSnapshot = {
         ...previousSnapshot,
         reopenedAt: nowIso,
@@ -524,13 +462,14 @@ export async function POST(
       nextNotes = reason;
     }
 
+    // ── mark_processing ─────────────────────────────────────────────
     if (action === "mark_processing") {
-      if (!canSubmit(profile.roles)) {
+      if (!isFinanceUser(profile.roles)) {
         return jsonResponse<null>(403, {
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Only Finance Admin and Super Admin can mark runs as processing."
+            message: "Only Finance users can mark runs as processing."
           },
           meta: buildMeta()
         });
@@ -555,13 +494,14 @@ export async function POST(
       };
     }
 
+    // ── mark_completed ──────────────────────────────────────────────
     if (action === "mark_completed") {
-      if (!canSubmit(profile.roles)) {
+      if (!isFinanceUser(profile.roles)) {
         return jsonResponse<null>(403, {
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Only Finance Admin and Super Admin can mark runs as completed."
+            message: "Only Finance users can mark runs as completed."
           },
           meta: buildMeta()
         });
@@ -579,6 +519,7 @@ export async function POST(
       }
 
       nextStatus = "completed";
+      nextCompletedAt = nowIso;
       nextSnapshot = {
         ...previousSnapshot,
         completedAt: nowIso,
@@ -599,14 +540,19 @@ export async function POST(
         first_approved_at: nextFirstApprovedAt,
         final_approved_by: nextFinalApprovedBy,
         final_approved_at: nextFinalApprovedAt,
+        submitted_at: nextSubmittedAt,
+        submitted_by: nextSubmittedBy,
+        rejected_at: nextRejectedAt,
+        rejected_by: nextRejectedBy,
+        rejection_reason: nextRejectionReason,
+        completed_at: nextCompletedAt,
+        locked_at: nextLockedAt,
         snapshot: nextSnapshot,
         notes: nextNotes
       })
       .eq("org_id", profile.org_id)
       .eq("id", runId)
-      .select(
-        "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, created_at, updated_at"
-      )
+      .select(PAYROLL_RUN_SELECT_COLUMNS)
       .single();
 
     if (updateError || !updatedRun) {
@@ -677,14 +623,14 @@ export async function POST(
             userIds: adminRecipientIds,
             type: "payroll_approved",
             title: "Payroll reopened",
-            body: `Payroll for ${payPeriodLabel} has been reopened by a Super Admin. All approvals have been cleared.`,
+            body: `Payroll for ${payPeriodLabel} has been reopened. All approvals have been cleared.`,
             link: "/payroll"
           });
         }
       }
     }
 
-    if (action === "approve_final" && nextStatus === "approved") {
+    if (action === "approve" && nextStatus === "approved") {
       const payPeriodLabel = formatPayPeriodLabel(
         parsedUpdated.data.pay_period_start,
         parsedUpdated.data.pay_period_end
@@ -719,7 +665,7 @@ export async function POST(
             userIds: adminRecipientIds,
             type: "payroll_approved",
             title: "Payroll approved",
-            body: `Payroll for ${payPeriodLabel} has been final-approved and is ready for payment processing.`,
+            body: `Payroll for ${payPeriodLabel} has been approved and is ready for payment processing.`,
             link: "/payroll"
           });
         }

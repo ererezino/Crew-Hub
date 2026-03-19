@@ -12,6 +12,11 @@ import {
   type PayrollRunSummary
 } from "../../../../types/payroll-runs";
 
+/** Shared select columns for payroll_runs queries. All routes should use this
+ *  so new audit/approval columns are consistently returned. */
+export const PAYROLL_RUN_SELECT_COLUMNS =
+  "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, run_month, published_at, submitted_at, submitted_by, rejected_at, rejected_by, rejection_reason, completed_at, locked_at, amendment_of, is_historical, reviewed_at, reviewed_by, authorized_at, authorized_by, created_at, updated_at";
+
 export const payrollRunStatusSchema = z.enum(PAYROLL_RUN_STATUSES);
 export const payrollItemPaymentStatusSchema = z.enum(PAYROLL_ITEM_PAYMENT_STATUSES);
 export const payrollAdjustmentTypeSchema = z.enum(PAYROLL_ADJUSTMENT_TYPES);
@@ -62,7 +67,9 @@ export const payrollRunRowSchema = z.object({
   run_month: z.string().nullable().optional().default(null),
   published_at: z.string().nullable().optional().default(null),
   submitted_at: z.string().nullable().optional().default(null),
+  submitted_by: z.string().uuid().nullable().optional().default(null),
   rejected_at: z.string().nullable().optional().default(null),
+  rejected_by: z.string().uuid().nullable().optional().default(null),
   rejection_reason: z.string().nullable().optional().default(null),
   completed_at: z.string().nullable().optional().default(null),
   amendment_of: z.string().uuid().nullable().optional().default(null),
@@ -176,6 +183,7 @@ export function toPayrollRunSummary(
     runMonth: row.run_month ?? null,
     publishedAt: row.published_at ?? null,
     submittedAt: row.submitted_at ?? null,
+    submittedBy: row.submitted_by ?? null,
     rejectedAt: row.rejected_at ?? null,
     rejectionReason: row.rejection_reason ?? null,
     completedAt: row.completed_at ?? null,

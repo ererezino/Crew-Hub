@@ -8,6 +8,7 @@ import {
   buildMeta,
   canManagePayroll,
   jsonResponse,
+  PAYROLL_RUN_SELECT_COLUMNS,
   parseIntegerAmount,
   parsePositiveIntegerAmount,
   payrollAdjustmentSchema,
@@ -141,7 +142,7 @@ export async function POST(
     const { data: rawRun, error: runError } = await supabase
       .from("payroll_runs")
       .select(
-        "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, created_at, updated_at"
+        PAYROLL_RUN_SELECT_COLUMNS
       )
       .eq("org_id", session.profile.org_id)
       .eq("id", runId)

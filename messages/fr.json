@@ -3154,8 +3154,8 @@
     "statusTimeline": {
       "draft": "Brouillon",
       "calculated": "Calculé",
-      "pendingFirstApproval": "Première approbation en attente",
-      "pendingFinalApproval": "Approbation finale en attente",
+      "submitted": "Soumis",
+      "rejected": "Refusé",
       "approved": "Approuvé",
       "processing": "En traitement",
       "completed": "Terminé"
@@ -3178,17 +3178,15 @@
       "submitting": "Envoi...",
       "submitForApproval": "Soumettre pour approbation",
       "approving": "Approbation...",
-      "approveStep1": "Approuver l'étape 1",
-      "approveFinal": "Approbation finale",
+      "approve": "Approuver",
       "cancelling": "Annulation...",
       "cancelRun": "Annuler le cycle"
     },
     "approval": {
       "title": "Flux d'approbation",
-      "step1Title": "Étape 1 : Première approbation",
-      "step2Title": "Étape 2 : Approbation finale",
-      "awaitingFirst": "En attente de la première approbation",
-      "awaitingFinal": "En attente de l'approbation finale",
+      "approvalTitle": "Approbation finance",
+      "awaitingApproval": "En attente d'approbation",
+      "rejected": "Refusé",
       "notApprovedYet": "Pas encore approuvé",
       "approvedByAt": "{name} le <time>{date}</time>"
     },
@@ -3286,10 +3284,9 @@
       "noStatementsGenerated": "Aucun bulletin n'a été généré.",
       "statementsSkipped": "{count, plural, one {# bulletin ignoré en raison de données manquantes ou d'un problème de téléversement.} other {# bulletins ignorés en raison de données manquantes ou de problèmes de téléversement.}}",
       "unableToUpdateApproval": "Impossible de mettre à jour l'état d'approbation.",
-      "submittedForApproval": "Cycle soumis pour première approbation.",
-      "firstApprovalComplete": "Première approbation effectuée. En attente de l'approbation finale.",
-      "finalApprovalComplete": "Approbation finale effectuée. Le cycle de paie est maintenant verrouillé.",
-      "runRejected": "Cycle refusé et renvoyé au statut calculé.",
+      "submittedForApproval": "Cycle soumis pour approbation.",
+      "approvalComplete": "Cycle approuvé et verrouillé.",
+      "runRejected": "Cycle refusé.",
       "runCancelled": "Cycle annulé.",
       "adjustmentApplied": "Ajustement de paie appliqué.",
       "unableToAddAdjustment": "Impossible d'ajouter l'ajustement de paie."

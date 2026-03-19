@@ -59,7 +59,7 @@ export default async function PayrollRunDetailPage({ params }: PayrollRunDetailP
       runId={id}
       viewerUserId={profile.id}
       canManage={canManagePayroll(profile.roles)}
-      canFinalApprove={hasRole(profile.roles, "SUPER_ADMIN")}
+      canApprove={hasRole(profile.roles, "FINANCE_APPROVER") || hasRole(profile.roles, "SUPER_ADMIN")}
     />
   );
 }

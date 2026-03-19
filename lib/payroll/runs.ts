@@ -96,9 +96,10 @@ export function toneForPayrollRunStatus(status: PayrollRunStatus): StatusTone {
       return "draft";
     case "calculated":
       return "info";
-    case "pending_first_approval":
-    case "pending_final_approval":
+    case "submitted":
       return "pending";
+    case "rejected":
+      return "warning";
     case "approved":
       return "success";
     case "processing":
