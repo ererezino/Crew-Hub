@@ -52,6 +52,53 @@ export type PayrollRunSummary = {
   employeeCount: number;
   snapshot: Record<string, unknown>;
   notes: string | null;
+  payrollCycleId: string | null;
+  runLabel: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PayrollCycleFrequency = "weekly" | "biweekly" | "semi_monthly" | "monthly";
+
+export type PayrollCycle = {
+  id: string;
+  orgId: string;
+  name: string;
+  frequency: PayrollCycleFrequency;
+  anchorDay: number;
+  payDayOffset: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PayrollCycleItem = {
+  id: string;
+  payrollCycleId: string;
+  employeeId: string;
+  orgId: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OvertimeEntryStatus = "pending" | "approved" | "rejected";
+
+export type OvertimeEntry = {
+  id: string;
+  employeeId: string;
+  orgId: string;
+  entryDate: string;
+  hours: number;
+  multiplier: number;
+  amount: number;
+  currency: string;
+  description: string | null;
+  status: OvertimeEntryStatus;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  payrollItemId: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -115,6 +162,8 @@ export type PayrollRunItem = {
   adjustments: PayrollRunAdjustment[];
   deductions: PayrollRunDeduction[];
   employerContributions: PayrollRunEmployerContribution[];
+  overtimeAmount: number;
+  overtimeHours: number;
   netAmount: number;
   withholdingApplied: boolean;
   paymentStatus: PayrollItemPaymentStatus;
