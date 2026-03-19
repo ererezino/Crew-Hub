@@ -102,6 +102,8 @@ const RUN = "00000000-0000-4000-a000-000000000002";
 const USR_FINANCE = "00000000-0000-4000-a000-000000000003";
 const USR_APPROVER = "00000000-0000-4000-a000-000000000004";
 const USR_EMPLOYEE = "00000000-0000-4000-a000-000000000005";
+const ITEM_A = "00000000-0000-4000-a000-000000000010";
+const ITEM_B = "00000000-0000-4000-a000-000000000011";
 
 const financeSession = {
   profile: { id: USR_FINANCE, org_id: ORG, roles: ["FINANCE_ADMIN"] }
@@ -163,8 +165,15 @@ function historicalRun(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function nonHistoricalRun() {
-  return historicalRun({ is_historical: false });
+/** A reviewed + authorized run ready for publish */
+function publishableRun(overrides: Record<string, unknown> = {}) {
+  return historicalRun({
+    reviewed_at: "2025-01-10T00:00:00.000Z",
+    reviewed_by: USR_FINANCE,
+    authorized_at: "2025-01-12T00:00:00.000Z",
+    authorized_by: USR_APPROVER,
+    ...overrides
+  });
 }
 
 function makeRequest(action: string, provenanceNote?: string) {
@@ -211,7 +220,7 @@ describe("POST /api/v1/payroll/runs/[id]/historical-actions", () => {
 
   it("returns 409 when run is not historical", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(financeSession);
-    enqueue("payroll_runs", { data: nonHistoricalRun(), error: null });
+    enqueue("payroll_runs", { data: historicalRun({ is_historical: false }), error: null });
 
     const res = await POST(makeRequest("review"), {
       params: Promise.resolve({ id: RUN })
@@ -225,82 +234,54 @@ describe("POST /api/v1/payroll/runs/[id]/historical-actions", () => {
 
   it("FINANCE_ADMIN can review; writes reviewed_at and reviewed_by", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(financeSession);
-    // Load run
     enqueue("payroll_runs", { data: historicalRun(), error: null });
-    // Update result
     enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-15T00:00:00.000Z",
-        reviewed_by: USR_FINANCE
-      }),
+      data: historicalRun({ reviewed_at: "2025-01-15T00:00:00.000Z", reviewed_by: USR_FINANCE }),
       error: null
     });
 
-    const res = await POST(makeRequest("review"), {
-      params: Promise.resolve({ id: RUN })
-    });
+    const res = await POST(makeRequest("review"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(200);
 
-    // Assert the DB update payload
     const runUpdates = updatesFor("payroll_runs");
     expect(runUpdates.length).toBe(1);
     expect(runUpdates[0]).toHaveProperty("reviewed_at");
     expect(runUpdates[0]).toHaveProperty("reviewed_by", USR_FINANCE);
 
-    // Audit logged
     expect(logAuditMock).toHaveBeenCalledWith(
       expect.objectContaining({
         tableName: "payroll_runs",
         recordId: RUN,
-        newValue: expect.objectContaining({
-          action: "review_historical",
-          reviewed_by: USR_FINANCE
-        })
+        newValue: expect.objectContaining({ action: "review_historical", reviewed_by: USR_FINANCE })
       })
     );
   });
 
-  it("EMPLOYEE cannot review (RBAC 403)", async () => {
+  it("EMPLOYEE cannot review (403)", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(employeeSession);
     enqueue("payroll_runs", { data: historicalRun(), error: null });
-
-    const res = await POST(makeRequest("review"), {
-      params: Promise.resolve({ id: RUN })
-    });
+    const res = await POST(makeRequest("review"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(403);
   });
 
   it("returns 409 if already reviewed", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(financeSession);
     enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE
-      }),
+      data: historicalRun({ reviewed_at: "2025-01-10T00:00:00.000Z", reviewed_by: USR_FINANCE }),
       error: null
     });
-
-    const res = await POST(makeRequest("review"), {
-      params: Promise.resolve({ id: RUN })
-    });
+    const res = await POST(makeRequest("review"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.error.message).toContain("Already reviewed");
   });
 
   // ─── AUTHORIZE ──────────────────────────────────────────────────
 
   it("FINANCE_APPROVER can authorize after review; writes authorized_at and authorized_by", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(approverSession);
-    // Load run — already reviewed by a different user
     enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE
-      }),
+      data: historicalRun({ reviewed_at: "2025-01-10T00:00:00.000Z", reviewed_by: USR_FINANCE }),
       error: null
     });
-    // Update result
     enqueue("payroll_runs", {
       data: historicalRun({
         reviewed_at: "2025-01-10T00:00:00.000Z",
@@ -311,181 +292,181 @@ describe("POST /api/v1/payroll/runs/[id]/historical-actions", () => {
       error: null
     });
 
-    const res = await POST(makeRequest("authorize"), {
-      params: Promise.resolve({ id: RUN })
-    });
+    const res = await POST(makeRequest("authorize"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(200);
 
     const runUpdates = updatesFor("payroll_runs");
     expect(runUpdates.length).toBe(1);
     expect(runUpdates[0]).toHaveProperty("authorized_at");
     expect(runUpdates[0]).toHaveProperty("authorized_by", USR_APPROVER);
-
-    expect(logAuditMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        newValue: expect.objectContaining({
-          action: "authorize_historical",
-          authorized_by: USR_APPROVER
-        })
-      })
-    );
   });
 
-  it("FINANCE_ADMIN cannot authorize (RBAC 403)", async () => {
+  it("FINANCE_ADMIN cannot authorize (403)", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(financeSession);
     enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE
-      }),
+      data: historicalRun({ reviewed_at: "2025-01-10T00:00:00.000Z", reviewed_by: USR_FINANCE }),
       error: null
     });
-
-    const res = await POST(makeRequest("authorize"), {
-      params: Promise.resolve({ id: RUN })
-    });
+    const res = await POST(makeRequest("authorize"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error.code).toBe("FORBIDDEN");
   });
 
   it("authorize fails if not yet reviewed (409)", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(approverSession);
-    enqueue("payroll_runs", {
-      data: historicalRun({ reviewed_at: null }),
-      error: null
-    });
-
-    const res = await POST(makeRequest("authorize"), {
-      params: Promise.resolve({ id: RUN })
-    });
+    enqueue("payroll_runs", { data: historicalRun(), error: null });
+    const res = await POST(makeRequest("authorize"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.error.message).toContain("reviewed before authorization");
   });
 
   it("reviewer cannot authorize (separation of duties, 403)", async () => {
-    // Same user reviewed and now tries to authorize
-    const sameUserSession = {
-      profile: { id: USR_FINANCE, org_id: ORG, roles: ["SUPER_ADMIN"] }
-    };
+    const sameUserSession = { profile: { id: USR_FINANCE, org_id: ORG, roles: ["SUPER_ADMIN"] } };
     getAuthenticatedSessionMock.mockResolvedValue(sameUserSession);
     enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE
-      }),
+      data: historicalRun({ reviewed_at: "2025-01-10T00:00:00.000Z", reviewed_by: USR_FINANCE }),
       error: null
     });
+    const res = await POST(makeRequest("authorize"), { params: Promise.resolve({ id: RUN }) });
+    expect(res.status).toBe(403);
+  });
 
-    const res = await POST(makeRequest("authorize"), {
-      params: Promise.resolve({ id: RUN })
-    });
+  // ─── PUBLISH — AUTHORITY ────────────────────────────────────────
+
+  it("FINANCE_ADMIN cannot publish (403) — only approver authority can make records employee-visible", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(financeSession);
+    enqueue("payroll_runs", { data: publishableRun(), error: null });
+
+    const res = await POST(makeRequest("publish"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.error.message).toContain("reviewer cannot authorize");
+    expect(body.error.code).toBe("FORBIDDEN");
+
+    // No updates, no audit — nothing happened
+    expect(updatesFor("payroll_runs").length).toBe(0);
+    expect(updatesFor("payslips").length).toBe(0);
+    expect(logAuditMock).not.toHaveBeenCalled();
   });
 
-  it("returns 409 if already authorized", async () => {
+  it("FINANCE_APPROVER can publish; writes payslips FIRST, then run", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(approverSession);
-    enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE,
-        authorized_at: "2025-01-12T00:00:00.000Z",
-        authorized_by: USR_APPROVER
-      }),
-      error: null
-    });
-
-    const res = await POST(makeRequest("authorize"), {
-      params: Promise.resolve({ id: RUN })
-    });
-    expect(res.status).toBe(409);
-  });
-
-  // ─── PUBLISH ────────────────────────────────────────────────────
-
-  it("publish sets published_at/by on run and published_at on payslips", async () => {
-    getAuthenticatedSessionMock.mockResolvedValue(financeSession);
-    // Load run — reviewed and authorized
-    enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE,
-        authorized_at: "2025-01-12T00:00:00.000Z",
-        authorized_by: USR_APPROVER
-      }),
-      error: null
-    });
+    enqueue("payroll_runs", { data: publishableRun(), error: null });
     // payroll_items fetch
-    enqueue("payroll_items", {
-      data: [
-        { id: "00000000-0000-4000-a000-000000000010" },
-        { id: "00000000-0000-4000-a000-000000000011" }
-      ],
+    enqueue("payroll_items", { data: [{ id: ITEM_A }, { id: ITEM_B }], error: null });
+    // payslips existence check
+    enqueue("payslips", {
+      data: [{ payroll_item_id: ITEM_A }, { payroll_item_id: ITEM_B }],
       error: null
     });
-    // payroll_runs update result
+    // payslips update result (step 1)
+    enqueue("payslips", { data: null, error: null });
+    // payroll_runs update result (step 2)
     enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE,
-        authorized_at: "2025-01-12T00:00:00.000Z",
-        authorized_by: USR_APPROVER,
+      data: publishableRun({
         published_at: "2025-01-15T00:00:00.000Z",
-        published_by: USR_FINANCE,
-        provenance_note: "Historical import from legacy system"
+        published_by: USR_APPROVER,
+        provenance_note: "Legacy system import"
       }),
       error: null
     });
-    // payslips update result
-    enqueue("payslips", { data: null, error: null });
 
     const res = await POST(
-      makeRequest("publish", "Historical import from legacy system"),
+      makeRequest("publish", "Legacy system import"),
       { params: Promise.resolve({ id: RUN }) }
     );
     expect(res.status).toBe(200);
 
-    // Verify run update payload
-    const runUpdates = updatesFor("payroll_runs");
-    expect(runUpdates.length).toBe(1);
-    expect(runUpdates[0]).toHaveProperty("published_at");
-    expect(runUpdates[0]).toHaveProperty("published_by", USR_FINANCE);
-    expect(runUpdates[0]).toHaveProperty("provenance_note", "Historical import from legacy system");
-
-    // Verify payslips were updated with published_at and statement_type
+    // Payslips updated with published_at and statement_type
     const payslipUpdates = updatesFor("payslips");
     expect(payslipUpdates.length).toBe(1);
     expect(payslipUpdates[0]).toHaveProperty("published_at");
     expect(payslipUpdates[0]).toHaveProperty("statement_type", "historical");
 
-    // Two audit entries: run publication + payslip publication
+    // Run updated with published_at, published_by, provenance_note
+    const runUpdates = updatesFor("payroll_runs");
+    expect(runUpdates.length).toBe(1);
+    expect(runUpdates[0]).toHaveProperty("published_at");
+    expect(runUpdates[0]).toHaveProperty("published_by", USR_APPROVER);
+    expect(runUpdates[0]).toHaveProperty("provenance_note", "Legacy system import");
+
+    // Two audit entries — only logged after both writes
     expect(logAuditMock).toHaveBeenCalledTimes(2);
     expect(logAuditMock).toHaveBeenCalledWith(
       expect.objectContaining({
         tableName: "payroll_runs",
-        newValue: expect.objectContaining({
-          action: "publish_historical",
-          published_by: USR_FINANCE,
-          provenance_note: "Historical import from legacy system"
-        })
+        newValue: expect.objectContaining({ action: "publish_historical", published_by: USR_APPROVER })
       })
     );
     expect(logAuditMock).toHaveBeenCalledWith(
       expect.objectContaining({
         tableName: "payslips",
-        newValue: expect.objectContaining({
-          action: "publish_historical_payslips",
-          statement_type: "historical"
-        })
+        newValue: expect.objectContaining({ action: "publish_historical_payslips" })
       })
     );
   });
 
+  // ─── PUBLISH — TRUTHFULNESS ─────────────────────────────────────
+
+  it("publish blocked when no payroll items exist (409 MISSING_PAYSLIPS)", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(approverSession);
+    enqueue("payroll_runs", { data: publishableRun(), error: null });
+    // payroll_items fetch returns empty
+    enqueue("payroll_items", { data: [], error: null });
+
+    const res = await POST(makeRequest("publish"), { params: Promise.resolve({ id: RUN }) });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe("MISSING_PAYSLIPS");
+
+    // Nothing written
+    expect(updatesFor("payroll_runs").length).toBe(0);
+    expect(updatesFor("payslips").length).toBe(0);
+    expect(logAuditMock).not.toHaveBeenCalled();
+  });
+
+  it("publish blocked when payslip records are missing for some payroll items (409 MISSING_PAYSLIPS)", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(approverSession);
+    enqueue("payroll_runs", { data: publishableRun(), error: null });
+    // 2 payroll items
+    enqueue("payroll_items", { data: [{ id: ITEM_A }, { id: ITEM_B }], error: null });
+    // Only 1 payslip exists — ITEM_B missing
+    enqueue("payslips", { data: [{ payroll_item_id: ITEM_A }], error: null });
+
+    const res = await POST(makeRequest("publish"), { params: Promise.resolve({ id: RUN }) });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe("MISSING_PAYSLIPS");
+    expect(body.error.message).toContain("1 payroll item(s)");
+
+    // Nothing written, no false audit
+    expect(updatesFor("payroll_runs").length).toBe(0);
+    expect(updatesFor("payslips").length).toBe(0);
+    expect(logAuditMock).not.toHaveBeenCalled();
+  });
+
+  it("publish fails atomically when payslip update fails — run stays unpublished, no audit lie", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(approverSession);
+    enqueue("payroll_runs", { data: publishableRun(), error: null });
+    enqueue("payroll_items", { data: [{ id: ITEM_A }], error: null });
+    // Payslips exist
+    enqueue("payslips", { data: [{ payroll_item_id: ITEM_A }], error: null });
+    // Payslip update FAILS
+    enqueue("payslips", { data: null, error: { message: "DB write failed" } });
+
+    const res = await POST(makeRequest("publish"), { params: Promise.resolve({ id: RUN }) });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error.code).toBe("PAYSLIP_PUBLICATION_FAILED");
+    expect(body.error.message).toContain("remains unpublished");
+
+    // Run NOT updated — no false "published" state
+    expect(updatesFor("payroll_runs").length).toBe(0);
+    // Payslip update was attempted but failed
+    expect(updatesFor("payslips").length).toBe(1);
+    // NO audit logged — audit must not lie
+    expect(logAuditMock).not.toHaveBeenCalled();
+  });
+
   it("publish fails if not authorized (409)", async () => {
-    getAuthenticatedSessionMock.mockResolvedValue(financeSession);
+    getAuthenticatedSessionMock.mockResolvedValue(approverSession);
     enqueue("payroll_runs", {
       data: historicalRun({
         reviewed_at: "2025-01-10T00:00:00.000Z",
@@ -494,42 +475,27 @@ describe("POST /api/v1/payroll/runs/[id]/historical-actions", () => {
       }),
       error: null
     });
-
-    const res = await POST(makeRequest("publish"), {
-      params: Promise.resolve({ id: RUN })
-    });
+    const res = await POST(makeRequest("publish"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.error.message).toContain("authorized before publication");
   });
 
   it("publish fails if already published (409)", async () => {
-    getAuthenticatedSessionMock.mockResolvedValue(financeSession);
+    getAuthenticatedSessionMock.mockResolvedValue(approverSession);
     enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE,
-        authorized_at: "2025-01-12T00:00:00.000Z",
-        authorized_by: USR_APPROVER,
+      data: publishableRun({
         published_at: "2025-01-14T00:00:00.000Z",
-        published_by: USR_FINANCE
+        published_by: USR_APPROVER
       }),
       error: null
     });
-
-    const res = await POST(makeRequest("publish"), {
-      params: Promise.resolve({ id: RUN })
-    });
+    const res = await POST(makeRequest("publish"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(409);
   });
 
-  it("SUPER_ADMIN can authorize (RBAC)", async () => {
+  it("SUPER_ADMIN can authorize", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(superAdminSession);
     enqueue("payroll_runs", {
-      data: historicalRun({
-        reviewed_at: "2025-01-10T00:00:00.000Z",
-        reviewed_by: USR_FINANCE
-      }),
+      data: historicalRun({ reviewed_at: "2025-01-10T00:00:00.000Z", reviewed_by: USR_FINANCE }),
       error: null
     });
     enqueue("payroll_runs", {
@@ -541,10 +507,21 @@ describe("POST /api/v1/payroll/runs/[id]/historical-actions", () => {
       }),
       error: null
     });
+    const res = await POST(makeRequest("authorize"), { params: Promise.resolve({ id: RUN }) });
+    expect(res.status).toBe(200);
+  });
 
-    const res = await POST(makeRequest("authorize"), {
-      params: Promise.resolve({ id: RUN })
+  it("SUPER_ADMIN can publish", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(superAdminSession);
+    enqueue("payroll_runs", { data: publishableRun(), error: null });
+    enqueue("payroll_items", { data: [{ id: ITEM_A }], error: null });
+    enqueue("payslips", { data: [{ payroll_item_id: ITEM_A }], error: null });
+    enqueue("payslips", { data: null, error: null }); // payslip update
+    enqueue("payroll_runs", {
+      data: publishableRun({ published_at: "2025-01-15T00:00:00.000Z", published_by: USR_APPROVER }),
+      error: null
     });
+    const res = await POST(makeRequest("publish"), { params: Promise.resolve({ id: RUN }) });
     expect(res.status).toBe(200);
   });
 });

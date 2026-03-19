@@ -298,13 +298,15 @@ export async function POST(
     }
 
     // ── publish ────────────────────────────────────────────────────────
+    // AUTHORITY: only FINANCE_APPROVER or SUPER_ADMIN may publish.
+    // FINANCE_ADMIN alone cannot make historical payroll employee-visible.
     if (action === "publish") {
-      if (!canManagePayroll(profile.roles)) {
+      if (!canApprovePayroll(profile.roles)) {
         return jsonResponse<null>(403, {
           data: null,
           error: {
             code: "FORBIDDEN",
-            message: "Only Finance users can publish historical runs."
+            message: "Only Finance Approver and Super Admin can publish historical runs."
           },
           meta: buildMeta()
         });
@@ -332,7 +334,10 @@ export async function POST(
         });
       }
 
-      // Fetch payroll item IDs for this run
+      // ── Pre-condition: historical payslips must exist ────────────────
+      // Option B: block publish unless every payroll item already has a
+      // payslip row. If they don't exist, the publish action fails hard.
+
       const { data: payrollItems, error: itemsError } = await supabase
         .from("payroll_items")
         .select("id")
@@ -351,9 +356,82 @@ export async function POST(
         });
       }
 
-      const payrollItemIds = (payrollItems ?? []).map((item) => item.id);
+      const payrollItemIds = (payrollItems ?? []).map(
+        (item: { id: string }) => item.id
+      );
 
-      // Build the run update payload
+      if (payrollItemIds.length === 0) {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "MISSING_PAYSLIPS",
+            message: "No payroll items exist for this run. Cannot publish."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      // Verify that a payslip row exists for every payroll item
+      const { data: existingPayslips, error: payslipCheckError } = await supabase
+        .from("payslips")
+        .select("payroll_item_id")
+        .in("payroll_item_id", payrollItemIds)
+        .is("deleted_at", null);
+
+      if (payslipCheckError) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "PAYROLL_RUN_ACTION_FAILED",
+            message: "Unable to verify payslip existence."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      const existingPayslipItemIds = new Set(
+        (existingPayslips ?? []).map(
+          (row: { payroll_item_id: string }) => row.payroll_item_id
+        )
+      );
+
+      const missingPayslipItemIds = payrollItemIds.filter(
+        (id: string) => !existingPayslipItemIds.has(id)
+      );
+
+      if (missingPayslipItemIds.length > 0) {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "MISSING_PAYSLIPS",
+            message: `${missingPayslipItemIds.length} payroll item(s) do not have generated payslip records. Generate payment statements before publishing.`
+          },
+          meta: buildMeta()
+        });
+      }
+
+      // ── Step 1: Update payslips FIRST ────────────────────────────────
+      // Payslips must be made employee-visible before the run is marked
+      // published. If this step fails, the run stays unpublished — truthful.
+      const { error: payslipUpdateError } = await supabase
+        .from("payslips")
+        .update({ published_at: nowIso, statement_type: "historical" })
+        .in("payroll_item_id", payrollItemIds)
+        .is("deleted_at", null);
+
+      if (payslipUpdateError) {
+        // Payslips NOT made visible → do NOT mark run as published → no audit lie
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "PAYSLIP_PUBLICATION_FAILED",
+            message: "Failed to make payslips employee-visible. Run remains unpublished."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      // ── Step 2: Mark run as published ────────────────────────────────
       const runUpdate: Record<string, unknown> = {
         published_at: nowIso,
         published_by: profile.id
@@ -372,30 +450,23 @@ export async function POST(
         .single();
 
       if (updateError || !updatedRun) {
+        // Run update failed but payslips were already updated.
+        // Roll back payslip visibility so the state remains consistent:
+        // unpublished run = invisible payslips.
+        await supabase
+          .from("payslips")
+          .update({ published_at: null, statement_type: "historical" })
+          .in("payroll_item_id", payrollItemIds)
+          .is("deleted_at", null);
+
         return jsonResponse<null>(500, {
           data: null,
           error: {
             code: "PAYROLL_RUN_ACTION_FAILED",
-            message: "Unable to update payroll run."
+            message: "Unable to mark run as published. Payslip visibility has been rolled back."
           },
           meta: buildMeta()
         });
-      }
-
-      // Bulk-update payslips visibility
-      if (payrollItemIds.length > 0) {
-        const { error: payslipError } = await supabase
-          .from("payslips")
-          .update({ published_at: nowIso, statement_type: "historical" })
-          .in("payroll_item_id", payrollItemIds)
-          .is("deleted_at", null);
-
-        if (payslipError) {
-          console.error("Failed to publish payslips for historical run.", {
-            runId,
-            message: payslipError.message
-          });
-        }
       }
 
       const parsedUpdated = payrollRunRowSchema.safeParse(updatedRun);
@@ -411,7 +482,7 @@ export async function POST(
         });
       }
 
-      // Audit: run update
+      // ── Step 3: Audit ONLY after both writes succeeded ───────────────
       await logAudit({
         action: "updated",
         tableName: "payroll_runs",
@@ -425,7 +496,6 @@ export async function POST(
         }
       });
 
-      // Audit: payslip publication
       await logAudit({
         action: "updated",
         tableName: "payslips",
@@ -446,7 +516,6 @@ export async function POST(
       });
     }
 
-    // Unreachable given zod validation, but just in case
     return jsonResponse<null>(400, {
       data: null,
       error: {

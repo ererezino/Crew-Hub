@@ -1287,7 +1287,7 @@ export function PayrollRunDetailClient({
                   </button>
                 ) : null}
 
-                {isAuthorized && !isPublished ? (
+                {isAuthorized && !isPublished && canApprove ? (
                   <button
                     type="button"
                     className="button button-destructive"
@@ -1299,8 +1299,8 @@ export function PayrollRunDetailClient({
                 ) : null}
               </div>
 
-              {/* Publish confirmation dialog */}
-              {showPublishConfirm ? (
+              {/* Publish confirmation dialog — only reachable by approver authority */}
+              {showPublishConfirm && canApprove ? (
                 <div className="confirm-dialog" style={{ marginTop: "1rem", padding: "1rem", border: "2px solid var(--color-warning)", borderRadius: "0.5rem" }}>
                   <h3 className="section-title">{td("historical.confirmPublishTitle")}</h3>
                   <p className="settings-card-description">{td("historical.confirmPublishDescription")}</p>
