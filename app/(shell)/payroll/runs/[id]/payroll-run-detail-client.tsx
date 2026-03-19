@@ -1230,19 +1230,19 @@ export function PayrollRunDetailClient({
               </div>
 
               {/* Three-step timeline */}
-              <div className="historical-timeline" style={{ display: "flex", gap: "1rem", margin: "1rem 0" }}>
+              <div className="historical-timeline">
                 <div className={`historical-step${isReviewed ? " historical-step-done" : ""}`}>
                   <StatusBadge tone={isReviewed ? "success" : "draft"}>
                     {isReviewed ? "\u2713 " : ""}{td("historical.reviewStep")}
                   </StatusBadge>
                 </div>
-                <span style={{ alignSelf: "center" }}>{"\u2192"}</span>
+                <span className="historical-timeline-arrow">{"\u2192"}</span>
                 <div className={`historical-step${isAuthorized ? " historical-step-done" : ""}`}>
                   <StatusBadge tone={isAuthorized ? "success" : "draft"}>
                     {isAuthorized ? "\u2713 " : ""}{td("historical.authorizeStep")}
                   </StatusBadge>
                 </div>
-                <span style={{ alignSelf: "center" }}>{"\u2192"}</span>
+                <span className="historical-timeline-arrow">{"\u2192"}</span>
                 <div className={`historical-step${isPublished ? " historical-step-done" : ""}`}>
                   <StatusBadge tone={isPublished ? "success" : "draft"}>
                     {isPublished ? "\u2713 " : ""}{td("historical.publishStep")}
@@ -1251,20 +1251,20 @@ export function PayrollRunDetailClient({
               </div>
 
               {/* Visibility status */}
-              <p className={isPublished ? "field-success" : "field-warning"} style={{ margin: "0.5rem 0" }}>
+              <p className={`historical-visibility-status ${isPublished ? "historical-visibility-visible" : "historical-visibility-hidden"}`}>
                 {isPublished ? td("historical.visibleToEmployees") : td("historical.notYetVisible")}
               </p>
 
               {/* Provenance note display */}
               {run?.provenanceNote ? (
-                <div style={{ margin: "0.75rem 0" }}>
-                  <span className="form-label">{td("historical.provenanceDisplay")}</span>
+                <div className="historical-provenance">
+                  <span className="historical-provenance-label">{td("historical.provenanceDisplay")}</span>
                   <p className="settings-card-description">{run.provenanceNote}</p>
                 </div>
               ) : null}
 
               {/* Action buttons */}
-              <div className="button-row" style={{ marginTop: "1rem" }}>
+              <div className="historical-actions">
                 {!isReviewed ? (
                   <button
                     type="button"
@@ -1301,10 +1301,10 @@ export function PayrollRunDetailClient({
 
               {/* Publish confirmation dialog — only reachable by approver authority */}
               {showPublishConfirm && canApprove ? (
-                <div className="confirm-dialog" style={{ marginTop: "1rem", padding: "1rem", border: "2px solid var(--color-warning)", borderRadius: "0.5rem" }}>
+                <div className="historical-confirm-dialog">
                   <h3 className="section-title">{td("historical.confirmPublishTitle")}</h3>
                   <p className="settings-card-description">{td("historical.confirmPublishDescription")}</p>
-                  <div className="form-field" style={{ margin: "0.75rem 0" }}>
+                  <div className="form-field">
                     <label className="form-label" htmlFor="provenance-note">{td("historical.provenanceLabel")}</label>
                     <textarea
                       id="provenance-note"

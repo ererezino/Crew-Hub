@@ -335,11 +335,11 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                 </div>
 
                 <div className="payslip-card-badges">
-                  <StatusBadge tone={statement.withholdingApplied ? "processing" : "draft"}>
+                  <StatusBadge tone={statement.withholdingApplied ? "success" : "draft"}>
                     {statement.withholdingApplied ? t('payslipType') : t('paymentStatementType')}
                   </StatusBadge>
                   {statement.statementType === "historical" ? (
-                    <StatusBadge tone="warning">
+                    <StatusBadge tone="info">
                       {t('historicalBadge')}
                     </StatusBadge>
                   ) : null}
@@ -385,7 +385,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                         {t('viewedAt', { date: formatRelativeTime(statement.viewedAt, locale) })}
                       </span>
                     ) : (
-                      t('notViewed')
+                      <StatusBadge tone="pending">{t('notViewed')}</StatusBadge>
                     )}
                   </dd>
                 </div>
@@ -416,7 +416,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
               <div className="payslip-card-actions">
                 <button
                   type="button"
-                  className="table-row-action"
+                  className="button button-accent"
                   onClick={() => {
                     void openStatement(statement, "view");
                   }}
@@ -428,7 +428,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                 </button>
                 <button
                   type="button"
-                  className="table-row-action"
+                  className="button button-subtle"
                   onClick={() => {
                     void openStatement(statement, "download");
                   }}
