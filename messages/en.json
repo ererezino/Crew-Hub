@@ -3398,6 +3398,7 @@
     "paymentStatus": {
       "pending": "Pending",
       "processing": "Processing",
+      "partially_paid": "Partially paid",
       "paid": "Paid",
       "failed": "Failed",
       "cancelled": "Cancelled"
@@ -3452,6 +3453,19 @@
       "employeeCount": "{count, plural, one {# employee} other {# employees}}",
       "cycleLabel": "{currency} payout",
       "allCyclesPaid": "All payout cycles completed. Run finalized."
+    },
+    "cycleDialog": {
+      "title": "Create payout cycle",
+      "description": "Choose how much of each employee's remaining net to include in this cycle.",
+      "labelField": "Cycle label (optional)",
+      "labelPlaceholder": "e.g. Cycle 1 - March 2026",
+      "modeLabel": "Disbursement amount",
+      "modeFull": "Full remaining amount",
+      "modePartial": "Partial amount (percentage of net)",
+      "percentageLabel": "Percentage of net to disburse",
+      "percentageHint": "Each employee will receive {percentage}% of their net pay in this cycle. The remaining {remaining}% can be paid in a later cycle.",
+      "cancel": "Cancel",
+      "create": "Create cycle"
     },
     "confirmPreparePayout": {
       "title": "Prepare payout cycles?",

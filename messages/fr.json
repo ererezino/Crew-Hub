@@ -3329,6 +3329,19 @@
       "cycleLabel": "Paiement {currency}",
       "allCyclesPaid": "Tous les cycles de paiement terminés. Cycle de paie finalisé."
     },
+    "cycleDialog": {
+      "title": "Créer un cycle de paiement",
+      "description": "Choisissez le montant du net restant de chaque employé à inclure dans ce cycle.",
+      "labelField": "Nom du cycle (facultatif)",
+      "labelPlaceholder": "ex. Cycle 1 - Mars 2026",
+      "modeLabel": "Montant du décaissement",
+      "modeFull": "Montant restant complet",
+      "modePartial": "Montant partiel (pourcentage du net)",
+      "percentageLabel": "Pourcentage du net à décaisser",
+      "percentageHint": "Chaque employé recevra {percentage}% de son salaire net dans ce cycle. Les {remaining}% restants pourront être versés dans un cycle ultérieur.",
+      "cancel": "Annuler",
+      "create": "Créer le cycle"
+    },
     "confirmPreparePayout": {
       "title": "Préparer les cycles de paiement ?",
       "description": "Un cycle de paiement brouillon sera créé pour les employés restants.",
@@ -3366,6 +3379,14 @@
       "confirmLabel": "Créer le correctif"
     },
     "amendmentBadge": "Correctif du cycle {id}",
+    "paymentStatus": {
+      "pending": "En attente",
+      "processing": "En traitement",
+      "partially_paid": "Partiellement payé",
+      "paid": "Payé",
+      "failed": "Échoué",
+      "cancelled": "Annulé"
+    },
     "dismissToast": "Fermer la notification"
   },
   "timeOff": {

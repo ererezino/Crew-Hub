@@ -163,6 +163,8 @@ function paymentStatusTone(
   switch (status) {
     case "paid":
       return "success";
+    case "partially_paid":
+      return "processing";
     case "processing":
       return "processing";
     case "failed":
@@ -320,6 +322,10 @@ export function PayrollRunDetailClient({
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isPreparingPayout, setIsPreparingPayout] = useState(false);
+  const [showCycleDialog, setShowCycleDialog] = useState(false);
+  const [cycleDialogMode, setCycleDialogMode] = useState<"full" | "partial">("full");
+  const [cyclePercentage, setCyclePercentage] = useState(100);
+  const [cycleLabel, setCycleLabel] = useState("");
   const [activeCycleActionId, setActiveCycleActionId] = useState<string | null>(null);
   const [markingPaidCycleId, setMarkingPaidCycleId] = useState<string | null>(null);
   const [isCreatingAmendment, setIsCreatingAmendment] = useState(false);
@@ -802,21 +808,53 @@ export function PayrollRunDetailClient({
     await performRunAction("cancel");
   };
 
-  const preparePayout = async () => {
-    const confirmed = await confirm({
-      title: td("confirmPreparePayout.title"),
-      description: td("confirmPreparePayout.description"),
-      confirmLabel: td("confirmPreparePayout.confirmLabel"),
-      tone: "default"
-    });
-    if (!confirmed) return;
+  const openCycleDialog = () => {
+    setCycleDialogMode(hasCycles ? "partial" : "full");
+    setCyclePercentage(hasCycles ? 100 : 100);
+    setCycleLabel("");
+    setShowCycleDialog(true);
+  };
 
+  const createCycle = async (mode: "full" | "partial", percentage: number, label: string) => {
+    setShowCycleDialog(false);
     setIsPreparingPayout(true);
+
     try {
+      // Build the request body
+      const body: Record<string, unknown> = {};
+      if (label.trim()) body.label = label.trim();
+
+      // For partial mode, we need to compute per-employee amounts
+      // based on the percentage of their remaining undisbursed net
+      if (mode === "partial" && percentage < 100 && percentage > 0) {
+        // Load current payroll items to compute amounts
+        const itemsResponse = await fetch(`/api/v1/payroll/runs/${runId}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" }
+        });
+        const itemsPayload = await itemsResponse.json();
+        const items = itemsPayload?.data?.items ?? [];
+
+        if (items.length > 0) {
+          const disbursements: { employeeId: string; amount: number }[] = [];
+          for (const item of items) {
+            // Use the net amount and apply the percentage
+            const netAmount = typeof item.netAmount === "number" ? item.netAmount : 0;
+            const amount = Math.round(netAmount * (percentage / 100));
+            if (amount > 0 && item.employeeId) {
+              disbursements.push({ employeeId: item.employeeId, amount });
+            }
+          }
+          if (disbursements.length > 0) {
+            body.disbursements = disbursements;
+          }
+        }
+      }
+
       const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({})
+        body: JSON.stringify(body)
       });
 
       const payload = (await response.json()) as PreparePayoutResponse;
@@ -834,21 +872,17 @@ export function PayrollRunDetailClient({
 
           if (!overrideConfirmed) return;
 
-          // Prompt for reason
           const reason = window.prompt(td("confirmHoldOverride.reasonPrompt"));
           if (!reason?.trim()) return;
 
-          // Re-send with hold overrides
+          const overrideBody = { ...body, holdOverrides: heldIds.map((id) => ({ employeeId: id, reason: reason.trim() })) };
           const overrideResponse = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              holdOverrides: heldIds.map((id) => ({ employeeId: id, reason: reason.trim() }))
-            })
+            body: JSON.stringify(overrideBody)
           });
 
           const overridePayload = (await overrideResponse.json()) as PreparePayoutResponse;
-
           if (!overrideResponse.ok || !overridePayload.data) {
             showToast("error", overridePayload.error?.message ?? td("toast.payoutPrepFailed"));
             return;
@@ -1372,7 +1406,7 @@ export function PayrollRunDetailClient({
                     type="button"
                     className="button button-accent"
                     disabled={isPreparingPayout || activeRunAction !== null}
-                    onClick={() => void preparePayout()}
+                    onClick={() => openCycleDialog()}
                   >
                     {isPreparingPayout
                       ? td("cycles.preparingPayout")
@@ -1392,6 +1426,92 @@ export function PayrollRunDetailClient({
                     {isCreatingAmendment ? td("cycles.creatingAmendment") : td("cycles.createAmendment")}
                   </button>
                 ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          {showCycleDialog ? (
+            <section className="settings-card" aria-label={td("cycleDialog.title")}>
+              <h3 className="section-title">{td("cycleDialog.title")}</h3>
+              <p className="settings-card-description">{td("cycleDialog.description")}</p>
+
+              <div className="payroll-cycle-dialog-fields">
+                <div className="field-group">
+                  <label htmlFor="cycle-label" className="field-label">{td("cycleDialog.labelField")}</label>
+                  <input
+                    id="cycle-label"
+                    type="text"
+                    className="input"
+                    placeholder={td("cycleDialog.labelPlaceholder")}
+                    value={cycleLabel}
+                    onChange={(e) => setCycleLabel(e.target.value)}
+                  />
+                </div>
+
+                <div className="field-group">
+                  <label className="field-label">{td("cycleDialog.modeLabel")}</label>
+                  <div className="payroll-cycle-mode-options">
+                    <label className="radio-label">
+                      <input
+                        type="radio"
+                        name="cycleMode"
+                        checked={cycleDialogMode === "full"}
+                        onChange={() => { setCycleDialogMode("full"); setCyclePercentage(100); }}
+                      />
+                      {td("cycleDialog.modeFull")}
+                    </label>
+                    <label className="radio-label">
+                      <input
+                        type="radio"
+                        name="cycleMode"
+                        checked={cycleDialogMode === "partial"}
+                        onChange={() => { setCycleDialogMode("partial"); setCyclePercentage(60); }}
+                      />
+                      {td("cycleDialog.modePartial")}
+                    </label>
+                  </div>
+                </div>
+
+                {cycleDialogMode === "partial" ? (
+                  <div className="field-group">
+                    <label htmlFor="cycle-percentage" className="field-label">
+                      {td("cycleDialog.percentageLabel")}
+                    </label>
+                    <div className="payroll-cycle-percentage-row">
+                      <input
+                        id="cycle-percentage"
+                        type="range"
+                        min={10}
+                        max={90}
+                        step={5}
+                        value={cyclePercentage}
+                        onChange={(e) => setCyclePercentage(Number(e.target.value))}
+                      />
+                      <span className="payroll-cycle-percentage-value">{cyclePercentage}%</span>
+                    </div>
+                    <p className="settings-card-description">
+                      {td("cycleDialog.percentageHint", { percentage: cyclePercentage, remaining: 100 - cyclePercentage })}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setShowCycleDialog(false)}
+                >
+                  {td("cycleDialog.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  disabled={isPreparingPayout}
+                  onClick={() => void createCycle(cycleDialogMode, cyclePercentage, cycleLabel)}
+                >
+                  {isPreparingPayout ? td("cycles.preparingPayout") : td("cycleDialog.create")}
+                </button>
               </div>
             </section>
           ) : null}

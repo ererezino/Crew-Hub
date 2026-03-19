@@ -17,6 +17,7 @@ export type PayrollRunStatus = (typeof PAYROLL_RUN_STATUSES)[number];
 export const PAYROLL_ITEM_PAYMENT_STATUSES = [
   "pending",
   "processing",
+  "partially_paid",
   "paid",
   "failed",
   "cancelled"

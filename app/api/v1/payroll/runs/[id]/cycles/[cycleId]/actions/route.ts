@@ -225,7 +225,9 @@ export async function POST(
       .eq("payroll_cycle_id", cycleId)
       .eq("org_id", profile.org_id);
 
-    // 3. Update the corresponding payroll_items → paid
+    // 3. Derive truthful payment state per payroll item.
+    //    An item is 'paid' only when sum(disbursement_amount) across
+    //    ALL paid cycles >= net_amount. Otherwise 'partially_paid'.
     const { data: cycleItemRows } = await supabase
       .from("payroll_cycle_items")
       .select("payroll_item_id")
@@ -233,15 +235,81 @@ export async function POST(
       .eq("org_id", profile.org_id);
 
     if (cycleItemRows && cycleItemRows.length > 0) {
-      const payrollItemIds = cycleItemRows.map(
-        (row: { payroll_item_id: string }) => row.payroll_item_id
-      );
+      const payrollItemIds = [...new Set(
+        cycleItemRows.map((row: { payroll_item_id: string }) => row.payroll_item_id)
+      )];
 
-      await supabase
+      // Load the net_amount for each affected payroll item
+      const { data: affectedItems } = await supabase
         .from("payroll_items")
-        .update({ payment_status: "paid" })
+        .select("id, net_amount")
         .eq("org_id", profile.org_id)
         .in("id", payrollItemIds);
+
+      // Get ALL paid cycle IDs for this run
+      const { data: allPaidCycleRows } = await supabase
+        .from("payroll_cycles")
+        .select("id")
+        .eq("payroll_run_id", runId)
+        .eq("org_id", profile.org_id)
+        .eq("status", "paid")
+        .is("deleted_at", null);
+
+      // Include the cycle we just marked paid (it was updated above)
+      const allPaidCycleIds = [
+        ...(allPaidCycleRows ?? []).map((c: { id: string }) => c.id),
+        cycleId
+      ];
+      const uniquePaidCycleIds = [...new Set(allPaidCycleIds)];
+
+      // Sum disbursements across all paid cycles for these items
+      const { data: allPaidDisbursements } = await supabase
+        .from("payroll_cycle_items")
+        .select("payroll_item_id, disbursement_amount")
+        .in("payroll_cycle_id", uniquePaidCycleIds)
+        .in("payroll_item_id", payrollItemIds)
+        .is("deleted_at", null);
+
+      const paidByItem = new Map<string, number>();
+      for (const d of allPaidDisbursements ?? []) {
+        const amt = typeof d.disbursement_amount === "number"
+          ? d.disbursement_amount
+          : Number.parseInt(String(d.disbursement_amount), 10) || 0;
+        paidByItem.set(d.payroll_item_id, (paidByItem.get(d.payroll_item_id) ?? 0) + amt);
+      }
+
+      // Update each item to the correct status
+      const fullyPaidIds: string[] = [];
+      const partiallyPaidIds: string[] = [];
+
+      for (const item of affectedItems ?? []) {
+        const net = typeof item.net_amount === "number"
+          ? item.net_amount
+          : Number.parseInt(String(item.net_amount), 10) || 0;
+        const totalPaid = paidByItem.get(item.id) ?? 0;
+
+        if (totalPaid >= net) {
+          fullyPaidIds.push(item.id);
+        } else {
+          partiallyPaidIds.push(item.id);
+        }
+      }
+
+      if (fullyPaidIds.length > 0) {
+        await supabase
+          .from("payroll_items")
+          .update({ payment_status: "paid" })
+          .eq("org_id", profile.org_id)
+          .in("id", fullyPaidIds);
+      }
+
+      if (partiallyPaidIds.length > 0) {
+        await supabase
+          .from("payroll_items")
+          .update({ payment_status: "partially_paid" })
+          .eq("org_id", profile.org_id)
+          .in("id", partiallyPaidIds);
+      }
     }
 
     // 4. If the run is still approved, move it to processing
