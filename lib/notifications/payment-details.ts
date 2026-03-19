@@ -10,12 +10,14 @@ import { sendPaymentDetailsUpdatedEmail } from "./email";
  */
 export async function notifyPaymentDetailsChanged({
   orgId,
+  employeeId,
   employeeName,
   employeeEmail,
   paymentMethod,
   changeEffectiveAt
 }: {
   orgId: string;
+  employeeId: string;
   employeeName: string;
   employeeEmail: string;
   paymentMethod: PaymentMethod;
@@ -24,6 +26,7 @@ export async function notifyPaymentDetailsChanged({
   try {
     await sendPaymentDetailsUpdatedEmail({
       orgId,
+      employeeId,
       employeeName,
       employeeEmail,
       paymentMethod: methodLabel(paymentMethod),

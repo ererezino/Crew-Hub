@@ -1159,12 +1159,14 @@ export async function sendSignatureRequestEmail({
 
 export async function sendPaymentDetailsUpdatedEmail({
   orgId,
+  employeeId,
   employeeName,
   employeeEmail,
   paymentMethod,
   changeEffectiveAt
 }: {
   orgId: string;
+  employeeId: string;
   employeeName: string;
   employeeEmail: string;
   paymentMethod: string;
@@ -1199,7 +1201,7 @@ export async function sendPaymentDetailsUpdatedEmail({
       ].join("\n"),
       ctaButton: {
         label: t("paymentDetails.cta"),
-        url: `${appUrl}/people`,
+        url: `${appUrl}/people/${employeeId}?tab=compensation`,
         style: "primary"
       },
       ...emailLocaleOptions(t, locale)

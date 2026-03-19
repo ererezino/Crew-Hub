@@ -381,6 +381,7 @@ export async function PUT(request: Request) {
 
     await notifyPaymentDetailsChanged({
       orgId: session.profile.org_id,
+      employeeId: session.profile.id,
       employeeName: session.profile.full_name,
       employeeEmail: session.profile.email,
       paymentMethod: maskedDetail.paymentMethod,

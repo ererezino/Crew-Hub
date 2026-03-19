@@ -29,7 +29,7 @@ export function PeopleCompensationClient({
     enabled: mode === "admin"
   });
   const meQuery = useMeCompensation(mode === "me");
-  const paymentQuery = useHrPaymentDetails();
+  const paymentQuery = useHrPaymentDetails({ enabled: mode === "admin" });
 
   const isLoading = mode === "admin" ? adminQuery.isLoading : meQuery.isLoading;
   const errorMessage = mode === "admin" ? adminQuery.errorMessage : meQuery.errorMessage;
