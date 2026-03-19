@@ -3381,7 +3381,15 @@
       "adjustmentApplied": "Payroll adjustment applied.",
       "unableToAddAdjustment": "Unable to add payroll adjustment.",
       "editItemSuccess": "Payroll item updated. Run Calculate to apply withholding rules.",
-      "editItemFailed": "Unable to update payroll item."
+      "editItemFailed": "Unable to update payroll item.",
+      "payoutPrepared": "Payout cycles created. Run moved to processing.",
+      "payoutPrepFailed": "Unable to prepare payout cycles.",
+      "cyclePaid": "Cycle marked as paid.",
+      "cyclePaidFailed": "Unable to mark cycle as paid.",
+      "amendmentCreated": "Amendment run created.",
+      "amendmentFailed": "Unable to create amendment run.",
+      "flaggedItemsBlock": "Flagged items must be resolved or overridden before payout.",
+      "reopenBlockedByCycles": "Cannot reopen. This run has paid payout cycles. Create an amendment instead."
     },
     "paymentStatus": {
       "pending": "Pending",
@@ -3414,7 +3422,48 @@
       "allowanceLabelRequired": "Allowance label is required.",
       "allowanceAmountInvalid": "Allowance amount must be a non-negative whole number.",
       "noFieldsChanged": "No fields were changed."
-    }
+    },
+    "cycles": {
+      "title": "Payout cycles",
+      "noCycles": "No payout cycles created yet.",
+      "preparePayout": "Prepare payout",
+      "preparingPayout": "Preparing...",
+      "markPaid": "Mark as paid",
+      "markingPaid": "Marking...",
+      "createAmendment": "Create amendment",
+      "creatingAmendment": "Creating...",
+      "statusReady": "Ready",
+      "statusPaid": "Paid",
+      "statusProcessing": "Processing",
+      "statusFailed": "Failed",
+      "statusCancelled": "Cancelled",
+      "paidAt": "Paid on {date}",
+      "preparedAt": "Prepared on {date}",
+      "employeeCount": "{count, plural, one {# employee} other {# employees}}",
+      "cycleLabel": "{currency} payout",
+      "allCyclesPaid": "All payout cycles completed. Run finalized."
+    },
+    "confirmPreparePayout": {
+      "title": "Prepare payout cycles?",
+      "description": "This will group items by currency and create payout cycles. The run will move to processing.",
+      "confirmLabel": "Prepare payout"
+    },
+    "confirmPreparePayout_flagged": {
+      "title": "Flagged items detected",
+      "description": "{count, plural, one {# item is flagged} other {# items are flagged}}. Override the hold to continue with payout preparation?",
+      "confirmLabel": "Override and prepare"
+    },
+    "confirmMarkPaid": {
+      "title": "Mark cycle as paid?",
+      "description": "This confirms disbursement is complete for all items in this cycle. The cycle will be locked.",
+      "confirmLabel": "Confirm paid"
+    },
+    "confirmAmendment": {
+      "title": "Create amendment run?",
+      "description": "A new draft run will be created linked to this locked run. Only add correction items to the amendment.",
+      "confirmLabel": "Create amendment"
+    },
+    "amendmentBadge": "Amendment of run {id}"
   },
   "timeOff": {
     "title": "Time Off",

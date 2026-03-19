@@ -30,12 +30,16 @@ import type { GeneratePayslipsResponse } from "../../../../../types/payslips";
 import type {
   AddPayrollAdjustmentResponse,
   CalculatePayrollRunResponse,
+  CreateAmendmentRunResponse,
   EditPayrollItemResponse,
+  MarkCyclePaidResponse,
   PayrollAdjustmentType,
+  PayrollCycle,
   PayrollRunAllowance,
   PayrollRunItem,
   PayrollRunActionResponse,
-  PayrollRunStatus
+  PayrollRunStatus,
+  PreparePayoutResponse
 } from "../../../../../types/payroll-runs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
@@ -315,6 +319,9 @@ export function PayrollRunDetailClient({
   const [editFormErrors, setEditFormErrors] = useState<EditFormErrors>({});
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isPreparingPayout, setIsPreparingPayout] = useState(false);
+  const [markingPaidCycleId, setMarkingPaidCycleId] = useState<string | null>(null);
+  const [isCreatingAmendment, setIsCreatingAmendment] = useState(false);
   const { confirm, confirmDialog } = useConfirmAction();
 
   const sortedItems = useMemo(() => {
@@ -362,6 +369,11 @@ export function PayrollRunDetailClient({
   const canMarkProcessing = canManage && isApproved;
   const canMarkCompleted = canManage && isProcessing;
   const canEditItems = canManage && (run?.status === "draft" || isCalculated || isRejected);
+  const cycles: PayrollCycle[] = runQuery.data?.cycles ?? [];
+  const activeCycles = cycles.filter((c) => c.status !== "cancelled");
+  const hasPaidCycles = activeCycles.some((c) => c.status === "paid");
+  const canPreparePayout = canManage && isApproved && activeCycles.length === 0;
+  const canCreateAmendment = canApprove && !!run?.lockedAt && hasPaidCycles;
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -788,6 +800,118 @@ export function PayrollRunDetailClient({
     await performRunAction("cancel");
   };
 
+  const preparePayout = async () => {
+    const flaggedCount = runQuery.data?.flaggedCount ?? 0;
+    let overrideHolds = false;
+
+    if (flaggedCount > 0) {
+      const confirmed = await confirm({
+        title: td("confirmPreparePayout_flagged.title"),
+        description: td("confirmPreparePayout_flagged.description", { count: flaggedCount }),
+        confirmLabel: td("confirmPreparePayout_flagged.confirmLabel"),
+        tone: "danger"
+      });
+      if (!confirmed) return;
+      overrideHolds = true;
+    } else {
+      const confirmed = await confirm({
+        title: td("confirmPreparePayout.title"),
+        description: td("confirmPreparePayout.description"),
+        confirmLabel: td("confirmPreparePayout.confirmLabel"),
+        tone: "default"
+      });
+      if (!confirmed) return;
+    }
+
+    setIsPreparingPayout(true);
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ overrideHolds })
+      });
+
+      const payload = (await response.json()) as PreparePayoutResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? td("toast.payoutPrepFailed"));
+        return;
+      }
+
+      showToast("success", td("toast.payoutPrepared"));
+      runQuery.refresh();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : td("toast.payoutPrepFailed"));
+    } finally {
+      setIsPreparingPayout(false);
+    }
+  };
+
+  const markCyclePaid = async (cycleId: string) => {
+    const confirmed = await confirm({
+      title: td("confirmMarkPaid.title"),
+      description: td("confirmMarkPaid.description"),
+      confirmLabel: td("confirmMarkPaid.confirmLabel"),
+      tone: "danger"
+    });
+    if (!confirmed) return;
+
+    setMarkingPaidCycleId(cycleId);
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles/${cycleId}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_paid" })
+      });
+
+      const payload = (await response.json()) as MarkCyclePaidResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? td("toast.cyclePaidFailed"));
+        return;
+      }
+
+      showToast("success", td("toast.cyclePaid"));
+      runQuery.refresh();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : td("toast.cyclePaidFailed"));
+    } finally {
+      setMarkingPaidCycleId(null);
+    }
+  };
+
+  const createAmendment = async () => {
+    const confirmed = await confirm({
+      title: td("confirmAmendment.title"),
+      description: td("confirmAmendment.description"),
+      confirmLabel: td("confirmAmendment.confirmLabel"),
+      tone: "default"
+    });
+    if (!confirmed) return;
+
+    setIsCreatingAmendment(true);
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/amend`, {
+        method: "POST"
+      });
+
+      const payload = (await response.json()) as CreateAmendmentRunResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? td("toast.amendmentFailed"));
+        return;
+      }
+
+      showToast("success", td("toast.amendmentCreated"));
+      // Navigate to the new amendment run
+      window.location.href = `/payroll/runs/${payload.data.run.id}`;
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : td("toast.amendmentFailed"));
+    } finally {
+      setIsCreatingAmendment(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -1088,6 +1212,94 @@ export function PayrollRunDetailClient({
                 <p className="settings-card-description">
                   {isCompleted ? t('locked.completedDescription') : isProcessing ? t('locked.processingDescription') : t('locked.description')}
                 </p>
+              </div>
+            </section>
+          ) : null}
+
+          {run?.amendmentOf ? (
+            <section className="payroll-amendment-banner">
+              <StatusBadge tone="info">
+                {td("amendmentBadge", { id: run.amendmentOf.slice(0, 8) })}
+              </StatusBadge>
+            </section>
+          ) : null}
+
+          {(isApproved || isProcessing || isCompleted) ? (
+            <section className="settings-card payroll-cycles-card" aria-label={td("cycles.title")}>
+              <div className="payroll-approval-header">
+                <h2 className="section-title">{td("cycles.title")}</h2>
+              </div>
+
+              {activeCycles.length === 0 ? (
+                <p className="settings-card-description">{td("cycles.noCycles")}</p>
+              ) : (
+                <div className="payroll-cycles-grid">
+                  {activeCycles.map((cycle) => (
+                    <article key={cycle.id} className="payroll-cycle-card settings-card">
+                      <p className="section-title">{cycle.label}</p>
+                      <StatusBadge
+                        tone={
+                          cycle.status === "paid" ? "success"
+                            : cycle.status === "ready" ? "pending"
+                            : cycle.status === "failed" ? "error"
+                            : "processing"
+                        }
+                      >
+                        {td(`cycles.status${cycle.status.charAt(0).toUpperCase()}${cycle.status.slice(1)}`)}
+                      </StatusBadge>
+                      <p className="settings-card-description">
+                        {td("cycles.employeeCount", { count: cycle.employeeCount })}
+                        {" · "}
+                        <CurrencyDisplay amount={cycle.totalNet} currency={cycle.currency} />
+                      </p>
+                      {cycle.paidAt ? (
+                        <p className="settings-card-description">
+                          {td("cycles.paidAt", { date: formatDate(cycle.paidAt, locale) })}
+                        </p>
+                      ) : cycle.preparedAt ? (
+                        <p className="settings-card-description">
+                          {td("cycles.preparedAt", { date: formatDate(cycle.preparedAt, locale) })}
+                        </p>
+                      ) : null}
+                      {canManage && (cycle.status === "ready" || cycle.status === "processing") ? (
+                        <div className="settings-actions">
+                          <button
+                            type="button"
+                            className="button button-primary"
+                            disabled={markingPaidCycleId !== null}
+                            onClick={() => void markCyclePaid(cycle.id)}
+                          >
+                            {markingPaidCycleId === cycle.id ? td("cycles.markingPaid") : td("cycles.markPaid")}
+                          </button>
+                        </div>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              <div className="settings-actions payroll-cycle-actions">
+                {canPreparePayout ? (
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    disabled={isPreparingPayout || activeRunAction !== null}
+                    onClick={() => void preparePayout()}
+                  >
+                    {isPreparingPayout ? td("cycles.preparingPayout") : td("cycles.preparePayout")}
+                  </button>
+                ) : null}
+
+                {canCreateAmendment ? (
+                  <button
+                    type="button"
+                    className="button"
+                    disabled={isCreatingAmendment}
+                    onClick={() => void createAmendment()}
+                  >
+                    {isCreatingAmendment ? td("cycles.creatingAmendment") : td("cycles.createAmendment")}
+                  </button>
+                ) : null}
               </div>
             </section>
           ) : null}

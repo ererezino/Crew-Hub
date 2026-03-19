@@ -232,6 +232,49 @@ describe("Payroll approval policy", () => {
     }
   });
 
+  // ── reopen with paid cycles ─────────────────────────────────────────
+
+  it("blocks reopen when hasPaidCycles is true", () => {
+    const decision = evaluatePayrollApprovalAction({
+      action: "reopen",
+      status: "approved",
+      actorId: "approver-1",
+      submittedBy: "submitter-1",
+      actorRoles: ["FINANCE_APPROVER"],
+      hasPaidCycles: true
+    });
+
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) {
+      expect(decision.code).toBe("PAYROLL_LOCKED");
+    }
+  });
+
+  it("allows reopen when hasPaidCycles is false", () => {
+    const decision = evaluatePayrollApprovalAction({
+      action: "reopen",
+      status: "approved",
+      actorId: "approver-1",
+      submittedBy: "submitter-1",
+      actorRoles: ["FINANCE_APPROVER"],
+      hasPaidCycles: false
+    });
+
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("allows reopen when hasPaidCycles is undefined (backward compat)", () => {
+    const decision = evaluatePayrollApprovalAction({
+      action: "reopen",
+      status: "approved",
+      actorId: "approver-1",
+      submittedBy: "submitter-1",
+      actorRoles: ["FINANCE_APPROVER"]
+    });
+
+    expect(decision.allowed).toBe(true);
+  });
+
   // ── locked state guards ─────────────────────────────────────────────
 
   it("blocks modifications to completed runs", () => {

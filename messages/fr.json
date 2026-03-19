@@ -3289,8 +3289,57 @@
       "runRejected": "Cycle refusé.",
       "runCancelled": "Cycle annulé.",
       "adjustmentApplied": "Ajustement de paie appliqué.",
-      "unableToAddAdjustment": "Impossible d'ajouter l'ajustement de paie."
+      "unableToAddAdjustment": "Impossible d'ajouter l'ajustement de paie.",
+      "payoutPrepared": "Cycles de paiement créés. Le cycle de paie passe en traitement.",
+      "payoutPrepFailed": "Impossible de préparer les cycles de paiement.",
+      "cyclePaid": "Cycle marqué comme payé.",
+      "cyclePaidFailed": "Impossible de marquer le cycle comme payé.",
+      "amendmentCreated": "Cycle correctif créé.",
+      "amendmentFailed": "Impossible de créer le cycle correctif.",
+      "flaggedItemsBlock": "Les postes signalés doivent être résolus ou remplacés avant le paiement.",
+      "reopenBlockedByCycles": "Impossible de rouvrir. Ce cycle de paie a des paiements effectués. Créez un correctif."
     },
+    "cycles": {
+      "title": "Cycles de paiement",
+      "noCycles": "Aucun cycle de paiement créé pour l'instant.",
+      "preparePayout": "Préparer le paiement",
+      "preparingPayout": "Préparation...",
+      "markPaid": "Marquer comme payé",
+      "markingPaid": "Marquage...",
+      "createAmendment": "Créer un correctif",
+      "creatingAmendment": "Création...",
+      "statusReady": "Prêt",
+      "statusPaid": "Payé",
+      "statusProcessing": "En traitement",
+      "statusFailed": "Échoué",
+      "statusCancelled": "Annulé",
+      "paidAt": "Payé le {date}",
+      "preparedAt": "Préparé le {date}",
+      "employeeCount": "{count, plural, one {# employé} other {# employés}}",
+      "cycleLabel": "Paiement {currency}",
+      "allCyclesPaid": "Tous les cycles de paiement terminés. Cycle de paie finalisé."
+    },
+    "confirmPreparePayout": {
+      "title": "Préparer les cycles de paiement ?",
+      "description": "Les postes seront regroupés par devise et des cycles de paiement seront créés. Le cycle de paie passera en traitement.",
+      "confirmLabel": "Préparer le paiement"
+    },
+    "confirmPreparePayout_flagged": {
+      "title": "Postes signalés détectés",
+      "description": "{count, plural, one {# poste est signalé} other {# postes sont signalés}}. Remplacer le blocage pour continuer la préparation du paiement ?",
+      "confirmLabel": "Remplacer et préparer"
+    },
+    "confirmMarkPaid": {
+      "title": "Marquer le cycle comme payé ?",
+      "description": "Ceci confirme que le décaissement est terminé pour tous les postes de ce cycle. Le cycle sera verrouillé.",
+      "confirmLabel": "Confirmer le paiement"
+    },
+    "confirmAmendment": {
+      "title": "Créer un cycle correctif ?",
+      "description": "Un nouveau cycle de paie brouillon sera créé, lié à ce cycle verrouillé. N'ajoutez que des postes de correction au correctif.",
+      "confirmLabel": "Créer le correctif"
+    },
+    "amendmentBadge": "Correctif du cycle {id}",
     "dismissToast": "Fermer la notification"
   },
   "timeOff": {

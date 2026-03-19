@@ -11,6 +11,8 @@ export type PayrollApprovalInput = {
   /** The user who submitted the run (written to submitted_by). */
   submittedBy: string | null;
   actorRoles: readonly UserRole[];
+  /** When true, blocks reopen — caller must create an amendment instead. */
+  hasPaidCycles?: boolean;
 };
 
 export type PayrollApprovalDecision =
@@ -166,6 +168,14 @@ export function evaluatePayrollApprovalAction(input: PayrollApprovalInput): Payr
         allowed: false,
         code: "INVALID_STATE",
         message: "Only approved or processing runs can be reopened."
+      };
+    }
+
+    if (input.hasPaidCycles) {
+      return {
+        allowed: false,
+        code: "PAYROLL_LOCKED",
+        message: "Cannot reopen a run with paid payout cycles. Create an amendment instead."
       };
     }
   }

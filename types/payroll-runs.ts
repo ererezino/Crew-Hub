@@ -223,6 +223,7 @@ export type PayrollRunItem = {
 export type PayrollRunDetailResponseData = {
   run: PayrollRunSummary;
   items: PayrollRunItem[];
+  cycles: PayrollCycle[];
   flaggedCount: number;
 };
 
@@ -278,6 +279,23 @@ export type CreatePayrollRunResponse = ApiResponse<CreatePayrollRunResponseData>
 export type CalculatePayrollRunResponse = ApiResponse<CalculatePayrollRunResponseData>;
 export type AddPayrollAdjustmentResponse = ApiResponse<AddPayrollAdjustmentResponseData>;
 export type PayrollRunActionResponse = ApiResponse<PayrollRunActionResponseData>;
+
+export type PreparePayoutResponseData = {
+  cycles: PayrollCycle[];
+  runStatus: PayrollRunStatus;
+};
+
+export type MarkCyclePaidResponseData = {
+  cycle: PayrollCycle;
+};
+
+export type CreateAmendmentRunResponseData = {
+  run: PayrollRunSummary;
+};
+
+export type PreparePayoutResponse = ApiResponse<PreparePayoutResponseData>;
+export type MarkCyclePaidResponse = ApiResponse<MarkCyclePaidResponseData>;
+export type CreateAmendmentRunResponse = ApiResponse<CreateAmendmentRunResponseData>;
 
 /* ------------------------------------------------------------------ */
 /*  CSV Import types                                                   */

@@ -165,12 +165,27 @@ export async function POST(
       (toSnapshot(parsedRun.data.snapshot)?.submittedBy as string | null) ??
       null;
 
+    // For reopen, check if any cycle has been paid — blocks reopen if so.
+    let hasPaidCycles = false;
+    if (action === "reopen") {
+      const { count: paidCycleCount } = await supabase
+        .from("payroll_cycles")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", profile.org_id)
+        .eq("payroll_run_id", runId)
+        .eq("status", "paid")
+        .is("deleted_at", null);
+
+      hasPaidCycles = (paidCycleCount ?? 0) > 0;
+    }
+
     const actionDecision = evaluatePayrollApprovalAction({
       action,
       status: parsedRun.data.status,
       actorId: profile.id,
       submittedBy,
-      actorRoles: profile.roles
+      actorRoles: profile.roles,
+      hasPaidCycles
     });
 
     if (!actionDecision.allowed) {

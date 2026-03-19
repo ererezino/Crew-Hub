@@ -16,12 +16,15 @@ import {
   buildMeta,
   canViewPayroll,
   jsonResponse,
+  PAYROLL_CYCLE_SELECT_COLUMNS,
   PAYROLL_RUN_SELECT_COLUMNS,
   payrollAdjustmentSchema,
   payrollAllowanceSchema,
+  payrollCycleRowSchema,
   payrollDeductionSchema,
   payrollItemPaymentStatusSchema,
   payrollRunRowSchema,
+  toPayrollCycleSummary,
   toPayrollRunSummary
 } from "../../_helpers";
 
@@ -202,7 +205,7 @@ export async function GET(
     if (parsedRun.data.first_approved_by) userIdsToResolve.add(parsedRun.data.first_approved_by);
     if (parsedRun.data.final_approved_by) userIdsToResolve.add(parsedRun.data.final_approved_by);
 
-    const [{ data: rawItems, error: itemsError }, { data: rawActorProfiles, error: actorError }] =
+    const [{ data: rawItems, error: itemsError }, { data: rawActorProfiles, error: actorError }, { data: rawCycles, error: cyclesError }] =
       await Promise.all([
         supabase
           .from("payroll_items")
@@ -219,14 +222,21 @@ export async function GET(
               .select("id, full_name")
               .eq("org_id", session.profile.org_id)
               .in("id", [...userIdsToResolve])
-          : Promise.resolve({ data: [] as Array<{ id: string; full_name: string }>, error: null })
+          : Promise.resolve({ data: [] as Array<{ id: string; full_name: string }>, error: null }),
+        supabase
+          .from("payroll_cycles")
+          .select(PAYROLL_CYCLE_SELECT_COLUMNS)
+          .eq("org_id", session.profile.org_id)
+          .eq("payroll_run_id", runId)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: true })
       ]);
 
     const actorNameById = new Map(
       (rawActorProfiles ?? []).map((p: { id: string; full_name: string }) => [p.id, p.full_name])
     );
 
-    if (itemsError || actorError) {
+    if (itemsError || actorError || cyclesError) {
       return jsonResponse<null>(500, {
         data: null,
         error: {
@@ -430,9 +440,15 @@ export async function GET(
       }
     );
 
+    const parsedCycles = z.array(payrollCycleRowSchema).safeParse(rawCycles ?? []);
+    const cycles = parsedCycles.success
+      ? parsedCycles.data.map(toPayrollCycleSummary)
+      : [];
+
     const responseData: PayrollRunDetailResponseData = {
       run: runSummary,
       items,
+      cycles,
       flaggedCount: items.filter((item) => item.flagged).length
     };
 

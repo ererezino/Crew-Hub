@@ -9,8 +9,13 @@ import {
   PAYROLL_ADJUSTMENT_TYPES,
   PAYROLL_ITEM_PAYMENT_STATUSES,
   PAYROLL_RUN_STATUSES,
+  type PayrollCycle,
   type PayrollRunSummary
 } from "../../../../types/payroll-runs";
+
+/** Shared select columns for payroll_cycles queries. */
+export const PAYROLL_CYCLE_SELECT_COLUMNS =
+  "id, payroll_run_id, org_id, label, currency, status, target_pay_date, prepared_at, prepared_by, paid_at, paid_by, payment_snapshot, reconciled_at, reconciled_by, reconciliation_notes, locked_at, total_gross, total_net, total_deductions, employee_count, created_at, updated_at";
 
 /** Shared select columns for payroll_runs queries. All routes should use this
  *  so new audit/approval columns are consistently returned. */
@@ -199,4 +204,71 @@ export function toPayrollRunSummary(
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+// ── Payroll cycle schemas / mappers ─────────────────────────────────
+
+const PAYROLL_CYCLE_STATUSES = ["draft", "ready", "processing", "paid", "failed", "cancelled"] as const;
+
+export const payrollCycleRowSchema = z.object({
+  id: z.string().uuid(),
+  payroll_run_id: z.string().uuid(),
+  org_id: z.string().uuid(),
+  label: z.string(),
+  currency: z.string().length(3),
+  status: z.enum(PAYROLL_CYCLE_STATUSES),
+  target_pay_date: z.string().nullable(),
+  prepared_at: z.string().nullable(),
+  prepared_by: z.string().uuid().nullable(),
+  paid_at: z.string().nullable(),
+  paid_by: z.string().uuid().nullable(),
+  payment_snapshot: z.unknown(),
+  reconciled_at: z.string().nullable(),
+  reconciled_by: z.string().uuid().nullable(),
+  reconciliation_notes: z.string().nullable(),
+  locked_at: z.string().nullable(),
+  total_gross: z.union([z.number(), z.string()]),
+  total_net: z.union([z.number(), z.string()]),
+  total_deductions: z.union([z.number(), z.string()]),
+  employee_count: z.number().int(),
+  created_at: z.string(),
+  updated_at: z.string()
+});
+
+export function toPayrollCycleSummary(
+  row: z.infer<typeof payrollCycleRowSchema>
+): PayrollCycle {
+  return {
+    id: row.id,
+    payrollRunId: row.payroll_run_id,
+    orgId: row.org_id,
+    label: row.label,
+    currency: row.currency,
+    status: row.status,
+    targetPayDate: row.target_pay_date,
+    preparedAt: row.prepared_at,
+    preparedBy: row.prepared_by,
+    paidAt: row.paid_at,
+    paidBy: row.paid_by,
+    paymentSnapshot: toSnapshot(row.payment_snapshot),
+    reconciledAt: row.reconciled_at,
+    reconciledBy: row.reconciled_by,
+    reconciliationNotes: row.reconciliation_notes,
+    lockedAt: row.locked_at,
+    totalGross: parseAmount(row.total_gross),
+    totalNet: parseAmount(row.total_net),
+    totalDeductions: parseAmount(row.total_deductions),
+    employeeCount: row.employee_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function parseAmount(value: string | number | unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }
