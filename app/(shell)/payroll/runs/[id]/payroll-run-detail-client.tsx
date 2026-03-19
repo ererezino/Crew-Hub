@@ -1220,8 +1220,8 @@ export function PayrollRunDetailClient({
           </section>
 
           {isHistorical ? (
-            <section className="section-card">
-              <div className="section-card-header">
+            <section className="historical-governance">
+              <div className="historical-governance-header">
                 <h2 className="section-title">
                   <StatusBadge tone="warning">{td("historical.badge")}</StatusBadge>
                   {" "}{td("historical.title")}

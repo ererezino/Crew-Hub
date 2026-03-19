@@ -158,7 +158,15 @@ const PITEM_A = "00000000-0000-4000-a000-000000000020";
 const PITEM_B = "00000000-0000-4000-a000-000000000021";
 
 /** A published native payslip row (as returned by Supabase join) */
-function nativePayslipRow(id: string, payrollItemId: string, payPeriod: string) {
+function nativePayslipRow(
+  id: string,
+  payrollItemId: string,
+  payPeriod: string,
+  overrides?: {
+    payment_status?: string;
+    correction_of?: string | null;
+  }
+) {
   return {
     id,
     payroll_item_id: payrollItemId,
@@ -174,7 +182,9 @@ function nativePayslipRow(id: string, payrollItemId: string, payPeriod: string) 
       currency: "USD",
       deductions: [],
       withholding_applied: false,
-      payment_reference: null
+      payment_reference: null,
+      payment_status: overrides?.payment_status ?? "pending",
+      correction_of: overrides?.correction_of ?? null
     }
   };
 }
@@ -353,5 +363,160 @@ describe("GET /api/v1/me/payslips — employee visibility", () => {
     expect(body.data.summary.netAmount).toBe(800000);
     // 500000 per payslip × 2 = 1000000
     expect(body.data.summary.grossAmount).toBe(1000000);
+  });
+});
+
+// ── My Pay model tests ────────────────────────────────────────────────
+
+const PAYSLIP_C = "00000000-0000-4000-a000-000000000012";
+const PITEM_C = "00000000-0000-4000-a000-000000000022";
+
+describe("GET /api/v1/me/payslips — My Pay month-grouped model", () => {
+  it("groups statements into months with correct totals", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", {
+      data: [{ pay_period: "2025-01" }, { pay_period: "2025-02" }],
+      error: null
+    });
+
+    enqueueService("payslips", {
+      data: [
+        nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-01", { payment_status: "paid" }),
+        nativePayslipRow(PAYSLIP_B, PITEM_B, "2025-02", { payment_status: "pending" })
+      ],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.data.months).toHaveLength(2);
+
+    // First month (2025-01) — ordered descending, but months preserve insertion order
+    const jan = body.data.months.find((m: { payPeriod: string }) => m.payPeriod === "2025-01");
+    expect(jan).toBeDefined();
+    expect(jan.totalNet).toBe(400000);
+    expect(jan.totalGross).toBe(500000);
+    expect(jan.paymentStatus).toBe("paid");
+    expect(jan.statements).toHaveLength(1);
+
+    const feb = body.data.months.find((m: { payPeriod: string }) => m.payPeriod === "2025-02");
+    expect(feb).toBeDefined();
+    expect(feb.paymentStatus).toBe("pending");
+  });
+
+  it("surfaces payment_status from payroll_items on each statement", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", { data: [{ pay_period: "2025-03" }], error: null });
+    enqueueService("payslips", {
+      data: [
+        nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-03", { payment_status: "partially_paid" })
+      ],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    const body = await res.json();
+
+    expect(body.data.statements[0].paymentStatus).toBe("partially_paid");
+    expect(body.data.months[0].paymentStatus).toBe("partially_paid");
+  });
+
+  it("marks amendment statements with isAmendment: true", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", { data: [{ pay_period: "2025-01" }], error: null });
+
+    // Two payslips in same month — one original, one amendment
+    enqueueService("payslips", {
+      data: [
+        nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-01", { payment_status: "paid" }),
+        nativePayslipRow(PAYSLIP_B, PITEM_B, "2025-01", {
+          payment_status: "paid",
+          correction_of: PITEM_A
+        })
+      ],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    const body = await res.json();
+
+    // Should have 1 month with 2 statements
+    expect(body.data.months).toHaveLength(1);
+    const month = body.data.months[0];
+    expect(month.statements).toHaveLength(2);
+    expect(month.hasAmendment).toBe(true);
+
+    // First statement is original, second is amendment
+    const original = month.statements.find(
+      (s: { payrollItemId: string }) => s.payrollItemId === PITEM_A
+    );
+    const amendment = month.statements.find(
+      (s: { payrollItemId: string }) => s.payrollItemId === PITEM_B
+    );
+    expect(original.isAmendment).toBe(false);
+    expect(amendment.isAmendment).toBe(true);
+
+    // Month totals reflect both
+    expect(month.totalNet).toBe(800000); // 400000 × 2
+  });
+
+  it("month paymentStatus is worst-case across statements", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", { data: [{ pay_period: "2025-06" }], error: null });
+
+    // One paid, one pending — month should show pending
+    enqueueService("payslips", {
+      data: [
+        nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-06", { payment_status: "paid" }),
+        nativePayslipRow(PAYSLIP_B, PITEM_B, "2025-06", { payment_status: "pending" })
+      ],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    const body = await res.json();
+
+    expect(body.data.months[0].paymentStatus).toBe("pending");
+  });
+
+  it("historical months are flagged with hasHistorical: true", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", { data: [{ pay_period: "2024-12" }], error: null });
+    enqueueService("payslips", {
+      data: [historicalPayslipRow(PAYSLIP_A, PITEM_A, "2024-12")],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2024"));
+    const body = await res.json();
+
+    expect(body.data.months[0].hasHistorical).toBe(true);
+    expect(body.data.months[0].hasAmendment).toBe(false);
+  });
+
+  it("flat statements array is preserved for backward compatibility", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", { data: [{ pay_period: "2025-01" }], error: null });
+    enqueueService("payslips", {
+      data: [nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-01")],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    const body = await res.json();
+
+    // Both months and statements should exist
+    expect(body.data.months).toHaveLength(1);
+    expect(body.data.statements).toHaveLength(1);
+    expect(body.data.statements[0].id).toBe(PAYSLIP_A);
+    expect(body.data.statements[0].paymentStatus).toBe("pending");
   });
 });

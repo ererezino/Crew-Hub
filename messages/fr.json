@@ -2054,7 +2054,18 @@
     "toastLoaded": "Bulletin chargé.",
     "toastOpenError": "Impossible d'ouvrir ce bulletin. Réessayez.",
     "partiallyPaid": "Paiement partiel",
-    "fullyPaid": "Payé"
+    "fullyPaid": "Payé",
+    "paymentPending": "En attente",
+    "paymentProcessing": "En cours",
+    "paymentFailed": "Échoué",
+    "paymentCancelled": "Annulé",
+    "monthAriaLabel": "Détails de paie pour {month}",
+    "disbursedOf": "{disbursed} sur {total} versé",
+    "remainingAmount": "{amount} restant",
+    "amendmentBadge": "Correctif",
+    "amendmentStatement": "Correction",
+    "statementsInMonth": "{count, plural, one {# bulletin} other {# bulletins}}",
+    "paymentLabel": "Paiement"
   },
   "timeOffApprovals": {
     "title": "Approbations de congés",

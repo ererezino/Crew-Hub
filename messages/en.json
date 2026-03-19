@@ -1983,7 +1983,18 @@
     "toastLoaded": "Statement loaded.",
     "toastOpenError": "Unable to open this statement. Try again.",
     "partiallyPaid": "Partial payment",
-    "fullyPaid": "Paid"
+    "fullyPaid": "Paid",
+    "paymentPending": "Pending",
+    "paymentProcessing": "Processing",
+    "paymentFailed": "Failed",
+    "paymentCancelled": "Cancelled",
+    "monthAriaLabel": "Pay details for {month}",
+    "disbursedOf": "{disbursed} of {total} disbursed",
+    "remainingAmount": "{amount} remaining",
+    "amendmentBadge": "Amendment",
+    "amendmentStatement": "Correction",
+    "statementsInMonth": "{count, plural, one {# statement} other {# statements}}",
+    "paymentLabel": "Payment"
   },
   "timeOffApprovals": {
     "title": "Time Off Approvals",

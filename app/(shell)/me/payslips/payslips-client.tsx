@@ -13,8 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useMePayslips } from "../../../../hooks/use-payslips";
 import { formatMonth, formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import type {
+  ItemPaymentStatus,
   PaymentStatementRecord,
-  PaymentStatementSignedUrlResponse
+  PaymentStatementSignedUrlResponse,
+  PayMonth
 } from "../../../../types/payslips";
 import { humanizeError } from "@/lib/errors";
 
@@ -84,6 +86,40 @@ function absoluteAmount(value: number | null): number {
   return Math.abs(value);
 }
 
+function paymentStatusTone(status: ItemPaymentStatus): "success" | "pending" | "processing" | "warning" | "error" | "draft" {
+  switch (status) {
+    case "paid":
+      return "success";
+    case "partially_paid":
+      return "warning";
+    case "processing":
+      return "processing";
+    case "pending":
+      return "pending";
+    case "failed":
+      return "error";
+    case "cancelled":
+      return "draft";
+    default:
+      return "pending";
+  }
+}
+
+const PAYMENT_STATUS_KEYS = {
+  paid: "fullyPaid",
+  partially_paid: "partiallyPaid",
+  processing: "paymentProcessing",
+  pending: "paymentPending",
+  failed: "paymentFailed",
+  cancelled: "paymentCancelled"
+} as const;
+
+type PaymentStatusI18nKey = typeof PAYMENT_STATUS_KEYS[keyof typeof PAYMENT_STATUS_KEYS];
+
+function paymentStatusKey(status: ItemPaymentStatus): PaymentStatusI18nKey {
+  return PAYMENT_STATUS_KEYS[status] ?? "paymentPending";
+}
+
 export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
   const t = useTranslations('payslips');
   const tCommon = useTranslations('common');
@@ -110,6 +146,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
     return [...yearOptions].sort((leftYear, rightYear) => rightYear - leftYear);
   }, [payslipsQuery.data?.availableYears, selectedYear]);
 
+  const months: PayMonth[] = payslipsQuery.data?.months ?? [];
   const statements = payslipsQuery.data?.statements ?? [];
   const summary = payslipsQuery.data?.summary ?? {
     grossAmount: 0,
@@ -306,141 +343,226 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
 
       {!payslipsQuery.isLoading &&
       !payslipsQuery.errorMessage &&
-      statements.length === 0 ? (
+      months.length === 0 ? (
         <EmptyState
           title={t('noStatements')}
           description={t('noStatementsDescription')}
         />
       ) : null}
 
+      {/* ── Month-grouped pay cards ── */}
       {!payslipsQuery.isLoading &&
       !payslipsQuery.errorMessage &&
-      statements.length > 0 ? (
-        <section className="payslip-card-grid" aria-label={t('statementsAriaLabel')}>
-          {statements.map((statement) => (
-            <article
-              key={statement.id}
-              className={
-                activeStatementId === statement.id
-                  ? "payslip-card payslip-card-active"
-                  : "payslip-card"
-              }
-            >
-              <header className="payslip-card-header">
-                <div>
-                  <h2 className="section-title">{formatPayPeriod(statement.payPeriod, locale)}</h2>
-                  <p className="settings-card-description">
-                    {t('generated', { date: formatRelativeTime(statement.generatedAt, locale) })}
-                  </p>
-                </div>
+      months.length > 0 ? (
+        <section className="pay-month-list" aria-label={t('statementsAriaLabel')}>
+          {months.map((month) => {
+            const primaryStatement = month.statements[0];
+            if (!primaryStatement) return null;
 
-                <div className="payslip-card-badges">
-                  <StatusBadge tone={statement.withholdingApplied ? "success" : "draft"}>
-                    {statement.withholdingApplied ? t('payslipType') : t('paymentStatementType')}
-                  </StatusBadge>
-                  {statement.statementType === "historical" ? (
-                    <StatusBadge tone="info">
-                      {t('historicalBadge')}
+            const monthLabel = formatPayPeriod(month.payPeriod, locale);
+            const hasMultipleStatements = month.statements.length > 1;
+            const isPartiallyDisbursed =
+              month.paymentStatus === "partially_paid" ||
+              (month.amountDisbursed > 0 && month.amountDisbursed < month.totalNet);
+
+            return (
+              <article
+                key={month.payPeriod}
+                className="pay-month-card"
+                aria-label={t('monthAriaLabel', { month: monthLabel })}
+              >
+                {/* ── Month header ── */}
+                <header className="pay-month-header">
+                  <div>
+                    <h2 className="section-title">{monthLabel}</h2>
+                    <p className="settings-card-description">
+                      {t('generated', { date: formatRelativeTime(primaryStatement.generatedAt, locale) })}
+                    </p>
+                  </div>
+
+                  <div className="payslip-card-badges">
+                    <StatusBadge tone={paymentStatusTone(month.paymentStatus)}>
+                      {t(paymentStatusKey(month.paymentStatus))}
                     </StatusBadge>
-                  ) : null}
-                </div>
-              </header>
+                    {month.hasHistorical ? (
+                      <StatusBadge tone="info">{t('historicalBadge')}</StatusBadge>
+                    ) : null}
+                    {month.hasAmendment ? (
+                      <StatusBadge tone="warning">{t('amendmentBadge')}</StatusBadge>
+                    ) : null}
+                  </div>
+                </header>
 
-              <div className="payslip-card-amount">
-                <CurrencyDisplay amount={statement.netAmount} currency={statement.currency} />
-              </div>
+                {/* ── Net amount (hero) ── */}
+                <div className="payslip-card-amount">
+                  <CurrencyDisplay amount={month.totalNet} currency={month.currency} />
+                </div>
 
-              {statement.previousNetAmount !== null ? (
-                <p className="payslip-variance-copy">
-                  {t('varianceCopy', { period: formatPayPeriod(statement.previousPayPeriod ?? "", locale) })}
-                </p>
-              ) : (
-                <p className="payslip-variance-copy">{t('noVariance')}</p>
-              )}
+                {/* ── Disbursement progress (partial/pending) ── */}
+                {month.paymentStatus !== "paid" && month.totalNet > 0 ? (
+                  <div className="pay-month-disbursement">
+                    <div className="pay-month-progress-track">
+                      <div
+                        className="pay-month-progress-fill"
+                        style={{
+                          width: `${Math.min(100, Math.round((month.amountDisbursed / month.totalNet) * 100))}%`
+                        }}
+                      />
+                    </div>
+                    <p className="pay-month-disbursement-copy">
+                      {isPartiallyDisbursed ? (
+                        <>
+                          <CurrencyDisplay amount={month.amountDisbursed} currency={month.currency} />
+                          {" "}{t('remainingAmount', { amount: '' })}
+                          <CurrencyDisplay amount={month.amountRemaining} currency={month.currency} />
+                        </>
+                      ) : (
+                        t('paymentPending')
+                      )}
+                    </p>
+                  </div>
+                ) : null}
 
-              <dl className="payslip-card-meta">
-                <div>
-                  <dt>{t('gross')}</dt>
-                  <dd>
-                    <CurrencyDisplay amount={statement.grossAmount} currency={statement.currency} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>{t('deductions')}</dt>
-                  <dd>
-                    <CurrencyDisplay
-                      amount={statement.deductionsAmount}
-                      currency={statement.currency}
-                    />
-                  </dd>
-                </div>
-                <div>
-                  <dt>{t('statusLabel')}</dt>
-                  <dd>
-                    {statement.viewedAt ? (
-                      <span
-                        className="numeric"
-                        title={formatDateTimeTooltip(statement.viewedAt, locale)}
-                      >
-                        {t('viewedAt', { date: formatRelativeTime(statement.viewedAt, locale) })}
-                      </span>
-                    ) : (
-                      <StatusBadge tone="pending">{t('notViewed')}</StatusBadge>
-                    )}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{t('netChange')}</dt>
-                  <dd className="payslip-variance-value">
-                    {statement.previousNetAmount !== null ? (
-                      <>
-                        <DeltaBadge
-                          current={statement.netAmount}
-                          previous={statement.previousNetAmount}
-                        />
-                        <span className="numeric">
-                          {signedCurrencyPrefix(statement.netVarianceAmount)}
-                          <CurrencyDisplay
-                            amount={absoluteAmount(statement.netVarianceAmount)}
-                            currency={statement.currency}
+                {/* ── Variance copy ── */}
+                {primaryStatement.previousNetAmount !== null ? (
+                  <p className="payslip-variance-copy">
+                    {t('varianceCopy', { period: formatPayPeriod(primaryStatement.previousPayPeriod ?? "", locale) })}
+                  </p>
+                ) : (
+                  <p className="payslip-variance-copy">{t('noVariance')}</p>
+                )}
+
+                {/* ── Month-level breakdown ── */}
+                <dl className="payslip-card-meta">
+                  <div>
+                    <dt>{t('gross')}</dt>
+                    <dd>
+                      <CurrencyDisplay amount={month.totalGross} currency={month.currency} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t('deductions')}</dt>
+                    <dd>
+                      <CurrencyDisplay amount={month.totalDeductions} currency={month.currency} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t('paymentLabel')}</dt>
+                    <dd>
+                      <StatusBadge tone={paymentStatusTone(month.paymentStatus)}>
+                        {t(paymentStatusKey(month.paymentStatus))}
+                      </StatusBadge>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t('netChange')}</dt>
+                    <dd className="payslip-variance-value">
+                      {primaryStatement.previousNetAmount !== null ? (
+                        <>
+                          <DeltaBadge
+                            current={month.totalNet}
+                            previous={primaryStatement.previousNetAmount}
                           />
-                        </span>
-                      </>
-                    ) : (
-                      <span className="settings-card-description">{t('noBaseline')}</span>
-                    )}
-                  </dd>
-                </div>
-              </dl>
+                          <span className="numeric">
+                            {signedCurrencyPrefix(primaryStatement.netVarianceAmount)}
+                            <CurrencyDisplay
+                              amount={absoluteAmount(primaryStatement.netVarianceAmount)}
+                              currency={month.currency}
+                            />
+                          </span>
+                        </>
+                      ) : (
+                        <span className="settings-card-description">{t('noBaseline')}</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
 
-              <div className="payslip-card-actions">
-                <button
-                  type="button"
-                  className="button button-accent"
-                  onClick={() => {
-                    void openStatement(statement, "view");
-                  }}
-                  disabled={Boolean(isOpeningById[statement.id])}
-                >
-                  {isOpeningById[statement.id] && activeStatementId === statement.id
-                    ? t('opening')
-                    : t('view')}
-                </button>
-                <button
-                  type="button"
-                  className="button button-subtle"
-                  onClick={() => {
-                    void openStatement(statement, "download");
-                  }}
-                  disabled={Boolean(isOpeningById[statement.id])}
-                >
-                  {isOpeningById[statement.id] && activeStatementId !== statement.id
-                    ? t('preparing')
-                    : t('download')}
-                </button>
-              </div>
-            </article>
-          ))}
+                {/* ── Per-statement rows (visible when month has multiple) ── */}
+                {hasMultipleStatements ? (
+                  <div className="pay-month-statements">
+                    <p className="pay-month-statements-label">
+                      {t('statementsInMonth', { count: month.statements.length })}
+                    </p>
+                    {month.statements.map((statement) => (
+                      <div
+                        key={statement.id}
+                        className={`pay-month-statement-row${
+                          activeStatementId === statement.id ? " pay-month-statement-row-active" : ""
+                        }`}
+                      >
+                        <div className="pay-month-statement-info">
+                          <span className="pay-month-statement-amount">
+                            <CurrencyDisplay amount={statement.netAmount} currency={statement.currency} />
+                          </span>
+                          <span className="pay-month-statement-type">
+                            {statement.isAmendment ? (
+                              <StatusBadge tone="warning">{t('amendmentStatement')}</StatusBadge>
+                            ) : (
+                              <StatusBadge tone={statement.withholdingApplied ? "success" : "draft"}>
+                                {statement.withholdingApplied ? t('payslipType') : t('paymentStatementType')}
+                              </StatusBadge>
+                            )}
+                          </span>
+                          {statement.viewedAt ? null : (
+                            <StatusBadge tone="pending">{t('notViewed')}</StatusBadge>
+                          )}
+                        </div>
+                        <div className="pay-month-statement-actions">
+                          <button
+                            type="button"
+                            className="button button-accent button-sm"
+                            onClick={() => { void openStatement(statement, "view"); }}
+                            disabled={Boolean(isOpeningById[statement.id])}
+                          >
+                            {isOpeningById[statement.id] ? t('opening') : t('view')}
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-subtle button-sm"
+                            onClick={() => { void openStatement(statement, "download"); }}
+                            disabled={Boolean(isOpeningById[statement.id])}
+                          >
+                            {t('download')}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {/* ── Actions for single-statement months ── */}
+                {!hasMultipleStatements ? (
+                  <div className="payslip-card-actions">
+                    <button
+                      type="button"
+                      className="button button-accent"
+                      onClick={() => {
+                        void openStatement(primaryStatement, "view");
+                      }}
+                      disabled={Boolean(isOpeningById[primaryStatement.id])}
+                    >
+                      {isOpeningById[primaryStatement.id] && activeStatementId === primaryStatement.id
+                        ? t('opening')
+                        : t('view')}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-subtle"
+                      onClick={() => {
+                        void openStatement(primaryStatement, "download");
+                      }}
+                      disabled={Boolean(isOpeningById[primaryStatement.id])}
+                    >
+                      {isOpeningById[primaryStatement.id] && activeStatementId !== primaryStatement.id
+                        ? t('preparing')
+                        : t('download')}
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            );
+          })}
         </section>
       ) : null}
 
