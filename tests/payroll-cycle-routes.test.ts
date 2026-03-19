@@ -388,6 +388,7 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
     );
     enqueue("payroll_cycle_items",
       { data: null, error: null },                            // update cycle_items → paid
+      { data: [{ payroll_item_id: IA }, { payroll_item_id: IB }], error: null },  // 2b: select for publish
       { data: [{ payroll_item_id: IA }, { payroll_item_id: IB }], error: null },  // cycle items list
       { data: [                                               // all paid disbursements (partial)
         { payroll_item_id: IA, disbursement_amount: 480000 },
@@ -397,6 +398,9 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
         { payroll_item_id: IA, disbursement_amount: 480000 },
         { payroll_item_id: IB, disbursement_amount: 480000 }
       ], error: null }
+    );
+    enqueue("payslips",
+      { data: null, error: null }    // 2b: update payslips.published_at
     );
     // payroll_items dequeue order:
     //  1. select affected items (id, net_amount)
@@ -482,6 +486,7 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
     );
     enqueue("payroll_cycle_items",
       { data: null, error: null },                              // update cycle_items → paid
+      { data: [{ payroll_item_id: IA }, { payroll_item_id: IB }], error: null },  // 2b: select for publish
       { data: [{ payroll_item_id: IA }, { payroll_item_id: IB }], error: null },  // cycle items list
       { data: [                                                 // all paid disbursements (full)
         { payroll_item_id: IA, disbursement_amount: 480000 },
@@ -495,6 +500,9 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
         { payroll_item_id: IA, disbursement_amount: 320000 },
         { payroll_item_id: IB, disbursement_amount: 320000 }
       ], error: null }
+    );
+    enqueue("payslips",
+      { data: null, error: null }    // 2b: update payslips.published_at
     );
     // payroll_items dequeue order:
     //  1. select affected items (id, net_amount)

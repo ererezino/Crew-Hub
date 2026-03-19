@@ -3,13 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Route-level tests proving the employee visibility path in /api/v1/me/payslips.
  *
- * These tests directly exercise the GET handler and verify:
- * 1. Unpublished historical payslips do NOT appear
- * 2. Published historical payslips DO appear
- * 3. Another employee cannot see payslips belonging to a different employee
- * 4. Native payslips (with published_at set at generation) appear normally
- * 5. The `.not("published_at", "is", null)` filter is structurally present
- *    and the route enforces it — proved by the data that comes through.
+ * Trust model:
+ * - Native payslips are NOT published at generation time.
+ * - Native payslips become visible only when the first payout cycle is marked paid,
+ *   which stamps published_at on the payslip.
+ * - Historical payslips become visible only after the explicit publish action.
+ * - The `.not("published_at", "is", null)` filter ensures unpublished payslips
+ *   are never returned to employees.
+ * - Disbursement progress only counts paid cycle items — draft/ready/processing
+ *   cycle disbursements must not inflate employee-visible amounts.
  */
 
 type QResult = { data: unknown; error: unknown };
@@ -220,7 +222,7 @@ describe("GET /api/v1/me/payslips — employee visibility", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns published native payslips normally", async () => {
+  it("returns native payslips that have been published (cycle paid)", async () => {
     getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
 
     // Year-picker query (RPC client)
@@ -518,5 +520,135 @@ describe("GET /api/v1/me/payslips — My Pay month-grouped model", () => {
     expect(body.data.statements).toHaveLength(1);
     expect(body.data.statements[0].id).toBe(PAYSLIP_A);
     expect(body.data.statements[0].paymentStatus).toBe("pending");
+  });
+});
+
+// ── Visibility trust model tests ──────────────────────────────────────
+
+describe("GET /api/v1/me/payslips — visibility trust model", () => {
+  it("unpaid native payslips are hidden — published_at is null until first cycle pays", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    // The DB has the payslip but published_at is null because no cycle has paid yet.
+    // The route's .not("published_at", "is", null) filter excludes it.
+    // Simulate: DB returns nothing for year-picker and main query.
+    enqueueRpc("payslips", { data: [], error: null });
+    enqueueService("payslips", { data: [], error: null });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.data.statements).toHaveLength(0);
+    expect(body.data.months).toHaveLength(0);
+    expect(body.data.summary.monthsPaid).toBe(0);
+    expect(body.data.summary.netAmount).toBe(0);
+  });
+
+  it("first paid cycle makes the month visible — published_at now set", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    // After the first cycle is marked paid, the cycle-actions route stamps
+    // published_at on the payslip. Now the DB returns it.
+    enqueueRpc("payslips", { data: [{ pay_period: "2025-03" }], error: null });
+    enqueueService("payslips", {
+      data: [nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-03", { payment_status: "partially_paid" })],
+      error: null
+    });
+
+    // Enqueue cycle items query result — only paid disbursements
+    enqueueService("payroll_cycle_items", {
+      data: [{
+        payroll_item_id: PITEM_A,
+        disbursement_amount: 200000,
+        disbursement_status: "paid"
+      }],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.data.months).toHaveLength(1);
+    expect(body.data.months[0].paymentStatus).toBe("partially_paid");
+    expect(body.data.months[0].amountDisbursed).toBe(200000);
+    expect(body.data.months[0].amountRemaining).toBe(200000); // 400000 - 200000
+    expect(body.data.months[0].totalNet).toBe(400000);
+  });
+
+  it("only paid-cycle disbursements count — draft/ready/processing are excluded", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", { data: [{ pay_period: "2025-04" }], error: null });
+    enqueueService("payslips", {
+      data: [nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-04", { payment_status: "partially_paid" })],
+      error: null
+    });
+
+    // The route now filters by disbursement_status = "paid".
+    // Only paid items come through. Draft/processing are excluded by the DB filter.
+    // Simulate: DB returns only the paid cycle item (the route adds .eq("disbursement_status", "paid"))
+    enqueueService("payroll_cycle_items", {
+      data: [{
+        payroll_item_id: PITEM_A,
+        disbursement_amount: 150000,
+        disbursement_status: "paid"
+      }],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    const body = await res.json();
+
+    // Only the paid 150000 counts, not the full net
+    expect(body.data.statements[0].amountDisbursed).toBe(150000);
+    expect(body.data.months[0].amountDisbursed).toBe(150000);
+    expect(body.data.months[0].amountRemaining).toBe(250000); // 400000 - 150000
+  });
+
+  it("the route structurally filters cycle items by disbursement_status = paid", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", { data: [{ pay_period: "2025-05" }], error: null });
+    enqueueService("payslips", {
+      data: [nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-05")],
+      error: null
+    });
+
+    await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+
+    // Verify the cycle_items query includes .eq("disbursement_status", "paid")
+    const cycleItemEqCalls = serviceClientCalls.filter(
+      (c) => c.table === "payroll_cycle_items" && c.method === "eq"
+    );
+    const statusFilter = cycleItemEqCalls.find(
+      (c) => c.args[0] === "disbursement_status" && c.args[1] === "paid"
+    );
+    expect(statusFilter).toBeDefined();
+  });
+
+  it("future/unpaid cycles do not inflate employee-visible amounts", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", { data: [{ pay_period: "2025-06" }], error: null });
+    enqueueService("payslips", {
+      data: [nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-06", { payment_status: "pending" })],
+      error: null
+    });
+
+    // No paid cycle items exist — only draft/processing ones which the DB filter excludes.
+    // The route's .eq("disbursement_status", "paid") means DB returns empty.
+    enqueueService("payroll_cycle_items", {
+      data: [],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    const body = await res.json();
+
+    expect(body.data.statements[0].amountDisbursed).toBe(0);
+    expect(body.data.months[0].amountDisbursed).toBe(0);
+    expect(body.data.months[0].amountRemaining).toBe(400000);
   });
 });

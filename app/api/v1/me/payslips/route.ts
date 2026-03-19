@@ -259,10 +259,13 @@ export async function GET(request: Request) {
     let disbursementMap = new Map<string, number>();
 
     if (payrollItemIds.length > 0) {
+      // Only count disbursements from cycle items that are actually paid.
+      // Draft/ready/processing cycle items must not inflate employee-visible amounts.
       const { data: rawCycleItems } = await serviceClient
         .from("payroll_cycle_items")
         .select("payroll_item_id, disbursement_amount, disbursement_status")
         .in("payroll_item_id", payrollItemIds)
+        .eq("disbursement_status", "paid")
         .is("deleted_at", null);
 
       const parsedCycleItems = z.array(cycleItemRowSchema).safeParse(rawCycleItems ?? []);
@@ -271,7 +274,7 @@ export async function GET(request: Request) {
         for (const item of parsedCycleItems.data) {
           const amount = item.disbursement_amount ? parseAmount(item.disbursement_amount) : 0;
 
-          if (amount > 0 && item.disbursement_status !== "failed") {
+          if (amount > 0) {
             const current = disbursementMap.get(item.payroll_item_id) ?? 0;
             disbursementMap.set(item.payroll_item_id, current + amount);
           }

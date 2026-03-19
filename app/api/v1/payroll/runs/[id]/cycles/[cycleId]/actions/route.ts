@@ -225,6 +225,29 @@ export async function POST(
       .eq("payroll_cycle_id", cycleId)
       .eq("org_id", profile.org_id);
 
+    // 2b. Publish payslips for affected employees — employee visibility
+    //     starts when the first cycle is actually paid, not at generation.
+    const { data: paidCycleItems } = await supabase
+      .from("payroll_cycle_items")
+      .select("payroll_item_id")
+      .eq("payroll_cycle_id", cycleId)
+      .eq("org_id", profile.org_id)
+      .is("deleted_at", null);
+
+    if (paidCycleItems && paidCycleItems.length > 0) {
+      const paidPayrollItemIds = [
+        ...new Set(paidCycleItems.map((row: { payroll_item_id: string }) => row.payroll_item_id))
+      ];
+
+      // Stamp published_at on payslips that are not yet published
+      await supabase
+        .from("payslips")
+        .update({ published_at: nowIso })
+        .in("payroll_item_id", paidPayrollItemIds)
+        .is("published_at", null)
+        .is("deleted_at", null);
+    }
+
     // 3. Derive truthful payment state per payroll item.
     //    An item is 'paid' only when sum(disbursement_amount) across
     //    ALL paid cycles >= net_amount. Otherwise 'partially_paid'.

@@ -241,7 +241,6 @@ export async function POST(
       pay_period: string;
       file_path: string;
       generated_at: string;
-      published_at: string;
       statement_type: string;
     }[] = [];
     const generatedStatements: GeneratePayslipsResultItem[] = [];
@@ -328,7 +327,6 @@ export async function POST(
         pay_period: payPeriod,
         file_path: filePath,
         generated_at: generatedAt,
-        published_at: generatedAt,
         statement_type: "native"
       });
     }
