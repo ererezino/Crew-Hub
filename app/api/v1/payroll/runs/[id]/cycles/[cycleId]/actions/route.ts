@@ -227,9 +227,26 @@ export async function POST(
 
     // 2b. Publish payslips for affected employees — employee visibility
     //     starts when the first cycle is actually paid, not at generation.
-    //     This step MUST succeed. If it fails, the cycle is already marked paid
-    //     but payslips remain invisible — a trust violation. We rollback the
-    //     cycle status to prevent a paid cycle with hidden payslips.
+    //     If any step fails, we must roll back BOTH the cycle header AND
+    //     the cycle items (disbursement_status back to "pending") so that
+    //     My Pay does not see paid-status disbursements from a failed operation.
+    const previousStatus = parsedCycle.data.status;
+
+    async function rollbackMarkPaid() {
+      await Promise.all([
+        supabase
+          .from("payroll_cycles")
+          .update({ status: previousStatus, paid_at: null, paid_by: null, locked_at: null })
+          .eq("id", cycleId)
+          .eq("org_id", profile.org_id),
+        supabase
+          .from("payroll_cycle_items")
+          .update({ disbursement_status: "pending" })
+          .eq("payroll_cycle_id", cycleId)
+          .eq("org_id", profile.org_id)
+      ]);
+    }
+
     const { data: paidCycleItems, error: paidCycleItemsError } = await supabase
       .from("payroll_cycle_items")
       .select("payroll_item_id")
@@ -238,16 +255,11 @@ export async function POST(
       .is("deleted_at", null);
 
     if (paidCycleItemsError) {
-      // Rollback: revert cycle to previous status so it can be retried
-      await supabase
-        .from("payroll_cycles")
-        .update({ status: parsedCycle.data.status, paid_at: null, paid_by: null, locked_at: null })
-        .eq("id", cycleId)
-        .eq("org_id", profile.org_id);
+      await rollbackMarkPaid();
 
       return jsonResponse<null>(500, {
         data: null,
-        error: { code: "PAYSLIP_PUBLICATION_FAILED", message: "Unable to publish payslips for paid cycle. Cycle reverted." },
+        error: { code: "PAYSLIP_PUBLICATION_FAILED", message: "Unable to publish payslips for paid cycle. Cycle and disbursements reverted." },
         meta: buildMeta()
       });
     }
@@ -266,16 +278,11 @@ export async function POST(
         .is("deleted_at", null);
 
       if (publishError) {
-        // Rollback: revert cycle to previous status
-        await supabase
-          .from("payroll_cycles")
-          .update({ status: parsedCycle.data.status, paid_at: null, paid_by: null, locked_at: null })
-          .eq("id", cycleId)
-          .eq("org_id", profile.org_id);
+        await rollbackMarkPaid();
 
         return jsonResponse<null>(500, {
           data: null,
-          error: { code: "PAYSLIP_PUBLICATION_FAILED", message: "Unable to publish payslips for paid cycle. Cycle reverted." },
+          error: { code: "PAYSLIP_PUBLICATION_FAILED", message: "Unable to publish payslips for paid cycle. Cycle and disbursements reverted." },
           meta: buildMeta()
         });
       }

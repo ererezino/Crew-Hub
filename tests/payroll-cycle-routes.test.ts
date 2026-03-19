@@ -588,17 +588,18 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
     );
   });
 
-  it("payslip publication failure during mark_paid → 500 with cycle rollback", async () => {
+  it("payslip publication failure → 500, cycle AND cycle items rolled back, no paid residue", async () => {
     getAuthenticatedSessionMock.mockResolvedValueOnce(finSess);
 
     enqueue("payroll_cycles",
       { data: cyc(CYC, "ready", 960000), error: null },     // load cycle
       { data: cyc(CYC, "paid", 960000), error: null },       // update → paid
-      { data: null, error: null }                             // rollback cycle to previous status
+      { data: null, error: null }                             // rollback cycle header
     );
     enqueue("payroll_cycle_items",
-      { data: null, error: null },                            // update cycle_items → paid
-      { data: [{ payroll_item_id: IA }, { payroll_item_id: IB }], error: null }  // 2b: select for publish
+      { data: null, error: null },                            // step 2: update cycle_items → paid
+      { data: [{ payroll_item_id: IA }, { payroll_item_id: IB }], error: null },  // 2b: select for publish
+      { data: null, error: null }                             // rollback cycle_items → pending
     );
     // Payslip publication fails
     enqueue("payslips",
@@ -616,13 +617,13 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
     const json = await res.json();
     expect(json.error.code).toBe("PAYSLIP_PUBLICATION_FAILED");
 
-    // Verify rollback: cycle was reverted to previous status
+    // ── Assert: cycle header was rolled back to previous status ──
     const cycleUpdates = updatesFor("payroll_cycles");
-    const rollbackUpdate = cycleUpdates.find(
+    const rollbackCycleUpdate = cycleUpdates.find(
       (u) => u.status === "ready" && u.paid_at === null
     );
-    expect(rollbackUpdate).toBeDefined();
-    expect(rollbackUpdate).toEqual(
+    expect(rollbackCycleUpdate).toBeDefined();
+    expect(rollbackCycleUpdate).toEqual(
       expect.objectContaining({
         status: "ready",
         paid_at: null,
@@ -631,7 +632,18 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
       })
     );
 
-    // Verify NO audit log was written (failed operation)
+    // ── Assert: cycle items were rolled back to pending ──
+    // This is critical: without this rollback, My Pay would see
+    // disbursement_status = "paid" on cycle items from a failed operation,
+    // overstating the employee's confirmed disbursements.
+    const ciUpdates = updatesFor("payroll_cycle_items");
+    const rollbackCiUpdate = ciUpdates.find(
+      (u) => u.disbursement_status === "pending"
+    );
+    expect(rollbackCiUpdate).toBeDefined();
+    expect(rollbackCiUpdate).toEqual({ disbursement_status: "pending" });
+
+    // ── Assert: NO audit log (failed operation) ──
     expect(logAuditMock).not.toHaveBeenCalled();
   });
 });
