@@ -294,9 +294,24 @@ export type CreateAmendmentRunResponseData = {
   run: PayrollRunSummary;
 };
 
+export type EmployeeRemainingEntry = {
+  employeeId: string;
+  employeeName: string;
+  payrollItemId: string;
+  netAmount: number;
+  disbursed: number;
+  remaining: number;
+  currency: string;
+};
+
+export type RemainingResponseData = {
+  entries: EmployeeRemainingEntry[];
+};
+
 export type PreparePayoutResponse = ApiResponse<PreparePayoutResponseData>;
 export type MarkCyclePaidResponse = ApiResponse<MarkCyclePaidResponseData>;
 export type CreateAmendmentRunResponse = ApiResponse<CreateAmendmentRunResponseData>;
+export type RemainingResponse = ApiResponse<RemainingResponseData>;
 
 /* ------------------------------------------------------------------ */
 /*  CSV Import types                                                   */

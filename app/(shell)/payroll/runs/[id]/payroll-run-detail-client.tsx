@@ -32,6 +32,7 @@ import type {
   CalculatePayrollRunResponse,
   CreateAmendmentRunResponse,
   EditPayrollItemResponse,
+  EmployeeRemainingEntry,
   MarkCyclePaidResponse,
   PayrollAdjustmentType,
   PayrollCycle,
@@ -39,7 +40,8 @@ import type {
   PayrollRunItem,
   PayrollRunActionResponse,
   PayrollRunStatus,
-  PreparePayoutResponse
+  PreparePayoutResponse,
+  RemainingResponse
 } from "../../../../../types/payroll-runs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
@@ -323,9 +325,10 @@ export function PayrollRunDetailClient({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isPreparingPayout, setIsPreparingPayout] = useState(false);
   const [showCycleDialog, setShowCycleDialog] = useState(false);
-  const [cycleDialogMode, setCycleDialogMode] = useState<"full" | "partial">("full");
-  const [cyclePercentage, setCyclePercentage] = useState(100);
   const [cycleLabel, setCycleLabel] = useState("");
+  const [cycleEmployeeAmounts, setCycleEmployeeAmounts] = useState<Map<string, number>>(new Map());
+  const [cycleRemainingEntries, setCycleRemainingEntries] = useState<EmployeeRemainingEntry[]>([]);
+  const [isLoadingRemaining, setIsLoadingRemaining] = useState(false);
   const [activeCycleActionId, setActiveCycleActionId] = useState<string | null>(null);
   const [markingPaidCycleId, setMarkingPaidCycleId] = useState<string | null>(null);
   const [isCreatingAmendment, setIsCreatingAmendment] = useState(false);
@@ -808,47 +811,86 @@ export function PayrollRunDetailClient({
     await performRunAction("cancel");
   };
 
-  const openCycleDialog = () => {
-    setCycleDialogMode(hasCycles ? "partial" : "full");
-    setCyclePercentage(hasCycles ? 100 : 100);
+  const openCycleDialog = async () => {
     setCycleLabel("");
+    setCycleEmployeeAmounts(new Map());
+    setCycleRemainingEntries([]);
     setShowCycleDialog(true);
+    setIsLoadingRemaining(true);
+
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles/remaining`);
+      const payload = (await response.json()) as RemainingResponse;
+
+      if (response.ok && payload.data) {
+        const entries = payload.data.entries.filter((e) => e.remaining > 0);
+        setCycleRemainingEntries(entries);
+        // Default: fill every employee at their full remaining
+        const amounts = new Map<string, number>();
+        for (const entry of entries) {
+          amounts.set(entry.employeeId, entry.remaining);
+        }
+        setCycleEmployeeAmounts(amounts);
+      }
+    } catch {
+      // entries stay empty — dialog will show empty state
+    } finally {
+      setIsLoadingRemaining(false);
+    }
   };
 
-  const createCycle = async (mode: "full" | "partial", percentage: number, label: string) => {
+  const fillAllRemaining = () => {
+    const amounts = new Map<string, number>();
+    for (const entry of cycleRemainingEntries) {
+      amounts.set(entry.employeeId, entry.remaining);
+    }
+    setCycleEmployeeAmounts(amounts);
+  };
+
+  const fillAllAtPercentage = (pct: number) => {
+    const amounts = new Map<string, number>();
+    for (const entry of cycleRemainingEntries) {
+      const amount = Math.round(entry.remaining * (pct / 100));
+      if (amount > 0) {
+        amounts.set(entry.employeeId, amount);
+      }
+    }
+    setCycleEmployeeAmounts(amounts);
+  };
+
+  const clearAllAmounts = () => {
+    setCycleEmployeeAmounts(new Map());
+  };
+
+  const setEmployeeAmount = (employeeId: string, value: number) => {
+    setCycleEmployeeAmounts((prev) => {
+      const next = new Map(prev);
+      if (value <= 0) {
+        next.delete(employeeId);
+      } else {
+        next.set(employeeId, value);
+      }
+      return next;
+    });
+  };
+
+  const submitCycle = async () => {
     setShowCycleDialog(false);
     setIsPreparingPayout(true);
 
     try {
-      // Build the request body
+      // Build the request body with explicit per-employee amounts
       const body: Record<string, unknown> = {};
-      if (label.trim()) body.label = label.trim();
+      if (cycleLabel.trim()) body.label = cycleLabel.trim();
 
-      // For partial mode, we need to compute per-employee amounts
-      // based on the percentage of their remaining undisbursed net
-      if (mode === "partial" && percentage < 100 && percentage > 0) {
-        // Load current payroll items to compute amounts
-        const itemsResponse = await fetch(`/api/v1/payroll/runs/${runId}`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" }
-        });
-        const itemsPayload = await itemsResponse.json();
-        const items = itemsPayload?.data?.items ?? [];
-
-        if (items.length > 0) {
-          const disbursements: { employeeId: string; amount: number }[] = [];
-          for (const item of items) {
-            // Use the net amount and apply the percentage
-            const netAmount = typeof item.netAmount === "number" ? item.netAmount : 0;
-            const amount = Math.round(netAmount * (percentage / 100));
-            if (amount > 0 && item.employeeId) {
-              disbursements.push({ employeeId: item.employeeId, amount });
-            }
-          }
-          if (disbursements.length > 0) {
-            body.disbursements = disbursements;
-          }
+      const disbursements: { employeeId: string; amount: number }[] = [];
+      for (const [employeeId, amount] of cycleEmployeeAmounts) {
+        if (amount > 0) {
+          disbursements.push({ employeeId, amount });
         }
+      }
+      if (disbursements.length > 0) {
+        body.disbursements = disbursements;
       }
 
       const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
@@ -875,6 +917,7 @@ export function PayrollRunDetailClient({
           const reason = window.prompt(td("confirmHoldOverride.reasonPrompt"));
           if (!reason?.trim()) return;
 
+          // Preserve all original cycle config + add hold overrides
           const overrideBody = { ...body, holdOverrides: heldIds.map((id) => ({ employeeId: id, reason: reason.trim() })) };
           const overrideResponse = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
             method: "POST",
@@ -1448,52 +1491,101 @@ export function PayrollRunDetailClient({
                   />
                 </div>
 
+                {/* Quick-fill helpers */}
                 <div className="field-group">
-                  <label className="field-label">{td("cycleDialog.modeLabel")}</label>
-                  <div className="payroll-cycle-mode-options">
-                    <label className="radio-label">
-                      <input
-                        type="radio"
-                        name="cycleMode"
-                        checked={cycleDialogMode === "full"}
-                        onChange={() => { setCycleDialogMode("full"); setCyclePercentage(100); }}
-                      />
-                      {td("cycleDialog.modeFull")}
-                    </label>
-                    <label className="radio-label">
-                      <input
-                        type="radio"
-                        name="cycleMode"
-                        checked={cycleDialogMode === "partial"}
-                        onChange={() => { setCycleDialogMode("partial"); setCyclePercentage(60); }}
-                      />
-                      {td("cycleDialog.modePartial")}
-                    </label>
+                  <label className="field-label">{td("cycleDialog.quickFillLabel")}</label>
+                  <div className="payroll-cycle-quick-fill-actions">
+                    <button type="button" className="button button-small" onClick={fillAllRemaining}>
+                      {td("cycleDialog.fillRemaining")}
+                    </button>
+                    <button type="button" className="button button-small" onClick={() => fillAllAtPercentage(50)}>
+                      {td("cycleDialog.fill50")}
+                    </button>
+                    <button type="button" className="button button-small" onClick={() => fillAllAtPercentage(60)}>
+                      {td("cycleDialog.fill60")}
+                    </button>
+                    <button type="button" className="button button-small" onClick={() => fillAllAtPercentage(75)}>
+                      {td("cycleDialog.fill75")}
+                    </button>
+                    <button type="button" className="button button-small" onClick={clearAllAmounts}>
+                      {td("cycleDialog.clearAll")}
+                    </button>
                   </div>
                 </div>
 
-                {cycleDialogMode === "partial" ? (
-                  <div className="field-group">
-                    <label htmlFor="cycle-percentage" className="field-label">
-                      {td("cycleDialog.percentageLabel")}
-                    </label>
-                    <div className="payroll-cycle-percentage-row">
-                      <input
-                        id="cycle-percentage"
-                        type="range"
-                        min={10}
-                        max={90}
-                        step={5}
-                        value={cyclePercentage}
-                        onChange={(e) => setCyclePercentage(Number(e.target.value))}
-                      />
-                      <span className="payroll-cycle-percentage-value">{cyclePercentage}%</span>
+                {/* Per-employee disbursement table */}
+                <div className="field-group">
+                  <label className="field-label">{td("cycleDialog.employeeTableLabel")}</label>
+                  {isLoadingRemaining ? (
+                    <p className="settings-card-description">{td("cycleDialog.loadingEmployees")}</p>
+                  ) : cycleRemainingEntries.length === 0 ? (
+                    <p className="settings-card-description">{td("cycleDialog.noEligibleEmployees")}</p>
+                  ) : (
+                    <div className="data-table-container">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>{td("cycleDialog.colEmployee")}</th>
+                            <th className="text-right">{td("cycleDialog.colNet")}</th>
+                            <th className="text-right">{td("cycleDialog.colDisbursed")}</th>
+                            <th className="text-right">{td("cycleDialog.colRemaining")}</th>
+                            <th className="text-right">{td("cycleDialog.colThisCycle")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cycleRemainingEntries.map((entry) => {
+                            const currentAmount = cycleEmployeeAmounts.get(entry.employeeId) ?? 0;
+                            const exceedsRemaining = currentAmount > entry.remaining;
+                            return (
+                              <tr key={entry.employeeId}>
+                                <td>{entry.employeeName}</td>
+                                <td className="text-right">
+                                  <CurrencyDisplay amount={entry.netAmount} currency={entry.currency} />
+                                </td>
+                                <td className="text-right">
+                                  <CurrencyDisplay amount={entry.disbursed} currency={entry.currency} />
+                                </td>
+                                <td className="text-right">
+                                  <CurrencyDisplay amount={entry.remaining} currency={entry.currency} />
+                                </td>
+                                <td className="text-right">
+                                  <input
+                                    type="number"
+                                    className={`input input-small input-right${exceedsRemaining ? " input-error" : ""}`}
+                                    min={0}
+                                    max={entry.remaining}
+                                    value={currentAmount || ""}
+                                    placeholder="0"
+                                    onChange={(e) => {
+                                      const val = Number.parseInt(e.target.value, 10);
+                                      setEmployeeAmount(entry.employeeId, Number.isNaN(val) ? 0 : val);
+                                    }}
+                                  />
+                                  {exceedsRemaining ? (
+                                    <span className="field-error">{td("cycleDialog.exceedsRemaining")}</span>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan={4} className="text-right"><strong>{td("cycleDialog.totalLabel")}</strong></td>
+                            <td className="text-right">
+                              <strong>
+                                <CurrencyDisplay
+                                  amount={Array.from(cycleEmployeeAmounts.values()).reduce((s, v) => s + v, 0)}
+                                  currency={cycleRemainingEntries[0]?.currency ?? "USD"}
+                                />
+                              </strong>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
                     </div>
-                    <p className="settings-card-description">
-                      {td("cycleDialog.percentageHint", { percentage: cyclePercentage, remaining: 100 - cyclePercentage })}
-                    </p>
-                  </div>
-                ) : null}
+                  )}
+                </div>
               </div>
 
               <div className="settings-actions">
@@ -1507,8 +1599,12 @@ export function PayrollRunDetailClient({
                 <button
                   type="button"
                   className="button button-primary"
-                  disabled={isPreparingPayout}
-                  onClick={() => void createCycle(cycleDialogMode, cyclePercentage, cycleLabel)}
+                  disabled={
+                    isPreparingPayout ||
+                    cycleEmployeeAmounts.size === 0 ||
+                    cycleRemainingEntries.some((e) => (cycleEmployeeAmounts.get(e.employeeId) ?? 0) > e.remaining)
+                  }
+                  onClick={() => void submitCycle()}
                 >
                   {isPreparingPayout ? td("cycles.preparingPayout") : td("cycleDialog.create")}
                 </button>
