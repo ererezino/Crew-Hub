@@ -67,6 +67,11 @@ export const payrollRunRowSchema = z.object({
   completed_at: z.string().nullable().optional().default(null),
   amendment_of: z.string().uuid().nullable().optional().default(null),
   locked_at: z.string().nullable().optional().default(null),
+  is_historical: z.boolean().optional().default(false),
+  reviewed_at: z.string().nullable().optional().default(null),
+  reviewed_by: z.string().uuid().nullable().optional().default(null),
+  authorized_at: z.string().nullable().optional().default(null),
+  authorized_by: z.string().uuid().nullable().optional().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -176,6 +181,11 @@ export function toPayrollRunSummary(
     completedAt: row.completed_at ?? null,
     amendmentOf: row.amendment_of ?? null,
     lockedAt: row.locked_at ?? null,
+    isHistorical: row.is_historical ?? false,
+    reviewedAt: row.reviewed_at ?? null,
+    reviewedBy: row.reviewed_by ?? null,
+    authorizedAt: row.authorized_at ?? null,
+    authorizedBy: row.authorized_by ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

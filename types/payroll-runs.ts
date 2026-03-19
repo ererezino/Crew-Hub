@@ -60,6 +60,11 @@ export type PayrollRunSummary = {
   completedAt: string | null;
   amendmentOf: string | null;
   lockedAt: string | null;
+  isHistorical: boolean;
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  authorizedAt: string | null;
+  authorizedBy: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -73,9 +78,15 @@ export type PayrollCycle = {
   label: string;
   currency: string;
   status: PayrollCycleStatus;
+  targetPayDate: string | null;
+  preparedAt: string | null;
+  preparedBy: string | null;
   paidAt: string | null;
   paidBy: string | null;
   paymentSnapshot: Record<string, unknown>;
+  reconciledAt: string | null;
+  reconciledBy: string | null;
+  reconciliationNotes: string | null;
   lockedAt: string | null;
   totalGross: number;
   totalNet: number;

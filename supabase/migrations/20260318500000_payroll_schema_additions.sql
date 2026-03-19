@@ -1,6 +1,7 @@
--- Payroll schema additions (corrected)
--- Per-run payout cycles, overtime entries, batch audit trail,
--- amendment support, and least-privilege RLS (finance-only).
+-- Payroll schema additions (v3)
+-- Per-run payout cycles with full lifecycle, overtime entries,
+-- batch audit trail, historical publication governance,
+-- amendment support, and least-privilege finance-only RLS.
 -- All changes are additive — no existing columns or tables are dropped.
 
 begin;
@@ -13,7 +14,9 @@ alter table public.profiles
   add column if not exists overtime_eligible boolean not null default false;
 
 -- ══════════════════════════════════════════════════════════════════════
--- 2. payroll_runs additions (monthly batch model + audit trail)
+-- 2. payroll_runs additions
+--    Monthly batch identity, audit trail, amendment lineage,
+--    and historical-publication governance.
 -- ══════════════════════════════════════════════════════════════════════
 
 -- Monthly batch identity (YYYY-MM)
@@ -55,15 +58,45 @@ alter table public.payroll_runs
 alter table public.payroll_runs
   add column if not exists locked_at timestamptz;
 
--- Backfill run_month from pay_period_start for existing runs
-update public.payroll_runs
-  set run_month = to_char(pay_period_start, 'YYYY-MM')
-  where run_month is null;
+-- Historical-publication governance (uploaded legacy batches)
+-- Tracks whether this run represents uploaded historical data
+-- and the review/authorization lifecycle for that upload.
+alter table public.payroll_runs
+  add column if not exists is_historical boolean not null default false;
+alter table public.payroll_runs
+  add column if not exists reviewed_at timestamptz;
+alter table public.payroll_runs
+  add column if not exists reviewed_by uuid references public.profiles(id);
+alter table public.payroll_runs
+  add column if not exists authorized_at timestamptz;
+alter table public.payroll_runs
+  add column if not exists authorized_by uuid references public.profiles(id);
 
--- One primary (non-amendment) run per org per month
+-- Backfill run_month from pay_period_start for existing runs.
+-- Only the most recent non-cancelled, non-deleted, non-amendment run
+-- per org+month gets the run_month value. Older duplicates stay NULL
+-- to avoid violating the partial unique index.
+update public.payroll_runs pr
+set run_month = to_char(pr.pay_period_start, 'YYYY-MM')
+from (
+  select distinct on (org_id, to_char(pay_period_start, 'YYYY-MM'))
+    id
+  from public.payroll_runs
+  where deleted_at is null
+    and status != 'cancelled'
+    and amendment_of is null
+  order by org_id, to_char(pay_period_start, 'YYYY-MM'), created_at desc
+) latest
+where pr.id = latest.id
+  and pr.run_month is null;
+
+-- One primary (non-amendment) run per org per month.
+-- Excludes cancelled and soft-deleted runs so cancel-and-recreate works.
 create unique index if not exists idx_payroll_runs_org_month_primary
   on public.payroll_runs(org_id, run_month)
-  where amendment_of is null and deleted_at is null;
+  where amendment_of is null
+    and deleted_at is null
+    and status != 'cancelled';
 
 create index if not exists idx_payroll_runs_amendment
   on public.payroll_runs(amendment_of)
@@ -97,7 +130,7 @@ create index if not exists idx_payroll_items_correction
   where correction_of is not null;
 
 -- ══════════════════════════════════════════════════════════════════════
--- 4. payroll_cycles (per-run payout cycles)
+-- 4. payroll_cycles (per-run payout cycles with full lifecycle)
 -- ══════════════════════════════════════════════════════════════════════
 
 create table if not exists public.payroll_cycles (
@@ -108,10 +141,20 @@ create table if not exists public.payroll_cycles (
   currency varchar(3) not null check (currency ~ '^[A-Z]{3}$'),
   status varchar(20) not null default 'draft'
     check (status in ('draft', 'ready', 'processing', 'paid', 'failed', 'cancelled')),
+  -- Payout lifecycle
+  target_pay_date date,
+  prepared_at timestamptz,
+  prepared_by uuid references public.profiles(id),
   paid_at timestamptz,
   paid_by uuid references public.profiles(id),
   payment_snapshot jsonb not null default '{}'::jsonb,
+  -- Reconciliation
+  reconciled_at timestamptz,
+  reconciled_by uuid references public.profiles(id),
+  reconciliation_notes text,
+  -- Immutability
   locked_at timestamptz,
+  -- Totals
   total_gross bigint not null default 0 check (total_gross >= 0),
   total_net bigint not null default 0,
   total_deductions bigint not null default 0 check (total_deductions >= 0),
@@ -255,7 +298,12 @@ where ps.payroll_item_id = pi.id
   and ps.currency is null;
 
 -- ══════════════════════════════════════════════════════════════════════
--- 8. Grants and RLS (least-privilege, finance-only)
+-- 8. Grants and RLS
+--    Least-privilege, finance-only.
+--    FINANCE_APPROVER is a true superset of FINANCE_ADMIN:
+--    anything FINANCE_ADMIN can do, FINANCE_APPROVER can also do.
+--    Employees have NO direct access to payroll tables
+--    (employee-facing views are served through My Pay APIs).
 -- ══════════════════════════════════════════════════════════════════════
 
 -- Grants
@@ -268,7 +316,7 @@ alter table public.payroll_cycles enable row level security;
 alter table public.payroll_cycle_items enable row level security;
 alter table public.overtime_entries enable row level security;
 
--- ── payroll_runs: tighten to finance-only (remove HR_ADMIN) ──
+-- ── payroll_runs: finance-only (remove HR_ADMIN) ──
 
 drop policy if exists payroll_runs_select_scope on public.payroll_runs;
 create policy payroll_runs_select_scope
@@ -294,6 +342,7 @@ with check (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
@@ -330,11 +379,12 @@ using (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
 
--- ── payroll_items: tighten to finance-only (remove HR_ADMIN) ──
+-- ── payroll_items: finance-only (remove HR_ADMIN) ──
 
 drop policy if exists payroll_items_select_scope on public.payroll_items;
 create policy payroll_items_select_scope
@@ -367,6 +417,7 @@ with check (
   )
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
@@ -403,6 +454,7 @@ using (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
@@ -433,6 +485,7 @@ with check (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
@@ -469,11 +522,13 @@ using (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
 
--- ── payroll_cycle_items RLS (finance-only + employee own-read) ──
+-- ── payroll_cycle_items RLS (finance-only, NO employee access) ──
+-- Employees see cycle info only through My Pay APIs, never raw rows.
 
 drop policy if exists payroll_cycle_items_select_scope on public.payroll_cycle_items;
 create policy payroll_cycle_items_select_scope
@@ -484,8 +539,7 @@ using (
   org_id = public.get_user_org_id()
   and deleted_at is null
   and (
-    employee_id = auth.uid()
-    or public.has_role('FINANCE_ADMIN')
+    public.has_role('FINANCE_ADMIN')
     or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
@@ -500,6 +554,7 @@ with check (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
@@ -536,11 +591,12 @@ using (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
 
--- ── overtime_entries RLS (finance workflow, employee read-own) ──
+-- ── overtime_entries RLS (finance-only, employee read-own only) ──
 
 drop policy if exists overtime_entries_select_scope on public.overtime_entries;
 create policy overtime_entries_select_scope
@@ -568,6 +624,7 @@ with check (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
@@ -604,6 +661,7 @@ using (
   org_id = public.get_user_org_id()
   and (
     public.has_role('FINANCE_ADMIN')
+    or public.has_role('FINANCE_APPROVER')
     or public.has_role('SUPER_ADMIN')
   )
 );
