@@ -8,42 +8,54 @@ import {
 } from "../lib/payroll/cycle-policy";
 
 describe("Payroll cycle policy", () => {
-  // ── prepare payout ─────────────────────────────────────────────────
+  // ── prepare payout (multi-cycle) ────────────────────────────────────
 
   describe("prepare payout", () => {
-    it("allows payout prep on approved run", () => {
+    it("allows payout prep on approved run with eligible employees", () => {
       const decision = evaluatePreparePayoutAction({
         runStatus: "approved",
         actorRoles: ["FINANCE_ADMIN"],
-        existingCycleCount: 0
+        hasEligibleEmployees: true
       });
 
       expect(decision.allowed).toBe(true);
     });
 
-    it("blocks when run is not approved", () => {
+    it("allows payout prep on processing run (add another cycle)", () => {
+      const decision = evaluatePreparePayoutAction({
+        runStatus: "processing",
+        actorRoles: ["FINANCE_ADMIN"],
+        hasEligibleEmployees: true
+      });
+
+      expect(decision.allowed).toBe(true);
+    });
+
+    it("blocks when run is not approved or processing", () => {
       const decision = evaluatePreparePayoutAction({
         runStatus: "calculated",
         actorRoles: ["FINANCE_ADMIN"],
-        existingCycleCount: 0
+        hasEligibleEmployees: true
       });
 
       expect(decision.allowed).toBe(false);
       if (!decision.allowed) {
         expect(decision.code).toBe("INVALID_STATE");
+        expect(decision.message).toContain("approved or processing");
       }
     });
 
-    it("blocks when cycles already exist", () => {
+    it("blocks when no eligible employees remain", () => {
       const decision = evaluatePreparePayoutAction({
         runStatus: "approved",
         actorRoles: ["FINANCE_ADMIN"],
-        existingCycleCount: 2
+        hasEligibleEmployees: false
       });
 
       expect(decision.allowed).toBe(false);
       if (!decision.allowed) {
         expect(decision.code).toBe("INVALID_STATE");
+        expect(decision.message).toContain("already assigned");
       }
     });
 
@@ -51,12 +63,25 @@ describe("Payroll cycle policy", () => {
       const decision = evaluatePreparePayoutAction({
         runStatus: "approved",
         actorRoles: ["HR_ADMIN"],
-        existingCycleCount: 0
+        hasEligibleEmployees: true
       });
 
       expect(decision.allowed).toBe(false);
       if (!decision.allowed) {
         expect(decision.code).toBe("FORBIDDEN");
+      }
+    });
+
+    it("blocks completed run", () => {
+      const decision = evaluatePreparePayoutAction({
+        runStatus: "completed",
+        actorRoles: ["FINANCE_ADMIN"],
+        hasEligibleEmployees: true
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("INVALID_STATE");
       }
     });
   });

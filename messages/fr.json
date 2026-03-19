@@ -3307,6 +3307,7 @@
       "title": "Cycles de paiement",
       "noCycles": "Aucun cycle de paiement créé pour l'instant.",
       "preparePayout": "Préparer le paiement",
+      "addPayoutCycle": "Ajouter un cycle de paiement",
       "preparingPayout": "Préparation...",
       "markReady": "Marquer comme prêt",
       "markingReady": "Marquage...",
@@ -3330,7 +3331,7 @@
     },
     "confirmPreparePayout": {
       "title": "Préparer les cycles de paiement ?",
-      "description": "Les postes seront regroupés par devise et des cycles de paiement brouillons seront créés.",
+      "description": "Un cycle de paiement brouillon sera créé pour les employés restants.",
       "confirmLabel": "Préparer le paiement"
     },
     "confirmPreparePayout_flagged": {

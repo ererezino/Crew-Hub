@@ -9,7 +9,8 @@ export type PayrollCycleStatus = "draft" | "ready" | "processing" | "paid" | "fa
 export type PreparePayoutInput = {
   runStatus: string;
   actorRoles: readonly UserRole[];
-  existingCycleCount: number;
+  /** True when at least one employee is not yet assigned to an active cycle. */
+  hasEligibleEmployees: boolean;
 };
 
 export function evaluatePreparePayoutAction(input: PreparePayoutInput): PayrollApprovalDecision {
@@ -26,19 +27,20 @@ export function evaluatePreparePayoutAction(input: PreparePayoutInput): PayrollA
     };
   }
 
-  if (input.runStatus !== "approved") {
+  // Multi-cycle: allow new cycles on approved or processing runs
+  if (input.runStatus !== "approved" && input.runStatus !== "processing") {
     return {
       allowed: false,
       code: "INVALID_STATE",
-      message: "Only approved runs can have payout cycles prepared."
+      message: "Only approved or processing runs can have payout cycles created."
     };
   }
 
-  if (input.existingCycleCount > 0) {
+  if (!input.hasEligibleEmployees) {
     return {
       allowed: false,
       code: "INVALID_STATE",
-      message: "Payout cycles already exist for this run."
+      message: "All employees are already assigned to active payout cycles."
     };
   }
 

@@ -372,7 +372,8 @@ export function PayrollRunDetailClient({
   const canEditItems = canManage && (run?.status === "draft" || isCalculated || isRejected);
   const cycles: PayrollCycle[] = runQuery.data?.cycles ?? [];
   const activeCycles = cycles.filter((c) => c.status !== "cancelled");
-  const canPreparePayout = canManage && isApproved && activeCycles.length === 0;
+  const canPreparePayout = canManage && (isApproved || isProcessing);
+  const hasCycles = activeCycles.length > 0;
   const allCyclesPaid = activeCycles.length > 0 && activeCycles.every((c) => c.status === "paid");
   const canCreateAmendment = canApprove && isCompleted && allCyclesPaid;
 
@@ -1373,7 +1374,11 @@ export function PayrollRunDetailClient({
                     disabled={isPreparingPayout || activeRunAction !== null}
                     onClick={() => void preparePayout()}
                   >
-                    {isPreparingPayout ? td("cycles.preparingPayout") : td("cycles.preparePayout")}
+                    {isPreparingPayout
+                      ? td("cycles.preparingPayout")
+                      : hasCycles
+                        ? td("cycles.addPayoutCycle")
+                        : td("cycles.preparePayout")}
                   </button>
                 ) : null}
 

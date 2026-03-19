@@ -3431,6 +3431,7 @@
       "title": "Payout cycles",
       "noCycles": "No payout cycles created yet.",
       "preparePayout": "Prepare payout",
+      "addPayoutCycle": "Add payout cycle",
       "preparingPayout": "Preparing...",
       "markReady": "Mark as ready",
       "markingReady": "Marking...",
@@ -3454,7 +3455,7 @@
     },
     "confirmPreparePayout": {
       "title": "Prepare payout cycles?",
-      "description": "This will group items by currency and create draft payout cycles.",
+      "description": "This will create a draft payout cycle for the remaining employees.",
       "confirmLabel": "Prepare payout"
     },
     "confirmPreparePayout_flagged": {

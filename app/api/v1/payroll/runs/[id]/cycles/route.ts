@@ -23,6 +23,10 @@ const holdOverrideSchema = z.object({
 });
 
 const preparePayoutBodySchema = z.object({
+  /** Explicit list of employees for this cycle. Omit to include all remaining. */
+  employeeIds: z.array(z.string().uuid()).optional(),
+  /** Custom cycle label. Auto-generated if omitted. */
+  label: z.string().trim().min(1).max(200).optional(),
   holdOverrides: z.array(holdOverrideSchema).optional().default([])
 });
 
@@ -109,7 +113,12 @@ export async function GET(
   }
 }
 
-// ── POST: prepare payout (creates draft cycles from approved run) ────
+// ── POST: create a payout cycle for a run ────────────────────────────
+//
+// Multi-cycle model: each POST creates one payout-event cycle containing
+// the specified employees (or all remaining employees if none specified).
+// Multiple cycles can coexist for the same run. An employee can only
+// appear in one active (non-cancelled) cycle.
 
 export async function POST(
   request: Request,
@@ -174,49 +183,28 @@ export async function POST(
       });
     }
 
-    // Check existing cycles
-    const { count: existingCycleCount } = await supabase
+    // ── Determine which employees are already in active cycles ───────
+    const { data: activeCycleRows } = await supabase
       .from("payroll_cycles")
-      .select("id", { count: "exact", head: true })
+      .select("id")
       .eq("org_id", profile.org_id)
       .eq("payroll_run_id", runId)
       .is("deleted_at", null)
       .neq("status", "cancelled");
 
-    // Policy check
-    const decision = evaluatePreparePayoutAction({
-      runStatus: parsedRun.data.status,
-      actorRoles: profile.roles,
-      existingCycleCount: existingCycleCount ?? 0
-    });
+    const activeCycleIds = (activeCycleRows ?? []).map((c: { id: string }) => c.id);
 
-    if (!decision.allowed) {
-      const httpStatus = decision.code === "FORBIDDEN" ? 403 : 409;
-      return jsonResponse<null>(httpStatus, {
-        data: null,
-        error: { code: decision.code, message: decision.message },
-        meta: buildMeta()
-      });
-    }
+    let assignedEmployeeIds = new Set<string>();
+    if (activeCycleIds.length > 0) {
+      const { data: existingCycleItems } = await supabase
+        .from("payroll_cycle_items")
+        .select("employee_id")
+        .in("payroll_cycle_id", activeCycleIds)
+        .is("deleted_at", null);
 
-    // Flagged items hard-block — resolve flags before payout prep
-    const { count: flaggedCount } = await supabase
-      .from("payroll_items")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", profile.org_id)
-      .eq("payroll_run_id", runId)
-      .eq("flagged", true)
-      .is("deleted_at", null);
-
-    if ((flaggedCount ?? 0) > 0) {
-      return jsonResponse<null>(409, {
-        data: null,
-        error: {
-          code: "FLAGGED_ITEMS_EXIST",
-          message: `${flaggedCount} flagged item(s) must be resolved before payout prep.`
-        },
-        meta: buildMeta()
-      });
+      assignedEmployeeIds = new Set(
+        (existingCycleItems ?? []).map((e: { employee_id: string }) => e.employee_id)
+      );
     }
 
     // Load all payroll items for this run
@@ -238,8 +226,90 @@ export async function POST(
       });
     }
 
-    // ── Payment detail validation ────────────────────────────────────
-    const employeeIds = [...new Set(rawItems.map((item: { employee_id: string }) => item.employee_id))];
+    // All employee IDs in this run
+    const allRunEmployeeIds = [...new Set(rawItems.map((item: { employee_id: string }) => item.employee_id))];
+
+    // Eligible = not yet assigned to an active cycle
+    const eligibleEmployeeIds = allRunEmployeeIds.filter((id) => !assignedEmployeeIds.has(id));
+
+    // ── Determine selected employees for this cycle ──────────────────
+    let selectedEmployeeIds: string[];
+
+    if (parsedBody.data.employeeIds && parsedBody.data.employeeIds.length > 0) {
+      // Caller specified explicit employees — validate each is eligible
+      const eligibleSet = new Set(eligibleEmployeeIds);
+      const invalidIds = parsedBody.data.employeeIds.filter((id) => !eligibleSet.has(id));
+
+      if (invalidIds.length > 0) {
+        // Distinguish between "not in this run" and "already assigned"
+        const notInRun = invalidIds.filter((id) => !allRunEmployeeIds.includes(id));
+        const alreadyAssigned = invalidIds.filter((id) => assignedEmployeeIds.has(id));
+
+        const parts: string[] = [];
+        if (notInRun.length > 0) parts.push(`${notInRun.length} not in this run`);
+        if (alreadyAssigned.length > 0) parts.push(`${alreadyAssigned.length} already in an active cycle`);
+
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: `Invalid employee selection: ${parts.join(", ")}.`,
+            details: { notInRun, alreadyAssigned }
+          },
+          meta: buildMeta()
+        });
+      }
+
+      selectedEmployeeIds = parsedBody.data.employeeIds;
+    } else {
+      // Default: all remaining eligible employees
+      selectedEmployeeIds = eligibleEmployeeIds;
+    }
+
+    // Policy check (uses hasEligibleEmployees instead of existingCycleCount)
+    const decision = evaluatePreparePayoutAction({
+      runStatus: parsedRun.data.status,
+      actorRoles: profile.roles,
+      hasEligibleEmployees: selectedEmployeeIds.length > 0
+    });
+
+    if (!decision.allowed) {
+      const httpStatus = decision.code === "FORBIDDEN" ? 403 : 409;
+      return jsonResponse<null>(httpStatus, {
+        data: null,
+        error: { code: decision.code, message: decision.message },
+        meta: buildMeta()
+      });
+    }
+
+    // Flagged items hard-block — resolve flags before payout prep
+    // Only check items for the selected employees (not the entire run)
+    const selectedEmployeeSet = new Set(selectedEmployeeIds);
+    const selectedItems = rawItems.filter(
+      (item: { employee_id: string }) => selectedEmployeeSet.has(item.employee_id)
+    );
+
+    const selectedItemIds = selectedItems.map((item: { id: string }) => item.id);
+    const { count: flaggedCount } = await supabase
+      .from("payroll_items")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", profile.org_id)
+      .in("id", selectedItemIds)
+      .eq("flagged", true)
+      .is("deleted_at", null);
+
+    if ((flaggedCount ?? 0) > 0) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "FLAGGED_ITEMS_EXIST",
+          message: `${flaggedCount} flagged item(s) must be resolved before payout prep.`
+        },
+        meta: buildMeta()
+      });
+    }
+
+    // ── Payment detail validation (scoped to selected employees) ─────
     const nowDate = new Date();
     const { data: paymentDetails } = await supabase
       .from("employee_payment_details")
@@ -247,7 +317,7 @@ export async function POST(
         "employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, crew_tag, is_primary, is_verified, change_effective_at"
       )
       .eq("org_id", profile.org_id)
-      .in("employee_id", employeeIds)
+      .in("employee_id", selectedEmployeeIds)
       .eq("is_primary", true)
       .is("deleted_at", null);
 
@@ -358,7 +428,7 @@ export async function POST(
     }
 
     // Hard-block: employees missing payment details entirely
-    const employeesWithoutPayment = employeeIds.filter((id) => !paymentDetailsByEmployee.has(id));
+    const employeesWithoutPayment = selectedEmployeeIds.filter((id) => !paymentDetailsByEmployee.has(id));
     if (employeesWithoutPayment.length > 0) {
       return jsonResponse<null>(409, {
         data: null,
@@ -370,16 +440,22 @@ export async function POST(
       });
     }
 
-    // ── Create a single cycle containing all payroll items ───────────
+    // ── Create the cycle ─────────────────────────────────────────────
     const nowIso = nowDate.toISOString();
     const payPeriodLabel = formatPayPeriodLabel(
       parsedRun.data.pay_period_start,
       parsedRun.data.pay_period_end
     );
 
-    // Determine primary currency (most common among items)
+    // Sequence number: count of existing active cycles + 1
+    const cycleSequence = activeCycleIds.length + 1;
+
+    // Auto-label or caller-provided label
+    const cycleLabel = parsedBody.data.label ?? `Cycle ${cycleSequence} - ${payPeriodLabel}`;
+
+    // Determine primary currency among selected items
     const currencyCounts = new Map<string, number>();
-    for (const item of rawItems) {
+    for (const item of selectedItems) {
       const cur = (item as { pay_currency: string }).pay_currency;
       currencyCounts.set(cur, (currencyCounts.get(cur) ?? 0) + 1);
     }
@@ -396,7 +472,7 @@ export async function POST(
     let totalNet = 0;
     let totalDeductions = 0;
 
-    for (const item of rawItems) {
+    for (const item of selectedItems) {
       const castItem = item as { gross_amount: number | string; net_amount: number | string };
       const gross = typeof castItem.gross_amount === "number"
         ? castItem.gross_amount
@@ -409,15 +485,12 @@ export async function POST(
       totalDeductions += gross - net;
     }
 
-    // Cycles start as draft — they move to ready/processing/paid as
-    // actual payout events occur. The run stays approved until a cycle
-    // is explicitly moved forward.
     const { data: cycleRow, error: cycleError } = await supabase
       .from("payroll_cycles")
       .insert({
         payroll_run_id: runId,
         org_id: profile.org_id,
-        label: `Payout - ${payPeriodLabel}`,
+        label: cycleLabel,
         currency: primaryCurrency,
         status: "draft",
         target_pay_date: parsedRun.data.pay_date,
@@ -426,7 +499,7 @@ export async function POST(
         total_gross: totalGross,
         total_net: totalNet,
         total_deductions: totalDeductions,
-        employee_count: rawItems.length
+        employee_count: selectedItems.length
       })
       .select(PAYROLL_CYCLE_SELECT_COLUMNS)
       .single();
@@ -440,7 +513,7 @@ export async function POST(
     }
 
     // Insert cycle items with validated payment snapshots
-    const cycleItemInserts = rawItems.map((item) => {
+    const cycleItemInserts = selectedItems.map((item) => {
       const castItem = item as { id: string; employee_id: string; net_amount: number | string };
       const netAmount = typeof castItem.net_amount === "number"
         ? castItem.net_amount
@@ -475,8 +548,9 @@ export async function POST(
       createdCycles.push(toPayrollCycleSummary(parsedCycle.data));
     }
 
-    // Run stays approved — no automatic transition to processing.
-    // The run moves to processing only when a cycle action drives it.
+    // Run stays in its current state (approved or processing).
+    // Run → processing when a cycle action moves a cycle to processing.
+    // Run → completed when all employees are covered and all cycles paid.
 
     await logAudit({
       action: "updated",
@@ -485,7 +559,11 @@ export async function POST(
       oldValue: { status: parsedRun.data.status },
       newValue: {
         action: "prepare_payout",
-        cycleCount: createdCycles.length
+        cycleSequence,
+        cycleId: cycleRow.id,
+        employeeCount: selectedItems.length,
+        totalEmployeesInRun: allRunEmployeeIds.length,
+        remainingAfter: eligibleEmployeeIds.length - selectedEmployeeIds.length
       }
     });
 

@@ -252,7 +252,8 @@ export async function POST(
       .eq("org_id", profile.org_id)
       .eq("status", "approved");
 
-    // 5. Check if ALL non-cancelled cycles for this run are now paid
+    // 5. Check if ALL non-cancelled cycles are paid AND all run employees
+    //    are covered by active cycles (multi-cycle completion guard)
     const { count: unpaidCount } = await supabase
       .from("payroll_cycles")
       .select("id", { count: "exact", head: true })
@@ -263,29 +264,68 @@ export async function POST(
       .neq("status", "paid");
 
     if (unpaidCount === 0) {
-      // All cycles paid → complete the run
-      await supabase
-        .from("payroll_runs")
-        .update({
-          status: "completed",
-          completed_at: nowIso,
-          completed_by: profile.id,
-          locked_at: nowIso
-        })
-        .eq("id", runId)
-        .eq("org_id", profile.org_id);
+      // All existing cycles are paid — check employee coverage
+      const { data: runItemEmployees } = await supabase
+        .from("payroll_items")
+        .select("employee_id")
+        .eq("payroll_run_id", runId)
+        .eq("org_id", profile.org_id)
+        .is("deleted_at", null);
 
-      await logAudit({
-        action: "updated",
-        tableName: "payroll_runs",
-        recordId: runId,
-        oldValue: { status: "processing" },
-        newValue: {
-          status: "completed",
-          action: "all_cycles_paid",
-          completedBy: profile.id
-        }
-      });
+      const allRunEmployeeSet = new Set(
+        (runItemEmployees ?? []).map((r: { employee_id: string }) => r.employee_id)
+      );
+
+      const { data: activeCycleIdRows } = await supabase
+        .from("payroll_cycles")
+        .select("id")
+        .eq("payroll_run_id", runId)
+        .eq("org_id", profile.org_id)
+        .is("deleted_at", null)
+        .neq("status", "cancelled");
+
+      const activeCycleIdList = (activeCycleIdRows ?? []).map((c: { id: string }) => c.id);
+      let assignedSet = new Set<string>();
+
+      if (activeCycleIdList.length > 0) {
+        const { data: assignedRows } = await supabase
+          .from("payroll_cycle_items")
+          .select("employee_id")
+          .in("payroll_cycle_id", activeCycleIdList)
+          .is("deleted_at", null);
+
+        assignedSet = new Set(
+          (assignedRows ?? []).map((r: { employee_id: string }) => r.employee_id)
+        );
+      }
+
+      const allCovered = [...allRunEmployeeSet].every((id) => assignedSet.has(id));
+
+      if (allCovered) {
+        // All employees covered, all cycles paid → complete the run
+        await supabase
+          .from("payroll_runs")
+          .update({
+            status: "completed",
+            completed_at: nowIso,
+            completed_by: profile.id,
+            locked_at: nowIso
+          })
+          .eq("id", runId)
+          .eq("org_id", profile.org_id);
+
+        await logAudit({
+          action: "updated",
+          tableName: "payroll_runs",
+          recordId: runId,
+          oldValue: { status: "processing" },
+          newValue: {
+            status: "completed",
+            action: "all_cycles_paid",
+            completedBy: profile.id
+          }
+        });
+      }
     }
 
     await logAudit({
