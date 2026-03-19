@@ -15,7 +15,7 @@ import {
 /** Shared select columns for payroll_runs queries. All routes should use this
  *  so new audit/approval columns are consistently returned. */
 export const PAYROLL_RUN_SELECT_COLUMNS =
-  "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, run_month, published_at, submitted_at, submitted_by, rejected_at, rejected_by, rejection_reason, completed_at, locked_at, amendment_of, is_historical, reviewed_at, reviewed_by, authorized_at, authorized_by, created_at, updated_at";
+  "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, run_month, published_at, submitted_at, submitted_by, rejected_at, rejected_by, rejection_reason, completed_at, completed_by, locked_at, amendment_of, is_historical, reviewed_at, reviewed_by, authorized_at, authorized_by, created_at, updated_at";
 
 export const payrollRunStatusSchema = z.enum(PAYROLL_RUN_STATUSES);
 export const payrollItemPaymentStatusSchema = z.enum(PAYROLL_ITEM_PAYMENT_STATUSES);
@@ -72,6 +72,7 @@ export const payrollRunRowSchema = z.object({
   rejected_by: z.string().uuid().nullable().optional().default(null),
   rejection_reason: z.string().nullable().optional().default(null),
   completed_at: z.string().nullable().optional().default(null),
+  completed_by: z.string().uuid().nullable().optional().default(null),
   amendment_of: z.string().uuid().nullable().optional().default(null),
   locked_at: z.string().nullable().optional().default(null),
   is_historical: z.boolean().optional().default(false),
@@ -187,6 +188,7 @@ export function toPayrollRunSummary(
     rejectedAt: row.rejected_at ?? null,
     rejectionReason: row.rejection_reason ?? null,
     completedAt: row.completed_at ?? null,
+    completedBy: row.completed_by ?? null,
     amendmentOf: row.amendment_of ?? null,
     lockedAt: row.locked_at ?? null,
     isHistorical: row.is_historical ?? false,

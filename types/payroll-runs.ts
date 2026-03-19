@@ -59,6 +59,7 @@ export type PayrollRunSummary = {
   rejectedAt: string | null;
   rejectionReason: string | null;
   completedAt: string | null;
+  completedBy: string | null;
   amendmentOf: string | null;
   lockedAt: string | null;
   isHistorical: boolean;

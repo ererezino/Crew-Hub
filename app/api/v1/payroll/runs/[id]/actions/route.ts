@@ -200,6 +200,7 @@ export async function POST(
     let nextRejectedBy: string | null = parsedRun.data.rejected_by ?? null;
     let nextRejectionReason: string | null = parsedRun.data.rejection_reason ?? null;
     let nextCompletedAt: string | null = parsedRun.data.completed_at ?? null;
+    let nextCompletedBy: string | null = parsedRun.data.completed_by ?? null;
     let nextLockedAt: string | null = parsedRun.data.locked_at ?? null;
 
     // ── submit ──────────────────────────────────────────────────────
@@ -451,6 +452,7 @@ export async function POST(
       nextSubmittedBy = null;
       nextLockedAt = null;
       nextCompletedAt = null;
+      nextCompletedBy = null;
       nextSnapshot = {
         ...previousSnapshot,
         reopenedAt: nowIso,
@@ -520,6 +522,7 @@ export async function POST(
 
       nextStatus = "completed";
       nextCompletedAt = nowIso;
+      nextCompletedBy = profile.id;
       nextSnapshot = {
         ...previousSnapshot,
         completedAt: nowIso,
@@ -546,6 +549,7 @@ export async function POST(
         rejected_by: nextRejectedBy,
         rejection_reason: nextRejectionReason,
         completed_at: nextCompletedAt,
+        completed_by: nextCompletedBy,
         locked_at: nextLockedAt,
         snapshot: nextSnapshot,
         notes: nextNotes
