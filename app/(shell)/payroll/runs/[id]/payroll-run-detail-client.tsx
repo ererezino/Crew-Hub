@@ -332,6 +332,9 @@ export function PayrollRunDetailClient({
   const [activeCycleActionId, setActiveCycleActionId] = useState<string | null>(null);
   const [markingPaidCycleId, setMarkingPaidCycleId] = useState<string | null>(null);
   const [isCreatingAmendment, setIsCreatingAmendment] = useState(false);
+  const [isPerformingHistoricalAction, setIsPerformingHistoricalAction] = useState(false);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [provenanceNote, setProvenanceNote] = useState("");
   const { confirm, confirmDialog } = useConfirmAction();
 
   const sortedItems = useMemo(() => {
@@ -386,6 +389,11 @@ export function PayrollRunDetailClient({
   const allCyclesPaid = activeCycles.length > 0 && activeCycles.every((c) => c.status === "paid");
   const canCreateAmendment = canApprove && isCompleted && allCyclesPaid;
 
+  const isHistorical = run?.isHistorical === true;
+  const isReviewed = Boolean(run?.reviewedAt);
+  const isAuthorized = Boolean(run?.authorizedAt);
+  const isPublished = Boolean(run?.publishedAt);
+
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
   };
@@ -399,6 +407,42 @@ export function PayrollRunDetailClient({
     window.setTimeout(() => {
       dismissToast(toastId);
     }, 4000);
+  };
+
+  const performHistoricalAction = async (action: "review" | "authorize" | "publish") => {
+    if (!run || isPerformingHistoricalAction) return;
+
+    if (action === "publish" && !showPublishConfirm) {
+      setShowPublishConfirm(true);
+      return;
+    }
+
+    setIsPerformingHistoricalAction(true);
+    try {
+      const body: Record<string, unknown> = { action };
+      if (action === "publish" && provenanceNote.trim()) {
+        body.provenanceNote = provenanceNote.trim();
+      }
+      const res = await fetch(`/api/v1/payroll/runs/${runId}/historical-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast("error", json.error?.message ?? "Action failed.");
+        return;
+      }
+      runQuery.refresh();
+      const toastKey = action === "review" ? "historicalReviewed" : action === "authorize" ? "historicalAuthorized" : "historicalPublished";
+      showToast("success", td(`toast.${toastKey}`));
+      setShowPublishConfirm(false);
+      setProvenanceNote("");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Action failed.");
+    } finally {
+      setIsPerformingHistoricalAction(false);
+    }
   };
 
   const calculateRun = async () => {
@@ -1175,6 +1219,125 @@ export function PayrollRunDetailClient({
             </article>
           </section>
 
+          {isHistorical ? (
+            <section className="section-card">
+              <div className="section-card-header">
+                <h2 className="section-title">
+                  <StatusBadge tone="warning">{td("historical.badge")}</StatusBadge>
+                  {" "}{td("historical.title")}
+                </h2>
+                <p className="settings-card-description">{td("historical.description")}</p>
+              </div>
+
+              {/* Three-step timeline */}
+              <div className="historical-timeline" style={{ display: "flex", gap: "1rem", margin: "1rem 0" }}>
+                <div className={`historical-step${isReviewed ? " historical-step-done" : ""}`}>
+                  <StatusBadge tone={isReviewed ? "success" : "draft"}>
+                    {isReviewed ? "\u2713 " : ""}{td("historical.reviewStep")}
+                  </StatusBadge>
+                </div>
+                <span style={{ alignSelf: "center" }}>{"\u2192"}</span>
+                <div className={`historical-step${isAuthorized ? " historical-step-done" : ""}`}>
+                  <StatusBadge tone={isAuthorized ? "success" : "draft"}>
+                    {isAuthorized ? "\u2713 " : ""}{td("historical.authorizeStep")}
+                  </StatusBadge>
+                </div>
+                <span style={{ alignSelf: "center" }}>{"\u2192"}</span>
+                <div className={`historical-step${isPublished ? " historical-step-done" : ""}`}>
+                  <StatusBadge tone={isPublished ? "success" : "draft"}>
+                    {isPublished ? "\u2713 " : ""}{td("historical.publishStep")}
+                  </StatusBadge>
+                </div>
+              </div>
+
+              {/* Visibility status */}
+              <p className={isPublished ? "field-success" : "field-warning"} style={{ margin: "0.5rem 0" }}>
+                {isPublished ? td("historical.visibleToEmployees") : td("historical.notYetVisible")}
+              </p>
+
+              {/* Provenance note display */}
+              {run?.provenanceNote ? (
+                <div style={{ margin: "0.75rem 0" }}>
+                  <span className="form-label">{td("historical.provenanceDisplay")}</span>
+                  <p className="settings-card-description">{run.provenanceNote}</p>
+                </div>
+              ) : null}
+
+              {/* Action buttons */}
+              <div className="button-row" style={{ marginTop: "1rem" }}>
+                {!isReviewed ? (
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    disabled={isPerformingHistoricalAction}
+                    onClick={() => performHistoricalAction("review")}
+                  >
+                    {td("historical.markReviewed")}
+                  </button>
+                ) : null}
+
+                {isReviewed && !isAuthorized ? (
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    disabled={isPerformingHistoricalAction}
+                    onClick={() => performHistoricalAction("authorize")}
+                  >
+                    {td("historical.authorize")}
+                  </button>
+                ) : null}
+
+                {isAuthorized && !isPublished ? (
+                  <button
+                    type="button"
+                    className="button button-destructive"
+                    disabled={isPerformingHistoricalAction}
+                    onClick={() => performHistoricalAction("publish")}
+                  >
+                    {isPerformingHistoricalAction ? td("historical.publishing") : td("historical.publish")}
+                  </button>
+                ) : null}
+              </div>
+
+              {/* Publish confirmation dialog */}
+              {showPublishConfirm ? (
+                <div className="confirm-dialog" style={{ marginTop: "1rem", padding: "1rem", border: "2px solid var(--color-warning)", borderRadius: "0.5rem" }}>
+                  <h3 className="section-title">{td("historical.confirmPublishTitle")}</h3>
+                  <p className="settings-card-description">{td("historical.confirmPublishDescription")}</p>
+                  <div className="form-field" style={{ margin: "0.75rem 0" }}>
+                    <label className="form-label" htmlFor="provenance-note">{td("historical.provenanceLabel")}</label>
+                    <textarea
+                      id="provenance-note"
+                      className="input"
+                      rows={2}
+                      value={provenanceNote}
+                      onChange={(e) => setProvenanceNote(e.target.value)}
+                      placeholder={td("historical.provenancePlaceholder")}
+                    />
+                  </div>
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => setShowPublishConfirm(false)}
+                    >
+                      {tCommon("cancel")}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-destructive"
+                      disabled={isPerformingHistoricalAction}
+                      onClick={() => performHistoricalAction("publish")}
+                    >
+                      {isPerformingHistoricalAction ? td("historical.publishing") : td("historical.confirmPublishLabel")}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {!isHistorical ? (
           <section className="settings-card payroll-approval-card" aria-label={t('approval.title')}>
             <div className="payroll-approval-header">
               <h2 className="section-title">{t('approval.title')}</h2>
@@ -1328,6 +1491,7 @@ export function PayrollRunDetailClient({
               ) : null}
             </div>
           </section>
+          ) : null}
 
           {(isApproved || isProcessing || isCompleted) ? (
             <section className="payroll-lock-banner" aria-label={t('locked.title')}>

@@ -18,6 +18,7 @@ export type PaymentStatementRecord = {
   previousNetAmount: number | null;
   netVarianceAmount: number | null;
   netVariancePercent: number | null;
+  statementType: "native" | "historical";
 };
 
 export type PaymentStatementSummary = {

@@ -68,8 +68,19 @@ export type PayrollRunSummary = {
   reviewedBy: string | null;
   authorizedAt: string | null;
   authorizedBy: string | null;
+  publishedBy: string | null;
+  provenanceNote: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type HistoricalActionPayload = {
+  action: "review" | "authorize" | "publish";
+  provenanceNote?: string | null;
+};
+
+export type HistoricalActionResponseData = {
+  run: PayrollRunSummary;
 };
 
 export type PayrollCycleStatus = "draft" | "ready" | "processing" | "paid" | "failed" | "cancelled";
@@ -280,6 +291,7 @@ export type CreatePayrollRunResponse = ApiResponse<CreatePayrollRunResponseData>
 export type CalculatePayrollRunResponse = ApiResponse<CalculatePayrollRunResponseData>;
 export type AddPayrollAdjustmentResponse = ApiResponse<AddPayrollAdjustmentResponseData>;
 export type PayrollRunActionResponse = ApiResponse<PayrollRunActionResponseData>;
+export type HistoricalActionResponse = ApiResponse<HistoricalActionResponseData>;
 
 export type PreparePayoutResponseData = {
   cycles: PayrollCycle[];

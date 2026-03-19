@@ -241,6 +241,8 @@ export async function POST(
       pay_period: string;
       file_path: string;
       generated_at: string;
+      published_at: string;
+      statement_type: string;
     }[] = [];
     const generatedStatements: GeneratePayslipsResultItem[] = [];
     let skippedCount = 0;
@@ -325,7 +327,9 @@ export async function POST(
         org_id: item.org_id,
         pay_period: payPeriod,
         file_path: filePath,
-        generated_at: generatedAt
+        generated_at: generatedAt,
+        published_at: generatedAt,
+        statement_type: "native"
       });
     }
 

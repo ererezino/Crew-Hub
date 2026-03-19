@@ -1959,6 +1959,7 @@
     "generated": "Generated {date}",
     "payslipType": "Payslip",
     "paymentStatementType": "Payment statement",
+    "historicalBadge": "Historical",
     "varianceCopy": "Net pay changed from {period}.",
     "noVariance": "No previous period available for comparison.",
     "gross": "Gross",
@@ -3514,7 +3515,39 @@
       "description": "A new draft run will be created linked to this locked run. Only add correction items to the amendment.",
       "confirmLabel": "Create amendment"
     },
-    "amendmentBadge": "Amendment of run {id}"
+    "amendmentBadge": "Amendment of run {id}",
+    "historical": {
+      "badge": "Historical Import",
+      "title": "Historical Publication",
+      "description": "This run contains uploaded historical payroll data. It must be reviewed, authorized, and published before employees can see it.",
+      "notYetVisible": "Not yet visible to employees",
+      "visibleToEmployees": "Published and visible to employees",
+      "reviewStep": "Review",
+      "authorizeStep": "Authorize",
+      "publishStep": "Publish",
+      "reviewed": "Reviewed",
+      "authorized": "Authorized",
+      "published": "Published",
+      "markReviewed": "Mark as Reviewed",
+      "authorize": "Authorize for Publication",
+      "publish": "Publish to Employees",
+      "publishing": "Publishing…",
+      "provenanceLabel": "Provenance note",
+      "provenancePlaceholder": "Describe the origin of this data (e.g. 'Migrated from legacy ADP system')…",
+      "provenanceDisplay": "Source",
+      "confirmPublishTitle": "Publish historical payroll to employees?",
+      "confirmPublishDescription": "This will make all pay statements from this historical run visible to the affected employees. This action cannot be undone.",
+      "confirmPublishLabel": "Publish to Employees",
+      "reviewedBy": "Reviewed by {name} at {date}",
+      "authorizedBy": "Authorized by {name} at {date}",
+      "publishedBy": "Published by {name} at {date}",
+      "separationOfDuty": "The reviewer cannot authorize. A different approver is required."
+    },
+    "toast": {
+      "historicalReviewed": "Historical run marked as reviewed.",
+      "historicalAuthorized": "Historical run authorized for publication.",
+      "historicalPublished": "Historical run published. Payslips are now visible to employees."
+    }
   },
   "timeOff": {
     "title": "Time Off",

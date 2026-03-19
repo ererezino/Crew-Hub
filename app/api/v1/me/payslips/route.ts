@@ -36,6 +36,7 @@ const payslipRowSchema = z.object({
   generated_at: z.string(),
   emailed_at: z.string().nullable(),
   viewed_at: z.string().nullable(),
+  statement_type: z.enum(["native", "historical"]).optional().default("native"),
   payroll_item: z.union([payrollItemRowSchema, z.array(payrollItemRowSchema)])
 });
 
@@ -156,15 +157,17 @@ export async function GET(request: Request) {
           .eq("org_id", session.profile.org_id)
           .eq("employee_id", session.profile.id)
           .is("deleted_at", null)
+          .not("published_at", "is", null)
           .order("pay_period", { ascending: false }),
         serviceClient
           .from("payslips")
           .select(
-            "id, payroll_item_id, pay_period, file_path, generated_at, emailed_at, viewed_at, payroll_item:payroll_items!inner(gross_amount, net_amount, currency, deductions, withholding_applied, payment_reference)"
+            "id, payroll_item_id, pay_period, file_path, generated_at, emailed_at, viewed_at, statement_type, payroll_item:payroll_items!inner(gross_amount, net_amount, currency, deductions, withholding_applied, payment_reference)"
           )
           .eq("org_id", session.profile.org_id)
           .eq("employee_id", session.profile.id)
           .is("deleted_at", null)
+          .not("published_at", "is", null)
           .gte("pay_period", `${selectedYear}-01`)
           .lte("pay_period", `${selectedYear}-12`)
           .order("pay_period", { ascending: false })
@@ -227,6 +230,7 @@ export async function GET(request: Request) {
         currency: payrollItem.currency.toUpperCase(),
         paymentReference: payrollItem.payment_reference,
         withholdingApplied: payrollItem.withholding_applied,
+        statementType: row.statement_type ?? "native",
         previousPayPeriod: null,
         previousNetAmount: null,
         netVarianceAmount: null,

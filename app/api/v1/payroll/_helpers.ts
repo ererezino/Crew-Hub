@@ -20,7 +20,7 @@ export const PAYROLL_CYCLE_SELECT_COLUMNS =
 /** Shared select columns for payroll_runs queries. All routes should use this
  *  so new audit/approval columns are consistently returned. */
 export const PAYROLL_RUN_SELECT_COLUMNS =
-  "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, run_month, published_at, submitted_at, submitted_by, rejected_at, rejected_by, rejection_reason, completed_at, completed_by, locked_at, amendment_of, is_historical, reviewed_at, reviewed_by, authorized_at, authorized_by, created_at, updated_at";
+  "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, run_month, published_at, published_by, submitted_at, submitted_by, rejected_at, rejected_by, rejection_reason, completed_at, completed_by, locked_at, amendment_of, is_historical, reviewed_at, reviewed_by, authorized_at, authorized_by, provenance_note, created_at, updated_at";
 
 export const payrollRunStatusSchema = z.enum(PAYROLL_RUN_STATUSES);
 export const payrollItemPaymentStatusSchema = z.enum(PAYROLL_ITEM_PAYMENT_STATUSES);
@@ -71,6 +71,7 @@ export const payrollRunRowSchema = z.object({
   notes: z.string().nullable(),
   run_month: z.string().nullable().optional().default(null),
   published_at: z.string().nullable().optional().default(null),
+  published_by: z.string().uuid().nullable().optional().default(null),
   submitted_at: z.string().nullable().optional().default(null),
   submitted_by: z.string().uuid().nullable().optional().default(null),
   rejected_at: z.string().nullable().optional().default(null),
@@ -85,6 +86,7 @@ export const payrollRunRowSchema = z.object({
   reviewed_by: z.string().uuid().nullable().optional().default(null),
   authorized_at: z.string().nullable().optional().default(null),
   authorized_by: z.string().uuid().nullable().optional().default(null),
+  provenance_note: z.string().nullable().optional().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -201,6 +203,8 @@ export function toPayrollRunSummary(
     reviewedBy: row.reviewed_by ?? null,
     authorizedAt: row.authorized_at ?? null,
     authorizedBy: row.authorized_by ?? null,
+    publishedBy: row.published_by ?? null,
+    provenanceNote: row.provenance_note ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

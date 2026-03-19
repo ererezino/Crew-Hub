@@ -334,9 +334,16 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                   </p>
                 </div>
 
-                <StatusBadge tone={statement.withholdingApplied ? "processing" : "draft"}>
-                  {statement.withholdingApplied ? t('payslipType') : t('paymentStatementType')}
-                </StatusBadge>
+                <div className="payslip-card-badges">
+                  <StatusBadge tone={statement.withholdingApplied ? "processing" : "draft"}>
+                    {statement.withholdingApplied ? t('payslipType') : t('paymentStatementType')}
+                  </StatusBadge>
+                  {statement.statementType === "historical" ? (
+                    <StatusBadge tone="warning">
+                      {t('historicalBadge')}
+                    </StatusBadge>
+                  ) : null}
+                </div>
               </header>
 
               <div className="payslip-card-amount">
