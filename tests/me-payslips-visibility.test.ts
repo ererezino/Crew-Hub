@@ -365,6 +365,8 @@ describe("GET /api/v1/me/payslips — employee visibility", () => {
     expect(body.data.summary.netAmount).toBe(800000);
     // 500000 per payslip × 2 = 1000000
     expect(body.data.summary.grossAmount).toBe(1000000);
+    // No paid cycle items enqueued → amountDisbursed = 0
+    expect(body.data.summary.amountDisbursed).toBe(0);
   });
 });
 
@@ -650,5 +652,49 @@ describe("GET /api/v1/me/payslips — visibility trust model", () => {
     expect(body.data.statements[0].amountDisbursed).toBe(0);
     expect(body.data.months[0].amountDisbursed).toBe(0);
     expect(body.data.months[0].amountRemaining).toBe(400000);
+  });
+
+  it("YTD summary.amountDisbursed reflects only confirmed paid amounts", async () => {
+    getAuthenticatedSessionMock.mockResolvedValue(employeeSession(EMPLOYEE_A));
+
+    enqueueRpc("payslips", {
+      data: [{ pay_period: "2025-01" }, { pay_period: "2025-02" }],
+      error: null
+    });
+
+    // Jan is fully paid, Feb is partially paid
+    enqueueService("payslips", {
+      data: [
+        nativePayslipRow(PAYSLIP_A, PITEM_A, "2025-01", { payment_status: "paid" }),
+        nativePayslipRow(PAYSLIP_B, PITEM_B, "2025-02", { payment_status: "partially_paid" })
+      ],
+      error: null
+    });
+
+    // Cycle items: Jan fully disbursed (400k), Feb partially (100k)
+    enqueueService("payroll_cycle_items", {
+      data: [
+        { payroll_item_id: PITEM_A, disbursement_amount: 400000, disbursement_status: "paid" },
+        { payroll_item_id: PITEM_B, disbursement_amount: 100000, disbursement_status: "paid" }
+      ],
+      error: null
+    });
+
+    const res = await GET(new Request("http://localhost/api/v1/me/payslips?year=2025"));
+    const body = await res.json();
+
+    // YTD netAmount is full entitlement (800k), but amountDisbursed is only confirmed (500k)
+    expect(body.data.summary.netAmount).toBe(800000);
+    expect(body.data.summary.amountDisbursed).toBe(500000);
+    expect(body.data.summary.grossAmount).toBe(1000000);
+
+    // Per-month check
+    const jan = body.data.months.find((m: { payPeriod: string }) => m.payPeriod === "2025-01");
+    expect(jan.amountDisbursed).toBe(400000);
+    expect(jan.amountRemaining).toBe(0);
+
+    const feb = body.data.months.find((m: { payPeriod: string }) => m.payPeriod === "2025-02");
+    expect(feb.amountDisbursed).toBe(100000);
+    expect(feb.amountRemaining).toBe(300000);
   });
 });

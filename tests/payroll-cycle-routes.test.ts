@@ -587,4 +587,51 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
       })
     );
   });
+
+  it("payslip publication failure during mark_paid → 500 with cycle rollback", async () => {
+    getAuthenticatedSessionMock.mockResolvedValueOnce(finSess);
+
+    enqueue("payroll_cycles",
+      { data: cyc(CYC, "ready", 960000), error: null },     // load cycle
+      { data: cyc(CYC, "paid", 960000), error: null },       // update → paid
+      { data: null, error: null }                             // rollback cycle to previous status
+    );
+    enqueue("payroll_cycle_items",
+      { data: null, error: null },                            // update cycle_items → paid
+      { data: [{ payroll_item_id: IA }, { payroll_item_id: IB }], error: null }  // 2b: select for publish
+    );
+    // Payslip publication fails
+    enqueue("payslips",
+      { data: null, error: { message: "DB write failed" } }  // 2b: publish fails
+    );
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      req({ action: "mark_paid" }),
+      par(RUN, CYC) as { params: Promise<{ id: string; cycleId: string }> }
+    );
+
+    expect(res.status).toBe(500);
+
+    const json = await res.json();
+    expect(json.error.code).toBe("PAYSLIP_PUBLICATION_FAILED");
+
+    // Verify rollback: cycle was reverted to previous status
+    const cycleUpdates = updatesFor("payroll_cycles");
+    const rollbackUpdate = cycleUpdates.find(
+      (u) => u.status === "ready" && u.paid_at === null
+    );
+    expect(rollbackUpdate).toBeDefined();
+    expect(rollbackUpdate).toEqual(
+      expect.objectContaining({
+        status: "ready",
+        paid_at: null,
+        paid_by: null,
+        locked_at: null
+      })
+    );
+
+    // Verify NO audit log was written (failed operation)
+    expect(logAuditMock).not.toHaveBeenCalled();
+  });
 });

@@ -227,12 +227,30 @@ export async function POST(
 
     // 2b. Publish payslips for affected employees — employee visibility
     //     starts when the first cycle is actually paid, not at generation.
-    const { data: paidCycleItems } = await supabase
+    //     This step MUST succeed. If it fails, the cycle is already marked paid
+    //     but payslips remain invisible — a trust violation. We rollback the
+    //     cycle status to prevent a paid cycle with hidden payslips.
+    const { data: paidCycleItems, error: paidCycleItemsError } = await supabase
       .from("payroll_cycle_items")
       .select("payroll_item_id")
       .eq("payroll_cycle_id", cycleId)
       .eq("org_id", profile.org_id)
       .is("deleted_at", null);
+
+    if (paidCycleItemsError) {
+      // Rollback: revert cycle to previous status so it can be retried
+      await supabase
+        .from("payroll_cycles")
+        .update({ status: parsedCycle.data.status, paid_at: null, paid_by: null, locked_at: null })
+        .eq("id", cycleId)
+        .eq("org_id", profile.org_id);
+
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "PAYSLIP_PUBLICATION_FAILED", message: "Unable to publish payslips for paid cycle. Cycle reverted." },
+        meta: buildMeta()
+      });
+    }
 
     if (paidCycleItems && paidCycleItems.length > 0) {
       const paidPayrollItemIds = [
@@ -240,12 +258,27 @@ export async function POST(
       ];
 
       // Stamp published_at on payslips that are not yet published
-      await supabase
+      const { error: publishError } = await supabase
         .from("payslips")
         .update({ published_at: nowIso })
         .in("payroll_item_id", paidPayrollItemIds)
         .is("published_at", null)
         .is("deleted_at", null);
+
+      if (publishError) {
+        // Rollback: revert cycle to previous status
+        await supabase
+          .from("payroll_cycles")
+          .update({ status: parsedCycle.data.status, paid_at: null, paid_by: null, locked_at: null })
+          .eq("id", cycleId)
+          .eq("org_id", profile.org_id);
+
+        return jsonResponse<null>(500, {
+          data: null,
+          error: { code: "PAYSLIP_PUBLICATION_FAILED", message: "Unable to publish payslips for paid cycle. Cycle reverted." },
+          meta: buildMeta()
+        });
+      }
     }
 
     // 3. Derive truthful payment state per payroll item.

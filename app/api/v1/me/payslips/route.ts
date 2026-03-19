@@ -154,6 +154,7 @@ function emptySummary(currency: string): PaymentStatementSummary {
     grossAmount: 0,
     deductionsAmount: 0,
     netAmount: 0,
+    amountDisbursed: 0,
     monthsPaid: 0,
     currency
   };
@@ -323,11 +324,14 @@ export async function GET(request: Request) {
     }
 
     // ── Compute summary ──
+    // YTD totals use confirmed disbursed amounts, not full entitlements.
+    // This ensures partial months don't overstate what the employee received.
     const summary = statements.reduce<PaymentStatementSummary>(
       (currentSummary, statement) => ({
         grossAmount: currentSummary.grossAmount + statement.grossAmount,
         deductionsAmount: currentSummary.deductionsAmount + statement.deductionsAmount,
         netAmount: currentSummary.netAmount + statement.netAmount,
+        amountDisbursed: currentSummary.amountDisbursed + statement.amountDisbursed,
         monthsPaid: currentSummary.monthsPaid,
         currency: statement.currency
       }),

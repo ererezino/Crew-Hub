@@ -152,6 +152,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
     grossAmount: 0,
     deductionsAmount: 0,
     netAmount: 0,
+    amountDisbursed: 0,
     monthsPaid: 0,
     currency: "USD"
   };
@@ -326,7 +327,7 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
           <article className="metric-card">
             <p className="metric-label">{t('ytdNet')}</p>
             <p className="metric-value">
-              <CurrencyDisplay amount={summary.netAmount} currency={summary.currency} />
+              <CurrencyDisplay amount={summary.amountDisbursed} currency={summary.currency} />
             </p>
             <p className="metric-hint">{t('ytdNetHint', { year: selectedYear })}</p>
           </article>
@@ -393,9 +394,17 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
                   </div>
                 </header>
 
-                {/* ── Net amount (hero) ── */}
+                {/* ── Amount (hero) — show confirmed disbursed for partial months ── */}
                 <div className="payslip-card-amount">
-                  <CurrencyDisplay amount={month.totalNet} currency={month.currency} />
+                  <CurrencyDisplay
+                    amount={month.paymentStatus === "paid" ? month.totalNet : month.amountDisbursed}
+                    currency={month.currency}
+                  />
+                  {month.paymentStatus !== "paid" && month.totalNet > 0 ? (
+                    <span className="pay-month-of-total">
+                      {" / "}<CurrencyDisplay amount={month.totalNet} currency={month.currency} />
+                    </span>
+                  ) : null}
                 </div>
 
                 {/* ── Disbursement progress (partial/pending) ── */}

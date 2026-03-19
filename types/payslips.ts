@@ -74,6 +74,8 @@ export type PaymentStatementSummary = {
   grossAmount: number;
   deductionsAmount: number;
   netAmount: number;
+  /** Confirmed disbursed across all paid cycles. */
+  amountDisbursed: number;
   monthsPaid: number;
   currency: string;
 };
