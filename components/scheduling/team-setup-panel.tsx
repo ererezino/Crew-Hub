@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+
 import type { WeekendHourOption } from "../../types/scheduling";
 import type { PersonRecord } from "../../types/people";
 
@@ -297,25 +299,28 @@ export function TeamSetupPanel({
 
           {isWeekendWorker ? (
             <div className="schedule-team-setup-advanced">
-              <label className="schedule-team-setup-hours">
+              <div className="schedule-team-setup-hours">
                 <span>{t("teamSetup.weekendHours")}</span>
-                <select
-                  className="form-input"
+                <Select
                   value={draft.weekendShiftHours}
-                  onChange={(event) =>
+                  onValueChange={(value) =>
                     updateDraft(member, {
-                      weekendShiftHours:
-                        event.currentTarget.value as WeekendHourOption
+                      weekendShiftHours: value as WeekendHourOption
                     })
                   }
                 >
-                  {WEEKEND_HOURS_OPTIONS.map((hours) => (
-                    <option key={hours} value={hours}>
-                      {t("roster.hoursLabel", { hours })}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WEEKEND_HOURS_OPTIONS.map((hours) => (
+                      <SelectItem key={hours} value={hours}>
+                        {t("roster.hoursLabel", { hours })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <label className="schedule-team-setup-alternate">
                 <input

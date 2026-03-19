@@ -24,6 +24,7 @@ import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../components/ui/currency-display";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { useAnalytics, type AnalyticsQuery } from "../../../hooks/use-analytics";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDays } from "../../../lib/datetime";
@@ -386,33 +387,33 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
           </div>
 
           {countries.length > 1 && (
-            <select
-              className="form-input analytics-filter-select"
-              value={country}
-              onChange={(e) => applyCountry(e.target.value)}
-              aria-label={t('countryFilterAria')}
-            >
-              <option value="all">{t('allCountries')}</option>
-              {countries.map((cc) => (
-                <option key={cc} value={cc}>
-                  {countryFlagFromCode(cc)} {countryNameFromCode(cc, locale)}
-                </option>
-              ))}
-            </select>
+            <Select value={country} onValueChange={(value) => applyCountry(value)}>
+              <SelectTrigger aria-label={t('countryFilterAria')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('allCountries')}</SelectItem>
+                {countries.map((cc) => (
+                  <SelectItem key={cc} value={cc}>
+                    {countryFlagFromCode(cc)} {countryNameFromCode(cc, locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
           {departments.length > 1 && (
-            <select
-              className="form-input analytics-filter-select"
-              value={department}
-              onChange={(e) => applyDepartment(e.target.value)}
-              aria-label={t('departmentFilterAria')}
-            >
-              <option value="all">{t('allDepartments')}</option>
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
+            <Select value={department} onValueChange={(value) => applyDepartment(value)}>
+              <SelectTrigger aria-label={t('departmentFilterAria')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('allDepartments')}</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </div>
 

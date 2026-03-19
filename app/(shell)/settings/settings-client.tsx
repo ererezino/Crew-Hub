@@ -12,6 +12,7 @@ import { z } from "zod";
 import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { getCountryOptions } from "../../../lib/countries";
 import { getModuleState } from "../../../lib/feature-state";
 import { LOCALE_META, SUPPORTED_LOCALES, type AppLocale } from "../../../i18n/locales";
@@ -646,8 +647,7 @@ export function SettingsClient({
     setFormDirty(true);
   };
 
-  const handleLocaleChange = async (event: ChangeEvent<HTMLSelectElement>) => {
-    const newLocale = event.target.value as AppLocale;
+  const handleLocaleChange = async (newLocale: AppLocale) => {
     if (newLocale === preferredLocale) return;
 
     setIsLocaleSaving(true);
@@ -782,24 +782,27 @@ export function SettingsClient({
                 <input id="profile-email" className="form-input" value={profile.email} disabled />
               </label>
 
-              <label className="form-field" htmlFor="profile-country">
+              <div className="form-field">
                 <span className="form-label">{t('profile.countryLabel')}</span>
-                <select
-                  id="profile-country"
-                  className="form-input"
-                  value={profileValues.countryCode}
-                  onChange={(event) => {
-                    const nextValues = { ...profileValues, countryCode: event.currentTarget.value };
+                <Select
+                  value={profileValues.countryCode || "__none__"}
+                  onValueChange={(value) => {
+                    const nextValues = { ...profileValues, countryCode: value === "__none__" ? "" : value };
                     setProfileValues(nextValues);
                     setFormDirty(true);
                   }}
                 >
-                  <option value="">{t('profile.countryPlaceholder')}</option>
-                  {getCountryOptions(preferredLocale).map((opt) => (
-                    <option key={opt.code} value={opt.code}>{opt.name}</option>
-                  ))}
-                </select>
-              </label>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('profile.countryPlaceholder')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t('profile.countryPlaceholder')}</SelectItem>
+                    {getCountryOptions(preferredLocale).map((opt) => (
+                      <SelectItem key={opt.code} value={opt.code}>{opt.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <label className="form-field" htmlFor="profile-bio">
                 <span className="form-label">{t('profile.bioLabel')}</span>
@@ -1068,18 +1071,22 @@ export function SettingsClient({
                 {t('languagePreference.description')}
               </p>
 
-              <select
-                className="form-input settings-language-select"
+              <Select
                 value={preferredLocale}
-                onChange={(e) => void handleLocaleChange(e)}
+                onValueChange={(value) => void handleLocaleChange(value as AppLocale)}
                 disabled={isLocaleSaving}
               >
-                {SUPPORTED_LOCALES.map((loc) => (
-                  <option key={loc} value={loc}>
-                    {LOCALE_META[loc].nativeName}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_LOCALES.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {LOCALE_META[loc].nativeName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {localeFeedback ? (
                 <p className="settings-language-feedback">{localeFeedback}</p>

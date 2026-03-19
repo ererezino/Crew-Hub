@@ -22,6 +22,7 @@ import {
   monthToDateRange
 } from "../../../../lib/time-off";
 import type { AfkCalendarRecord, LeaveRequestRecord } from "../../../../types/time-off";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 
 type AppLocale = "en" | "fr";
 
@@ -317,39 +318,45 @@ export function TimeOffCalendarClient({
         </header>
 
         <div className="timeoff-filter-grid">
-          <label className="form-field" htmlFor="timeoff-calendar-country">
+          <div className="form-field">
             <span className="form-label">{t('countryLabel')}</span>
-            <select
-              id="timeoff-calendar-country"
-              className="form-input"
-              value={selectedCountryCode}
-              onChange={(event) => setSelectedCountryCode(event.currentTarget.value)}
+            <Select
+              value={selectedCountryCode || "__all__"}
+              onValueChange={(value) => setSelectedCountryCode(value === "__all__" ? "" : value)}
             >
-              <option value="">{t('allCountries')}</option>
-              {calendarQuery.data.filters.countries.map((countryCode) => (
-                <option key={countryCode} value={countryCode}>
-                  {countryNameFromCode(countryCode, locale)}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger>
+                <SelectValue placeholder={t('allCountries')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">{t('allCountries')}</SelectItem>
+                {calendarQuery.data.filters.countries.map((countryCode) => (
+                  <SelectItem key={countryCode} value={countryCode}>
+                    {countryNameFromCode(countryCode, locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <label className="form-field" htmlFor="timeoff-calendar-department">
+          <div className="form-field">
             <span className="form-label">{t('departmentLabel')}</span>
-            <select
-              id="timeoff-calendar-department"
-              className="form-input"
-              value={selectedDepartment}
-              onChange={(event) => setSelectedDepartment(event.currentTarget.value)}
+            <Select
+              value={selectedDepartment || "__all__"}
+              onValueChange={(value) => setSelectedDepartment(value === "__all__" ? "" : value)}
             >
-              <option value="">{t('allDepartments')}</option>
-              {calendarQuery.data.filters.departments.map((department) => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger>
+                <SelectValue placeholder={t('allDepartments')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">{t('allDepartments')}</SelectItem>
+                {calendarQuery.data.filters.departments.map((department) => (
+                  <SelectItem key={department} value={department}>
+                    {department}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </section>
 

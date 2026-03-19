@@ -42,6 +42,7 @@ import type {
   ExpenseRecord,
   UpdateExpenseResponse
 } from "../../../../types/expenses";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
 import { X } from "lucide-react";
 
@@ -1071,23 +1072,27 @@ export function ExpenseApprovalsClient({
             placeholder={t('filters.employeePlaceholder')}
           />
         </label>
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t('filters.category')}</span>
-          <select
-            className="form-input"
+          <Select
             value={categoryFilter}
-            onChange={(event) =>
-              setCategoryFilter(event.currentTarget.value as ExpenseCategory | "all")
+            onValueChange={(value) =>
+              setCategoryFilter(value as ExpenseCategory | "all")
             }
           >
-            <option value="all">{t('filters.allCategories')}</option>
-            {EXPENSE_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {getExpenseCategoryLabel(category)}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('filters.allCategories')}</SelectItem>
+              {EXPENSE_CATEGORIES.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {getExpenseCategoryLabel(category)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <label className="form-field">
           <span className="form-label">{t('filters.fromDate')}</span>
           <input

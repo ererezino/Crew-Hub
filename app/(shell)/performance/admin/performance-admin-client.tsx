@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import {
@@ -321,29 +322,35 @@ function CalibrationTab() {
               </StatusBadge>
             </div>
 
-            <select
-              className="form-input"
+            <Select
               value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.currentTarget.value)}
-              aria-label={t("calibration.filterByDepartment")}
+              onValueChange={(value) => setDepartmentFilter(value)}
             >
-              <option value="all">{t("calibration.allDepartments")}</option>
-              {departments.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+              <SelectTrigger aria-label={t("calibration.filterByDepartment")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("calibration.allDepartments")}</SelectItem>
+                {departments.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <select
-              className="form-input"
+            <Select
               value={countryFilter}
-              onChange={(e) => setCountryFilter(e.currentTarget.value)}
-              aria-label={t("calibration.filterByCountry")}
+              onValueChange={(value) => setCountryFilter(value)}
             >
-              <option value="all">{t("calibration.allCountries")}</option>
-              {countries.map((c) => (
-                <option key={c} value={c}>{countryNameFromCode(c, locale)}</option>
-              ))}
-            </select>
+              <SelectTrigger aria-label={t("calibration.filterByCountry")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("calibration.allCountries")}</SelectItem>
+                {countries.map((c) => (
+                  <SelectItem key={c} value={c}>{countryNameFromCode(c, locale)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {summary ? (
@@ -763,44 +770,50 @@ export function AdminPerformanceClient() {
                     ) : null}
                   </label>
 
-                  <label className="form-field" htmlFor="cycle-type">
+                  <div className="form-field">
                     <span className="form-label">{t("createCycle.cycleType")}</span>
-                    <select
-                      id="cycle-type"
-                      className="form-input"
+                    <Select
                       value={cycleForm.type}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         setCycleForm((current) => ({
                           ...current,
-                          type: event.currentTarget.value as CycleFormValues["type"]
+                          type: value as CycleFormValues["type"]
                         }))
                       }
                     >
-                      <option value="quarterly">{t("cycleType.quarterly")}</option>
-                      <option value="annual">{t("cycleType.annual")}</option>
-                      <option value="probation">{t("cycleType.probation")}</option>
-                    </select>
-                  </label>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="quarterly">{t("cycleType.quarterly")}</SelectItem>
+                        <SelectItem value="annual">{t("cycleType.annual")}</SelectItem>
+                        <SelectItem value="probation">{t("cycleType.probation")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  <label className="form-field" htmlFor="cycle-status">
+                  <div className="form-field">
                     <span className="form-label">{t("createCycle.initialStatus")}</span>
-                    <select
-                      id="cycle-status"
-                      className="form-input"
+                    <Select
                       value={cycleForm.status}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         setCycleForm((current) => ({
                           ...current,
-                          status: event.currentTarget.value as CycleFormValues["status"]
+                          status: value as CycleFormValues["status"]
                         }))
                       }
                     >
-                      <option value="draft">{t("cycleStatus.draft")}</option>
-                      <option value="active">{t("cycleStatus.active")}</option>
-                      <option value="in_review">{t("cycleStatus.inReview")}</option>
-                      <option value="completed">{t("cycleStatus.completed")}</option>
-                    </select>
-                  </label>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">{t("cycleStatus.draft")}</SelectItem>
+                        <SelectItem value="active">{t("cycleStatus.active")}</SelectItem>
+                        <SelectItem value="in_review">{t("cycleStatus.inReview")}</SelectItem>
+                        <SelectItem value="completed">{t("cycleStatus.completed")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <label className="form-field" htmlFor="cycle-start-date">
                     <span className="form-label">{t("createCycle.startDate")}</span>
@@ -915,39 +928,45 @@ export function AdminPerformanceClient() {
                     {isCreatingTemplate ? t("templates.creatingTemplate") : t("templates.createStandardTemplate")}
                   </button>
 
-                  <label className="form-field" htmlFor="assign-cycle">
+                  <div className="form-field">
                     <span className="form-label">{t("templates.cycleLabel")}</span>
-                    <select
-                      id="assign-cycle"
-                      className="form-input"
-                      value={selectedCycleId}
-                      onChange={(event) => setSelectedCycleId(event.currentTarget.value)}
+                    <Select
+                      value={selectedCycleId || "__none__"}
+                      onValueChange={(value) => setSelectedCycleId(value === "__none__" ? "" : value)}
                     >
-                      <option value="">{t("templates.selectCycle")}</option>
-                      {adminQuery.data.cycles.map((cycle) => (
-                        <option key={cycle.id} value={cycle.id}>
-                          {cycle.name} ({toSentenceCase(cycle.type)})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("templates.selectCycle")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">{t("templates.selectCycle")}</SelectItem>
+                        {adminQuery.data.cycles.map((cycle) => (
+                          <SelectItem key={cycle.id} value={cycle.id}>
+                            {cycle.name} ({toSentenceCase(cycle.type)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  <label className="form-field" htmlFor="assign-template">
+                  <div className="form-field">
                     <span className="form-label">{t("templates.templateLabel")}</span>
-                    <select
-                      id="assign-template"
-                      className="form-input"
-                      value={selectedTemplateId}
-                      onChange={(event) => setSelectedTemplateId(event.currentTarget.value)}
+                    <Select
+                      value={selectedTemplateId || "__none__"}
+                      onValueChange={(value) => setSelectedTemplateId(value === "__none__" ? "" : value)}
                     >
-                      <option value="">{t("templates.selectTemplate")}</option>
-                      {adminQuery.data.templates.map((template) => (
-                        <option key={template.id} value={template.id}>
-                          {template.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("templates.selectTemplate")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">{t("templates.selectTemplate")}</SelectItem>
+                        {adminQuery.data.templates.map((template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            {template.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <label className="form-field" htmlFor="assign-due-date">
                     <span className="form-label">{t("templates.dueDateLabel")}</span>

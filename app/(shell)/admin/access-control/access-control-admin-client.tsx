@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { NavIcon } from "../../../../components/shared/nav-icon";
 import { PageHeader } from "../../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import type {
   AccessControlProfileOption,
   AdminAccessConfigResponseData,
@@ -935,21 +936,25 @@ export function AccessControlAdminClient() {
 
               {/* Module selector */}
               <div className="rac-override-field">
-                <label className="rac-override-field-label">{t("selectModule")}</label>
-                <select
-                  className="form-input"
-                  value={overrideModule}
-                  onChange={(e) => {
-                    setOverrideModule(e.target.value);
+                <span className="rac-override-field-label">{t("selectModule")}</span>
+                <Select
+                  value={overrideModule || "__none__"}
+                  onValueChange={(value) => {
+                    setOverrideModule(value === "__none__" ? "" : value);
                     setOverrideSelectedIds(new Set());
                     setOverrideSearch("");
                   }}
                 >
-                  <option value="">{t("selectModule")}</option>
-                  {ALL_MODULES.map((mod) => (
-                    <option key={mod.key} value={mod.key}>{td(mod.labelKey)}</option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t("selectModule")}</SelectItem>
+                    {ALL_MODULES.map((mod) => (
+                      <SelectItem key={mod.key} value={mod.key}>{td(mod.labelKey)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Person search + selection */}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { formatCurrency } from "../../../../lib/format-currency";
 import { hasAnyRole, hasRole } from "../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../types/auth";
@@ -195,7 +196,7 @@ export async function GET(request: NextRequest) {
                   ? Number.parseInt(e.amount, 10)
                   : 0;
             const currency = e.currency || "USD";
-            const formatted = `${currency} ${(amountValue / 100).toFixed(2)}`;
+            const formatted = formatCurrency(amountValue / 100, currency);
             return {
               id: e.id,
               type: "expense",

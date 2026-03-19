@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { PageHeader } from "../../../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import type {
   SurveyMutationResponse,
   SurveyQuestionType,
@@ -276,42 +277,50 @@ export function NewSurveyClient() {
           </label>
 
           <div className="audit-filters">
-            <label className="form-field">
+            <div className="form-field">
               <span className="form-label">{t('typeLabel')}</span>
-              <select
-                className="form-input"
+              <Select
                 value={formValues.type}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setFormValues((currentValue) => ({
                     ...currentValue,
-                    type: event.currentTarget.value as SurveyType
+                    type: value as SurveyType
                   }))
                 }
               >
-                <option value="engagement">{t('typeEngagement')}</option>
-                <option value="pulse">{t('typePulse')}</option>
-                <option value="onboarding">{t('typeOnboarding')}</option>
-                <option value="exit">{t('typeExit')}</option>
-                <option value="custom">{t('typeCustom')}</option>
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="engagement">{t('typeEngagement')}</SelectItem>
+                  <SelectItem value="pulse">{t('typePulse')}</SelectItem>
+                  <SelectItem value="onboarding">{t('typeOnboarding')}</SelectItem>
+                  <SelectItem value="exit">{t('typeExit')}</SelectItem>
+                  <SelectItem value="custom">{t('typeCustom')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <label className="form-field">
+            <div className="form-field">
               <span className="form-label">{t('statusLabel')}</span>
-              <select
-                className="form-input"
+              <Select
                 value={formValues.status}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setFormValues((currentValue) => ({
                     ...currentValue,
-                    status: event.currentTarget.value as "draft" | "active"
+                    status: value as "draft" | "active"
                   }))
                 }
               >
-                <option value="draft">{t('statusDraft')}</option>
-                <option value="active">{t('statusActive')}</option>
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">{t('statusDraft')}</SelectItem>
+                  <SelectItem value="active">{t('statusActive')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <label className="form-field">
               <span className="form-label">{t('minResponsesLabel')}</span>
@@ -368,24 +377,28 @@ export function NewSurveyClient() {
               {validationErrors.endDate ? <p className="form-field-error">{validationErrors.endDate}</p> : null}
             </label>
 
-            <label className="form-field">
+            <div className="form-field">
               <span className="form-label">{t('recurrenceLabel')}</span>
-              <select
-                className="form-input"
-                value={formValues.recurrence}
-                onChange={(event) =>
+              <Select
+                value={formValues.recurrence || "__none__"}
+                onValueChange={(value) =>
                   setFormValues((currentValue) => ({
                     ...currentValue,
-                    recurrence: event.currentTarget.value as SurveyFormValues["recurrence"]
+                    recurrence: (value === "__none__" ? "" : value) as SurveyFormValues["recurrence"]
                   }))
                 }
               >
-                <option value="">{t('recurrenceNone')}</option>
-                <option value="weekly">{t('recurrenceWeekly')}</option>
-                <option value="monthly">{t('recurrenceMonthly')}</option>
-                <option value="quarterly">{t('recurrenceQuarterly')}</option>
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('recurrenceNone')}</SelectItem>
+                  <SelectItem value="weekly">{t('recurrenceWeekly')}</SelectItem>
+                  <SelectItem value="monthly">{t('recurrenceMonthly')}</SelectItem>
+                  <SelectItem value="quarterly">{t('recurrenceQuarterly')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <label className="settings-checkbox">
@@ -519,14 +532,13 @@ export function NewSurveyClient() {
               </label>
 
               <div className="audit-filters">
-                <label className="form-field">
+                <div className="form-field">
                   <span className="form-label">{t('questionTypeLabel')}</span>
-                  <select
-                    className="form-input"
+                  <Select
                     value={question.type}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       updateQuestion(index, (currentQuestion) => {
-                        const nextType = event.currentTarget.value as SurveyQuestionType;
+                        const nextType = value as SurveyQuestionType;
 
                         return {
                           ...currentQuestion,
@@ -543,12 +555,17 @@ export function NewSurveyClient() {
                       })
                     }
                   >
-                    <option value="rating">{t('questionTypeRating')}</option>
-                    <option value="text">{t('questionTypeText')}</option>
-                    <option value="select">{t('questionTypeSelect')}</option>
-                    <option value="likert">{t('questionTypeLikert')}</option>
-                  </select>
-                </label>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rating">{t('questionTypeRating')}</SelectItem>
+                      <SelectItem value="text">{t('questionTypeText')}</SelectItem>
+                      <SelectItem value="select">{t('questionTypeSelect')}</SelectItem>
+                      <SelectItem value="likert">{t('questionTypeLikert')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 {question.type === "rating" ? (
                   <label className="form-field">

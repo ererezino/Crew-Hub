@@ -7,6 +7,7 @@ import { ConfirmDialog } from "../../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import { useSchedulingTemplates } from "../../../../../hooks/use-scheduling";
 import { DEPARTMENTS } from "../../../../../lib/departments";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../../lib/datetime";
@@ -255,20 +256,23 @@ export function SchedulingTemplatesAdminClient({ embedded = false }: { embedded?
                 />
               </div>
               <div>
-                <label className="form-label" htmlFor="template-department">{t('departmentLabel')}</label>
-                <select
-                  id="template-department"
-                  className="form-input"
-                  value={templateForm.department}
-                  onChange={(event) =>
-                    setTemplateForm((currentValue) => ({ ...currentValue, department: event.target.value }))
+                <span className="form-label">{t('departmentLabel')}</span>
+                <Select
+                  value={templateForm.department || "__none__"}
+                  onValueChange={(value) =>
+                    setTemplateForm((currentValue) => ({ ...currentValue, department: value === "__none__" ? "" : value }))
                   }
                 >
-                  <option value="">{t('allDepartments')}</option>
-                  {DEPARTMENTS.map((dept) => (
-                    <option key={dept} value={dept}>{dept}</option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t('allDepartments')}</SelectItem>
+                    {DEPARTMENTS.map((dept) => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="form-label" htmlFor="template-start">{t('startTimeLabel')}</label>

@@ -24,6 +24,7 @@ import {
   type DocumentRecord,
   type DocumentUploadResponse
 } from "../../types/documents";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { SlidePanel } from "./slide-panel";
 
 function createUploadFormSchema(messages: {
@@ -448,30 +449,43 @@ export function DocumentUploadPanel({
         </label>
 
         <div className="documents-upload-grid">
-          <label className="form-field" htmlFor="document-category">
+          <div className="form-field">
             <span className="form-label">{t("uploadPanel.labelCategory")}</span>
-            <select
-              id="document-category"
-              className={errors.category ? "form-input form-input-error" : "form-input"}
+            <Select
               value={values.category}
-              onChange={handleFieldChange("category")}
-              onBlur={handleFieldBlur("category")}
+              onValueChange={(value) => {
+                const nextValues = { ...values, category: value as DocumentCategory };
+                setValues(nextValues);
+                if (touched.category) {
+                  setErrors(getValidationErrors(nextValues, touched, allowedCategories, selectedFile, uploadSchema, validationMessages));
+                }
+                if (submitError) {
+                  setSubmitError(null);
+                }
+              }}
               disabled={isSubmitting || isCategoryLocked}
-              aria-invalid={Boolean(errors.category)}
-              aria-describedby={errors.category ? "document-category-error" : undefined}
             >
-              {visibleCategoryOptions.map((category) => (
-                <option key={category} value={category}>
-                  {getDocumentCategoryLabel(category)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                onBlur={handleFieldBlur("category")}
+                aria-invalid={Boolean(errors.category)}
+                aria-describedby={errors.category ? "document-category-error" : undefined}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {visibleCategoryOptions.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {getDocumentCategoryLabel(category)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {errors.category ? (
               <p id="document-category-error" className="form-field-error" role="alert">
                 {errors.category}
               </p>
             ) : null}
-          </label>
+          </div>
 
           <label className="form-field" htmlFor="document-expiry">
             <span className="form-label">{t("uploadPanel.labelExpiryDate")}</span>
@@ -494,30 +508,44 @@ export function DocumentUploadPanel({
           </label>
         </div>
 
-        <label className="form-field" htmlFor="document-country">
+        <div className="form-field">
           <span className="form-label">{t("uploadPanel.labelCountry")}</span>
-          <select
-            id="document-country"
-            className={errors.countryCode ? "form-input form-input-error" : "form-input"}
-            value={values.countryCode}
-            onChange={handleFieldChange("countryCode")}
-            onBlur={handleFieldBlur("countryCode")}
+          <Select
+            value={values.countryCode || "__none__"}
+            onValueChange={(value) => {
+              const raw = value === "__none__" ? "" : value;
+              const nextValues = { ...values, countryCode: raw.toUpperCase() };
+              setValues(nextValues);
+              if (touched.countryCode) {
+                setErrors(getValidationErrors(nextValues, touched, allowedCategories, selectedFile, uploadSchema, validationMessages));
+              }
+              if (submitError) {
+                setSubmitError(null);
+              }
+            }}
             disabled={isSubmitting}
-            aria-invalid={Boolean(errors.countryCode)}
-            aria-describedby={errors.countryCode ? "document-country-error" : undefined}
           >
-            {countryOptions.map((option) => (
-              <option key={option.value || "none"} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              onBlur={handleFieldBlur("countryCode")}
+              aria-invalid={Boolean(errors.countryCode)}
+              aria-describedby={errors.countryCode ? "document-country-error" : undefined}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {countryOptions.map((option) => (
+                <SelectItem key={option.value || "__none__"} value={option.value || "__none__"}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {errors.countryCode ? (
             <p id="document-country-error" className="form-field-error" role="alert">
               {errors.countryCode}
             </p>
           ) : null}
-        </label>
+        </div>
 
         <div className="form-field">
           <span className="form-label">{t("uploadPanel.labelFileUpload")}</span>

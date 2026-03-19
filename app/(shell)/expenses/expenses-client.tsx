@@ -22,6 +22,7 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { FileAttachmentPicker } from "../../../components/shared/file-attachment-picker";
 import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { MoneyInput } from "../../../components/ui/money-input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { useExpenses } from "../../../hooks/use-expenses";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
@@ -2064,27 +2065,33 @@ export function ExpensesClient({
           </label>
 
           <div className="expenses-form-grid expenses-form-grid-3col">
-            <label className="form-field">
+            <div className="form-field">
               <span className="form-label">{t('submitPanel.currencyLabel')}</span>
-              <select
-                className={formErrors.currency ? "form-input form-input-error" : "form-input"}
+              <Select
                 value={formValues.currency}
-                onChange={handleFormFieldChange("currency")}
-                onBlur={handleFieldBlur("currency")}
+                onValueChange={(value) => {
+                  handleFormFieldChange("currency")(value);
+                  handleFieldBlur("currency")();
+                }}
                 disabled={isSubmitting}
               >
-                <option value="USD">{"\ud83c\uddfa\ud83c\uddf8"} USD</option>
-                <option value="NGN">{"\ud83c\uddf3\ud83c\uddec"} NGN</option>
-                <option value="GHS">{"\ud83c\uddec\ud83c\udded"} GHS</option>
-                <option value="KES">{"\ud83c\uddf0\ud83c\uddea"} KES</option>
-                <option value="ZAR">{"\ud83c\uddff\ud83c\udde6"} ZAR</option>
-                <option value="XAF">{"\ud83c\udde8\ud83c\uddf2"} XAF</option>
-                <option value="CAD">{"\ud83c\udde8\ud83c\udde6"} CAD</option>
-              </select>
+                <SelectTrigger className={formErrors.currency ? "form-input-error" : ""}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">{"\ud83c\uddfa\ud83c\uddf8"} USD</SelectItem>
+                  <SelectItem value="NGN">{"\ud83c\uddf3\ud83c\uddec"} NGN</SelectItem>
+                  <SelectItem value="GHS">{"\ud83c\uddec\ud83c\udded"} GHS</SelectItem>
+                  <SelectItem value="KES">{"\ud83c\uddf0\ud83c\uddea"} KES</SelectItem>
+                  <SelectItem value="ZAR">{"\ud83c\uddff\ud83c\udde6"} ZAR</SelectItem>
+                  <SelectItem value="XAF">{"\ud83c\udde8\ud83c\uddf2"} XAF</SelectItem>
+                  <SelectItem value="CAD">{"\ud83c\udde8\ud83c\udde6"} CAD</SelectItem>
+                </SelectContent>
+              </Select>
               {formErrors.currency ? (
                 <p className="form-field-error">{formErrors.currency}</p>
               ) : null}
-            </label>
+            </div>
 
             <label className="form-field">
               <span className="form-label">{t('submitPanel.amountLabel')}</span>
@@ -2121,13 +2128,12 @@ export function ExpensesClient({
               <h4 className="section-title" style={{ marginBottom: "0.5rem" }}>{t('vendorDetails.title')}</h4>
 
               {vendorBeneficiaries.vendors.length > 0 ? (
-                <label className="form-field">
+                <div className="form-field">
                   <span className="form-label">{t('submitPanel.selectSavedVendorLabel')}</span>
-                  <select
-                    className="form-input"
-                    value={selectedVendorId}
-                    onChange={(e) => {
-                      const nextVendorId = e.target.value;
+                  <Select
+                    value={selectedVendorId || "__none__"}
+                    onValueChange={(value) => {
+                      const nextVendorId = value === "__none__" ? "" : value;
                       setSelectedVendorId(nextVendorId);
                       const vendor = vendorBeneficiaries.vendors.find((v) => v.id === nextVendorId);
                       if (vendor) {
@@ -2157,23 +2163,28 @@ export function ExpensesClient({
                     }}
                     disabled={isSubmitting}
                   >
-                    <option value="">{t('submitPanel.chooseSavedVendor')}</option>
-                    {vendorBeneficiaries.vendors.map((vendor) => {
-                      const label = vendor.paymentMethod === "mobile_money"
-                        ? `${vendor.vendorName} - ${vendor.mobileMoneyNumber ?? ""}`
-                        : vendor.paymentMethod === "crew_tag"
-                          ? `${vendor.vendorName} - ${vendor.crewTag ?? ""}`
-                          : vendor.paymentMethod === "international_wire"
-                            ? `${vendor.vendorName} - ${vendor.wireAccountNumber ?? ""}`
-                            : `${vendor.vendorName} - ${vendor.bankAccountNumber}`;
-                      return (
-                        <option key={vendor.id} value={vendor.id}>
-                          {label}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </label>
+                    <SelectTrigger>
+                      <SelectValue placeholder={t('submitPanel.chooseSavedVendor')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">{t('submitPanel.chooseSavedVendor')}</SelectItem>
+                      {vendorBeneficiaries.vendors.map((vendor) => {
+                        const label = vendor.paymentMethod === "mobile_money"
+                          ? `${vendor.vendorName} - ${vendor.mobileMoneyNumber ?? ""}`
+                          : vendor.paymentMethod === "crew_tag"
+                            ? `${vendor.vendorName} - ${vendor.crewTag ?? ""}`
+                            : vendor.paymentMethod === "international_wire"
+                              ? `${vendor.vendorName} - ${vendor.wireAccountNumber ?? ""}`
+                              : `${vendor.vendorName} - ${vendor.bankAccountNumber}`;
+                        return (
+                          <SelectItem key={vendor.id} value={vendor.id}>
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
               ) : null}
 
               <label className="form-field">
@@ -2193,21 +2204,24 @@ export function ExpensesClient({
                 ) : null}
               </label>
 
-              <label className="form-field" htmlFor="expense-vendor-payment-method">
+              <div className="form-field">
                 <span className="form-label">{t('vendorPaymentMethod')}</span>
-                <select
-                  id="expense-vendor-payment-method"
-                  className="form-input"
+                <Select
                   value={formValues.vendorPaymentMethod}
-                  onChange={(e) => handleFormChange("vendorPaymentMethod", e.target.value)}
+                  onValueChange={(value) => handleFormChange("vendorPaymentMethod", value)}
                   disabled={isSubmitting}
                 >
-                  <option value="bank_transfer">{t('vendorBankTransfer')}</option>
-                  <option value="mobile_money">{t('vendorMobileMoney')}</option>
-                  <option value="crew_tag">{t('vendorCrewTag')}</option>
-                  <option value="international_wire">{t('vendorInternationalWire')}</option>
-                </select>
-              </label>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bank_transfer">{t('vendorBankTransfer')}</SelectItem>
+                    <SelectItem value="mobile_money">{t('vendorMobileMoney')}</SelectItem>
+                    <SelectItem value="crew_tag">{t('vendorCrewTag')}</SelectItem>
+                    <SelectItem value="international_wire">{t('vendorInternationalWire')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {formValues.vendorPaymentMethod === "bank_transfer" ? (
                 <>

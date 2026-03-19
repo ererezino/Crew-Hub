@@ -17,6 +17,7 @@ import {
   todayIsoDate
 } from "../../../../lib/datetime";
 import { type CompensationBandLocationType } from "../../../../types/compensation-bands";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
 
 type AppLocale = "en" | "fr";
@@ -1094,29 +1095,33 @@ export function CompensationBandsClient() {
             ) : null}
           </label>
 
-          <label className="form-field">
+          <div className="form-field">
             <span className="form-label">{t('bandPanel.locationType')}</span>
-            <select
-              className={`form-input ${bandFormErrors.locationType ? "form-input-error" : ""}`}
+            <Select
               value={bandFormValues.locationType}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 setBandFormValues((currentValues) => ({
                   ...currentValues,
-                  locationType: event.target.value as CompensationBandLocationType,
+                  locationType: value as CompensationBandLocationType,
                   locationValue:
-                    event.target.value === "global" ? "" : currentValues.locationValue
+                    value === "global" ? "" : currentValues.locationValue
                 }))
               }
             >
-              <option value="global">{t('bandPanel.locationTypeGlobal')}</option>
-              <option value="country">{t('bandPanel.locationTypeCountry')}</option>
-              <option value="city">{t('bandPanel.locationTypeCity')}</option>
-              <option value="zone">{t('bandPanel.locationTypeZone')}</option>
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="global">{t('bandPanel.locationTypeGlobal')}</SelectItem>
+                <SelectItem value="country">{t('bandPanel.locationTypeCountry')}</SelectItem>
+                <SelectItem value="city">{t('bandPanel.locationTypeCity')}</SelectItem>
+                <SelectItem value="zone">{t('bandPanel.locationTypeZone')}</SelectItem>
+              </SelectContent>
+            </Select>
             {bandFormErrors.locationType ? (
               <span className="form-field-error">{bandFormErrors.locationType}</span>
             ) : null}
-          </label>
+          </div>
 
           <label className="form-field">
             <span className="form-label">{t('bandPanel.locationValue')}</span>
@@ -1447,53 +1452,61 @@ export function CompensationBandsClient() {
         onClose={resetAssignmentPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleAssignmentSubmit}>
-          <label className="form-field">
+          <div className="form-field">
             <span className="form-label">{t('assignmentPanel.employee')}</span>
-            <select
-              className={`form-input ${assignmentFormErrors.employeeId ? "form-input-error" : ""}`}
-              value={assignmentFormValues.employeeId}
-              onChange={(event) =>
+            <Select
+              value={assignmentFormValues.employeeId || "__none__"}
+              onValueChange={(value) =>
                 setAssignmentFormValues((currentValues) => ({
                   ...currentValues,
-                  employeeId: event.target.value
+                  employeeId: value === "__none__" ? "" : value
                 }))
               }
             >
-              <option value="">{t('assignmentPanel.selectEmployee')}</option>
-              {activeEmployeeOptions.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.fullName}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t('assignmentPanel.selectEmployee')}</SelectItem>
+                {activeEmployeeOptions.map((employee) => (
+                  <SelectItem key={employee.id} value={employee.id}>
+                    {employee.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {assignmentFormErrors.employeeId ? (
               <span className="form-field-error">{assignmentFormErrors.employeeId}</span>
             ) : null}
-          </label>
+          </div>
 
-          <label className="form-field">
+          <div className="form-field">
             <span className="form-label">{t('assignmentPanel.compensationBand')}</span>
-            <select
-              className={`form-input ${assignmentFormErrors.bandId ? "form-input-error" : ""}`}
-              value={assignmentFormValues.bandId}
-              onChange={(event) =>
+            <Select
+              value={assignmentFormValues.bandId || "__none__"}
+              onValueChange={(value) =>
                 setAssignmentFormValues((currentValues) => ({
                   ...currentValues,
-                  bandId: event.target.value
+                  bandId: value === "__none__" ? "" : value
                 }))
               }
             >
-              <option value="">{t('assignmentPanel.selectBand')}</option>
-              {sortedBands.map((band) => (
-                <option key={band.id} value={band.id}>
-                  {band.title} {band.level ? `(${band.level})` : ""}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t('assignmentPanel.selectBand')}</SelectItem>
+                {sortedBands.map((band) => (
+                  <SelectItem key={band.id} value={band.id}>
+                    {band.title} {band.level ? `(${band.level})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {assignmentFormErrors.bandId ? (
               <span className="form-field-error">{assignmentFormErrors.bandId}</span>
             ) : null}
-          </label>
+          </div>
 
           <label className="form-field">
             <span className="form-label">{t('assignmentPanel.effectiveFrom')}</span>

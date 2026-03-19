@@ -21,6 +21,7 @@ import {
 } from "../../../../lib/auth/default-role-access";
 import { DEPARTMENTS } from "../../../../lib/departments";
 import { USER_ROLES } from "../../../../lib/navigation";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import type { AppRole } from "../../../../types/auth";
 import type {
   AdminAccessConfigResponse,
@@ -472,31 +473,34 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
               </div>
             </fieldset>
 
-            <label className="form-field" htmlFor="edit-user-department">
+            <div className="form-field">
               <span className="form-label">{t('departmentLabel')}</span>
-              <select
-                id="edit-user-department"
-                className="form-input"
-                value={editValues.department}
-                onChange={(event) =>
+              <Select
+                value={editValues.department || "__none__"}
+                onValueChange={(value) =>
                   setEditValues((currentValues) =>
                     currentValues
                       ? {
                           ...currentValues,
-                          department: event.currentTarget.value
+                          department: value === "__none__" ? "" : value
                         }
                       : currentValues
                   )
                 }
               >
-                <option value="">{t('noDepartment')}</option>
-                {DEPARTMENTS.map((department) => (
-                  <option key={department} value={department}>
-                    {department}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('noDepartment')}</SelectItem>
+                  {DEPARTMENTS.map((department) => (
+                    <SelectItem key={department} value={department}>
+                      {department}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <label className="form-field" htmlFor="edit-user-title">
               <span className="form-label">{t('titleLabel')}</span>
@@ -514,52 +518,58 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
               />
             </label>
 
-            <label className="form-field" htmlFor="edit-user-manager">
+            <div className="form-field">
               <span className="form-label">{t('managerLabel')}</span>
-              <select
-                id="edit-user-manager"
-                className="form-input"
-                value={editValues.managerId}
-                onChange={(event) =>
+              <Select
+                value={editValues.managerId || "__none__"}
+                onValueChange={(value) =>
                   setEditValues((currentValues) =>
                     currentValues
-                      ? { ...currentValues, managerId: event.currentTarget.value }
+                      ? { ...currentValues, managerId: value === "__none__" ? "" : value }
                       : currentValues
                   )
                 }
               >
-                <option value="">{t('noManager')}</option>
-                {managerOptions.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.fullName} ({person.department ?? ""})
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('noManager')}</SelectItem>
+                  {managerOptions.map((person) => (
+                    <SelectItem key={person.id} value={person.id}>
+                      {person.fullName} ({person.department ?? ""})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <label className="form-field" htmlFor="edit-user-status">
+            <div className="form-field">
               <span className="form-label">{t('statusLabel')}</span>
-              <select
-                id="edit-user-status"
-                className="form-input"
+              <Select
                 value={editValues.status}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setEditValues((currentValues) =>
                     currentValues
                       ? {
                           ...currentValues,
-                          status: event.currentTarget.value as ProfileStatus
+                          status: value as ProfileStatus
                         }
                       : currentValues
                   )
                 }
               >
-                <option value="active">{t('statusActive')}</option>
-                <option value="inactive">{t('statusInactive')}</option>
-                <option value="onboarding">{t('statusOnboarding')}</option>
-                <option value="offboarding">{t('statusOffboarding')}</option>
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">{t('statusActive')}</SelectItem>
+                  <SelectItem value="inactive">{t('statusInactive')}</SelectItem>
+                  <SelectItem value="onboarding">{t('statusOnboarding')}</SelectItem>
+                  <SelectItem value="offboarding">{t('statusOffboarding')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <AccessChecklist
               items={accessItems}

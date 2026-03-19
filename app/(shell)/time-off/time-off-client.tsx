@@ -26,6 +26,7 @@ import {
   todayIsoDate
 } from "../../../lib/datetime";
 import { formatLeaveStatus } from "../../../lib/format-labels";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import {
   calculateWorkingDays,
   enumerateIsoDatesInRange,
@@ -1176,24 +1177,37 @@ export function TimeOffClient({
           {availableLeaveTypes.length === 0 ? (
             <p className="form-field-error">{t('requestPanel.noPoliciesConfigured')}</p>
           ) : (
-          <label className="form-field" htmlFor="timeoff-leave-type">
+          <div className="form-field">
             <span className="form-label">{t('requestPanel.leaveTypeLabel')}</span>
-            <select
-              id="timeoff-leave-type"
-              className={formErrors.leaveType ? "form-input form-input-error" : "form-input"}
-              value={formValues.leaveType}
-              onChange={handleFieldChange("leaveType")}
-              onBlur={handleFieldBlur("leaveType")}
+            <Select
+              value={formValues.leaveType || "__placeholder__"}
+              onValueChange={(value) => {
+                const nextValue = value === "__placeholder__" ? "" : value;
+                const nextValues = {
+                  ...formValues,
+                  leaveType: nextValue
+                };
+                setFormValues(nextValues);
+                setFormErrors(getFormErrors(nextValues, formTouched, requestFormSchema, td));
+                if (submitError) {
+                  setSubmitError(null);
+                }
+              }}
             >
-              <option value="">{t('requestPanel.selectLeaveType')}</option>
-              {availableLeaveTypes.map((leaveType) => (
-                <option key={leaveType} value={leaveType}>
-                  {formatLeaveTypeLabel(leaveType, locale)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder={t('requestPanel.selectLeaveType')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__placeholder__">{t('requestPanel.selectLeaveType')}</SelectItem>
+                {availableLeaveTypes.map((leaveType) => (
+                  <SelectItem key={leaveType} value={leaveType}>
+                    {formatLeaveTypeLabel(leaveType, locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {formErrors.leaveType ? <p className="form-field-error">{formErrors.leaveType}</p> : null}
-          </label>
+          </div>
           )}
 
           <div className="timeoff-form-grid">

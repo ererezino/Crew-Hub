@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { DEPARTMENTS } from "../../lib/departments";
 import { USER_ROLES } from "../../lib/navigation";
 import {
@@ -426,29 +427,32 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
 
       {step === 2 ? (
         <div className="admin-users-form-grid">
-          <label className="form-field" htmlFor="invite-department">
+          <div className="form-field">
             <span className="form-label">{t("invite.departmentLabel")}</span>
-            <select
-              id="invite-department"
-              className={errors.department ? "form-input form-input-error" : "form-input"}
-              value={values.department}
-              onChange={(event) =>
+            <Select
+              value={values.department || "__none__"}
+              onValueChange={(value) =>
                 setValues((currentValues) => ({
                   ...currentValues,
-                  department: event.currentTarget.value,
+                  department: value === "__none__" ? "" : value,
                   managerId: ""
                 }))
               }
             >
-              <option value="">{t("invite.selectDepartment")}</option>
-              {DEPARTMENTS.map((department) => (
-                <option key={department} value={department}>
-                  {department}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t("invite.selectDepartment")}</SelectItem>
+                {DEPARTMENTS.map((department) => (
+                  <SelectItem key={department} value={department}>
+                    {department}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {errors.department ? <p className="form-field-error">{errors.department}</p> : null}
-          </label>
+          </div>
 
           <label className="form-field" htmlFor="invite-title">
             <span className="form-label">{t("invite.jobTitleLabel")}</span>
@@ -492,49 +496,56 @@ export function InviteForm({ people, accessItems, onCreated }: InviteFormProps) 
               value={managerSearch}
               onChange={(event) => setManagerSearch(event.currentTarget.value)}
             />
-            <select
-              className="form-input"
-              value={values.managerId}
-              onChange={(event) =>
+            <Select
+              value={values.managerId || "__none__"}
+              onValueChange={(value) =>
                 setValues((currentValues) => ({
                   ...currentValues,
-                  managerId: event.currentTarget.value
+                  managerId: value === "__none__" ? "" : value
                 }))
               }
             >
-              <option value="">{t("invite.noManager")}</option>
-              {managerOptions.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.fullName} ({person.department ?? ""})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t("invite.noManager")}</SelectItem>
+                {managerOptions.map((person) => (
+                  <SelectItem key={person.id} value={person.id}>
+                    {person.fullName} ({person.department ?? ""})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
 
-          <label className="form-field" htmlFor="invite-employment-type">
+          <div className="form-field">
             <span className="form-label">{t("invite.employmentTypeLabel")}</span>
-            <select
-              id="invite-employment-type"
-              className="form-input"
+            <Select
               value={values.employmentType}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 setValues((currentValues) => ({
                   ...currentValues,
-                  employmentType: event.currentTarget.value as EmploymentType
+                  employmentType: value as EmploymentType
                 }))
               }
             >
-              {EMPLOYMENT_TYPES.map((employmentType) => (
-                <option key={employmentType} value={employmentType}>
-                  {employmentType === "full_time"
-                    ? t("invite.employmentFullTime")
-                    : employmentType === "part_time"
-                      ? t("invite.employmentPartTime")
-                      : t("invite.employmentContractor")}
-                </option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EMPLOYMENT_TYPES.map((employmentType) => (
+                  <SelectItem key={employmentType} value={employmentType}>
+                    {employmentType === "full_time"
+                      ? t("invite.employmentFullTime")
+                      : employmentType === "part_time"
+                        ? t("invite.employmentPartTime")
+                        : t("invite.employmentContractor")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <label className="form-field" htmlFor="invite-start-date">
             <span className="form-label">{t("invite.startDateLabel")}</span>

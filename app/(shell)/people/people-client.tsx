@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { usePeople } from "../../../hooks/use-people";
@@ -1676,30 +1677,33 @@ export function PeopleClient({
             {createErrors.roles ? <p className="form-field-error">{createErrors.roles}</p> : null}
           </fieldset>
 
-          <label className="form-field" htmlFor="person-department">
+          <div className="form-field">
             <span className="form-label">{t('createPanel.departmentLabel')}</span>
-            <select
-              id="person-department"
-              className={createErrors.department ? "form-input form-input-error" : "form-input"}
-              value={createValues.department}
-              onChange={(event) =>
+            <Select
+              value={createValues.department || "__none__"}
+              onValueChange={(value) =>
                 updateCreateValues({
                   ...createValues,
-                  department: event.currentTarget.value
+                  department: value === "__none__" ? "" : value
                 })
               }
             >
-              <option value="">{t('createPanel.noDepartment')}</option>
-              {DEPARTMENTS.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t('createPanel.noDepartment')}</SelectItem>
+                {DEPARTMENTS.map((dept) => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {createErrors.department ? (
               <p className="form-field-error">{createErrors.department}</p>
             ) : null}
-          </label>
+          </div>
 
           <label className="form-field" htmlFor="person-title">
             <span className="form-label">{t('createPanel.titleLabel')}</span>
@@ -1792,56 +1796,60 @@ export function PeopleClient({
             ) : null}
           </label>
 
-          <label className="form-field" htmlFor="person-manager">
+          <div className="form-field">
             <span className="form-label">{t('createPanel.managerLabel')}</span>
-            <select
-              id="person-manager"
-              className={createErrors.managerId ? "form-input form-input-error" : "form-input"}
-              value={createValues.managerId}
-              onChange={(event) =>
+            <Select
+              value={createValues.managerId || "__none__"}
+              onValueChange={(value) =>
                 updateCreateValues({
                   ...createValues,
-                  managerId: event.currentTarget.value
+                  managerId: value === "__none__" ? "" : value
                 })
               }
             >
-              <option value="">{t('createPanel.noManager')}</option>
-              {managerOptions.map((person) => (
-                <option key={`manager-${person.id}`} value={person.id}>
-                  {person.fullName}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t('createPanel.noManager')}</SelectItem>
+                {managerOptions.map((person) => (
+                  <SelectItem key={`manager-${person.id}`} value={person.id}>
+                    {person.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {createErrors.managerId ? (
               <p className="form-field-error">{createErrors.managerId}</p>
             ) : null}
-          </label>
+          </div>
 
-          <label className="form-field" htmlFor="person-employment-type">
+          <div className="form-field">
             <span className="form-label">{t('createPanel.employmentTypeLabel')}</span>
-            <select
-              id="person-employment-type"
-              className={
-                createErrors.employmentType ? "form-input form-input-error" : "form-input"
-              }
+            <Select
               value={createValues.employmentType}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 updateCreateValues({
                   ...createValues,
-                  employmentType: event.currentTarget.value as EmploymentType
+                  employmentType: value as EmploymentType
                 })
               }
             >
-              {EMPLOYMENT_TYPES.map((employmentType) => (
-                <option key={employmentType} value={employmentType}>
-                  {formatEmploymentType(employmentType, locale)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EMPLOYMENT_TYPES.map((employmentType) => (
+                  <SelectItem key={employmentType} value={employmentType}>
+                    {formatEmploymentType(employmentType, locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {createErrors.employmentType ? (
               <p className="form-field-error">{createErrors.employmentType}</p>
             ) : null}
-          </label>
+          </div>
 
           <label className="form-field" htmlFor="person-primary-currency">
             <span className="form-label">{t('createPanel.primaryCurrencyLabel')}</span>
@@ -1864,29 +1872,32 @@ export function PeopleClient({
             ) : null}
           </label>
 
-          <label className="form-field" htmlFor="person-status">
+          <div className="form-field">
             <span className="form-label">{t('createPanel.profileStatusLabel')}</span>
-            <select
-              id="person-status"
-              className={createErrors.status ? "form-input form-input-error" : "form-input"}
+            <Select
               value={createValues.status}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 updateCreateValues({
                   ...createValues,
-                  status: event.currentTarget.value as ProfileStatus
+                  status: value as ProfileStatus
                 })
               }
             >
-              {PROFILE_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {formatProfileStatus(status, locale)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROFILE_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {formatProfileStatus(status, locale)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {createErrors.status ? (
               <p className="form-field-error">{createErrors.status}</p>
             ) : null}
-          </label>
+          </div>
 
           {createErrors.form ? <p className="form-submit-error">{createErrors.form}</p> : null}
 
@@ -2153,28 +2164,31 @@ export function PeopleClient({
               {editErrors.roles ? <p className="form-field-error">{editErrors.roles}</p> : null}
             </fieldset>
 
-            <label className="form-field" htmlFor="edit-person-department">
+            <div className="form-field">
               <span className="form-label">{t('createPanel.departmentLabel')}</span>
-              <select
-                id="edit-person-department"
-                className={editErrors.department ? "form-input form-input-error" : "form-input"}
-                value={editValues.department}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
+              <Select
+                value={editValues.department || "__none__"}
+                onValueChange={(value) => {
+                  const val = value === "__none__" ? "" : value;
                   setEditValues((prev) => ({ ...prev, department: val }));
                 }}
               >
-                <option value="">{t('createPanel.noDepartment')}</option>
-                {DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept}>
-                    {dept}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('createPanel.noDepartment')}</SelectItem>
+                  {DEPARTMENTS.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {editErrors.department ? (
                 <p className="form-field-error">{editErrors.department}</p>
               ) : null}
-            </label>
+            </div>
 
             <label className="form-field" htmlFor="edit-person-crew-tag">
               <span className="form-label">{t('editPanel.crewTagLabel')}</span>
@@ -2194,54 +2208,60 @@ export function PeopleClient({
               ) : null}
             </label>
 
-            <label className="form-field" htmlFor="edit-person-manager">
+            <div className="form-field">
               <span className="form-label">{t('createPanel.managerLabel')}</span>
-              <select
-                id="edit-person-manager"
-                className={editErrors.managerId ? "form-input form-input-error" : "form-input"}
-                value={editValues.managerId}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
+              <Select
+                value={editValues.managerId || "__none__"}
+                onValueChange={(value) => {
+                  const val = value === "__none__" ? "" : value;
                   setEditValues((prev) => ({ ...prev, managerId: val }));
                 }}
               >
-                <option value="">{t('createPanel.noManager')}</option>
-                {people
-                  .filter((p) => p.id !== editPerson.id && p.status === "active")
-                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
-                  .map((p) => (
-                    <option key={`edit-mgr-${p.id}`} value={p.id}>
-                      {p.fullName}
-                    </option>
-                  ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('createPanel.noManager')}</SelectItem>
+                  {people
+                    .filter((p) => p.id !== editPerson.id && p.status === "active")
+                    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                    .map((p) => (
+                      <SelectItem key={`edit-mgr-${p.id}`} value={p.id}>
+                        {p.fullName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
               {editErrors.managerId ? (
                 <p className="form-field-error">{editErrors.managerId}</p>
               ) : null}
-            </label>
+            </div>
 
-            <label className="form-field" htmlFor="edit-person-team-lead">
+            <div className="form-field">
               <span className="form-label">{t('editPanel.teamLeadLabel')}</span>
-              <select
-                id="edit-person-team-lead"
-                className="form-input"
-                value={editValues.teamLeadId}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
+              <Select
+                value={editValues.teamLeadId || "__none__"}
+                onValueChange={(value) => {
+                  const val = value === "__none__" ? "" : value;
                   setEditValues((prev) => ({ ...prev, teamLeadId: val }));
                 }}
               >
-                <option value="">{t('editPanel.noTeamLead')}</option>
-                {people
-                  .filter((p) => p.id !== editPerson.id && p.status === "active")
-                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
-                  .map((p) => (
-                    <option key={`edit-tl-${p.id}`} value={p.id}>
-                      {p.fullName}
-                    </option>
-                  ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('editPanel.noTeamLead')}</SelectItem>
+                  {people
+                    .filter((p) => p.id !== editPerson.id && p.status === "active")
+                    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                    .map((p) => (
+                      <SelectItem key={`edit-tl-${p.id}`} value={p.id}>
+                        {p.fullName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <label className="crew-mod-toggle" style={{ padding: "var(--space-3) 0", borderTop: "1px solid var(--border-default)", marginTop: "var(--space-2)" }}>
               <input
@@ -2252,23 +2272,26 @@ export function PeopleClient({
               {t('editPanel.directoryVisible')}
             </label>
 
-            <label className="form-field" htmlFor="edit-person-status" style={{ borderTop: "1px solid var(--border-default)", paddingTop: "var(--space-3)" }}>
+            <div className="form-field" style={{ borderTop: "1px solid var(--border-default)", paddingTop: "var(--space-3)" }}>
               <span className="form-label">{t('editPanel.statusLabel')}</span>
-              <select
-                id="edit-person-status"
-                className="form-input"
+              <Select
                 value={editValues.status}
-                onChange={(e) => {
-                  const val = e.currentTarget.value as ProfileStatus;
+                onValueChange={(value) => {
+                  const val = value as ProfileStatus;
                   setEditValues((prev) => ({ ...prev, status: val }));
                 }}
               >
-                {PROFILE_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {formatProfileStatus(s, locale as "en" | "fr")}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROFILE_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {formatProfileStatus(s, locale as "en" | "fr")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {editPerson && editValues.status !== editPerson.status ? (
                 <p className="form-field-hint">
                   {editValues.status === "active" && editPerson.status === "onboarding"
@@ -2282,7 +2305,7 @@ export function PeopleClient({
                           : null}
                 </p>
               ) : null}
-            </label>
+            </div>
 
             {/* Contracts section for pre_start people */}
             {editPerson && editPerson.status === "pre_start" ? (

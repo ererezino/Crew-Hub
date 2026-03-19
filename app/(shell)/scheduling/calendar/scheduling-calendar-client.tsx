@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { ShiftEditModal } from "../../../../components/scheduling/shift-edit-modal";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { TeamScheduleCalendar } from "../../../../components/scheduling/team-schedule-calendar";
 import { useSchedulingSchedules, useSchedulingShifts } from "../../../../hooks/use-scheduling";
 import { usePeople } from "../../../../hooks/use-people";
@@ -339,24 +340,27 @@ export function SchedulingCalendarClient({
       {/* Schedule selector */}
       {visibleSchedules.length > 1 || showAllPublishedOption ? (
         <div className="schedule-calendar-controls">
-          <label className="form-label" htmlFor="schedule-selector">{t("calendar.scheduleLabel")}</label>
-          <select
-            id="schedule-selector"
-            className="form-input"
-            value={selectedScheduleId ?? activeSchedule?.id ?? ""}
-            onChange={(e) => setSelectedScheduleId(e.target.value)}
+          <span className="form-label">{t("calendar.scheduleLabel")}</span>
+          <Select
+            value={selectedScheduleId ?? activeSchedule?.id ?? visibleSchedules[0]?.id ?? "__none__"}
+            onValueChange={(value) => setSelectedScheduleId(value)}
           >
-            {showAllPublishedOption ? (
-              <option value={ALL_PUBLISHED_SCHEDULE_ID}>
-                {t("calendar.allPublishedOption")}
-              </option>
-            ) : null}
-            {visibleSchedules.map((s) => (
-              <option key={s.id} value={s.id}>
-                {t("calendar.scheduleDateRange", { name: s.name ?? t("calendar.scheduleLabel"), startDate: s.startDate, endDate: s.endDate })}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {showAllPublishedOption ? (
+                <SelectItem value={ALL_PUBLISHED_SCHEDULE_ID}>
+                  {t("calendar.allPublishedOption")}
+                </SelectItem>
+              ) : null}
+              {visibleSchedules.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {t("calendar.scheduleDateRange", { name: s.name ?? t("calendar.scheduleLabel"), startDate: s.startDate, endDate: s.endDate })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       ) : null}
 

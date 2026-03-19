@@ -8,6 +8,7 @@ import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import { formatRelativeTime } from "../../../../../lib/datetime";
 
 type AppLocale = "en" | "fr";
@@ -354,17 +355,22 @@ export function SectionClient({ hubId, sectionId, isLeadOrAdmin }: SectionClient
             />
           </label>
 
-          <label className="field-label">
+          <div className="field-label">
             {t('typeLabel')}
-            <select name="pageType" className="input" defaultValue="document">
-              <option value="document">{t('typeDocument')}</option>
-              <option value="runbook">{t('typeRunbook')}</option>
-              <option value="contact_list">{t('typeContacts')}</option>
-              <option value="reference_list">{t('typeReference')}</option>
-              <option value="table">{t('typeTable')}</option>
-              <option value="link">{t('typeLink')}</option>
-            </select>
-          </label>
+            <Select name="pageType" defaultValue="document">
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="document">{t('typeDocument')}</SelectItem>
+                <SelectItem value="runbook">{t('typeRunbook')}</SelectItem>
+                <SelectItem value="contact_list">{t('typeContacts')}</SelectItem>
+                <SelectItem value="reference_list">{t('typeReference')}</SelectItem>
+                <SelectItem value="table">{t('typeTable')}</SelectItem>
+                <SelectItem value="link">{t('typeLink')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <label className="field-label">
             {t('iconLabel')}

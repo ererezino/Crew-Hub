@@ -11,10 +11,7 @@ export default function NotFoundPage() {
           </p>
         </header>
         <div className="settings-actions">
-          <Link href="/dashboard" className="button button-accent">
-            Go to dashboard
-          </Link>
-          <Link href="/login" className="button">
+          <Link href="/login" className="button button-accent">
             Sign in
           </Link>
         </div>

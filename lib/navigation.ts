@@ -62,7 +62,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Announcements",
         labelKey: "announcements",
         href: "/announcements",
-        icon: "Bell",
+        icon: "Megaphone",
         description: "Company announcements and updates",
         shortcut: "G C"
       },
@@ -94,7 +94,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Time off",
         labelKey: "timeOff",
         href: "/time-off",
-        icon: "CalendarOff",
+        icon: "CalendarDays",
         description: "Request time off, check balances, and track approval status",
         shortcut: "G T"
       },
@@ -142,7 +142,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Approvals",
         labelKey: "approvals",
         href: "/approvals",
-        icon: "CheckCircle",
+        icon: "CheckCircle2",
         description: "Review and act on pending team requests",
         shortcut: "G V"
       },
@@ -150,7 +150,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Scheduling",
         labelKey: "scheduling",
         href: "/scheduling",
-        icon: "Calendar",
+        icon: "CalendarClock",
         description: "Build, publish, and manage team shift schedules",
         shortcut: "G S",
         moduleId: "scheduling"
@@ -167,7 +167,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Team hub",
         labelKey: "teamHub",
         href: "/team-hub",
-        icon: "BookOpen",
+        icon: "Users2",
         description: "Your department's knowledge base: guides, contacts, and resources",
         shortcut: "G B",
         moduleId: "team_hub"
@@ -183,7 +183,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Payroll",
         labelKey: "payroll",
         href: "/payroll",
-        icon: "Calculator",
+        icon: "Banknote",
         description: "Run payroll with staged approvals and clear payout status",
         shortcut: "F P",
         moduleId: "payroll"
@@ -215,7 +215,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Performance",
         labelKey: "performance",
         href: "/performance",
-        icon: "Star",
+        icon: "Target",
         description: "Run review cycles, track completion, and calibrate fairly",
         shortcut: "G R",
         moduleId: "performance"
@@ -249,7 +249,7 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Signatures",
         labelKey: "signatures",
         href: "/signatures",
-        icon: "PenTool",
+        icon: "PenLine",
         description: "Request, sign, and track documents with signer timelines",
         shortcut: "G I",
         moduleId: "signatures"

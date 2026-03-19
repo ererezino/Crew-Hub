@@ -9,6 +9,7 @@ import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { useMePayslips } from "../../../../hooks/use-payslips";
 import { formatMonth, formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import type {
@@ -224,26 +225,29 @@ export function MePayslipsClient({ embedded = false }: { embedded?: boolean }) {
       ) : null}
 
       <section className="payslips-toolbar" aria-label={t('title')}>
-        <label className="form-field" htmlFor="payslips-year-filter">
+        <div className="form-field">
           <span className="form-label">{t('yearLabel')}</span>
-          <select
-            id="payslips-year-filter"
-            className="form-input"
-            value={selectedYear}
-            onChange={(event) => {
-              const nextYear = Number.parseInt(event.currentTarget.value, 10);
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(value) => {
+              const nextYear = Number.parseInt(value, 10);
               if (Number.isFinite(nextYear)) {
                 setSelectedYear(nextYear);
               }
             }}
           >
-            {availableYears.map((yearOption) => (
-              <option key={`payslip-year-${yearOption}`} value={yearOption}>
-                {yearOption}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map((yearOption) => (
+                <SelectItem key={`payslip-year-${yearOption}`} value={String(yearOption)}>
+                  {yearOption}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </section>
 
       {payslipsQuery.isLoading ? metricsSkeleton() : null}

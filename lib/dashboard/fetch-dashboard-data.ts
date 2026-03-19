@@ -14,6 +14,7 @@ import {
 import type { SessionOrg, SessionProfile } from "../auth/session";
 import { getDashboardPersona, type DashboardPersona } from "../dashboard-persona";
 import { normalizeUserRoles, type UserRole } from "../navigation";
+import { formatCurrency } from "../format-currency";
 import { hasRole } from "../roles";
 import { getOrgHealthAlerts } from "./health-alerts";
 import { createSupabaseServiceRoleClient } from "../supabase/service-role";
@@ -551,7 +552,7 @@ async function fetchPendingApprovalItems(
           type: "expense",
           title: `${empName}`,
           subtitle: ex.description ?? "Expense",
-          detail: `${currency} ${amount.toFixed(2)}`,
+          detail: formatCurrency(amount / 100, currency),
           date: ex.created_at ? toDateString(new Date(ex.created_at)) : ""
         });
       }

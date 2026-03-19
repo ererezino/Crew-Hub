@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { AUDIT_LOG_ACTIONS, type AuditLogAction, type AuditLogsResponse } from "../../../types/settings";
 
 type AppLocale = "en" | "fr";
@@ -21,9 +22,9 @@ type AuditFilters = {
 const initialFilters: AuditFilters = {
   dateFrom: "",
   dateTo: "",
-  actorId: "",
-  action: "",
-  tableName: "",
+  actorId: "__all__",
+  action: "__all__",
+  tableName: "__all__",
   sort: "desc"
 };
 
@@ -189,15 +190,15 @@ export function AuditLogViewer() {
           params.set("dateTo", appliedFilters.dateTo);
         }
 
-        if (appliedFilters.actorId) {
+        if (appliedFilters.actorId && appliedFilters.actorId !== "__all__") {
           params.set("actorId", appliedFilters.actorId);
         }
 
-        if (appliedFilters.action) {
+        if (appliedFilters.action && appliedFilters.action !== "__all__") {
           params.set("action", appliedFilters.action);
         }
 
-        if (appliedFilters.tableName) {
+        if (appliedFilters.tableName && appliedFilters.tableName !== "__all__") {
           params.set("table", appliedFilters.tableName);
         }
 
@@ -309,85 +310,101 @@ export function AuditLogViewer() {
           />
         </label>
 
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t('audit.actor')}</span>
-          <select
-            className="form-input"
+          <Select
             value={draftFilters.actorId}
-            onChange={(event) =>
+            onValueChange={(value) =>
               setDraftFilters((previous) => ({
                 ...previous,
-                actorId: event.currentTarget.value
+                actorId: value
               }))
             }
           >
-            <option value="">{t('audit.allActors')}</option>
-            {actorOptions.map((actor) => (
-              <option key={actor.id} value={actor.id}>
-                {actor.fullName}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{t('audit.allActors')}</SelectItem>
+              {actorOptions.map((actor) => (
+                <SelectItem key={actor.id} value={actor.id}>
+                  {actor.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t('audit.action')}</span>
-          <select
-            className="form-input"
+          <Select
             value={draftFilters.action}
-            onChange={(event) =>
+            onValueChange={(value) =>
               setDraftFilters((previous) => ({
                 ...previous,
-                action: event.currentTarget.value
+                action: value
               }))
             }
           >
-            <option value="">{t('audit.allActions')}</option>
-            {actionOptions.map((action) => (
-              <option key={action} value={action}>
-                {action}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{t('audit.allActions')}</SelectItem>
+              {actionOptions.map((action) => (
+                <SelectItem key={action} value={action}>
+                  {action}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t('audit.table')}</span>
-          <select
-            className="form-input"
+          <Select
             value={draftFilters.tableName}
-            onChange={(event) =>
+            onValueChange={(value) =>
               setDraftFilters((previous) => ({
                 ...previous,
-                tableName: event.currentTarget.value
+                tableName: value
               }))
             }
           >
-            <option value="">{t('audit.allTables')}</option>
-            {tableOptions.map((tableName) => (
-              <option key={tableName} value={tableName}>
-                {tableName}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">{t('audit.allTables')}</SelectItem>
+              {tableOptions.map((tableName) => (
+                <SelectItem key={tableName} value={tableName}>
+                  {tableName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t('audit.sort')}</span>
-          <select
-            className="form-input"
+          <Select
             value={draftFilters.sort}
-            onChange={(event) =>
+            onValueChange={(value) =>
               setDraftFilters((previous) => ({
                 ...previous,
-                sort: event.currentTarget.value as "asc" | "desc"
+                sort: value as "asc" | "desc"
               }))
             }
           >
-            <option value="desc">{t('audit.newestFirst')}</option>
-            <option value="asc">{t('audit.oldestFirst')}</option>
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="desc">{t('audit.newestFirst')}</SelectItem>
+              <SelectItem value="asc">{t('audit.oldestFirst')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="audit-filter-actions">
           <button type="submit" className="button button-accent">

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+
 import type { ShiftRecord } from "../../types/scheduling";
 
 type ShiftEditAssignee = {
@@ -169,26 +171,29 @@ export function ShiftEditModal({
         <h2 className="modal-title">{tSched("shiftEditModal.title")}</h2>
         <p className="settings-card-description">{tSched("shiftEditModal.description")}</p>
 
-        <label className="form-label" htmlFor="shift-edit-assignee">
+        <span className="form-label">
           {tSched("shiftEditModal.assignee")}
-        </label>
-        <select
-          id="shift-edit-assignee"
-          className="form-input"
-          value={employeeId}
-          onChange={(event) => {
-            setEmployeeId(event.target.value);
+        </span>
+        <Select
+          value={employeeId || "__none__"}
+          onValueChange={(value) => {
+            setEmployeeId(value === "__none__" ? "" : value);
             setError(null);
           }}
           disabled={isSubmitting}
         >
-          <option value="">{tSched("shiftEditModal.openShiftOption")}</option>
-          {assignees.map((assignee) => (
-            <option key={assignee.id} value={assignee.id}>
-              {assignee.fullName}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">{tSched("shiftEditModal.openShiftOption")}</SelectItem>
+            {assignees.map((assignee) => (
+              <SelectItem key={assignee.id} value={assignee.id}>
+                {assignee.fullName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <div
           className="shift-edit-grid"

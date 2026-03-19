@@ -30,6 +30,7 @@ import type {
 } from "../../../types/esignatures";
 import type { DocumentSignedUrlResponse } from "../../../types/documents";
 import { PenSquare } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
 
 type AppLocale = "en" | "fr";
@@ -700,14 +701,12 @@ export function SignaturesClient({
           onClose={closeCreatePanel}
         >
           <form className="slide-panel-form-wrapper" onSubmit={handleCreateSubmit} noValidate>
-            <label className="form-field" htmlFor="signature-document-id">
+            <div className="form-field">
               <span className="form-label">{t('documentLabel')}</span>
-              <select
-                id="signature-document-id"
-                className={createErrors.documentId ? "form-input form-input-error" : "form-input"}
-                value={createValues.documentId}
-                onChange={(event) => {
-                  const nextDocumentId = event.currentTarget.value;
+              <Select
+                value={createValues.documentId || "__placeholder__"}
+                onValueChange={(value) => {
+                  const nextDocumentId = value === "__placeholder__" ? "" : value;
                   const selectedDocument = documents.documents.find(
                     (document) => document.id === nextDocumentId
                   );
@@ -723,17 +722,22 @@ export function SignaturesClient({
                 }}
                 disabled={documents.isLoading || isSubmittingCreate}
               >
-                <option value="">{t('selectDocument')}</option>
-                {documents.documents.map((document) => (
-                  <option key={document.id} value={document.id}>
-                    {document.title}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('selectDocument')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__placeholder__">{t('selectDocument')}</SelectItem>
+                  {documents.documents.map((document) => (
+                    <SelectItem key={document.id} value={document.id}>
+                      {document.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {createErrors.documentId ? (
                 <p className="form-field-error">{createErrors.documentId}</p>
               ) : null}
-            </label>
+            </div>
 
             <label className="form-field" htmlFor="signature-request-title">
               <span className="form-label">{t('requestTitleLabel')}</span>

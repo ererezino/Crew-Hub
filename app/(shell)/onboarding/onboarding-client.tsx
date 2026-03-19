@@ -6,6 +6,7 @@ import { useMemo, useState, type FormEvent } from "react";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useAtRiskOnboardings, useOnboardingInstances, useOnboardingTemplates } from "../../../hooks/use-onboarding";
@@ -843,16 +844,19 @@ export function OnboardingClient({
       {activeTab === "active" || activeTab === "completed" ? (
         <>
           <div className="onboarding-type-filter">
-            <select
-              className="form-input form-input-sm"
+            <Select
               value={typeFilter}
-              onChange={(event) => setTypeFilter(event.currentTarget.value as TypeFilter)}
-              aria-label={td('typeFilter.all')}
+              onValueChange={(value) => setTypeFilter(value as TypeFilter)}
             >
-              <option value="all">{td('typeFilter.all')}</option>
-              <option value="onboarding">{td('typeFilter.onboarding')}</option>
-              <option value="offboarding">{td('typeFilter.offboarding')}</option>
-            </select>
+              <SelectTrigger aria-label={td('typeFilter.all')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{td('typeFilter.all')}</SelectItem>
+                <SelectItem value="onboarding">{td('typeFilter.onboarding')}</SelectItem>
+                <SelectItem value="offboarding">{td('typeFilter.offboarding')}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {activeInstancesQueryForTab.isLoading ? <OnboardingTableSkeleton /> : null}
@@ -1288,82 +1292,92 @@ export function OnboardingClient({
         onClose={closeStartPanel}
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleStartOnboarding} noValidate>
-          <label className="form-field" htmlFor="onboarding-employee">
+          <div className="form-field">
             <span className="form-label">{t('startPanel.employeeLabel')}</span>
-            <select
-              id="onboarding-employee"
-              className={startErrors.employeeId ? "form-input form-input-error" : "form-input"}
-              value={startValues.employeeId}
-              onChange={(event) =>
+            <Select
+              value={startValues.employeeId || "__none__"}
+              onValueChange={(value) =>
                 updateStartValues({
                   ...startValues,
-                  employeeId: event.currentTarget.value
+                  employeeId: value === "__none__" ? "" : value
                 })
               }
             >
-              <option value="">{t('startPanel.selectEmployee')}</option>
-              {employeeOptions.map((person) => (
-                <option key={`onboarding-employee-${person.id}`} value={person.id}>
-                  {person.fullName}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder={t('startPanel.selectEmployee')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t('startPanel.selectEmployee')}</SelectItem>
+                {employeeOptions.map((person) => (
+                  <SelectItem key={`onboarding-employee-${person.id}`} value={person.id}>
+                    {person.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {startErrors.employeeId ? (
               <p className="form-field-error">{startErrors.employeeId}</p>
             ) : null}
-          </label>
+          </div>
 
-          <label className="form-field" htmlFor="onboarding-template">
+          <div className="form-field">
             <span className="form-label">{t('startPanel.templateLabel')}</span>
-            <select
-              id="onboarding-template"
-              className={startErrors.templateId ? "form-input form-input-error" : "form-input"}
-              value={startValues.templateId}
-              onChange={(event) => {
+            <Select
+              value={startValues.templateId || "__none__"}
+              onValueChange={(value) => {
+                const resolvedValue = value === "__none__" ? "" : value;
                 const nextTemplate = templatesQuery.templates.find(
-                  (template) => template.id === event.currentTarget.value
+                  (template) => template.id === resolvedValue
                 );
 
                 updateStartValues({
                   ...startValues,
-                  templateId: event.currentTarget.value,
+                  templateId: resolvedValue,
                   type: nextTemplate?.type ?? startValues.type
                 });
               }}
             >
-              <option value="">{t('startPanel.selectTemplate')}</option>
-              {templatesQuery.templates.map((template) => (
-                <option key={`onboarding-template-${template.id}`} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue placeholder={t('startPanel.selectTemplate')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t('startPanel.selectTemplate')}</SelectItem>
+                {templatesQuery.templates.map((template) => (
+                  <SelectItem key={`onboarding-template-${template.id}`} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {startErrors.templateId ? (
               <p className="form-field-error">{startErrors.templateId}</p>
             ) : null}
-          </label>
+          </div>
 
-          <label className="form-field" htmlFor="onboarding-type">
+          <div className="form-field">
             <span className="form-label">{t('startPanel.typeLabel')}</span>
-            <select
-              id="onboarding-type"
-              className={startErrors.type ? "form-input form-input-error" : "form-input"}
+            <Select
               value={startValues.type}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 updateStartValues({
                   ...startValues,
-                  type: event.currentTarget.value as OnboardingType
+                  type: value as OnboardingType
                 })
               }
             >
-              {ONBOARDING_TYPES.map((type) => (
-                <option key={`onboarding-type-${type}`} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ONBOARDING_TYPES.map((type) => (
+                  <SelectItem key={`onboarding-type-${type}`} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {startErrors.type ? <p className="form-field-error">{startErrors.type}</p> : null}
-          </label>
+          </div>
 
           <label className="form-field" htmlFor="onboarding-start-date">
             <span className="form-label">{t('startPanel.startDateLabel')}</span>
@@ -1433,27 +1447,30 @@ export function OnboardingClient({
             {templateErrors.name ? <p className="form-field-error">{templateErrors.name}</p> : null}
           </label>
 
-          <label className="form-field" htmlFor="template-type">
+          <div className="form-field">
             <span className="form-label">{t('createTemplatePanel.typeLabel')}</span>
-            <select
-              id="template-type"
-              className={templateErrors.type ? "form-input form-input-error" : "form-input"}
+            <Select
               value={templateValues.type}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 updateTemplateValues({
                   ...templateValues,
-                  type: event.currentTarget.value as OnboardingType
+                  type: value as OnboardingType
                 })
               }
             >
-              {ONBOARDING_TYPES.map((type) => (
-                <option key={`template-type-${type}`} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ONBOARDING_TYPES.map((type) => (
+                  <SelectItem key={`template-type-${type}`} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {templateErrors.type ? <p className="form-field-error">{templateErrors.type}</p> : null}
-          </label>
+          </div>
 
           <label className="form-field" htmlFor="template-country">
             <span className="form-label">{t('createTemplatePanel.countryCodeLabel')}</span>
@@ -1631,31 +1648,34 @@ export function OnboardingClient({
                       ) : null}
                     </label>
 
-                    <label className="form-field" htmlFor={`template-task-track-${index}`}>
+                    <div className="form-field">
                       <span className="form-label">{t('templateEditorPanel.taskTrackLabel')}</span>
-                      <select
-                        id={`template-task-track-${index}`}
-                        className="form-input"
-                        value={task.track}
-                        onChange={(event) =>
+                      <Select
+                        value={task.track || "__none__"}
+                        onValueChange={(value) =>
                           updateTemplateValues({
                             ...templateValues,
                             tasks: templateValues.tasks.map((currentTask, taskIndex) =>
                               taskIndex === index
-                                ? { ...currentTask, track: event.currentTarget.value as OnboardingTrack | "" }
+                                ? { ...currentTask, track: (value === "__none__" ? "" : value) as OnboardingTrack | "" }
                                 : currentTask
                             )
                           })
                         }
                       >
-                        <option value="">{t('templateEditorPanel.trackNone')}</option>
-                        {ONBOARDING_TRACKS.map((track) => (
-                          <option key={`task-track-${index}-${track}`} value={track}>
-                            {t(`templateEditorPanel.track_${track}`)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">{t('templateEditorPanel.trackNone')}</SelectItem>
+                          {ONBOARDING_TRACKS.map((track) => (
+                            <SelectItem key={`task-track-${index}-${track}`} value={track}>
+                              {t(`templateEditorPanel.track_${track}`)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
                     <label className="form-field" htmlFor={`template-task-offset-${index}`}>
                       <span className="form-label">{t('createTemplatePanel.taskDueOffsetLabel')}</span>

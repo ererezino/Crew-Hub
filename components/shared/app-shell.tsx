@@ -32,6 +32,7 @@ import { useKeyboardShortcuts } from "../../hooks/use-keyboard-shortcuts";
 import { AppErrorBoundary } from "./app-error-boundary";
 import { KeyboardShortcutsModal } from "./keyboard-shortcuts-modal";
 import { NavIcon } from "./nav-icon";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 const CommandPalette = dynamic(() => import("./command-palette").then((m) => m.CommandPalette));
 const NotificationCenter = dynamic(() => import("./notification-center").then((m) => m.NotificationCenter), { ssr: false });
@@ -581,12 +582,10 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                         </button>
                       </div>
                     ) : (
-                      <select
-                        id="status-duration-select"
-                        className="status-duration-select"
-                        value={statusDurationDays}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
+                      <Select
+                        value={String(statusDurationDays)}
+                        onValueChange={(value) => {
+                          const val = Number(value);
                           if (val === -1) {
                             setShowCustomDaysInput(true);
                             setStatusCustomDays("");
@@ -595,22 +594,30 @@ function UserMenu({ profile, initials, roles }: UserMenuProps) {
                           }
                         }}
                       >
-                        {oooDayOptions.map((opt) => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="status-duration-select">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {oooDayOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )
                   ) : (
-                    <select
-                      id="status-duration-select"
-                      className="status-duration-select"
-                      value={statusDuration}
-                      onChange={(e) => setStatusDuration(Number(e.target.value))}
+                    <Select
+                      value={String(statusDuration)}
+                      onValueChange={(value) => setStatusDuration(Number(value))}
                     >
-                      {afkDurationOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="status-duration-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {afkDurationOptions.map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
                 <div className="status-note-actions">

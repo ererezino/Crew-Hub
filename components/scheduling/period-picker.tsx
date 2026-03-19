@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+
 import { formatMonth, formatDateRange } from "../../lib/datetime";
 
 type PeriodPickerProps = {
@@ -140,17 +142,20 @@ export function PeriodPicker({
 
       {!isCustom ? (
         <div className="schedule-period-field">
-          <label className="form-label" htmlFor="schedule-start-month">{t("period.startingMonth")}</label>
-          <select
-            id="schedule-start-month"
-            className="form-input"
+          <span className="form-label">{t("period.startingMonth")}</span>
+          <Select
             value={month}
-            onChange={(e) => onMonthChange(e.target.value)}
+            onValueChange={(value) => onMonthChange(value)}
           >
-            {monthOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       ) : (
         <div className="schedule-period-custom-range">

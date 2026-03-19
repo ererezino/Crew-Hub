@@ -37,6 +37,7 @@ import type {
   PayrollRunActionResponse,
   PayrollRunStatus
 } from "../../../../../types/payroll-runs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
 
 type SortDirection = "asc" | "desc";
@@ -1418,34 +1419,32 @@ export function PayrollRunDetailClient({
                                   {canAdjustItems ? (
                                     adjustmentItemId === item.id ? (
                                       <form className="settings-form" onSubmit={submitAdjustment} noValidate>
-                                        <label className="form-field" htmlFor={`adjustment-type-${item.id}`}>
+                                        <div className="form-field">
                                           <span className="form-label">{t('adjustments.typeLabel')}</span>
-                                          <select
-                                            id={`adjustment-type-${item.id}`}
-                                            className={
-                                              adjustmentErrors.adjustmentType
-                                                ? "form-input form-input-error"
-                                                : "form-input"
-                                            }
+                                          <Select
                                             value={adjustmentValues.adjustmentType}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                               setAdjustmentValues((current) => ({
                                                 ...current,
-                                                adjustmentType: event.currentTarget
-                                                  .value as PayrollAdjustmentType
+                                                adjustmentType: value as PayrollAdjustmentType
                                               }))
                                             }
                                           >
-                                            <option value="bonus">{t('adjustments.bonus')}</option>
-                                            <option value="deduction">{t('adjustments.deduction')}</option>
-                                            <option value="correction">{t('adjustments.correction')}</option>
-                                          </select>
+                                            <SelectTrigger>
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="bonus">{t('adjustments.bonus')}</SelectItem>
+                                              <SelectItem value="deduction">{t('adjustments.deduction')}</SelectItem>
+                                              <SelectItem value="correction">{t('adjustments.correction')}</SelectItem>
+                                            </SelectContent>
+                                          </Select>
                                           {adjustmentErrors.adjustmentType ? (
                                             <p className="form-field-error">
                                               {adjustmentErrors.adjustmentType}
                                             </p>
                                           ) : null}
-                                        </label>
+                                        </div>
 
                                         <label className="form-field" htmlFor={`adjustment-label-${item.id}`}>
                                           <span className="form-label">{t('adjustments.labelField')}</span>
