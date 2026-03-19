@@ -12003,6 +12003,8 @@ html.dark .chart-tooltip-frosted {
   margin: 0 auto;
   padding: 0 var(--space-5);
   padding-bottom: var(--space-12);
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ── Welcome Hero ── */
@@ -19720,6 +19722,20 @@ html.dark .crew-games-platform-game:hover {
   flex-shrink: 0;
   margin-left: auto;
   text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .oversight-card-item {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+  .oversight-item-meta {
+    flex-basis: 100%;
+    font-size: var(--text-xs);
+  }
+  .oversight-item-action {
+    margin-left: 0;
+  }
 }
 
 /* ══════════════════════════════════════════════════════
