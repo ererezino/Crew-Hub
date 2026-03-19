@@ -1276,7 +1276,7 @@ export function PayrollRunDetailClient({
                   </button>
                 ) : null}
 
-                {isReviewed && !isAuthorized ? (
+                {isReviewed && !isAuthorized && canApprove ? (
                   <button
                     type="button"
                     className="button button-accent"
