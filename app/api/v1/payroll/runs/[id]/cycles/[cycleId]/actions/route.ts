@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../../../lib/audit";
-import { evaluateMarkCyclePaidAction } from "../../../../../../../../../lib/payroll/cycle-policy";
+import { evaluateCycleAction } from "../../../../../../../../../lib/payroll/cycle-policy";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import type { MarkCyclePaidResponseData, PayrollCycle } from "../../../../../../../../../types/payroll-runs";
 import {
@@ -13,8 +13,17 @@ import {
   toPayrollCycleSummary
 } from "../../../../../_helpers";
 
+/** Cycle lifecycle:
+ *  draft → ready (finance confirms cycle is prepared and ready to disburse)
+ *  ready → processing (payout initiated — money is being sent)
+ *  processing → paid (disbursement confirmed — money arrived)
+ *
+ *  The run transitions to `processing` on the first cycle moving to `processing`.
+ *  The run transitions to `completed` when ALL non-cancelled cycles are `paid`.
+ */
+
 const cycleActionBodySchema = z.object({
-  action: z.enum(["mark_paid"])
+  action: z.enum(["mark_ready", "mark_processing", "mark_paid"])
 });
 
 export async function POST(
@@ -46,11 +55,12 @@ export async function POST(
   if (!parsedBody.success) {
     return jsonResponse<null>(422, {
       data: null,
-      error: { code: "VALIDATION_ERROR", message: "Invalid cycle action." },
+      error: { code: "VALIDATION_ERROR", message: "Invalid cycle action. Must be mark_ready, mark_processing, or mark_paid." },
       meta: buildMeta()
     });
   }
 
+  const { action } = parsedBody.data;
   const { id: runId, cycleId } = await params;
   const profile = session.profile;
 
@@ -88,7 +98,8 @@ export async function POST(
     }
 
     // Policy check
-    const decision = evaluateMarkCyclePaidAction({
+    const decision = evaluateCycleAction({
+      action,
       cycleStatus: parsedCycle.data.status,
       actorRoles: profile.roles
     });
@@ -104,7 +115,88 @@ export async function POST(
 
     const nowIso = new Date().toISOString();
 
-    // 1. Update the cycle → paid
+    // ── mark_ready: draft → ready ───────────────────────────────────
+    if (action === "mark_ready") {
+      const { data: updatedRow, error: updateError } = await supabase
+        .from("payroll_cycles")
+        .update({ status: "ready" })
+        .eq("id", cycleId)
+        .eq("org_id", profile.org_id)
+        .select(PAYROLL_CYCLE_SELECT_COLUMNS)
+        .single();
+
+      if (updateError || !updatedRow) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: { code: "PAYROLL_CYCLE_UPDATE_FAILED", message: "Unable to mark cycle as ready." },
+          meta: buildMeta()
+        });
+      }
+
+      await logAudit({
+        action: "updated",
+        tableName: "payroll_cycles",
+        recordId: cycleId,
+        oldValue: { status: parsedCycle.data.status },
+        newValue: { status: "ready", action: "mark_ready" }
+      });
+
+      const parsed = payrollCycleRowSchema.safeParse(updatedRow);
+      const cycle = parsed.success ? toPayrollCycleSummary(parsed.data) : toPayrollCycleSummary(parsedCycle.data);
+
+      return jsonResponse<MarkCyclePaidResponseData>(200, {
+        data: { cycle },
+        error: null,
+        meta: buildMeta()
+      });
+    }
+
+    // ── mark_processing: ready → processing ─────────────────────────
+    if (action === "mark_processing") {
+      const { data: updatedRow, error: updateError } = await supabase
+        .from("payroll_cycles")
+        .update({ status: "processing" })
+        .eq("id", cycleId)
+        .eq("org_id", profile.org_id)
+        .select(PAYROLL_CYCLE_SELECT_COLUMNS)
+        .single();
+
+      if (updateError || !updatedRow) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: { code: "PAYROLL_CYCLE_UPDATE_FAILED", message: "Unable to mark cycle as processing." },
+          meta: buildMeta()
+        });
+      }
+
+      // Transition the run to processing if it's still approved
+      await supabase
+        .from("payroll_runs")
+        .update({ status: "processing" })
+        .eq("id", runId)
+        .eq("org_id", profile.org_id)
+        .eq("status", "approved");
+
+      await logAudit({
+        action: "updated",
+        tableName: "payroll_cycles",
+        recordId: cycleId,
+        oldValue: { status: parsedCycle.data.status },
+        newValue: { status: "processing", action: "mark_processing" }
+      });
+
+      const parsed = payrollCycleRowSchema.safeParse(updatedRow);
+      const cycle = parsed.success ? toPayrollCycleSummary(parsed.data) : toPayrollCycleSummary(parsedCycle.data);
+
+      return jsonResponse<MarkCyclePaidResponseData>(200, {
+        data: { cycle },
+        error: null,
+        meta: buildMeta()
+      });
+    }
+
+    // ── mark_paid: ready|processing → paid ──────────────────────────
+    // 1. Update the cycle → paid + locked
     const { data: updatedCycleRow, error: updateCycleError } = await supabase
       .from("payroll_cycles")
       .update({
@@ -152,7 +244,15 @@ export async function POST(
         .in("id", payrollItemIds);
     }
 
-    // 4. Check if ALL non-cancelled cycles for this run are now paid
+    // 4. If the run is still approved, move it to processing
+    await supabase
+      .from("payroll_runs")
+      .update({ status: "processing" })
+      .eq("id", runId)
+      .eq("org_id", profile.org_id)
+      .eq("status", "approved");
+
+    // 5. Check if ALL non-cancelled cycles for this run are now paid
     const { count: unpaidCount } = await supabase
       .from("payroll_cycles")
       .select("id", { count: "exact", head: true })
@@ -169,8 +269,7 @@ export async function POST(
         .update({
           status: "completed",
           completed_at: nowIso,
-          completed_by: profile.id,
-          locked_at: nowIso
+          completed_by: profile.id
         })
         .eq("id", runId)
         .eq("org_id", profile.org_id);
@@ -211,7 +310,7 @@ export async function POST(
       data: null,
       error: {
         code: "PAYROLL_CYCLE_UPDATE_FAILED",
-        message: error instanceof Error ? error.message : "Unable to mark cycle as paid."
+        message: error instanceof Error ? error.message : "Unable to update cycle."
       },
       meta: buildMeta()
     });

@@ -320,6 +320,7 @@ export function PayrollRunDetailClient({
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isPreparingPayout, setIsPreparingPayout] = useState(false);
+  const [activeCycleActionId, setActiveCycleActionId] = useState<string | null>(null);
   const [markingPaidCycleId, setMarkingPaidCycleId] = useState<string | null>(null);
   const [isCreatingAmendment, setIsCreatingAmendment] = useState(false);
   const { confirm, confirmDialog } = useConfirmAction();
@@ -847,6 +848,60 @@ export function PayrollRunDetailClient({
     }
   };
 
+  const performCycleAction = async (
+    cycleId: string,
+    action: "mark_ready" | "mark_processing" | "mark_paid",
+    successMessage: string,
+    failMessage: string
+  ) => {
+    setActiveCycleActionId(cycleId);
+    if (action === "mark_paid") setMarkingPaidCycleId(cycleId);
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles/${cycleId}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action })
+      });
+
+      const payload = (await response.json()) as MarkCyclePaidResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? failMessage);
+        return;
+      }
+
+      showToast("success", successMessage);
+      runQuery.refresh();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : failMessage);
+    } finally {
+      setActiveCycleActionId(null);
+      if (action === "mark_paid") setMarkingPaidCycleId(null);
+    }
+  };
+
+  const markCycleReady = async (cycleId: string) => {
+    const confirmed = await confirm({
+      title: td("confirmMarkReady.title"),
+      description: td("confirmMarkReady.description"),
+      confirmLabel: td("confirmMarkReady.confirmLabel"),
+      tone: "default"
+    });
+    if (!confirmed) return;
+    await performCycleAction(cycleId, "mark_ready", td("toast.cycleReady"), td("toast.cycleReadyFailed"));
+  };
+
+  const markCycleProcessing = async (cycleId: string) => {
+    const confirmed = await confirm({
+      title: td("confirmMarkProcessing.title"),
+      description: td("confirmMarkProcessing.description"),
+      confirmLabel: td("confirmMarkProcessing.confirmLabel"),
+      tone: "default"
+    });
+    if (!confirmed) return;
+    await performCycleAction(cycleId, "mark_processing", td("toast.cycleProcessing"), td("toast.cycleProcessingFailed"));
+  };
+
   const markCyclePaid = async (cycleId: string) => {
     const confirmed = await confirm({
       title: td("confirmMarkPaid.title"),
@@ -855,29 +910,7 @@ export function PayrollRunDetailClient({
       tone: "danger"
     });
     if (!confirmed) return;
-
-    setMarkingPaidCycleId(cycleId);
-    try {
-      const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles/${cycleId}/actions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_paid" })
-      });
-
-      const payload = (await response.json()) as MarkCyclePaidResponse;
-
-      if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? td("toast.cyclePaidFailed"));
-        return;
-      }
-
-      showToast("success", td("toast.cyclePaid"));
-      runQuery.refresh();
-    } catch (error) {
-      showToast("error", error instanceof Error ? error.message : td("toast.cyclePaidFailed"));
-    } finally {
-      setMarkingPaidCycleId(null);
-    }
+    await performCycleAction(cycleId, "mark_paid", td("toast.cyclePaid"), td("toast.cyclePaidFailed"));
   };
 
   const createAmendment = async () => {
@@ -1242,6 +1275,7 @@ export function PayrollRunDetailClient({
                           cycle.status === "paid" ? "success"
                             : cycle.status === "ready" ? "pending"
                             : cycle.status === "failed" ? "error"
+                            : cycle.status === "draft" ? "draft"
                             : "processing"
                         }
                       >
@@ -1261,12 +1295,42 @@ export function PayrollRunDetailClient({
                           {td("cycles.preparedAt", { date: formatDate(cycle.preparedAt, locale) })}
                         </p>
                       ) : null}
-                      {canManage && (cycle.status === "ready" || cycle.status === "processing") ? (
+                      {canManage && cycle.status === "draft" ? (
                         <div className="settings-actions">
                           <button
                             type="button"
                             className="button button-primary"
-                            disabled={markingPaidCycleId !== null}
+                            disabled={activeCycleActionId !== null}
+                            onClick={() => void markCycleReady(cycle.id)}
+                          >
+                            {activeCycleActionId === cycle.id ? td("cycles.markingReady") : td("cycles.markReady")}
+                          </button>
+                        </div>
+                      ) : canManage && cycle.status === "ready" ? (
+                        <div className="settings-actions">
+                          <button
+                            type="button"
+                            className="button"
+                            disabled={activeCycleActionId !== null}
+                            onClick={() => void markCycleProcessing(cycle.id)}
+                          >
+                            {activeCycleActionId === cycle.id ? td("cycles.markingProcessing") : td("cycles.markProcessing")}
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-primary"
+                            disabled={activeCycleActionId !== null}
+                            onClick={() => void markCyclePaid(cycle.id)}
+                          >
+                            {markingPaidCycleId === cycle.id ? td("cycles.markingPaid") : td("cycles.markPaid")}
+                          </button>
+                        </div>
+                      ) : canManage && cycle.status === "processing" ? (
+                        <div className="settings-actions">
+                          <button
+                            type="button"
+                            className="button button-primary"
+                            disabled={activeCycleActionId !== null}
                             onClick={() => void markCyclePaid(cycle.id)}
                           >
                             {markingPaidCycleId === cycle.id ? td("cycles.markingPaid") : td("cycles.markPaid")}

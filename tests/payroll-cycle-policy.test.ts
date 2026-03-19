@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   evaluateCreateAmendmentAction,
+  evaluateCycleAction,
   evaluateMarkCyclePaidAction,
   evaluatePreparePayoutAction
 } from "../lib/payroll/cycle-policy";
@@ -122,9 +123,165 @@ describe("Payroll cycle policy", () => {
     });
   });
 
-  // ── mark cycle paid ────────────────────────────────────────────────
+  // ── cycle action: mark_ready ──────────────────────────────────────
 
-  describe("mark cycle paid", () => {
+  describe("cycle action: mark_ready", () => {
+    it("allows marking a draft cycle as ready", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_ready",
+        cycleStatus: "draft",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(true);
+    });
+
+    it("blocks marking a ready cycle as ready (already transitioned)", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_ready",
+        cycleStatus: "ready",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("INVALID_STATE");
+      }
+    });
+
+    it("blocks marking a paid cycle as ready", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_ready",
+        cycleStatus: "paid",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("INVALID_STATE");
+      }
+    });
+
+    it("blocks non-finance roles from marking ready", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_ready",
+        cycleStatus: "draft",
+        actorRoles: ["HR_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("FORBIDDEN");
+      }
+    });
+  });
+
+  // ── cycle action: mark_processing ─────────────────────────────────
+
+  describe("cycle action: mark_processing", () => {
+    it("allows marking a ready cycle as processing", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_processing",
+        cycleStatus: "ready",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(true);
+    });
+
+    it("blocks marking a draft cycle as processing (must be ready first)", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_processing",
+        cycleStatus: "draft",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("INVALID_STATE");
+      }
+    });
+
+    it("blocks marking a paid cycle as processing", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_processing",
+        cycleStatus: "paid",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("INVALID_STATE");
+      }
+    });
+  });
+
+  // ── cycle action: mark_paid ───────────────────────────────────────
+
+  describe("cycle action: mark_paid", () => {
+    it("allows marking a ready cycle as paid", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_paid",
+        cycleStatus: "ready",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(true);
+    });
+
+    it("allows marking a processing cycle as paid", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_paid",
+        cycleStatus: "processing",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(true);
+    });
+
+    it("blocks marking a draft cycle as paid (must be ready or processing)", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_paid",
+        cycleStatus: "draft",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("INVALID_STATE");
+      }
+    });
+
+    it("blocks marking an already-paid cycle as paid", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_paid",
+        cycleStatus: "paid",
+        actorRoles: ["FINANCE_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("INVALID_STATE");
+      }
+    });
+
+    it("blocks non-finance roles from marking paid", () => {
+      const decision = evaluateCycleAction({
+        action: "mark_paid",
+        cycleStatus: "ready",
+        actorRoles: ["HR_ADMIN"]
+      });
+
+      expect(decision.allowed).toBe(false);
+      if (!decision.allowed) {
+        expect(decision.code).toBe("FORBIDDEN");
+      }
+    });
+  });
+
+  // ── mark cycle paid (legacy function) ─────────────────────────────
+
+  describe("mark cycle paid (legacy)", () => {
     it("allows marking a ready cycle as paid", () => {
       const decision = evaluateMarkCyclePaidAction({
         cycleStatus: "ready",
@@ -183,9 +340,9 @@ describe("Payroll cycle policy", () => {
   // ── create amendment ───────────────────────────────────────────────
 
   describe("create amendment", () => {
-    it("allows FINANCE_APPROVER to create amendment on locked run", () => {
+    it("allows FINANCE_APPROVER to create amendment when run has paid cycles", () => {
       const decision = evaluateCreateAmendmentAction({
-        runLockedAt: "2026-03-19T00:00:00Z",
+        hasPaidCycles: true,
         hasActiveAmendment: false,
         actorRoles: ["FINANCE_APPROVER"]
       });
@@ -195,7 +352,7 @@ describe("Payroll cycle policy", () => {
 
     it("allows SUPER_ADMIN to create amendment", () => {
       const decision = evaluateCreateAmendmentAction({
-        runLockedAt: "2026-03-19T00:00:00Z",
+        hasPaidCycles: true,
         hasActiveAmendment: false,
         actorRoles: ["SUPER_ADMIN"]
       });
@@ -205,7 +362,7 @@ describe("Payroll cycle policy", () => {
 
     it("blocks FINANCE_ADMIN from creating amendment", () => {
       const decision = evaluateCreateAmendmentAction({
-        runLockedAt: "2026-03-19T00:00:00Z",
+        hasPaidCycles: true,
         hasActiveAmendment: false,
         actorRoles: ["FINANCE_ADMIN"]
       });
@@ -216,9 +373,9 @@ describe("Payroll cycle policy", () => {
       }
     });
 
-    it("blocks amendment when run has no locked_at", () => {
+    it("blocks amendment when run has no paid cycles", () => {
       const decision = evaluateCreateAmendmentAction({
-        runLockedAt: null,
+        hasPaidCycles: false,
         hasActiveAmendment: false,
         actorRoles: ["FINANCE_APPROVER"]
       });
@@ -231,7 +388,7 @@ describe("Payroll cycle policy", () => {
 
     it("blocks amendment when active amendment already exists", () => {
       const decision = evaluateCreateAmendmentAction({
-        runLockedAt: "2026-03-19T00:00:00Z",
+        hasPaidCycles: true,
         hasActiveAmendment: true,
         actorRoles: ["FINANCE_APPROVER"]
       });

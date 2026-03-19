@@ -66,9 +66,18 @@ export async function POST(
       .is("deleted_at", null)
       .neq("status", "cancelled");
 
+    // Check for paid cycles — amendment requires actual paid history
+    const { count: paidCycleCount } = await supabase
+      .from("payroll_cycles")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", profile.org_id)
+      .eq("payroll_run_id", runId)
+      .is("deleted_at", null)
+      .eq("status", "paid");
+
     // Policy check
     const decision = evaluateCreateAmendmentAction({
-      runLockedAt: parsedRun.data.locked_at ?? null,
+      hasPaidCycles: (paidCycleCount ?? 0) > 0,
       hasActiveAmendment: (activeAmendmentCount ?? 0) > 0,
       actorRoles: profile.roles
     });

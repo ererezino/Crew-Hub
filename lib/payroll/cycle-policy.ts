@@ -69,14 +69,30 @@ export function evaluatePreparePayoutAction(input: PreparePayoutInput): PayrollA
   return { allowed: true };
 }
 
-// ── Mark cycle paid ─────────────────────────────────────────────────
+// ── Cycle action (mark_ready / mark_processing / mark_paid) ────────
 
-export type MarkCyclePaidInput = {
+export type CycleActionType = "mark_ready" | "mark_processing" | "mark_paid";
+
+export type CycleActionInput = {
+  action: CycleActionType;
   cycleStatus: PayrollCycleStatus;
   actorRoles: readonly UserRole[];
 };
 
-export function evaluateMarkCyclePaidAction(input: MarkCyclePaidInput): PayrollApprovalDecision {
+/** Valid transitions per action. */
+const CYCLE_ACTION_TRANSITIONS: Record<CycleActionType, readonly PayrollCycleStatus[]> = {
+  mark_ready: ["draft"],
+  mark_processing: ["ready"],
+  mark_paid: ["ready", "processing"]
+};
+
+const CYCLE_ACTION_LABELS: Record<CycleActionType, string> = {
+  mark_ready: "ready",
+  mark_processing: "processing",
+  mark_paid: "paid"
+};
+
+export function evaluateCycleAction(input: CycleActionInput): PayrollApprovalDecision {
   const isFinanceUser =
     hasRole(input.actorRoles, "FINANCE_ADMIN") ||
     hasRole(input.actorRoles, "FINANCE_APPROVER") ||
@@ -86,25 +102,42 @@ export function evaluateMarkCyclePaidAction(input: MarkCyclePaidInput): PayrollA
     return {
       allowed: false,
       code: "FORBIDDEN",
-      message: "Only Finance users can mark cycles as paid."
+      message: "Only Finance users can update cycle status."
     };
   }
 
-  if (input.cycleStatus !== "ready" && input.cycleStatus !== "processing") {
+  const validFrom = CYCLE_ACTION_TRANSITIONS[input.action];
+  if (!validFrom.includes(input.cycleStatus)) {
+    const target = CYCLE_ACTION_LABELS[input.action];
     return {
       allowed: false,
       code: "INVALID_STATE",
-      message: "Only ready or processing cycles can be marked as paid."
+      message: `Cannot mark cycle as ${target} from current status "${input.cycleStatus}".`
     };
   }
 
   return { allowed: true };
 }
 
+// ── Mark cycle paid (legacy convenience — delegates to evaluateCycleAction) ─
+
+export type MarkCyclePaidInput = {
+  cycleStatus: PayrollCycleStatus;
+  actorRoles: readonly UserRole[];
+};
+
+export function evaluateMarkCyclePaidAction(input: MarkCyclePaidInput): PayrollApprovalDecision {
+  return evaluateCycleAction({
+    action: "mark_paid",
+    cycleStatus: input.cycleStatus,
+    actorRoles: input.actorRoles
+  });
+}
+
 // ── Create amendment ────────────────────────────────────────────────
 
 export type CreateAmendmentInput = {
-  runLockedAt: string | null;
+  hasPaidCycles: boolean;
   hasActiveAmendment: boolean;
   actorRoles: readonly UserRole[];
 };
@@ -122,11 +155,11 @@ export function evaluateCreateAmendmentAction(input: CreateAmendmentInput): Payr
     };
   }
 
-  if (!input.runLockedAt) {
+  if (!input.hasPaidCycles) {
     return {
       allowed: false,
       code: "INVALID_STATE",
-      message: "Only locked (completed/paid) runs can be amended."
+      message: "Only runs with paid cycles can be amended."
     };
   }
 

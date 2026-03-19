@@ -3290,8 +3290,12 @@
       "runCancelled": "Cycle annulé.",
       "adjustmentApplied": "Ajustement de paie appliqué.",
       "unableToAddAdjustment": "Impossible d'ajouter l'ajustement de paie.",
-      "payoutPrepared": "Cycles de paiement créés. Le cycle de paie passe en traitement.",
+      "payoutPrepared": "Cycles de paiement créés.",
       "payoutPrepFailed": "Impossible de préparer les cycles de paiement.",
+      "cycleReady": "Cycle marqué comme prêt.",
+      "cycleReadyFailed": "Impossible de marquer le cycle comme prêt.",
+      "cycleProcessing": "Cycle marqué en traitement.",
+      "cycleProcessingFailed": "Impossible de marquer le cycle en traitement.",
       "cyclePaid": "Cycle marqué comme payé.",
       "cyclePaidFailed": "Impossible de marquer le cycle comme payé.",
       "amendmentCreated": "Cycle correctif créé.",
@@ -3304,10 +3308,15 @@
       "noCycles": "Aucun cycle de paiement créé pour l'instant.",
       "preparePayout": "Préparer le paiement",
       "preparingPayout": "Préparation...",
+      "markReady": "Marquer comme prêt",
+      "markingReady": "Marquage...",
+      "markProcessing": "Marquer en traitement",
+      "markingProcessing": "Marquage...",
       "markPaid": "Marquer comme payé",
       "markingPaid": "Marquage...",
       "createAmendment": "Créer un correctif",
       "creatingAmendment": "Création...",
+      "statusDraft": "Brouillon",
       "statusReady": "Prêt",
       "statusPaid": "Payé",
       "statusProcessing": "En traitement",
@@ -3321,13 +3330,23 @@
     },
     "confirmPreparePayout": {
       "title": "Préparer les cycles de paiement ?",
-      "description": "Les postes seront regroupés par devise et des cycles de paiement seront créés. Le cycle de paie passera en traitement.",
+      "description": "Les postes seront regroupés par devise et des cycles de paiement brouillons seront créés.",
       "confirmLabel": "Préparer le paiement"
     },
     "confirmPreparePayout_flagged": {
       "title": "Postes signalés détectés",
       "description": "{count, plural, one {# poste est signalé} other {# postes sont signalés}}. Remplacer le blocage pour continuer la préparation du paiement ?",
       "confirmLabel": "Remplacer et préparer"
+    },
+    "confirmMarkReady": {
+      "title": "Marquer le cycle comme prêt ?",
+      "description": "Ceci confirme que le cycle a été vérifié et est prêt pour le décaissement.",
+      "confirmLabel": "Marquer comme prêt"
+    },
+    "confirmMarkProcessing": {
+      "title": "Marquer le cycle en traitement ?",
+      "description": "Ceci indique que le décaissement a été initié. Le cycle de paie passera en traitement.",
+      "confirmLabel": "Marquer en traitement"
     },
     "confirmMarkPaid": {
       "title": "Marquer le cycle comme payé ?",

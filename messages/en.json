@@ -3382,8 +3382,12 @@
       "unableToAddAdjustment": "Unable to add payroll adjustment.",
       "editItemSuccess": "Payroll item updated. Run Calculate to apply withholding rules.",
       "editItemFailed": "Unable to update payroll item.",
-      "payoutPrepared": "Payout cycles created. Run moved to processing.",
+      "payoutPrepared": "Payout cycles created.",
       "payoutPrepFailed": "Unable to prepare payout cycles.",
+      "cycleReady": "Cycle marked as ready.",
+      "cycleReadyFailed": "Unable to mark cycle as ready.",
+      "cycleProcessing": "Cycle marked as processing.",
+      "cycleProcessingFailed": "Unable to mark cycle as processing.",
       "cyclePaid": "Cycle marked as paid.",
       "cyclePaidFailed": "Unable to mark cycle as paid.",
       "amendmentCreated": "Amendment run created.",
@@ -3428,10 +3432,15 @@
       "noCycles": "No payout cycles created yet.",
       "preparePayout": "Prepare payout",
       "preparingPayout": "Preparing...",
+      "markReady": "Mark as ready",
+      "markingReady": "Marking...",
+      "markProcessing": "Mark as processing",
+      "markingProcessing": "Marking...",
       "markPaid": "Mark as paid",
       "markingPaid": "Marking...",
       "createAmendment": "Create amendment",
       "creatingAmendment": "Creating...",
+      "statusDraft": "Draft",
       "statusReady": "Ready",
       "statusPaid": "Paid",
       "statusProcessing": "Processing",
@@ -3445,13 +3454,23 @@
     },
     "confirmPreparePayout": {
       "title": "Prepare payout cycles?",
-      "description": "This will group items by currency and create payout cycles. The run will move to processing.",
+      "description": "This will group items by currency and create draft payout cycles.",
       "confirmLabel": "Prepare payout"
     },
     "confirmPreparePayout_flagged": {
       "title": "Flagged items detected",
       "description": "{count, plural, one {# item is flagged} other {# items are flagged}}. Override the hold to continue with payout preparation?",
       "confirmLabel": "Override and prepare"
+    },
+    "confirmMarkReady": {
+      "title": "Mark cycle as ready?",
+      "description": "This confirms the cycle has been reviewed and is ready for disbursement.",
+      "confirmLabel": "Mark ready"
+    },
+    "confirmMarkProcessing": {
+      "title": "Mark cycle as processing?",
+      "description": "This indicates disbursement has been initiated. The payroll run will move to processing.",
+      "confirmLabel": "Mark processing"
     },
     "confirmMarkPaid": {
       "title": "Mark cycle as paid?",

@@ -13,15 +13,14 @@ import {
   PAYROLL_RUN_SELECT_COLUMNS,
   payrollCycleRowSchema,
   payrollRunRowSchema,
-  toPayrollCycleSummary,
-  toPayrollRunSummary
+  toPayrollCycleSummary
 } from "../../../_helpers";
 
 const preparePayoutBodySchema = z.object({
   overrideHolds: z.boolean().optional().default(false)
 });
 
-function formatPayPeriodLabel(startDate: string, endDate: string): string {
+function formatPayPeriodLabel(_startDate: string, endDate: string): string {
   try {
     const end = new Date(endDate + "T00:00:00Z");
     return end.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
@@ -104,7 +103,7 @@ export async function GET(
   }
 }
 
-// ── POST: prepare payout (creates cycles from approved run) ─────────
+// ── POST: prepare payout (creates draft cycles from approved run) ────
 
 export async function POST(
   request: Request,
@@ -224,29 +223,90 @@ export async function POST(
       });
     }
 
-    // Load payment details for snapshot
+    // ── Payment detail validation (P0 + P1 fix) ─────────────────────
+    // Load verified, primary, effective payment details using the real
+    // encrypted schema columns. Hard-block if any employee is missing a
+    // valid payment destination.
     const employeeIds = [...new Set(rawItems.map((item: { employee_id: string }) => item.employee_id))];
+    const nowDate = new Date();
     const { data: paymentDetails } = await supabase
       .from("employee_payment_details")
-      .select("employee_id, bank_name, account_number, routing_number, account_type, currency, is_primary")
+      .select(
+        "employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, wise_recipient_id, is_primary, is_verified, change_effective_at"
+      )
       .eq("org_id", profile.org_id)
       .in("employee_id", employeeIds)
+      .eq("is_primary", true)
       .is("deleted_at", null);
 
+    // Build a map of employee → validated payment snapshot (non-encrypted fields only)
     const paymentDetailsByEmployee = new Map<string, Record<string, unknown>>();
+    const employeesWithHeldPayment: string[] = [];
+    const employeesWithUnverifiedPayment: string[] = [];
+
     for (const detail of paymentDetails ?? []) {
-      if (!paymentDetailsByEmployee.has(detail.employee_id) || detail.is_primary) {
-        paymentDetailsByEmployee.set(detail.employee_id, {
-          bankName: detail.bank_name,
-          accountNumber: detail.account_number,
-          routingNumber: detail.routing_number,
-          accountType: detail.account_type,
-          currency: detail.currency
-        });
+      const effectiveAt = new Date(detail.change_effective_at);
+      const isEffective = effectiveAt <= nowDate;
+
+      if (!detail.is_verified) {
+        employeesWithUnverifiedPayment.push(detail.employee_id);
+        continue;
       }
+
+      if (!isEffective) {
+        employeesWithHeldPayment.push(detail.employee_id);
+        continue;
+      }
+
+      // Snapshot uses only non-encrypted, safe fields
+      paymentDetailsByEmployee.set(detail.employee_id, {
+        paymentMethod: detail.payment_method,
+        currency: detail.currency,
+        bankAccountLast4: detail.bank_account_last4,
+        mobileMoneyLast4: detail.mobile_money_last4,
+        wiseRecipientId: detail.wise_recipient_id,
+        snapshotAt: nowDate.toISOString()
+      });
     }
 
-    // Group items by pay_currency
+    // Hard-block: employees with unverified payment details
+    if (employeesWithUnverifiedPayment.length > 0) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "PAYMENT_DETAILS_UNVERIFIED",
+          message: `${employeesWithUnverifiedPayment.length} employee(s) have unverified payment details. Verify payment details before preparing payout.`
+        },
+        meta: buildMeta()
+      });
+    }
+
+    // Hard-block: employees with held (change_effective_at in future) payment details
+    if (employeesWithHeldPayment.length > 0) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "PAYMENT_DETAILS_HELD",
+          message: `${employeesWithHeldPayment.length} employee(s) have payment detail changes that are not yet effective. Wait for the hold period to elapse.`
+        },
+        meta: buildMeta()
+      });
+    }
+
+    // Hard-block: employees missing payment details entirely
+    const employeesWithoutPayment = employeeIds.filter((id) => !paymentDetailsByEmployee.has(id));
+    if (employeesWithoutPayment.length > 0) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "PAYMENT_DETAILS_MISSING",
+          message: `${employeesWithoutPayment.length} employee(s) do not have payment details on file. Add payment details before preparing payout.`
+        },
+        meta: buildMeta()
+      });
+    }
+
+    // ── Group items by pay_currency → create one cycle per currency ──
     const itemsByCurrency = new Map<string, typeof rawItems>();
     for (const item of rawItems) {
       const currency = (item as { pay_currency: string }).pay_currency;
@@ -255,7 +315,7 @@ export async function POST(
       itemsByCurrency.set(currency, existing);
     }
 
-    const nowIso = new Date().toISOString();
+    const nowIso = nowDate.toISOString();
     const payPeriodLabel = formatPayPeriodLabel(
       parsedRun.data.pay_period_start,
       parsedRun.data.pay_period_end
@@ -280,7 +340,9 @@ export async function POST(
         totalDeductions += gross - net;
       }
 
-      // Insert the cycle
+      // Cycles start as draft — they move to ready/processing/paid as
+      // actual payout events occur. The run stays approved until a cycle
+      // is explicitly moved forward.
       const { data: cycleRow, error: cycleError } = await supabase
         .from("payroll_cycles")
         .insert({
@@ -288,7 +350,7 @@ export async function POST(
           org_id: profile.org_id,
           label: `${currency} Payout - ${payPeriodLabel}`,
           currency,
-          status: "ready",
+          status: "draft",
           target_pay_date: parsedRun.data.pay_date,
           prepared_at: nowIso,
           prepared_by: profile.id,
@@ -308,7 +370,7 @@ export async function POST(
         });
       }
 
-      // Insert cycle items
+      // Insert cycle items with validated payment snapshots
       const cycleItemInserts = items.map((item) => {
         const castItem = item as { id: string; employee_id: string; net_amount: number | string };
         const netAmount = typeof castItem.net_amount === "number"
@@ -344,12 +406,8 @@ export async function POST(
       }
     }
 
-    // Transition run to processing
-    await supabase
-      .from("payroll_runs")
-      .update({ status: "processing" })
-      .eq("id", runId)
-      .eq("org_id", profile.org_id);
+    // Run stays approved — no automatic transition to processing.
+    // The run moves to processing only when a cycle action drives it.
 
     await logAudit({
       action: "updated",
@@ -357,7 +415,6 @@ export async function POST(
       recordId: runId,
       oldValue: { status: parsedRun.data.status },
       newValue: {
-        status: "processing",
         action: "prepare_payout",
         cycleCount: createdCycles.length,
         overrideHolds
@@ -367,7 +424,7 @@ export async function POST(
     return jsonResponse<PreparePayoutResponseData>(200, {
       data: {
         cycles: createdCycles,
-        runStatus: "processing"
+        runStatus: parsedRun.data.status
       },
       error: null,
       meta: buildMeta()
