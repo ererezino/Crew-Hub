@@ -252,8 +252,9 @@ export async function POST(
       .eq("org_id", profile.org_id)
       .eq("status", "approved");
 
-    // 5. Check if ALL non-cancelled cycles are paid AND all run employees
-    //    are covered by active cycles (multi-cycle completion guard)
+    // 5. Check if ALL non-cancelled cycles are paid AND the full
+    //    disbursement plan is complete (every payroll item fully paid
+    //    across all paid cycles).
     const { count: unpaidCount } = await supabase
       .from("payroll_cycles")
       .select("id", { count: "exact", head: true })
@@ -264,45 +265,52 @@ export async function POST(
       .neq("status", "paid");
 
     if (unpaidCount === 0) {
-      // All existing cycles are paid — check employee coverage
-      const { data: runItemEmployees } = await supabase
+      // All existing cycles are paid — check disbursement completeness
+      const { data: allRunItems } = await supabase
         .from("payroll_items")
-        .select("employee_id")
+        .select("id, net_amount")
         .eq("payroll_run_id", runId)
         .eq("org_id", profile.org_id)
         .is("deleted_at", null);
 
-      const allRunEmployeeSet = new Set(
-        (runItemEmployees ?? []).map((r: { employee_id: string }) => r.employee_id)
-      );
-
-      const { data: activeCycleIdRows } = await supabase
+      const { data: paidCycleRows } = await supabase
         .from("payroll_cycles")
         .select("id")
         .eq("payroll_run_id", runId)
         .eq("org_id", profile.org_id)
-        .is("deleted_at", null)
-        .neq("status", "cancelled");
+        .eq("status", "paid")
+        .is("deleted_at", null);
 
-      const activeCycleIdList = (activeCycleIdRows ?? []).map((c: { id: string }) => c.id);
-      let assignedSet = new Set<string>();
+      const paidCycleIdList = (paidCycleRows ?? []).map((c: { id: string }) => c.id);
+      const paidByItem = new Map<string, number>();
 
-      if (activeCycleIdList.length > 0) {
-        const { data: assignedRows } = await supabase
+      if (paidCycleIdList.length > 0) {
+        const { data: paidDisbursements } = await supabase
           .from("payroll_cycle_items")
-          .select("employee_id")
-          .in("payroll_cycle_id", activeCycleIdList)
+          .select("payroll_item_id, disbursement_amount")
+          .in("payroll_cycle_id", paidCycleIdList)
           .is("deleted_at", null);
 
-        assignedSet = new Set(
-          (assignedRows ?? []).map((r: { employee_id: string }) => r.employee_id)
-        );
+        for (const d of paidDisbursements ?? []) {
+          const amt = typeof d.disbursement_amount === "number"
+            ? d.disbursement_amount
+            : Number.parseInt(String(d.disbursement_amount), 10) || 0;
+          paidByItem.set(d.payroll_item_id, (paidByItem.get(d.payroll_item_id) ?? 0) + amt);
+        }
       }
 
-      const allCovered = [...allRunEmployeeSet].every((id) => assignedSet.has(id));
+      const fullyDisbursed = (allRunItems ?? []).every(
+        (item: { id: string; net_amount: number | string }) => {
+          const net = typeof item.net_amount === "number"
+            ? item.net_amount
+            : Number.parseInt(String(item.net_amount), 10) || 0;
+          const paid = paidByItem.get(item.id) ?? 0;
+          return paid >= net;
+        }
+      );
 
-      if (allCovered) {
-        // All employees covered, all cycles paid → complete the run
+      if (fullyDisbursed) {
+        // All cycles paid + every payroll item fully disbursed → complete
         await supabase
           .from("payroll_runs")
           .update({

@@ -22,11 +22,21 @@ const holdOverrideSchema = z.object({
   reason: z.string().trim().min(1).max(500)
 });
 
+const disbursementEntrySchema = z.object({
+  employeeId: z.string().uuid(),
+  amount: z.number().int().positive()
+});
+
 const preparePayoutBodySchema = z.object({
-  /** Explicit list of employees for this cycle. Omit to include all remaining. */
-  employeeIds: z.array(z.string().uuid()).optional(),
-  /** Custom cycle label. Auto-generated if omitted. */
+  /** Custom cycle label. Auto-generated as "Cycle {N} - {period}" if omitted. */
   label: z.string().trim().min(1).max(200).optional(),
+  /**
+   * Per-employee disbursement amounts for this cycle.
+   * Omit to include every employee whose payroll item has remaining
+   * undisbursed net, each at their full remaining amount.
+   * Provide to set explicit per-employee payout amounts.
+   */
+  disbursements: z.array(disbursementEntrySchema).optional(),
   holdOverrides: z.array(holdOverrideSchema).optional().default([])
 });
 
@@ -38,6 +48,24 @@ function formatPayPeriodLabel(_startDate: string, endDate: string): string {
     return endDate.slice(0, 7);
   }
 }
+
+function toInt(value: number | string | unknown): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const n = Number.parseInt(value, 10);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+type PayrollItem = {
+  id: string;
+  employee_id: string;
+  pay_currency: string;
+  net_amount: number | string;
+  gross_amount: number | string;
+  deductions: unknown;
+};
 
 // ── GET: list cycles for a run ──────────────────────────────────────
 
@@ -113,12 +141,17 @@ export async function GET(
   }
 }
 
-// ── POST: create a payout cycle for a run ────────────────────────────
+// ── POST: create a payout-event cycle for a run ──────────────────────
 //
-// Multi-cycle model: each POST creates one payout-event cycle containing
-// the specified employees (or all remaining employees if none specified).
-// Multiple cycles can coexist for the same run. An employee can only
-// appear in one active (non-cancelled) cycle.
+// Multi-cycle model: each POST creates one disbursement-event cycle.
+// The same employee can appear in multiple cycles with different
+// disbursement amounts. Each cycle item carries a per-cycle payout
+// amount; the sum across all paid cycles for a payroll item should
+// converge to that item's net_amount.
+//
+// Cycle 1 might disburse 60 % of net to every employee. Cycle 2
+// disburses the remaining 40 %. Corrections to an earlier cycle
+// flow through a later unpaid cycle by adjusting its amounts.
 
 export async function POST(
   request: Request,
@@ -183,30 +216,6 @@ export async function POST(
       });
     }
 
-    // ── Determine which employees are already in active cycles ───────
-    const { data: activeCycleRows } = await supabase
-      .from("payroll_cycles")
-      .select("id")
-      .eq("org_id", profile.org_id)
-      .eq("payroll_run_id", runId)
-      .is("deleted_at", null)
-      .neq("status", "cancelled");
-
-    const activeCycleIds = (activeCycleRows ?? []).map((c: { id: string }) => c.id);
-
-    let assignedEmployeeIds = new Set<string>();
-    if (activeCycleIds.length > 0) {
-      const { data: existingCycleItems } = await supabase
-        .from("payroll_cycle_items")
-        .select("employee_id")
-        .in("payroll_cycle_id", activeCycleIds)
-        .is("deleted_at", null);
-
-      assignedEmployeeIds = new Set(
-        (existingCycleItems ?? []).map((e: { employee_id: string }) => e.employee_id)
-      );
-    }
-
     // Load all payroll items for this run
     const { data: rawItems, error: itemsError } = await supabase
       .from("payroll_items")
@@ -226,51 +235,56 @@ export async function POST(
       });
     }
 
-    // All employee IDs in this run
-    const allRunEmployeeIds = [...new Set(rawItems.map((item: { employee_id: string }) => item.employee_id))];
+    const items = rawItems as PayrollItem[];
 
-    // Eligible = not yet assigned to an active cycle
-    const eligibleEmployeeIds = allRunEmployeeIds.filter((id) => !assignedEmployeeIds.has(id));
+    // ── Compute already-disbursed amounts per payroll item ───────────
+    // Count amounts from ALL active (non-cancelled) cycle items,
+    // regardless of cycle status (draft/ready/processing/paid).
+    // This prevents double-booking the same portion of net.
+    const { data: activeCycleRows } = await supabase
+      .from("payroll_cycles")
+      .select("id")
+      .eq("org_id", profile.org_id)
+      .eq("payroll_run_id", runId)
+      .is("deleted_at", null)
+      .neq("status", "cancelled");
 
-    // ── Determine selected employees for this cycle ──────────────────
-    let selectedEmployeeIds: string[];
+    const activeCycleIds = (activeCycleRows ?? []).map((c: { id: string }) => c.id);
 
-    if (parsedBody.data.employeeIds && parsedBody.data.employeeIds.length > 0) {
-      // Caller specified explicit employees — validate each is eligible
-      const eligibleSet = new Set(eligibleEmployeeIds);
-      const invalidIds = parsedBody.data.employeeIds.filter((id) => !eligibleSet.has(id));
+    const disbursedByItem = new Map<string, number>();
+    if (activeCycleIds.length > 0) {
+      const { data: existingCycleItems } = await supabase
+        .from("payroll_cycle_items")
+        .select("payroll_item_id, disbursement_amount")
+        .in("payroll_cycle_id", activeCycleIds)
+        .is("deleted_at", null);
 
-      if (invalidIds.length > 0) {
-        // Distinguish between "not in this run" and "already assigned"
-        const notInRun = invalidIds.filter((id) => !allRunEmployeeIds.includes(id));
-        const alreadyAssigned = invalidIds.filter((id) => assignedEmployeeIds.has(id));
-
-        const parts: string[] = [];
-        if (notInRun.length > 0) parts.push(`${notInRun.length} not in this run`);
-        if (alreadyAssigned.length > 0) parts.push(`${alreadyAssigned.length} already in an active cycle`);
-
-        return jsonResponse<null>(422, {
-          data: null,
-          error: {
-            code: "VALIDATION_ERROR",
-            message: `Invalid employee selection: ${parts.join(", ")}.`,
-            details: { notInRun, alreadyAssigned }
-          },
-          meta: buildMeta()
-        });
+      for (const ci of existingCycleItems ?? []) {
+        const prev = disbursedByItem.get(ci.payroll_item_id) ?? 0;
+        disbursedByItem.set(ci.payroll_item_id, prev + toInt(ci.disbursement_amount));
       }
-
-      selectedEmployeeIds = parsedBody.data.employeeIds;
-    } else {
-      // Default: all remaining eligible employees
-      selectedEmployeeIds = eligibleEmployeeIds;
     }
 
-    // Policy check (uses hasEligibleEmployees instead of existingCycleCount)
+    // Build a map: employeeId → payroll item + remaining amount
+    const itemByEmployee = new Map<string, PayrollItem>();
+    const remainingByItem = new Map<string, number>();
+
+    for (const item of items) {
+      itemByEmployee.set(item.employee_id, item);
+      const net = toInt(item.net_amount);
+      const disbursed = disbursedByItem.get(item.id) ?? 0;
+      remainingByItem.set(item.id, Math.max(0, net - disbursed));
+    }
+
+    // Items with remaining undisbursed net > 0
+    const itemsWithRemaining = items.filter((i) => (remainingByItem.get(i.id) ?? 0) > 0);
+    const hasEligibleEmployees = itemsWithRemaining.length > 0;
+
+    // Policy check
     const decision = evaluatePreparePayoutAction({
       runStatus: parsedRun.data.status,
       actorRoles: profile.roles,
-      hasEligibleEmployees: selectedEmployeeIds.length > 0
+      hasEligibleEmployees
     });
 
     if (!decision.allowed) {
@@ -282,19 +296,78 @@ export async function POST(
       });
     }
 
-    // Flagged items hard-block — resolve flags before payout prep
-    // Only check items for the selected employees (not the entire run)
-    const selectedEmployeeSet = new Set(selectedEmployeeIds);
-    const selectedItems = rawItems.filter(
-      (item: { employee_id: string }) => selectedEmployeeSet.has(item.employee_id)
-    );
+    // ── Determine per-employee disbursements for this cycle ──────────
+    type CycleDisbursement = {
+      payrollItemId: string;
+      employeeId: string;
+      amount: number;
+    };
 
-    const selectedItemIds = selectedItems.map((item: { id: string }) => item.id);
+    let cycleDisbursements: CycleDisbursement[];
+
+    if (parsedBody.data.disbursements && parsedBody.data.disbursements.length > 0) {
+      // Explicit per-employee amounts
+      cycleDisbursements = [];
+
+      for (const d of parsedBody.data.disbursements) {
+        const payrollItem = itemByEmployee.get(d.employeeId);
+        if (!payrollItem) {
+          return jsonResponse<null>(422, {
+            data: null,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: `Employee ${d.employeeId} is not in this payroll run.`
+            },
+            meta: buildMeta()
+          });
+        }
+
+        const remaining = remainingByItem.get(payrollItem.id) ?? 0;
+        if (d.amount > remaining) {
+          return jsonResponse<null>(422, {
+            data: null,
+            error: {
+              code: "AMOUNT_EXCEEDS_REMAINING",
+              message: `Disbursement amount (${d.amount}) exceeds remaining undisbursed (${remaining}) for employee ${d.employeeId}.`,
+              details: { employeeId: d.employeeId, requested: d.amount, remaining }
+            },
+            meta: buildMeta()
+          });
+        }
+
+        cycleDisbursements.push({
+          payrollItemId: payrollItem.id,
+          employeeId: d.employeeId,
+          amount: d.amount
+        });
+      }
+    } else {
+      // Default: every employee at their full remaining amount
+      cycleDisbursements = itemsWithRemaining.map((item) => ({
+        payrollItemId: item.id,
+        employeeId: item.employee_id,
+        amount: remainingByItem.get(item.id) ?? 0
+      }));
+    }
+
+    if (cycleDisbursements.length === 0) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "INVALID_STATE",
+          message: "No disbursements to include. All employees are fully disbursed."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    // Flagged items hard-block — only check items included in this cycle
+    const cyclePayrollItemIds = cycleDisbursements.map((d) => d.payrollItemId);
     const { count: flaggedCount } = await supabase
       .from("payroll_items")
       .select("id", { count: "exact", head: true })
       .eq("org_id", profile.org_id)
-      .in("id", selectedItemIds)
+      .in("id", cyclePayrollItemIds)
       .eq("flagged", true)
       .is("deleted_at", null);
 
@@ -309,7 +382,8 @@ export async function POST(
       });
     }
 
-    // ── Payment detail validation (scoped to selected employees) ─────
+    // ── Payment detail validation (scoped to this cycle's employees) ─
+    const cycleEmployeeIds = [...new Set(cycleDisbursements.map((d) => d.employeeId))];
     const nowDate = new Date();
     const { data: paymentDetails } = await supabase
       .from("employee_payment_details")
@@ -317,11 +391,10 @@ export async function POST(
         "employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, crew_tag, is_primary, is_verified, change_effective_at"
       )
       .eq("org_id", profile.org_id)
-      .in("employee_id", selectedEmployeeIds)
+      .in("employee_id", cycleEmployeeIds)
       .eq("is_primary", true)
       .is("deleted_at", null);
 
-    // Build a map of employee → validated payment snapshot (non-encrypted fields only)
     const paymentDetailsByEmployee = new Map<string, Record<string, unknown>>();
     const employeesWithHeldPayment: string[] = [];
     const employeesWithUnverifiedPayment: string[] = [];
@@ -350,7 +423,6 @@ export async function POST(
         continue;
       }
 
-      // Snapshot uses only non-encrypted, safe fields
       paymentDetailsByEmployee.set(detail.employee_id, {
         paymentMethod: detail.payment_method,
         currency: detail.currency,
@@ -361,7 +433,7 @@ export async function POST(
       });
     }
 
-    // Hard-block: employees with unverified payment details
+    // Hard-block: unverified
     if (employeesWithUnverifiedPayment.length > 0) {
       return jsonResponse<null>(409, {
         data: null,
@@ -373,7 +445,7 @@ export async function POST(
       });
     }
 
-    // Held employees: overridable with holdOverrides
+    // Held: overridable per-employee
     if (employeesWithHeldPayment.length > 0) {
       if (holdOverrides.length === 0) {
         return jsonResponse<null>(409, {
@@ -387,7 +459,6 @@ export async function POST(
         });
       }
 
-      // Role check: must be FINANCE_APPROVER or SUPER_ADMIN
       const canOverride =
         hasRole(profile.roles, "FINANCE_APPROVER") ||
         hasRole(profile.roles, "SUPER_ADMIN");
@@ -400,7 +471,6 @@ export async function POST(
         });
       }
 
-      // Coverage check: every held employee must be covered
       const overrideEmployeeIds = new Set(holdOverrides.map((o) => o.employeeId));
       const uncoveredHeld = employeesWithHeldPayment.filter((id) => !overrideEmployeeIds.has(id));
       if (uncoveredHeld.length > 0) {
@@ -411,7 +481,6 @@ export async function POST(
         });
       }
 
-      // Audit each override and include held employees in the cycle
       for (const override of holdOverrides) {
         await logAudit({
           action: "created",
@@ -427,8 +496,8 @@ export async function POST(
       }
     }
 
-    // Hard-block: employees missing payment details entirely
-    const employeesWithoutPayment = selectedEmployeeIds.filter((id) => !paymentDetailsByEmployee.has(id));
+    // Hard-block: missing
+    const employeesWithoutPayment = cycleEmployeeIds.filter((id) => !paymentDetailsByEmployee.has(id));
     if (employeesWithoutPayment.length > 0) {
       return jsonResponse<null>(409, {
         data: null,
@@ -447,42 +516,45 @@ export async function POST(
       parsedRun.data.pay_period_end
     );
 
-    // Sequence number: count of existing active cycles + 1
     const cycleSequence = activeCycleIds.length + 1;
-
-    // Auto-label or caller-provided label
     const cycleLabel = parsedBody.data.label ?? `Cycle ${cycleSequence} - ${payPeriodLabel}`;
 
-    // Determine primary currency among selected items
+    // Currency: most common among this cycle's employees
     const currencyCounts = new Map<string, number>();
-    for (const item of selectedItems) {
-      const cur = (item as { pay_currency: string }).pay_currency;
-      currencyCounts.set(cur, (currencyCounts.get(cur) ?? 0) + 1);
+    for (const d of cycleDisbursements) {
+      const item = itemByEmployee.get(d.employeeId);
+      if (item) {
+        const cur = item.pay_currency;
+        currencyCounts.set(cur, (currencyCounts.get(cur) ?? 0) + 1);
+      }
     }
     let primaryCurrency = "USD";
-    let maxCount = 0;
+    let maxCurrencyCount = 0;
     for (const [cur, count] of currencyCounts) {
-      if (count > maxCount) {
-        maxCount = count;
+      if (count > maxCurrencyCount) {
+        maxCurrencyCount = count;
         primaryCurrency = cur;
       }
     }
 
+    // Cycle totals: total_net is the actual disbursement total for this
+    // cycle. total_gross and total_deductions are reference totals from
+    // the underlying payroll items (full item values, not prorated).
     let totalGross = 0;
-    let totalNet = 0;
     let totalDeductions = 0;
+    const totalNet = cycleDisbursements.reduce((sum, d) => sum + d.amount, 0);
 
-    for (const item of selectedItems) {
-      const castItem = item as { gross_amount: number | string; net_amount: number | string };
-      const gross = typeof castItem.gross_amount === "number"
-        ? castItem.gross_amount
-        : Number.parseInt(String(castItem.gross_amount), 10) || 0;
-      const net = typeof castItem.net_amount === "number"
-        ? castItem.net_amount
-        : Number.parseInt(String(castItem.net_amount), 10) || 0;
-      totalGross += gross;
-      totalNet += net;
-      totalDeductions += gross - net;
+    const seenItemIds = new Set<string>();
+    for (const d of cycleDisbursements) {
+      if (seenItemIds.has(d.payrollItemId)) continue;
+      seenItemIds.add(d.payrollItemId);
+      const item = itemByEmployee.get(d.employeeId);
+      if (item) {
+        const gross = toInt(item.gross_amount);
+        const net = toInt(item.net_amount);
+        totalGross += gross;
+        totalDeductions += gross - net;
+      }
     }
 
     const { data: cycleRow, error: cycleError } = await supabase
@@ -499,7 +571,7 @@ export async function POST(
         total_gross: totalGross,
         total_net: totalNet,
         total_deductions: totalDeductions,
-        employee_count: selectedItems.length
+        employee_count: cycleDisbursements.length
       })
       .select(PAYROLL_CYCLE_SELECT_COLUMNS)
       .single();
@@ -512,23 +584,16 @@ export async function POST(
       });
     }
 
-    // Insert cycle items with validated payment snapshots
-    const cycleItemInserts = selectedItems.map((item) => {
-      const castItem = item as { id: string; employee_id: string; net_amount: number | string };
-      const netAmount = typeof castItem.net_amount === "number"
-        ? castItem.net_amount
-        : Number.parseInt(String(castItem.net_amount), 10) || 0;
-
-      return {
-        payroll_cycle_id: cycleRow.id,
-        payroll_item_id: castItem.id,
-        employee_id: castItem.employee_id,
-        org_id: profile.org_id,
-        payment_destination_snapshot: paymentDetailsByEmployee.get(castItem.employee_id) ?? {},
-        disbursement_status: "pending",
-        disbursement_amount: netAmount
-      };
-    });
+    // Insert cycle items with per-cycle disbursement amounts
+    const cycleItemInserts = cycleDisbursements.map((d) => ({
+      payroll_cycle_id: cycleRow.id,
+      payroll_item_id: d.payrollItemId,
+      employee_id: d.employeeId,
+      org_id: profile.org_id,
+      payment_destination_snapshot: paymentDetailsByEmployee.get(d.employeeId) ?? {},
+      disbursement_status: "pending",
+      disbursement_amount: d.amount
+    }));
 
     const { error: cycleItemsError } = await supabase
       .from("payroll_cycle_items")
@@ -548,10 +613,6 @@ export async function POST(
       createdCycles.push(toPayrollCycleSummary(parsedCycle.data));
     }
 
-    // Run stays in its current state (approved or processing).
-    // Run → processing when a cycle action moves a cycle to processing.
-    // Run → completed when all employees are covered and all cycles paid.
-
     await logAudit({
       action: "updated",
       tableName: "payroll_runs",
@@ -561,9 +622,8 @@ export async function POST(
         action: "prepare_payout",
         cycleSequence,
         cycleId: cycleRow.id,
-        employeeCount: selectedItems.length,
-        totalEmployeesInRun: allRunEmployeeIds.length,
-        remainingAfter: eligibleEmployeeIds.length - selectedEmployeeIds.length
+        employeeCount: cycleDisbursements.length,
+        disbursementTotal: totalNet
       }
     });
 
