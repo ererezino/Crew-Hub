@@ -66,18 +66,29 @@ export async function POST(
       .is("deleted_at", null)
       .neq("status", "cancelled");
 
-    // Check for paid cycles — amendment requires actual paid history
-    const { count: paidCycleCount } = await supabase
+    // Check that ALL non-cancelled cycles are paid
+    const { count: unpaidCycleCount } = await supabase
       .from("payroll_cycles")
       .select("id", { count: "exact", head: true })
       .eq("org_id", profile.org_id)
       .eq("payroll_run_id", runId)
       .is("deleted_at", null)
-      .eq("status", "paid");
+      .neq("status", "cancelled")
+      .neq("status", "paid");
+
+    const { count: totalCycleCount } = await supabase
+      .from("payroll_cycles")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", profile.org_id)
+      .eq("payroll_run_id", runId)
+      .is("deleted_at", null)
+      .neq("status", "cancelled");
+
+    const allCyclesPaid = (totalCycleCount ?? 0) > 0 && (unpaidCycleCount ?? 0) === 0;
 
     // Policy check
     const decision = evaluateCreateAmendmentAction({
-      hasPaidCycles: (paidCycleCount ?? 0) > 0,
+      allCyclesPaid,
       hasActiveAmendment: (activeAmendmentCount ?? 0) > 0,
       actorRoles: profile.roles
     });

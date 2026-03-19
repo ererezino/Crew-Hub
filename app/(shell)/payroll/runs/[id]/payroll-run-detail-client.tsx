@@ -372,9 +372,9 @@ export function PayrollRunDetailClient({
   const canEditItems = canManage && (run?.status === "draft" || isCalculated || isRejected);
   const cycles: PayrollCycle[] = runQuery.data?.cycles ?? [];
   const activeCycles = cycles.filter((c) => c.status !== "cancelled");
-  const hasPaidCycles = activeCycles.some((c) => c.status === "paid");
   const canPreparePayout = canManage && isApproved && activeCycles.length === 0;
-  const canCreateAmendment = canApprove && !!run?.lockedAt && hasPaidCycles;
+  const allCyclesPaid = activeCycles.length > 0 && activeCycles.every((c) => c.status === "paid");
+  const canCreateAmendment = canApprove && isCompleted && allCyclesPaid;
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -802,39 +802,62 @@ export function PayrollRunDetailClient({
   };
 
   const preparePayout = async () => {
-    const flaggedCount = runQuery.data?.flaggedCount ?? 0;
-    let overrideHolds = false;
-
-    if (flaggedCount > 0) {
-      const confirmed = await confirm({
-        title: td("confirmPreparePayout_flagged.title"),
-        description: td("confirmPreparePayout_flagged.description", { count: flaggedCount }),
-        confirmLabel: td("confirmPreparePayout_flagged.confirmLabel"),
-        tone: "danger"
-      });
-      if (!confirmed) return;
-      overrideHolds = true;
-    } else {
-      const confirmed = await confirm({
-        title: td("confirmPreparePayout.title"),
-        description: td("confirmPreparePayout.description"),
-        confirmLabel: td("confirmPreparePayout.confirmLabel"),
-        tone: "default"
-      });
-      if (!confirmed) return;
-    }
+    const confirmed = await confirm({
+      title: td("confirmPreparePayout.title"),
+      description: td("confirmPreparePayout.description"),
+      confirmLabel: td("confirmPreparePayout.confirmLabel"),
+      tone: "default"
+    });
+    if (!confirmed) return;
 
     setIsPreparingPayout(true);
     try {
       const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ overrideHolds })
+        body: JSON.stringify({})
       });
 
       const payload = (await response.json()) as PreparePayoutResponse;
 
       if (!response.ok || !payload.data) {
+        // Handle held payment details — prompt for override
+        if (payload.error?.code === "PAYMENT_DETAILS_HELD" && payload.error.details?.heldEmployeeIds) {
+          const heldIds = payload.error.details.heldEmployeeIds as string[];
+          const overrideConfirmed = await confirm({
+            title: td("confirmHoldOverride.title"),
+            description: td("confirmHoldOverride.description", { count: heldIds.length }),
+            confirmLabel: td("confirmHoldOverride.confirmLabel"),
+            tone: "danger"
+          });
+
+          if (!overrideConfirmed) return;
+
+          // Prompt for reason
+          const reason = window.prompt(td("confirmHoldOverride.reasonPrompt"));
+          if (!reason?.trim()) return;
+
+          // Re-send with hold overrides
+          const overrideResponse = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              holdOverrides: heldIds.map((id) => ({ employeeId: id, reason: reason.trim() }))
+            })
+          });
+
+          const overridePayload = (await overrideResponse.json()) as PreparePayoutResponse;
+
+          if (!overrideResponse.ok || !overridePayload.data) {
+            showToast("error", overridePayload.error?.message ?? td("toast.payoutPrepFailed"));
+            return;
+          }
+
+          showToast("success", td("toast.payoutPrepared"));
+          runQuery.refresh();
+          return;
+        }
+
         showToast("error", payload.error?.message ?? td("toast.payoutPrepFailed"));
         return;
       }

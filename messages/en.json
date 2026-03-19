@@ -3462,6 +3462,12 @@
       "description": "{count, plural, one {# item is flagged} other {# items are flagged}}. Override the hold to continue with payout preparation?",
       "confirmLabel": "Override and prepare"
     },
+    "confirmHoldOverride": {
+      "title": "Payment detail hold detected",
+      "description": "{count, plural, one {# employee has} other {# employees have}} recently changed payment details. Override the hold period to proceed?",
+      "confirmLabel": "Override and prepare",
+      "reasonPrompt": "Enter a reason for overriding the payment detail hold:"
+    },
     "confirmMarkReady": {
       "title": "Mark cycle as ready?",
       "description": "This confirms the cycle has been reviewed and is ready for disbursement.",

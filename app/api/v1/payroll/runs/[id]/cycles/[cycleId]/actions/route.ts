@@ -269,7 +269,8 @@ export async function POST(
         .update({
           status: "completed",
           completed_at: nowIso,
-          completed_by: profile.id
+          completed_by: profile.id,
+          locked_at: nowIso
         })
         .eq("id", runId)
         .eq("org_id", profile.org_id);

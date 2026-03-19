@@ -8,8 +8,6 @@ export type PayrollCycleStatus = "draft" | "ready" | "processing" | "paid" | "fa
 
 export type PreparePayoutInput = {
   runStatus: string;
-  flaggedCount: number;
-  overrideHolds: boolean;
   actorRoles: readonly UserRole[];
   existingCycleCount: number;
 };
@@ -42,28 +40,6 @@ export function evaluatePreparePayoutAction(input: PreparePayoutInput): PayrollA
       code: "INVALID_STATE",
       message: "Payout cycles already exist for this run."
     };
-  }
-
-  if (input.flaggedCount > 0 && !input.overrideHolds) {
-    return {
-      allowed: false,
-      code: "INVALID_STATE",
-      message: `${input.flaggedCount} flagged item(s) must be resolved or overridden before payout.`
-    };
-  }
-
-  if (input.flaggedCount > 0 && input.overrideHolds) {
-    const canOverride =
-      hasRole(input.actorRoles, "FINANCE_APPROVER") ||
-      hasRole(input.actorRoles, "SUPER_ADMIN");
-
-    if (!canOverride) {
-      return {
-        allowed: false,
-        code: "FORBIDDEN",
-        message: "Only Finance Approver or Super Admin can override flagged-item holds."
-      };
-    }
   }
 
   return { allowed: true };
@@ -137,7 +113,7 @@ export function evaluateMarkCyclePaidAction(input: MarkCyclePaidInput): PayrollA
 // ── Create amendment ────────────────────────────────────────────────
 
 export type CreateAmendmentInput = {
-  hasPaidCycles: boolean;
+  allCyclesPaid: boolean;
   hasActiveAmendment: boolean;
   actorRoles: readonly UserRole[];
 };
@@ -155,11 +131,11 @@ export function evaluateCreateAmendmentAction(input: CreateAmendmentInput): Payr
     };
   }
 
-  if (!input.hasPaidCycles) {
+  if (!input.allCyclesPaid) {
     return {
       allowed: false,
       code: "INVALID_STATE",
-      message: "Only runs with paid cycles can be amended."
+      message: "Only fully completed runs (all cycles paid) can be amended."
     };
   }
 

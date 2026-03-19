@@ -3338,6 +3338,12 @@
       "description": "{count, plural, one {# poste est signalé} other {# postes sont signalés}}. Remplacer le blocage pour continuer la préparation du paiement ?",
       "confirmLabel": "Remplacer et préparer"
     },
+    "confirmHoldOverride": {
+      "title": "Blocage de détails de paiement détecté",
+      "description": "{count, plural, one {# employé a} other {# employés ont}} récemment modifié leurs détails de paiement. Remplacer la période de blocage pour continuer ?",
+      "confirmLabel": "Remplacer et préparer",
+      "reasonPrompt": "Saisissez une raison pour le remplacement du blocage :"
+    },
     "confirmMarkReady": {
       "title": "Marquer le cycle comme prêt ?",
       "description": "Ceci confirme que le cycle a été vérifié et est prêt pour le décaissement.",
