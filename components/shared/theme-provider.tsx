@@ -43,13 +43,8 @@ function getInitialTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
-  const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    setTheme(getInitialTheme());
-    setIsReady(true);
-  }, []);
+  const [theme, setTheme] = useState<Theme>(() => getInitialTheme());
+  const isReady = true;
 
   useEffect(() => {
     if (!isReady) {

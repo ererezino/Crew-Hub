@@ -448,7 +448,7 @@ export function PayrollWorksheet({
 
     const displayValue = isAmount && typeof value === "number"
       ? <CurrencyDisplay amount={value} currency={currency} locale={locale} />
-      : (value ?? <span className="text-muted">\u2014</span>);
+      : (value ?? <span className="text-muted">{String.fromCharCode(8212)}</span>);
 
     return (
       <span

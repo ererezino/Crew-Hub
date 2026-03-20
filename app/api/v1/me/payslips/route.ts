@@ -257,7 +257,7 @@ export async function GET(request: Request) {
     const payrollItemIds = parsedRows.data.map((row) => row.payroll_item_id);
 
     // ── Fetch cycle disbursement data for these payroll items ──
-    let disbursementMap = new Map<string, number>();
+    const disbursementMap = new Map<string, number>();
 
     if (payrollItemIds.length > 0) {
       // Only count disbursements from cycle items that are actually paid.

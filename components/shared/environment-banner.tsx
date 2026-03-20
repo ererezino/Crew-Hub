@@ -31,18 +31,13 @@ export function resolveEnvironmentBannerLabel({
 }
 
 export function EnvironmentBanner() {
-  const [label, setLabel] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Hostname is only reliable on the client. Starting empty avoids SSR/CSR label drift.
-    setLabel(
-      resolveEnvironmentBannerLabel({
-        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV,
-        hostname: window.location.hostname
-      })
-    );
-  }, []);
+  const [label] = useState<string | null>(() =>
+    resolveEnvironmentBannerLabel({
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV,
+      hostname: typeof window === "undefined" ? null : window.location.hostname
+    })
+  );
 
   useEffect(() => {
     if (!label) return;

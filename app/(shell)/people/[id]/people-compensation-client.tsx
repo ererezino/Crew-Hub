@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 
 import { CompensationOverview } from "../../../../components/shared/compensation-overview";
@@ -46,10 +45,10 @@ export function PeopleCompensationClient({
         : null
       : meQuery.data;
 
-  const employeePaymentRow = useMemo(() => {
+  const employeePaymentRow = (() => {
     if (mode !== "admin" || !paymentQuery.data?.rows) return null;
     return paymentQuery.data.rows.find((row) => row.employeeId === employeeId) ?? null;
-  }, [mode, paymentQuery.data?.rows, employeeId]);
+  })();
 
   return (
     <section aria-label={t('ariaLabel')}>

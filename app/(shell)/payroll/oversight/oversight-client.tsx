@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
@@ -99,13 +100,17 @@ function safeCycleTone(status: string): StatusTone {
 }
 
 function CycleCard({ cycle }: { cycle: OversightCycleSummary }) {
+  const t = useTranslations("dashboard.financeOversight");
+
   return (
     <Link
       href={`/payroll/runs/${cycle.runId}`}
       className="oversight-cycle-card"
     >
       <div className="oversight-cycle-card-header">
-        <span className="oversight-cycle-label">{cycle.label ?? `Cycle ${cycle.cycleNumber ?? "?"}`}</span>
+        <span className="oversight-cycle-label">
+          {cycle.label ?? t("cycleLabelFallback", { cycle: cycle.cycleNumber ?? "?" })}
+        </span>
         <StatusBadge tone={safeCycleTone(cycle.status)}>
           {labelForPayrollCycleStatus(cycle.status)}
         </StatusBadge>
@@ -115,16 +120,22 @@ function CycleCard({ cycle }: { cycle: OversightCycleSummary }) {
           <CurrencyDisplay amount={cycle.totalNet} currency={cycle.currency} />
         </div>
         <div className="oversight-cycle-meta">
-          <span>{cycle.employeeCount} employee{cycle.employeeCount !== 1 ? "s" : ""}</span>
+          <span>{t("cycleEmployees", { count: cycle.employeeCount })}</span>
           {cycle.targetPayDate && (
-            <span className="oversight-cycle-pay-date">Pay: {cycle.targetPayDate}</span>
+            <span className="oversight-cycle-pay-date">
+              {t("cyclePayDate", { date: cycle.targetPayDate })}
+            </span>
           )}
         </div>
         {cycle.submittedByName && (
-          <div className="oversight-cycle-actor">Submitted by {cycle.submittedByName}</div>
+          <div className="oversight-cycle-actor">
+            {t("cycleSubmittedBy", { name: cycle.submittedByName })}
+          </div>
         )}
         {cycle.approvedByName && (
-          <div className="oversight-cycle-actor">Approved by {cycle.approvedByName}</div>
+          <div className="oversight-cycle-actor">
+            {t("cycleApprovedBy", { name: cycle.approvedByName })}
+          </div>
         )}
       </div>
     </Link>
@@ -132,10 +143,12 @@ function CycleCard({ cycle }: { cycle: OversightCycleSummary }) {
 }
 
 function HistoricalStepBadge({ step }: { step: "review" | "authorize" | "publish" }) {
+  const t = useTranslations("dashboard.financeOversight");
+
   const labels: Record<string, string> = {
-    review: "Needs review",
-    authorize: "Needs authorization",
-    publish: "Ready to publish"
+    review: t("historicalNeedsReview"),
+    authorize: t("historicalNeedsAuthorization"),
+    publish: t("historicalReadyToPublish")
   };
   const tones: Record<string, StatusTone> = {
     review: "warning",
@@ -147,14 +160,15 @@ function HistoricalStepBadge({ step }: { step: "review" | "authorize" | "publish
 }
 
 export function OversightClient() {
+  const t = useTranslations("dashboard.financeOversight");
   const { data, error, loading } = useOversightData();
 
   if (loading) {
     return (
       <>
         <PageHeader
-          title="Finance oversight"
-          description="Cycles awaiting approval, payout blockers, and audit status"
+          title={t("pageTitle")}
+          description={t("pageDescription")}
         />
         <OversightSkeleton />
       </>
@@ -165,10 +179,10 @@ export function OversightClient() {
     return (
       <>
         <PageHeader
-          title="Finance oversight"
-          description="Cycles awaiting approval, payout blockers, and audit status"
+          title={t("pageTitle")}
+          description={t("pageDescription")}
         />
-        <ErrorState message={error ?? "Unable to load oversight data."} />
+        <ErrorState message={error ?? t("loadFailed")} />
       </>
     );
   }
@@ -183,24 +197,21 @@ export function OversightClient() {
   return (
     <>
       <PageHeader
-        title="Finance oversight"
-        description="Cycles awaiting approval, payout blockers, and audit status"
+        title={t("pageTitle")}
+        description={t("pageDescription")}
       />
 
       {!hasAnything && (
         <EmptyState
-          title="All clear"
-          description="No cycles need attention right now."
+          title={t("allClearTitle")}
+          description={t("allClearDescription")}
         />
       )}
 
-      {/* Cycles awaiting approval — the primary action surface */}
       {data.cyclesAwaitingApproval.length > 0 && (
         <section className="oversight-section">
-          <h2 className="oversight-section-title">Awaiting approval</h2>
-          <p className="oversight-section-description">
-            These cycles have been submitted and need FINANCE_APPROVER or SUPER_ADMIN review.
-          </p>
+          <h2 className="oversight-section-title">{t("awaitingApprovalSectionTitle")}</h2>
+          <p className="oversight-section-description">{t("awaitingApprovalSectionDescription")}</p>
           <div className="oversight-cycle-grid">
             {data.cyclesAwaitingApproval.map((cycle) => (
               <CycleCard key={cycle.id} cycle={cycle} />
@@ -209,13 +220,10 @@ export function OversightClient() {
         </section>
       )}
 
-      {/* Active cycles — approved/ready/processing */}
       {data.activeCycles.length > 0 && (
         <section className="oversight-section">
-          <h2 className="oversight-section-title">Active cycles</h2>
-          <p className="oversight-section-description">
-            Approved or in-progress cycles awaiting payment completion.
-          </p>
+          <h2 className="oversight-section-title">{t("activeCyclesSectionTitle")}</h2>
+          <p className="oversight-section-description">{t("activeCyclesSectionDescription")}</p>
           <div className="oversight-cycle-grid">
             {data.activeCycles.map((cycle) => (
               <CycleCard key={cycle.id} cycle={cycle} />
@@ -224,13 +232,10 @@ export function OversightClient() {
         </section>
       )}
 
-      {/* Payout blockers */}
       {data.payoutBlockers.length > 0 && (
         <section className="oversight-section">
-          <h2 className="oversight-section-title">Payout blockers</h2>
-          <p className="oversight-section-description">
-            Runs with flagged items that need resolution before payment.
-          </p>
+          <h2 className="oversight-section-title">{t("payoutBlockersSectionTitle")}</h2>
+          <p className="oversight-section-description">{t("payoutBlockersSectionDescription")}</p>
           <div className="oversight-blocker-list">
             {data.payoutBlockers.map((blocker) => (
               <Link
@@ -238,21 +243,20 @@ export function OversightClient() {
                 href={`/payroll/runs/${blocker.runId}`}
                 className="oversight-blocker-card"
               >
-                <StatusBadge tone="error">{blocker.flaggedCount} flagged</StatusBadge>
-                <span className="oversight-blocker-label">View run</span>
+                <StatusBadge tone="error">
+                  {t("flaggedCount", { count: blocker.flaggedCount })}
+                </StatusBadge>
+                <span className="oversight-blocker-label">{t("viewRun")}</span>
               </Link>
             ))}
           </div>
         </section>
       )}
 
-      {/* Historical runs needing action */}
       {data.historicalAwaitingAction.length > 0 && (
         <section className="oversight-section">
-          <h2 className="oversight-section-title">Historical runs</h2>
-          <p className="oversight-section-description">
-            Imported historical runs that need review, authorization, or publication.
-          </p>
+          <h2 className="oversight-section-title">{t("historicalRunsSectionTitle")}</h2>
+          <p className="oversight-section-description">{t("historicalRunsSectionDescription")}</p>
           <div className="oversight-historical-list">
             {data.historicalAwaitingAction.map((run) => (
               <Link
@@ -260,7 +264,7 @@ export function OversightClient() {
                 href={`/payroll/runs/${run.id}`}
                 className="oversight-historical-card"
               >
-                <span className="oversight-historical-period">{run.payPeriod || "Unknown period"}</span>
+                <span className="oversight-historical-period">{run.payPeriod || t("unknownPeriod")}</span>
                 <HistoricalStepBadge step={run.nextStep} />
               </Link>
             ))}
@@ -268,13 +272,10 @@ export function OversightClient() {
         </section>
       )}
 
-      {/* Recently paid — audit trail */}
       {data.recentlyPaidCycles.length > 0 && (
         <section className="oversight-section">
-          <h2 className="oversight-section-title">Recently completed</h2>
-          <p className="oversight-section-description">
-            Last 10 paid cycles for audit reference.
-          </p>
+          <h2 className="oversight-section-title">{t("recentlyCompletedSectionTitle")}</h2>
+          <p className="oversight-section-description">{t("recentlyCompletedSectionDescription")}</p>
           <div className="oversight-cycle-grid">
             {data.recentlyPaidCycles.map((cycle) => (
               <CycleCard key={cycle.id} cycle={cycle} />
