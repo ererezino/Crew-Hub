@@ -310,12 +310,14 @@ export function AuditLogViewer() {
             className="form-input"
             type="date"
             value={draftFilters.dateFrom}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextValue = event.currentTarget.value;
+
               setDraftFilters((previous) => ({
                 ...previous,
-                dateFrom: event.currentTarget.value
-              }))
-            }
+                dateFrom: nextValue
+              }));
+            }}
           />
         </label>
 
@@ -325,12 +327,14 @@ export function AuditLogViewer() {
             className="form-input"
             type="date"
             value={draftFilters.dateTo}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextValue = event.currentTarget.value;
+
               setDraftFilters((previous) => ({
                 ...previous,
-                dateTo: event.currentTarget.value
-              }))
-            }
+                dateTo: nextValue
+              }));
+            }}
           />
         </label>
 
@@ -339,12 +343,14 @@ export function AuditLogViewer() {
           <select
             className="form-input"
             value={draftFilters.actorId}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextValue = event.currentTarget.value;
+
               setDraftFilters((previous) => ({
                 ...previous,
-                actorId: event.currentTarget.value
-              }))
-            }
+                actorId: nextValue
+              }));
+            }}
           >
             <option value="">{t('audit.allActors')}</option>
             {actorOptions.map((actor) => (
@@ -360,12 +366,14 @@ export function AuditLogViewer() {
           <select
             className="form-input"
             value={draftFilters.action}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextValue = event.currentTarget.value;
+
               setDraftFilters((previous) => ({
                 ...previous,
-                action: event.currentTarget.value
-              }))
-            }
+                action: nextValue
+              }));
+            }}
           >
             <option value="">{t('audit.allActions')}</option>
             {actionOptions.map((action) => (
@@ -381,12 +389,14 @@ export function AuditLogViewer() {
           <select
             className="form-input"
             value={draftFilters.tableName}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextValue = event.currentTarget.value;
+
               setDraftFilters((previous) => ({
                 ...previous,
-                tableName: event.currentTarget.value
-              }))
-            }
+                tableName: nextValue
+              }));
+            }}
           >
             <option value="">{t('audit.allTables')}</option>
             {tableOptions.map((tableName) => (
@@ -402,12 +412,14 @@ export function AuditLogViewer() {
           <select
             className="form-input"
             value={draftFilters.sort}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextValue = event.currentTarget.value as "asc" | "desc";
+
               setDraftFilters((previous) => ({
                 ...previous,
-                sort: event.currentTarget.value as "asc" | "desc"
-              }))
-            }
+                sort: nextValue
+              }));
+            }}
           >
             <option value="desc">{t('audit.newestFirst')}</option>
             <option value="asc">{t('audit.oldestFirst')}</option>
