@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 const DISMISS_KEY = "crewhub-browser-notification-prompt-dismissed";
@@ -29,6 +29,11 @@ function shouldShowPrompt(): boolean {
 export function BrowserNotificationPrompt() {
   const t = useTranslations("appShell.notificationPrompt");
   const [dismissed, setDismissed] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    setIsVisible(shouldShowPrompt());
+  }, []);
 
   const handleEnable = useCallback(async () => {
     try {
@@ -62,15 +67,17 @@ export function BrowserNotificationPrompt() {
 
     /* Dismiss regardless of outcome */
     window.localStorage.setItem(DISMISS_KEY, "true");
+    setIsVisible(false);
     setDismissed(true);
   }, []);
 
   const handleDismiss = useCallback(() => {
     window.localStorage.setItem(DISMISS_KEY, "true");
+    setIsVisible(false);
     setDismissed(true);
   }, []);
 
-  if (dismissed || !shouldShowPrompt()) return null;
+  if (dismissed || !isVisible) return null;
 
   return (
     <div className="browser-notification-prompt" role="status">
