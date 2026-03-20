@@ -6,9 +6,11 @@ import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import type {
+  ItemPaymentStatus,
   MePayslipsResponseData,
   PaymentStatementRecord,
-  PaymentStatementSummary
+  PaymentStatementSummary,
+  PayMonth
 } from "../../../../../types/payslips";
 
 const querySchema = z.object({
@@ -25,7 +27,9 @@ const payrollItemRowSchema = z.object({
   currency: z.string().length(3),
   deductions: z.unknown(),
   withholding_applied: z.boolean(),
-  payment_reference: z.string().nullable()
+  payment_reference: z.string().nullable(),
+  payment_status: z.string().nullable().optional(),
+  correction_of: z.string().uuid().nullable().optional()
 });
 
 const payslipRowSchema = z.object({
@@ -36,11 +40,18 @@ const payslipRowSchema = z.object({
   generated_at: z.string(),
   emailed_at: z.string().nullable(),
   viewed_at: z.string().nullable(),
+  statement_type: z.enum(["native", "historical"]).optional().default("native"),
   payroll_item: z.union([payrollItemRowSchema, z.array(payrollItemRowSchema)])
 });
 
 const deductionRowSchema = z.object({
   amount: z.union([z.number(), z.string()])
+});
+
+const cycleItemRowSchema = z.object({
+  payroll_item_id: z.string().uuid(),
+  disbursement_amount: z.union([z.number(), z.string()]).nullable(),
+  disbursement_status: z.string().nullable()
 });
 
 function buildMeta() {
@@ -101,11 +112,49 @@ function toPayrollItem(
   return row.payroll_item;
 }
 
+function normalizePaymentStatus(raw: string | null | undefined): ItemPaymentStatus {
+  const valid: ItemPaymentStatus[] = [
+    "pending", "processing", "partially_paid", "paid", "failed", "cancelled"
+  ];
+
+  if (raw && (valid as string[]).includes(raw)) {
+    return raw as ItemPaymentStatus;
+  }
+
+  return "pending";
+}
+
+/**
+ * Return the "worst" payment status across a set of statuses.
+ * Priority: pending > processing > partially_paid > paid (failed/cancelled treated as pending).
+ */
+function worstPaymentStatus(statuses: ItemPaymentStatus[]): ItemPaymentStatus {
+  const priority: Record<ItemPaymentStatus, number> = {
+    pending: 0,
+    failed: 1,
+    cancelled: 2,
+    processing: 3,
+    partially_paid: 4,
+    paid: 5
+  };
+
+  let worst: ItemPaymentStatus = "paid";
+
+  for (const status of statuses) {
+    if (priority[status] < priority[worst]) {
+      worst = status;
+    }
+  }
+
+  return worst;
+}
+
 function emptySummary(currency: string): PaymentStatementSummary {
   return {
     grossAmount: 0,
     deductionsAmount: 0,
     netAmount: 0,
+    amountDisbursed: 0,
     monthsPaid: 0,
     currency
   };
@@ -156,15 +205,17 @@ export async function GET(request: Request) {
           .eq("org_id", session.profile.org_id)
           .eq("employee_id", session.profile.id)
           .is("deleted_at", null)
+          .not("published_at", "is", null)
           .order("pay_period", { ascending: false }),
         serviceClient
           .from("payslips")
           .select(
-            "id, payroll_item_id, pay_period, file_path, generated_at, emailed_at, viewed_at, payroll_item:payroll_items!inner(gross_amount, net_amount, currency, deductions, withholding_applied, payment_reference)"
+            "id, payroll_item_id, pay_period, file_path, generated_at, emailed_at, viewed_at, statement_type, payroll_item:payroll_items!inner(gross_amount, net_amount, currency, deductions, withholding_applied, payment_reference, payment_status, correction_of)"
           )
           .eq("org_id", session.profile.org_id)
           .eq("employee_id", session.profile.id)
           .is("deleted_at", null)
+          .not("published_at", "is", null)
           .gte("pay_period", `${selectedYear}-01`)
           .lte("pay_period", `${selectedYear}-12`)
           .order("pay_period", { ascending: false })
@@ -202,6 +253,37 @@ export async function GET(request: Request) {
       .filter((yearValue) => Number.isFinite(yearValue))
       .sort((leftYear, rightYear) => rightYear - leftYear);
 
+    // ── Collect payroll item IDs for cycle disbursement lookup ──
+    const payrollItemIds = parsedRows.data.map((row) => row.payroll_item_id);
+
+    // ── Fetch cycle disbursement data for these payroll items ──
+    let disbursementMap = new Map<string, number>();
+
+    if (payrollItemIds.length > 0) {
+      // Only count disbursements from cycle items that are actually paid.
+      // Draft/ready/processing cycle items must not inflate employee-visible amounts.
+      const { data: rawCycleItems } = await serviceClient
+        .from("payroll_cycle_items")
+        .select("payroll_item_id, disbursement_amount, disbursement_status")
+        .in("payroll_item_id", payrollItemIds)
+        .eq("disbursement_status", "paid")
+        .is("deleted_at", null);
+
+      const parsedCycleItems = z.array(cycleItemRowSchema).safeParse(rawCycleItems ?? []);
+
+      if (parsedCycleItems.success) {
+        for (const item of parsedCycleItems.data) {
+          const amount = item.disbursement_amount ? parseAmount(item.disbursement_amount) : 0;
+
+          if (amount > 0) {
+            const current = disbursementMap.get(item.payroll_item_id) ?? 0;
+            disbursementMap.set(item.payroll_item_id, current + amount);
+          }
+        }
+      }
+    }
+
+    // ── Build statement records ──
     const statements: PaymentStatementRecord[] = [];
 
     for (const row of parsedRows.data) {
@@ -212,6 +294,9 @@ export async function GET(request: Request) {
       }
 
       const deductionsAmount = parseDeductionTotal(payrollItem.deductions);
+      const paymentStatus = normalizePaymentStatus(payrollItem.payment_status);
+      const amountDisbursed = disbursementMap.get(row.payroll_item_id) ?? 0;
+      const isAmendment = payrollItem.correction_of !== null && payrollItem.correction_of !== undefined;
 
       statements.push({
         id: row.id,
@@ -227,6 +312,10 @@ export async function GET(request: Request) {
         currency: payrollItem.currency.toUpperCase(),
         paymentReference: payrollItem.payment_reference,
         withholdingApplied: payrollItem.withholding_applied,
+        statementType: row.statement_type ?? "native",
+        paymentStatus,
+        amountDisbursed,
+        isAmendment,
         previousPayPeriod: null,
         previousNetAmount: null,
         netVarianceAmount: null,
@@ -234,11 +323,15 @@ export async function GET(request: Request) {
       });
     }
 
+    // ── Compute summary ──
+    // YTD totals use confirmed disbursed amounts, not full entitlements.
+    // This ensures partial months don't overstate what the employee received.
     const summary = statements.reduce<PaymentStatementSummary>(
       (currentSummary, statement) => ({
         grossAmount: currentSummary.grossAmount + statement.grossAmount,
         deductionsAmount: currentSummary.deductionsAmount + statement.deductionsAmount,
         netAmount: currentSummary.netAmount + statement.netAmount,
+        amountDisbursed: currentSummary.amountDisbursed + statement.amountDisbursed,
         monthsPaid: currentSummary.monthsPaid,
         currency: statement.currency
       }),
@@ -247,6 +340,7 @@ export async function GET(request: Request) {
 
     summary.monthsPaid = new Set(statements.map((statement) => statement.payPeriod)).size;
 
+    // ── Add variance to flat statement list ──
     const statementsWithVariance = statements.map((statement, statementIndex) => {
       const previousStatement = statements[statementIndex + 1] ?? null;
       const previousNetAmount = previousStatement?.netAmount ?? null;
@@ -266,11 +360,51 @@ export async function GET(request: Request) {
       };
     });
 
+    // ── Group into months ──
+    const monthMap = new Map<string, PaymentStatementRecord[]>();
+
+    for (const statement of statementsWithVariance) {
+      const existing = monthMap.get(statement.payPeriod) ?? [];
+      existing.push(statement);
+      monthMap.set(statement.payPeriod, existing);
+    }
+
+    const months: PayMonth[] = [];
+
+    for (const [payPeriod, monthStatements] of monthMap) {
+      const totalGross = monthStatements.reduce((sum, s) => sum + s.grossAmount, 0);
+      const totalDeductions = monthStatements.reduce((sum, s) => sum + s.deductionsAmount, 0);
+      const totalNet = monthStatements.reduce((sum, s) => sum + s.netAmount, 0);
+      const amountDisbursed = monthStatements.reduce((sum, s) => sum + s.amountDisbursed, 0);
+      const amountRemaining = Math.max(0, totalNet - amountDisbursed);
+      const currency = monthStatements[0]?.currency ?? "USD";
+      const paymentStatus = worstPaymentStatus(
+        monthStatements.map((s) => s.paymentStatus)
+      );
+      const hasAmendment = monthStatements.some((s) => s.isAmendment);
+      const hasHistorical = monthStatements.some((s) => s.statementType === "historical");
+
+      months.push({
+        payPeriod,
+        totalGross,
+        totalDeductions,
+        totalNet,
+        currency,
+        paymentStatus,
+        amountDisbursed,
+        amountRemaining,
+        hasAmendment,
+        hasHistorical,
+        statements: monthStatements
+      });
+    }
+
     const responseData: MePayslipsResponseData = {
       year: selectedYear,
       availableYears:
         availableYears.length > 0 ? availableYears : [selectedYear],
       summary,
+      months,
       statements: statementsWithVariance
     };
 

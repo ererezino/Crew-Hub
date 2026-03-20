@@ -19,6 +19,7 @@ function resolveScope(roles: readonly UserRole[]): PeopleScope {
   if (
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN")
   ) {
     return "all";
@@ -75,7 +76,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   const canInvitePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const canEditPeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const canResetAuthenticator = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
-  const isAdmin = hasRole(roles, "HR_ADMIN") || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  const isAdmin = hasRole(roles, "HR_ADMIN") || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
   const isSuperAdmin = hasRole(roles, "SUPER_ADMIN");
   const scope = resolveScope(roles);
 

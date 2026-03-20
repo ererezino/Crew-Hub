@@ -1,6 +1,11 @@
 import Link from "next/link";
 
-export default function NotFoundPage() {
+import { getAuthenticatedSession } from "../lib/auth/session";
+
+export default async function NotFoundPage() {
+  const session = await getAuthenticatedSession();
+  const isAuthenticated = !!session?.profile;
+
   return (
     <main className="standalone-page auth-page">
       <section className="standalone-card auth-card" aria-label="Page not found">
@@ -11,12 +16,15 @@ export default function NotFoundPage() {
           </p>
         </header>
         <div className="settings-actions">
-          <Link href="/dashboard" className="button button-accent">
-            Go to dashboard
-          </Link>
-          <Link href="/login" className="button">
-            Sign in
-          </Link>
+          {isAuthenticated ? (
+            <Link href="/" className="button button-accent">
+              Back to app
+            </Link>
+          ) : (
+            <Link href="/login" className="button button-accent">
+              Sign in
+            </Link>
+          )}
         </div>
       </section>
     </main>

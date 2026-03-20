@@ -75,13 +75,21 @@ export function useMePaymentDetails(): UseFetchState<MePaymentDetailsResponseDat
   };
 }
 
-export function useHrPaymentDetails(): UseFetchState<HrPaymentDetailsResponseData> {
+export function useHrPaymentDetails(
+  options: { enabled?: boolean } = {}
+): UseFetchState<HrPaymentDetailsResponseData> {
+  const { enabled = true } = options;
   const [data, setData] = useState<HrPaymentDetailsResponseData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     const abortController = new AbortController();
 
     const load = async () => {
@@ -121,7 +129,7 @@ export function useHrPaymentDetails(): UseFetchState<HrPaymentDetailsResponseDat
     return () => {
       abortController.abort();
     };
-  }, [reloadToken]);
+  }, [enabled, reloadToken]);
 
   const refresh = useCallback(() => {
     setReloadToken((currentValue) => currentValue + 1);

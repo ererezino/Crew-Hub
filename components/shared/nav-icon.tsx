@@ -3,6 +3,7 @@
 import {
   LayoutDashboard,
   Megaphone,
+  CalendarDays,
   CalendarOff,
   Receipt,
   CalendarClock,
@@ -12,9 +13,12 @@ import {
   GraduationCap,
   Star,
   CheckCircle,
+  CheckCircle2,
   Users,
+  Users2,
   Calendar,
   Rocket,
+  Banknote,
   BarChart3,
   ShieldCheck,
   UserCog,
@@ -23,6 +27,7 @@ import {
   CreditCard,
   Lock,
   Settings,
+  PenLine,
   PenTool,
   BookOpen,
   Building,
@@ -73,12 +78,14 @@ import {
   RefreshCw,
   Gamepad2,
   Route,
+  FolderOpen,
   type LucideIcon,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard,
   Megaphone,
+  CalendarDays,
   CalendarOff,
   Receipt,
   CalendarClock,
@@ -88,9 +95,12 @@ const ICON_MAP: Record<string, LucideIcon> = {
   GraduationCap,
   Star,
   CheckCircle,
+  CheckCircle2,
   Users,
+  Users2,
   Calendar,
   Rocket,
+  Banknote,
   BarChart3,
   ShieldCheck,
   UserCog,
@@ -99,6 +109,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   CreditCard,
   Lock,
   Settings,
+  PenLine,
   PenTool,
   BookOpen,
   Building,
@@ -149,6 +160,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   RefreshCw,
   Gamepad2,
   Route,
+  FolderOpen,
 };
 
 type NavIconProps = {

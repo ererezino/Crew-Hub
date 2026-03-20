@@ -5560,9 +5560,127 @@ button.att-img-link {
   height: 7rem;
 }
 
-.payslip-card-grid {
+/* ── Month-grouped My Pay layout ──────── */
+
+.pay-month-list {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .pay-month-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pay-month-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  padding: var(--space-4);
   display: grid;
   gap: var(--space-3);
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
+}
+
+.pay-month-card:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.pay-month-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* ── Disbursement progress ──────── */
+
+.pay-month-disbursement {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.pay-month-progress-track {
+  height: 6px;
+  background: var(--border-subtle);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pay-month-progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  min-width: 0;
+}
+
+.pay-month-disbursement-copy {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* ── Multi-statement rows within a month ──────── */
+
+.pay-month-statements {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pay-month-statements-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.pay-month-statement-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+}
+
+.pay-month-statement-row-active {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+.pay-month-statement-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pay-month-statement-amount {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.pay-month-statement-actions {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+/* Legacy card grid (kept for backward compat) */
+.payslip-card-grid {
+  display: grid;
+  gap: var(--space-4);
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: var(--space-4);
 }
@@ -5570,20 +5688,21 @@ button.att-img-link {
 .payslip-card {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
-  background: var(--bg-canvas);
-  padding: var(--space-3);
+  background: var(--bg-surface);
+  padding: var(--space-4);
   display: grid;
   gap: var(--space-3);
-  transition: border-color var(--transition-hover), background-color var(--transition-hover);
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
 }
 
 .payslip-card:hover {
   border-color: var(--color-accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .payslip-card-active {
   border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent-subtle) 35%, var(--bg-canvas));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
 .payslip-card-header {
@@ -5593,10 +5712,23 @@ button.att-img-link {
   gap: var(--space-3);
 }
 
+.payslip-card-badges {
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
 .payslip-card-amount {
   font-size: var(--text-xl);
   line-height: 1.25;
   font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.pay-month-of-total {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text-muted);
 }
 
 .payslip-card-meta {
@@ -5608,29 +5740,38 @@ button.att-img-link {
 .payslip-card-meta div {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-default);
-  background: var(--bg-surface);
-  padding: var(--space-2) var(--space-2);
+  background: var(--bg-canvas);
+  padding: var(--space-2);
 }
 
 .payslip-card-meta dt {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
 }
 
 .payslip-card-meta dd {
   margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
 }
 
 .payslip-card-actions {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.payslip-card-actions .button {
+  flex: 1;
+  justify-content: center;
 }
 
 .payslip-variance-copy {
   margin: calc(var(--space-1) * -1) 0 0;
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .payslip-variance-value {
@@ -5638,6 +5779,91 @@ button.att-img-link {
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+/* ── Historical governance panel (finance) ──────── */
+
+.historical-governance {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  padding: var(--space-5);
+}
+
+.historical-governance-header {
+  margin-bottom: var(--space-4);
+}
+
+.historical-timeline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+
+.historical-timeline-arrow {
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+  flex-shrink: 0;
+}
+
+.historical-visibility-status {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-default);
+  margin: var(--space-3) 0;
+}
+
+.historical-visibility-visible {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border: 1px solid var(--status-success-border);
+}
+
+.historical-visibility-hidden {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+  border: 1px solid var(--status-warning-border);
+}
+
+.historical-provenance {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-default);
+}
+
+.historical-provenance-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.historical-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.historical-confirm-dialog {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 2px solid var(--status-warning-border);
+  border-radius: var(--radius-card);
+  background: var(--status-warning-bg);
+}
+
+.historical-confirm-dialog .form-field {
+  margin: var(--space-3) 0;
+}
+
+.historical-confirm-dialog .button-row {
+  margin-top: var(--space-3);
 }
 
 .payslip-viewer-card {
@@ -10395,6 +10621,117 @@ button.att-img-link {
   color: var(--text-muted);
 }
 
+/* ─── Radix Select ─── */
+
+.select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
+  text-align: left;
+  min-height: 38px;
+}
+
+.select-trigger:focus,
+.select-trigger[data-state="open"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent);
+}
+
+.select-trigger:disabled {
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.select-trigger[data-placeholder] {
+  color: var(--text-muted);
+}
+
+.select-chevron {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.select-content {
+  overflow: hidden;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  min-width: var(--radix-select-trigger-width);
+  max-height: var(--radix-select-content-available-height, 320px);
+}
+
+.select-content[data-state="open"] {
+  animation: select-fade-in 150ms ease-out;
+}
+
+.select-content[data-state="closed"] {
+  animation: select-fade-out 100ms ease-in;
+}
+
+@keyframes select-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes select-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-2px); }
+}
+
+.select-viewport {
+  padding: var(--space-1);
+}
+
+.select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: calc(var(--radius-default) - 2px);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  font-size: 0.875rem;
+}
+
+.select-item[data-highlighted] {
+  background: var(--bg-surface);
+}
+
+.select-item[data-disabled] {
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.select-item-indicator {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+
+.select-label {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
 /* Input with prefix addon (social links, URLs) */
 .input-with-addon {
   display: flex;
@@ -11666,6 +12003,8 @@ html.dark .chart-tooltip-frosted {
   margin: 0 auto;
   padding: 0 var(--space-5);
   padding-bottom: var(--space-12);
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ── Welcome Hero ── */
@@ -19213,4 +19552,678 @@ html.dark .crew-games-platform-game:hover {
   align-items: center;
   justify-content: center;
   color: var(--text-muted);
+}
+
+/* ══════════════════════════════════════════════════════
+   Finance Oversight Dashboard
+   ══════════════════════════════════════════════════════ */
+
+.oversight-section {
+  margin-bottom: var(--space-5);
+}
+
+.oversight-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+  letter-spacing: -0.01em;
+}
+
+.oversight-all-clear {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-radius: var(--radius-card);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.oversight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 768px) {
+  .oversight-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.oversight-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
+}
+
+.oversight-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.oversight-card-urgent {
+  border-left: 3px solid var(--color-accent);
+}
+
+.oversight-card-attention {
+  border-left: 3px solid var(--status-warning-text);
+}
+
+.oversight-card-warning {
+  border-left: 3px solid var(--status-pending-text);
+}
+
+.oversight-card-danger {
+  border-left: 3px solid var(--status-error-text);
+}
+
+.oversight-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oversight-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-default);
+  flex-shrink: 0;
+}
+
+.oversight-icon-urgent {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+}
+
+.oversight-icon-attention {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.oversight-icon-info {
+  background: var(--status-info-bg);
+  color: var(--status-info-text);
+}
+
+.oversight-icon-warning {
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+}
+
+.oversight-icon-danger {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+}
+
+.oversight-card-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+.oversight-card-count {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.oversight-card-description {
+  font-size: var(--text-sm);
+}
+
+.oversight-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.oversight-card-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
+  flex-wrap: wrap;
+}
+
+.oversight-item-period {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.oversight-item-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.oversight-item-action {
+  flex-shrink: 0;
+  margin-left: auto;
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .oversight-card-item {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+  .oversight-item-meta {
+    flex-basis: 100%;
+    font-size: var(--text-xs);
+  }
+  .oversight-item-action {
+    margin-left: 0;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — My Pay card refinements
+   ══════════════════════════════════════════════════════ */
+
+/* Stronger month label hierarchy */
+.pay-month-card .section-title {
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Clearer amount hero */
+.pay-month-card .payslip-card-amount {
+  font-size: var(--text-2xl, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* Disbursement progress bar — thicker, more visible */
+.pay-month-progress-track {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.pay-month-progress-fill {
+  border-radius: 4px;
+}
+
+/* Paid months get subtle success accent */
+.pay-month-card:has(.status-badge-success) {
+  border-left: 3px solid var(--status-success-text);
+}
+
+/* Partial months get warning accent */
+.pay-month-card:has(.status-badge-warning) {
+  border-left: 3px solid var(--status-warning-text);
+}
+
+/* Pending months get muted accent */
+.pay-month-card:has(.status-badge-pending) {
+  border-left: 3px solid var(--status-pending-text);
+}
+
+/* Meta grid — tighter on mobile */
+@media (max-width: 640px) {
+  .payslip-card-meta {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Variance copy — more subtle */
+.payslip-variance-copy {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — Payroll run detail refinements
+   ══════════════════════════════════════════════════════ */
+
+/* Status timeline dots — cleaner sizing */
+.payroll-status-step-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.payroll-status-step-complete .payroll-status-step-dot {
+  background: var(--status-success-text);
+  border-color: var(--status-success-text);
+}
+
+.payroll-status-step-active .payroll-status-step-dot {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+}
+
+/* Run summary metrics — stronger hierarchy */
+.payroll-run-summary-grid .metric-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-card);
+  padding: var(--space-3) var(--space-4);
+}
+
+/* Cycle cards — distinct state treatment */
+.payroll-cycle-card {
+  border-radius: var(--radius-card);
+  padding: var(--space-3) var(--space-4);
+  transition: border-color var(--transition-hover), box-shadow var(--transition-hover);
+}
+
+.payroll-cycle-card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Cycle action buttons — clearer hierarchy */
+.payroll-cycle-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.payroll-cycle-actions .button-accent {
+  font-weight: 600;
+}
+
+/* ══════════════════════════════════════════════════════
+   Payroll Worksheet — spreadsheet-like finance screen
+   ══════════════════════════════════════════════════════ */
+
+.payroll-view-toggle {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+
+.payroll-view-toggle-btn {
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  border: none;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.payroll-view-toggle-btn:not(:last-child) {
+  border-right: 1px solid var(--border-default);
+}
+
+.payroll-view-toggle-btn:hover {
+  background: var(--bg-hover);
+}
+
+.payroll-view-toggle-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.payroll-worksheet {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.payroll-worksheet-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-default);
+  padding-bottom: 0;
+}
+
+.payroll-worksheet-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+
+.payroll-worksheet-tab:hover {
+  color: var(--text-primary);
+}
+
+.payroll-worksheet-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.payroll-worksheet-tab .status-badge {
+  font-size: var(--text-xs);
+}
+
+.payroll-worksheet-cycle-info {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border-radius: var(--radius-default);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.payroll-worksheet-cycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  align-items: flex-start;
+}
+
+.payroll-worksheet-reject-inline {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.payroll-worksheet-reject-inline .button-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.payroll-worksheet-snapshot {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.payroll-worksheet-snapshot-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.payroll-worksheet-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.payroll-worksheet-snapshot-label {
+  display: block;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-1);
+}
+
+.payroll-worksheet-snapshot-value {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.payroll-worksheet-table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.payroll-worksheet-table {
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.payroll-worksheet-table th,
+.payroll-worksheet-table td {
+  padding: var(--space-1) var(--space-2);
+}
+
+.payroll-worksheet-table th {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.payroll-worksheet-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+}
+
+.payroll-worksheet-table thead .payroll-worksheet-sticky-col {
+  background: var(--bg-surface);
+}
+
+.payroll-worksheet-table tbody .payroll-worksheet-sticky-col {
+  background: var(--bg-canvas);
+}
+
+.payroll-worksheet-table .data-table-row:hover .payroll-worksheet-sticky-col {
+  background: var(--bg-hover);
+}
+
+.payroll-worksheet-employee-name {
+  display: block;
+  font-weight: 500;
+}
+
+.payroll-worksheet-username {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.payroll-worksheet-total-cell {
+  font-weight: 600;
+}
+
+.payroll-worksheet-text-cell {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.payroll-worksheet-totals-row td {
+  border-top: 2px solid var(--border-default);
+  background: var(--bg-surface);
+  font-weight: 600;
+}
+
+.payroll-worksheet-totals-row .payroll-worksheet-sticky-col {
+  background: var(--bg-surface);
+}
+
+/* Editable cell styles */
+.worksheet-cell-editable {
+  cursor: pointer;
+  border-radius: var(--radius-default);
+  padding: 1px 4px;
+  transition: background 0.12s;
+}
+
+.worksheet-cell-editable:hover {
+  background: var(--bg-hover);
+  outline: 1px dashed var(--border-default);
+}
+
+.worksheet-cell-editable:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.worksheet-cell-frozen {
+  cursor: not-allowed;
+  opacity: 0.55;
+  user-select: none;
+}
+
+.worksheet-cell-saving {
+  opacity: 0.5;
+}
+
+.worksheet-cell-input {
+  width: 100%;
+  min-width: 60px;
+  max-width: 120px;
+  padding: 2px 4px;
+  font-size: var(--text-sm);
+  font-family: inherit;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-default);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.worksheet-cell-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — Historical governance refinements
+   ══════════════════════════════════════════════════════ */
+
+/* Historical step indicators — cleaner visual */
+.historical-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 80px;
+}
+
+.historical-step .status-badge {
+  font-size: var(--text-xs);
+}
+
+/* Publish confirmation — more prominent */
+.historical-confirm-dialog {
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  background: var(--bg-surface);
+  margin-top: var(--space-3);
+}
+
+/* Historical visibility status — clearer contrast */
+.historical-visibility-visible {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border-radius: var(--radius-default);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.historical-visibility-hidden {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--status-draft-bg);
+  color: var(--status-draft-text);
+  border-radius: var(--radius-default);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — Button hierarchy & consequential actions
+   ══════════════════════════════════════════════════════ */
+
+/* High-consequence action buttons — visually distinct */
+.button-consequential {
+  background: var(--status-error-bg);
+  color: var(--status-error-text);
+  border: 1px solid var(--status-error-border, var(--status-error-text));
+  font-weight: 600;
+}
+
+.button-consequential:hover {
+  background: var(--status-error-text);
+  color: white;
+}
+
+/* Approve action — success tone, not generic */
+.button-approve {
+  background: var(--status-success-bg);
+  color: var(--status-success-text);
+  border: 1px solid var(--status-success-text);
+  font-weight: 600;
+}
+
+.button-approve:hover {
+  background: var(--status-success-text);
+  color: white;
+}
+
+/* ══════════════════════════════════════════════════════
+   Design Polish — Metric card refinements
+   ══════════════════════════════════════════════════════ */
+
+.metric-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+  line-height: 1.4;
+}
+
+/* Inline-style replacements for dashboard widgets */
+.oversight-expense-snapshot {
+  margin-bottom: var(--space-3);
+}
+
+.oversight-expense-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.oversight-expense-pipeline {
+  margin-top: var(--space-2);
+}
+
+.oversight-expiring-docs-desc {
+  margin-bottom: var(--space-2);
 }

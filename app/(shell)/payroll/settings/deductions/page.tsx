@@ -9,7 +9,7 @@ import { loadNigeriaRuleConfig } from "../../../../../lib/payroll/engines/nigeri
 import { DeductionsSettingsClient } from "./settings-client";
 
 function canEditNigeriaRules(roles: readonly UserRole[]): boolean {
-  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+  return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }
 
 export default async function PayrollDeductionsSettingsPage() {

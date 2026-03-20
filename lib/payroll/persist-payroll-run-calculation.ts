@@ -16,6 +16,7 @@ import type {
 const eligibleProfileRowSchema = z.object({
   id: z.string().uuid(),
   full_name: z.string(),
+  title: z.string().nullable(),
   department: z.string().nullable(),
   country_code: z.string().nullable(),
   primary_currency: z.string().nullable(),
@@ -66,7 +67,22 @@ const payrollAdjustmentSchema = z.object({
 const existingItemRowSchema = z.object({
   id: z.string().uuid(),
   employee_id: z.string().uuid(),
-  adjustments: z.unknown()
+  base_salary_amount: z.union([z.number(), z.string()]).optional().default(0),
+  adjustments: z.unknown(),
+  cycle_1_base_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_base_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_overtime_hours: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_overtime_hours: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_overtime_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_overtime_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_included: z.boolean().optional().default(true),
+  cycle_2_included: z.boolean().optional().default(true),
+  fees: z.union([z.number(), z.string()]).optional().default(0),
+  bonus: z.union([z.number(), z.string()]).optional().default(0),
+  comment: z.string().nullable().optional().default(null),
+  exception_reason: z.string().nullable().optional().default(null),
+  designation: z.string().nullable().optional().default(null),
+  accrue_username: z.string().nullable().optional().default(null)
 });
 
 type PersistPayrollRunCalculationInput = {
@@ -96,6 +112,14 @@ function adjustmentAmountTotal(adjustments: ReadonlyArray<{ amount: number }>): 
   return adjustments.reduce((sum, row) => sum + Math.trunc(row.amount), 0);
 }
 
+function defaultCycleSplit(amount: number): { cycle1: number; cycle2: number } {
+  const cycle1 = Math.round(amount / 2);
+  return {
+    cycle1,
+    cycle2: amount - cycle1
+  };
+}
+
 function toSnapshot(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -111,7 +135,7 @@ export async function persistPayrollRunCalculation({
 }: PersistPayrollRunCalculationInput): Promise<CalculatePayrollRunResponseData> {
   const { data: rawEligibleProfiles, error: eligibleProfilesError } = await supabase
     .from("profiles")
-    .select("id, full_name, department, country_code, primary_currency, start_date, payroll_mode")
+    .select("id, full_name, title, department, country_code, primary_currency, start_date, payroll_mode")
     .eq("org_id", actor.orgId)
     .in("payroll_mode", [
       "contractor_usd_no_withholding",
@@ -146,6 +170,7 @@ export async function persistPayrollRunCalculation({
             "id, employee_id, base_salary_amount, currency, effective_from, effective_to, updated_at"
           )
           .eq("org_id", actor.orgId)
+          .eq("salary_status", "approved")
           .is("deleted_at", null)
           .in("employee_id", eligibleEmployeeIds)
           .lte("effective_from", run.pay_period_end)
@@ -172,7 +197,9 @@ export async function persistPayrollRunCalculation({
           .in("employee_id", eligibleEmployeeIds),
         supabase
           .from("payroll_items")
-          .select("id, employee_id, adjustments")
+          .select(
+            "id, employee_id, base_salary_amount, adjustments, cycle_1_base_amount, cycle_2_base_amount, cycle_1_overtime_hours, cycle_2_overtime_hours, cycle_1_overtime_amount, cycle_2_overtime_amount, cycle_1_included, cycle_2_included, fees, bonus, comment, exception_reason, designation, accrue_username"
+          )
           .eq("org_id", actor.orgId)
           .eq("payroll_run_id", run.id)
           .is("deleted_at", null)
@@ -238,9 +265,11 @@ export async function persistPayrollRunCalculation({
 
   const employeeIdsWithPayment = new Set(parsedPaymentRows.data.map((row) => row.employee_id));
   const existingAdjustmentsByEmployeeId = new Map<string, z.infer<typeof payrollAdjustmentSchema>[]>();
+  const existingItemsByEmployeeId = new Map<string, z.infer<typeof existingItemRowSchema>>();
   const staleItemIds: string[] = [];
 
   for (const row of parsedExistingItems.data) {
+    existingItemsByEmployeeId.set(row.employee_id, row);
     const parsedAdjustments = z.array(payrollAdjustmentSchema).safeParse(row.adjustments);
     existingAdjustmentsByEmployeeId.set(
       row.employee_id,
@@ -333,6 +362,35 @@ export async function persistPayrollRunCalculation({
 
       const adjustmentsTotal = adjustmentAmountTotal(adjustments);
       const netAmount = calculated.net_amount + adjustmentsTotal;
+      const existingItem = existingItemsByEmployeeId.get(employee.id) ?? null;
+      const previousBaseSalaryAmount = existingItem ? parseAmount(existingItem.base_salary_amount) : 0;
+      const existingCycle1BaseAmount = existingItem ? parseAmount(existingItem.cycle_1_base_amount) : 0;
+      const existingCycle2BaseAmount = existingItem ? parseAmount(existingItem.cycle_2_base_amount) : 0;
+      const previousDefaultSplit = defaultCycleSplit(previousBaseSalaryAmount);
+      const nextDefaultSplit = defaultCycleSplit(baseSalaryAmount);
+      const splitWasCustomized =
+        Boolean(existingItem) &&
+        (
+          existingCycle1BaseAmount !== previousDefaultSplit.cycle1 ||
+          existingCycle2BaseAmount !== previousDefaultSplit.cycle2 ||
+          Boolean(existingItem?.exception_reason)
+        );
+      const cycle1BaseAmount = splitWasCustomized
+        ? existingCycle1BaseAmount
+        : nextDefaultSplit.cycle1;
+      const cycle2BaseAmount = splitWasCustomized
+        ? existingCycle2BaseAmount
+        : nextDefaultSplit.cycle2;
+      const cycle1OvertimeHours = existingItem ? Number(existingItem.cycle_1_overtime_hours ?? 0) : 0;
+      const cycle2OvertimeHours = existingItem ? Number(existingItem.cycle_2_overtime_hours ?? 0) : 0;
+      const cycle1OvertimeAmount = existingItem ? parseAmount(existingItem.cycle_1_overtime_amount) : 0;
+      const cycle2OvertimeAmount = existingItem ? parseAmount(existingItem.cycle_2_overtime_amount) : 0;
+      const fees = existingItem ? parseAmount(existingItem.fees) : 0;
+      const bonus = existingItem ? parseAmount(existingItem.bonus) : 0;
+      const comment = existingItem?.comment ?? null;
+      const exceptionReason = splitWasCustomized ? existingItem?.exception_reason ?? null : null;
+      const designation = existingItem?.designation ?? employee.title ?? null;
+      const accrueUsername = existingItem?.accrue_username ?? null;
       const flagReasons: string[] = [];
 
       if (!employeeIdsWithPayment.has(employee.id)) {
@@ -375,12 +433,28 @@ export async function persistPayrollRunCalculation({
         adjustments,
         deductions: mappedDeductions,
         employer_contributions: mappedEmployerContributions,
+        overtime_hours: cycle1OvertimeHours + cycle2OvertimeHours,
+        overtime_amount: cycle1OvertimeAmount + cycle2OvertimeAmount,
         net_amount: netAmount,
         withholding_applied: calculated.withholding_applied,
         payment_status: "pending" as const,
         payment_reference: null,
         payment_id: null,
         notes: compensation ? null : "Compensation record missing.",
+        cycle_1_base_amount: cycle1BaseAmount,
+        cycle_2_base_amount: cycle2BaseAmount,
+        cycle_1_overtime_hours: cycle1OvertimeHours,
+        cycle_2_overtime_hours: cycle2OvertimeHours,
+        cycle_1_overtime_amount: cycle1OvertimeAmount,
+        cycle_2_overtime_amount: cycle2OvertimeAmount,
+        cycle_1_included: existingItem?.cycle_1_included ?? true,
+        cycle_2_included: existingItem?.cycle_2_included ?? true,
+        fees,
+        bonus,
+        comment,
+        exception_reason: exceptionReason,
+        designation,
+        accrue_username: accrueUsername,
         flagged: flagReasons.length > 0,
         flag_reason: flagReasons.length > 0 ? flagReasons.join("; ") : null,
         deleted_at: null

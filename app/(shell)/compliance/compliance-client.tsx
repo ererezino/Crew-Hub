@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
@@ -926,69 +927,78 @@ export function ComplianceClient() {
               </p>
             ) : null}
 
-            <label className="form-field" htmlFor="compliance-status">
+            <div className="form-field">
               <span className="form-label">{t('panel.statusLabel')}</span>
-              <select
-                id="compliance-status"
-                className="form-input"
+              <Select
                 value={formState.status}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setFormState((current) =>
-                    current ? { ...current, status: event.currentTarget.value as ComplianceStatus } : current
+                    current ? { ...current, status: value as ComplianceStatus } : current
                   )
                 }
               >
-                <option value="pending">{t('panelStatus.pending')}</option>
-                <option value="in_progress">{t('panelStatus.inProgress')}</option>
-                <option value="completed">{t('panelStatus.completed')}</option>
-                <option value="overdue">{t('panelStatus.overdue')}</option>
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">{t('panelStatus.pending')}</SelectItem>
+                  <SelectItem value="in_progress">{t('panelStatus.inProgress')}</SelectItem>
+                  <SelectItem value="completed">{t('panelStatus.completed')}</SelectItem>
+                  <SelectItem value="overdue">{t('panelStatus.overdue')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            <label className="form-field" htmlFor="compliance-assigned-to">
+            <div className="form-field">
               <span className="form-label">{t('panel.assignedToLabel')}</span>
-              <select
-                id="compliance-assigned-to"
-                className="form-input"
-                value={formState.assignedTo ?? ""}
-                onChange={(event) =>
+              <Select
+                value={formState.assignedTo ?? "__unassigned__"}
+                onValueChange={(value) =>
                   setFormState((current) =>
-                    current ? { ...current, assignedTo: event.currentTarget.value || null } : current
+                    current ? { ...current, assignedTo: value === "__unassigned__" ? null : value } : current
                   )
                 }
               >
-                <option value="">{t('panel.unassigned')}</option>
-                {(complianceQuery.data?.assignees ?? []).map((assignee) => (
-                  <option key={assignee.id} value={assignee.id}>
-                    {assignee.fullName}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__unassigned__">{t('panel.unassigned')}</SelectItem>
+                  {(complianceQuery.data?.assignees ?? []).map((assignee) => (
+                    <SelectItem key={assignee.id} value={assignee.id}>
+                      {assignee.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <label className="form-field" htmlFor="compliance-proof-document">
+            <div className="form-field">
               <span className="form-label">{t('panel.proofAttachment')}</span>
-              <select
-                id="compliance-proof-document"
-                className="form-input"
-                value={formState.proofDocumentId ?? ""}
-                onChange={(event) =>
+              <Select
+                value={formState.proofDocumentId ?? "__none__"}
+                onValueChange={(value) =>
                   setFormState((current) =>
-                    current ? { ...current, proofDocumentId: event.currentTarget.value || null } : current
+                    current ? { ...current, proofDocumentId: value === "__none__" ? null : value } : current
                   )
                 }
               >
-                <option value="">{t('panel.noProofDocument')}</option>
-                {(complianceQuery.data?.proofDocuments ?? []).map((proof) => (
-                  <option key={proof.id} value={proof.id}>
-                    {proof.title}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('panel.noProofDocument')}</SelectItem>
+                  {(complianceQuery.data?.proofDocuments ?? []).map((proof) => (
+                    <SelectItem key={proof.id} value={proof.id}>
+                      {proof.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Link className="settings-card-description" href="/documents">
                 {t('panel.uploadProofLink')}
               </Link>
-            </label>
+            </div>
 
             <label className="form-field" htmlFor="compliance-notes">
               <span className="form-label">{t('panel.notesLabel')}</span>

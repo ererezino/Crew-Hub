@@ -12,6 +12,7 @@ import { z } from "zod";
 type AppLocale = "en" | "fr";
 
 import { CsvImportDialog } from "../../../../../components/payroll/csv-import-dialog";
+import { PayrollWorksheet } from "../../../../../components/payroll/payroll-worksheet";
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
@@ -30,13 +31,20 @@ import type { GeneratePayslipsResponse } from "../../../../../types/payslips";
 import type {
   AddPayrollAdjustmentResponse,
   CalculatePayrollRunResponse,
+  CreateAmendmentRunResponse,
   EditPayrollItemResponse,
+  EmployeeRemainingEntry,
+  MarkCyclePaidResponse,
   PayrollAdjustmentType,
+  PayrollCycle,
   PayrollRunAllowance,
   PayrollRunItem,
   PayrollRunActionResponse,
-  PayrollRunStatus
+  PayrollRunStatus,
+  PreparePayoutResponse,
+  RemainingResponse
 } from "../../../../../types/payroll-runs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
 
 type SortDirection = "asc" | "desc";
@@ -61,8 +69,7 @@ type AdjustmentFormErrors = Partial<Record<AdjustmentFormField, string>>;
 const RUN_STATUS_FLOW: PayrollRunStatus[] = [
   "draft",
   "calculated",
-  "pending_first_approval",
-  "pending_final_approval",
+  "submitted",
   "approved",
   "processing",
   "completed"
@@ -159,6 +166,8 @@ function paymentStatusTone(
   switch (status) {
     case "paid":
       return "success";
+    case "partially_paid":
+      return "processing";
     case "processing":
       return "processing";
     case "failed":
@@ -192,11 +201,12 @@ function statusToTimelineKey(status: PayrollRunStatus): string {
   const map: Record<string, string> = {
     draft: "draft",
     calculated: "calculated",
-    pending_first_approval: "pendingFirstApproval",
-    pending_final_approval: "pendingFinalApproval",
+    submitted: "submitted",
+    rejected: "rejected",
     approved: "approved",
     processing: "processing",
     completed: "completed",
+    cancelled: "cancelled",
   };
   return map[status] ?? status;
 }
@@ -277,12 +287,12 @@ export function PayrollRunDetailClient({
   runId,
   viewerUserId,
   canManage,
-  canFinalApprove
+  canApprove
 }: {
   runId: string;
   viewerUserId: string;
   canManage: boolean;
-  canFinalApprove: boolean;
+  canApprove: boolean;
 }) {
   const t = useTranslations('payrollRunDetail');
   const tCommon = useTranslations('common');
@@ -295,7 +305,7 @@ export function PayrollRunDetailClient({
   const [isCalculating, setIsCalculating] = useState(false);
   const [isGeneratingStatements, setIsGeneratingStatements] = useState(false);
   const [activeRunAction, setActiveRunAction] = useState<
-    null | "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed"
+    null | "submit" | "approve" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed"
   >(null);
   const [adjustmentItemId, setAdjustmentItemId] = useState<string | null>(null);
   const [adjustmentValues, setAdjustmentValues] = useState<AdjustmentFormValues>(
@@ -315,6 +325,19 @@ export function PayrollRunDetailClient({
   const [editFormErrors, setEditFormErrors] = useState<EditFormErrors>({});
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [isPreparingPayout, setIsPreparingPayout] = useState(false);
+  const [showCycleDialog, setShowCycleDialog] = useState(false);
+  const [cycleLabel, setCycleLabel] = useState("");
+  const [cycleEmployeeAmounts, setCycleEmployeeAmounts] = useState<Map<string, number>>(new Map());
+  const [cycleRemainingEntries, setCycleRemainingEntries] = useState<EmployeeRemainingEntry[]>([]);
+  const [isLoadingRemaining, setIsLoadingRemaining] = useState(false);
+  const [activeCycleActionId, setActiveCycleActionId] = useState<string | null>(null);
+  const [markingPaidCycleId, setMarkingPaidCycleId] = useState<string | null>(null);
+  const [isCreatingAmendment, setIsCreatingAmendment] = useState(false);
+  const [isPerformingHistoricalAction, setIsPerformingHistoricalAction] = useState(false);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [detailView, setDetailView] = useState<"worksheet" | "items">("worksheet");
+  const [provenanceNote, setProvenanceNote] = useState("");
   const { confirm, confirmDialog } = useConfirmAction();
 
   const sortedItems = useMemo(() => {
@@ -338,35 +361,41 @@ export function PayrollRunDetailClient({
   const isProcessing = run?.status === "processing";
   const isCompleted = run?.status === "completed";
   const isCalculated = run?.status === "calculated";
-  const isPendingFirst = run?.status === "pending_first_approval";
-  const isPendingFinal = run?.status === "pending_final_approval";
-  const canCalculateRun = canManage && (run?.status === "draft" || isCalculated);
-  const canImportCsv = canManage && (run?.status === "draft" || isCalculated);
+  const isSubmitted = run?.status === "submitted";
+  const isRejected = run?.status === "rejected";
+  const canCalculateRun = canManage && (run?.status === "draft" || isCalculated || isRejected);
+  const canImportCsv = canManage && (run?.status === "draft" || isCalculated || isRejected);
   const canGenerateStatements = canManage && isApproved;
-  const canAdjustItems = canManage && isCalculated;
-  const canSubmitForApproval = canManage && isCalculated;
-  const canApproveFirst =
-    canManage &&
-    isPendingFirst &&
-    run?.initiatedBy !== viewerUserId;
-  const canApproveFinal =
-    canFinalApprove &&
-    isPendingFinal &&
-    run?.firstApprovedBy !== viewerUserId;
-  const canRejectAtCurrentStep =
-    (canManage &&
-      isPendingFirst &&
-      run?.initiatedBy !== viewerUserId) ||
-    (canFinalApprove &&
-      isPendingFinal &&
-      run?.firstApprovedBy !== viewerUserId);
+  const canAdjustItems = canManage && (isCalculated || isRejected);
+  const canSubmitForApproval = canManage && (isCalculated || isRejected);
+  /** Resolve who submitted the run for separation-of-duties checks. */
+  const runSubmittedBy: string | null = run?.submittedBy ?? run?.initiatedBy ?? null;
+  const canApproveRun =
+    canApprove &&
+    isSubmitted &&
+    runSubmittedBy !== viewerUserId;
+  const canRejectRun =
+    canApprove &&
+    isSubmitted &&
+    runSubmittedBy !== viewerUserId;
   const canCancelRun =
     canManage &&
     (run ? run.status !== "approved" && run.status !== "cancelled" && run.status !== "processing" && run.status !== "completed" : false);
-  const canReopenRun = canFinalApprove && (isApproved || isProcessing);
+  const canReopenRun = canApprove && (isApproved || isProcessing);
   const canMarkProcessing = canManage && isApproved;
   const canMarkCompleted = canManage && isProcessing;
-  const canEditItems = canManage && (run?.status === "draft" || isCalculated);
+  const canEditItems = canManage && (run?.status === "draft" || isCalculated || isRejected);
+  const cycles: PayrollCycle[] = runQuery.data?.cycles ?? [];
+  const activeCycles = cycles.filter((c) => c.status !== "cancelled");
+  const canPreparePayout = canManage && (isApproved || isProcessing);
+  const hasCycles = activeCycles.length > 0;
+  const allCyclesPaid = activeCycles.length > 0 && activeCycles.every((c) => c.status === "paid");
+  const canCreateAmendment = canApprove && isCompleted && allCyclesPaid;
+
+  const isHistorical = run?.isHistorical === true;
+  const isReviewed = Boolean(run?.reviewedAt);
+  const isAuthorized = Boolean(run?.authorizedAt);
+  const isPublished = Boolean(run?.publishedAt);
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -381,6 +410,42 @@ export function PayrollRunDetailClient({
     window.setTimeout(() => {
       dismissToast(toastId);
     }, 4000);
+  };
+
+  const performHistoricalAction = async (action: "review" | "authorize" | "publish") => {
+    if (!run || isPerformingHistoricalAction) return;
+
+    if (action === "publish" && !showPublishConfirm) {
+      setShowPublishConfirm(true);
+      return;
+    }
+
+    setIsPerformingHistoricalAction(true);
+    try {
+      const body: Record<string, unknown> = { action };
+      if (action === "publish" && provenanceNote.trim()) {
+        body.provenanceNote = provenanceNote.trim();
+      }
+      const res = await fetch(`/api/v1/payroll/runs/${runId}/historical-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        showToast("error", json.error?.message ?? "Action failed.");
+        return;
+      }
+      runQuery.refresh();
+      const toastKey = action === "review" ? "historicalReviewed" : action === "authorize" ? "historicalAuthorized" : "historicalPublished";
+      showToast("success", td(`toast.${toastKey}`));
+      setShowPublishConfirm(false);
+      setProvenanceNote("");
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Action failed.");
+    } finally {
+      setIsPerformingHistoricalAction(false);
+    }
   };
 
   const calculateRun = async () => {
@@ -453,7 +518,7 @@ export function PayrollRunDetailClient({
   };
 
   const performRunAction = async (
-    action: "submit" | "approve_first" | "approve_final" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed",
+    action: "submit" | "approve" | "reject" | "cancel" | "reopen" | "mark_processing" | "mark_completed",
     reason: string | null = null
   ) => {
     setActiveRunAction(action);
@@ -479,10 +544,8 @@ export function PayrollRunDetailClient({
 
       if (action === "submit") {
         showToast("success", td("toast.submittedForApproval"));
-      } else if (action === "approve_first") {
-        showToast("success", td("toast.firstApprovalComplete"));
-      } else if (action === "approve_final") {
-        showToast("success", td("toast.finalApprovalComplete"));
+      } else if (action === "approve") {
+        showToast("success", td("toast.approvalComplete"));
       } else if (action === "reject") {
         showToast("info", td("toast.runRejected"));
       } else if (action === "cancel") {
@@ -495,7 +558,7 @@ export function PayrollRunDetailClient({
         showToast("success", td("toast.runMarkedCompleted"));
       }
 
-      if (action === "approve_final") {
+      if (action === "approve") {
         setAdjustmentItemId(null);
       }
 
@@ -795,6 +858,241 @@ export function PayrollRunDetailClient({
     await performRunAction("cancel");
   };
 
+  const openCycleDialog = async () => {
+    setCycleLabel("");
+    setCycleEmployeeAmounts(new Map());
+    setCycleRemainingEntries([]);
+    setShowCycleDialog(true);
+    setIsLoadingRemaining(true);
+
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles/remaining`);
+      const payload = (await response.json()) as RemainingResponse;
+
+      if (response.ok && payload.data) {
+        const entries = payload.data.entries.filter((e) => e.remaining > 0);
+        setCycleRemainingEntries(entries);
+        // Default: fill every employee at their full remaining
+        const amounts = new Map<string, number>();
+        for (const entry of entries) {
+          amounts.set(entry.employeeId, entry.remaining);
+        }
+        setCycleEmployeeAmounts(amounts);
+      }
+    } catch {
+      // entries stay empty — dialog will show empty state
+    } finally {
+      setIsLoadingRemaining(false);
+    }
+  };
+
+  const fillAllRemaining = () => {
+    const amounts = new Map<string, number>();
+    for (const entry of cycleRemainingEntries) {
+      amounts.set(entry.employeeId, entry.remaining);
+    }
+    setCycleEmployeeAmounts(amounts);
+  };
+
+  const fillAllAtPercentage = (pct: number) => {
+    const amounts = new Map<string, number>();
+    for (const entry of cycleRemainingEntries) {
+      const amount = Math.round(entry.remaining * (pct / 100));
+      if (amount > 0) {
+        amounts.set(entry.employeeId, amount);
+      }
+    }
+    setCycleEmployeeAmounts(amounts);
+  };
+
+  const clearAllAmounts = () => {
+    setCycleEmployeeAmounts(new Map());
+  };
+
+  const setEmployeeAmount = (employeeId: string, value: number) => {
+    setCycleEmployeeAmounts((prev) => {
+      const next = new Map(prev);
+      if (value <= 0) {
+        next.delete(employeeId);
+      } else {
+        next.set(employeeId, value);
+      }
+      return next;
+    });
+  };
+
+  const submitCycle = async () => {
+    setShowCycleDialog(false);
+    setIsPreparingPayout(true);
+
+    try {
+      // Build the request body with explicit per-employee amounts
+      const body: Record<string, unknown> = {};
+      if (cycleLabel.trim()) body.label = cycleLabel.trim();
+
+      const disbursements: { employeeId: string; amount: number }[] = [];
+      for (const [employeeId, amount] of cycleEmployeeAmounts) {
+        if (amount > 0) {
+          disbursements.push({ employeeId, amount });
+        }
+      }
+      if (disbursements.length > 0) {
+        body.disbursements = disbursements;
+      }
+
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      const payload = (await response.json()) as PreparePayoutResponse;
+
+      if (!response.ok || !payload.data) {
+        // Handle held payment details — prompt for override
+        if (payload.error?.code === "PAYMENT_DETAILS_HELD" && payload.error.details?.heldEmployeeIds) {
+          const heldIds = payload.error.details.heldEmployeeIds as string[];
+          const overrideConfirmed = await confirm({
+            title: td("confirmHoldOverride.title"),
+            description: td("confirmHoldOverride.description", { count: heldIds.length }),
+            confirmLabel: td("confirmHoldOverride.confirmLabel"),
+            tone: "danger"
+          });
+
+          if (!overrideConfirmed) return;
+
+          const reason = window.prompt(td("confirmHoldOverride.reasonPrompt"));
+          if (!reason?.trim()) return;
+
+          // Preserve all original cycle config + add hold overrides
+          const overrideBody = { ...body, holdOverrides: heldIds.map((id) => ({ employeeId: id, reason: reason.trim() })) };
+          const overrideResponse = await fetch(`/api/v1/payroll/runs/${runId}/cycles`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(overrideBody)
+          });
+
+          const overridePayload = (await overrideResponse.json()) as PreparePayoutResponse;
+          if (!overrideResponse.ok || !overridePayload.data) {
+            showToast("error", overridePayload.error?.message ?? td("toast.payoutPrepFailed"));
+            return;
+          }
+
+          showToast("success", td("toast.payoutPrepared"));
+          runQuery.refresh();
+          return;
+        }
+
+        showToast("error", payload.error?.message ?? td("toast.payoutPrepFailed"));
+        return;
+      }
+
+      showToast("success", td("toast.payoutPrepared"));
+      runQuery.refresh();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : td("toast.payoutPrepFailed"));
+    } finally {
+      setIsPreparingPayout(false);
+    }
+  };
+
+  const performCycleAction = async (
+    cycleId: string,
+    action: "mark_ready" | "mark_processing" | "mark_paid",
+    successMessage: string,
+    failMessage: string
+  ) => {
+    setActiveCycleActionId(cycleId);
+    if (action === "mark_paid") setMarkingPaidCycleId(cycleId);
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/cycles/${cycleId}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action })
+      });
+
+      const payload = (await response.json()) as MarkCyclePaidResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? failMessage);
+        return;
+      }
+
+      showToast("success", successMessage);
+      runQuery.refresh();
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : failMessage);
+    } finally {
+      setActiveCycleActionId(null);
+      if (action === "mark_paid") setMarkingPaidCycleId(null);
+    }
+  };
+
+  const markCycleReady = async (cycleId: string) => {
+    const confirmed = await confirm({
+      title: td("confirmMarkReady.title"),
+      description: td("confirmMarkReady.description"),
+      confirmLabel: td("confirmMarkReady.confirmLabel"),
+      tone: "default"
+    });
+    if (!confirmed) return;
+    await performCycleAction(cycleId, "mark_ready", td("toast.cycleReady"), td("toast.cycleReadyFailed"));
+  };
+
+  const markCycleProcessing = async (cycleId: string) => {
+    const confirmed = await confirm({
+      title: td("confirmMarkProcessing.title"),
+      description: td("confirmMarkProcessing.description"),
+      confirmLabel: td("confirmMarkProcessing.confirmLabel"),
+      tone: "default"
+    });
+    if (!confirmed) return;
+    await performCycleAction(cycleId, "mark_processing", td("toast.cycleProcessing"), td("toast.cycleProcessingFailed"));
+  };
+
+  const markCyclePaid = async (cycleId: string) => {
+    const confirmed = await confirm({
+      title: td("confirmMarkPaid.title"),
+      description: td("confirmMarkPaid.description"),
+      confirmLabel: td("confirmMarkPaid.confirmLabel"),
+      tone: "danger"
+    });
+    if (!confirmed) return;
+    await performCycleAction(cycleId, "mark_paid", td("toast.cyclePaid"), td("toast.cyclePaidFailed"));
+  };
+
+  const createAmendment = async () => {
+    const confirmed = await confirm({
+      title: td("confirmAmendment.title"),
+      description: td("confirmAmendment.description"),
+      confirmLabel: td("confirmAmendment.confirmLabel"),
+      tone: "default"
+    });
+    if (!confirmed) return;
+
+    setIsCreatingAmendment(true);
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/amend`, {
+        method: "POST"
+      });
+
+      const payload = (await response.json()) as CreateAmendmentRunResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast("error", payload.error?.message ?? td("toast.amendmentFailed"));
+        return;
+      }
+
+      showToast("success", td("toast.amendmentCreated"));
+      // Navigate to the new amendment run
+      window.location.href = `/payroll/runs/${payload.data.run.id}`;
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : td("toast.amendmentFailed"));
+    } finally {
+      setIsCreatingAmendment(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -924,6 +1222,126 @@ export function PayrollRunDetailClient({
             </article>
           </section>
 
+          {isHistorical ? (
+            <section className="historical-governance">
+              <div className="historical-governance-header">
+                <h2 className="section-title">
+                  <StatusBadge tone="warning">{td("historical.badge")}</StatusBadge>
+                  {" "}{td("historical.title")}
+                </h2>
+                <p className="settings-card-description">{td("historical.description")}</p>
+              </div>
+
+              {/* Three-step timeline */}
+              <div className="historical-timeline">
+                <div className={`historical-step${isReviewed ? " historical-step-done" : ""}`}>
+                  <StatusBadge tone={isReviewed ? "success" : "draft"}>
+                    {isReviewed ? "\u2713 " : ""}{td("historical.reviewStep")}
+                  </StatusBadge>
+                </div>
+                <span className="historical-timeline-arrow">{"\u2192"}</span>
+                <div className={`historical-step${isAuthorized ? " historical-step-done" : ""}`}>
+                  <StatusBadge tone={isAuthorized ? "success" : "draft"}>
+                    {isAuthorized ? "\u2713 " : ""}{td("historical.authorizeStep")}
+                  </StatusBadge>
+                </div>
+                <span className="historical-timeline-arrow">{"\u2192"}</span>
+                <div className={`historical-step${isPublished ? " historical-step-done" : ""}`}>
+                  <StatusBadge tone={isPublished ? "success" : "draft"}>
+                    {isPublished ? "\u2713 " : ""}{td("historical.publishStep")}
+                  </StatusBadge>
+                </div>
+              </div>
+
+              {/* Visibility status */}
+              <p className={`historical-visibility-status ${isPublished ? "historical-visibility-visible" : "historical-visibility-hidden"}`}>
+                {isPublished ? td("historical.visibleToEmployees") : td("historical.notYetVisible")}
+              </p>
+
+              {/* Provenance note display */}
+              {run?.provenanceNote ? (
+                <div className="historical-provenance">
+                  <span className="historical-provenance-label">{td("historical.provenanceDisplay")}</span>
+                  <p className="settings-card-description">{run.provenanceNote}</p>
+                </div>
+              ) : null}
+
+              {/* Action buttons */}
+              <div className="historical-actions">
+                {!isReviewed ? (
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    disabled={isPerformingHistoricalAction}
+                    onClick={() => performHistoricalAction("review")}
+                  >
+                    {td("historical.markReviewed")}
+                  </button>
+                ) : null}
+
+                {isReviewed && !isAuthorized && canApprove ? (
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    disabled={isPerformingHistoricalAction}
+                    onClick={() => performHistoricalAction("authorize")}
+                  >
+                    {td("historical.authorize")}
+                  </button>
+                ) : null}
+
+                {isAuthorized && !isPublished && canApprove ? (
+                  <button
+                    type="button"
+                    className="button button-destructive"
+                    disabled={isPerformingHistoricalAction}
+                    onClick={() => performHistoricalAction("publish")}
+                  >
+                    {isPerformingHistoricalAction ? td("historical.publishing") : td("historical.publish")}
+                  </button>
+                ) : null}
+              </div>
+
+              {/* Publish confirmation dialog — only reachable by approver authority */}
+              {showPublishConfirm && canApprove ? (
+                <div className="historical-confirm-dialog">
+                  <h3 className="section-title">{td("historical.confirmPublishTitle")}</h3>
+                  <p className="settings-card-description">{td("historical.confirmPublishDescription")}</p>
+                  <div className="form-field">
+                    <label className="form-label" htmlFor="provenance-note">{td("historical.provenanceLabel")}</label>
+                    <textarea
+                      id="provenance-note"
+                      className="input"
+                      rows={2}
+                      value={provenanceNote}
+                      onChange={(e) => setProvenanceNote(e.target.value)}
+                      placeholder={td("historical.provenancePlaceholder")}
+                    />
+                  </div>
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="button"
+                      onClick={() => setShowPublishConfirm(false)}
+                    >
+                      {tCommon("cancel")}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-destructive"
+                      disabled={isPerformingHistoricalAction}
+                      onClick={() => performHistoricalAction("publish")}
+                    >
+                      {isPerformingHistoricalAction ? td("historical.publishing") : td("historical.confirmPublishLabel")}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          {/* Run-level management — secondary to cycle-level approval */}
+          {!isHistorical ? (
           <section className="settings-card payroll-approval-card" aria-label={t('approval.title')}>
             <div className="payroll-approval-header">
               <h2 className="section-title">{t('approval.title')}</h2>
@@ -932,135 +1350,11 @@ export function PayrollRunDetailClient({
               </StatusBadge>
             </div>
 
-            <div className="payroll-approval-steps">
-              <article className="payroll-approval-step">
-                <p className="payroll-approval-step-title">{t('approval.step1Title')}</p>
-                {runQuery.data.run.firstApprovedAt ? (
-                  <>
-                    <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
-                    <p className="settings-card-description">
-                      {t.rich('approval.approvedByAt', {
-                        name: runQuery.data.run.firstApprovedByName ?? "--",
-                        date: formatDate(runQuery.data.run.firstApprovedAt, locale),
-                        time: (chunks) => (
-                          <time
-                            dateTime={runQuery.data?.run.firstApprovedAt ?? ""}
-                            title={formatDateTimeTooltip(runQuery.data?.run.firstApprovedAt ?? "", locale)}
-                          >
-                            {chunks}
-                          </time>
-                        )
-                      })}
-                    </p>
-                  </>
-                ) : (
-                  <StatusBadge tone={isPendingFirst ? "pending" : "draft"}>
-                    {isPendingFirst ? t('approval.awaitingFirst') : t('approval.notApprovedYet')}
-                  </StatusBadge>
-                )}
-              </article>
-
-              <article className="payroll-approval-step">
-                <p className="payroll-approval-step-title">{t('approval.step2Title')}</p>
-                {runQuery.data.run.finalApprovedAt ? (
-                  <>
-                    <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
-                    <p className="settings-card-description">
-                      {t.rich('approval.approvedByAt', {
-                        name: runQuery.data.run.finalApprovedByName ?? "--",
-                        date: formatDate(runQuery.data.run.finalApprovedAt, locale),
-                        time: (chunks) => (
-                          <time
-                            dateTime={runQuery.data?.run.finalApprovedAt ?? ""}
-                            title={formatDateTimeTooltip(runQuery.data?.run.finalApprovedAt ?? "", locale)}
-                          >
-                            {chunks}
-                          </time>
-                        )
-                      })}
-                    </p>
-                  </>
-                ) : (
-                  <StatusBadge tone={isPendingFinal ? "pending" : "draft"}>
-                    {isPendingFinal ? t('approval.awaitingFinal') : t('approval.notApprovedYet')}
-                  </StatusBadge>
-                )}
-              </article>
-            </div>
+            <p className="settings-card-description">
+              {td("cycleApprovalNote")}
+            </p>
 
             <div className="settings-actions payroll-approval-actions">
-              {canSubmitForApproval ? (
-                <button
-                  type="button"
-                  className="button"
-                  disabled={activeRunAction !== null || isCalculating}
-                  onClick={async () => {
-                    const confirmed = await confirm({
-                      title: td("confirmSubmit.title"),
-                      description: td("confirmSubmit.description"),
-                      confirmLabel: td("confirmSubmit.confirmLabel"),
-                      tone: "default"
-                    });
-                    if (confirmed) void performRunAction("submit");
-                  }}
-                >
-                  {activeRunAction === "submit" ? t('actions.submitting') : t('actions.submitForApproval')}
-                </button>
-              ) : null}
-
-              {canApproveFirst ? (
-                <button
-                  type="button"
-                  className="button button-primary"
-                  disabled={activeRunAction !== null}
-                  onClick={async () => {
-                    const confirmed = await confirm({
-                      title: td("confirmApproveFirst.title"),
-                      description: td("confirmApproveFirst.description"),
-                      confirmLabel: td("confirmApproveFirst.confirmLabel"),
-                      tone: "default"
-                    });
-                    if (confirmed) void performRunAction("approve_first");
-                  }}
-                >
-                  {activeRunAction === "approve_first" ? t('actions.approving') : t('actions.approveStep1')}
-                </button>
-              ) : null}
-
-              {canApproveFinal ? (
-                <button
-                  type="button"
-                  className="button button-primary"
-                  disabled={activeRunAction !== null}
-                  onClick={async () => {
-                    const confirmed = await confirm({
-                      title: td("confirmApproveFinal.title"),
-                      description: td("confirmApproveFinal.description"),
-                      confirmLabel: td("confirmApproveFinal.confirmLabel"),
-                      tone: "danger"
-                    });
-                    if (confirmed) void performRunAction("approve_final");
-                  }}
-                >
-                  {activeRunAction === "approve_final" ? t('actions.approving') : t('actions.approveFinal')}
-                </button>
-              ) : null}
-
-              {canRejectAtCurrentStep ? (
-                <button
-                  type="button"
-                  className="button button-subtle"
-                  disabled={activeRunAction !== null}
-                  onClick={() => {
-                    setRejectReasonError(null);
-                    setRejectReason("");
-                    setIsRejectDialogOpen(true);
-                  }}
-                >
-                  {tCommon('status.rejected')}
-                </button>
-              ) : null}
-
               {canCancelRun ? (
                 <button
                   type="button"
@@ -1074,23 +1368,10 @@ export function PayrollRunDetailClient({
                 </button>
               ) : null}
 
-              {canMarkProcessing ? (
-                <button
-                  type="button"
-                  className="button"
-                  disabled={activeRunAction !== null}
-                  onClick={() => {
-                    void markProcessing();
-                  }}
-                >
-                  {activeRunAction === "mark_processing" ? td('actions.marking') : td('actions.markProcessing')}
-                </button>
-              ) : null}
-
               {canMarkCompleted ? (
                 <button
                   type="button"
-                  className="button button-primary"
+                  className="button button-consequential"
                   disabled={activeRunAction !== null}
                   onClick={() => {
                     void markCompleted();
@@ -1116,6 +1397,7 @@ export function PayrollRunDetailClient({
               ) : null}
             </div>
           </section>
+          ) : null}
 
           {(isApproved || isProcessing || isCompleted) ? (
             <section className="payroll-lock-banner" aria-label={t('locked.title')}>
@@ -1134,6 +1416,213 @@ export function PayrollRunDetailClient({
                 <p className="settings-card-description">
                   {isCompleted ? t('locked.completedDescription') : isProcessing ? t('locked.processingDescription') : t('locked.description')}
                 </p>
+              </div>
+            </section>
+          ) : null}
+
+          {run?.amendmentOf ? (
+            <section className="payroll-amendment-banner">
+              <StatusBadge tone="info">
+                {td("amendmentBadge", { id: run.amendmentOf.slice(0, 8) })}
+              </StatusBadge>
+            </section>
+          ) : null}
+
+          {/* Semimonthly cycles overview — always visible when cycles exist */}
+          {activeCycles.length > 0 ? (
+            <section className="settings-card payroll-cycles-card" aria-label={td("cycles.title")}>
+              <div className="payroll-approval-header">
+                <h2 className="section-title">{td("cycles.title")}</h2>
+              </div>
+
+              <div className="payroll-cycles-grid">
+                {activeCycles.map((cycle) => (
+                  <article key={cycle.id} className="payroll-cycle-card settings-card">
+                    <p className="section-title">{cycle.label}</p>
+                    <StatusBadge
+                      tone={
+                        cycle.status === "paid" ? "success"
+                          : cycle.status === "ready" ? "pending"
+                          : cycle.status === "submitted" ? "pending"
+                          : cycle.status === "approved" ? "info"
+                          : cycle.status === "failed" ? "error"
+                          : cycle.status === "rejected" ? "error"
+                          : cycle.status === "draft" ? "draft"
+                          : "processing"
+                      }
+                    >
+                      {td(`cycles.status${cycle.status.charAt(0).toUpperCase()}${cycle.status.slice(1)}`)}
+                    </StatusBadge>
+                    <p className="settings-card-description">
+                      {td("cycles.employeeCount", { count: cycle.employeeCount })}
+                      {" · "}
+                      <CurrencyDisplay amount={cycle.totalNet} currency={cycle.currency} />
+                    </p>
+                    {cycle.targetPayDate ? (
+                      <p className="settings-card-description">
+                        {td("cycles.targetDate", { date: formatDate(cycle.targetPayDate, locale) })}
+                      </p>
+                    ) : null}
+                    {cycle.paidAt ? (
+                      <p className="settings-card-description">
+                        {td("cycles.paidAt", { date: formatDate(cycle.paidAt, locale) })}
+                      </p>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+
+              <div className="settings-actions payroll-cycle-actions">
+                {canCreateAmendment ? (
+                  <button
+                    type="button"
+                    className="button"
+                    disabled={isCreatingAmendment}
+                    onClick={() => void createAmendment()}
+                  >
+                    {isCreatingAmendment ? td("cycles.creatingAmendment") : td("cycles.createAmendment")}
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          {/* Generic cycle dialog removed — semimonthly cycles are auto-created and managed via worksheet tabs */}
+          {false && showCycleDialog ? (
+            <section className="settings-card" aria-label={td("cycleDialog.title")}>
+              <h3 className="section-title">{td("cycleDialog.title")}</h3>
+              <p className="settings-card-description">{td("cycleDialog.description")}</p>
+
+              <div className="payroll-cycle-dialog-fields">
+                <div className="field-group">
+                  <label htmlFor="cycle-label" className="field-label">{td("cycleDialog.labelField")}</label>
+                  <input
+                    id="cycle-label"
+                    type="text"
+                    className="input"
+                    placeholder={td("cycleDialog.labelPlaceholder")}
+                    value={cycleLabel}
+                    onChange={(e) => setCycleLabel(e.target.value)}
+                  />
+                </div>
+
+                {/* Quick-fill helpers */}
+                <div className="field-group">
+                  <label className="field-label">{td("cycleDialog.quickFillLabel")}</label>
+                  <div className="payroll-cycle-quick-fill-actions">
+                    <button type="button" className="button button-small" onClick={fillAllRemaining}>
+                      {td("cycleDialog.fillRemaining")}
+                    </button>
+                    <button type="button" className="button button-small" onClick={() => fillAllAtPercentage(50)}>
+                      {td("cycleDialog.fill50")}
+                    </button>
+                    <button type="button" className="button button-small" onClick={() => fillAllAtPercentage(60)}>
+                      {td("cycleDialog.fill60")}
+                    </button>
+                    <button type="button" className="button button-small" onClick={() => fillAllAtPercentage(75)}>
+                      {td("cycleDialog.fill75")}
+                    </button>
+                    <button type="button" className="button button-small" onClick={clearAllAmounts}>
+                      {td("cycleDialog.clearAll")}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Per-employee disbursement table */}
+                <div className="field-group">
+                  <label className="field-label">{td("cycleDialog.employeeTableLabel")}</label>
+                  {isLoadingRemaining ? (
+                    <p className="settings-card-description">{td("cycleDialog.loadingEmployees")}</p>
+                  ) : cycleRemainingEntries.length === 0 ? (
+                    <p className="settings-card-description">{td("cycleDialog.noEligibleEmployees")}</p>
+                  ) : (
+                    <div className="data-table-container">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>{td("cycleDialog.colEmployee")}</th>
+                            <th className="text-right">{td("cycleDialog.colNet")}</th>
+                            <th className="text-right">{td("cycleDialog.colDisbursed")}</th>
+                            <th className="text-right">{td("cycleDialog.colRemaining")}</th>
+                            <th className="text-right">{td("cycleDialog.colThisCycle")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cycleRemainingEntries.map((entry) => {
+                            const currentAmount = cycleEmployeeAmounts.get(entry.employeeId) ?? 0;
+                            const exceedsRemaining = currentAmount > entry.remaining;
+                            return (
+                              <tr key={entry.employeeId}>
+                                <td>{entry.employeeName}</td>
+                                <td className="text-right">
+                                  <CurrencyDisplay amount={entry.netAmount} currency={entry.currency} />
+                                </td>
+                                <td className="text-right">
+                                  <CurrencyDisplay amount={entry.disbursed} currency={entry.currency} />
+                                </td>
+                                <td className="text-right">
+                                  <CurrencyDisplay amount={entry.remaining} currency={entry.currency} />
+                                </td>
+                                <td className="text-right">
+                                  <input
+                                    type="number"
+                                    className={`input input-small input-right${exceedsRemaining ? " input-error" : ""}`}
+                                    min={0}
+                                    max={entry.remaining}
+                                    value={currentAmount || ""}
+                                    placeholder="0"
+                                    onChange={(e) => {
+                                      const val = Number.parseInt(e.target.value, 10);
+                                      setEmployeeAmount(entry.employeeId, Number.isNaN(val) ? 0 : val);
+                                    }}
+                                  />
+                                  {exceedsRemaining ? (
+                                    <span className="field-error">{td("cycleDialog.exceedsRemaining")}</span>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan={4} className="text-right"><strong>{td("cycleDialog.totalLabel")}</strong></td>
+                            <td className="text-right">
+                              <strong>
+                                <CurrencyDisplay
+                                  amount={Array.from(cycleEmployeeAmounts.values()).reduce((s, v) => s + v, 0)}
+                                  currency={cycleRemainingEntries[0]?.currency ?? "USD"}
+                                />
+                              </strong>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => setShowCycleDialog(false)}
+                >
+                  {td("cycleDialog.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="button button-primary"
+                  disabled={
+                    isPreparingPayout ||
+                    cycleEmployeeAmounts.size === 0 ||
+                    cycleRemainingEntries.some((e) => (cycleEmployeeAmounts.get(e.employeeId) ?? 0) > e.remaining)
+                  }
+                  onClick={() => void submitCycle()}
+                >
+                  {isPreparingPayout ? td("cycles.preparingPayout") : td("cycleDialog.create")}
+                </button>
               </div>
             </section>
           ) : null}
@@ -1157,6 +1646,37 @@ export function PayrollRunDetailClient({
               ctaHref="/payroll"
             />
           ) : (
+            <>
+              {/* View toggle: worksheet vs legacy items */}
+              <div className="payroll-view-toggle">
+                <button
+                  type="button"
+                  className={`payroll-view-toggle-btn${detailView === "worksheet" ? " active" : ""}`}
+                  onClick={() => setDetailView("worksheet")}
+                >
+                  {td("viewToggle.worksheet")}
+                </button>
+                <button
+                  type="button"
+                  className={`payroll-view-toggle-btn${detailView === "items" ? " active" : ""}`}
+                  onClick={() => setDetailView("items")}
+                >
+                  {td("viewToggle.items")}
+                </button>
+              </div>
+
+              {detailView === "worksheet" ? (
+                <PayrollWorksheet
+                  run={runQuery.data.run}
+                  items={sortedItems}
+                  cycles={activeCycles}
+                  canEdit={canEditItems}
+                  canApprove={canApprove}
+                  viewerUserId={viewerUserId}
+                  onItemUpdated={() => runQuery.refresh()}
+                  onToast={showToast}
+                />
+              ) : (
             <section className="data-table-container" aria-label={t('title')}>
               <p className="settings-card-description">
                 {t('disbursementNotice')}
@@ -1418,34 +1938,32 @@ export function PayrollRunDetailClient({
                                   {canAdjustItems ? (
                                     adjustmentItemId === item.id ? (
                                       <form className="settings-form" onSubmit={submitAdjustment} noValidate>
-                                        <label className="form-field" htmlFor={`adjustment-type-${item.id}`}>
+                                        <div className="form-field">
                                           <span className="form-label">{t('adjustments.typeLabel')}</span>
-                                          <select
-                                            id={`adjustment-type-${item.id}`}
-                                            className={
-                                              adjustmentErrors.adjustmentType
-                                                ? "form-input form-input-error"
-                                                : "form-input"
-                                            }
+                                          <Select
                                             value={adjustmentValues.adjustmentType}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                               setAdjustmentValues((current) => ({
                                                 ...current,
-                                                adjustmentType: event.currentTarget
-                                                  .value as PayrollAdjustmentType
+                                                adjustmentType: value as PayrollAdjustmentType
                                               }))
                                             }
                                           >
-                                            <option value="bonus">{t('adjustments.bonus')}</option>
-                                            <option value="deduction">{t('adjustments.deduction')}</option>
-                                            <option value="correction">{t('adjustments.correction')}</option>
-                                          </select>
+                                            <SelectTrigger>
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="bonus">{t('adjustments.bonus')}</SelectItem>
+                                              <SelectItem value="deduction">{t('adjustments.deduction')}</SelectItem>
+                                              <SelectItem value="correction">{t('adjustments.correction')}</SelectItem>
+                                            </SelectContent>
+                                          </Select>
                                           {adjustmentErrors.adjustmentType ? (
                                             <p className="form-field-error">
                                               {adjustmentErrors.adjustmentType}
                                             </p>
                                           ) : null}
-                                        </label>
+                                        </div>
 
                                         <label className="form-field" htmlFor={`adjustment-label-${item.id}`}>
                                           <span className="form-label">{t('adjustments.labelField')}</span>
@@ -1734,6 +2252,8 @@ export function PayrollRunDetailClient({
                 </tbody>
               </table>
             </section>
+              )}
+            </>
           )}
         </>
       ) : null}

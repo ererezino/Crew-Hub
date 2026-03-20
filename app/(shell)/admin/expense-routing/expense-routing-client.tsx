@@ -8,6 +8,7 @@ import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { EXPENSE_CATEGORIES } from "../../../../types/expenses";
 import { getExpenseCategoryLabel } from "../../../../lib/expenses";
@@ -447,20 +448,23 @@ export function ExpenseRoutingClient() {
 
           {/* Category */}
           <div className="form-group">
-            <label htmlFor="rule-category">{t("form.category")}</label>
-            <select
-              id="rule-category"
-              className="form-input"
-              value={formValues.category}
-              onChange={(e) => updateField("category", e.target.value)}
+            <span>{t("form.category")}</span>
+            <Select
+              value={formValues.category || "__none__"}
+              onValueChange={(value) => updateField("category", value === "__none__" ? "" : value)}
             >
-              <option value="">{t("form.anyCategory")}</option>
-              {EXPENSE_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {getExpenseCategoryLabel(cat)}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t("form.anyCategory")}</SelectItem>
+                {EXPENSE_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {getExpenseCategoryLabel(cat)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Min Amount */}
@@ -495,18 +499,21 @@ export function ExpenseRoutingClient() {
 
           {/* Approver Type */}
           <div className="form-group">
-            <label htmlFor="rule-approver-type">{t("form.approverType")}</label>
-            <select
-              id="rule-approver-type"
-              className="form-input"
+            <span>{t("form.approverType")}</span>
+            <Select
               value={formValues.approverType}
-              onChange={(e) =>
-                updateField("approverType", e.target.value as "department_owner" | "specific_person")
+              onValueChange={(value) =>
+                updateField("approverType", value as "department_owner" | "specific_person")
               }
             >
-              <option value="department_owner">{t("form.departmentOwner")}</option>
-              <option value="specific_person">{t("form.specificPerson")}</option>
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="department_owner">{t("form.departmentOwner")}</SelectItem>
+                <SelectItem value="specific_person">{t("form.specificPerson")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Approver ID (conditional) */}

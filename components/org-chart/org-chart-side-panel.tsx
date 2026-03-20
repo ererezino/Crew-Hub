@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { SlidePanel } from "../shared/slide-panel";
 import { ConfirmDialog } from "../shared/confirm-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import type { OrgChartPerson } from "../../lib/org-chart/types";
 
 type OrgChartSidePanelProps = {
@@ -159,52 +160,58 @@ export function OrgChartSidePanel({ person, allPeople, onClose, onSave }: OrgCha
 
             {/* Reporting manager */}
             <fieldset className="org-chart-side-panel-field">
-              <label className="org-chart-side-panel-label" htmlFor="org-chart-manager">
+              <span className="org-chart-side-panel-label">
                 {t("sidePanel.reportsTo")}
-              </label>
+              </span>
               <p className="org-chart-side-panel-hint">{t("sidePanel.reportsToHint")}</p>
-              <select
-                id="org-chart-manager"
-                className="input"
-                value={editManagerId ?? ""}
-                onChange={(e) => setEditManagerId(e.target.value || null)}
+              <Select
+                value={editManagerId ?? "__none__"}
+                onValueChange={(value) => setEditManagerId(value === "__none__" ? null : value)}
               >
-                <option value="">{t("sidePanel.none")}</option>
-                {eligiblePeople.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.fullName}
-                    {p.department ? ` (${p.department})` : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t("sidePanel.none")}</SelectItem>
+                  {eligiblePeople.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.fullName}
+                      {p.department ? ` (${p.department})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </fieldset>
 
             {/* Operational lead */}
             <fieldset className="org-chart-side-panel-field">
-              <label className="org-chart-side-panel-label" htmlFor="org-chart-team-lead">
+              <span className="org-chart-side-panel-label">
                 {t("sidePanel.operationalLead")}
-              </label>
+              </span>
               <p className="org-chart-side-panel-hint">
                 {t("sidePanel.operationalLeadHint")}
               </p>
-              <select
-                id="org-chart-team-lead"
-                className="input"
-                value={editTeamLeadId ?? ""}
-                onChange={(e) => setEditTeamLeadId(e.target.value || null)}
+              <Select
+                value={editTeamLeadId ?? "__none__"}
+                onValueChange={(value) => setEditTeamLeadId(value === "__none__" ? null : value)}
               >
-                <option value="">
-                  {currentManagerName
-                    ? t("sidePanel.fallbackToManager", { name: currentManagerName })
-                    : t("sidePanel.none")}
-                </option>
-                {eligiblePeople.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.fullName}
-                    {p.department ? ` (${p.department})` : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    {currentManagerName
+                      ? t("sidePanel.fallbackToManager", { name: currentManagerName })
+                      : t("sidePanel.none")}
+                  </SelectItem>
+                  {eligiblePeople.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.fullName}
+                      {p.department ? ` (${p.department})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </fieldset>
 
             {/* Error */}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { PageHeader } from "../../../../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../../../components/ui/select";
 import { toSentenceCase } from "../../../../../../lib/format-labels";
 import {
   LEARNING_COURSE_CONTENT_TYPES,
@@ -222,25 +223,29 @@ export function NewLearningCourseClient() {
             </label>
             {errors.category ? <p className="form-field-error">{errors.category}</p> : null}
 
-            <label className="settings-field">
+            <div className="settings-field">
               <span className="settings-field-label">{t('labelContentType')}</span>
-              <select
-                className="settings-input"
+              <Select
                 value={values.contentType}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setValues((currentValue) => ({
                     ...currentValue,
-                    contentType: event.target.value as (typeof LEARNING_COURSE_CONTENT_TYPES)[number]
+                    contentType: value as (typeof LEARNING_COURSE_CONTENT_TYPES)[number]
                   }))
                 }
               >
-                {LEARNING_COURSE_CONTENT_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {toSentenceCase(type)}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEARNING_COURSE_CONTENT_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {toSentenceCase(type)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {errors.contentType ? <p className="form-field-error">{errors.contentType}</p> : null}
 
             <label className="settings-field">
@@ -268,21 +273,25 @@ export function NewLearningCourseClient() {
             </label>
             {errors.durationMinutes ? <p className="form-field-error">{errors.durationMinutes}</p> : null}
 
-            <label className="settings-field">
+            <div className="settings-field">
               <span className="settings-field-label">{t('labelDifficulty')}</span>
-              <select
-                className="settings-input"
-                value={values.difficulty}
-                onChange={(event) => setValues((currentValue) => ({ ...currentValue, difficulty: event.target.value }))}
+              <Select
+                value={values.difficulty || "__none__"}
+                onValueChange={(value) => setValues((currentValue) => ({ ...currentValue, difficulty: value === "__none__" ? "" : value }))}
               >
-                <option value="">{t('notSet')}</option>
-                {LEARNING_COURSE_DIFFICULTIES.map((difficulty) => (
-                  <option key={difficulty} value={difficulty}>
-                    {difficulty}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('notSet')}</SelectItem>
+                  {LEARNING_COURSE_DIFFICULTIES.map((difficulty) => (
+                    <SelectItem key={difficulty} value={difficulty}>
+                      {difficulty}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {errors.difficulty ? <p className="form-field-error">{errors.difficulty}</p> : null}
 
             <label className="settings-field">
@@ -299,21 +308,25 @@ export function NewLearningCourseClient() {
             </label>
             {errors.passingScore ? <p className="form-field-error">{errors.passingScore}</p> : null}
 
-            <label className="settings-field">
+            <div className="settings-field">
               <span className="settings-field-label">{t('labelRecurrence')}</span>
-              <select
-                className="settings-input"
-                value={values.recurrence}
-                onChange={(event) => setValues((currentValue) => ({ ...currentValue, recurrence: event.target.value }))}
+              <Select
+                value={values.recurrence || "__none__"}
+                onValueChange={(value) => setValues((currentValue) => ({ ...currentValue, recurrence: value === "__none__" ? "" : value }))}
               >
-                <option value="">{t('notRecurring')}</option>
-                {LEARNING_COURSE_RECURRENCES.map((recurrence) => (
-                  <option key={recurrence} value={recurrence}>
-                    {toSentenceCase(recurrence)}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('notRecurring')}</SelectItem>
+                  {LEARNING_COURSE_RECURRENCES.map((recurrence) => (
+                    <SelectItem key={recurrence} value={recurrence}>
+                      {toSentenceCase(recurrence)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             {errors.recurrence ? <p className="form-field-error">{errors.recurrence}</p> : null}
 
             <label className="settings-checkbox">

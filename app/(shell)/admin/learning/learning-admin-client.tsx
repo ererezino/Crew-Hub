@@ -9,6 +9,7 @@ import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useLearningCourses } from "../../../../hooks/use-learning";
 import { usePeople } from "../../../../hooks/use-people";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { toSentenceCase } from "../../../../lib/format-labels";
 import type {
@@ -230,26 +231,30 @@ export function LearningAdminClient() {
             </header>
 
             <form className="settings-form-grid" onSubmit={handleAssignCourse}>
-              <label className="settings-field">
+              <div className="settings-field">
                 <span className="settings-field-label">{t('courseLabel')}</span>
-                <select
-                  className="settings-input"
-                  value={assignmentForm.courseId}
-                  onChange={(event) =>
+                <Select
+                  value={assignmentForm.courseId || "__none__"}
+                  onValueChange={(value) =>
                     setAssignmentForm((currentValue) => ({
                       ...currentValue,
-                      courseId: event.target.value
+                      courseId: value === "__none__" ? "" : value
                     }))
                   }
                 >
-                  <option value="">{t('selectCourse')}</option>
-                  {sortedCourses.map((course) => (
-                    <option key={course.id} value={course.id}>
-                      {course.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t('selectCourse')}</SelectItem>
+                    {sortedCourses.map((course) => (
+                      <SelectItem key={course.id} value={course.id}>
+                        {course.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               <label className="settings-field">
                 <span className="settings-field-label">{t('dueDateLabel')}</span>

@@ -25,6 +25,8 @@ function formatRoleLabel(role: string): string | null {
       return "HR Admin";
     case "FINANCE_ADMIN":
       return "Finance";
+    case "FINANCE_APPROVER":
+      return "Finance Approver";
     case "MANAGER":
       return "Manager";
     case "TEAM_LEAD":
@@ -36,7 +38,7 @@ function formatRoleLabel(role: string): string | null {
 
 function getPrimaryRoleLabel(roles: string[]): string | null {
   // Show the highest-privilege non-EMPLOYEE role
-  const roleOrder = ["SUPER_ADMIN", "HR_ADMIN", "FINANCE_ADMIN", "MANAGER", "TEAM_LEAD"];
+  const roleOrder = ["SUPER_ADMIN", "FINANCE_APPROVER", "HR_ADMIN", "FINANCE_ADMIN", "MANAGER", "TEAM_LEAD"];
   for (const role of roleOrder) {
     if (roles.includes(role)) {
       return formatRoleLabel(role);

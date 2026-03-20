@@ -11,7 +11,7 @@ import {
   normalizeCurrencyCode,
   extractLast4Digits
 } from "../../../../../lib/payment-details";
-import { notifyHrPaymentDetailsChanged } from "../../../../../lib/notifications/payment-details";
+import { notifyPaymentDetailsChanged } from "../../../../../lib/notifications/payment-details";
 import {
   createBulkNotifications,
   createNotification
@@ -379,8 +379,9 @@ export async function PUT(request: Request) {
       newValue: auditPayloadFromMasked(maskedDetail)
     });
 
-    await notifyHrPaymentDetailsChanged({
+    await notifyPaymentDetailsChanged({
       orgId: session.profile.org_id,
+      employeeId: session.profile.id,
       employeeName: session.profile.full_name,
       employeeEmail: session.profile.email,
       paymentMethod: maskedDetail.paymentMethod,
@@ -399,23 +400,27 @@ export async function PUT(request: Request) {
         message: hrRowsError.message
       });
     } else {
-      const hrRecipientIds = (hrRows ?? [])
+      const financeRecipientIds = (hrRows ?? [])
         .filter((row) => {
           const roles = Array.isArray(row.roles)
             ? row.roles.filter((role): role is string => typeof role === "string")
             : [];
-          return roles.includes("HR_ADMIN") || roles.includes("SUPER_ADMIN");
+          return (
+            roles.includes("FINANCE_ADMIN") ||
+            roles.includes("FINANCE_APPROVER") ||
+            roles.includes("SUPER_ADMIN")
+          );
         })
         .map((row) => row.id)
         .filter((id): id is string => typeof id === "string");
 
       await createBulkNotifications({
         orgId: session.profile.org_id,
-        userIds: hrRecipientIds,
+        userIds: financeRecipientIds,
         type: "payment_details_changed",
         title: "Payment details changed",
         body: `${session.profile.full_name} updated payment details. Change holds for 2 hours.`,
-        link: "/admin/payment-details"
+        link: `/people/${session.profile.id}?tab=compensation`
       });
     }
 

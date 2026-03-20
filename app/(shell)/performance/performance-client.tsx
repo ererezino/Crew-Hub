@@ -10,6 +10,7 @@ import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageHeader } from "../../../components/shared/page-header";
 import { ProgressRing } from "../../../components/shared/progress-ring";
 import { RatingCircles } from "../../../components/shared/rating-circles";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
@@ -405,17 +406,20 @@ function GoalsTab({
         <div className="performance-goals-header">
           <h2 className="section-title">{t("sections.goals")}</h2>
           <div className="performance-goals-controls">
-            <select
-              className="form-input performance-goals-filter"
+            <Select
               value={goalStatusFilter}
-              onChange={(event) => setGoalStatusFilter(event.currentTarget.value)}
-              aria-label={t("goals.filterByStatus")}
+              onValueChange={(value) => setGoalStatusFilter(value)}
             >
-              <option value="all">{t("goals.filterAll")}</option>
-              <option value="active">{t("goals.statusActive")}</option>
-              <option value="completed">{t("goals.statusCompleted")}</option>
-              <option value="cancelled">{t("goals.statusCancelled")}</option>
-            </select>
+              <SelectTrigger className="performance-goals-filter" aria-label={t("goals.filterByStatus")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("goals.filterAll")}</SelectItem>
+                <SelectItem value="active">{t("goals.statusActive")}</SelectItem>
+                <SelectItem value="completed">{t("goals.statusCompleted")}</SelectItem>
+                <SelectItem value="cancelled">{t("goals.statusCancelled")}</SelectItem>
+              </SelectContent>
+            </Select>
             <button type="button" className="button button-accent" onClick={openAddGoal}>
               {t("goals.addGoal")}
             </button>
@@ -576,20 +580,23 @@ function GoalsTab({
           </label>
 
           {!editingGoal && activeCycleId ? (
-            <label className="form-field" htmlFor="goal-cycle">
+            <div className="form-field">
               <span className="form-label">{t("goals.linkToCycle")}</span>
-              <select
-                id="goal-cycle"
-                className="form-input"
-                value={goalForm.cycleId}
-                onChange={(event) =>
-                  setGoalForm((current) => ({ ...current, cycleId: event.currentTarget.value }))
+              <Select
+                value={goalForm.cycleId || "__none__"}
+                onValueChange={(value) =>
+                  setGoalForm((current) => ({ ...current, cycleId: value === "__none__" ? "" : value }))
                 }
               >
-                <option value="">{t("goals.noCycle")}</option>
-                <option value={activeCycleId}>{activeCycleName ?? t("goals.activeCycle")}</option>
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t("goals.noCycle")}</SelectItem>
+                  <SelectItem value={activeCycleId}>{activeCycleName ?? t("goals.activeCycle")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           ) : null}
 
           <div className="settings-actions">
@@ -780,17 +787,21 @@ function ReviewActionItemsSection({
                 onChange={(event) => setNewDueDate(event.currentTarget.value)}
               />
             </label>
-            <label className="form-field">
+            <div className="form-field">
               <span className="form-label">{t("actionItems.assignToLabel")}</span>
-              <select
-                className="form-input"
+              <Select
                 value={newAssignedTo}
-                onChange={(event) => setNewAssignedTo(event.currentTarget.value)}
+                onValueChange={(value) => setNewAssignedTo(value)}
               >
-                <option value={assignment.employeeId}>{assignment.employeeName}</option>
-                <option value={assignment.reviewerId}>{assignment.reviewerName}</option>
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={assignment.employeeId}>{assignment.employeeName}</SelectItem>
+                  <SelectItem value={assignment.reviewerId}>{assignment.reviewerName}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <button
             type="button"

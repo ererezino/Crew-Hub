@@ -758,10 +758,11 @@ export async function sendExpenseApprovedEmail({
     if (!isEmailEnabled("expenseApproved")) return;
 
     const employee = await fetchRecipientProfile({ orgId, userId });
-    const financeEmails = await fetchEmailsByRole({
-      orgId,
-      role: "FINANCE_ADMIN"
-    });
+    const [financeAdminEmails, financeApproverEmails] = await Promise.all([
+      fetchEmailsByRole({ orgId, role: "FINANCE_ADMIN" }),
+      fetchEmailsByRole({ orgId, role: "FINANCE_APPROVER" })
+    ]);
+    const financeEmails = [...new Set([...financeAdminEmails, ...financeApproverEmails])];
     const appUrl = resolveAppUrl();
 
     // Template 10: to Employee
@@ -1158,12 +1159,14 @@ export async function sendSignatureRequestEmail({
 
 export async function sendPaymentDetailsUpdatedEmail({
   orgId,
+  employeeId,
   employeeName,
   employeeEmail,
   paymentMethod,
   changeEffectiveAt
 }: {
   orgId: string;
+  employeeId: string;
   employeeName: string;
   employeeEmail: string;
   paymentMethod: string;
@@ -1173,9 +1176,10 @@ export async function sendPaymentDetailsUpdatedEmail({
     if (isEmailFlowSuspended("paymentDetailsUpdated")) return;
     if (!isEmailEnabled("paymentDetailsUpdated")) return;
 
-    const hrEmails = await fetchEmailsByRole({ orgId, role: "HR_ADMIN" });
+    const financeEmails = await fetchEmailsByRole({ orgId, role: "FINANCE_ADMIN" });
+    const approverEmails = await fetchEmailsByRole({ orgId, role: "FINANCE_APPROVER" });
     const adminEmails = await fetchEmailsByRole({ orgId, role: "SUPER_ADMIN" });
-    const recipients = [...new Set([...hrEmails, ...adminEmails])];
+    const recipients = [...new Set([...financeEmails, ...approverEmails, ...adminEmails])];
 
     if (recipients.length === 0) return;
 
@@ -1197,7 +1201,7 @@ export async function sendPaymentDetailsUpdatedEmail({
       ].join("\n"),
       ctaButton: {
         label: t("paymentDetails.cta"),
-        url: `${appUrl}/people`,
+        url: `${appUrl}/people/${employeeId}?tab=compensation`,
         style: "primary"
       },
       ...emailLocaleOptions(t, locale)
@@ -2281,14 +2285,12 @@ export async function sendPayrollApprovedEmail({
   try {
     if (!isEmailEnabled("payrollApproval")) return;
 
-    const financeEmails = await fetchEmailsByRole({
-      orgId,
-      role: "FINANCE_ADMIN"
-    });
-    const adminEmails = await fetchEmailsByRole({
-      orgId,
-      role: "SUPER_ADMIN"
-    });
+    const [financeAdminEmails, financeApproverEmails, adminEmails] = await Promise.all([
+      fetchEmailsByRole({ orgId, role: "FINANCE_ADMIN" }),
+      fetchEmailsByRole({ orgId, role: "FINANCE_APPROVER" }),
+      fetchEmailsByRole({ orgId, role: "SUPER_ADMIN" })
+    ]);
+    const financeEmails = [...new Set([...financeAdminEmails, ...financeApproverEmails])];
     const approver = await fetchRecipientProfile({ orgId, userId });
     const appUrl = resolveAppUrl();
 

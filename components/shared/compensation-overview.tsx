@@ -35,8 +35,8 @@ type TimelineEvent = {
   tone: "success" | "warning" | "error" | "info" | "pending" | "draft" | "processing";
 };
 
-function approvalTone(approvedBy: string | null) {
-  return approvedBy ? "success" : "pending";
+function approvalTone(salaryStatus: string) {
+  return salaryStatus === "approved" ? "success" : "pending";
 }
 
 type CompensationTranslator = ReturnType<typeof useTranslations<"compensation">>;
@@ -176,7 +176,7 @@ export function CompensationOverview({
                   />
                 </p>
               </div>
-              <StatusBadge tone={approvalTone(currentSalary.approvedBy)}>
+              <StatusBadge tone={approvalTone(currentSalary.salaryStatus)}>
                 {approvalLabel(currentSalary.approvedBy, currentSalary.approvedByName, t)}
               </StatusBadge>
             </header>
@@ -253,8 +253,8 @@ export function CompensationOverview({
                     </td>
                     <td>{formatPayFrequencyLabel(record.payFrequency)}</td>
                     <td>
-                      <StatusBadge tone={approvalTone(record.approvedBy)}>
-                        {record.approvedBy ? t("approved") : t("pending")}
+                      <StatusBadge tone={approvalTone(record.salaryStatus)}>
+                        {record.salaryStatus === "approved" ? t("approved") : t("pending")}
                       </StatusBadge>
                     </td>
                     <td className="table-row-action-cell">

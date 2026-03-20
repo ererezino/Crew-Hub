@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { StatusBadge } from "../shared/status-badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
 import { formatProfileStatus } from "../../lib/format-labels";
 import { USER_ROLES } from "../../lib/navigation";
@@ -23,6 +24,7 @@ function getRoleLabel(role: AppRole, t: ReturnType<typeof useTranslations<"admin
     case "MANAGER": return t("directory.roleManager");
     case "HR_ADMIN": return t("directory.roleHrAdmin");
     case "FINANCE_ADMIN": return t("directory.roleFinanceAdmin");
+    case "FINANCE_APPROVER": return t("directory.roleFinanceApprover");
     case "SUPER_ADMIN": return t("directory.roleSuperAdmin");
   }
 }
@@ -95,39 +97,45 @@ export function UserListTable({
           />
         </label>
 
-        <label className="form-field" htmlFor="admin-users-filter-department">
+        <div className="form-field">
           <span className="form-label">{t('directory.departmentLabel')}</span>
-          <select
-            id="admin-users-filter-department"
-            className="form-input"
+          <Select
             value={departmentFilter}
-            onChange={(event) => setDepartmentFilter(event.currentTarget.value)}
+            onValueChange={(value) => setDepartmentFilter(value)}
           >
-            <option value="all">{t('directory.allDepartments')}</option>
-            {departmentOptions.map((department) => (
-              <option key={department} value={department}>
-                {department}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('directory.allDepartments')}</SelectItem>
+              {departmentOptions.map((department) => (
+                <SelectItem key={department} value={department}>
+                  {department}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label className="form-field" htmlFor="admin-users-filter-role">
+        <div className="form-field">
           <span className="form-label">{t('directory.roleLabel')}</span>
-          <select
-            id="admin-users-filter-role"
-            className="form-input"
+          <Select
             value={roleFilter}
-            onChange={(event) => setRoleFilter(event.currentTarget.value as "all" | AppRole)}
+            onValueChange={(value) => setRoleFilter(value as "all" | AppRole)}
           >
-            <option value="all">{t('directory.allRoles')}</option>
-            {USER_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {getRoleLabel(role, t)}
-              </option>
-            ))}
-          </select>
-        </label>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('directory.allRoles')}</SelectItem>
+              {USER_ROLES.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {getRoleLabel(role, t)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="data-table-container">

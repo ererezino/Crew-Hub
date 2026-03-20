@@ -143,7 +143,7 @@ export async function POST(
 
   const roles = session.profile.roles ?? [];
   const isFinanceOrSuper =
-    roles.includes("FINANCE_ADMIN") || roles.includes("SUPER_ADMIN");
+    roles.includes("FINANCE_ADMIN") || roles.includes("FINANCE_APPROVER") || roles.includes("SUPER_ADMIN");
 
   if (!isFinanceOrSuper) {
     return jsonResponse<null>(403, {

@@ -310,7 +310,7 @@ export async function canApproveAtStage({
   }
 
   if (stage === "finance") {
-    const hasFinanceRole = hasRole(userRoles, "FINANCE_ADMIN") || isSuperAdmin;
+    const hasFinanceRole = hasRole(userRoles, "FINANCE_ADMIN") || hasRole(userRoles, "FINANCE_APPROVER") || isSuperAdmin;
     if (!hasFinanceRole) return noAuth;
 
     return { allowed: true, delegationCtx: { actingFor: null, delegateType: null } };

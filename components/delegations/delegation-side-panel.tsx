@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "../shared/confirm-dialog";
 import { SlidePanel } from "../shared/slide-panel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import type {
   DelegationRecord,
   DelegationFormValues,
@@ -136,46 +137,52 @@ export function DelegationSidePanel({
         <div className="delegation-form">
           {/* Principal */}
           <div className="delegation-form-field">
-            <label htmlFor="delegation-principal">{t("field.principal")}</label>
+            <span>{t("field.principal")}</span>
             <p className="delegation-field-hint">{t("field.principalHint")}</p>
-            <select
-              id="delegation-principal"
-              className="delegation-select"
-              value={form.principalId}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, principalId: e.target.value }))
+            <Select
+              value={form.principalId || "__none__"}
+              onValueChange={(value) =>
+                setForm((prev) => ({ ...prev, principalId: value === "__none__" ? "" : value }))
               }
             >
-              <option value="">{t("field.selectPerson")}</option>
-              {principalOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.fullName}
-                  {p.department ? ` · ${p.department}` : ""}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t("field.selectPerson")}</SelectItem>
+                {principalOptions.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.fullName}
+                    {p.department ? ` · ${p.department}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Delegate */}
           <div className="delegation-form-field">
-            <label htmlFor="delegation-delegate">{t("field.delegate")}</label>
+            <span>{t("field.delegate")}</span>
             <p className="delegation-field-hint">{t("field.delegateHint")}</p>
-            <select
-              id="delegation-delegate"
-              className="delegation-select"
-              value={form.delegateId}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, delegateId: e.target.value }))
+            <Select
+              value={form.delegateId || "__none__"}
+              onValueChange={(value) =>
+                setForm((prev) => ({ ...prev, delegateId: value === "__none__" ? "" : value }))
               }
             >
-              <option value="">{t("field.selectPerson")}</option>
-              {delegateOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.fullName}
-                  {p.department ? ` · ${p.department}` : ""}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t("field.selectPerson")}</SelectItem>
+                {delegateOptions.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.fullName}
+                    {p.department ? ` · ${p.department}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Delegation Type */}

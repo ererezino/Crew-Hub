@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { Employee360 } from "../../../../components/people/employee-360";
 import { ErrorState } from "../../../../components/shared/error-state";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
@@ -309,6 +310,7 @@ export function PeopleOverviewClient({
     MANAGER: tCommon('role.manager'),
     HR_ADMIN: tCommon('role.hrAdmin'),
     FINANCE_ADMIN: tCommon('role.financeAdmin'),
+    FINANCE_APPROVER: tCommon('role.financeApprover'),
     SUPER_ADMIN: tCommon('role.superAdmin')
   }), [tCommon]);
 
@@ -1297,24 +1299,26 @@ export function PeopleOverviewClient({
                 />
               </label>
 
-              <label className="form-field" htmlFor="offboard-reason">
+              <div className="form-field">
                 <span className="form-label">{t('offboardModal.reasonLabel')}</span>
-                <select
-                  id="offboard-reason"
-                  className="form-input"
-                  required
-                  value={offboardReason}
-                  onChange={(e) => setOffboardReason(e.currentTarget.value)}
+                <Select
+                  value={offboardReason || "__none__"}
+                  onValueChange={(value) => setOffboardReason(value === "__none__" ? "" : value)}
                   disabled={isSubmittingOffboard}
                 >
-                  <option value="">{t('offboardModal.selectReason')}</option>
-                  <option value="resignation">{t('offboardModal.resignation')}</option>
-                  <option value="redundancy">{t('offboardModal.redundancy')}</option>
-                  <option value="performance">{t('offboardModal.performance')}</option>
-                  <option value="contract_end">{t('offboardModal.contractEnd')}</option>
-                  <option value="other">{t('offboardModal.other')}</option>
-                </select>
-              </label>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t('offboardModal.selectReason')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t('offboardModal.selectReason')}</SelectItem>
+                    <SelectItem value="resignation">{t('offboardModal.resignation')}</SelectItem>
+                    <SelectItem value="redundancy">{t('offboardModal.redundancy')}</SelectItem>
+                    <SelectItem value="performance">{t('offboardModal.performance')}</SelectItem>
+                    <SelectItem value="contract_end">{t('offboardModal.contractEnd')}</SelectItem>
+                    <SelectItem value="other">{t('offboardModal.other')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               <label className="form-field" htmlFor="offboard-confirm-name">
                 <span className="form-label">{t('offboardModal.confirmLabel', { name: person.fullName })}</span>
@@ -1666,89 +1670,100 @@ export function PeopleOverviewClient({
               </div>
             </fieldset>
 
-            <label className="form-field" htmlFor="admin-edit-department">
+            <div className="form-field">
               <span className="form-label">{t('adminEditPanel.department')}</span>
-              <select
-                id="admin-edit-department"
-                className="form-input"
-                value={adminEditValues.department}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
+              <Select
+                value={adminEditValues.department || "__none__"}
+                onValueChange={(value) => {
+                  const val = value === "__none__" ? "" : value;
                   setAdminEditValues((prev) => ({ ...prev, department: val }));
                 }}
               >
-                <option value="">{t('adminEditPanel.noDepartment')}</option>
-                {DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept}>
-                    {dept}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('adminEditPanel.noDepartment')}</SelectItem>
+                  {DEPARTMENTS.map((dept) => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <label className="form-field" htmlFor="admin-edit-manager">
+            <div className="form-field">
               <span className="form-label">{t('adminEditPanel.manager')}</span>
-              <select
-                id="admin-edit-manager"
-                className="form-input"
-                value={adminEditValues.managerId}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
+              <Select
+                value={adminEditValues.managerId || "__none__"}
+                onValueChange={(value) => {
+                  const val = value === "__none__" ? "" : value;
                   setAdminEditValues((prev) => ({ ...prev, managerId: val }));
                 }}
               >
-                <option value="">{t('adminEditPanel.noManager')}</option>
-                {allPeople
-                  .filter((p) => p.id !== person.id && p.status === "active")
-                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
-                  .map((p) => (
-                    <option key={`admin-mgr-${p.id}`} value={p.id}>
-                      {p.fullName}
-                    </option>
-                  ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('adminEditPanel.noManager')}</SelectItem>
+                  {allPeople
+                    .filter((p) => p.id !== person.id && p.status === "active")
+                    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                    .map((p) => (
+                      <SelectItem key={`admin-mgr-${p.id}`} value={p.id}>
+                        {p.fullName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <label className="form-field" htmlFor="admin-edit-team-lead">
+            <div className="form-field">
               <span className="form-label">{t('adminEditPanel.teamLead')}</span>
-              <select
-                id="admin-edit-team-lead"
-                className="form-input"
-                value={adminEditValues.teamLeadId}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
+              <Select
+                value={adminEditValues.teamLeadId || "__none__"}
+                onValueChange={(value) => {
+                  const val = value === "__none__" ? "" : value;
                   setAdminEditValues((prev) => ({ ...prev, teamLeadId: val }));
                 }}
               >
-                <option value="">{t('adminEditPanel.noTeamLead')}</option>
-                {allPeople
-                  .filter((p) => p.id !== person.id && p.status === "active")
-                  .sort((a, b) => a.fullName.localeCompare(b.fullName))
-                  .map((p) => (
-                    <option key={`admin-tl-${p.id}`} value={p.id}>
-                      {p.fullName}
-                    </option>
-                  ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">{t('adminEditPanel.noTeamLead')}</SelectItem>
+                  {allPeople
+                    .filter((p) => p.id !== person.id && p.status === "active")
+                    .sort((a, b) => a.fullName.localeCompare(b.fullName))
+                    .map((p) => (
+                      <SelectItem key={`admin-tl-${p.id}`} value={p.id}>
+                        {p.fullName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <label className="form-field" htmlFor="admin-edit-status">
+            <div className="form-field">
               <span className="form-label">{t('adminEditPanel.statusLabel')}</span>
-              <select
-                id="admin-edit-status"
-                className="form-input"
+              <Select
                 value={adminEditValues.status}
-                onChange={(e) => {
-                  const val = e.currentTarget.value;
-                  setAdminEditValues((prev) => ({ ...prev, status: val }));
+                onValueChange={(value) => {
+                  setAdminEditValues((prev) => ({ ...prev, status: value }));
                 }}
               >
-                <option value="active">{t('adminEditPanel.statusActive')}</option>
-                <option value="onboarding">{t('adminEditPanel.statusOnboarding')}</option>
-                <option value="offboarding">{t('adminEditPanel.statusOffboarding')}</option>
-                <option value="inactive">{t('adminEditPanel.statusInactive')}</option>
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">{t('adminEditPanel.statusActive')}</SelectItem>
+                  <SelectItem value="onboarding">{t('adminEditPanel.statusOnboarding')}</SelectItem>
+                  <SelectItem value="offboarding">{t('adminEditPanel.statusOffboarding')}</SelectItem>
+                  <SelectItem value="inactive">{t('adminEditPanel.statusInactive')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="slide-panel-actions">
               <button type="button" className="button button-ghost" onClick={closeAdminEdit} disabled={isAdminEditSaving}>

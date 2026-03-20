@@ -12,6 +12,7 @@ function canViewExpenseReports(roles: readonly UserRole[]): boolean {
     hasRole(roles, "MANAGER") ||
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN")
   );
 }

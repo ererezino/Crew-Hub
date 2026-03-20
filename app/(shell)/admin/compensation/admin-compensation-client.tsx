@@ -37,6 +37,7 @@ import {
   type CompensationMutationResponse,
   type EquityGrantRecord
 } from "../../../../types/compensation";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
 
 type AppLocale = "en" | "fr";
@@ -63,7 +64,6 @@ type SalaryFormValues = {
   employmentType: (typeof COMPENSATION_EMPLOYMENT_TYPES)[number];
   effectiveFrom: string;
   effectiveTo: string;
-  approve: boolean;
 };
 
 type AllowanceFormValues = {
@@ -106,8 +106,7 @@ const salaryFormSchema = z
       .string()
       .trim()
       .regex(isoDatePattern, "Effective from date must be in YYYY-MM-DD format."),
-    effectiveTo: z.string().trim(),
-    approve: z.boolean()
+    effectiveTo: z.string().trim()
   })
   .superRefine((values, context) => {
     if (values.effectiveTo.length > 0 && !isoDatePattern.test(values.effectiveTo)) {
@@ -253,8 +252,7 @@ function validateSalary(values: SalaryFormValues): SalaryFormErrors {
     payFrequency: fieldErrors.payFrequency?.[0],
     employmentType: fieldErrors.employmentType?.[0],
     effectiveFrom: fieldErrors.effectiveFrom?.[0],
-    effectiveTo: fieldErrors.effectiveTo?.[0],
-    approve: fieldErrors.approve?.[0]
+    effectiveTo: fieldErrors.effectiveTo?.[0]
   };
 }
 
@@ -302,15 +300,14 @@ function validateEquity(values: EquityFormValues): EquityFormErrors {
   };
 }
 
-function initialSalaryForm(canApprove: boolean): SalaryFormValues {
+function initialSalaryForm(): SalaryFormValues {
   return {
     baseSalaryAmount: "",
     currency: "USD",
     payFrequency: "monthly",
     employmentType: "contractor",
     effectiveFrom: todayIsoDate(),
-    effectiveTo: "",
-    approve: canApprove
+    effectiveTo: ""
   };
 }
 
@@ -342,7 +339,11 @@ function initialEquityForm(canApprove: boolean): EquityFormValues {
   };
 }
 
-function salaryApprovalTone(approvedBy: string | null) {
+function salaryApprovalTone(salaryStatus: string) {
+  return salaryStatus === "approved" ? "success" : "pending";
+}
+
+function equityApprovalTone(approvedBy: string | null) {
   return approvedBy ? "success" : "pending";
 }
 
@@ -400,7 +401,7 @@ export function AdminCompensationClient({
 
   const [isSalaryPanelOpen, setIsSalaryPanelOpen] = useState(false);
   const [salaryFormValues, setSalaryFormValues] = useState<SalaryFormValues>(
-    initialSalaryForm(canApprove)
+    initialSalaryForm()
   );
   const [salaryFormErrors, setSalaryFormErrors] = useState<SalaryFormErrors>({});
   const [isSubmittingSalary, setIsSubmittingSalary] = useState(false);
@@ -527,7 +528,7 @@ export function AdminCompensationClient({
   };
 
   const resetSalaryPanel = () => {
-    setSalaryFormValues(initialSalaryForm(canApprove));
+    setSalaryFormValues(initialSalaryForm());
     setSalaryFormErrors({});
     setIsSalaryPanelOpen(false);
   };
@@ -576,8 +577,7 @@ export function AdminCompensationClient({
           payFrequency: salaryFormValues.payFrequency,
           employmentType: salaryFormValues.employmentType,
           effectiveFrom: salaryFormValues.effectiveFrom,
-          effectiveTo: salaryFormValues.effectiveTo || null,
-          approve: canApprove ? salaryFormValues.approve : false
+          effectiveTo: salaryFormValues.effectiveTo || null
         })
       });
 
@@ -847,22 +847,22 @@ export function AdminCompensationClient({
       />
 
       <section className="compensation-admin-employee-card" aria-label={t('employeeSelector.ariaLabel')}>
-        <label className="form-field" htmlFor="compensation-employee-selector">
+        <div className="form-field">
           <span className="form-label">{t('employeeSelector.label')}</span>
-          <select
-            id="compensation-employee-selector"
-            className="form-input"
-            value={selectedEmployeeId ?? ""}
-            onChange={(event) => setSelectedEmployeeId(event.currentTarget.value || null)}
-          >
-            <option value="">{t('employeeSelector.placeholder')}</option>
-            {(compensationQuery.data?.employees ?? []).map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.fullName}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select value={selectedEmployeeId ?? "__none__"} onValueChange={(value) => setSelectedEmployeeId(value === "__none__" ? null : value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">{t('employeeSelector.placeholder')}</SelectItem>
+              {(compensationQuery.data?.employees ?? []).map((employee) => (
+                <SelectItem key={employee.id} value={employee.id}>
+                  {employee.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {selectedEmployeeId ? (
           <Link
             className="button"
@@ -927,7 +927,7 @@ export function AdminCompensationClient({
                 className="button button-accent"
                 onClick={() => {
                   setSalaryFormValues({
-                    ...initialSalaryForm(canApprove),
+                    ...initialSalaryForm(),
                     currency: selectedEmployee.primaryCurrency,
                     employmentType: selectedEmployee.employmentType
                   });
@@ -951,8 +951,8 @@ export function AdminCompensationClient({
                       />
                     </p>
                   </div>
-                  <StatusBadge tone={salaryApprovalTone(currentSalary.approvedBy)}>
-                    {currentSalary.approvedBy ? t('salary.approved') : t('salary.pendingApproval')}
+                  <StatusBadge tone={salaryApprovalTone(currentSalary.salaryStatus)}>
+                    {currentSalary.salaryStatus === "approved" ? t('salary.approved') : t('salary.pendingApproval')}
                   </StatusBadge>
                 </header>
 
@@ -1028,8 +1028,8 @@ export function AdminCompensationClient({
                         </td>
                         <td>{formatPayFrequencyLabel(record.payFrequency)}</td>
                         <td>
-                          <StatusBadge tone={salaryApprovalTone(record.approvedBy)}>
-                            {record.approvedBy ? t('salary.approved') : t('salary.pending')}
+                          <StatusBadge tone={salaryApprovalTone(record.salaryStatus)}>
+                            {record.salaryStatus === "approved" ? t('salary.approved') : t('salary.pending')}
                           </StatusBadge>
                         </td>
                         <td className="table-row-action-cell">
@@ -1041,14 +1041,14 @@ export function AdminCompensationClient({
                                 onClick={() =>
                                   handleSalaryApproval(
                                     record.id,
-                                    record.approvedBy ? "revoke" : "approve"
+                                    record.salaryStatus === "approved" ? "revoke" : "approve"
                                   )
                                 }
                                 disabled={isUpdatingSalaryApprovalId === record.id}
                               >
                                 {isUpdatingSalaryApprovalId === record.id
                                   ? tCommon('working')
-                                  : record.approvedBy
+                                  : record.salaryStatus === "approved"
                                     ? t('salary.revoke')
                                     : t('salary.approve')}
                               </button>
@@ -1266,7 +1266,7 @@ export function AdminCompensationClient({
                             </div>
                           </td>
                           <td>
-                            <StatusBadge tone={salaryApprovalTone(grant.approvedBy)}>
+                            <StatusBadge tone={equityApprovalTone(grant.approvedBy)}>
                               {grant.approvedBy ? t('equity.approved') : t('equity.pending')}
                             </StatusBadge>
                           </td>
@@ -1363,65 +1363,67 @@ export function AdminCompensationClient({
               ) : null}
             </label>
 
-            <label className="form-field" htmlFor="salary-pay-frequency">
+            <div className="form-field">
               <span className="form-label">{t('salaryPanel.payFrequencyLabel')}</span>
-              <select
-                id="salary-pay-frequency"
-                className={
-                  salaryFormErrors.payFrequency ? "form-input form-input-error" : "form-input"
-                }
+              <Select
                 value={salaryFormValues.payFrequency}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   const nextValues = {
                     ...salaryFormValues,
-                    payFrequency: event.currentTarget.value as SalaryFormValues["payFrequency"]
+                    payFrequency: value as SalaryFormValues["payFrequency"]
                   };
 
                   setSalaryFormValues(nextValues);
                   setSalaryFormErrors(validateSalary(nextValues));
                 }}
               >
-                {COMPENSATION_PAY_FREQUENCIES.map((value) => (
-                  <option key={value} value={value}>
-                    {formatPayFrequencyLabel(value)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMPENSATION_PAY_FREQUENCIES.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {formatPayFrequencyLabel(value)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {salaryFormErrors.payFrequency ? (
                 <p className="form-field-error">{salaryFormErrors.payFrequency}</p>
               ) : null}
-            </label>
+            </div>
           </div>
 
           <div className="timeoff-form-grid">
-            <label className="form-field" htmlFor="salary-employment-type">
+            <div className="form-field">
               <span className="form-label">{t('salaryPanel.employmentTypeLabel')}</span>
-              <select
-                id="salary-employment-type"
-                className={
-                  salaryFormErrors.employmentType ? "form-input form-input-error" : "form-input"
-                }
+              <Select
                 value={salaryFormValues.employmentType}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   const nextValues = {
                     ...salaryFormValues,
-                    employmentType: event.currentTarget.value as SalaryFormValues["employmentType"]
+                    employmentType: value as SalaryFormValues["employmentType"]
                   };
 
                   setSalaryFormValues(nextValues);
                   setSalaryFormErrors(validateSalary(nextValues));
                 }}
               >
-                {COMPENSATION_EMPLOYMENT_TYPES.map((value) => (
-                  <option key={value} value={value}>
-                    {formatEmploymentTypeLabel(value)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMPENSATION_EMPLOYMENT_TYPES.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {formatEmploymentTypeLabel(value)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {salaryFormErrors.employmentType ? (
                 <p className="form-field-error">{salaryFormErrors.employmentType}</p>
               ) : null}
-            </label>
+            </div>
 
             <label className="form-field" htmlFor="salary-effective-from">
               <span className="form-label">{t('salaryPanel.effectiveFromLabel')}</span>
@@ -1472,26 +1474,6 @@ export function AdminCompensationClient({
             ) : null}
           </label>
 
-          {canApprove ? (
-            <label className="settings-checkbox" htmlFor="salary-approve">
-              <input
-                id="salary-approve"
-                type="checkbox"
-                checked={salaryFormValues.approve}
-                onChange={(event) => {
-                  const nextValues = {
-                    ...salaryFormValues,
-                    approve: event.currentTarget.checked
-                  };
-
-                  setSalaryFormValues(nextValues);
-                  setSalaryFormErrors(validateSalary(nextValues));
-                }}
-              />
-              <span>{t('salaryPanel.approveCheckbox')}</span>
-            </label>
-          ) : null}
-
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={resetSalaryPanel}>
               {tCommon('cancel')}
@@ -1511,32 +1493,35 @@ export function AdminCompensationClient({
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleAllowanceSubmit} noValidate>
           <div className="timeoff-form-grid">
-            <label className="form-field" htmlFor="allowance-type">
+            <div className="form-field">
               <span className="form-label">{t('allowancePanel.typeLabel')}</span>
-              <select
-                id="allowance-type"
-                className={allowanceFormErrors.type ? "form-input form-input-error" : "form-input"}
+              <Select
                 value={allowanceFormValues.type}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   const nextValues = {
                     ...allowanceFormValues,
-                    type: event.currentTarget.value as AllowanceFormValues["type"]
+                    type: value as AllowanceFormValues["type"]
                   };
 
                   setAllowanceFormValues(nextValues);
                   setAllowanceFormErrors(validateAllowance(nextValues));
                 }}
               >
-                {ALLOWANCE_TYPES.map((value) => (
-                  <option key={value} value={value}>
-                    {formatAllowanceTypeLabel(value)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ALLOWANCE_TYPES.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {formatAllowanceTypeLabel(value)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {allowanceFormErrors.type ? (
                 <p className="form-field-error">{allowanceFormErrors.type}</p>
               ) : null}
-            </label>
+            </div>
 
             <label className="form-field" htmlFor="allowance-amount">
               <span className="form-label">{t('allowancePanel.amountLabel')}</span>
@@ -1697,32 +1682,35 @@ export function AdminCompensationClient({
       >
         <form className="slide-panel-form-wrapper" onSubmit={handleEquitySubmit} noValidate>
           <div className="timeoff-form-grid">
-            <label className="form-field" htmlFor="equity-grant-type">
+            <div className="form-field">
               <span className="form-label">{t('equityPanel.grantTypeLabel')}</span>
-              <select
-                id="equity-grant-type"
-                className={equityFormErrors.grantType ? "form-input form-input-error" : "form-input"}
+              <Select
                 value={equityFormValues.grantType}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   const nextValues = {
                     ...equityFormValues,
-                    grantType: event.currentTarget.value as EquityFormValues["grantType"]
+                    grantType: value as EquityFormValues["grantType"]
                   };
 
                   setEquityFormValues(nextValues);
                   setEquityFormErrors(validateEquity(nextValues));
                 }}
               >
-                {EQUITY_GRANT_TYPES.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EQUITY_GRANT_TYPES.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {equityFormErrors.grantType ? (
                 <p className="form-field-error">{equityFormErrors.grantType}</p>
               ) : null}
-            </label>
+            </div>
 
             <label className="form-field" htmlFor="equity-number-of-shares">
               <span className="form-label">{t('equityPanel.numberOfSharesLabel')}</span>
@@ -1772,32 +1760,35 @@ export function AdminCompensationClient({
               ) : null}
             </label>
 
-            <label className="form-field" htmlFor="equity-status">
+            <div className="form-field">
               <span className="form-label">{t('equityPanel.statusLabel')}</span>
-              <select
-                id="equity-status"
-                className={equityFormErrors.status ? "form-input form-input-error" : "form-input"}
+              <Select
                 value={equityFormValues.status}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   const nextValues = {
                     ...equityFormValues,
-                    status: event.currentTarget.value as EquityFormValues["status"]
+                    status: value as EquityFormValues["status"]
                   };
 
                   setEquityFormValues(nextValues);
                   setEquityFormErrors(validateEquity(nextValues));
                 }}
               >
-                {EQUITY_GRANT_STATUSES.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EQUITY_GRANT_STATUSES.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {equityFormErrors.status ? (
                 <p className="form-field-error">{equityFormErrors.status}</p>
               ) : null}
-            </label>
+            </div>
           </div>
 
           <div className="timeoff-form-grid">

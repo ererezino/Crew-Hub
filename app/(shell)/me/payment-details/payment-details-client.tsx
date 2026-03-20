@@ -16,6 +16,7 @@ import {
   type PaymentDetailsUpdatePayload,
   type PaymentMethod
 } from "../../../../types/payment-details";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
 
 type AppLocale = "en" | "fr";
@@ -312,25 +313,6 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
       });
     };
 
-  const handleMethodChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const nextMethod = event.currentTarget.value as PaymentMethod;
-
-    const nextValues = {
-      ...formValues,
-      paymentMethod: nextMethod
-    };
-
-    const nextTouched: PaymentDetailsFormTouched = {
-      ...INITIAL_TOUCHED,
-      paymentMethod: true,
-      currency: formTouched.currency
-    };
-
-    setFormValues(nextValues);
-    setFormTouched(nextTouched);
-    setFormErrors(getFormErrors(nextValues, nextTouched));
-  };
-
   const performSave = async () => {
     const payload = buildPayloadFromForm(formValues);
 
@@ -510,27 +492,41 @@ export function MePaymentDetailsClient({ embedded = false }: { embedded?: boolea
 
             <form className="settings-form" onSubmit={handleSubmit} noValidate>
               <div className="timeoff-form-grid">
-                <label className="form-field" htmlFor="payment-method">
+                <div className="form-field">
                   <span className="form-label">{t('paymentMethodLabel')}</span>
-                  <select
-                    id="payment-method"
-                    className={
-                      formErrors.paymentMethod ? "form-input form-input-error" : "form-input"
-                    }
+                  <Select
                     value={formValues.paymentMethod}
-                    onChange={handleMethodChange}
-                    onBlur={() => markTouched("paymentMethod")}
+                    onValueChange={(value) => {
+                      const nextMethod = value as PaymentMethod;
+                      const nextValues = {
+                        ...formValues,
+                        paymentMethod: nextMethod
+                      };
+                      const nextTouched: PaymentDetailsFormTouched = {
+                        ...INITIAL_TOUCHED,
+                        paymentMethod: true,
+                        currency: formTouched.currency
+                      };
+                      setFormValues(nextValues);
+                      setFormTouched(nextTouched);
+                      setFormErrors(getFormErrors(nextValues, nextTouched));
+                    }}
                   >
-                    {PAYMENT_METHODS.map((method) => (
-                      <option key={method} value={method}>
-                        {methodLabel(method)}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map((method) => (
+                        <SelectItem key={method} value={method}>
+                          {methodLabel(method)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {formErrors.paymentMethod ? (
                     <p className="form-field-error">{formErrors.paymentMethod}</p>
                   ) : null}
-                </label>
+                </div>
 
                 <label className="form-field" htmlFor="payment-currency">
                   <span className="form-label">{t('currencyLabel')}</span>

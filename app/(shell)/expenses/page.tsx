@@ -23,6 +23,7 @@ export default async function ExpensesPage() {
   const canApprove =
     hasRole(session.profile.roles, "MANAGER") ||
     hasRole(session.profile.roles, "FINANCE_ADMIN") ||
+    hasRole(session.profile.roles, "FINANCE_APPROVER") ||
     hasRole(session.profile.roles, "SUPER_ADMIN");
 
   const canViewReports =
@@ -32,6 +33,7 @@ export default async function ExpensesPage() {
   const isAdmin =
     hasRole(session.profile.roles, "HR_ADMIN") ||
     hasRole(session.profile.roles, "FINANCE_ADMIN") ||
+    hasRole(session.profile.roles, "FINANCE_APPROVER") ||
     hasRole(session.profile.roles, "SUPER_ADMIN");
 
   // Server-fetch current month's expenses so the table renders in the initial HTML.

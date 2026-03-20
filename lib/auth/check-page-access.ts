@@ -17,6 +17,7 @@ import {
   isNavItemVisibleForUser,
   sanitizeRoles
 } from "../access-control";
+import { logger } from "../logger";
 import type { UserRole } from "../navigation";
 import { hasRole } from "../roles";
 import { createSupabaseServiceRoleClient } from "../supabase/service-role";
@@ -40,7 +41,7 @@ type PageAccessResult = {
  * when multiple page components check access in the same render.
  */
 const fetchNavAccessConfig = cache(
-  async (orgId: string): Promise<NavAccessRow[]> => {
+  async (orgId: string): Promise<NavAccessRow[] | null> => {
     const supabase = createSupabaseServiceRoleClient();
 
     const { data, error } = await supabase
@@ -50,11 +51,15 @@ const fetchNavAccessConfig = cache(
       )
       .eq("org_id", orgId);
 
-    if (error || !data) {
-      return [];
+    if (error) {
+      logger.warn("Access config lookup failed for page access.", {
+        orgId,
+        message: error.message
+      });
+      return null;
     }
 
-    return data as NavAccessRow[];
+    return (data ?? []) as NavAccessRow[];
   }
 );
 
@@ -67,7 +72,9 @@ const fetchNavAccessConfig = cache(
  * - Checks revoked_employee_ids for per-person revokes (takes precedence)
  * - SUPER_ADMIN always has access
  *
- * Falls back to default role-based access if no config rows exist.
+ * Falls back to default role-based access only when no config rows exist.
+ * If the config lookup itself fails, access is denied to avoid widening
+ * permissions during transient database errors.
  */
 export async function checkPageAccess(
   navItemKey: string
@@ -86,6 +93,9 @@ export async function checkPageAccess(
   }
 
   const rows = await fetchNavAccessConfig(profile.org_id);
+  if (rows === null) {
+    return { allowed: false, profile };
+  }
   const row = rows.find((r) => r.nav_item_key === navItemKey);
 
   const visibleToRoles: UserRole[] = row
@@ -117,6 +127,9 @@ export async function checkPageAccessForProfile(
   }
 
   const rows = await fetchNavAccessConfig(profile.org_id);
+  if (rows === null) {
+    return false;
+  }
   const row = rows.find((r) => r.nav_item_key === navItemKey);
 
   const visibleToRoles: UserRole[] = row

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
+
 type EmployeeOption = {
   id: string;
   fullName: string;
@@ -48,17 +50,21 @@ export function EmployeePickerField({
   );
 
   return (
-    <select
-      className="form-input"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
+    <Select
+      value={value || "__none__"}
+      onValueChange={(val) => onChange(val === "__none__" ? "" : val)}
     >
-      <option value="">{placeholder}</option>
-      {sortedEmployees.map((emp) => (
-        <option key={emp.id} value={emp.id}>
-          {emp.fullName}
-        </option>
-      ))}
-    </select>
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">{placeholder}</SelectItem>
+        {sortedEmployees.map((emp) => (
+          <SelectItem key={emp.id} value={emp.id}>
+            {emp.fullName}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

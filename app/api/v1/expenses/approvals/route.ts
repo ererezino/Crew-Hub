@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { logAudit } from "../../../../../lib/audit";
+import { formatCurrency } from "../../../../../lib/format-currency";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import {
   getEffectiveApproverScope,
@@ -96,19 +97,7 @@ function resolveStage({
 }
 
 function formatMinorUnits(amount: number, currency: string): string {
-  const safeAmount = parseIntegerAmount(amount);
-  const major = safeAmount / 100;
-
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(major);
-  } catch {
-    return `${currency} ${major.toFixed(2)}`;
-  }
+  return formatCurrency(parseIntegerAmount(amount) / 100, currency);
 }
 
 async function getManagerStageScope({
@@ -157,7 +146,7 @@ async function listFinanceAdminIds({
   }
 
   return parsedRows.data
-    .filter((row) => row.roles?.includes("FINANCE_ADMIN"))
+    .filter((row) => row.roles?.includes("FINANCE_ADMIN") || row.roles?.includes("FINANCE_APPROVER"))
     .map((row) => row.id);
 }
 

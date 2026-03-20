@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { getCountryOptions } from "../../../../lib/countries";
 import type { AppLocale } from "../../../../i18n/locales";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
@@ -306,67 +307,71 @@ export function ExpenseReportsClient() {
           />
         </label>
 
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t("filterCountry")}</span>
-          <select
-            className="form-input analytics-filter-select"
-            value={country}
-            onChange={(event) => setCountry(event.currentTarget.value)}
-          >
-            <option value="all">{t("allCountries")}</option>
-            {getCountryOptions(locale).map((opt) => (
-              <option key={opt.code} value={opt.code}>{opt.name}</option>
-            ))}
-          </select>
-        </label>
+          <Select value={country} onValueChange={(value) => setCountry(value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("allCountries")}</SelectItem>
+              {getCountryOptions(locale).map((opt) => (
+                <SelectItem key={opt.code} value={opt.code}>{opt.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t("filterDepartment")}</span>
-          <select
-            className="form-input analytics-filter-select"
-            value={department}
-            onChange={(event) => setDepartment(event.currentTarget.value)}
-          >
-            <option value="all">{t("allDepartments")}</option>
-            {uniqueDepartments.map((dept) => (
-              <option key={dept} value={dept}>
-                {dept}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select value={department} onValueChange={(value) => setDepartment(value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("allDepartments")}</SelectItem>
+              {uniqueDepartments.map((dept) => (
+                <SelectItem key={dept} value={dept}>
+                  {dept}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t("filterStatus")}</span>
-          <select
-            className="form-input analytics-filter-select"
-            value={status}
-            onChange={(event) => setStatus(event.currentTarget.value)}
-          >
-            <option value="all">{t("allStatuses")}</option>
-            {EXPENSE_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {getExpenseStatusLabel(s)}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select value={status} onValueChange={(value) => setStatus(value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("allStatuses")}</SelectItem>
+              {EXPENSE_STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {getExpenseStatusLabel(s)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <label className="form-field">
+        <div className="form-field">
           <span className="form-label">{t("filterCategory")}</span>
-          <select
-            className="form-input analytics-filter-select"
-            value={category}
-            onChange={(event) => setCategory(event.currentTarget.value)}
-          >
-            <option value="all">{t("allCategories")}</option>
-            {EXPENSE_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {getExpenseCategoryLabel(cat)}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select value={category} onValueChange={(value) => setCategory(value)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("allCategories")}</SelectItem>
+              {EXPENSE_CATEGORIES.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {getExpenseCategoryLabel(cat)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <p className="settings-card-description">{t("showingMonth", { month: formatMonthLabel(month) })}</p>
       </section>

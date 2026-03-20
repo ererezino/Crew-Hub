@@ -20,6 +20,7 @@ import {
   buildMeta,
   canManagePayroll,
   jsonResponse,
+  PAYROLL_RUN_SELECT_COLUMNS,
   payrollAdjustmentSchema,
   payrollDeductionSchema,
   payrollRunRowSchema
@@ -96,7 +97,7 @@ export async function POST(
     const { data: rawRun, error: runError } = await supabase
       .from("payroll_runs")
       .select(
-        "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, created_at, updated_at"
+        PAYROLL_RUN_SELECT_COLUMNS
       )
       .eq("org_id", session.profile.org_id)
       .eq("id", runId)
@@ -240,6 +241,7 @@ export async function POST(
       pay_period: string;
       file_path: string;
       generated_at: string;
+      statement_type: string;
     }[] = [];
     const generatedStatements: GeneratePayslipsResultItem[] = [];
     let skippedCount = 0;
@@ -324,7 +326,8 @@ export async function POST(
         org_id: item.org_id,
         pay_period: payPeriod,
         file_path: filePath,
-        generated_at: generatedAt
+        generated_at: generatedAt,
+        statement_type: "native"
       });
     }
 

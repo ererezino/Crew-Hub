@@ -3,8 +3,8 @@ import { z } from "zod";
 import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
+import { currentMonthPeriod, getCurrencyTotal, semiMonthlyCycleDates } from "../../../../../lib/payroll/runs";
 import { persistPayrollRunCalculation } from "../../../../../lib/payroll/persist-payroll-run-calculation";
-import { currentMonthPeriod, getCurrencyTotal } from "../../../../../lib/payroll/runs";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type {
   CalculatePayrollRunResponseData,
@@ -16,6 +16,7 @@ import {
   canManagePayroll,
   canViewPayroll,
   jsonResponse,
+  PAYROLL_RUN_SELECT_COLUMNS,
   payrollRunRowSchema,
   toPayrollRunSummary
 } from "../_helpers";
@@ -115,7 +116,7 @@ export async function GET() {
       supabase
         .from("payroll_runs")
         .select(
-          "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, created_at, updated_at"
+          PAYROLL_RUN_SELECT_COLUMNS
         )
         .eq("org_id", session.profile.org_id)
         .is("deleted_at", null)
@@ -296,6 +297,13 @@ export async function POST(request: Request) {
   try {
     const supabase = await createSupabaseServerClient();
 
+    // Compute semimonthly cycle dates from the pay period
+    const periodStartDate = new Date(`${payPeriodStart}T00:00:00Z`);
+    const periodYear = periodStartDate.getUTCFullYear();
+    const periodMonth = periodStartDate.getUTCMonth() + 1; // 1-based
+    const { cycle1Date, cycle2Date } = semiMonthlyCycleDates(periodYear, periodMonth);
+    const runMonth = `${periodYear}-${String(periodMonth).padStart(2, "0")}`;
+
     const { data: insertedRun, error: insertError } = await supabase
       .from("payroll_runs")
       .insert({
@@ -305,6 +313,9 @@ export async function POST(request: Request) {
         pay_date: payDate,
         status: "draft",
         initiated_by: session.profile.id,
+        run_month: runMonth,
+        cycle_1_date: cycle1Date,
+        cycle_2_date: cycle2Date,
         total_gross: { USD: 0 },
         total_net: { USD: 0 },
         total_deductions: { USD: 0 },
@@ -318,7 +329,7 @@ export async function POST(request: Request) {
         notes: parsedBody.data.notes ?? null
       })
       .select(
-        "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, created_at, updated_at"
+        PAYROLL_RUN_SELECT_COLUMNS
       )
       .single();
 
@@ -346,6 +357,63 @@ export async function POST(request: Request) {
       });
     }
 
+    // Auto-create exactly two semimonthly cycles: Cycle 1 (first Friday) and Cycle 2 (third Friday)
+    const monthLabel = periodStartDate.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    const cycleInserts = [
+      {
+        payroll_run_id: parsedRun.data.id,
+        org_id: session.profile.org_id,
+        label: `Cycle 1 - ${monthLabel}`,
+        cycle_number: 1,
+        currency: "USD",
+        status: "draft",
+        target_pay_date: cycle1Date,
+        prepared_by: session.profile.id,
+        prepared_at: new Date().toISOString(),
+        total_gross: 0,
+        total_net: 0,
+        total_deductions: 0,
+        employee_count: 0
+      },
+      {
+        payroll_run_id: parsedRun.data.id,
+        org_id: session.profile.org_id,
+        label: `Cycle 2 - ${monthLabel}`,
+        cycle_number: 2,
+        currency: "USD",
+        status: "draft",
+        target_pay_date: cycle2Date,
+        prepared_by: session.profile.id,
+        prepared_at: new Date().toISOString(),
+        total_gross: 0,
+        total_net: 0,
+        total_deductions: 0,
+        employee_count: 0
+      }
+    ];
+
+    const { error: cycleInsertError } = await supabase
+      .from("payroll_cycles")
+      .insert(cycleInserts);
+
+    if (cycleInsertError) {
+      // Fatal: semimonthly cycles are mandatory. Roll back the run.
+      await supabase
+        .from("payroll_runs")
+        .delete()
+        .eq("id", parsedRun.data.id)
+        .eq("org_id", session.profile.org_id);
+
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "CYCLE_CREATION_FAILED",
+          message: "Unable to create semimonthly cycles. The payroll run was not created."
+        },
+        meta: buildMeta()
+      });
+    }
+
     let calculationResult: CalculatePayrollRunResponseData;
 
     try {
@@ -358,6 +426,12 @@ export async function POST(request: Request) {
         run: parsedRun.data
       });
     } catch (calculationError) {
+      await supabase
+        .from("payroll_cycles")
+        .delete()
+        .eq("payroll_run_id", parsedRun.data.id)
+        .eq("org_id", session.profile.org_id);
+
       await supabase
         .from("payroll_runs")
         .delete()
@@ -403,6 +477,8 @@ export async function POST(request: Request) {
         payPeriodStart: runSummary.payPeriodStart,
         payPeriodEnd: runSummary.payPeriodEnd,
         payDate: runSummary.payDate,
+        cycle1Date,
+        cycle2Date,
         status: runSummary.status,
         employeeCount: runSummary.employeeCount
       }

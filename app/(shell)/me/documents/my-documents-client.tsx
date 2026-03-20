@@ -27,6 +27,7 @@ import {
   type DocumentSignedUrlResponse
 } from "../../../../types/documents";
 import { FileText } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import type {
   TravelSupportCreatePayload,
   TravelSupportCreateResponse,
@@ -1150,21 +1151,23 @@ export function MyDocumentsClient({ currentUserId, isSuperAdmin, isHrAdmin }: My
             </div>
           ) : null}
 
-          <label className="form-field" htmlFor="entity-country">
+          <div className="form-field">
             <span className="form-label">{t('approvePanel.issuingEntityCountry')}</span>
-            <select
-              id="entity-country"
-              className="form-input"
-              required
-              value={approvalCountry}
-              onChange={(e) => handleCountryChange(e.currentTarget.value)}
+            <Select
+              value={approvalCountry || "__placeholder__"}
+              onValueChange={(value) => handleCountryChange(value === "__placeholder__" ? "" : value)}
             >
-              <option value="">{t('approvePanel.selectCountry')}</option>
-              {countryOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger>
+                <SelectValue placeholder={t('approvePanel.selectCountry')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__placeholder__">{t('approvePanel.selectCountry')}</SelectItem>
+                {countryOptions.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <label className="form-field" htmlFor="entity-address">
             <span className="form-label">{t('approvePanel.entityAddress')}</span>

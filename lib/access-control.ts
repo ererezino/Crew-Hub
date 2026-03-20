@@ -51,7 +51,7 @@ export const DASHBOARD_WIDGET_DEFINITIONS: ReadonlyArray<{
 ] as const;
 
 const ALL_ROLES = USER_ROLES as readonly UserRole[];
-const ADMIN_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"];
+const ADMIN_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"];
 const SUPER_ONLY: readonly UserRole[] = ["SUPER_ADMIN"];
 const SCHEDULING_ROLES: readonly UserRole[] = [
   "HR_ADMIN",
@@ -65,6 +65,7 @@ const APPROVAL_ROLES: readonly UserRole[] = [
   "MANAGER",
   "HR_ADMIN",
   "FINANCE_ADMIN",
+  "FINANCE_APPROVER",
   "SUPER_ADMIN"
 ];
 const MANAGE_GROUP_ROLES: readonly UserRole[] = [
@@ -72,7 +73,7 @@ const MANAGE_GROUP_ROLES: readonly UserRole[] = [
   "HR_ADMIN",
   "SUPER_ADMIN"
 ];
-const INSIGHTS_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"];
+const INSIGHTS_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"];
 
 const DEFAULT_NAV_ROLE_OVERRIDES: Readonly<Record<string, readonly UserRole[]>> = {
   "/approvals": APPROVAL_ROLES,
@@ -85,8 +86,9 @@ const DEFAULT_NAV_ROLE_OVERRIDES: Readonly<Record<string, readonly UserRole[]>> 
   "/team-hub": ALL_ROLES,
   "/analytics": INSIGHTS_ROLES,
   "/compliance": ["HR_ADMIN", "SUPER_ADMIN"],
-  "/admin/compensation": ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
-  "/payroll": ["FINANCE_ADMIN", "HR_ADMIN", "SUPER_ADMIN"],
+  "/admin/compensation": ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
+  "/payroll": ["FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
+  "/payroll/oversight": ["FINANCE_APPROVER", "SUPER_ADMIN"],
   "/admin/access-control": ["SUPER_ADMIN"],
   "/performance": ["HR_ADMIN", "SUPER_ADMIN"],
   "/documents": ["HR_ADMIN", "SUPER_ADMIN"],
@@ -103,7 +105,7 @@ const DEFAULT_WIDGET_ROLE_OVERRIDES: Readonly<
   hero_metrics: ALL_ROLES,
   primary_chart: ALL_ROLES,
   expense_widget: ALL_ROLES,
-  compliance_widget: ["HR_ADMIN", "FINANCE_ADMIN", "SUPER_ADMIN"],
+  compliance_widget: ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
   secondary_panels: ALL_ROLES
 };
 
@@ -346,6 +348,7 @@ export function defaultWidgetConfigPayload(): DashboardWidgetConfigPayload[] {
 
 export function getRoleLabel(role: UserRole): string {
   if (role === "SUPER_ADMIN") return "Super Admin";
+  if (role === "FINANCE_APPROVER") return "Finance Approver";
   if (role === "FINANCE_ADMIN") return "Finance Admin";
   if (role === "HR_ADMIN") return "HR Admin";
   if (role === "TEAM_LEAD") return "Team Lead";

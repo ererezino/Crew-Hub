@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { usePeople } from "../../../../hooks/use-people";
 import { useSchedulingShifts, useSchedulingSwaps } from "../../../../hooks/use-scheduling";
@@ -300,25 +301,28 @@ export function SchedulingSwapsClient({
             </header>
             <form className="settings-form" onSubmit={handleCreateSwapRequest}>
               <div>
-                <label className="form-label" htmlFor="swap-shift-select">{t("swaps.myShift")}</label>
-                <select
-                  id="swap-shift-select"
-                  className="form-input"
-                  value={requestForm.shiftId}
-                  onChange={(event) =>
+                <span className="form-label">{t("swaps.myShift")}</span>
+                <Select
+                  value={requestForm.shiftId || "__none__"}
+                  onValueChange={(value) =>
                     setRequestForm((currentValue) => ({
                       ...currentValue,
-                      shiftId: event.target.value
+                      shiftId: value === "__none__" ? "" : value
                     }))
                   }
                 >
-                  <option value="">{t("swaps.selectShift")}</option>
-                  {swappableShifts.map((shift) => (
-                    <option key={shift.id} value={shift.id}>
-                      {shift.shiftDate} {formatTimeRangeLabel(shift.startTime, shift.endTime)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("swaps.selectShift")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">{t("swaps.selectShift")}</SelectItem>
+                    {swappableShifts.map((shift) => (
+                      <SelectItem key={shift.id} value={shift.id}>
+                        {shift.shiftDate} {formatTimeRangeLabel(shift.startTime, shift.endTime)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="form-label" htmlFor="swap-reason">{t("swaps.reason")}</label>
@@ -525,28 +529,32 @@ export function SchedulingSwapsClient({
               {t("swaps.assignDescription", { requesterName: assignSwap.requesterName, shiftDate: assignSwap.shiftDate })}
             </p>
 
-            <label className="form-field">
+            <div className="form-field">
               <span className="form-label">{t("swaps.replacementLabel")}</span>
-              <select
-                className="form-input"
-                value={assignTargetId}
-                onChange={(event) => {
-                  setAssignTargetId(event.currentTarget.value);
+              <Select
+                value={assignTargetId || "__none__"}
+                onValueChange={(value) => {
+                  setAssignTargetId(value === "__none__" ? "" : value);
                   setAssignError(null);
                   setAssignLeaveWarning(null);
                 }}
                 disabled={reportsQuery.isLoading || isUpdatingSwapId === assignSwap.id}
               >
-                <option value="">
-                  {reportsQuery.isLoading ? t("swaps.loadingMembers") : t("swaps.selectReplacement")}
-                </option>
-                {assignCandidates.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.fullName}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger>
+                  <SelectValue placeholder={reportsQuery.isLoading ? t("swaps.loadingMembers") : t("swaps.selectReplacement")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    {reportsQuery.isLoading ? t("swaps.loadingMembers") : t("swaps.selectReplacement")}
+                  </SelectItem>
+                  {assignCandidates.map((person) => (
+                    <SelectItem key={person.id} value={person.id}>
+                      {person.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {assignLeaveWarning ? (
               <div className="settings-card" style={{ borderColor: "var(--color-error-strong)" }}>

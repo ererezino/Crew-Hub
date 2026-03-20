@@ -16,11 +16,15 @@ import {
   buildMeta,
   canViewPayroll,
   jsonResponse,
+  PAYROLL_CYCLE_SELECT_COLUMNS,
+  PAYROLL_RUN_SELECT_COLUMNS,
   payrollAdjustmentSchema,
   payrollAllowanceSchema,
+  payrollCycleRowSchema,
   payrollDeductionSchema,
   payrollItemPaymentStatusSchema,
   payrollRunRowSchema,
+  toPayrollCycleSummary,
   toPayrollRunSummary
 } from "../../_helpers";
 
@@ -37,14 +41,33 @@ const payrollItemRowSchema = z.object({
   adjustments: z.unknown(),
   deductions: z.unknown(),
   employer_contributions: z.unknown(),
+  overtime_amount: z.union([z.number(), z.string()]).optional().default(0),
+  overtime_hours: z.union([z.number(), z.string()]).optional().default(0),
   net_amount: z.union([z.number(), z.string()]),
   withholding_applied: z.boolean(),
   payment_status: payrollItemPaymentStatusSchema,
   payment_reference: z.string().nullable(),
   payment_id: z.string().uuid().nullable(),
   notes: z.string().nullable(),
+  finance_notes: z.string().nullable().optional().default(null),
+  correction_of: z.string().uuid().nullable().optional().default(null),
+  correction_reason: z.string().nullable().optional().default(null),
   flagged: z.boolean(),
   flag_reason: z.string().nullable(),
+  cycle_1_base_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_base_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_overtime_hours: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_overtime_hours: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_overtime_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_2_overtime_amount: z.union([z.number(), z.string()]).optional().default(0),
+  cycle_1_included: z.boolean().optional().default(true),
+  cycle_2_included: z.boolean().optional().default(true),
+  fees: z.union([z.number(), z.string()]).optional().default(0),
+  bonus: z.union([z.number(), z.string()]).optional().default(0),
+  comment: z.string().nullable().optional().default(null),
+  exception_reason: z.string().nullable().optional().default(null),
+  designation: z.string().nullable().optional().default(null),
+  accrue_username: z.string().nullable().optional().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -159,7 +182,7 @@ export async function GET(
     const { data: rawRun, error: runError } = await supabase
       .from("payroll_runs")
       .select(
-        "id, org_id, pay_period_start, pay_period_end, pay_date, status, initiated_by, first_approved_by, first_approved_at, final_approved_by, final_approved_at, total_gross, total_net, total_deductions, total_employer_contributions, employee_count, snapshot, notes, created_at, updated_at"
+        PAYROLL_RUN_SELECT_COLUMNS
       )
       .eq("org_id", session.profile.org_id)
       .eq("id", runId)
@@ -196,12 +219,12 @@ export async function GET(
     if (parsedRun.data.first_approved_by) userIdsToResolve.add(parsedRun.data.first_approved_by);
     if (parsedRun.data.final_approved_by) userIdsToResolve.add(parsedRun.data.final_approved_by);
 
-    const [{ data: rawItems, error: itemsError }, { data: rawActorProfiles, error: actorError }] =
+    const [{ data: rawItems, error: itemsError }, { data: rawActorProfiles, error: actorError }, { data: rawCycles, error: cyclesError }] =
       await Promise.all([
         supabase
           .from("payroll_items")
           .select(
-            "id, payroll_run_id, employee_id, org_id, gross_amount, currency, pay_currency, base_salary_amount, allowances, adjustments, deductions, employer_contributions, net_amount, withholding_applied, payment_status, payment_reference, payment_id, notes, flagged, flag_reason, created_at, updated_at"
+            "id, payroll_run_id, employee_id, org_id, gross_amount, currency, pay_currency, base_salary_amount, allowances, adjustments, deductions, employer_contributions, overtime_amount, overtime_hours, net_amount, withholding_applied, payment_status, payment_reference, payment_id, notes, finance_notes, correction_of, correction_reason, flagged, flag_reason, cycle_1_base_amount, cycle_2_base_amount, cycle_1_overtime_hours, cycle_2_overtime_hours, cycle_1_overtime_amount, cycle_2_overtime_amount, cycle_1_included, cycle_2_included, fees, bonus, comment, exception_reason, designation, accrue_username, created_at, updated_at"
           )
           .eq("org_id", session.profile.org_id)
           .eq("payroll_run_id", runId)
@@ -213,14 +236,21 @@ export async function GET(
               .select("id, full_name")
               .eq("org_id", session.profile.org_id)
               .in("id", [...userIdsToResolve])
-          : Promise.resolve({ data: [] as Array<{ id: string; full_name: string }>, error: null })
+          : Promise.resolve({ data: [] as Array<{ id: string; full_name: string }>, error: null }),
+        supabase
+          .from("payroll_cycles")
+          .select(PAYROLL_CYCLE_SELECT_COLUMNS)
+          .eq("org_id", session.profile.org_id)
+          .eq("payroll_run_id", runId)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: true })
       ]);
 
     const actorNameById = new Map(
       (rawActorProfiles ?? []).map((p: { id: string; full_name: string }) => [p.id, p.full_name])
     );
 
-    if (itemsError || actorError) {
+    if (itemsError || actorError || cyclesError) {
       return jsonResponse<null>(500, {
         data: null,
         error: {
@@ -386,12 +416,17 @@ export async function GET(
         adjustments,
         deductions,
         employerContributions,
+        overtimeAmount: parseAmount(row.overtime_amount ?? 0),
+        overtimeHours: Number(row.overtime_hours ?? 0),
         netAmount,
         withholdingApplied: row.withholding_applied,
         paymentStatus: row.payment_status,
         paymentReference: row.payment_reference,
         paymentId: row.payment_id,
         notes: row.notes,
+        financeNotes: row.finance_notes ?? null,
+        correctionOf: row.correction_of ?? null,
+        correctionReason: row.correction_reason ?? null,
         flagged: row.flagged,
         flagReason: row.flag_reason,
         previousRunId: previousComparison?.runId ?? null,
@@ -404,6 +439,27 @@ export async function GET(
           previousNetAmount === null ? null : netAmount - previousNetAmount,
         deductionTotal: deductionTotal(deductions),
         adjustmentTotal: adjustmentTotal(adjustments),
+        cycle1BaseAmount: parseAmount(row.cycle_1_base_amount ?? 0),
+        cycle2BaseAmount: parseAmount(row.cycle_2_base_amount ?? 0),
+        cycle1OvertimeHours: Number(row.cycle_1_overtime_hours ?? 0),
+        cycle2OvertimeHours: Number(row.cycle_2_overtime_hours ?? 0),
+        cycle1OvertimeAmount: parseAmount(row.cycle_1_overtime_amount ?? 0),
+        cycle2OvertimeAmount: parseAmount(row.cycle_2_overtime_amount ?? 0),
+        cycle1Included: row.cycle_1_included ?? true,
+        cycle2Included: row.cycle_2_included ?? true,
+        fees: parseAmount(row.fees ?? 0),
+        bonus: parseAmount(row.bonus ?? 0),
+        comment: row.comment ?? null,
+        exceptionReason: row.exception_reason ?? null,
+        designation: row.designation ?? null,
+        accrueUsername: row.accrue_username ?? null,
+        monthlyTotal:
+          parseAmount(row.cycle_1_base_amount ?? 0)
+          + parseAmount(row.cycle_2_base_amount ?? 0)
+          + parseAmount(row.cycle_1_overtime_amount ?? 0)
+          + parseAmount(row.cycle_2_overtime_amount ?? 0)
+          + parseAmount(row.bonus ?? 0)
+          - parseAmount(row.fees ?? 0),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       };
@@ -422,9 +478,15 @@ export async function GET(
       }
     );
 
+    const parsedCycles = z.array(payrollCycleRowSchema).safeParse(rawCycles ?? []);
+    const cycles = parsedCycles.success
+      ? parsedCycles.data.map(toPayrollCycleSummary)
+      : [];
+
     const responseData: PayrollRunDetailResponseData = {
       run: runSummary,
       items,
+      cycles,
       flaggedCount: items.filter((item) => item.flagged).length
     };
 

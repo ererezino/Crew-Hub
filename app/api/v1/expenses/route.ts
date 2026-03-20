@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { logAudit } from "../../../../lib/audit";
+import { formatCurrency } from "../../../../lib/format-currency";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { fetchExpensesData } from "../../../../lib/expenses/fetch-expenses-data";
 import { sendExpenseSubmittedEmail } from "../../../../lib/notifications/email";
@@ -119,7 +120,10 @@ export async function GET(request: Request) {
       data,
       error: null,
       meta: buildMeta()
-    }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
+    }, {
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+      "Vary": "Cookie"
+    });
   } catch {
     return jsonResponse<null>(500, {
       data: null,
@@ -549,18 +553,7 @@ export async function POST(request: Request) {
   // Fire-and-forget email notification for expense submission
   if (employeeProfile?.manager_id) {
     const currency = expense.currency;
-    const major = expense.amount / 100;
-    let formattedAmount: string;
-    try {
-      formattedAmount = new Intl.NumberFormat(undefined, {
-        style: "currency",
-        currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(major);
-    } catch {
-      formattedAmount = `${currency} ${major.toFixed(2)}`;
-    }
+    const formattedAmount = formatCurrency(expense.amount / 100, currency);
 
     sendExpenseSubmittedEmail({
       orgId: session.profile.org_id,

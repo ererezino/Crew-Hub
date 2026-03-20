@@ -18,6 +18,7 @@ import {
   isNavItemVisibleForUser,
   sanitizeRoles
 } from "../access-control";
+import { logger } from "../logger";
 import type { UserRole } from "../navigation";
 import { hasRole } from "../roles";
 import { createSupabaseServiceRoleClient } from "../supabase/service-role";
@@ -38,7 +39,8 @@ type NavAccessRow = {
  * - visible_to_roles for role-level access
  * - granted_employee_ids for per-person grants
  * - revoked_employee_ids for per-person revokes (takes precedence)
- * - Falls back to default role-based access if no config rows exist
+ * - Falls back to default role-based access only if no config row exists
+ * - Denies access if the config lookup itself fails
  */
 export async function checkApiAccess(
   navItemKey: string,
@@ -60,9 +62,13 @@ export async function checkApiAccess(
     .maybeSingle();
 
   if (error) {
-    // On error, fall back to default role-based access
-    const defaultRoles = getDefaultVisibleRolesForNavItem(navItemKey);
-    return defaultRoles.some((role) => hasRole(profile.roles, role));
+    logger.warn("Access config lookup failed for API access.", {
+      navItemKey,
+      orgId: profile.org_id,
+      userId: profile.id,
+      message: error.message
+    });
+    return false;
   }
 
   const row = data as NavAccessRow | null;

@@ -7,6 +7,7 @@ export type DashboardPersona =
   | "manager"
   | "hr_admin"
   | "finance_admin"
+  | "finance_approver"
   | "super_admin";
 
 export type PersonaProfile = {
@@ -26,17 +27,19 @@ export type PersonaOnboardingInstance = {
  *
  * Priority:
  * 1. SUPER_ADMIN role → super_admin
- * 2. FINANCE_ADMIN role → finance_admin
- * 3. HR_ADMIN role → hr_admin
- * 4. MANAGER or TEAM_LEAD role → manager
- * 5. start_date within last 30 days AND active onboarding → new_hire
- * 6. Otherwise → employee
+ * 2. FINANCE_APPROVER role → finance_approver
+ * 3. FINANCE_ADMIN role → finance_admin
+ * 4. HR_ADMIN role → hr_admin
+ * 5. MANAGER or TEAM_LEAD role → manager
+ * 6. start_date within last 30 days AND active onboarding → new_hire
+ * 7. Otherwise → employee
  */
 export function getDashboardPersona(
   profile: PersonaProfile,
   onboardingInstance: PersonaOnboardingInstance | null
 ): DashboardPersona {
   if (hasRole(profile.roles, "SUPER_ADMIN")) return "super_admin";
+  if (hasRole(profile.roles, "FINANCE_APPROVER")) return "finance_approver";
   if (hasRole(profile.roles, "FINANCE_ADMIN")) return "finance_admin";
   if (hasRole(profile.roles, "HR_ADMIN")) return "hr_admin";
   if (hasRole(profile.roles, "MANAGER") || hasRole(profile.roles, "TEAM_LEAD"))

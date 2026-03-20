@@ -95,5 +95,8 @@ export async function GET() {
     data: { members, departmentCounts, totalCount: members.length },
     error: null,
     meta: buildMeta()
-  }, { "Cache-Control": "private, no-cache" });
+  }, {
+    "Cache-Control": "private, no-cache",
+    "Vary": "Cookie"
+  });
 }

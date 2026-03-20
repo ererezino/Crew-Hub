@@ -35,7 +35,10 @@ export async function GET() {
       data,
       error: null,
       meta: buildMeta()
-    }, { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" });
+    }, {
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+      "Vary": "Cookie"
+    });
   } catch (error) {
     return jsonResponse<null>(500, {
       data: null,

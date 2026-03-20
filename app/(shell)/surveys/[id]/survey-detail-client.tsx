@@ -8,6 +8,7 @@ import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useSurveyDetail } from "../../../../hooks/use-surveys";
 import { toSentenceCase } from "../../../../lib/format-labels";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import type {
   SurveyAnswerValue,
   SurveyAnswers,
@@ -308,32 +309,31 @@ export function SurveyDetailClient({ surveyId }: { surveyId: string }) {
                     ) : null}
 
                     {(question.type === "select" || question.type === "likert") ? (
-                      <select
-                        id={`survey-question-${question.id}`}
-                        className={`form-input ${fieldError ? "form-input-error" : ""}`}
-                        value={normalizeStringAnswer(value)}
-                        onBlur={() =>
+                      <Select
+                        value={normalizeStringAnswer(value) || "__placeholder__"}
+                        onValueChange={(nextValue) => {
+                          setAnswers((currentValue) => ({
+                            ...currentValue,
+                            [question.id]: nextValue === "__placeholder__" ? null : nextValue
+                          }));
                           setTouched((currentValue) => ({
                             ...currentValue,
                             [question.id]: true
-                          }))
-                        }
-                        onChange={(event) => {
-                          const nextValue = event.currentTarget.value;
-
-                          setAnswers((currentValue) => ({
-                            ...currentValue,
-                            [question.id]: nextValue.length > 0 ? nextValue : null
                           }));
                         }}
                       >
-                        <option value="">{t('selectOption')}</option>
-                        {question.options.map((option) => (
-                          <option key={`${question.id}-${option}`} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('selectOption')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__placeholder__">{t('selectOption')}</SelectItem>
+                          {question.options.map((option) => (
+                            <SelectItem key={`${question.id}-${option}`} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     ) : null}
                   </label>
 

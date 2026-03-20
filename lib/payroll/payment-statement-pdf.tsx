@@ -8,6 +8,7 @@ import {
   StyleSheet,
   pdf
 } from "@react-pdf/renderer";
+import { formatCurrency } from "../format-currency";
 import { AccrueLetterhead, AccrueFooter } from "../pdf/accrue-letterhead";
 
 type StatementLineItem = {
@@ -193,19 +194,7 @@ const styles = StyleSheet.create({
 /* ── Helpers ── */
 
 function formatAmount(amount: number, currency: string): string {
-  const normalizedCurrency = currency.trim().toUpperCase() || "USD";
-  const majorAmount = amount / 100;
-
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: normalizedCurrency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(majorAmount);
-  } catch {
-    return `${normalizedCurrency} ${majorAmount.toFixed(2)}`;
-  }
+  return formatCurrency(amount / 100, currency.trim().toUpperCase() || "USD");
 }
 
 /* ── Document ── */

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2, Upload } from "lucide-react";
 
 import { useCrewGamesMutations } from "../../../../hooks/use-crew-games";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import type { CrewNightEvent, CrewNightEventType } from "../../../../types/crew-games";
 import {
   ALLOWED_IMAGE_MIME_TYPES,
@@ -191,16 +192,20 @@ export function EventFormPanel({
       </div>
 
       <div className="form-field">
-        <label className="form-label">{t("status")}</label>
-        <select
-          className="form-input"
+        <span className="form-label">{t("status")}</span>
+        <Select
           value={status}
-          onChange={(e) => setStatus(e.target.value as "draft" | "upcoming" | "completed")}
+          onValueChange={(value) => setStatus(value as "draft" | "upcoming" | "completed")}
         >
-          <option value="draft">{t("draft")}</option>
-          <option value="upcoming">{t("upcoming")}</option>
-          <option value="completed">{t("completed")}</option>
-        </select>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="draft">{t("draft")}</SelectItem>
+            <SelectItem value="upcoming">{t("upcoming")}</SelectItem>
+            <SelectItem value="completed">{t("completed")}</SelectItem>
+          </SelectContent>
+        </Select>
         {status === "upcoming" && !existingEvent?.publishedAt ? (
           <p className="form-field-hint">
             {t("upcomingHint")}

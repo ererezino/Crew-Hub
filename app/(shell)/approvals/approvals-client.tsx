@@ -47,7 +47,7 @@ export function ApprovalsClient({
   const canManagerApproveExpenses =
     hasRole(userRoles, "TEAM_LEAD") || hasRole(userRoles, "MANAGER") || hasRole(userRoles, "SUPER_ADMIN");
   const canFinanceApproveExpenses =
-    hasRole(userRoles, "FINANCE_ADMIN") || hasRole(userRoles, "SUPER_ADMIN");
+    hasRole(userRoles, "FINANCE_ADMIN") || hasRole(userRoles, "FINANCE_APPROVER") || hasRole(userRoles, "SUPER_ADMIN");
 
   const approvalsCountQuery = useQuery({
     queryKey: [
@@ -126,7 +126,7 @@ export function ApprovalsClient({
         key: "expenses",
         label: t('tab.expenses'),
         badge: expensesCount,
-        requiredRoles: ["TEAM_LEAD", "MANAGER", "FINANCE_ADMIN", "SUPER_ADMIN"]
+        requiredRoles: ["TEAM_LEAD", "MANAGER", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"]
       }
     ],
     [expensesCount, timeOffCount, totalPendingCount, t]
