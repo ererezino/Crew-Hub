@@ -1,28 +1,48 @@
 "use client";
 
-import { useEffect } from "react";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 
 const PRODUCTION_PROJECT_REF = "xmeruhyybvyosqxfleiu";
 
-function isNonProduction(): boolean {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  return !supabaseUrl.includes(PRODUCTION_PROJECT_REF);
+export function isNonProductionSupabaseUrl(supabaseUrl: string | null | undefined): boolean {
+  return !(supabaseUrl ?? "").includes(PRODUCTION_PROJECT_REF);
 }
 
-function getLabel(): string | null {
-  if (!isNonProduction()) return null;
-  const vercelEnv = process.env.NEXT_PUBLIC_VERCEL_ENV;
+export function resolveEnvironmentBannerLabel({
+  supabaseUrl,
+  vercelEnv,
+  hostname
+}: {
+  supabaseUrl?: string | null;
+  vercelEnv?: string | null;
+  hostname?: string | null;
+}): string | null {
+  if (!isNonProductionSupabaseUrl(supabaseUrl)) {
+    return null;
+  }
+
   if (vercelEnv === "preview") return "PREVIEW";
-  if (typeof window === "undefined") return "STAGING"; // SSR fallback
-  const h = window.location.hostname;
-  return h === "localhost" || h === "127.0.0.1" ? "LOCAL" : "STAGING";
-}
 
-const subscribe = () => () => {}; // hostname never changes
+  if (!hostname) {
+    return null;
+  }
+
+  return hostname === "localhost" || hostname === "127.0.0.1" ? "LOCAL" : "STAGING";
+}
 
 export function EnvironmentBanner() {
-  const label = useSyncExternalStore(subscribe, getLabel, () => getLabel());
+  const [label, setLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Hostname is only reliable on the client. Starting empty avoids SSR/CSR label drift.
+    setLabel(
+      resolveEnvironmentBannerLabel({
+        supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV,
+        hostname: window.location.hostname
+      })
+    );
+  }, []);
 
   useEffect(() => {
     if (!label) return;
