@@ -36,7 +36,7 @@ export type AuditLogEntry = {
   timestamp: string;
   actorId: string | null;
   actorName: string;
-  action: AuditLogAction;
+  action: string;
   tableName: string;
   recordId: string | null;
   oldValue: Record<string, unknown> | null;

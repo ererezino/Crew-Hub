@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
-import { AUDIT_LOG_ACTIONS, type AuditLogAction, type AuditLogsResponse } from "../../../types/settings";
+import { AUDIT_LOG_ACTIONS, type AuditLogsResponse } from "../../../types/settings";
 
 type AppLocale = "en" | "fr";
 
@@ -37,7 +37,24 @@ type DiffLine = {
   nextValue?: string;
 };
 
-function badgeToneForAction(action: AuditLogAction) {
+export function mergeFilterOptions(
+  options: readonly string[],
+  ...selectedValues: Array<string | null | undefined>
+): string[] {
+  const merged = new Set(options.filter((option) => option.length > 0));
+
+  for (const value of selectedValues) {
+    if (!value || value === "__all__") {
+      continue;
+    }
+
+    merged.add(value);
+  }
+
+  return [...merged].sort((left, right) => left.localeCompare(right));
+}
+
+function badgeToneForAction(action: string) {
   switch (action) {
     case "created":
     case "approved":
@@ -249,7 +266,15 @@ export function AuditLogViewer() {
 
   const actionOptions = responseData?.actionOptions ?? [...AUDIT_LOG_ACTIONS];
   const actorOptions = responseData?.actors ?? [];
-  const tableOptions = responseData?.tableOptions ?? [];
+  const tableOptions = useMemo(
+    () =>
+      mergeFilterOptions(
+        responseData?.tableOptions ?? [],
+        draftFilters.tableName,
+        appliedFilters.tableName
+      ),
+    [responseData?.tableOptions, draftFilters.tableName, appliedFilters.tableName]
+  );
 
   const handleFilterSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
