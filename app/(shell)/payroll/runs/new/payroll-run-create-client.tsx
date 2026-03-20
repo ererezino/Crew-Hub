@@ -10,7 +10,7 @@ import { PageHeader } from "../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { usePayrollRunsDashboard } from "../../../../../hooks/use-payroll-runs";
 import { useUnsavedGuard } from "../../../../../hooks/use-unsaved-guard";
-import { currentMonthPeriod, monthPeriod } from "../../../../../lib/payroll/runs";
+import { currentMonthPeriod, monthPeriod, semiMonthlyCycleDates } from "../../../../../lib/payroll/runs";
 import type {
   CreatePayrollRunPayload,
   CreatePayrollRunResponse
@@ -19,7 +19,6 @@ import type {
 type CreateRunFormValues = {
   payPeriodStart: string;
   payPeriodEnd: string;
-  payDate: string;
   notes: string;
 };
 
@@ -33,7 +32,6 @@ function initialValues(): CreateRunFormValues {
   return {
     payPeriodStart: period.payPeriodStart,
     payPeriodEnd: period.payPeriodEnd,
-    payDate: period.payDate,
     notes: ""
   };
 }
@@ -41,7 +39,6 @@ function initialValues(): CreateRunFormValues {
 const INITIAL_TOUCHED: FormTouched = {
   payPeriodStart: false,
   payPeriodEnd: false,
-  payDate: false,
   notes: false
 };
 
@@ -60,7 +57,6 @@ export function CreatePayrollRunClient() {
         .object({
           payPeriodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, t('payPeriodStartRequired')),
           payPeriodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, t('payPeriodEndRequired')),
-          payDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, t('payDateRequired')),
           notes: z.string().max(500, t('notesMax'))
         })
         .superRefine((value, context) => {
@@ -87,6 +83,21 @@ export function CreatePayrollRunClient() {
     () => dashboardQuery.data?.metrics.eligibleEmployeeCount ?? 0,
     [dashboardQuery.data?.metrics.eligibleEmployeeCount]
   );
+
+  const cyclePreview = useMemo(() => {
+    const [yearPart, monthPart] = formValues.payPeriodStart.split("-");
+    const year = Number.parseInt(yearPart ?? "", 10);
+    const month = Number.parseInt(monthPart ?? "", 10);
+
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+      const fallback = currentMonthPeriod();
+      const fallbackYear = Number.parseInt(fallback.payPeriodStart.slice(0, 4), 10);
+      const fallbackMonth = Number.parseInt(fallback.payPeriodStart.slice(5, 7), 10);
+      return semiMonthlyCycleDates(fallbackYear, fallbackMonth);
+    }
+
+    return semiMonthlyCycleDates(year, month);
+  }, [formValues.payPeriodStart]);
 
   const getFormErrors = useMemo(
     () =>
@@ -137,7 +148,6 @@ export function CreatePayrollRunClient() {
     const nextTouched: FormTouched = {
       payPeriodStart: true,
       payPeriodEnd: true,
-      payDate: true,
       notes: true
     };
 
@@ -154,7 +164,7 @@ export function CreatePayrollRunClient() {
     const payload: CreatePayrollRunPayload = {
       payPeriodStart: formValues.payPeriodStart,
       payPeriodEnd: formValues.payPeriodEnd,
-      payDate: formValues.payDate,
+      payDate: cyclePreview.cycle2Date,
       notes: formValues.notes.trim() ? formValues.notes.trim() : null
     };
 
@@ -242,14 +252,28 @@ export function CreatePayrollRunClient() {
                   setFormValues((currentValues) => ({
                     ...currentValues,
                     payPeriodStart: period.payPeriodStart,
-                    payPeriodEnd: period.payPeriodEnd,
-                    payDate: period.payDate
+                    payPeriodEnd: period.payPeriodEnd
                   }));
                   setCreateRunDirty(true);
                 }}
               />
               <p className="form-hint">{t('quickMonthHint')}</p>
             </label>
+
+            <div className="settings-card payroll-create-cycle-preview" aria-label={t('cyclePreviewTitle')}>
+              <h3 className="section-title">{t('cyclePreviewTitle')}</h3>
+              <p className="settings-card-description">{t('cyclePreviewDescription')}</p>
+              <div className="payroll-create-cycle-preview-grid">
+                <div>
+                  <span className="metric-label">{t('cycle1Date')}</span>
+                  <p className="metric-value numeric">{cyclePreview.cycle1Date}</p>
+                </div>
+                <div>
+                  <span className="metric-label">{t('cycle2Date')}</span>
+                  <p className="metric-value numeric">{cyclePreview.cycle2Date}</p>
+                </div>
+              </div>
+            </div>
 
             <div className="timeoff-form-grid">
               <label className="form-field" htmlFor="pay-period-start">
@@ -284,19 +308,6 @@ export function CreatePayrollRunClient() {
                 ) : null}
               </label>
             </div>
-
-            <label className="form-field" htmlFor="pay-date">
-              <span className="form-label">{t('payDate')}</span>
-              <input
-                id="pay-date"
-                type="date"
-                className={formErrors.payDate ? "form-input form-input-error" : "form-input"}
-                value={formValues.payDate}
-                onChange={handleChange("payDate")}
-                onBlur={() => markTouched("payDate")}
-              />
-              {formErrors.payDate ? <p className="form-field-error">{formErrors.payDate}</p> : null}
-            </label>
 
             <label className="form-field" htmlFor="run-notes">
               <span className="form-label">{t('notesLabel')}</span>

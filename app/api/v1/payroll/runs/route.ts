@@ -199,8 +199,9 @@ export async function GET() {
 
     const nextPayDate =
       runs
-        .filter((run) => run.payDate >= today && run.status !== "cancelled")
-        .map((run) => run.payDate)
+        .filter((run) => run.status !== "cancelled" && run.status !== "completed")
+        .flatMap((run) => [run.cycle1Date, run.cycle2Date])
+        .filter((value): value is string => typeof value === "string" && value >= today)
         .sort()[0] ?? null;
 
     const responseData: PayrollRunsDashboardResponseData = {

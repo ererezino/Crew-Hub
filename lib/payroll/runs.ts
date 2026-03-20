@@ -118,13 +118,16 @@ export function currentMonthPeriod(now: Date = new Date()): {
   payPeriodEnd: string;
   payDate: string;
 } {
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() + 1;
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const end = new Date(Date.UTC(year, month, 0));
 
   return {
     payPeriodStart: start.toISOString().slice(0, 10),
     payPeriodEnd: end.toISOString().slice(0, 10),
-    payDate: end.toISOString().slice(0, 10)
+    // Legacy run.payDate should align to the second semimonthly cycle, not month-end.
+    payDate: thirdFriday(year, month)
   };
 }
 
@@ -143,7 +146,8 @@ export function monthPeriod(year: number, month: number): {
   return {
     payPeriodStart: start.toISOString().slice(0, 10),
     payPeriodEnd: end.toISOString().slice(0, 10),
-    payDate: end.toISOString().slice(0, 10)
+    // Keep the legacy field aligned with the second semimonthly payout date.
+    payDate: thirdFriday(year, month)
   };
 }
 

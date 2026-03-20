@@ -58,6 +58,11 @@ function formatPeriodLabel(start: string, end: string, locale: AppLocale): strin
   return `${formatDate(startDate, locale)} - ${formatDate(endDate, locale)}`;
 }
 
+function formatCycleDate(date: string | null, locale: AppLocale): string {
+  if (!date) return "—";
+  return formatDate(date, locale);
+}
+
 export function PayrollDashboardClient({
   canManage,
   createRunHref,
@@ -74,7 +79,7 @@ export function PayrollDashboardClient({
     const rows = runsQuery.data?.runs ?? [];
 
     return [...rows].sort((left, right) => {
-      const comparison = left.payDate.localeCompare(right.payDate);
+      const comparison = left.payPeriodStart.localeCompare(right.payPeriodStart);
       return sortDirection === "asc" ? comparison : comparison * -1;
     });
   }, [runsQuery.data?.runs, sortDirection]);
@@ -188,6 +193,7 @@ export function PayrollDashboardClient({
                         <span className="numeric">{sortDirection === "asc" ? "↑" : "↓"}</span>
                       </button>
                     </th>
+                    <th>{t('colCycles')}</th>
                     <th>{t('colStatus')}</th>
                     <th>{t('colEmployees')}</th>
                     <th>{t('colGross')}</th>
@@ -201,9 +207,29 @@ export function PayrollDashboardClient({
                       <td>
                         <p>{formatPeriodLabel(run.payPeriodStart, run.payPeriodEnd, locale)}</p>
                         <p className="settings-card-description">
-                          {t('payDate')}{" "}
-                          <time dateTime={run.payDate} title={formatDateTimeTooltip(run.payDate, locale)}>
-                            {formatDate(run.payDate, locale)}
+                          {t('cycleSchedule', {
+                            cycle1: formatCycleDate(run.cycle1Date, locale),
+                            cycle2: formatCycleDate(run.cycle2Date, locale)
+                          })}
+                        </p>
+                      </td>
+                      <td>
+                        <p className="settings-card-description">{t('cycle1Label')}</p>
+                        <p>
+                          <time
+                            dateTime={run.cycle1Date ?? ""}
+                            title={run.cycle1Date ? formatDateTimeTooltip(run.cycle1Date, locale) : undefined}
+                          >
+                            {formatCycleDate(run.cycle1Date, locale)}
+                          </time>
+                        </p>
+                        <p className="settings-card-description">{t('cycle2Label')}</p>
+                        <p>
+                          <time
+                            dateTime={run.cycle2Date ?? ""}
+                            title={run.cycle2Date ? formatDateTimeTooltip(run.cycle2Date, locale) : undefined}
+                          >
+                            {formatCycleDate(run.cycle2Date, locale)}
                           </time>
                         </p>
                       </td>

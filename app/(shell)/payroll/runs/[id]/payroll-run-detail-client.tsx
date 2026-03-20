@@ -385,6 +385,8 @@ export function PayrollRunDetailClient({
   const canMarkProcessing = canManage && isApproved;
   const canMarkCompleted = canManage && isProcessing;
   const canEditItems = canManage && (run?.status === "draft" || isCalculated || isRejected);
+  const calculateActionLabel =
+    run?.status === "draft" ? t('actions.calculateRun') : t('actions.refreshWorksheet');
   const cycles: PayrollCycle[] = runQuery.data?.cycles ?? [];
   const activeCycles = cycles.filter((c) => c.status !== "cancelled");
   const canPreparePayout = canManage && (isApproved || isProcessing);
@@ -1119,7 +1121,7 @@ export function PayrollRunDetailClient({
               {canCalculateRun ? (
                 <button
                   type="button"
-                  className="button button-accent"
+                  className={run?.status === "draft" ? "button button-accent" : "button button-subtle"}
                   onClick={calculateRun}
                   disabled={
                     isCalculating ||
@@ -1127,7 +1129,7 @@ export function PayrollRunDetailClient({
                     activeRunAction !== null
                   }
                 >
-                  {isCalculating ? t('actions.calculating') : t('actions.calculateRun')}
+                  {isCalculating ? t('actions.calculating') : calculateActionLabel}
                 </button>
               ) : null}
 
@@ -1183,13 +1185,10 @@ export function PayrollRunDetailClient({
                 </StatusBadge>
               </p>
               <p className="metric-hint">
-                {t('metrics.payDate')}{" "}
-                <time
-                  dateTime={runQuery.data.run.payDate}
-                  title={formatDateTimeTooltip(runQuery.data.run.payDate, locale)}
-                >
-                  {formatDate(runQuery.data.run.payDate, locale)}
-                </time>
+                {t('metrics.cycleDates', {
+                  cycle1: runQuery.data.run.cycle1Date ? formatDate(runQuery.data.run.cycle1Date, locale) : "—",
+                  cycle2: runQuery.data.run.cycle2Date ? formatDate(runQuery.data.run.cycle2Date, locale) : "—"
+                })}
               </p>
             </article>
 
