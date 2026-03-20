@@ -11,6 +11,7 @@ import type {
   CreatePayrollRunResponseData,
   PayrollRunsDashboardResponseData
 } from "../../../../../types/payroll-runs";
+import { PAYROLL_CYCLE_STATUSES } from "../../../../../types/payroll-runs";
 import {
   buildMeta,
   canManagePayroll,
@@ -83,6 +84,13 @@ async function countEligibleEmployees({
 
   return count ?? 0;
 }
+
+const dashboardCyclePreviewSchema = z.object({
+  payroll_run_id: z.string().uuid(),
+  cycle_number: z.number().int().nullable().optional().default(null),
+  status: z.enum(PAYROLL_CYCLE_STATUSES),
+  target_pay_date: z.string().nullable()
+});
 
 export async function GET() {
   const session = await getAuthenticatedSession();
@@ -194,14 +202,91 @@ export async function GET() {
       )
     );
 
-    const latestRun = runs[0] ?? null;
+    const cyclePreviewByRunId = new Map<
+      string,
+      { cycle1Status: (typeof PAYROLL_CYCLE_STATUSES)[number] | null; cycle2Status: (typeof PAYROLL_CYCLE_STATUSES)[number] | null }
+    >();
+
+    const runIds = runs.map((run) => run.id);
+
+    if (runIds.length > 0) {
+      const { data: rawCyclePreviews, error: cyclePreviewError } = await supabase
+        .from("payroll_cycles")
+        .select("payroll_run_id, cycle_number, status, target_pay_date")
+        .eq("org_id", session.profile.org_id)
+        .in("payroll_run_id", runIds)
+        .in("cycle_number", [1, 2]);
+
+      if (cyclePreviewError) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "PAYROLL_RUNS_FETCH_FAILED",
+            message: "Unable to load payroll cycle previews."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      const parsedCyclePreviews = z
+        .array(dashboardCyclePreviewSchema)
+        .safeParse(rawCyclePreviews ?? []);
+
+      if (!parsedCyclePreviews.success) {
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "PAYROLL_RUNS_PARSE_FAILED",
+            message: "Payroll cycle previews are not in the expected format."
+          },
+          meta: buildMeta()
+        });
+      }
+
+      for (const cycle of parsedCyclePreviews.data) {
+        const current = cyclePreviewByRunId.get(cycle.payroll_run_id) ?? {
+          cycle1Status: null,
+          cycle2Status: null
+        };
+
+        if (cycle.cycle_number === 1) {
+          current.cycle1Status = cycle.status;
+        }
+
+        if (cycle.cycle_number === 2) {
+          current.cycle2Status = cycle.status;
+        }
+
+        cyclePreviewByRunId.set(cycle.payroll_run_id, current);
+      }
+    }
+
+    const runsWithCyclePreview = runs.map((run) => {
+      const cyclePreview = cyclePreviewByRunId.get(run.id);
+      return {
+        ...run,
+        cycle1Status: cyclePreview?.cycle1Status ?? null,
+        cycle2Status: cyclePreview?.cycle2Status ?? null
+      };
+    });
+
+    const latestRun = runsWithCyclePreview[0] ?? null;
     const today = new Date().toISOString().slice(0, 10);
 
     const nextPayDate =
-      runs
+      runsWithCyclePreview
         .filter((run) => run.status !== "cancelled" && run.status !== "completed")
-        .flatMap((run) => [run.cycle1Date, run.cycle2Date])
-        .filter((value): value is string => typeof value === "string" && value >= today)
+        .flatMap((run) => {
+          const cycleDates: string[] = [];
+          if (run.cycle1Date && !["paid", "cancelled", "failed"].includes(run.cycle1Status ?? "")) {
+            cycleDates.push(run.cycle1Date);
+          }
+          if (run.cycle2Date && !["paid", "cancelled", "failed"].includes(run.cycle2Status ?? "")) {
+            cycleDates.push(run.cycle2Date);
+          }
+          return cycleDates;
+        })
+        .filter((value) => value >= today)
         .sort()[0] ?? null;
 
     const responseData: PayrollRunsDashboardResponseData = {
@@ -212,7 +297,7 @@ export async function GET() {
         nextPayDate,
         eligibleEmployeeCount
       },
-      runs
+      runs: runsWithCyclePreview
     };
 
     return jsonResponse<PayrollRunsDashboardResponseData>(200, {

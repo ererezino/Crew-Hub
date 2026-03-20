@@ -56,6 +56,8 @@ export type PayrollRunSummary = {
   runMonth: string | null;
   cycle1Date: string | null;
   cycle2Date: string | null;
+  cycle1Status: PayrollCycleStatus | null;
+  cycle2Status: PayrollCycleStatus | null;
   publishedAt: string | null;
   submittedAt: string | null;
   submittedBy: string | null;

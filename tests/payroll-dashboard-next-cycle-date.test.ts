@@ -12,7 +12,8 @@ describe("payroll dashboard next pay date", () => {
       "utf8"
     );
 
-    expect(source).toContain(".flatMap((run) => [run.cycle1Date, run.cycle2Date])");
+    expect(source).toContain("run.cycle1Date && ![\"paid\", \"cancelled\", \"failed\"].includes(run.cycle1Status ?? \"\")");
+    expect(source).toContain("run.cycle2Date && ![\"paid\", \"cancelled\", \"failed\"].includes(run.cycle2Status ?? \"\")");
     expect(source).toContain('run.status !== "completed"');
   });
 });

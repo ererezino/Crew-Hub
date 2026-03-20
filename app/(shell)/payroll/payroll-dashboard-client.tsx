@@ -15,7 +15,9 @@ import { formatDate, formatDateTimeTooltip, formatRelativeTime } from "../../../
 import {
   getCurrencyTotal,
   getPrimaryCurrency,
+  labelForPayrollCycleStatus,
   labelForPayrollRunStatus,
+  toneForPayrollCycleStatus,
   toneForPayrollRunStatus
 } from "../../../lib/payroll/runs";
 
@@ -223,6 +225,11 @@ export function PayrollDashboardClient({
                             {formatCycleDate(run.cycle1Date, locale)}
                           </time>
                         </p>
+                        {run.cycle1Status ? (
+                          <StatusBadge tone={toneForPayrollCycleStatus(run.cycle1Status)}>
+                            {labelForPayrollCycleStatus(run.cycle1Status)}
+                          </StatusBadge>
+                        ) : null}
                         <p className="settings-card-description">{t('cycle2Label')}</p>
                         <p>
                           <time
@@ -232,6 +239,11 @@ export function PayrollDashboardClient({
                             {formatCycleDate(run.cycle2Date, locale)}
                           </time>
                         </p>
+                        {run.cycle2Status ? (
+                          <StatusBadge tone={toneForPayrollCycleStatus(run.cycle2Status)}>
+                            {labelForPayrollCycleStatus(run.cycle2Status)}
+                          </StatusBadge>
+                        ) : null}
                       </td>
                       <td>
                         <StatusBadge tone={toneForPayrollRunStatus(run.status)}>

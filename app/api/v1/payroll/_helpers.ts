@@ -199,6 +199,8 @@ export function toPayrollRunSummary(
     runMonth: row.run_month ?? null,
     cycle1Date: row.cycle_1_date ?? null,
     cycle2Date: row.cycle_2_date ?? null,
+    cycle1Status: null,
+    cycle2Status: null,
     publishedAt: row.published_at ?? null,
     submittedAt: row.submitted_at ?? null,
     submittedBy: row.submitted_by ?? null,
