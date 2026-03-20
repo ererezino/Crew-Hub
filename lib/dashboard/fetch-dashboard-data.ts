@@ -1318,6 +1318,7 @@ export async function fetchFinanceOversight(
     /* 5. Payout blockers — aggregate flagged items by run */
     if (flaggedRunsResult.data) {
       const flagsByRun = new Map<string, number>();
+      const runPeriodById = new Map<string, string>();
       for (const row of flaggedRunsResult.data) {
         const runId = row.payroll_run_id as string;
         flagsByRun.set(runId, (flagsByRun.get(runId) ?? 0) + 1);
@@ -1327,12 +1328,16 @@ export async function fetchFinanceOversight(
       const activeRunIds = new Set<string>();
       if (stuckRunsResult.data) {
         for (const row of stuckRunsResult.data) {
-          activeRunIds.add(row.id as string);
+          const runId = row.id as string;
+          activeRunIds.add(runId);
+          runPeriodById.set(runId, (row.pay_period_end ?? row.pay_period_start ?? "") as string);
         }
       }
       if (submittedRunsResult.data) {
         for (const row of submittedRunsResult.data) {
-          activeRunIds.add(row.id as string);
+          const runId = row.id as string;
+          activeRunIds.add(runId);
+          runPeriodById.set(runId, (row.pay_period_end ?? row.pay_period_start ?? "") as string);
         }
       }
 
@@ -1340,7 +1345,7 @@ export async function fetchFinanceOversight(
         if (activeRunIds.has(runId)) {
           empty.payoutBlockers.push({
             runId,
-            payPeriod: "",
+            payPeriod: runPeriodById.get(runId) ?? "",
             flaggedCount: count
           });
         }
