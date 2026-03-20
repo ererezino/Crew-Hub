@@ -67,6 +67,20 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
 
   const isEditable = canEdit && ["draft", "calculated", "rejected"].includes(run.status);
 
+  /* Per-cycle freeze: fields for a cycle are locked once it leaves draft/rejected */
+  const frozenStatuses = ["submitted", "approved", "ready", "processing", "paid"];
+  const isCycle1Frozen = Boolean(cycle1 && frozenStatuses.includes(cycle1.status));
+  const isCycle2Frozen = Boolean(cycle2 && frozenStatuses.includes(cycle2.status));
+
+  const cycle1Fields: Array<keyof WorksheetRowEditPayload> = ["cycle1BaseAmount", "cycle1OvertimeHours", "cycle1Included"];
+  const cycle2Fields: Array<keyof WorksheetRowEditPayload> = ["cycle2BaseAmount", "cycle2OvertimeHours", "cycle2Included"];
+
+  function isFieldFrozen(field: keyof WorksheetRowEditPayload): boolean {
+    if (cycle1Fields.includes(field)) return isCycle1Frozen;
+    if (cycle2Fields.includes(field)) return isCycle2Frozen;
+    return false;
+  }
+
   const sortedItems = useMemo(() => {
     const rows = [...items];
     return rows.sort((a, b) => {
@@ -103,10 +117,10 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
   /* ── Inline editing ─────────────────────────────────────── */
 
   const startEdit = useCallback((itemId: string, field: keyof WorksheetRowEditPayload, currentValue: string | number | boolean | null) => {
-    if (!isEditable) return;
+    if (!isEditable || isFieldFrozen(field)) return;
     setEditingCell({ itemId, field });
     setEditValue(currentValue === null ? "" : String(currentValue));
-  }, [isEditable]);
+  }, [isEditable, isCycle1Frozen, isCycle2Frozen]);
 
   const cancelEdit = useCallback(() => {
     setEditingCell(null);
@@ -148,15 +162,21 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
 
       if (res.ok) {
         onItemUpdated();
+      } else {
+        const json = await res.json().catch(() => null);
+        const msg = (json as { error?: { message?: string } } | null)?.error?.message ?? "Unable to save worksheet edit.";
+        onToast("error", msg);
       }
     } finally {
       setSavingItemId(null);
       setEditValue("");
     }
-  }, [editingCell, editValue, run.id, onItemUpdated]);
+  }, [editingCell, editValue, run.id, onItemUpdated, onToast]);
 
   const toggleCycleInclusion = useCallback(async (itemId: string, cycle: 1 | 2, currentValue: boolean) => {
     if (!isEditable) return;
+    if (cycle === 1 && isCycle1Frozen) return;
+    if (cycle === 2 && isCycle2Frozen) return;
     setSavingItemId(itemId);
     const payload: WorksheetRowEditPayload = cycle === 1
       ? { cycle1Included: !currentValue }
@@ -168,11 +188,17 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      if (res.ok) onItemUpdated();
+      if (res.ok) {
+        onItemUpdated();
+      } else {
+        const json = await res.json().catch(() => null);
+        const msg = (json as { error?: { message?: string } } | null)?.error?.message ?? "Unable to save worksheet edit.";
+        onToast("error", msg);
+      }
     } finally {
       setSavingItemId(null);
     }
-  }, [isEditable, run.id, onItemUpdated]);
+  }, [isEditable, isCycle1Frozen, isCycle2Frozen, run.id, onItemUpdated, onToast]);
 
   /* ── Cycle-level actions (Amendment 1 — primary workflow) ── */
 
@@ -260,6 +286,8 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
   }) {
     const isEditing = editingCell?.itemId === itemId && editingCell?.field === field;
     const isSaving = savingItemId === itemId;
+    const frozen = isFieldFrozen(field);
+    const cellEditable = isEditable && !frozen;
 
     if (isEditing) {
       return (
@@ -284,13 +312,14 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
 
     return (
       <span
-        className={`${isEditable ? "worksheet-cell-editable" : ""} ${className ?? ""} ${isSaving ? "worksheet-cell-saving" : ""}`}
-        onClick={() => isEditable && startEdit(itemId, field, value)}
+        className={`${cellEditable ? "worksheet-cell-editable" : ""} ${frozen ? "worksheet-cell-frozen" : ""} ${className ?? ""} ${isSaving ? "worksheet-cell-saving" : ""}`}
+        onClick={() => cellEditable && startEdit(itemId, field, value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && isEditable) startEdit(itemId, field, value);
+          if (e.key === "Enter" && cellEditable) startEdit(itemId, field, value);
         }}
-        role={isEditable ? "button" : undefined}
-        tabIndex={isEditable ? 0 : undefined}
+        role={cellEditable ? "button" : undefined}
+        tabIndex={cellEditable ? 0 : undefined}
+        title={frozen ? "This field is locked — the cycle has been submitted for approval." : undefined}
       >
         {displayValue}
       </span>
@@ -507,8 +536,9 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
                         <input
                           type="checkbox"
                           checked={item.cycle1Included}
-                          disabled={!isEditable || savingItemId === item.id}
+                          disabled={!isEditable || isCycle1Frozen || savingItemId === item.id}
                           onChange={() => void toggleCycleInclusion(item.id, 1, item.cycle1Included)}
+                          title={isCycle1Frozen ? "Cycle 1 is locked — it has been submitted for approval." : undefined}
                         />
                       </td>
                     ) : null}
@@ -530,8 +560,9 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
                         <input
                           type="checkbox"
                           checked={item.cycle2Included}
-                          disabled={!isEditable || savingItemId === item.id}
+                          disabled={!isEditable || isCycle2Frozen || savingItemId === item.id}
                           onChange={() => void toggleCycleInclusion(item.id, 2, item.cycle2Included)}
+                          title={isCycle2Frozen ? "Cycle 2 is locked — it has been submitted for approval." : undefined}
                         />
                       </td>
                     ) : null}
