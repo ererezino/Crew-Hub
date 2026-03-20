@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
+import { formatCurrency } from "../../../../../../../../../lib/format-currency";
 import { renderPayrollCycleAuditPdf } from "../../../../../../../../../lib/payroll/cycle-audit-pdf";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import type { PayrollCycleApprovalSnapshot } from "../../../../../../../../../types/payroll-runs";
@@ -24,12 +25,25 @@ import {
 
 const EXPORTABLE_STATUSES = new Set(["submitted", "approved", "ready", "processing", "paid"]);
 
-function formatCentsToDollars(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  const abs = Math.abs(cents);
-  const dollars = Math.floor(abs / 100);
-  const remainder = abs % 100;
-  return `${sign}${dollars}.${String(remainder).padStart(2, "0")}`;
+function formatCentsForCurrency(cents: number, currency: string): string {
+  return formatCurrency(cents / 100, currency);
+}
+
+function formatSnapshotTotals(
+  totals: Record<string, number> | null | undefined,
+  fallbackCurrency: string,
+  fallbackAmount: number
+): string {
+  const entries = Object.entries(totals ?? {}).filter(([, amount]) => Number.isFinite(amount) && amount !== 0);
+
+  if (entries.length === 0) {
+    return formatCentsForCurrency(fallbackAmount, fallbackCurrency);
+  }
+
+  return entries
+    .sort((left, right) => right[1] - left[1])
+    .map(([currency, amount]) => formatCentsForCurrency(amount, currency))
+    .join(" | ");
 }
 
 function escapeCsvField(value: string | null | undefined): string {
@@ -179,6 +193,7 @@ export async function GET(
       "Designation",
       "Department",
       "Accrue Username",
+      "Currency",
       "Monthly Salary",
       "Cycle Base Amount",
       "Overtime Hours",
@@ -199,14 +214,15 @@ export async function GET(
         escapeCsvField(row.designation),
         escapeCsvField(row.department),
         escapeCsvField(row.accrueUsername),
-        formatCentsToDollars(row.monthlySalary),
-        formatCentsToDollars(row.cycleBaseAmount),
+        escapeCsvField(row.currency ?? snapshot.currency),
+        formatCentsForCurrency(row.monthlySalary, row.currency ?? snapshot.currency),
+        formatCentsForCurrency(row.cycleBaseAmount, row.currency ?? snapshot.currency),
         String(row.overtimeHours),
-        formatCentsToDollars(row.overtimeRate),
-        formatCentsToDollars(row.overtimeAmount),
-        formatCentsToDollars(row.bonus),
-        formatCentsToDollars(row.fees),
-        formatCentsToDollars(row.finalPayable),
+        formatCentsForCurrency(row.overtimeRate, row.currency ?? snapshot.currency),
+        formatCentsForCurrency(row.overtimeAmount, row.currency ?? snapshot.currency),
+        formatCentsForCurrency(row.bonus, row.currency ?? snapshot.currency),
+        formatCentsForCurrency(row.fees, row.currency ?? snapshot.currency),
+        formatCentsForCurrency(row.finalPayable, row.currency ?? snapshot.currency),
         escapeCsvField(row.comment),
         escapeCsvField(row.exceptionReason)
       ].join(","));
@@ -216,13 +232,13 @@ export async function GET(
     csvLines.push("");
     csvLines.push([
       "TOTALS",
-      "", "", "", "",
-      formatCentsToDollars(snapshot.totalNet),
+      "", "", "", "", "",
+      formatSnapshotTotals(snapshot.totalNetByCurrency, snapshot.currency, snapshot.totalNet),
       "", "",
-      formatCentsToDollars(snapshot.totalOvertime),
-      formatCentsToDollars(snapshot.totalBonus),
-      formatCentsToDollars(snapshot.totalFees),
-      formatCentsToDollars(snapshot.totalNet),
+      formatSnapshotTotals(snapshot.totalOvertimeByCurrency, snapshot.currency, snapshot.totalOvertime),
+      formatSnapshotTotals(snapshot.totalBonusByCurrency, snapshot.currency, snapshot.totalBonus),
+      formatSnapshotTotals(snapshot.totalFeesByCurrency, snapshot.currency, snapshot.totalFees),
+      formatSnapshotTotals(snapshot.totalNetByCurrency, snapshot.currency, snapshot.totalNet),
       "", ""
     ].join(","));
     csvLines.push(`Employee Count,${snapshot.employeeCount}`);

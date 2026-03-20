@@ -308,7 +308,9 @@ export async function persistPayrollRunCalculation({
       const currency = normalizeCurrencyCode(
         compensation?.currency ?? employee.primary_currency ?? "USD"
       );
-      const payCurrency = normalizeCurrencyCode(employee.primary_currency ?? "USD");
+      const payCurrency = normalizeCurrencyCode(
+        compensation?.currency ?? employee.primary_currency ?? "USD"
+      );
 
       let calculated: Awaited<ReturnType<typeof calculatePayrollItem>>;
       let calcError: string | null = null;

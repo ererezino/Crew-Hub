@@ -158,6 +158,12 @@ export type PayrollCycleApprovalSnapshot = {
   totalOvertime: number;
   totalBonus: number;
   totalFees: number;
+  totalGrossByCurrency?: PayrollCurrencyTotals;
+  totalNetByCurrency?: PayrollCurrencyTotals;
+  totalDeductionsByCurrency?: PayrollCurrencyTotals;
+  totalOvertimeByCurrency?: PayrollCurrencyTotals;
+  totalBonusByCurrency?: PayrollCurrencyTotals;
+  totalFeesByCurrency?: PayrollCurrencyTotals;
   rows: PayrollCycleSnapshotRow[];
 };
 
@@ -167,6 +173,7 @@ export type PayrollCycleSnapshotRow = {
   designation: string | null;
   department: string | null;
   accrueUsername: string | null;
+  currency?: string;
   monthlySalary: number;
   cycleBaseAmount: number;
   overtimeHours: number;
@@ -220,6 +227,7 @@ export type PayslipStatementType = "native" | "historical";
 export type PayrollRunDashboardMetrics = {
   latestStatus: PayrollRunStatus | null;
   latestTotalCostAmount: number;
+  latestTotalCostTotals: PayrollCurrencyTotals;
   latestEmployeeCount: number;
   nextPayDate: string | null;
   eligibleEmployeeCount: number;

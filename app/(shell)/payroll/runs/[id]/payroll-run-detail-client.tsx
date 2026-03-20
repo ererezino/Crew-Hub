@@ -18,13 +18,12 @@ import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../../components/ui/currency-display";
+import { CurrencyTotalsDisplay } from "../../../../../components/ui/currency-totals-display";
 import { useConfirmAction } from "../../../../../hooks/use-confirm-action";
 import { usePayrollRunDetail } from "../../../../../hooks/use-payroll-runs";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../../lib/countries";
 import { formatDate, formatDateTimeTooltip } from "../../../../../lib/datetime";
 import {
-  getCurrencyTotal,
-  getPrimaryCurrency,
   toneForPayrollRunStatus
 } from "../../../../../lib/payroll/runs";
 import type { GeneratePayslipsResponse } from "../../../../../types/payslips";
@@ -350,13 +349,6 @@ export function PayrollRunDetailClient({
     });
   }, [runQuery.data?.items, sortDirection]);
 
-
-  /** Derive the primary currency from the run's gross totals. */
-  const runCurrency = useMemo(() => {
-    const totals = runQuery.data?.run?.totalGross;
-    if (!totals) return "NGN";
-    return getPrimaryCurrency(totals);
-  }, [runQuery.data?.run?.totalGross]);
   const run = runQuery.data?.run ?? null;
   const isApproved = run?.status === "approved";
   const isProcessing = run?.status === "processing";
@@ -1201,10 +1193,7 @@ export function PayrollRunDetailClient({
             <article className="metric-card">
               <p className="metric-label">{t('metrics.grossTotal')}</p>
               <p className="metric-value">
-                <CurrencyDisplay
-                  amount={getCurrencyTotal(runQuery.data.run.totalGross, runCurrency)}
-                  currency={runCurrency}
-                />
+                <CurrencyTotalsDisplay totals={runQuery.data.run.totalGross} locale={locale} />
               </p>
               <p className="metric-hint">{t('metrics.grossTotalHint')}</p>
             </article>
@@ -1212,10 +1201,7 @@ export function PayrollRunDetailClient({
             <article className="metric-card">
               <p className="metric-label">{t('metrics.netTotal')}</p>
               <p className="metric-value">
-                <CurrencyDisplay
-                  amount={getCurrencyTotal(runQuery.data.run.totalNet, runCurrency)}
-                  currency={runCurrency}
-                />
+                <CurrencyTotalsDisplay totals={runQuery.data.run.totalNet} locale={locale} />
               </p>
               <p className="metric-hint">{t('metrics.netTotalHint')}</p>
             </article>

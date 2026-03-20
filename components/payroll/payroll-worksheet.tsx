@@ -4,9 +4,11 @@ import { useCallback, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
 import { CurrencyDisplay } from "../ui/currency-display";
+import { CurrencyTotalsDisplay } from "../ui/currency-totals-display";
 import { StatusBadge } from "../shared/status-badge";
 import type {
   PayrollCycle,
+  PayrollCurrencyTotals,
   PayrollRunItem,
   PayrollRunSummary,
   WorksheetRowEditPayload
@@ -55,6 +57,7 @@ type WorksheetDisplayRow = {
   designation: string | null;
   department: string | null;
   accrueUsername: string | null;
+  payCurrency: string;
   baseSalaryAmount: number;
   cycle1Included: boolean;
   cycle2Included: boolean;
@@ -96,8 +99,6 @@ export function PayrollWorksheet({
   const [markPaidCycleId, setMarkPaidCycleId] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
-
-  const currency = run.totalGross ? Object.keys(run.totalGross)[0] ?? "NGN" : "NGN";
 
   const cycle1 = cycles.find((c) => c.cycleNumber === 1);
   const cycle2 = cycles.find((c) => c.cycleNumber === 2);
@@ -151,6 +152,7 @@ export function PayrollWorksheet({
         designation: item.designation,
         department: item.department,
         accrueUsername: item.accrueUsername,
+        payCurrency: item.payCurrency,
         baseSalaryAmount: item.baseSalaryAmount,
         cycle1Included: item.cycle1Included,
         cycle2Included: item.cycle2Included,
@@ -186,6 +188,7 @@ export function PayrollWorksheet({
       designation: row.designation,
       department: row.department,
       accrueUsername: row.accrueUsername,
+      payCurrency: row.currency ?? activeSnapshot.currency,
       baseSalaryAmount: row.monthlySalary,
       cycle1Included: viewMode === "cycle1",
       cycle2Included: viewMode === "cycle2",
@@ -222,21 +225,36 @@ export function PayrollWorksheet({
     return sortedItems;
   }, [activeSnapshot, sortedItems, viewMode]);
 
+  function sumCurrencyTotals(
+    rows: WorksheetDisplayRow[],
+    selector: (row: WorksheetDisplayRow) => number
+  ): PayrollCurrencyTotals {
+    return rows.reduce<PayrollCurrencyTotals>((totalsByCurrency, row) => {
+      const amount = selector(row);
+      if (!amount) return totalsByCurrency;
+      const currentAmount = totalsByCurrency[row.payCurrency] ?? 0;
+      return {
+        ...totalsByCurrency,
+        [row.payCurrency]: currentAmount + amount
+      };
+    }, {});
+  }
+
   /* ── Totals ─────────────────────────────────────────────── */
 
   const totals = useMemo(() => {
     const rows = filteredItems;
     return {
-      monthlySalary: rows.reduce((s, r) => s + r.baseSalaryAmount, 0),
-      c1Base: rows.reduce((s, r) => s + r.cycle1BaseAmount, 0),
-      c2Base: rows.reduce((s, r) => s + r.cycle2BaseAmount, 0),
+      monthlySalary: sumCurrencyTotals(rows, (row) => row.baseSalaryAmount),
+      c1Base: sumCurrencyTotals(rows, (row) => row.cycle1BaseAmount),
+      c2Base: sumCurrencyTotals(rows, (row) => row.cycle2BaseAmount),
       c1OtHours: rows.reduce((s, r) => s + r.cycle1OvertimeHours, 0),
-      c1OtAmount: rows.reduce((s, r) => s + r.cycle1OvertimeAmount, 0),
+      c1OtAmount: sumCurrencyTotals(rows, (row) => row.cycle1OvertimeAmount),
       c2OtHours: rows.reduce((s, r) => s + r.cycle2OvertimeHours, 0),
-      c2OtAmount: rows.reduce((s, r) => s + r.cycle2OvertimeAmount, 0),
-      bonus: rows.reduce((s, r) => s + r.bonus, 0),
-      fees: rows.reduce((s, r) => s + r.fees, 0),
-      monthlyTotal: rows.reduce((s, r) => s + r.monthlyTotal, 0),
+      c2OtAmount: sumCurrencyTotals(rows, (row) => row.cycle2OvertimeAmount),
+      bonus: sumCurrencyTotals(rows, (row) => row.bonus),
+      fees: sumCurrencyTotals(rows, (row) => row.fees),
+      monthlyTotal: sumCurrencyTotals(rows, (row) => row.monthlyTotal),
       count: rows.length
     };
   }, [filteredItems]);
@@ -415,12 +433,14 @@ export function PayrollWorksheet({
     itemId,
     field,
     value,
+    currency,
     isAmount,
     className
   }: {
     itemId: string;
     field: keyof WorksheetRowEditPayload;
     value: string | number | null;
+    currency?: string;
     isAmount?: boolean;
     className?: string;
   }) {
@@ -447,7 +467,7 @@ export function PayrollWorksheet({
     }
 
     const displayValue = isAmount && typeof value === "number"
-      ? <CurrencyDisplay amount={value} currency={currency} locale={locale} />
+      ? <CurrencyDisplay amount={value} currency={currency ?? "USD"} locale={locale} />
       : (value ?? <span className="text-muted">{String.fromCharCode(8212)}</span>);
 
     return (
@@ -713,7 +733,10 @@ export function PayrollWorksheet({
             <div>
               <span className="payroll-worksheet-snapshot-label">{t("snapshot.totalNet")}</span>
               <span className="payroll-worksheet-snapshot-value">
-                <CurrencyDisplay amount={activeSnapshot.totalNet} currency={activeSnapshot.currency} locale={locale} />
+                <CurrencyTotalsDisplay
+                  totals={activeSnapshot.totalNetByCurrency ?? { [activeSnapshot.currency]: activeSnapshot.totalNet }}
+                  locale={locale}
+                />
               </span>
             </div>
             {activeCycle?.approvedAt ? (
@@ -798,7 +821,7 @@ export function PayrollWorksheet({
                 <td>{item.department ?? "\u2014"}</td>
                 {viewMode === "worksheet" ? (
                   <td className="text-right">
-                    <CurrencyDisplay amount={item.baseSalaryAmount} currency={currency} locale={locale} />
+                    <CurrencyDisplay amount={item.baseSalaryAmount} currency={item.payCurrency} locale={locale} />
                   </td>
                 ) : null}
                 {viewMode !== "cycle2" ? (
@@ -815,13 +838,13 @@ export function PayrollWorksheet({
                       </td>
                     ) : null}
                     <td className="text-right">
-                      <EditableCell itemId={item.id} field="cycle1BaseAmount" value={item.cycle1BaseAmount} isAmount />
+                      <EditableCell itemId={item.id} field="cycle1BaseAmount" value={item.cycle1BaseAmount} currency={item.payCurrency} isAmount />
                     </td>
                     <td className="text-right">
                       <EditableCell itemId={item.id} field="cycle1OvertimeHours" value={item.cycle1OvertimeHours} className="numeric" />
                     </td>
                     <td className="text-right">
-                      <CurrencyDisplay amount={item.cycle1OvertimeAmount} currency={currency} locale={locale} />
+                      <CurrencyDisplay amount={item.cycle1OvertimeAmount} currency={item.payCurrency} locale={locale} />
                     </td>
                   </>
                 ) : null}
@@ -839,24 +862,24 @@ export function PayrollWorksheet({
                       </td>
                     ) : null}
                     <td className="text-right">
-                      <EditableCell itemId={item.id} field="cycle2BaseAmount" value={item.cycle2BaseAmount} isAmount />
+                      <EditableCell itemId={item.id} field="cycle2BaseAmount" value={item.cycle2BaseAmount} currency={item.payCurrency} isAmount />
                     </td>
                     <td className="text-right">
                       <EditableCell itemId={item.id} field="cycle2OvertimeHours" value={item.cycle2OvertimeHours} className="numeric" />
                     </td>
                     <td className="text-right">
-                      <CurrencyDisplay amount={item.cycle2OvertimeAmount} currency={currency} locale={locale} />
+                      <CurrencyDisplay amount={item.cycle2OvertimeAmount} currency={item.payCurrency} locale={locale} />
                     </td>
                   </>
                 ) : null}
                 <td className="text-right">
-                  <EditableCell itemId={item.id} field="bonus" value={item.bonus} isAmount />
+                  <EditableCell itemId={item.id} field="bonus" value={item.bonus} currency={item.payCurrency} isAmount />
                 </td>
                 <td className="text-right">
-                  <EditableCell itemId={item.id} field="fees" value={item.fees} isAmount />
+                  <EditableCell itemId={item.id} field="fees" value={item.fees} currency={item.payCurrency} isAmount />
                 </td>
                 <td className="text-right payroll-worksheet-total-cell">
-                  <CurrencyDisplay amount={item.monthlyTotal} currency={currency} locale={locale} />
+                  <CurrencyDisplay amount={item.monthlyTotal} currency={item.payCurrency} locale={locale} />
                 </td>
                 <td className="payroll-worksheet-text-cell">
                   <EditableCell itemId={item.id} field="comment" value={item.comment} />
@@ -876,20 +899,20 @@ export function PayrollWorksheet({
               <td />
               {viewMode === "worksheet" ? (
                 <td className="text-right">
-                  <strong><CurrencyDisplay amount={totals.monthlySalary} currency={currency} locale={locale} /></strong>
+                  <CurrencyTotalsDisplay totals={totals.monthlySalary} locale={locale} />
                 </td>
               ) : null}
               {viewMode !== "cycle2" ? (
                 <>
                   {viewMode === "worksheet" ? <td /> : null}
                   <td className="text-right">
-                    <strong><CurrencyDisplay amount={totals.c1Base} currency={currency} locale={locale} /></strong>
+                    <CurrencyTotalsDisplay totals={totals.c1Base} locale={locale} />
                   </td>
                   <td className="text-right">
                     <strong className="numeric">{totals.c1OtHours}</strong>
                   </td>
                   <td className="text-right">
-                    <strong><CurrencyDisplay amount={totals.c1OtAmount} currency={currency} locale={locale} /></strong>
+                    <CurrencyTotalsDisplay totals={totals.c1OtAmount} locale={locale} />
                   </td>
                 </>
               ) : null}
@@ -897,24 +920,24 @@ export function PayrollWorksheet({
                 <>
                   {viewMode === "worksheet" ? <td /> : null}
                   <td className="text-right">
-                    <strong><CurrencyDisplay amount={totals.c2Base} currency={currency} locale={locale} /></strong>
+                    <CurrencyTotalsDisplay totals={totals.c2Base} locale={locale} />
                   </td>
                   <td className="text-right">
                     <strong className="numeric">{totals.c2OtHours}</strong>
                   </td>
                   <td className="text-right">
-                    <strong><CurrencyDisplay amount={totals.c2OtAmount} currency={currency} locale={locale} /></strong>
+                    <CurrencyTotalsDisplay totals={totals.c2OtAmount} locale={locale} />
                   </td>
                 </>
               ) : null}
               <td className="text-right">
-                <strong><CurrencyDisplay amount={totals.bonus} currency={currency} locale={locale} /></strong>
+                <CurrencyTotalsDisplay totals={totals.bonus} locale={locale} />
               </td>
               <td className="text-right">
-                <strong><CurrencyDisplay amount={totals.fees} currency={currency} locale={locale} /></strong>
+                <CurrencyTotalsDisplay totals={totals.fees} locale={locale} />
               </td>
               <td className="text-right payroll-worksheet-total-cell">
-                <strong><CurrencyDisplay amount={totals.monthlyTotal} currency={currency} locale={locale} /></strong>
+                <CurrencyTotalsDisplay totals={totals.monthlyTotal} locale={locale} />
               </td>
               <td />
               <td />

@@ -4,7 +4,7 @@ import { Document, Page, Text, View, StyleSheet, pdf } from "@react-pdf/renderer
 
 import { formatCurrency } from "../format-currency";
 import { AccrueFooter, AccrueLetterhead } from "../pdf/accrue-letterhead";
-import type { PayrollCycleApprovalSnapshot } from "../../types/payroll-runs";
+import type { PayrollCurrencyTotals, PayrollCycleApprovalSnapshot } from "../../types/payroll-runs";
 
 type CycleAuditPdfInput = {
   companyName: string;
@@ -157,6 +157,22 @@ function money(amount: number, currency: string) {
   return formatCurrency(amount / 100, currency);
 }
 
+function moneyTotals(
+  totals: PayrollCurrencyTotals | null | undefined,
+  fallbackCurrency: string,
+  fallbackAmount: number
+) {
+  const entries = Object.entries(totals ?? {})
+    .filter(([, amount]) => Number.isFinite(amount) && amount !== 0)
+    .sort((left, right) => right[1] - left[1]);
+
+  if (entries.length === 0) {
+    return money(fallbackAmount, fallbackCurrency);
+  }
+
+  return entries.map(([currencyCode, amount]) => money(amount, currencyCode)).join(" | ");
+}
+
 function formatDate(value: string | null): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -221,16 +237,20 @@ function CycleAuditDocument({
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>Total payable</Text>
-            <Text style={styles.summaryValue}>{money(snapshot.totalNet, currency)}</Text>
+            <Text style={styles.summaryValue}>
+              {moneyTotals(snapshot.totalNetByCurrency, currency, snapshot.totalNet)}
+            </Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>Overtime</Text>
-            <Text style={styles.summaryValue}>{money(snapshot.totalOvertime, currency)}</Text>
+            <Text style={styles.summaryValue}>
+              {moneyTotals(snapshot.totalOvertimeByCurrency, currency, snapshot.totalOvertime)}
+            </Text>
           </View>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>Bonus / Fees</Text>
             <Text style={styles.summaryValue}>
-              {money(snapshot.totalBonus, currency)} / {money(snapshot.totalFees, currency)}
+              {moneyTotals(snapshot.totalBonusByCurrency, currency, snapshot.totalBonus)} / {moneyTotals(snapshot.totalFeesByCurrency, currency, snapshot.totalFees)}
             </Text>
           </View>
         </View>
@@ -251,11 +271,11 @@ function CycleAuditDocument({
           <View key={row.employeeId} style={styles.tableRow}>
             <Text style={[styles.tableText, styles.colEmployee]}>{row.employeeName}</Text>
             <Text style={[styles.tableText, styles.colTitle]}>{row.designation ?? "-"}</Text>
-            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.cycleBaseAmount, currency)}</Text>
-            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.overtimeAmount, currency)}</Text>
-            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.bonus, currency)}</Text>
-            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.fees, currency)}</Text>
-            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.finalPayable, currency)}</Text>
+            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.cycleBaseAmount, row.currency ?? currency)}</Text>
+            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.overtimeAmount, row.currency ?? currency)}</Text>
+            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.bonus, row.currency ?? currency)}</Text>
+            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.fees, row.currency ?? currency)}</Text>
+            <Text style={[styles.tableText, styles.colAmounts]}>{money(row.finalPayable, row.currency ?? currency)}</Text>
             <Text style={[styles.tableText, styles.colNotes]}>
               {[row.comment, row.exceptionReason].filter(Boolean).join(" | ") || "-"}
             </Text>

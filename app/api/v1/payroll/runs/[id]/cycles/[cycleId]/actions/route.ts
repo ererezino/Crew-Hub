@@ -3,13 +3,18 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../../../lib/audit";
 import { evaluateCycleAction } from "../../../../../../../../../lib/payroll/cycle-policy";
-import { derivePayrollRunStatusFromCycles } from "../../../../../../../../../lib/payroll/runs";
+import {
+  addCurrencyTotal,
+  derivePayrollRunStatusFromCycles,
+  normalizeCurrencyCode
+} from "../../../../../../../../../lib/payroll/runs";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import type {
   MarkCyclePaidResponseData,
   PayrollCycle,
   PayrollCycleActionResponseData,
   PayrollCycleApprovalSnapshot,
+  PayrollCurrencyTotals,
   PayrollCycleSnapshotRow,
   PayrollRunStatus
 } from "../../../../../../../../../types/payroll-runs";
@@ -354,7 +359,7 @@ async function handleSubmit({
   const { data: rawItems, error: itemsError } = await supabase
     .from("payroll_items")
     .select(
-      `id, employee_id, base_salary_amount, ${baseAmountColumn}, ${overtimeHoursColumn}, ${overtimeAmountColumn}, ${includedColumn}, fees, bonus, comment, exception_reason, designation, accrue_username, overtime_hours, net_amount`
+      `id, employee_id, pay_currency, base_salary_amount, ${baseAmountColumn}, ${overtimeHoursColumn}, ${overtimeAmountColumn}, ${includedColumn}, fees, bonus, comment, exception_reason, designation, accrue_username, overtime_hours, net_amount`
     )
     .eq("payroll_run_id", runId)
     .eq("org_id", profile.org_id)
@@ -402,6 +407,12 @@ async function handleSubmit({
   let totalOvertime = 0;
   let totalBonus = 0;
   let totalFees = 0;
+  let totalGrossByCurrency: PayrollCurrencyTotals = {};
+  let totalNetByCurrency: PayrollCurrencyTotals = {};
+  let totalDeductionsByCurrency: PayrollCurrencyTotals = {};
+  let totalOvertimeByCurrency: PayrollCurrencyTotals = {};
+  let totalBonusByCurrency: PayrollCurrencyTotals = {};
+  let totalFeesByCurrency: PayrollCurrencyTotals = {};
 
   for (const item of items) {
     const cycleBaseAmount = parseAmount((item as Record<string, unknown>)[baseAmountColumn]);
@@ -410,6 +421,7 @@ async function handleSubmit({
     const itemBonus = parseAmount(item.bonus);
     const itemFees = parseAmount(item.fees);
     const monthlySalary = parseAmount(item.base_salary_amount);
+    const itemCurrency = normalizeCurrencyCode(item.pay_currency ?? parsedCycle.currency);
 
     const finalPayable = cycleBaseAmount + cycleOvertimeAmount + itemBonus - itemFees;
 
@@ -421,6 +433,7 @@ async function handleSubmit({
       designation: item.designation ?? null,
       department: emp?.department ?? null,
       accrueUsername: item.accrue_username ?? null,
+      currency: itemCurrency,
       monthlySalary,
       cycleBaseAmount,
       overtimeHours: cycleOvertimeHours,
@@ -438,9 +451,18 @@ async function handleSubmit({
     totalOvertime += cycleOvertimeAmount;
     totalBonus += itemBonus;
     totalFees += itemFees;
+    totalGrossByCurrency = addCurrencyTotal(totalGrossByCurrency, itemCurrency, cycleBaseAmount + cycleOvertimeAmount + itemBonus);
+    totalNetByCurrency = addCurrencyTotal(totalNetByCurrency, itemCurrency, finalPayable);
+    totalOvertimeByCurrency = addCurrencyTotal(totalOvertimeByCurrency, itemCurrency, cycleOvertimeAmount);
+    totalBonusByCurrency = addCurrencyTotal(totalBonusByCurrency, itemCurrency, itemBonus);
+    totalFeesByCurrency = addCurrencyTotal(totalFeesByCurrency, itemCurrency, itemFees);
   }
 
   totalDeductions = totalGross - totalNet;
+  for (const [currencyCode, grossAmount] of Object.entries(totalGrossByCurrency)) {
+    const netAmount = totalNetByCurrency[currencyCode] ?? 0;
+    totalDeductionsByCurrency = addCurrencyTotal(totalDeductionsByCurrency, currencyCode, grossAmount - netAmount);
+  }
 
   const approvalSnapshot: PayrollCycleApprovalSnapshot = {
     cycleNumber: cycleNumber ?? 1,
@@ -457,6 +479,12 @@ async function handleSubmit({
     totalOvertime,
     totalBonus,
     totalFees,
+    totalGrossByCurrency,
+    totalNetByCurrency,
+    totalDeductionsByCurrency,
+    totalOvertimeByCurrency,
+    totalBonusByCurrency,
+    totalFeesByCurrency,
     rows: snapshotRows
   };
 

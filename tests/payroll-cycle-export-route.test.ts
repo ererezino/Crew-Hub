@@ -77,6 +77,12 @@ const snapshot = {
   totalOvertime: 0,
   totalBonus: 0,
   totalFees: 0,
+  totalGrossByCurrency: { NGN: 250000 },
+  totalNetByCurrency: { NGN: 250000 },
+  totalDeductionsByCurrency: { NGN: 0 },
+  totalOvertimeByCurrency: {},
+  totalBonusByCurrency: {},
+  totalFeesByCurrency: {},
   rows: [
     {
       employeeId: "00000000-0000-4000-a000-000000000005",
@@ -84,6 +90,7 @@ const snapshot = {
       designation: "Engineer",
       department: "Engineering",
       accrueUsername: "ada",
+      currency: "NGN",
       monthlySalary: 500000,
       cycleBaseAmount: 250000,
       overtimeHours: 0,
@@ -172,5 +179,22 @@ describe("GET /cycles/[cycleId]/export", () => {
         snapshot
       })
     );
+  });
+
+  it("returns CSV rows with each employee's currency preserved", async () => {
+    getAuthenticatedSessionMock.mockResolvedValueOnce(session);
+    enqueue("payroll_cycles", { data: cycleRow(), error: null });
+
+    const { GET } = await importRoute();
+    const res = await GET(
+      new Request("http://localhost/api/v1/payroll/runs/run/cycles/cycle/export?format=csv"),
+      { params: Promise.resolve({ id: RUN, cycleId: CYC }) }
+    );
+
+    expect(res.status).toBe(200);
+    const csv = await res.text();
+    expect(csv).toContain("Currency");
+    expect(csv).toContain("NGN");
+    expect(csv).toContain("₦2,500.00");
   });
 });

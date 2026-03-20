@@ -5,7 +5,6 @@ import { logAudit } from "../../../../../lib/audit";
 import {
   currentMonthPeriod,
   derivePayrollRunStatusFromCycles,
-  getCurrencyTotal,
   semiMonthlyCycleDates
 } from "../../../../../lib/payroll/runs";
 import { persistPayrollRunCalculation } from "../../../../../lib/payroll/persist-payroll-run-calculation";
@@ -302,7 +301,8 @@ export async function GET() {
     const responseData: PayrollRunsDashboardResponseData = {
       metrics: {
         latestStatus: latestRun?.status ?? null,
-        latestTotalCostAmount: latestRun ? getCurrencyTotal(latestRun.totalNet, "USD") : 0,
+        latestTotalCostAmount: 0,
+        latestTotalCostTotals: latestRun?.totalNet ?? {},
         latestEmployeeCount: latestRun?.employeeCount ?? 0,
         nextPayDate,
         eligibleEmployeeCount

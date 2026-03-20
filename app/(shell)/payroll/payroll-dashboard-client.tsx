@@ -9,12 +9,10 @@ import { ErrorState } from "../../../components/shared/error-state";
 import { FeatureBanner } from "../../../components/shared/feature-banner";
 import { PageHeader } from "../../../components/shared/page-header";
 import { StatusBadge } from "../../../components/shared/status-badge";
-import { CurrencyDisplay } from "../../../components/ui/currency-display";
+import { CurrencyTotalsDisplay } from "../../../components/ui/currency-totals-display";
 import { usePayrollRunsDashboard } from "../../../hooks/use-payroll-runs";
 import { formatDate, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import {
-  getCurrencyTotal,
-  getPrimaryCurrency,
   labelForPayrollCycleStatus,
   labelForPayrollRunStatus,
   toneForPayrollCycleStatus,
@@ -86,13 +84,6 @@ export function PayrollDashboardClient({
     });
   }, [runsQuery.data?.runs, sortDirection]);
 
-  /** Derive the primary currency from the most recent run's totals. */
-  const dashboardCurrency = useMemo(() => {
-    const runs = runsQuery.data?.runs ?? [];
-    if (runs.length === 0) return "NGN";
-    return getPrimaryCurrency(runs[0].totalGross);
-  }, [runsQuery.data?.runs]);
-
   return (
     <>
       <PageHeader
@@ -136,9 +127,9 @@ export function PayrollDashboardClient({
             <article className="metric-card">
               <p className="metric-label">{t('totalCost')}</p>
               <p className="metric-value">
-                <CurrencyDisplay
-                  amount={runsQuery.data.metrics.latestTotalCostAmount}
-                  currency={dashboardCurrency}
+                <CurrencyTotalsDisplay
+                  totals={runsQuery.data.metrics.latestTotalCostTotals}
+                  locale={locale}
                 />
               </p>
               <p className="metric-hint">{t('totalCostHint')}</p>
@@ -252,10 +243,7 @@ export function PayrollDashboardClient({
                       </td>
                       <td className="numeric">{run.employeeCount}</td>
                       <td>
-                        <CurrencyDisplay
-                          amount={getCurrencyTotal(run.totalGross, getPrimaryCurrency(run.totalGross))}
-                          currency={getPrimaryCurrency(run.totalGross)}
-                        />
+                        <CurrencyTotalsDisplay totals={run.totalGross} locale={locale} />
                       </td>
                       <td>{run.initiatedByName ?? "--"}</td>
                       <td className="table-row-action-cell">

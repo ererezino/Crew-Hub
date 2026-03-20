@@ -14,6 +14,7 @@ function buildSnapshotRow(overrides: Partial<PayrollCycleSnapshotRow> = {}): Pay
     designation: "Software Engineer",
     department: "Engineering",
     accrueUsername: "alice.j",
+    currency: "USD",
     monthlySalary: 500000,
     cycleBaseAmount: 250000,
     overtimeHours: 0,
@@ -53,6 +54,12 @@ function buildSnapshot(
     totalOvertime,
     totalBonus,
     totalFees,
+    totalGrossByCurrency: { USD: totalGross },
+    totalNetByCurrency: { USD: totalNet },
+    totalDeductionsByCurrency: { USD: totalGross - totalNet },
+    totalOvertimeByCurrency: { USD: totalOvertime },
+    totalBonusByCurrency: { USD: totalBonus },
+    totalFeesByCurrency: { USD: totalFees },
     rows,
     ...overrides
   };
@@ -83,6 +90,7 @@ describe("Payroll cycle approval snapshot", () => {
       expect(row.designation).toBeTruthy();
       expect(row.department).toBeTruthy();
       expect(row.accrueUsername).toBeTruthy();
+      expect(row.currency).toBeTruthy();
     });
 
     it("snapshot row contains financial fields matching the real spreadsheet", () => {
@@ -142,6 +150,38 @@ describe("Payroll cycle approval snapshot", () => {
       expect(snapshot.totalOvertime).toBe(0);
       expect(snapshot.totalBonus).toBe(0);
       expect(snapshot.totalFees).toBe(0);
+    });
+
+    it("preserves per-currency totals for mixed-currency cycles", () => {
+      const rows = [
+        buildSnapshotRow({
+          employeeId: "emp-usd",
+          employeeName: "USD Worker",
+          currency: "USD",
+          cycleBaseAmount: 100000,
+          finalPayable: 100000
+        }),
+        buildSnapshotRow({
+          employeeId: "emp-ngn",
+          employeeName: "NGN Worker",
+          currency: "NGN",
+          cycleBaseAmount: 32500000,
+          finalPayable: 32500000
+        })
+      ];
+
+      const snapshot = buildSnapshot(rows, {
+        totalGrossByCurrency: { USD: 100000, NGN: 32500000 },
+        totalNetByCurrency: { USD: 100000, NGN: 32500000 },
+        totalDeductionsByCurrency: { USD: 0, NGN: 0 },
+        totalOvertimeByCurrency: {},
+        totalBonusByCurrency: {},
+        totalFeesByCurrency: {}
+      });
+
+      expect(snapshot.rows[0].currency).toBe("USD");
+      expect(snapshot.rows[1].currency).toBe("NGN");
+      expect(snapshot.totalNetByCurrency).toEqual({ USD: 100000, NGN: 32500000 });
     });
   });
 
