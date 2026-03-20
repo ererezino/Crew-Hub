@@ -1,8 +1,58 @@
+import { z } from "zod";
+
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { fetchFinanceOversight } from "../../../../../lib/dashboard/fetch-dashboard-data";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { FinanceOversightData } from "../../../../../types/dashboard";
 import { buildMeta, canApprovePayroll, jsonResponse } from "../_helpers";
+
+const financeOversightDataSchema = z.object({
+  pendingPayrollApprovals: z.array(
+    z.object({
+      id: z.string().uuid(),
+      payPeriod: z.string(),
+      status: z.string(),
+      employeeCount: z.number().int().nonnegative(),
+      submittedAt: z.string().nullable()
+    })
+  ),
+  pendingSalaryApprovals: z.object({
+    count: z.number().int().nonnegative()
+  }),
+  historicalAwaitingAction: z.array(
+    z.object({
+      id: z.string().uuid(),
+      payPeriod: z.string(),
+      nextStep: z.enum(["review", "authorize", "publish"])
+    })
+  ),
+  completionGaps: z.array(
+    z.object({
+      id: z.string().uuid(),
+      payPeriod: z.string(),
+      status: z.string(),
+      createdAt: z.string()
+    })
+  ),
+  payoutBlockers: z.array(
+    z.object({
+      runId: z.string().uuid(),
+      payPeriod: z.string(),
+      flaggedCount: z.number().int().nonnegative()
+    })
+  ),
+  activeCycles: z.array(
+    z.object({
+      runId: z.string().uuid(),
+      cycleId: z.string().uuid(),
+      label: z.string().nullable(),
+      status: z.string(),
+      totalNet: z.number().nonnegative(),
+      currency: z.string(),
+      payPeriod: z.string()
+    })
+  )
+});
 
 export async function GET() {
   const session = await getAuthenticatedSession();
@@ -27,7 +77,9 @@ export async function GET() {
 
   try {
     const supabase = createSupabaseServiceRoleClient();
-    const responseData = await fetchFinanceOversight(supabase, orgId);
+    const responseData = financeOversightDataSchema.parse(
+      await fetchFinanceOversight(supabase, orgId)
+    );
 
     return jsonResponse<FinanceOversightData>(200, {
       data: responseData,
