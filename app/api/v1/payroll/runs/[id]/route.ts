@@ -171,7 +171,7 @@ export async function GET(
         data: null,
         error: {
           code: "PAYROLL_RUN_FETCH_FAILED",
-          message: "Unable to load payroll run."
+          message: `Unable to load payroll run: ${runError.message}`
         },
         meta: buildMeta()
       });
@@ -225,7 +225,10 @@ export async function GET(
         data: null,
         error: {
           code: "PAYROLL_RUN_FETCH_FAILED",
-          message: "Unable to load payroll run item data."
+          message:
+            itemsError?.message ??
+            actorError?.message ??
+            "Unable to load payroll run item data."
         },
         meta: buildMeta()
       });
@@ -260,7 +263,7 @@ export async function GET(
           data: null,
           error: {
             code: "PAYROLL_RUN_FETCH_FAILED",
-            message: "Unable to load employee metadata for payroll items."
+            message: `Unable to load employee metadata for payroll items: ${profileError.message}`
           },
           meta: buildMeta()
         });

@@ -1720,14 +1720,14 @@
   },
   "payrollCreate": {
     "title": "Créer un cycle de paie",
-    "description": "Définissez les limites de la période de paie et la date de paie, puis calculez la paie des contractuels.",
+    "description": "Définissez le mois de paie et Crew Hub préremplira la liste de paie pour la revue financière.",
     "unavailable": "Nombre de contractuels indisponible",
     "formAriaLabel": "Formulaire de création de cycle de paie",
     "eligibilitySnapshot": "Aperçu de l'éligibilité",
-    "eligibilityDescription": "{count} contractuels actifs sont actuellement éligibles au calcul.",
+    "eligibilityDescription": "{count} membres actifs de l'équipe sont actuellement éligibles pour cette liste de paie.",
     "contractorMode": "Mode contractuel : net égal au brut",
     "runDetails": "Détails du cycle",
-    "runDetailsDescription": "Crew Hub calcule les contractuels sans retenue d'impôt dans cette phase.",
+    "runDetailsDescription": "Quand vous créez le cycle, Crew Hub calcule immédiatement la liste de paie pour que la finance puisse commencer la revue ligne par ligne.",
     "payPeriodStart": "Début de la période de paie",
     "payPeriodStartRequired": "Le début de la période de paie est requis.",
     "payPeriodEnd": "Fin de la période de paie",
@@ -3169,7 +3169,7 @@
     },
     "actions": {
       "calculating": "Calcul...",
-      "calculateRun": "Calculer le cycle",
+      "calculateRun": "Recalculer le cycle",
       "generating": "Génération...",
       "generateStatements": "Générer les bulletins",
       "submitting": "Envoi...",
@@ -3200,7 +3200,7 @@
     },
     "emptyState": {
       "title": "Aucun poste de paie",
-      "description": "Lancez le calcul pour remplir les membres de l'équipe dans ce cycle de paie.",
+      "description": "Aucune ligne de paie n'est encore disponible pour ce mois. Recalculez le cycle pour recharger la liste de paie.",
       "backToPayroll": "Retour à la paie"
     },
     "disbursementNotice": "L'exécution des décaissements est désactivée dans cette version. Il s'agit uniquement d'enregistrements de paie non exécutoires.",

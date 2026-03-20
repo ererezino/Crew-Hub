@@ -1647,16 +1647,16 @@
   },
   "payrollCreate": {
     "title": "Create Payroll Run",
-    "description": "Set pay period boundaries and pay date, then calculate contractor payroll.",
+    "description": "Set the pay month and Crew Hub will prefill the payroll list for finance review.",
     "unavailable": "Contractor count unavailable",
     "formAriaLabel": "Create payroll run form",
     "eligibilitySnapshot": "Eligibility snapshot",
-    "eligibilityDescription": "{count} active crew members are currently eligible for calculation.",
+    "eligibilityDescription": "{count} active crew members are currently eligible for this payroll list.",
     "contractorMode": "Contractor mode: net equals gross",
     "quickMonth": "Pay month",
     "quickMonthHint": "Select a month to auto-fill the period dates below. You can override them manually.",
     "runDetails": "Run details",
-    "runDetailsDescription": "Crew Hub calculates contractors with no tax withholding in this phase.",
+    "runDetailsDescription": "When you create the run, Crew Hub will calculate the current payroll list immediately so finance can start reviewing rows right away.",
     "payPeriodStart": "Pay period start",
     "payPeriodStartRequired": "Pay period start is required.",
     "payPeriodEnd": "Pay period end",
@@ -3219,7 +3219,7 @@
     },
     "actions": {
       "calculating": "Calculating...",
-      "calculateRun": "Calculate run",
+      "calculateRun": "Recalculate run",
       "generating": "Generating...",
       "generateStatements": "Generate statements",
       "submitting": "Submitting...",
@@ -3257,7 +3257,7 @@
     },
     "emptyState": {
       "title": "No payroll items yet",
-      "description": "Run calculation to populate crew members in this payroll run.",
+      "description": "No payroll rows are available for this month yet. Recalculate the run to repopulate the payroll list.",
       "backToPayroll": "Back to payroll"
     },
     "disbursementNotice": "Disbursement execution is disabled in this release. These are non-execution payroll records only.",

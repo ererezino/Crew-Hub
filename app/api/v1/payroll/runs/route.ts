@@ -3,9 +3,11 @@ import { z } from "zod";
 import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
+import { persistPayrollRunCalculation } from "../../../../../lib/payroll/persist-payroll-run-calculation";
 import { currentMonthPeriod, getCurrencyTotal } from "../../../../../lib/payroll/runs";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type {
+  CalculatePayrollRunResponseData,
   CreatePayrollRunResponseData,
   PayrollRunsDashboardResponseData
 } from "../../../../../types/payroll-runs";
@@ -127,7 +129,7 @@ export async function GET() {
         data: null,
         error: {
           code: "PAYROLL_RUNS_FETCH_FAILED",
-          message: "Unable to load payroll runs."
+          message: `Unable to load payroll runs: ${runsError.message}`
         },
         meta: buildMeta()
       });
@@ -344,12 +346,54 @@ export async function POST(request: Request) {
       });
     }
 
+    let calculationResult: CalculatePayrollRunResponseData;
+
+    try {
+      calculationResult = await persistPayrollRunCalculation({
+        supabase,
+        actor: {
+          id: session.profile.id,
+          orgId: session.profile.org_id
+        },
+        run: parsedRun.data
+      });
+    } catch (calculationError) {
+      await supabase
+        .from("payroll_runs")
+        .delete()
+        .eq("org_id", session.profile.org_id)
+        .eq("id", parsedRun.data.id);
+
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PAYROLL_RUN_CREATE_FAILED",
+          message:
+            calculationError instanceof Error
+              ? calculationError.message
+              : "Unable to create and prefill payroll run."
+        },
+        meta: buildMeta()
+      });
+    }
+
     const eligibleEmployeeCount = await countEligibleEmployees({
       supabase,
       orgId: session.profile.org_id
     });
 
-    const runSummary = toPayrollRunSummary(parsedRun.data, session.profile.full_name);
+    const runSummary = toPayrollRunSummary(
+      {
+        ...parsedRun.data,
+        status: calculationResult.status,
+        total_gross: calculationResult.totalGross,
+        total_net: calculationResult.totalNet,
+        total_deductions: calculationResult.totalDeductions,
+        total_employer_contributions: calculationResult.totalEmployerContributions,
+        employee_count: calculationResult.employeeCount
+      },
+      session.profile.full_name
+    );
 
     await logAudit({
       action: "created",
@@ -359,7 +403,8 @@ export async function POST(request: Request) {
         payPeriodStart: runSummary.payPeriodStart,
         payPeriodEnd: runSummary.payPeriodEnd,
         payDate: runSummary.payDate,
-        status: runSummary.status
+        status: runSummary.status,
+        employeeCount: runSummary.employeeCount
       }
     });
 
