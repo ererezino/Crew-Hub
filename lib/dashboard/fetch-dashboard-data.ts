@@ -1185,7 +1185,7 @@ async function fetchComplianceHealth(
 
 /* ── Finance oversight aggregator ── */
 
-async function fetchFinanceOversight(
+export async function fetchFinanceOversight(
   supabase: SupabaseClient,
   orgId: string
 ): Promise<FinanceOversightData> {
