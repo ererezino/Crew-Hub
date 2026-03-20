@@ -389,6 +389,77 @@ async function handleSubmit({
     rows: snapshotRows
   };
 
+  // ── Create payroll_cycle_items (disbursement records) ───────────────
+  // These are the rows that mark_paid, My Pay, and completion logic depend on.
+  // On re-submit after rejection, clear stale items first.
+
+  await supabase
+    .from("payroll_cycle_items")
+    .delete()
+    .eq("payroll_cycle_id", cycleId)
+    .eq("org_id", profile.org_id);
+
+  // Load payment destination snapshots for included employees
+  const nowDate = new Date();
+  const { data: paymentDetails } = await supabase
+    .from("employee_payment_details")
+    .select(
+      "employee_id, payment_method, currency, bank_account_last4, mobile_money_last4, crew_tag, is_primary, is_verified, change_effective_at"
+    )
+    .eq("org_id", profile.org_id)
+    .in("employee_id", employeeIds)
+    .eq("is_primary", true)
+    .is("deleted_at", null);
+
+  const paymentDetailsByEmployee = new Map<string, Record<string, unknown>>();
+  for (const detail of paymentDetails ?? []) {
+    const effectiveAt = new Date(detail.change_effective_at);
+    const isEffective = effectiveAt <= nowDate;
+    if (detail.is_verified && isEffective) {
+      paymentDetailsByEmployee.set(detail.employee_id, {
+        paymentMethod: detail.payment_method,
+        currency: detail.currency,
+        bankAccountLast4: detail.bank_account_last4,
+        mobileMoneyLast4: detail.mobile_money_last4,
+        crewTag: detail.crew_tag,
+        snapshotAt: nowDate.toISOString()
+      });
+    }
+  }
+
+  // Build cycle item inserts — one per included employee
+  const cycleItemInserts = items
+    .filter((item: Record<string, unknown>) => {
+      const row = snapshotRows.find((r) => r.employeeId === item.employee_id);
+      return row && row.finalPayable > 0;
+    })
+    .map((item: { id: string; employee_id: string }) => {
+      const row = snapshotRows.find((r) => r.employeeId === item.employee_id)!;
+      return {
+        payroll_cycle_id: cycleId,
+        payroll_item_id: item.id,
+        employee_id: item.employee_id,
+        org_id: profile.org_id,
+        payment_destination_snapshot: paymentDetailsByEmployee.get(item.employee_id) ?? {},
+        disbursement_status: "pending" as const,
+        disbursement_amount: row.finalPayable
+      };
+    });
+
+  if (cycleItemInserts.length > 0) {
+    const { error: cycleItemsError } = await supabase
+      .from("payroll_cycle_items")
+      .insert(cycleItemInserts);
+
+    if (cycleItemsError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "PAYROLL_CYCLE_SUBMIT_FAILED", message: "Unable to create cycle disbursement records." },
+        meta: buildMeta()
+      });
+    }
+  }
+
   // Update cycle with snapshot + submitted status + totals
   const { data: updatedRow, error: updateError } = await supabase
     .from("payroll_cycles")
@@ -411,6 +482,13 @@ async function handleSubmit({
     .single();
 
   if (updateError || !updatedRow) {
+    // Roll back cycle items if status update failed
+    await supabase
+      .from("payroll_cycle_items")
+      .delete()
+      .eq("payroll_cycle_id", cycleId)
+      .eq("org_id", profile.org_id);
+
     return jsonResponse<null>(500, {
       data: null,
       error: { code: "PAYROLL_CYCLE_SUBMIT_FAILED", message: "Unable to submit cycle for approval." },
@@ -428,7 +506,8 @@ async function handleSubmit({
       action: "submit",
       submittedBy: profile.id,
       employeeCount: snapshotRows.length,
-      totalNet
+      totalNet,
+      cycleItemCount: cycleItemInserts.length
     }
   });
 

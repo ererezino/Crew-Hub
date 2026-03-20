@@ -30,6 +30,7 @@ describe("Default nav item visibility by role", () => {
     "/approvals": ["MANAGER", "HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
     "/onboarding": ["MANAGER", "HR_ADMIN", "SUPER_ADMIN"],
     "/admin/compensation": ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"],
+    "/payroll/oversight": ["FINANCE_APPROVER", "SUPER_ADMIN"],
     "/admin/access-control": ["SUPER_ADMIN"]
   };
 
@@ -207,13 +208,22 @@ describe("defaultNavVisibilityForRoles", () => {
     expect(visible).not.toContain("/admin/access-control");
   });
 
-  it("FINANCE_ADMIN sees payroll and compensation but not people (by default)", () => {
+  it("FINANCE_ADMIN sees payroll and compensation but not people or oversight (by default)", () => {
     const visible = defaultNavVisibilityForRoles(["FINANCE_ADMIN"]);
     expect(visible).toContain("/payroll");
     expect(visible).toContain("/admin/compensation");
     expect(visible).toContain("/analytics");
     expect(visible).not.toContain("/people");
+    expect(visible).not.toContain("/payroll/oversight");
     expect(visible).not.toContain("/admin/access-control");
+  });
+
+  it("FINANCE_APPROVER sees payroll, oversight, and compensation", () => {
+    const visible = defaultNavVisibilityForRoles(["FINANCE_APPROVER"]);
+    expect(visible).toContain("/payroll");
+    expect(visible).toContain("/payroll/oversight");
+    expect(visible).toContain("/admin/compensation");
+    expect(visible).not.toContain("/people");
   });
 
   it("HR_ADMIN sees people, compliance, performance", () => {

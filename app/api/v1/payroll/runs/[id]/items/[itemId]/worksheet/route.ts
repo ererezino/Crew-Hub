@@ -167,6 +167,46 @@ export async function PATCH(
     });
   }
 
+  /* ── Cycle-specific immutability: block edits to fields whose cycle is frozen ── */
+  const touchesCycle1 =
+    edits.cycle1BaseAmount !== undefined ||
+    edits.cycle1OvertimeHours !== undefined ||
+    edits.cycle1Included !== undefined;
+  const touchesCycle2 =
+    edits.cycle2BaseAmount !== undefined ||
+    edits.cycle2OvertimeHours !== undefined ||
+    edits.cycle2Included !== undefined;
+
+  if (touchesCycle1 || touchesCycle2) {
+    const frozenStatuses = ["submitted", "approved", "ready", "processing", "paid"];
+    const cyclesToCheck: number[] = [];
+    if (touchesCycle1) cyclesToCheck.push(1);
+    if (touchesCycle2) cyclesToCheck.push(2);
+
+    const { data: frozenCycles } = await supabase
+      .from("payroll_cycles")
+      .select("cycle_number, status")
+      .eq("payroll_run_id", runId)
+      .eq("org_id", profile.org_id)
+      .in("cycle_number", cyclesToCheck)
+      .in("status", frozenStatuses)
+      .is("deleted_at", null);
+
+    if (frozenCycles && frozenCycles.length > 0) {
+      const frozenLabels = frozenCycles
+        .map((c: { cycle_number: number; status: string }) => `Cycle ${c.cycle_number} (${c.status})`)
+        .join(", ");
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "CYCLE_FROZEN",
+          message: `Cannot edit fields for ${frozenLabels}. Cycle must be in draft or rejected status.`
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
   /* Fetch the specific payroll item */
   const { data: rawItem, error: itemError } = await supabase
     .from("payroll_items")
