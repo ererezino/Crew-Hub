@@ -1,9 +1,13 @@
 import { z } from "zod";
 
-import { checkApiAccess } from "../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logAudit } from "../../../../../lib/audit";
-import { currentMonthPeriod, getCurrencyTotal, semiMonthlyCycleDates } from "../../../../../lib/payroll/runs";
+import {
+  currentMonthPeriod,
+  derivePayrollRunStatusFromCycles,
+  getCurrencyTotal,
+  semiMonthlyCycleDates
+} from "../../../../../lib/payroll/runs";
 import { persistPayrollRunCalculation } from "../../../../../lib/payroll/persist-payroll-run-calculation";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type {
@@ -106,7 +110,7 @@ export async function GET() {
     });
   }
 
-  if (!(await checkApiAccess("/payroll", session.profile))) {
+  if (!canViewPayroll(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
@@ -265,6 +269,12 @@ export async function GET() {
       const cyclePreview = cyclePreviewByRunId.get(run.id);
       return {
         ...run,
+        status: derivePayrollRunStatusFromCycles(
+          [cyclePreview?.cycle1Status, cyclePreview?.cycle2Status].filter(
+            (value): value is (typeof PAYROLL_CYCLE_STATUSES)[number] => Boolean(value)
+          ),
+          run.status
+        ),
         cycle1Status: cyclePreview?.cycle1Status ?? null,
         cycle2Status: cyclePreview?.cycle2Status ?? null
       };

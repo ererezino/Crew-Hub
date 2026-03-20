@@ -12,7 +12,7 @@ import { z } from "zod";
 type AppLocale = "en" | "fr";
 
 import { CsvImportDialog } from "../../../../../components/payroll/csv-import-dialog";
-import { PayrollWorksheet } from "../../../../../components/payroll/payroll-worksheet";
+import { PayrollWorksheet, type ViewMode as WorksheetViewMode } from "../../../../../components/payroll/payroll-worksheet";
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../../components/shared/error-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
@@ -337,6 +337,7 @@ export function PayrollRunDetailClient({
   const [isPerformingHistoricalAction, setIsPerformingHistoricalAction] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [detailView, setDetailView] = useState<"worksheet" | "items">("worksheet");
+  const [worksheetViewMode, setWorksheetViewMode] = useState<WorksheetViewMode>("worksheet");
   const [provenanceNote, setProvenanceNote] = useState("");
   const { confirm, confirmDialog } = useConfirmAction();
 
@@ -389,6 +390,7 @@ export function PayrollRunDetailClient({
     run?.status === "draft" ? t('actions.calculateRun') : t('actions.refreshWorksheet');
   const cycles: PayrollCycle[] = runQuery.data?.cycles ?? [];
   const activeCycles = cycles.filter((c) => c.status !== "cancelled");
+  const hasEditableCycles = activeCycles.some((cycle) => cycle.status === "draft" || cycle.status === "rejected");
   const canPreparePayout = canManage && (isApproved || isProcessing);
   const hasCycles = activeCycles.length > 0;
   const allCyclesPaid = activeCycles.length > 0 && activeCycles.every((c) => c.status === "paid");
@@ -398,6 +400,10 @@ export function PayrollRunDetailClient({
   const isReviewed = Boolean(run?.reviewedAt);
   const isAuthorized = Boolean(run?.authorizedAt);
   const isPublished = Boolean(run?.publishedAt);
+  const canEditWorksheet =
+    canManage &&
+    !isHistorical &&
+    (run ? run.status !== "completed" && run.status !== "cancelled" : false);
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -1398,7 +1404,7 @@ export function PayrollRunDetailClient({
           </section>
           ) : null}
 
-          {(isApproved || isProcessing || isCompleted) ? (
+          {(isCompleted || ((isApproved || isProcessing) && !hasEditableCycles)) ? (
             <section className="payroll-lock-banner" aria-label={t('locked.title')}>
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path
@@ -1669,9 +1675,11 @@ export function PayrollRunDetailClient({
                   run={runQuery.data.run}
                   items={sortedItems}
                   cycles={activeCycles}
-                  canEdit={canEditItems}
+                  canEdit={canEditWorksheet}
                   canApprove={canApprove}
                   viewerUserId={viewerUserId}
+                  viewMode={worksheetViewMode}
+                  onViewModeChange={setWorksheetViewMode}
                   onItemUpdated={() => runQuery.refresh()}
                   onToast={showToast}
                 />

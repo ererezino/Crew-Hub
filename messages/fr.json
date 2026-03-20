@@ -1117,7 +1117,7 @@
   "payrollPage": {
     "withholdingSettings": "Paramètres de retenues",
     "createPayrollRun": "Créer un cycle de paie",
-    "accessDenied": "Seuls les Admin RH, Admin financier et Super admin peuvent consulter les cycles de paie.",
+    "accessDenied": "Seuls les Admin Finance, les Approbateurs Finance et les Super Admin peuvent consulter les cycles de paie.",
     "createTitle": "Créer un cycle de paie",
     "createDescription": "Définissez la période de paie et la date de versement pour un nouveau cycle.",
     "settingsTitle": "Paramètres de la paie",
@@ -1125,9 +1125,9 @@
     "settingsCountryDescription": "Configurez les retenues légales pays par pays dans Crew Hub.",
     "runTitle": "Cycle de paie",
     "runDescription": "Examinez les calculs du cycle de paie et les détails de versement par membre.",
-    "accessDeniedModules": "Seuls les Admin RH, Admin Finance et Super Admin peuvent accéder aux modules de paie.",
-    "createAccessDenied": "Seuls les Admin Finance et Super Admin peuvent créer des cycles de paie.",
-    "settingsAccessDenied": "Seuls les Admin RH, Admin Finance et Super Admin peuvent consulter les paramètres de paie."
+    "accessDeniedModules": "Seuls les Admin Finance, les Approbateurs Finance et les Super Admin peuvent accéder aux modules de paie.",
+    "createAccessDenied": "Seuls les Admin Finance, les Approbateurs Finance et les Super Admin peuvent créer des cycles de paie.",
+    "settingsAccessDenied": "Seuls les Admin Finance, les Approbateurs Finance et les Super Admin peuvent consulter les paramètres de paie."
   },
   "approvalsPage": {
     "accessDenied": "Les approbations sont restreintes",

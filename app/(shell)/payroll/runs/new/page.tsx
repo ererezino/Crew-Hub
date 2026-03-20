@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
-import { checkPageAccess } from "../../../../../lib/auth/check-page-access";
+import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { CreatePayrollRunClient } from "./payroll-run-create-client";
@@ -12,7 +12,8 @@ function canManagePayroll(roles: readonly UserRole[]): boolean {
 }
 
 export default async function PayrollRunCreatePage() {
-  const { allowed, profile } = await checkPageAccess("/payroll");
+  const session = await getAuthenticatedSession();
+  const profile = session?.profile ?? null;
   const t = await getTranslations("payrollPage");
   const tCommon = await getTranslations("common");
   const tSettings = await getTranslations("payrollSettings");
@@ -34,22 +35,7 @@ export default async function PayrollRunCreatePage() {
     );
   }
 
-  if (!allowed) {
-    return (
-      <>
-        <PageHeader
-          title={t("createTitle")}
-          description={t("createDescription")}
-        />
-        <EmptyState
-          title={tCommon("emptyState.accessDenied")}
-          description={t("accessDeniedModules")}
-        />
-      </>
-    );
-  }
-
-  if (!canManagePayroll(profile.roles)) {
+  if (!profile || !canManagePayroll(profile.roles)) {
     return (
       <>
         <PageHeader

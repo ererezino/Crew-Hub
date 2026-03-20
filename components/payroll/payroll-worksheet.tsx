@@ -21,6 +21,8 @@ type WorksheetProps = {
   canEdit: boolean;
   canApprove: boolean;
   viewerUserId: string;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
   onItemUpdated: () => void;
   onToast: (variant: "success" | "error" | "info", message: string) => void;
 };
@@ -45,7 +47,7 @@ function cycleTone(status: string): CycleTone {
   }
 }
 
-type ViewMode = "worksheet" | "cycle1" | "cycle2";
+export type ViewMode = "worksheet" | "cycle1" | "cycle2";
 
 type WorksheetDisplayRow = {
   id: string;
@@ -69,10 +71,20 @@ type WorksheetDisplayRow = {
   monthlyTotal: number;
 };
 
-export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, viewerUserId, onItemUpdated, onToast }: WorksheetProps) {
+export function PayrollWorksheet({
+  run,
+  items,
+  cycles,
+  canEdit,
+  canApprove,
+  viewerUserId,
+  viewMode,
+  onViewModeChange,
+  onItemUpdated,
+  onToast
+}: WorksheetProps) {
   const t = useTranslations("payrollWorksheet");
   const locale = useLocale() as AppLocale;
-  const [viewMode, setViewMode] = useState<ViewMode>("worksheet");
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState("");
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
@@ -90,8 +102,6 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
   const cycle1 = cycles.find((c) => c.cycleNumber === 1);
   const cycle2 = cycles.find((c) => c.cycleNumber === 2);
   const activeCycle = viewMode === "cycle1" ? cycle1 : viewMode === "cycle2" ? cycle2 : undefined;
-
-  const isEditable = canEdit && ["draft", "calculated", "rejected"].includes(run.status);
 
   /* Per-cycle freeze: fields for a cycle are locked once it leaves draft/rejected */
   const frozenStatuses = ["submitted", "approved", "ready", "processing", "paid"];
@@ -195,6 +205,7 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
 
   const sourceRows = activeSnapshot ? snapshotRows : liveRows;
   const tableIsReadOnly = Boolean(activeSnapshot);
+  const canEditLiveWorksheet = canEdit && !tableIsReadOnly;
 
   const sortedItems = useMemo(() => {
     const rows = [...sourceRows];
@@ -233,10 +244,10 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
   /* ── Inline editing ─────────────────────────────────────── */
 
   const startEdit = useCallback((itemId: string, field: keyof WorksheetRowEditPayload, currentValue: string | number | boolean | null) => {
-    if (!isEditable || isFieldFrozen(field)) return;
+    if (!canEditLiveWorksheet || isFieldFrozen(field)) return;
     setEditingCell({ itemId, field });
     setEditValue(currentValue === null ? "" : String(currentValue));
-  }, [isEditable, isCycle1Frozen, isCycle2Frozen]);
+  }, [canEditLiveWorksheet, isCycle1Frozen, isCycle2Frozen, tableIsReadOnly]);
 
   const cancelEdit = useCallback(() => {
     setEditingCell(null);
@@ -290,7 +301,7 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
   }, [editingCell, editValue, run.id, onItemUpdated, onToast]);
 
   const toggleCycleInclusion = useCallback(async (itemId: string, cycle: 1 | 2, currentValue: boolean) => {
-    if (!isEditable) return;
+    if (!canEditLiveWorksheet) return;
     if (cycle === 1 && isCycle1Frozen) return;
     if (cycle === 2 && isCycle2Frozen) return;
     setSavingItemId(itemId);
@@ -314,7 +325,7 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
     } finally {
       setSavingItemId(null);
     }
-  }, [isEditable, isCycle1Frozen, isCycle2Frozen, run.id, onItemUpdated, onToast]);
+  }, [canEditLiveWorksheet, isCycle1Frozen, isCycle2Frozen, run.id, onItemUpdated, onToast]);
 
   /* ── Cycle-level actions (Amendment 1 — primary workflow) ── */
 
@@ -416,7 +427,7 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
     const isEditing = editingCell?.itemId === itemId && editingCell?.field === field;
     const isSaving = savingItemId === itemId;
     const frozen = isFieldFrozen(field);
-    const cellEditable = isEditable && !frozen && !tableIsReadOnly;
+    const cellEditable = canEditLiveWorksheet && !frozen;
 
     if (isEditing) {
       return (
@@ -464,14 +475,14 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
         <button
           type="button"
           className={`payroll-worksheet-tab ${viewMode === "worksheet" ? "active" : ""}`}
-          onClick={() => setViewMode("worksheet")}
+          onClick={() => onViewModeChange("worksheet")}
         >
           {t("tabs.worksheet")}
         </button>
         <button
           type="button"
           className={`payroll-worksheet-tab ${viewMode === "cycle1" ? "active" : ""}`}
-          onClick={() => setViewMode("cycle1")}
+          onClick={() => onViewModeChange("cycle1")}
         >
           {t("tabs.cycle1")}
           {cycle1 ? (
@@ -481,7 +492,7 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
         <button
           type="button"
           className={`payroll-worksheet-tab ${viewMode === "cycle2" ? "active" : ""}`}
-          onClick={() => setViewMode("cycle2")}
+          onClick={() => onViewModeChange("cycle2")}
         >
           {t("tabs.cycle2")}
           {cycle2 ? (
@@ -797,7 +808,7 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
                         <input
                           type="checkbox"
                           checked={item.cycle1Included}
-                          disabled={!isEditable || isCycle1Frozen || savingItemId === item.id}
+                          disabled={!canEditLiveWorksheet || isCycle1Frozen || savingItemId === item.id}
                           onChange={() => void toggleCycleInclusion(item.id, 1, item.cycle1Included)}
                           title={isCycle1Frozen ? "Cycle 1 is locked — it has been submitted for approval." : undefined}
                         />
@@ -821,7 +832,7 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, view
                         <input
                           type="checkbox"
                           checked={item.cycle2Included}
-                          disabled={!isEditable || isCycle2Frozen || savingItemId === item.id}
+                          disabled={!canEditLiveWorksheet || isCycle2Frozen || savingItemId === item.id}
                           onChange={() => void toggleCycleInclusion(item.id, 2, item.cycle2Included)}
                           title={isCycle2Frozen ? "Cycle 2 is locked — it has been submitted for approval." : undefined}
                         />

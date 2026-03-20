@@ -1037,7 +1037,7 @@
   "payrollPage": {
     "withholdingSettings": "Withholding settings",
     "createPayrollRun": "Create payroll run",
-    "accessDenied": "Only HR Admin, Finance Admin, and Super Admin can view payroll runs.",
+    "accessDenied": "Only Finance Admin, Finance Approver, and Super Admin can view payroll runs.",
     "createTitle": "Create Payroll Run",
     "createDescription": "Define pay period and pay date for a new payroll run.",
     "settingsTitle": "Payroll Settings",
@@ -1045,9 +1045,9 @@
     "settingsCountryDescription": "Configure country-by-country statutory withholding in Crew Hub.",
     "runTitle": "Payroll Run",
     "runDescription": "Review payroll run calculations and crew member payout details.",
-    "accessDeniedModules": "Only HR Admin, Finance Admin, and Super Admin can view payroll modules.",
-    "createAccessDenied": "Only Finance Admin and Super Admin can create payroll runs.",
-    "settingsAccessDenied": "Only HR Admin, Finance Admin, and Super Admin can view payroll settings."
+    "accessDeniedModules": "Only Finance Admin, Finance Approver, and Super Admin can view payroll modules.",
+    "createAccessDenied": "Only Finance Admin, Finance Approver, and Super Admin can create payroll runs.",
+    "settingsAccessDenied": "Only Finance Admin, Finance Approver, and Super Admin can view payroll settings."
   },
   "approvalsPage": {
     "accessDenied": "Approvals are restricted",

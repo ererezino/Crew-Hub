@@ -1,4 +1,5 @@
 import type {
+  PayrollCycleStatus,
   PayrollCurrencyTotals,
   PayrollRunAdjustment,
   PayrollRunDeduction,
@@ -111,6 +112,48 @@ export function toneForPayrollRunStatus(status: PayrollRunStatus): StatusTone {
     default:
       return "draft";
   }
+}
+
+/**
+ * Derive the month-level payroll run status from the real semimonthly cycle state.
+ * This keeps run status as a truthful aggregate while Cycle 1 / Cycle 2 remain
+ * the operational source of truth.
+ */
+export function derivePayrollRunStatusFromCycles(
+  cycleStatuses: readonly PayrollCycleStatus[],
+  currentStatus: PayrollRunStatus
+): PayrollRunStatus {
+  if (currentStatus === "cancelled" || currentStatus === "completed") {
+    return currentStatus;
+  }
+
+  const activeStatuses = cycleStatuses.filter((status) => status !== "cancelled");
+
+  if (activeStatuses.length === 0) {
+    return currentStatus === "draft" ? "draft" : "calculated";
+  }
+
+  if (activeStatuses.every((status) => status === "draft")) {
+    return "calculated";
+  }
+
+  if (activeStatuses.some((status) => status === "processing" || status === "paid")) {
+    return "processing";
+  }
+
+  if (activeStatuses.some((status) => status === "submitted")) {
+    return "submitted";
+  }
+
+  if (activeStatuses.some((status) => status === "rejected" || status === "failed")) {
+    return "rejected";
+  }
+
+  if (activeStatuses.some((status) => status === "approved" || status === "ready")) {
+    return "approved";
+  }
+
+  return currentStatus;
 }
 
 export function currentMonthPeriod(now: Date = new Date()): {

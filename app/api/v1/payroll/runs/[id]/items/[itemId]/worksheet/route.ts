@@ -154,14 +154,16 @@ export async function PATCH(
     });
   }
 
-  /* Worksheet edits allowed in draft, calculated, or rejected status */
-  const editableStatuses = ["draft", "calculated", "rejected"];
-  if (!editableStatuses.includes(parsedRun.data.status)) {
+  /* Worksheet edits stay available for unfrozen cycle fields until the month is
+   * fully completed or cancelled. Cycle-level freeze rules below remain the
+   * authoritative control over which columns are still editable. */
+  const blockedStatuses = ["completed", "cancelled"];
+  if (blockedStatuses.includes(parsedRun.data.status)) {
     return jsonResponse<null>(409, {
       data: null,
       error: {
         code: "INVALID_STATE",
-        message: "Worksheet edits are only allowed when the run is in draft, calculated, or rejected status."
+        message: "Worksheet edits are not allowed once the payroll month is completed or cancelled."
       },
       meta: buildMeta()
     });

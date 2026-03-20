@@ -3,7 +3,7 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
-import { checkPageAccess } from "../../../lib/auth/check-page-access";
+import { getAuthenticatedSession } from "../../../lib/auth/session";
 import type { UserRole } from "../../../lib/navigation";
 import { hasRole } from "../../../lib/roles";
 import { PayrollDashboardClient } from "./payroll-dashboard-client";
@@ -13,7 +13,8 @@ function canManagePayroll(roles: readonly UserRole[]): boolean {
 }
 
 export default async function PayrollPage() {
-  const { allowed, profile } = await checkPageAccess("/payroll");
+  const session = await getAuthenticatedSession();
+  const profile = session?.profile ?? null;
   const tNav = await getTranslations('nav');
 
   if (!profile) {
@@ -32,7 +33,7 @@ export default async function PayrollPage() {
     );
   }
 
-  if (!allowed) {
+  if (!profile || !canManagePayroll(profile.roles)) {
     const t = await getTranslations('common');
     const tPayroll = await getTranslations('payrollPage');
     return (

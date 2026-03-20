@@ -3,13 +3,15 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../../../lib/audit";
 import { evaluateCycleAction } from "../../../../../../../../../lib/payroll/cycle-policy";
+import { derivePayrollRunStatusFromCycles } from "../../../../../../../../../lib/payroll/runs";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import type {
   MarkCyclePaidResponseData,
   PayrollCycle,
   PayrollCycleActionResponseData,
   PayrollCycleApprovalSnapshot,
-  PayrollCycleSnapshotRow
+  PayrollCycleSnapshotRow,
+  PayrollRunStatus
 } from "../../../../../../../../../types/payroll-runs";
 import {
   buildMeta,
@@ -47,6 +49,64 @@ function parseAmount(value: string | number | unknown): number {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
+}
+
+async function syncRunAggregateStatus({
+  supabase,
+  runId,
+  orgId
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  runId: string;
+  orgId: string;
+}) {
+  const [{ data: cycleRows, error: cycleError }, { data: runRow, error: runError }] = await Promise.all([
+    supabase
+      .from("payroll_cycles")
+      .select("status")
+      .eq("payroll_run_id", runId)
+      .eq("org_id", orgId)
+      .is("deleted_at", null),
+    supabase
+      .from("payroll_runs")
+      .select("status, completed_at, completed_by, locked_at")
+      .eq("id", runId)
+      .eq("org_id", orgId)
+      .maybeSingle()
+  ]);
+
+  if (cycleError) {
+    throw new Error("Unable to derive month status from payroll cycles.");
+  }
+
+  if (runError || !runRow) {
+    throw new Error("Unable to load payroll run while syncing month status.");
+  }
+
+  const nextStatus = derivePayrollRunStatusFromCycles(
+    (cycleRows ?? [])
+      .map((row: { status?: unknown }) => (typeof row.status === "string" ? row.status : null))
+      .filter((value): value is z.infer<typeof payrollCycleRowSchema>["status"] => value !== null),
+    (typeof runRow.status === "string" ? runRow.status : "calculated") as PayrollRunStatus
+  );
+
+  const updatePayload: Record<string, unknown> = { status: nextStatus };
+
+  if (nextStatus !== "completed") {
+    updatePayload.completed_at = null;
+    updatePayload.completed_by = null;
+    updatePayload.locked_at = null;
+  }
+
+  const { error: updateRunError } = await supabase
+    .from("payroll_runs")
+    .update(updatePayload)
+    .eq("id", runId)
+    .eq("org_id", orgId);
+
+  if (updateRunError) {
+    throw new Error("Unable to sync month status from payroll cycles.");
+  }
 }
 
 export async function POST(
@@ -522,6 +582,12 @@ async function handleSubmit({
     }
   });
 
+  await syncRunAggregateStatus({
+    supabase,
+    runId,
+    orgId: profile.org_id
+  });
+
   const parsed = payrollCycleRowSchema.safeParse(updatedRow);
   const cycle = parsed.success ? toPayrollCycleSummary(parsed.data) : toPayrollCycleSummary(parsedCycle);
 
@@ -579,6 +645,12 @@ async function handleSimpleTransition({
     recordId: cycleId,
     oldValue: { status: parsedCycle.status },
     newValue: { status: newStatus, action: auditAction }
+  });
+
+  await syncRunAggregateStatus({
+    supabase,
+    runId: _runId,
+    orgId: profile.org_id
   });
 
   const parsed = payrollCycleRowSchema.safeParse(updatedRow);
@@ -879,6 +951,12 @@ async function handleMarkPaid({
     recordId: cycleId,
     oldValue: { status: parsedCycle.status },
     newValue: { status: "paid", action: "mark_paid", paymentReference, paymentNote }
+  });
+
+  await syncRunAggregateStatus({
+    supabase,
+    runId,
+    orgId: profile.org_id
   });
 
   const parsedUpdated = payrollCycleRowSchema.safeParse(updatedCycleRow);

@@ -26,6 +26,7 @@ const {
         obj[method] = (..._args: unknown[]) => obj;
       }
     }
+    obj.update = (_payload: unknown) => obj;
     obj.then = (resolve?: (value: QResult) => unknown, reject?: (reason: unknown) => unknown) =>
       Promise.resolve(dequeue(table)).then(resolve, reject);
     return obj;
@@ -66,14 +67,14 @@ const USR = "00000000-0000-4000-a000-000000000004";
 
 const session = { profile: { id: USR, org_id: ORG, roles: ["FINANCE_ADMIN"] } };
 
-function runRow() {
+function runRow(status = "calculated") {
   return {
     id: RUN,
     org_id: ORG,
     pay_period_start: "2026-03-01",
     pay_period_end: "2026-03-31",
     pay_date: "2026-03-31",
-    status: "calculated",
+    status,
     initiated_by: USR,
     first_approved_by: null,
     first_approved_at: null,
@@ -123,5 +124,72 @@ describe("PATCH /items/[itemId]/worksheet", () => {
     expect(res.status).toBe(409);
     expect(json.error.code).toBe("CYCLE_FROZEN");
     expect(json.error.message).toContain("shared payout fields");
+  });
+
+  it("still allows cycle 2 edits after cycle 1 has moved the month into submitted status", async () => {
+    getAuthenticatedSessionMock.mockResolvedValueOnce(session);
+    enqueue("payroll_runs", { data: runRow("submitted"), error: null });
+    enqueue("payroll_cycles", { data: [], error: null });
+    enqueue("payroll_items", {
+      data: {
+        id: ITEM,
+        payroll_run_id: RUN,
+        employee_id: "00000000-0000-4000-a000-000000000005",
+        org_id: ORG,
+        base_salary_amount: 300000,
+        overtime_amount: 0,
+        overtime_hours: 0,
+        cycle_1_base_amount: 150000,
+        cycle_2_base_amount: 150000,
+        cycle_1_overtime_hours: 0,
+        cycle_2_overtime_hours: 0,
+        cycle_1_overtime_amount: 0,
+        cycle_2_overtime_amount: 0,
+        cycle_1_included: true,
+        cycle_2_included: true,
+        fees: 0,
+        bonus: 0,
+        comment: null,
+        exception_reason: null
+      },
+      error: null
+    });
+    enqueue("payroll_items", {
+      data: {
+        cycle_2_base_amount: 160000,
+        cycle_1_base_amount: 150000,
+        cycle_1_overtime_hours: 0,
+        cycle_2_overtime_hours: 0,
+        cycle_1_overtime_amount: 0,
+        cycle_2_overtime_amount: 0,
+        cycle_1_included: true,
+        cycle_2_included: true,
+        fees: 0,
+        bonus: 0,
+        comment: null,
+        exception_reason: "Second cycle adjustment",
+        net_amount: 310000,
+        gross_amount: 310000
+      },
+      error: null
+    });
+
+    const { PATCH } = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost/test", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cycle2BaseAmount: 160000,
+          exceptionReason: "Second cycle adjustment"
+        })
+      }),
+      { params: Promise.resolve({ id: RUN, itemId: ITEM }) }
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.error).toBeNull();
+    expect(json.data.item.cycle2BaseAmount).toBe(160000);
   });
 });

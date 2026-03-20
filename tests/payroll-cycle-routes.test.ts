@@ -401,7 +401,8 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
       { data: cyc(CYC, "paid", 960000), error: null },       // update → paid
       { data: [{ id: CYC }], error: null },                  // paid cycles for disbursement sum
       { data: null, error: null, count: 0 },                 // unpaid count = 0
-      { data: [{ id: CYC }], error: null }                   // paid cycles for completion check
+      { data: [{ id: CYC }], error: null },                  // paid cycles for completion check
+      { data: [{ status: "paid" }, { status: "draft" }], error: null } // aggregate run status sync
     );
     enqueue("payroll_cycle_items",
       { data: null, error: null },                            // update cycle_items → paid
@@ -429,7 +430,9 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
       { data: [{ id: IA, net_amount: 800000 }, { id: IB, net_amount: 800000 }], error: null }
     );
     enqueue("payroll_runs",
-      { data: null, error: null }    // update run → processing
+      { data: null, error: null },   // update run → processing
+      { data: { status: "processing", completed_at: null, completed_by: null, locked_at: null }, error: null }, // sync select
+      { data: null, error: null }    // sync update run status
     );
 
     const { POST } = await importRoute();
@@ -499,7 +502,8 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
       { data: cyc(CYC2, "paid", 640000), error: null },        // update → paid
       { data: [{ id: CYC }, { id: CYC2 }], error: null },      // paid cycles for disbursement sum
       { data: null, error: null, count: 0 },                   // unpaid count = 0 (all paid)
-      { data: [{ id: CYC }, { id: CYC2 }], error: null }       // paid cycles for completion check
+      { data: [{ id: CYC }, { id: CYC2 }], error: null },      // paid cycles for completion check
+      { data: [{ status: "paid" }, { status: "paid" }], error: null } // aggregate run status sync
     );
     enqueue("payroll_cycle_items",
       { data: null, error: null },                              // update cycle_items → paid
@@ -532,7 +536,9 @@ describe("POST /cycles/[cycleId]/actions — mark_paid", () => {
     );
     enqueue("payroll_runs",
       { data: null, error: null },   // update run → processing
-      { data: null, error: null }    // update run → completed
+      { data: null, error: null },   // update run → completed
+      { data: { status: "completed", completed_at: "2026-03-20T00:00:00Z", completed_by: USR, locked_at: "2026-03-20T00:00:00Z" }, error: null }, // sync select
+      { data: null, error: null }    // sync update run status
     );
 
     const { POST } = await importRoute();

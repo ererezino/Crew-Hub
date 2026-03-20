@@ -1,8 +1,11 @@
 import { z } from "zod";
 
-import { checkApiAccess } from "../../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
-import { adjustmentTotal, deductionTotal } from "../../../../../../lib/payroll/runs";
+import {
+  adjustmentTotal,
+  deductionTotal,
+  derivePayrollRunStatusFromCycles
+} from "../../../../../../lib/payroll/runs";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type {
   PayrollRunAdjustment,
@@ -163,7 +166,7 @@ export async function GET(
     });
   }
 
-  if (!(await checkApiAccess("/payroll", session.profile))) {
+  if (!canViewPayroll(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: {
@@ -465,23 +468,28 @@ export async function GET(
       };
     });
 
-    const runSummary = toPayrollRunSummary(
-      parsedRun.data,
-      parsedRun.data.initiated_by ? actorNameById.get(parsedRun.data.initiated_by) ?? null : null,
-      {
-        firstApprovedByName: parsedRun.data.first_approved_by
-          ? actorNameById.get(parsedRun.data.first_approved_by) ?? null
-          : null,
-        finalApprovedByName: parsedRun.data.final_approved_by
-          ? actorNameById.get(parsedRun.data.final_approved_by) ?? null
-          : null
-      }
-    );
-
     const parsedCycles = z.array(payrollCycleRowSchema).safeParse(rawCycles ?? []);
     const cycles = parsedCycles.success
       ? parsedCycles.data.map(toPayrollCycleSummary)
       : [];
+    const runSummary = {
+      ...toPayrollRunSummary(
+        parsedRun.data,
+        parsedRun.data.initiated_by ? actorNameById.get(parsedRun.data.initiated_by) ?? null : null,
+        {
+          firstApprovedByName: parsedRun.data.first_approved_by
+            ? actorNameById.get(parsedRun.data.first_approved_by) ?? null
+            : null,
+          finalApprovedByName: parsedRun.data.final_approved_by
+            ? actorNameById.get(parsedRun.data.final_approved_by) ?? null
+            : null
+        }
+      ),
+      status: derivePayrollRunStatusFromCycles(
+        cycles.map((cycle) => cycle.status),
+        parsedRun.data.status
+      )
+    };
 
     const responseData: PayrollRunDetailResponseData = {
       run: runSummary,

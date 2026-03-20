@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../../components/shared/page-header";
-import { checkPageAccess } from "../../../../../lib/auth/check-page-access";
+import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { loadNigeriaRuleConfig } from "../../../../../lib/payroll/engines/nigeria";
@@ -13,7 +13,8 @@ function canEditNigeriaRules(roles: readonly UserRole[]): boolean {
 }
 
 export default async function PayrollDeductionsSettingsPage() {
-  const { allowed, profile } = await checkPageAccess("/payroll");
+  const session = await getAuthenticatedSession();
+  const profile = session?.profile ?? null;
   const t = await getTranslations("payrollPage");
   const tSettings = await getTranslations("payrollSettings");
   const tCommon = await getTranslations("common");
@@ -35,7 +36,7 @@ export default async function PayrollDeductionsSettingsPage() {
     );
   }
 
-  if (!allowed) {
+  if (!profile || !canEditNigeriaRules(profile.roles)) {
     return (
       <>
         <PageHeader
@@ -44,7 +45,7 @@ export default async function PayrollDeductionsSettingsPage() {
         />
         <EmptyState
           title={tCommon("emptyState.accessDenied")}
-          description={t("settingsAccessDenied")}
+          description={t("createAccessDenied")}
         />
       </>
     );
