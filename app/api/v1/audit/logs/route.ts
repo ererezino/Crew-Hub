@@ -50,6 +50,26 @@ function toPlainObject(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function toSafeString(value: unknown, fallback = ""): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  return String(value);
+}
+
+function toSafeNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  return typeof value === "string" ? value : String(value);
+}
+
 function actorNameFor(
   actorId: string | null,
   actorMap: ReadonlyMap<string, string>
@@ -168,20 +188,20 @@ export async function GET(request: Request) {
     .order("full_name", { ascending: true });
 
   const actors: AuditLogActor[] = (actorData ?? []).map((actor) => ({
-    id: actor.id,
-    fullName: actor.full_name
+    id: toSafeString(actor.id),
+    fullName: toSafeString(actor.full_name, "Unknown user")
   }));
 
   const actorMap = new Map<string, string>(actors.map((actor) => [actor.id, actor.fullName]));
 
   const entries: AuditLogEntry[] = (logsData ?? []).map((entry) => ({
-    id: entry.id,
-    timestamp: entry.created_at,
-    actorId: entry.actor_user_id,
-    actorName: actorNameFor(entry.actor_user_id, actorMap),
-    action: entry.action as AuditLogAction,
-    tableName: entry.table_name,
-    recordId: entry.record_id,
+    id: toSafeString(entry.id),
+    timestamp: toSafeString(entry.created_at, new Date().toISOString()),
+    actorId: toSafeNullableString(entry.actor_user_id),
+    actorName: actorNameFor(toSafeNullableString(entry.actor_user_id), actorMap),
+    action: toSafeString(entry.action, "updated"),
+    tableName: toSafeString(entry.table_name),
+    recordId: toSafeNullableString(entry.record_id),
     oldValue: toPlainObject(entry.old_value),
     newValue: toPlainObject(entry.new_value)
   }));
