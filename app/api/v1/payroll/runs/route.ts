@@ -395,8 +395,21 @@ export async function POST(request: Request) {
       .insert(cycleInserts);
 
     if (cycleInsertError) {
-      // Non-fatal: run was created, cycles failed. Log but continue.
-      console.error("Failed to auto-create semimonthly cycles:", cycleInsertError.message);
+      // Fatal: semimonthly cycles are mandatory. Roll back the run.
+      await supabase
+        .from("payroll_runs")
+        .delete()
+        .eq("id", parsedRun.data.id)
+        .eq("org_id", session.profile.org_id);
+
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "CYCLE_CREATION_FAILED",
+          message: "Unable to create semimonthly cycles. The payroll run was not created."
+        },
+        meta: buildMeta()
+      });
     }
 
     const eligibleEmployeeCount = await countEligibleEmployees({

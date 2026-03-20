@@ -1340,6 +1340,7 @@ export function PayrollRunDetailClient({
             </section>
           ) : null}
 
+          {/* Run-level management — secondary to cycle-level approval */}
           {!isHistorical ? (
           <section className="settings-card payroll-approval-card" aria-label={t('approval.title')}>
             <div className="payroll-approval-header">
@@ -1349,96 +1350,11 @@ export function PayrollRunDetailClient({
               </StatusBadge>
             </div>
 
-            <div className="payroll-approval-steps">
-              <article className="payroll-approval-step">
-                <p className="payroll-approval-step-title">{t('approval.approvalTitle')}</p>
-                {runQuery.data.run.finalApprovedAt ? (
-                  <>
-                    <StatusBadge tone="success">{tCommon('status.approved')}</StatusBadge>
-                    <p className="settings-card-description">
-                      {t.rich('approval.approvedByAt', {
-                        name: runQuery.data.run.finalApprovedByName ?? "--",
-                        date: formatDate(runQuery.data.run.finalApprovedAt, locale),
-                        time: (chunks) => (
-                          <time
-                            dateTime={runQuery.data?.run.finalApprovedAt ?? ""}
-                            title={formatDateTimeTooltip(runQuery.data?.run.finalApprovedAt ?? "", locale)}
-                          >
-                            {chunks}
-                          </time>
-                        )
-                      })}
-                    </p>
-                  </>
-                ) : runQuery.data.run.rejectedAt ? (
-                  <>
-                    <StatusBadge tone="warning">{t('approval.rejected')}</StatusBadge>
-                    {runQuery.data.run.rejectionReason ? (
-                      <p className="settings-card-description">{runQuery.data.run.rejectionReason}</p>
-                    ) : null}
-                  </>
-                ) : (
-                  <StatusBadge tone={isSubmitted ? "pending" : "draft"}>
-                    {isSubmitted ? t('approval.awaitingApproval') : t('approval.notApprovedYet')}
-                  </StatusBadge>
-                )}
-              </article>
-            </div>
+            <p className="settings-card-description">
+              {td("cycleApprovalNote")}
+            </p>
 
             <div className="settings-actions payroll-approval-actions">
-              {canSubmitForApproval ? (
-                <button
-                  type="button"
-                  className="button"
-                  disabled={activeRunAction !== null || isCalculating}
-                  onClick={async () => {
-                    const confirmed = await confirm({
-                      title: td("confirmSubmit.title"),
-                      description: td("confirmSubmit.description"),
-                      confirmLabel: td("confirmSubmit.confirmLabel"),
-                      tone: "default"
-                    });
-                    if (confirmed) void performRunAction("submit");
-                  }}
-                >
-                  {activeRunAction === "submit" ? t('actions.submitting') : t('actions.submitForApproval')}
-                </button>
-              ) : null}
-
-              {canApproveRun ? (
-                <button
-                  type="button"
-                  className="button button-approve"
-                  disabled={activeRunAction !== null}
-                  onClick={async () => {
-                    const confirmed = await confirm({
-                      title: td("confirmApprove.title"),
-                      description: td("confirmApprove.description"),
-                      confirmLabel: td("confirmApprove.confirmLabel"),
-                      tone: "danger"
-                    });
-                    if (confirmed) void performRunAction("approve");
-                  }}
-                >
-                  {activeRunAction === "approve" ? t('actions.approving') : t('actions.approve')}
-                </button>
-              ) : null}
-
-              {canRejectRun ? (
-                <button
-                  type="button"
-                  className="button button-subtle"
-                  disabled={activeRunAction !== null}
-                  onClick={() => {
-                    setRejectReasonError(null);
-                    setRejectReason("");
-                    setIsRejectDialogOpen(true);
-                  }}
-                >
-                  {tCommon('status.rejected')}
-                </button>
-              ) : null}
-
               {canCancelRun ? (
                 <button
                   type="button"
@@ -1449,19 +1365,6 @@ export function PayrollRunDetailClient({
                   }}
                 >
                   {activeRunAction === "cancel" ? t('actions.cancelling') : t('actions.cancelRun')}
-                </button>
-              ) : null}
-
-              {canMarkProcessing ? (
-                <button
-                  type="button"
-                  className="button"
-                  disabled={activeRunAction !== null}
-                  onClick={() => {
-                    void markProcessing();
-                  }}
-                >
-                  {activeRunAction === "mark_processing" ? td('actions.marking') : td('actions.markProcessing')}
                 </button>
               ) : null}
 
@@ -1525,107 +1428,51 @@ export function PayrollRunDetailClient({
             </section>
           ) : null}
 
-          {(isApproved || isProcessing || isCompleted) ? (
+          {/* Semimonthly cycles overview — always visible when cycles exist */}
+          {activeCycles.length > 0 ? (
             <section className="settings-card payroll-cycles-card" aria-label={td("cycles.title")}>
               <div className="payroll-approval-header">
                 <h2 className="section-title">{td("cycles.title")}</h2>
               </div>
 
-              {activeCycles.length === 0 ? (
-                <p className="settings-card-description">{td("cycles.noCycles")}</p>
-              ) : (
-                <div className="payroll-cycles-grid">
-                  {activeCycles.map((cycle) => (
-                    <article key={cycle.id} className="payroll-cycle-card settings-card">
-                      <p className="section-title">{cycle.label}</p>
-                      <StatusBadge
-                        tone={
-                          cycle.status === "paid" ? "success"
-                            : cycle.status === "ready" ? "pending"
-                            : cycle.status === "failed" ? "error"
-                            : cycle.status === "draft" ? "draft"
-                            : "processing"
-                        }
-                      >
-                        {td(`cycles.status${cycle.status.charAt(0).toUpperCase()}${cycle.status.slice(1)}`)}
-                      </StatusBadge>
+              <div className="payroll-cycles-grid">
+                {activeCycles.map((cycle) => (
+                  <article key={cycle.id} className="payroll-cycle-card settings-card">
+                    <p className="section-title">{cycle.label}</p>
+                    <StatusBadge
+                      tone={
+                        cycle.status === "paid" ? "success"
+                          : cycle.status === "ready" ? "pending"
+                          : cycle.status === "submitted" ? "pending"
+                          : cycle.status === "approved" ? "info"
+                          : cycle.status === "failed" ? "error"
+                          : cycle.status === "rejected" ? "error"
+                          : cycle.status === "draft" ? "draft"
+                          : "processing"
+                      }
+                    >
+                      {td(`cycles.status${cycle.status.charAt(0).toUpperCase()}${cycle.status.slice(1)}`)}
+                    </StatusBadge>
+                    <p className="settings-card-description">
+                      {td("cycles.employeeCount", { count: cycle.employeeCount })}
+                      {" · "}
+                      <CurrencyDisplay amount={cycle.totalNet} currency={cycle.currency} />
+                    </p>
+                    {cycle.targetPayDate ? (
                       <p className="settings-card-description">
-                        {td("cycles.employeeCount", { count: cycle.employeeCount })}
-                        {" · "}
-                        <CurrencyDisplay amount={cycle.totalNet} currency={cycle.currency} />
+                        {td("cycles.targetDate", { date: formatDate(cycle.targetPayDate, locale) })}
                       </p>
-                      {cycle.paidAt ? (
-                        <p className="settings-card-description">
-                          {td("cycles.paidAt", { date: formatDate(cycle.paidAt, locale) })}
-                        </p>
-                      ) : cycle.preparedAt ? (
-                        <p className="settings-card-description">
-                          {td("cycles.preparedAt", { date: formatDate(cycle.preparedAt, locale) })}
-                        </p>
-                      ) : null}
-                      {canManage && cycle.status === "draft" ? (
-                        <div className="payroll-cycle-actions">
-                          <button
-                            type="button"
-                            className="button button-accent"
-                            disabled={activeCycleActionId !== null}
-                            onClick={() => void markCycleReady(cycle.id)}
-                          >
-                            {activeCycleActionId === cycle.id ? td("cycles.markingReady") : td("cycles.markReady")}
-                          </button>
-                        </div>
-                      ) : canManage && cycle.status === "ready" ? (
-                        <div className="payroll-cycle-actions">
-                          <button
-                            type="button"
-                            className="button button-subtle"
-                            disabled={activeCycleActionId !== null}
-                            onClick={() => void markCycleProcessing(cycle.id)}
-                          >
-                            {activeCycleActionId === cycle.id ? td("cycles.markingProcessing") : td("cycles.markProcessing")}
-                          </button>
-                          <button
-                            type="button"
-                            className="button button-consequential"
-                            disabled={activeCycleActionId !== null}
-                            onClick={() => void markCyclePaid(cycle.id)}
-                          >
-                            {markingPaidCycleId === cycle.id ? td("cycles.markingPaid") : td("cycles.markPaid")}
-                          </button>
-                        </div>
-                      ) : canManage && cycle.status === "processing" ? (
-                        <div className="payroll-cycle-actions">
-                          <button
-                            type="button"
-                            className="button button-consequential"
-                            disabled={activeCycleActionId !== null}
-                            onClick={() => void markCyclePaid(cycle.id)}
-                          >
-                            {markingPaidCycleId === cycle.id ? td("cycles.markingPaid") : td("cycles.markPaid")}
-                          </button>
-                        </div>
-                      ) : null}
-                    </article>
-                  ))}
-                </div>
-              )}
+                    ) : null}
+                    {cycle.paidAt ? (
+                      <p className="settings-card-description">
+                        {td("cycles.paidAt", { date: formatDate(cycle.paidAt, locale) })}
+                      </p>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
 
               <div className="settings-actions payroll-cycle-actions">
-                {canPreparePayout ? (
-                  <button
-                    type="button"
-                    className="button button-accent"
-                    disabled={isPreparingPayout || activeRunAction !== null}
-                    onClick={() => openCycleDialog()}
-                  >
-                    {isPreparingPayout
-                      ? td("cycles.preparingPayout")
-                      : hasCycles
-                        ? td("cycles.addPayoutCycle")
-                        : td("cycles.preparePayout")}
-                  </button>
-                ) : null}
-
                 {canCreateAmendment ? (
                   <button
                     type="button"
@@ -1640,7 +1487,8 @@ export function PayrollRunDetailClient({
             </section>
           ) : null}
 
-          {showCycleDialog ? (
+          {/* Generic cycle dialog removed — semimonthly cycles are auto-created and managed via worksheet tabs */}
+          {false && showCycleDialog ? (
             <section className="settings-card" aria-label={td("cycleDialog.title")}>
               <h3 className="section-title">{td("cycleDialog.title")}</h3>
               <p className="settings-card-description">{td("cycleDialog.description")}</p>
@@ -1823,7 +1671,10 @@ export function PayrollRunDetailClient({
                   items={sortedItems}
                   cycles={activeCycles}
                   canEdit={canEditItems}
+                  canApprove={canApprove}
+                  viewerUserId={viewerUserId}
                   onItemUpdated={() => runQuery.refresh()}
+                  onToast={showToast}
                 />
               ) : (
             <section className="data-table-container" aria-label={t('title')}>

@@ -111,6 +111,10 @@ export function canViewPayroll(roles: readonly UserRole[]): boolean {
   );
 }
 
+export function canApprovePayroll(roles: readonly UserRole[]): boolean {
+  return hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
+}
+
 export function canManagePayroll(roles: readonly UserRole[]): boolean {
   return hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
 }

@@ -3365,12 +3365,16 @@
       "createAmendment": "Créer un correctif",
       "creatingAmendment": "Création...",
       "statusDraft": "Brouillon",
+      "statusSubmitted": "Soumis",
+      "statusApproved": "Approuvé",
+      "statusRejected": "Rejeté",
       "statusReady": "Prêt",
       "statusPaid": "Payé",
       "statusProcessing": "En traitement",
       "statusFailed": "Échoué",
       "statusCancelled": "Annulé",
       "paidAt": "Payé le {date}",
+      "targetDate": "Date de paiement cible : {date}",
       "preparedAt": "Préparé le {date}",
       "employeeCount": "{count, plural, one {# employé} other {# employés}}",
       "cycleLabel": "Paiement {currency}",
@@ -3481,7 +3485,8 @@
     "viewToggle": {
       "worksheet": "Feuille de calcul",
       "items": "Détail des éléments"
-    }
+    },
+    "cycleApprovalNote": "Soumettez et approuvez chaque cycle individuellement depuis les onglets Cycle 1 / Cycle 2 dans la feuille de calcul ci-dessous."
   },
   "payrollWorksheet": {
     "title": "Feuille de paie mensuelle",
@@ -3511,7 +3516,30 @@
       "comment": "Commentaire",
       "exception": "Exception"
     },
-    "totals": "{count, plural, one {# employé} other {# employés}}"
+    "totals": "{count, plural, one {# employé} other {# employés}}",
+    "cycleActions": {
+      "submitCycle": "Soumettre le cycle pour approbation",
+      "submitting": "Soumission\u2026",
+      "approveCycle": "Approuver le cycle",
+      "approving": "Approbation\u2026",
+      "rejectCycle": "Rejeter le cycle",
+      "confirmReject": "Confirmer le rejet",
+      "cancelReject": "Annuler",
+      "rejectReasonPlaceholder": "Raison du rejet\u2026",
+      "markPaid": "Marquer comme payé",
+      "markingPaid": "Marquage\u2026",
+      "exportCsv": "Exporter CSV",
+      "exporting": "Exportation\u2026",
+      "actionFailed": "L'action du cycle a échoué.",
+      "exportFailed": "L'exportation a échoué.",
+      "exportSuccess": "CSV téléchargé.",
+      "submitSuccess": "Cycle soumis pour approbation.",
+      "approveSuccess": "Cycle approuvé.",
+      "rejectSuccess": "Cycle rejeté.",
+      "mark_readySuccess": "Cycle marqué comme prêt.",
+      "mark_processingSuccess": "Cycle marqué en traitement.",
+      "mark_paidSuccess": "Cycle marqué comme payé."
+    }
   },
   "timeOff": {
     "title": "Congés",

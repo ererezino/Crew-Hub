@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
-import { buildMeta, canViewPayroll, jsonResponse } from "../_helpers";
+import { buildMeta, canApprovePayroll, jsonResponse } from "../_helpers";
 
 /** Finance Oversight API — dedicated endpoint for the /payroll/oversight page.
  *
@@ -89,7 +89,7 @@ export async function GET() {
     });
   }
 
-  if (!canViewPayroll(session.profile.roles)) {
+  if (!canApprovePayroll(session.profile.roles)) {
     return jsonResponse<null>(403, {
       data: null,
       error: { code: "FORBIDDEN", message: "You are not allowed to view finance oversight." },

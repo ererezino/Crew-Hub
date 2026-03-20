@@ -19,7 +19,10 @@ type WorksheetProps = {
   items: PayrollRunItem[];
   cycles: PayrollCycle[];
   canEdit: boolean;
+  canApprove: boolean;
+  viewerUserId: string;
   onItemUpdated: () => void;
+  onToast: (variant: "success" | "error" | "info", message: string) => void;
 };
 
 type EditingCell = {
@@ -44,7 +47,7 @@ function cycleTone(status: string): CycleTone {
 
 type ViewMode = "worksheet" | "cycle1" | "cycle2";
 
-export function PayrollWorksheet({ run, items, cycles, canEdit, onItemUpdated }: WorksheetProps) {
+export function PayrollWorksheet({ run, items, cycles, canEdit, canApprove, viewerUserId, onItemUpdated, onToast }: WorksheetProps) {
   const t = useTranslations("payrollWorksheet");
   const locale = useLocale() as AppLocale;
   const [viewMode, setViewMode] = useState<ViewMode>("worksheet");
@@ -52,6 +55,10 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, onItemUpdated }:
   const [editValue, setEditValue] = useState("");
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [cycleActionLoading, setCycleActionLoading] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<string | null>(null);
+  const [rejectCycleId, setRejectCycleId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const currency = run.totalGross ? Object.keys(run.totalGross)[0] ?? "NGN" : "NGN";
 
@@ -167,6 +174,75 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, onItemUpdated }:
     }
   }, [isEditable, run.id, onItemUpdated]);
 
+  /* ── Cycle-level actions (Amendment 1 — primary workflow) ── */
+
+  const performCycleAction = useCallback(async (
+    cycleId: string,
+    action: "submit" | "approve" | "reject" | "mark_ready" | "mark_processing" | "mark_paid",
+    reason?: string
+  ) => {
+    setCycleActionLoading(`${cycleId}-${action}`);
+    try {
+      const res = await fetch(`/api/v1/payroll/runs/${run.id}/cycles/${cycleId}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reason: reason ?? null })
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        onToast("error", json.error?.message ?? t("cycleActions.actionFailed"));
+        return false;
+      }
+      onToast("success", t(`cycleActions.${action}Success`));
+      onItemUpdated();
+      return true;
+    } catch {
+      onToast("error", t("cycleActions.actionFailed"));
+      return false;
+    } finally {
+      setCycleActionLoading(null);
+    }
+  }, [run.id, onItemUpdated, onToast, t]);
+
+  const exportCycleCsv = useCallback(async (cycleId: string) => {
+    setIsExporting(cycleId);
+    try {
+      const res = await fetch(`/api/v1/payroll/runs/${run.id}/cycles/${cycleId}/export`);
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        onToast("error", (json as { error?: { message?: string } } | null)?.error?.message ?? t("cycleActions.exportFailed"));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cycle-${cycleId.slice(0, 8)}-export.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      onToast("success", t("cycleActions.exportSuccess"));
+    } catch {
+      onToast("error", t("cycleActions.exportFailed"));
+    } finally {
+      setIsExporting(null);
+    }
+  }, [run.id, onToast, t]);
+
+  /* Determine what actions are available for a given cycle */
+  function cycleActions(cycle: PayrollCycle | undefined) {
+    if (!cycle) return { canSubmit: false, canApproveCycle: false, canReject: false, canExport: false, canMarkPaid: false };
+    const submittedBy = cycle.submittedBy ?? cycle.preparedBy ?? null;
+    return {
+      canSubmit: canEdit && cycle.status === "draft",
+      canApproveCycle: canApprove && cycle.status === "submitted" && submittedBy !== viewerUserId,
+      canReject: canApprove && cycle.status === "submitted" && submittedBy !== viewerUserId,
+      canExport: ["submitted", "approved", "ready", "processing", "paid"].includes(cycle.status),
+      canMarkPaid: canEdit && ["approved", "ready", "processing"].includes(cycle.status)
+    };
+  }
+
   /* ── Editable cell ──────────────────────────────────────── */
 
   function EditableCell({
@@ -268,6 +344,104 @@ export function PayrollWorksheet({ run, items, cycles, canEdit, onItemUpdated }:
           )}
         </div>
       ) : null}
+
+      {/* Cycle action bar — THE primary approval workflow */}
+      {viewMode !== "worksheet" ? (() => {
+        const activeCycle = viewMode === "cycle1" ? cycle1 : cycle2;
+        const actions = cycleActions(activeCycle);
+        const cycleId = activeCycle?.id;
+        if (!cycleId) return null;
+        const isLoading = cycleActionLoading !== null;
+        const isRejectingThis = rejectCycleId === cycleId;
+
+        return (
+          <div className="payroll-worksheet-cycle-actions">
+            {actions.canSubmit ? (
+              <button
+                type="button"
+                className="button button-accent"
+                disabled={isLoading}
+                onClick={() => void performCycleAction(cycleId, "submit")}
+              >
+                {cycleActionLoading === `${cycleId}-submit` ? t("cycleActions.submitting") : t("cycleActions.submitCycle")}
+              </button>
+            ) : null}
+            {actions.canApproveCycle ? (
+              <button
+                type="button"
+                className="button button-approve"
+                disabled={isLoading}
+                onClick={() => void performCycleAction(cycleId, "approve")}
+              >
+                {cycleActionLoading === `${cycleId}-approve` ? t("cycleActions.approving") : t("cycleActions.approveCycle")}
+              </button>
+            ) : null}
+            {actions.canReject && !isRejectingThis ? (
+              <button
+                type="button"
+                className="button button-subtle"
+                disabled={isLoading}
+                onClick={() => { setRejectCycleId(cycleId); setRejectReason(""); }}
+              >
+                {t("cycleActions.rejectCycle")}
+              </button>
+            ) : null}
+            {actions.canMarkPaid ? (
+              <button
+                type="button"
+                className="button button-consequential"
+                disabled={isLoading}
+                onClick={() => void performCycleAction(cycleId, "mark_paid")}
+              >
+                {cycleActionLoading === `${cycleId}-mark_paid` ? t("cycleActions.markingPaid") : t("cycleActions.markPaid")}
+              </button>
+            ) : null}
+            {actions.canExport ? (
+              <button
+                type="button"
+                className="button"
+                disabled={isExporting !== null}
+                onClick={() => void exportCycleCsv(cycleId)}
+              >
+                {isExporting === cycleId ? t("cycleActions.exporting") : t("cycleActions.exportCsv")}
+              </button>
+            ) : null}
+
+            {/* Inline reject reason form */}
+            {isRejectingThis ? (
+              <div className="payroll-worksheet-reject-inline">
+                <textarea
+                  className="input"
+                  rows={2}
+                  placeholder={t("cycleActions.rejectReasonPlaceholder")}
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                />
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="button button-danger"
+                    disabled={!rejectReason.trim() || isLoading}
+                    onClick={async () => {
+                      const ok = await performCycleAction(cycleId, "reject", rejectReason.trim());
+                      if (ok) { setRejectCycleId(null); setRejectReason(""); }
+                    }}
+                  >
+                    {t("cycleActions.confirmReject")}
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-subtle"
+                    onClick={() => { setRejectCycleId(null); setRejectReason(""); }}
+                  >
+                    {t("cycleActions.cancelReject")}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        );
+      })() : null}
 
       {/* Worksheet table */}
       <div className="data-table-container payroll-worksheet-table-container">

@@ -2,11 +2,13 @@ import { getTranslations } from "next-intl/server";
 
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
-import { checkPageAccess } from "../../../../lib/auth/check-page-access";
+import { getAuthenticatedSession } from "../../../../lib/auth/session";
+import { hasRole } from "../../../../lib/roles";
 import { OversightClient } from "./oversight-client";
 
 export default async function FinanceOversightPage() {
-  const { allowed, profile } = await checkPageAccess("/payroll");
+  const session = await getAuthenticatedSession();
+  const profile = session?.profile ?? null;
 
   if (!profile) {
     const t = await getTranslations("common");
@@ -23,6 +25,8 @@ export default async function FinanceOversightPage() {
       </>
     );
   }
+
+  const allowed = hasRole(profile.roles, "FINANCE_APPROVER") || hasRole(profile.roles, "SUPER_ADMIN");
 
   if (!allowed) {
     const t = await getTranslations("common");

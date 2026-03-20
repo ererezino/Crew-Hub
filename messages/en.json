@@ -3485,12 +3485,16 @@
       "createAmendment": "Create amendment",
       "creatingAmendment": "Creating...",
       "statusDraft": "Draft",
+      "statusSubmitted": "Submitted",
+      "statusApproved": "Approved",
+      "statusRejected": "Rejected",
       "statusReady": "Ready",
       "statusPaid": "Paid",
       "statusProcessing": "Processing",
       "statusFailed": "Failed",
       "statusCancelled": "Cancelled",
       "paidAt": "Paid on {date}",
+      "targetDate": "Target pay date: {date}",
       "preparedAt": "Prepared on {date}",
       "employeeCount": "{count, plural, one {# employee} other {# employees}}",
       "cycleLabel": "{currency} payout",
@@ -3592,7 +3596,8 @@
     "viewToggle": {
       "worksheet": "Worksheet",
       "items": "Item detail"
-    }
+    },
+    "cycleApprovalNote": "Submit and approve each cycle individually from the Cycle 1 / Cycle 2 tabs in the worksheet below."
   },
   "payrollWorksheet": {
     "title": "Monthly payroll worksheet",
@@ -3622,7 +3627,30 @@
       "comment": "Comment",
       "exception": "Exception"
     },
-    "totals": "{count, plural, one {# employee} other {# employees}}"
+    "totals": "{count, plural, one {# employee} other {# employees}}",
+    "cycleActions": {
+      "submitCycle": "Submit cycle for approval",
+      "submitting": "Submitting\u2026",
+      "approveCycle": "Approve cycle",
+      "approving": "Approving\u2026",
+      "rejectCycle": "Reject cycle",
+      "confirmReject": "Confirm rejection",
+      "cancelReject": "Cancel",
+      "rejectReasonPlaceholder": "Reason for rejection\u2026",
+      "markPaid": "Mark as paid",
+      "markingPaid": "Marking paid\u2026",
+      "exportCsv": "Export CSV",
+      "exporting": "Exporting\u2026",
+      "actionFailed": "Cycle action failed.",
+      "exportFailed": "Export failed.",
+      "exportSuccess": "CSV downloaded.",
+      "submitSuccess": "Cycle submitted for approval.",
+      "approveSuccess": "Cycle approved.",
+      "rejectSuccess": "Cycle rejected.",
+      "mark_readySuccess": "Cycle marked as ready.",
+      "mark_processingSuccess": "Cycle marked as processing.",
+      "mark_paidSuccess": "Cycle marked as paid."
+    }
   },
   "timeOff": {
     "title": "Time Off",

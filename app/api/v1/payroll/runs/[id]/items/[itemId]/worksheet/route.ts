@@ -198,6 +198,30 @@ export async function PATCH(
 
   const old = parsedItem.data;
 
+  /* ── Enforce exception reason for non-50/50 splits (Amendment 5) ── */
+  const effectiveC1Base = edits.cycle1BaseAmount ?? parseAmount(old.cycle_1_base_amount);
+  const effectiveC2Base = edits.cycle2BaseAmount ?? parseAmount(old.cycle_2_base_amount);
+  const effectiveBaseSalary = parseAmount(old.base_salary_amount);
+  const defaultHalf = Math.round(effectiveBaseSalary / 2);
+
+  const isNonDefaultSplit =
+    effectiveBaseSalary > 0 &&
+    (effectiveC1Base !== defaultHalf || effectiveC2Base !== (effectiveBaseSalary - defaultHalf));
+
+  if (isNonDefaultSplit) {
+    const effectiveExceptionReason = edits.exceptionReason ?? old.exception_reason;
+    if (!effectiveExceptionReason || !String(effectiveExceptionReason).trim()) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "EXCEPTION_REASON_REQUIRED",
+          message: "An exception reason is required when the cycle split deviates from the default 50/50."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
   /* Build the DB update payload */
   const updatePayload: Record<string, unknown> = {};
   const auditOldValue: Record<string, unknown> = {};

@@ -19941,6 +19941,27 @@ html.dark .crew-games-platform-game:hover {
   color: var(--text-secondary);
 }
 
+.payroll-worksheet-cycle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  align-items: flex-start;
+}
+
+.payroll-worksheet-reject-inline {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.payroll-worksheet-reject-inline .button-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .payroll-worksheet-table-container {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
