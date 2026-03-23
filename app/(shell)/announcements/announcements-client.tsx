@@ -147,16 +147,8 @@ function getUnifiedItemKey(item: UnifiedItem): string {
 function UpdatesSkeleton() {
   return (
     <div className="updates-shell" aria-hidden="true">
-      <section className="settings-card updates-brief-card">
-        <div className="announcements-skeleton-row announcements-skeleton-title" />
-        <div className="announcements-skeleton-row" />
-      </section>
-      <div className="metric-grid updates-metric-grid">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div key={`updates-metric-${index}`} className="settings-skeleton updates-metric-skeleton" />
-        ))}
-      </div>
       <section className="notifications-toolbar">
+        <div className="announcements-skeleton-row announcements-skeleton-title" />
         <div className="announcements-skeleton-row announcements-skeleton-title" />
       </section>
       <div className="updates-layout">
@@ -1068,51 +1060,6 @@ export function AnnouncementsClient({
 
       {!isLoading && !errorMessage && unifiedFeed.length > 0 ? (
         <div className="updates-shell">
-          <section className="settings-card updates-brief-card" aria-label={t("briefTitle")}>
-            <div className="updates-brief-copy">
-              <span className="metric-label">{t("briefLabel")}</span>
-              <h2 className="section-title">{t("briefTitle")}</h2>
-              <p className="settings-card-description">{t("briefDescription")}</p>
-            </div>
-            <div className="page-header-actions">
-              <button type="button" className="button button-subtle" onClick={refresh}>
-                {t("refresh")}
-              </button>
-              <button
-                type="button"
-                className="button button-accent"
-                disabled={totalUnreadCount === 0}
-                onClick={() => void handleMarkAllRead()}
-              >
-                <CheckCheck size={14} />
-                {t("markAllRead")}
-              </button>
-            </div>
-          </section>
-
-          <div className="metric-grid updates-metric-grid" aria-label={t("summaryTitle")}>
-            <article className="metric-card">
-              <span className="metric-label">{t("summaryUnreadLabel")}</span>
-              <strong className="metric-value">{totalUnreadCount}</strong>
-              <p className="metric-hint">{t("summaryUnreadHint")}</p>
-            </article>
-            <article className="metric-card">
-              <span className="metric-label">{t("summaryCompanyLabel")}</span>
-              <strong className="metric-value">{companyUpdateCount}</strong>
-              <p className="metric-hint">{t("summaryCompanyHint")}</p>
-            </article>
-            <article className="metric-card">
-              <span className="metric-label">{t("summaryAlertsLabel")}</span>
-              <strong className="metric-value">{alertCount}</strong>
-              <p className="metric-hint">{t("summaryAlertsHint")}</p>
-            </article>
-            <article className="metric-card">
-              <span className="metric-label">{t("summaryActionLabel")}</span>
-              <strong className="metric-value">{actionRequiredCount}</strong>
-              <p className="metric-hint">{t("summaryActionHint")}</p>
-            </article>
-          </div>
-
           <section className="notifications-toolbar" aria-label={t("filterToolbarAriaLabel")}>
             <div className="page-tabs">
               <button
@@ -1136,6 +1083,9 @@ export function AnnouncementsClient({
                 onClick={() => setActiveFilter("company")}
               >
                 {t("filterCompany")}
+                {companyUpdateCount > 0 ? (
+                  <span className="page-tab-badge numeric">{companyUpdateCount}</span>
+                ) : null}
               </button>
               <button
                 type="button"
@@ -1143,6 +1093,7 @@ export function AnnouncementsClient({
                 onClick={() => setActiveFilter("alerts")}
               >
                 {t("filterAlerts")}
+                {alertCount > 0 ? <span className="page-tab-badge numeric">{alertCount}</span> : null}
               </button>
               <button
                 type="button"
@@ -1153,18 +1104,26 @@ export function AnnouncementsClient({
                 {actionRequiredCount > 0 ? <span className="page-tab-badge numeric">{actionRequiredCount}</span> : null}
               </button>
             </div>
+            <div className="page-header-actions">
+              <button type="button" className="button button-subtle" onClick={refresh}>
+                {t("refresh")}
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                disabled={totalUnreadCount === 0}
+                onClick={() => void handleMarkAllRead()}
+              >
+                <CheckCheck size={14} />
+                {t("markAllRead")}
+              </button>
+            </div>
           </section>
 
           <div className="updates-layout">
             <section className="settings-card updates-feed-card" aria-label={t("sectionTitle")}>
               <header className="updates-feed-header">
-                <div>
-                  <h2 className="section-title">{t("sectionTitle")}</h2>
-                  <p className="settings-card-description">{t("sectionDescription")}</p>
-                </div>
-                <StatusBadge tone={totalUnreadCount > 0 ? "pending" : "success"}>
-                  {totalUnreadCount > 0 ? t("unreadCount", { count: totalUnreadCount }) : t("allCaughtUp")}
-                </StatusBadge>
+                <h2 className="section-title">{t("sectionTitle")}</h2>
               </header>
 
               {filteredFeed.length === 0 ? (
