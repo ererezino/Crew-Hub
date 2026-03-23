@@ -5056,29 +5056,45 @@ button.att-img-link {
 }
 
 .timeoff-calendar-weekday {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--text-secondary);
   text-align: center;
 }
 
 .timeoff-calendar-day {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-default);
-  background: var(--bg-canvas);
-  min-height: 4rem;
+  border: 1px solid color-mix(in srgb, var(--border-default) 88%, var(--color-accent) 12%);
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg-surface) 90%, var(--color-accent-subtle) 10%),
+      var(--bg-canvas)
+    );
+  min-height: 8.75rem;
   padding: var(--space-2);
-  display: grid;
-  gap: var(--space-1);
-  align-content: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: stretch;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border-default) 70%, transparent);
 }
 
 .timeoff-calendar-day-muted {
-  opacity: 0.35;
+  opacity: 0.42;
+  background: color-mix(in srgb, var(--bg-surface) 72%, var(--bg-canvas));
 }
 
 .timeoff-calendar-day-approved {
-  border-color: var(--status-success-border);
-  background: color-mix(in srgb, var(--status-success-bg) 40%, var(--bg-canvas));
+  border-color: color-mix(in srgb, var(--crew-sage) 30%, var(--border-default));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--crew-sage-tint) 82%, var(--bg-canvas)),
+      color-mix(in srgb, var(--crew-sage-tint) 34%, var(--bg-canvas))
+    );
 }
 
 .timeoff-calendar-day-pending {
@@ -5087,8 +5103,7 @@ button.att-img-link {
 }
 
 .timeoff-calendar-day-afk {
-  border-color: var(--status-info-border);
-  background: color-mix(in srgb, var(--status-info-bg) 40%, var(--bg-canvas));
+  border-color: color-mix(in srgb, var(--crew-navy) 18%, var(--border-default));
 }
 
 .timeoff-calendar-note {
@@ -5097,6 +5112,7 @@ button.att-img-link {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-left: 0.125rem;
 }
 
 .timeoff-calendar-badge {
@@ -5144,6 +5160,66 @@ button.att-img-link {
   background: color-mix(in srgb, #fb923c 12%, var(--bg-surface));
 }
 
+.timeoff-calendar-day-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.timeoff-calendar-day-label {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #D97706 30%, transparent);
+  background: color-mix(in srgb, #FEF6E4 88%, var(--bg-canvas));
+  color: #D97706;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.125rem 0.45rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeoff-calendar-day-stack {
+  display: grid;
+  gap: 0.35rem;
+  align-content: flex-start;
+}
+
+.timeoff-calendar-person-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--crew-sage) 22%, transparent);
+  background: var(--crew-sage-tint);
+  color: var(--crew-sage);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 0.28rem 0.55rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeoff-calendar-person-chip-afk {
+  border-color: color-mix(in srgb, var(--crew-navy) 18%, transparent);
+  background: var(--crew-navy-tint);
+  color: var(--crew-navy);
+}
+
+.timeoff-calendar-meta {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  padding-left: 0.125rem;
+}
+
 .timeoff-calendar-legend {
   grid-column: 1 / -1;
   display: flex;
@@ -5169,7 +5245,9 @@ button.att-img-link {
 .timeoff-calendar-day-clickable:hover,
 .timeoff-calendar-day-clickable:focus-visible {
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent),
+    0 12px 24px rgba(26, 43, 60, 0.08);
   outline: none;
 }
 
@@ -11532,7 +11610,23 @@ button.att-img-link {
   }
 
   .timeoff-calendar-day {
-    min-height: 4.2rem;
+    min-height: 6.5rem;
+    padding: 0.45rem;
+    gap: 0.35rem;
+  }
+
+  .timeoff-calendar-day-label {
+    max-width: 2.5rem;
+    padding-inline: 0.3rem;
+  }
+
+  .timeoff-calendar-person-chip {
+    font-size: 10px;
+    padding: 0.2rem 0.35rem;
+  }
+
+  .timeoff-calendar-meta {
+    display: none;
   }
 
   .compensation-summary-card,

@@ -32,6 +32,17 @@ type CalendarCell = {
   isCurrentMonth: boolean;
 };
 
+type CalendarPersonLike = {
+  employeeId: string;
+  employeeName: string;
+};
+
+type CalendarPersonPreview = {
+  employeeId: string;
+  fullName: string;
+  label: string;
+};
+
 function shiftMonth(month: string, delta: number): string {
   const range = monthToDateRange(month);
 
@@ -115,6 +126,51 @@ function buildCalendarCells(month: string): CalendarCell[] {
   }
 
   return cells;
+}
+
+function buildCalendarPersonPreviews(records: readonly CalendarPersonLike[]): CalendarPersonPreview[] {
+  const uniquePeople = new Map<string, string>();
+
+  for (const record of records) {
+    if (!uniquePeople.has(record.employeeId)) {
+      uniquePeople.set(record.employeeId, record.employeeName);
+    }
+  }
+
+  const normalizedPeople = [...uniquePeople.entries()]
+    .map(([employeeId, employeeName]) => {
+      const nameParts = employeeName
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+      const firstName = nameParts[0] ?? employeeName.trim();
+      const lastInitial = nameParts.length > 1 ? `${nameParts[nameParts.length - 1]?.[0] ?? ""}.` : "";
+
+      return {
+        employeeId,
+        employeeName,
+        firstName,
+        lastInitial
+      };
+    })
+    .sort((left, right) => left.employeeName.localeCompare(right.employeeName));
+
+  const firstNameCounts = new Map<string, number>();
+
+  for (const person of normalizedPeople) {
+    const key = person.firstName.toLowerCase();
+    firstNameCounts.set(key, (firstNameCounts.get(key) ?? 0) + 1);
+  }
+
+  return normalizedPeople.map((person) => {
+    const count = firstNameCounts.get(person.firstName.toLowerCase()) ?? 0;
+
+    return {
+      employeeId: person.employeeId,
+      fullName: person.employeeName,
+      label: count > 1 && person.lastInitial ? `${person.firstName} ${person.lastInitial}` : person.firstName
+    };
+  });
 }
 
 function CalendarSkeleton() {
@@ -251,6 +307,26 @@ export function TimeOffCalendarClient({
     return map;
   }, [calendarQuery.data?.afkLogs]);
 
+  const leavePreviewsByDate = useMemo(() => {
+    const map = new Map<string, CalendarPersonPreview[]>();
+
+    for (const [dateKey, requestRecords] of requestsByDate.entries()) {
+      map.set(dateKey, buildCalendarPersonPreviews(requestRecords));
+    }
+
+    return map;
+  }, [requestsByDate]);
+
+  const afkPreviewsByDate = useMemo(() => {
+    const map = new Map<string, CalendarPersonPreview[]>();
+
+    for (const [dateKey, afkRecords] of afkByDate.entries()) {
+      map.set(dateKey, buildCalendarPersonPreviews(afkRecords));
+    }
+
+    return map;
+  }, [afkByDate]);
+
   const closePanel = useCallback(() => setSelectedDay(null), []);
 
   if (calendarQuery.isLoading) {
@@ -373,10 +449,16 @@ export function TimeOffCalendarClient({
             const holidayNames = holidayNamesByDate.get(cell.dateKey) ?? [];
             const requestCount = requestCountByDate.get(cell.dateKey) ?? 0;
             const afkCount = afkCountByDate.get(cell.dateKey) ?? 0;
+            const leavePreviews = leavePreviewsByDate.get(cell.dateKey) ?? [];
+            const afkPreviews = afkPreviewsByDate.get(cell.dateKey) ?? [];
             const isHoliday = holidayNames.length > 0;
             const hasLeave = requestCount > 0;
             const hasAfk = afkCount > 0;
-            const entryCount = requestCount + afkCount;
+            const visibleLeavePreviews = leavePreviews.slice(0, 2);
+            const hiddenLeaveCount = Math.max(leavePreviews.length - visibleLeavePreviews.length, 0);
+            const visibleAfkPreviews =
+              visibleLeavePreviews.length === 0 ? afkPreviews.slice(0, 2) : [];
+            const hiddenAfkCount = Math.max(afkPreviews.length - visibleAfkPreviews.length, 0);
             const className = [
               "timeoff-calendar-day",
               cell.isCurrentMonth ? "timeoff-calendar-day-current" : "timeoff-calendar-day-muted",
@@ -408,15 +490,50 @@ export function TimeOffCalendarClient({
                     : undefined
                 }
               >
-                <p className="numeric">{cell.dayNumber}</p>
-                <span className="timeoff-calendar-dots">
-                  {hasLeave ? <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" /> : null}
-                  {hasAfk ? <span className="timeoff-calendar-badge timeoff-calendar-badge-afk" /> : null}
-                  {isHoliday ? <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" /> : null}
-                </span>
-                {entryCount > 1 ? (
-                  <p className="timeoff-calendar-note numeric">{entryCount}</p>
-                ) : null}
+                <div className="timeoff-calendar-day-header">
+                  <p className="numeric">{cell.dayNumber}</p>
+                  {isHoliday && cell.isCurrentMonth ? (
+                    <span className="timeoff-calendar-day-label" title={holidayNames.join(", ")}>
+                      {t('holidayBadge')}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="timeoff-calendar-day-stack">
+                  {visibleLeavePreviews.map((preview) => (
+                    <span
+                      key={`leave-preview-${cell.dateKey}-${preview.employeeId}`}
+                      className="timeoff-calendar-person-chip"
+                      title={preview.fullName}
+                    >
+                      {preview.label}
+                    </span>
+                  ))}
+
+                  {hiddenLeaveCount > 0 ? (
+                    <p className="timeoff-calendar-note">{t('morePeople', { count: hiddenLeaveCount })}</p>
+                  ) : null}
+
+                  {visibleLeavePreviews.length === 0
+                    ? visibleAfkPreviews.map((preview) => (
+                        <span
+                          key={`afk-preview-${cell.dateKey}-${preview.employeeId}`}
+                          className="timeoff-calendar-person-chip timeoff-calendar-person-chip-afk"
+                          title={`${preview.fullName} (${t('afkBadge')})`}
+                        >
+                          {preview.label}
+                        </span>
+                      ))
+                    : null}
+
+                  {visibleLeavePreviews.length === 0 && hiddenAfkCount > 0 ? (
+                    <p className="timeoff-calendar-note">{t('morePeople', { count: hiddenAfkCount })}</p>
+                  ) : null}
+
+                  {visibleLeavePreviews.length > 0 && afkPreviews.length > 0 ? (
+                    <p className="timeoff-calendar-meta">{t('afkSummary', { count: afkPreviews.length })}</p>
+                  ) : null}
+                </div>
               </article>
             );
           })}
