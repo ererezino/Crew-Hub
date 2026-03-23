@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { todayIsoDate } from "../../../../../lib/datetime";
 import { isIsoDate, getBirthdayLeaveOptions } from "../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
@@ -99,11 +100,12 @@ export async function POST(request: Request) {
   }
 
   const currentYear = new Date().getUTCFullYear();
+  const today = todayIsoDate();
 
   // Check if birthday leave already exists for this year
-  const { data: existingRequest } = await supabase
+  const { data: existingRequestRows, error: existingRequestError } = await supabase
     .from("leave_requests")
-    .select("id")
+    .select("id, start_date, status")
     .eq("org_id", session.profile.org_id)
     .eq("employee_id", session.profile.id)
     .eq("leave_type", "birthday_leave")
@@ -112,16 +114,18 @@ export async function POST(request: Request) {
     .is("deleted_at", null)
     .limit(1);
 
-  if (existingRequest && existingRequest.length > 0) {
-    return jsonResponse<null>(422, {
+  if (existingRequestError) {
+    return jsonResponse<null>(500, {
       data: null,
       error: {
-        code: "ALREADY_CHOSEN",
-        message: "You have already used your birthday leave for this year."
+        code: "REQUEST_LOOKUP_FAILED",
+        message: "Unable to check your existing birthday leave."
       },
       meta: buildMeta()
     });
   }
+
+  const existingRequest = existingRequestRows?.[0] ?? null;
 
   // Fetch holidays for validation
   const { data: holidays } = await serviceClient
@@ -140,6 +144,17 @@ export async function POST(request: Request) {
     holidayDateKeys
   );
 
+  if (parsedBody.data.chosenDate < today) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "PAST_DATE_NOT_ALLOWED",
+        message: "Birthday leave cannot be moved to a past date."
+      },
+      meta: buildMeta()
+    });
+  }
+
   // Validate the chosen date is one of the allowed options
   if (!birthdayOptions.options.includes(parsedBody.data.chosenDate)) {
     return jsonResponse<null>(422, {
@@ -152,39 +167,88 @@ export async function POST(request: Request) {
     });
   }
 
-  // Create the approved birthday leave request
-  const { data: insertedRequest, error: insertError } = await supabase
-    .from("leave_requests")
-    .insert({
-      org_id: session.profile.org_id,
-      employee_id: session.profile.id,
-      leave_type: "birthday_leave",
-      start_date: parsedBody.data.chosenDate,
-      end_date: parsedBody.data.chosenDate,
-      total_days: 1,
-      status: "approved",
-      reason: "Birthday leave (employee choice)"
-    })
-    .select("id, start_date")
-    .single();
-
-  if (insertError || !insertedRequest) {
-    return jsonResponse<null>(500, {
+  if (existingRequest && existingRequest.start_date < today) {
+    return jsonResponse<null>(422, {
       data: null,
       error: {
-        code: "REQUEST_CREATE_FAILED",
-        message: "Unable to create birthday leave request."
+        code: "ALREADY_USED",
+        message: "You have already used your birthday leave for this year."
       },
       meta: buildMeta()
     });
   }
 
+  let requestRecord: { id: string; start_date: string } | null = null;
+
+  if (existingRequest) {
+    const { data: updatedRequest, error: updateError } = await supabase
+      .from("leave_requests")
+      .update({
+        start_date: parsedBody.data.chosenDate,
+        end_date: parsedBody.data.chosenDate,
+        total_days: 1,
+        reason:
+          parsedBody.data.chosenDate === birthdayOptions.birthdayDate
+            ? "Birthday leave (birthday date confirmed)"
+            : "Birthday leave (employee override)"
+      })
+      .eq("id", existingRequest.id)
+      .eq("org_id", session.profile.org_id)
+      .eq("employee_id", session.profile.id)
+      .select("id, start_date")
+      .single();
+
+    if (updateError || !updatedRequest) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "REQUEST_UPDATE_FAILED",
+          message: "Unable to update birthday leave request."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    requestRecord = updatedRequest;
+  } else {
+    const { data: insertedRequest, error: insertError } = await supabase
+      .from("leave_requests")
+      .insert({
+        org_id: session.profile.org_id,
+        employee_id: session.profile.id,
+        leave_type: "birthday_leave",
+        start_date: parsedBody.data.chosenDate,
+        end_date: parsedBody.data.chosenDate,
+        total_days: 1,
+        status: "approved",
+        reason:
+          parsedBody.data.chosenDate === birthdayOptions.birthdayDate
+            ? "Birthday leave (birthday date confirmed)"
+            : "Birthday leave (employee choice)"
+      })
+      .select("id, start_date")
+      .single();
+
+    if (insertError || !insertedRequest) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "REQUEST_CREATE_FAILED",
+          message: "Unable to create birthday leave request."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    requestRecord = insertedRequest;
+  }
+
   const responseData: BirthdayChoiceResponseData = {
-    requestId: insertedRequest.id,
-    chosenDate: insertedRequest.start_date
+    requestId: requestRecord.id,
+    chosenDate: requestRecord.start_date
   };
 
-  return jsonResponse<BirthdayChoiceResponseData>(201, {
+  return jsonResponse<BirthdayChoiceResponseData>(existingRequest ? 200 : 201, {
     data: responseData,
     error: null,
     meta: buildMeta()

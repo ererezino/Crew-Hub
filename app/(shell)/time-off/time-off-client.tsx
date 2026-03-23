@@ -20,6 +20,7 @@ import {
   formatDays,
   formatDateRangeHuman,
   formatDateTimeTooltip,
+  formatDateNoYear,
   formatMonth,
   formatRelativeTime,
   formatSingleDateHuman,
@@ -81,7 +82,7 @@ function buildRequestFormSchema(td: (key: string) => string) {
       .string()
       .min(1, td("validation.endDateRequired"))
       .refine((value) => isIsoDate(value), td("validation.endDateFormat")),
-    reason: z.string().trim().min(1, td("validation.reasonRequired")).max(2000, td("validation.reasonTooLong"))
+    reason: z.string().trim().max(2000, td("validation.reasonTooLong"))
   });
 }
 
@@ -165,6 +166,14 @@ function getFormErrors(
     values.endDate < values.startDate
   ) {
     errors.endDate = td("validation.endDateAfterStart");
+  }
+
+  if (
+    values.leaveType !== "birthday_leave" &&
+    touched.reason &&
+    values.reason.trim().length === 0
+  ) {
+    errors.reason = td("validation.reasonRequired");
   }
 
   return errors;
@@ -342,13 +351,52 @@ export function TimeOffClient({
     initialSummaryData
   );
 
+  const currentBirthdayYear = new Date().getUTCFullYear();
+  const birthdayProfile = summaryQuery.data?.profile ?? null;
+  const hasBirthdayConfigured = Boolean(birthdayProfile?.dateOfBirth);
+
+  const holidayDateKeys = useMemo(
+    () => new Set(summaryQuery.data?.holidays.map((holiday) => holiday.date) ?? []),
+    [summaryQuery.data?.holidays]
+  );
+
+  const birthdayLeaveInfo = useMemo(() => {
+    if (!birthdayProfile?.dateOfBirth) {
+      return null;
+    }
+
+    return getBirthdayLeaveOptions(
+      birthdayProfile.dateOfBirth,
+      currentBirthdayYear,
+      holidayDateKeys
+    );
+  }, [birthdayProfile?.dateOfBirth, currentBirthdayYear, holidayDateKeys]);
+
+  const birthdayLeaveRequestForCurrentYear = useMemo(() => {
+    return (summaryQuery.data?.requests ?? []).find(
+      (requestRecord) =>
+        requestRecord.leaveType === "birthday_leave" &&
+        requestRecord.startDate.startsWith(String(currentBirthdayYear))
+    ) ?? null;
+  }, [currentBirthdayYear, summaryQuery.data?.requests]);
+
   const availableLeaveTypes = useMemo(() => {
     const policyTypes = summaryQuery.data?.policies.map((policy) => policy.leaveType) ?? [];
     const balanceTypes = summaryQuery.data?.balances.map((balance) => balance.leaveType) ?? [];
     return [...new Set([...policyTypes, ...balanceTypes])]
-      .filter((leaveType) => !AUTO_GRANTED_LEAVE_TYPES.has(leaveType))
-      .sort((leftValue, rightValue) => leftValue.localeCompare(rightValue));
-  }, [summaryQuery.data?.balances, summaryQuery.data?.policies]);
+      .filter((leaveType) => {
+        if (leaveType === "birthday_leave") {
+          return hasBirthdayConfigured;
+        }
+
+        return !AUTO_GRANTED_LEAVE_TYPES.has(leaveType);
+      })
+      .sort((leftValue, rightValue) => {
+        if (leftValue === "birthday_leave") return 1;
+        if (rightValue === "birthday_leave") return -1;
+        return leftValue.localeCompare(rightValue);
+      });
+  }, [hasBirthdayConfigured, summaryQuery.data?.balances, summaryQuery.data?.policies]);
 
   const isSelectedTypeUnlimited = useMemo(() => {
     if (!formValues.leaveType) return false;
@@ -361,11 +409,6 @@ export function TimeOffClient({
       summaryQuery.data?.balances.find((balance) => balance.leaveType === formValues.leaveType) ??
       null,
     [formValues.leaveType, summaryQuery.data?.balances]
-  );
-
-  const holidayDateKeys = useMemo(
-    () => new Set(summaryQuery.data?.holidays.map((holiday) => holiday.date) ?? []),
-    [summaryQuery.data?.holidays]
   );
 
   const calculatedWorkingDays = useMemo(() => {
@@ -459,25 +502,26 @@ export function TimeOffClient({
     }, 4000);
   };
 
-  const birthdayChoiceInfo = useMemo(() => {
-    const profile = summaryQuery.data?.profile;
-    if (!profile?.dateOfBirth) return null;
-
-    const currentYear = new Date().getUTCFullYear();
-    const options = getBirthdayLeaveOptions(profile.dateOfBirth, currentYear, holidayDateKeys);
-
-    if (!options.needsChoice) return null;
-
-    const existingBirthdayRequest = (summaryQuery.data?.requests ?? []).find(
-      (r) => r.leaveType === "birthday_leave" && r.startDate.startsWith(String(currentYear))
-    );
-
-    if (existingBirthdayRequest) return null;
-
-    return options;
-  }, [summaryQuery.data?.profile, summaryQuery.data?.requests, holidayDateKeys]);
-
   const [isBirthdayChoosing, setIsBirthdayChoosing] = useState(false);
+  const birthdayChoiceInfo = useMemo(() => {
+    if (!birthdayLeaveInfo?.needsChoice) {
+      return null;
+    }
+
+    if (birthdayLeaveRequestForCurrentYear) {
+      return null;
+    }
+
+    return birthdayLeaveInfo;
+  }, [birthdayLeaveInfo, birthdayLeaveRequestForCurrentYear]);
+
+  const isBirthdayLeaveSelected = formValues.leaveType === "birthday_leave";
+  const birthdayOverrideConfirmNeeded = Boolean(
+    isBirthdayLeaveSelected &&
+      birthdayLeaveInfo?.isBirthdayWorkday &&
+      isIsoDate(formValues.startDate) &&
+      formValues.startDate !== birthdayLeaveInfo.birthdayDate
+  );
 
   const handleBirthdayChoice = async (chosenDate: string) => {
     setIsBirthdayChoosing(true);
@@ -497,6 +541,7 @@ export function TimeOffClient({
       }
 
       summaryQuery.refresh();
+      closeRequestPanel();
       showToast("success", td("toast.birthdaySelected"));
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : td("toast.unableToSelectBirthday"));
@@ -573,9 +618,18 @@ export function TimeOffClient({
   };
 
   const openRequestPanel = () => {
+    const initialLeaveType = availableLeaveTypes[0] ?? "";
+    const initialBirthdayDate =
+      initialLeaveType === "birthday_leave"
+        ? birthdayLeaveRequestForCurrentYear?.startDate ??
+          (birthdayLeaveInfo?.needsChoice ? "" : birthdayLeaveInfo?.birthdayDate ?? "")
+        : "";
+
     setFormValues({
       ...INITIAL_FORM_VALUES,
-      leaveType: availableLeaveTypes[0] ?? ""
+      leaveType: initialLeaveType,
+      startDate: initialBirthdayDate,
+      endDate: initialBirthdayDate
     });
     setFormTouched(INITIAL_FORM_TOUCHED);
     setFormErrors({});
@@ -596,10 +650,19 @@ export function TimeOffClient({
   const handleFieldChange =
     (field: RequestFormField) =>
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+      const rawValue = event.currentTarget.value;
       const nextValues = {
         ...formValues,
-        [field]: event.currentTarget.value
+        [field]: rawValue
       };
+
+      if (formValues.leaveType === "birthday_leave" && field === "startDate") {
+        nextValues.endDate = rawValue;
+      }
+
+      if (formValues.leaveType === "birthday_leave" && field === "endDate") {
+        nextValues.startDate = rawValue;
+      }
 
       setFormValues(nextValues);
 
@@ -631,6 +694,62 @@ export function TimeOffClient({
     setSubmitError(null);
 
     if (hasFormErrors(nextErrors)) {
+      return;
+    }
+
+    if (formValues.leaveType === "birthday_leave") {
+      if (birthdayOverrideConfirmNeeded && birthdayLeaveInfo) {
+        const shouldMoveBirthdayLeave = await confirm({
+          title: td("birthdayOverrideDialog.title"),
+          description: td("birthdayOverrideDialog.description", {
+            birthdayDate: formatSingleDateHuman(birthdayLeaveInfo.birthdayDate, locale),
+            chosenDate: formatSingleDateHuman(formValues.startDate, locale)
+          }),
+          confirmLabel: td("birthdayOverrideDialog.confirmLabel")
+        });
+
+        if (!shouldMoveBirthdayLeave) {
+          return;
+        }
+      }
+
+      setIsSubmitting(true);
+
+      try {
+        const response = await fetch("/api/v1/time-off/birthday-choice", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            chosenDate: formValues.startDate
+          })
+        });
+
+        const payload = (await response.json()) as {
+          data?: { requestId?: string; chosenDate?: string } | null;
+          error?: { message?: string } | null;
+        };
+
+        if (!response.ok || !payload.data?.requestId) {
+          const message = payload.error?.message ?? td("toast.unableToSelectBirthday");
+          setSubmitError(message);
+          showToast("error", message);
+          return;
+        }
+
+        closeRequestPanel();
+        summaryQuery.refresh();
+        showToast("success", td("toast.birthdaySelected"));
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : td("toast.unableToSelectBirthday");
+        setSubmitError(message);
+        showToast("error", message);
+      } finally {
+        setIsSubmitting(false);
+      }
+
       return;
     }
 
@@ -1187,6 +1306,17 @@ export function TimeOffClient({
                   ...formValues,
                   leaveType: nextValue
                 };
+
+                if (nextValue === "birthday_leave") {
+                  const nextBirthdayDate =
+                    birthdayLeaveRequestForCurrentYear?.startDate ??
+                    (birthdayLeaveInfo?.needsChoice ? "" : birthdayLeaveInfo?.birthdayDate ?? "");
+
+                  nextValues.startDate = nextBirthdayDate;
+                  nextValues.endDate = nextBirthdayDate;
+                  nextValues.reason = "";
+                }
+
                 setFormValues(nextValues);
                 setFormErrors(getFormErrors(nextValues, formTouched, requestFormSchema, td));
                 if (submitError) {
@@ -1207,6 +1337,44 @@ export function TimeOffClient({
               </SelectContent>
             </Select>
             {formErrors.leaveType ? <p className="form-field-error">{formErrors.leaveType}</p> : null}
+            <p className="settings-card-description">
+              {!hasBirthdayConfigured
+                ? t("requestPanel.birthdayLeaveMissingProfileHint")
+                : isBirthdayLeaveSelected && birthdayLeaveInfo?.needsChoice
+                  ? td("requestPanel.birthdayLeaveChoiceHint", {
+                      date: formatSingleDateHuman(birthdayLeaveInfo.birthdayDate, locale)
+                    })
+                  : isBirthdayLeaveSelected && birthdayLeaveInfo?.isBirthdayWorkday
+                    ? td("requestPanel.birthdayLeaveWeekdayHint", {
+                        birthdayDate: formatSingleDateHuman(birthdayLeaveInfo.birthdayDate, locale)
+                      })
+                    : birthdayLeaveRequestForCurrentYear
+                      ? td("requestPanel.birthdayLeaveChosenHint", {
+                          date: formatSingleDateHuman(birthdayLeaveRequestForCurrentYear.startDate, locale)
+                        })
+                      : t("requestPanel.birthdayLeaveManagedHint")}
+            </p>
+            {isBirthdayLeaveSelected && birthdayLeaveInfo?.options.length ? (
+              <div className="timeoff-row-actions" style={{ marginTop: "var(--spacing-xs)" }}>
+                {birthdayLeaveInfo.options.map((dateOption) => (
+                  <button
+                    key={`request-panel-birthday-${dateOption}`}
+                    type="button"
+                    className="button"
+                    disabled={isBirthdayChoosing}
+                    onClick={() =>
+                      setFormValues((currentValues) => ({
+                        ...currentValues,
+                        startDate: dateOption,
+                        endDate: dateOption
+                      }))
+                    }
+                  >
+                    {formatSingleDateHuman(dateOption, locale)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
           )}
 
@@ -1220,6 +1388,17 @@ export function TimeOffClient({
                 value={formValues.startDate}
                 onChange={handleFieldChange("startDate")}
                 onBlur={handleFieldBlur("startDate")}
+                disabled={isBirthdayLeaveSelected && Boolean(birthdayLeaveInfo?.needsChoice)}
+                min={
+                  isBirthdayLeaveSelected && birthdayLeaveInfo?.isBirthdayWorkday
+                    ? birthdayLeaveInfo.birthdayDate
+                    : undefined
+                }
+                max={
+                  isBirthdayLeaveSelected && birthdayLeaveInfo?.options.length
+                    ? birthdayLeaveInfo.options[birthdayLeaveInfo.options.length - 1]
+                    : undefined
+                }
               />
               {formErrors.startDate ? <p className="form-field-error">{formErrors.startDate}</p> : null}
             </label>
@@ -1233,6 +1412,7 @@ export function TimeOffClient({
                 value={formValues.endDate}
                 onChange={handleFieldChange("endDate")}
                 onBlur={handleFieldBlur("endDate")}
+                disabled={isBirthdayLeaveSelected}
               />
               {formErrors.endDate ? <p className="form-field-error">{formErrors.endDate}</p> : null}
             </label>
@@ -1242,18 +1422,20 @@ export function TimeOffClient({
             <TeamAvailabilityPanel startDate={formValues.startDate} endDate={formValues.endDate} />
           ) : null}
 
-          <label className="form-field" htmlFor="timeoff-reason">
-            <span className="form-label">{t('requestPanel.reasonLabel')}</span>
-            <textarea
-              id="timeoff-reason"
-              rows={4}
-              className={formErrors.reason ? "form-input form-input-error" : "form-input"}
-              value={formValues.reason}
-              onChange={handleFieldChange("reason")}
-              onBlur={handleFieldBlur("reason")}
-            />
-            {formErrors.reason ? <p className="form-field-error">{formErrors.reason}</p> : null}
-          </label>
+          {isBirthdayLeaveSelected ? null : (
+            <label className="form-field" htmlFor="timeoff-reason">
+              <span className="form-label">{t('requestPanel.reasonLabel')}</span>
+              <textarea
+                id="timeoff-reason"
+                rows={4}
+                className={formErrors.reason ? "form-input form-input-error" : "form-input"}
+                value={formValues.reason}
+                onChange={handleFieldChange("reason")}
+                onBlur={handleFieldBlur("reason")}
+              />
+              {formErrors.reason ? <p className="form-field-error">{formErrors.reason}</p> : null}
+            </label>
+          )}
 
           <section className="timeoff-request-summary">
             <p>

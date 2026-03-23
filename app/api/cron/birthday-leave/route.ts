@@ -31,6 +31,23 @@ function addDaysIso(isoDate: string, days: number): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+type OrgProfileRow = {
+  id: string;
+  full_name: string;
+  roles: unknown;
+  status: string | null;
+};
+
+function normalizeRoles(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((role): role is string => typeof role === "string")
+    : [];
+}
+
+function isActiveProfile(profile: OrgProfileRow): boolean {
+  return profile.status === "active" || profile.status === null;
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
@@ -74,7 +91,39 @@ export async function GET(request: Request) {
   }
 
   let autoGranted = 0;
+  let birthdayAnnouncements = 0;
   let remindersSent = 0;
+  const orgContextCache = new Map<
+    string,
+    { activeMemberIds: string[]; creatorId: string | null }
+  >();
+
+  async function getOrgContext(orgId: string) {
+    const cached = orgContextCache.get(orgId);
+    if (cached) {
+      return cached;
+    }
+
+    const { data: orgProfiles } = await supabase
+      .from("profiles")
+      .select("id, full_name, roles, status")
+      .eq("org_id", orgId)
+      .is("deleted_at", null);
+
+    const parsedProfiles = (orgProfiles ?? []) as OrgProfileRow[];
+    const activeProfiles = parsedProfiles.filter((profile) => isActiveProfile(profile));
+    const superAdmin = activeProfiles.find((profile) =>
+      normalizeRoles(profile.roles).includes("SUPER_ADMIN")
+    );
+    const creatorId = superAdmin?.id ?? activeProfiles[0]?.id ?? null;
+    const context = {
+      activeMemberIds: activeProfiles.map((profile) => profile.id),
+      creatorId
+    };
+
+    orgContextCache.set(orgId, context);
+    return context;
+  }
 
   for (const emp of employees) {
     if (!emp.date_of_birth || emp.status === "onboarding") continue;
@@ -101,6 +150,83 @@ export async function GET(request: Request) {
 
     const holidayDateKeys = new Set((holidays ?? []).map((h) => h.date));
     const birthdayOptions = getBirthdayLeaveOptions(emp.date_of_birth, currentYear, holidayDateKeys);
+
+    if (isBirthdayToday) {
+      const { activeMemberIds, creatorId } = await getOrgContext(emp.org_id);
+
+      await createNotification({
+        orgId: emp.org_id,
+        userId: emp.id,
+        type: "announcement",
+        title: "Happy birthday!",
+        body: birthdayOptions.needsChoice
+          ? "Wishing you a wonderful birthday today."
+          : "Wishing you a wonderful birthday today. Your birthday leave is ready in Crew Hub.",
+        link: "/time-off",
+        dedupeKey: `birthday-greeting:${today}:${emp.id}`
+      });
+
+      if (creatorId) {
+        const announcementTitle = `Happy birthday, ${emp.full_name}!`;
+        const announcementBody = birthdayOptions.needsChoice
+          ? `Join us in wishing ${emp.full_name} a happy birthday today.`
+          : `Join us in wishing ${emp.full_name} a happy birthday today. They are also out on birthday leave.`;
+
+        const { data: existingAnnouncement } = await supabase
+          .from("announcements")
+          .select("id")
+          .eq("org_id", emp.org_id)
+          .eq("title", announcementTitle)
+          .gte("created_at", `${today}T00:00:00Z`)
+          .is("deleted_at", null)
+          .limit(1);
+
+        if (!existingAnnouncement || existingAnnouncement.length === 0) {
+          const { data: announcement, error: insertAnnouncementError } = await supabase
+            .from("announcements")
+            .insert({
+              org_id: emp.org_id,
+              title: announcementTitle,
+              body: announcementBody,
+              is_pinned: false,
+              created_by: creatorId
+            })
+            .select("id")
+            .single();
+
+          if (insertAnnouncementError || !announcement) {
+            console.error(
+              `Birthday leave cron: failed to create birthday announcement for ${emp.full_name}`,
+              insertAnnouncementError?.message
+            );
+          } else {
+            await supabase.from("announcement_reads").upsert(
+              {
+                announcement_id: announcement.id,
+                user_id: creatorId,
+                read_at: new Date().toISOString()
+              },
+              { onConflict: "announcement_id,user_id" }
+            );
+
+            const recipientIds = activeMemberIds.filter((id) => id !== creatorId);
+            if (recipientIds.length > 0) {
+              await createBulkNotifications({
+                orgId: emp.org_id,
+                userIds: recipientIds,
+                type: "announcement",
+                title: announcementTitle,
+                body: announcementBody,
+                link: "/announcements",
+                dedupeKey: `birthday-announcement:${today}:${emp.id}`
+              });
+            }
+
+            birthdayAnnouncements++;
+          }
+        }
+      }
+    }
 
     if (isBirthdayToday && !birthdayOptions.needsChoice) {
       // Auto-grant: birthday is a working day today
@@ -136,37 +262,15 @@ export async function GET(request: Request) {
         continue;
       }
 
-      // Notify the employee
       await createNotification({
         orgId: emp.org_id,
         userId: emp.id,
         type: "leave_status",
-        title: "Happy birthday!",
+        title: "Birthday leave approved",
         body: "You have the day off today for your birthday. Enjoy!",
         link: "/time-off",
         dedupeKey: `birthday-leave:${today}:${emp.id}`
       });
-
-      // Notify the team
-      const { data: orgMembers } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("org_id", emp.org_id)
-        .is("deleted_at", null);
-
-      const teamIds = (orgMembers ?? []).map((m) => m.id).filter((id) => id !== emp.id);
-
-      if (teamIds.length > 0) {
-        await createBulkNotifications({
-          orgId: emp.org_id,
-          userIds: teamIds,
-          type: "announcement",
-          title: `It's ${emp.full_name}'s birthday!`,
-          body: `${emp.full_name} is off today for their birthday.`,
-          link: "/time-off",
-          dedupeKey: `birthday-team:${today}:${emp.id}`
-        });
-      }
 
       autoGranted++;
     }
@@ -188,7 +292,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    message: `Birthday leave: ${autoGranted} auto-granted, ${remindersSent} reminders sent`,
+    message: `Birthday leave: ${autoGranted} auto-granted, ${birthdayAnnouncements} announcement(s), ${remindersSent} reminders sent`,
     date: today
   });
 }

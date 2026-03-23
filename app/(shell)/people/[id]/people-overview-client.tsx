@@ -11,7 +11,7 @@ import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatProfileStatus } from "../../../../lib/format-labels";
-import { formatDate as formatDateLib, formatRelativeTime } from "../../../../lib/datetime";
+import { formatDate as formatDateLib, formatDateNoYear, formatRelativeTime } from "../../../../lib/datetime";
 import { DEPARTMENTS } from "../../../../lib/departments";
 import { USER_ROLES } from "../../../../lib/navigation";
 import type { ApiResponse, AppRole } from "../../../../types/auth";
@@ -168,6 +168,7 @@ export function PeopleOverviewClient({
     teamLeadId: "",
     title: "",
     startDate: "",
+    dateOfBirth: "",
     status: "active" as string
   });
   const [adminEditError, setAdminEditError] = useState<string | null>(null);
@@ -324,6 +325,7 @@ export function PeopleOverviewClient({
       teamLeadId: person.teamLeadId ?? "",
       title: person.title ?? "",
       startDate: person.startDate ?? "",
+      dateOfBirth: person.dateOfBirth ?? "",
       status: person.status ?? "active"
     });
     setAdminEditError(null);
@@ -365,6 +367,7 @@ export function PeopleOverviewClient({
             teamLeadId: adminEditValues.teamLeadId.trim() || null,
             title: adminEditValues.title.trim() || null,
             startDate: adminEditValues.startDate.trim() || null,
+            dateOfBirth: adminEditValues.dateOfBirth.trim() || null,
             status: adminEditValues.status || undefined
           })
         });
@@ -948,6 +951,13 @@ export function PeopleOverviewClient({
               <>
                 <dt>{t('basicInfo.pronouns')}</dt>
                 <dd>{person.pronouns}</dd>
+              </>
+            ) : null}
+
+            {person.dateOfBirth ? (
+              <>
+                <dt>{t('basicInfo.birthday')}</dt>
+                <dd>{formatDateNoYear(person.dateOfBirth, locale)}</dd>
               </>
             ) : null}
 
@@ -1650,6 +1660,20 @@ export function PeopleOverviewClient({
                 onChange={(e) => {
                   const val = e.currentTarget.value;
                   setAdminEditValues((prev) => ({ ...prev, startDate: val }));
+                }}
+              />
+            </label>
+
+            <label className="form-field" htmlFor="admin-edit-date-of-birth">
+              <span className="form-label">{t('adminEditPanel.dateOfBirth')}</span>
+              <input
+                id="admin-edit-date-of-birth"
+                type="date"
+                className="form-input"
+                value={adminEditValues.dateOfBirth}
+                onChange={(event) => {
+                  const val = event.currentTarget.value;
+                  setAdminEditValues((prev) => ({ ...prev, dateOfBirth: val }));
                 }}
               />
             </label>

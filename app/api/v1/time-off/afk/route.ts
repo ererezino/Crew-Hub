@@ -4,7 +4,11 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { logger } from "../../../../../lib/logger";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
-import { isIsoDate } from "../../../../../lib/time-off";
+import {
+  applyPendingBalanceDelta,
+  fetchLeaveBalanceAvailability
+} from "../../../../../lib/time-off/balances";
+import { isIsoDate, parseNumeric } from "../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import type { AfkLogRecord, AfkLogsResponseData } from "../../../../../types/time-off";
@@ -35,6 +39,11 @@ const afkLogRowSchema = z.object({
   leave_request_id: z.string().uuid().nullable(),
   notes: z.string(),
   created_at: z.string()
+});
+
+const leavePolicyRowSchema = z.object({
+  default_days_per_year: z.union([z.number(), z.string()]),
+  is_unlimited: z.boolean()
 });
 
 const AFK_WEEKLY_LIMIT = 2;
@@ -174,6 +183,8 @@ export async function POST(request: Request) {
     });
   }
 
+  const sessionProfile = session.profile;
+
   let body: unknown;
 
   try {
@@ -220,8 +231,8 @@ export async function POST(request: Request) {
   const { count: weeklyCount, error: countError } = await supabase
     .from("afk_logs")
     .select("id", { count: "exact", head: true })
-    .eq("org_id", session.profile.org_id)
-    .eq("employee_id", session.profile.id)
+    .eq("org_id", sessionProfile.org_id)
+    .eq("employee_id", sessionProfile.id)
     .gte("date", weekStart)
     .lte("date", weekEnd)
     .is("deleted_at", null);
@@ -243,7 +254,9 @@ export async function POST(request: Request) {
     });
   }
 
-  if ((weeklyCount ?? 0) >= AFK_WEEKLY_LIMIT) {
+  const shouldReclassifyAsPersonalDay = durationMinutes > AFK_RECLASSIFY_THRESHOLD_MINUTES;
+
+  if (!shouldReclassifyAsPersonalDay && (weeklyCount ?? 0) >= AFK_WEEKLY_LIMIT) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
@@ -258,14 +271,71 @@ export async function POST(request: Request) {
   let leaveRequestId: string | null = null;
 
   // Auto-reclassify if > 2 hours
-  if (durationMinutes > AFK_RECLASSIFY_THRESHOLD_MINUTES) {
+  if (shouldReclassifyAsPersonalDay) {
     reclassifiedAs = "personal_days";
+
+    const { data: rawPolicy, error: policyError } = await supabase
+      .from("leave_policies")
+      .select("default_days_per_year, is_unlimited")
+      .eq("org_id", sessionProfile.org_id)
+      .eq("leave_type", "personal_days")
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (policyError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "POLICY_FETCH_FAILED",
+          message: "Unable to validate personal day policy for AFK reclassification."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedPolicy = leavePolicyRowSchema.safeParse(rawPolicy);
+
+    if (!parsedPolicy.success) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "POLICY_NOT_FOUND",
+          message: "Personal days are not configured for your organization."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const leaveYear = Number.parseInt(parsedBody.data.date.slice(0, 4), 10);
+    const fallbackTotalDays = parseNumeric(parsedPolicy.data.default_days_per_year);
+
+    if (!parsedPolicy.data.is_unlimited) {
+      const balance = await fetchLeaveBalanceAvailability({
+        orgId: sessionProfile.org_id,
+        employeeId: sessionProfile.id,
+        leaveType: "personal_days",
+        year: leaveYear,
+        fallbackTotalDays
+      });
+
+      if (balance.availableDays < 1) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "BALANCE_EXCEEDED",
+            message: "AFKs longer than 2 hours must be recorded as a personal day, but you do not have a personal day available. Please contact your manager."
+          },
+          meta: buildMeta()
+        });
+      }
+    }
 
     const { data: leaveRequest, error: leaveError } = await supabase
       .from("leave_requests")
       .insert({
-        org_id: session.profile.org_id,
-        employee_id: session.profile.id,
+        org_id: sessionProfile.org_id,
+        employee_id: sessionProfile.id,
         leave_type: "personal_days",
         start_date: parsedBody.data.date,
         end_date: parsedBody.data.date,
@@ -278,29 +348,91 @@ export async function POST(request: Request) {
 
     if (leaveError || !leaveRequest) {
       logger.error("Failed to create reclassified leave request.", {
-        employeeId: session.profile.id,
+        employeeId: sessionProfile.id,
         afkDate: parsedBody.data.date,
         message: leaveError?.message ?? "Leave request not returned."
       });
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "RECLASSIFICATION_FAILED",
+          message: "Unable to convert this AFK into a personal day request."
+        },
+        meta: buildMeta()
+      });
     } else {
+      try {
+        await applyPendingBalanceDelta({
+          orgId: sessionProfile.org_id,
+          employeeId: sessionProfile.id,
+          leaveType: "personal_days",
+          year: leaveYear,
+          pendingDaysDelta: 1,
+          fallbackTotalDays
+        });
+      } catch (error) {
+        await supabase
+          .from("leave_requests")
+          .delete()
+          .eq("id", leaveRequest.id)
+          .eq("org_id", sessionProfile.org_id);
+
+        return jsonResponse<null>(500, {
+          data: null,
+          error: {
+            code: "BALANCE_UPDATE_FAILED",
+            message: error instanceof Error ? error.message : "Unable to update personal day balance."
+          },
+          meta: buildMeta()
+        });
+      }
+
       leaveRequestId = leaveRequest.id;
 
-      // Notify manager
       const { data: profileRow } = await supabase
         .from("profiles")
         .select("full_name, manager_id")
-        .eq("id", session.profile.id)
-        .eq("org_id", session.profile.org_id)
+        .eq("id", sessionProfile.id)
+        .eq("org_id", sessionProfile.org_id)
         .is("deleted_at", null)
         .single();
 
-      if (profileRow?.manager_id) {
+      const { data: approverRows, error: approverError } = await supabase
+        .from("profiles")
+        .select("id, roles")
+        .eq("org_id", sessionProfile.org_id)
+        .is("deleted_at", null);
+
+      if (approverError) {
+        logger.error("Unable to load AFK approver recipients.", {
+          employeeId: sessionProfile.id,
+          afkDate: parsedBody.data.date,
+          message: approverError.message
+        });
+      }
+
+      const adminApproverIds = (approverRows ?? [])
+        .filter((row) => {
+          const roles = Array.isArray(row.roles)
+            ? row.roles.filter((role): role is string => typeof role === "string")
+            : [];
+          return roles.includes("HR_ADMIN") || roles.includes("SUPER_ADMIN");
+        })
+        .map((row) => row.id)
+        .filter((id): id is string => typeof id === "string");
+
+      const recipientIds = [
+        ...(profileRow?.manager_id ? [profileRow.manager_id] : []),
+        ...adminApproverIds
+      ].filter((id) => id !== sessionProfile.id);
+
+      if (recipientIds.length > 0) {
         await createBulkNotifications({
-          orgId: session.profile.org_id,
-          userIds: [profileRow.manager_id],
+          orgId: sessionProfile.org_id,
+          userIds: recipientIds,
           type: "leave_submitted",
           title: "AFK reclassified as personal day",
-          body: `${profileRow.full_name ?? "An employee"} logged ${durationMinutes} minutes AFK, which has been automatically reclassified as a personal day request.`,
+          body: `${profileRow?.full_name ?? "An employee"} logged ${durationMinutes} minutes AFK, which has been automatically reclassified as a personal day request.`,
           link: "/time-off/approvals"
         });
       }
@@ -310,8 +442,8 @@ export async function POST(request: Request) {
   const { data: insertedLog, error: insertError } = await supabase
     .from("afk_logs")
     .insert({
-      org_id: session.profile.org_id,
-      employee_id: session.profile.id,
+      org_id: sessionProfile.org_id,
+      employee_id: sessionProfile.id,
       date: parsedBody.data.date,
       start_time: parsedBody.data.startTime,
       end_time: parsedBody.data.endTime,

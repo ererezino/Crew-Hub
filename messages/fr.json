@@ -3770,12 +3770,22 @@
       "availableBalance": "Solde disponible :",
       "balanceWarning": "Les jours demandés ({requested}) dépassent le solde disponible ({available}).",
       "sickLeaveNote": "Un certificat médical peut être requis pour un arrêt maladie de plus de 2 jours ouvrés consécutifs.",
+      "birthdayLeaveManagedHint": "Le congé anniversaire est limité à un seul jour ouvré par an.",
+      "birthdayLeaveMissingProfileHint": "Le congé anniversaire apparaît une fois votre date d'anniversaire enregistrée sur votre profil.",
+      "birthdayLeaveChoiceHint": "Le congé anniversaire est limité à un seul jour ouvré. Votre anniversaire tombe sur un jour non ouvré cette année ({date}), alors choisissez ci-dessous l'une des dates autorisées.",
+      "birthdayLeaveWeekdayHint": "Le congé anniversaire est prévu par défaut le {birthdayDate}. Si vous choisissez un autre jour ici, nous déplacerons votre congé anniversaire vers cette nouvelle date après confirmation.",
+      "birthdayLeaveChosenHint": "Le congé anniversaire est limité à un seul jour ouvré. Votre congé anniversaire pour cette année est déjà fixé au {date}.",
       "submitting": "Envoi...",
       "submitRequest": "Soumettre la demande",
       "medicalEvidenceLabel": "Justificatif médical",
       "sickLeaveUploadNote": "Un justificatif médical est requis pour les congés maladie de plus de 2 jours.",
       "medicalEvidenceRequired": "Veuillez télécharger un justificatif médical avant de soumettre.",
       "noPoliciesConfigured": "Aucune politique de congé n'est configurée pour votre pays. Contactez votre administrateur RH."
+    },
+    "birthdayOverrideDialog": {
+      "title": "Déplacer le congé anniversaire ?",
+      "description": "Nous allons déplacer votre congé anniversaire du {birthdayDate} au {chosenDate}. Confirmez pour continuer.",
+      "confirmLabel": "Déplacer le congé anniversaire"
     },
     "afkPanel": {
       "title": "Enregistrer une absence",
@@ -4071,6 +4081,7 @@
       "country": "Pays",
       "timezone": "Fuseau horaire",
       "pronouns": "Pronoms",
+      "birthday": "Anniversaire",
       "joined": "Date d'arrivée",
       "reportsTo": "Supérieur hiérarchique",
       "operationalLead": "Responsable opérationnel"
@@ -4221,6 +4232,7 @@
       "jobTitle": "Intitulé de poste",
       "jobTitlePlaceholder": "ex. Ingénieur logiciel",
       "startDate": "Date de début (Accrue)",
+      "dateOfBirth": "Anniversaire",
       "roles": "Rôles",
       "rolesLabel": "Rôles",
       "department": "Département",
@@ -5305,6 +5317,18 @@
       "away": "Absent",
       "offline": "Hors ligne"
     },
+    "birthdays": {
+      "title": "Anniversaires",
+      "description": "Liste partagée des anniversaires de toute l'entreprise.",
+      "empty": "Aucun anniversaire n'a encore été ajouté.",
+      "tableAriaLabel": "Anniversaires de l'entreprise",
+      "name": "Nom",
+      "birthday": "Anniversaire",
+      "nextCelebration": "Prochaine célébration",
+      "department": "Département",
+      "today": "Aujourd'hui",
+      "inDays": "Dans {count} jours"
+    },
     "table": {
       "accountConfirmed": "Compte confirmé et configuré",
       "notSetUp": "N'a pas encore configuré son compte",
@@ -5364,6 +5388,7 @@
       "profileStatusLabel": "Statut du profil",
       "rolesLabel": "Rôles",
       "startDateLabel": "Date de début",
+      "dateOfBirthLabel": "Anniversaire",
       "timezoneLabel": "Fuseau horaire",
       "titleLabel": "Titre"
     },
@@ -5375,6 +5400,7 @@
       "jobTitlePlaceholder": "ex. Ingénieur logiciel",
       "crewTagLabel": "Identifiant Crew",
       "crewTagPlaceholder": "ex. jean.dupont",
+      "dateOfBirthLabel": "Anniversaire",
       "saveChanges": "Enregistrer les modifications",
       "directoryVisible": "Visible sur L'équipe",
       "statusLabel": "Statut d'emploi",
@@ -5459,6 +5485,7 @@
       "timezoneTooLong": "Le fuseau horaire est trop long.",
       "phoneTooLong": "Le numéro de téléphone est trop long.",
       "startDateFormat": "La date de début doit être au format AAAA-MM-JJ.",
+      "dateOfBirthFormat": "L'anniversaire doit être au format AAAA-MM-JJ.",
       "managerValid": "Le responsable doit être valide.",
       "currencyCode": "La devise doit être un code à 3 lettres.",
       "fullNameRequired": "Le nom complet est obligatoire.",

@@ -14,7 +14,7 @@ export type LeaveType = (typeof LEAVE_TYPES)[number];
 /** Leave types where balance tracking is skipped entirely (unlimited). */
 export const UNLIMITED_LEAVE_TYPES: ReadonlySet<string> = new Set(["sick_leave", "sick"]);
 
-/** Leave types that should NOT appear in the employee request form (auto-granted). */
+/** Leave types that should stay out of generic request flows unless a surface explicitly opts in. */
 export const AUTO_GRANTED_LEAVE_TYPES: ReadonlySet<string> = new Set(["birthday_leave"]);
 
 export const LEAVE_REQUEST_STATUSES = [

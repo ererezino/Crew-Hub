@@ -3878,12 +3878,22 @@
       "availableBalance": "Available balance:",
       "balanceWarning": "Requested days ({requested}) exceed available balance ({available}).",
       "sickLeaveNote": "A doctor's note may be required for sick leave exceeding 2 consecutive working days.",
+      "birthdayLeaveManagedHint": "Birthday Leave is limited to one working day per year.",
+      "birthdayLeaveMissingProfileHint": "Birthday Leave appears once your birthday is saved on your profile.",
+      "birthdayLeaveChoiceHint": "Birthday Leave is limited to one working day. Your birthday falls on a non-working day this year ({date}), so choose one of the allowed dates below.",
+      "birthdayLeaveWeekdayHint": "Birthday Leave defaults to your birthday on {birthdayDate}. If you choose another day here, we will move your birthday leave to that new date after you confirm.",
+      "birthdayLeaveChosenHint": "Birthday Leave is limited to one working day. Your birthday leave for this year is already set for {date}.",
       "submitting": "Submitting...",
       "submitRequest": "Submit request",
       "medicalEvidenceLabel": "Medical evidence",
       "sickLeaveUploadNote": "Medical documentation is required for sick leave longer than 2 days.",
       "medicalEvidenceRequired": "Please upload medical evidence before submitting.",
       "noPoliciesConfigured": "No leave policies are configured for your country. Contact your HR administrator."
+    },
+    "birthdayOverrideDialog": {
+      "title": "Move birthday leave?",
+      "description": "We will move your birthday leave from {birthdayDate} to {chosenDate}. Confirm to continue.",
+      "confirmLabel": "Move birthday leave"
     },
     "afkPanel": {
       "title": "Log AFK",
@@ -4179,6 +4189,7 @@
       "country": "Country",
       "timezone": "Timezone",
       "pronouns": "Pronouns",
+      "birthday": "Birthday",
       "joined": "Joined",
       "reportsTo": "Reports to",
       "operationalLead": "Operational lead"
@@ -4329,6 +4340,7 @@
       "jobTitle": "Job title",
       "jobTitlePlaceholder": "e.g. Software Engineer",
       "startDate": "Start date (Accrue)",
+      "dateOfBirth": "Birthday",
       "roles": "Roles",
       "rolesLabel": "Roles",
       "department": "Department",
@@ -5413,6 +5425,18 @@
       "away": "Away",
       "offline": "Offline"
     },
+    "birthdays": {
+      "title": "Birthdays",
+      "description": "Shared birthday list for the whole company.",
+      "empty": "No birthdays have been added yet.",
+      "tableAriaLabel": "Company birthdays",
+      "name": "Name",
+      "birthday": "Birthday",
+      "nextCelebration": "Next celebration",
+      "department": "Department",
+      "today": "Today",
+      "inDays": "In {count} days"
+    },
     "table": {
       "ariaLabel": "People directory table",
       "name": "Name",
@@ -5469,6 +5493,7 @@
       "timezoneLabel": "Timezone",
       "phoneLabel": "Phone",
       "startDateLabel": "Start date",
+      "dateOfBirthLabel": "Birthday",
       "managerLabel": "Manager",
       "noManager": "No manager",
       "employmentTypeLabel": "Employment type",
@@ -5483,6 +5508,7 @@
       "jobTitlePlaceholder": "e.g. Software Engineer",
       "crewTagLabel": "Crew tag",
       "crewTagPlaceholder": "e.g. john.doe",
+      "dateOfBirthLabel": "Birthday",
       "saveChanges": "Save Changes",
       "directoryVisible": "Visible on The Crew",
       "statusLabel": "Employment status",
@@ -5567,6 +5593,7 @@
       "timezoneTooLong": "Timezone is too long.",
       "phoneTooLong": "Phone number is too long.",
       "startDateFormat": "Start date must be YYYY-MM-DD.",
+      "dateOfBirthFormat": "Birthday must be YYYY-MM-DD.",
       "managerValid": "Manager must be valid.",
       "currencyCode": "Currency must be a 3-letter code.",
       "fullNameRequired": "Full name is required.",

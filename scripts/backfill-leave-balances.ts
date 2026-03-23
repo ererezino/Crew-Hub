@@ -90,37 +90,48 @@ async function main() {
   for (const employee of targetEmployees) {
     checkedCount++;
 
-    if (!employee.country_code) {
-      console.log(
-        `  SKIP ${employee.full_name} (${employee.email}): no country_code`
-      );
-      skippedCount++;
-      continue;
-    }
-
-    // Fetch leave policies for this employee's country
-    const { data: policies, error: policyError } = await supabase
+    const { data: orgWidePolicies, error: orgWidePolicyError } = await supabase
       .from("leave_policies")
       .select("leave_type, default_days_per_year, is_unlimited")
       .eq("org_id", employee.org_id)
-      .eq("country_code", employee.country_code)
+      .is("country_code", null)
       .is("deleted_at", null);
 
-    if (policyError) {
-      const msg = `  ERROR ${employee.full_name}: failed to fetch policies - ${policyError.message}`;
+    if (orgWidePolicyError) {
+      const msg = `  ERROR ${employee.full_name}: failed to fetch policies - ${orgWidePolicyError.message}`;
       console.error(msg);
       errors.push(msg);
       continue;
     }
 
+    let policies = orgWidePolicies ?? [];
+
+    if (policies.length === 0 && employee.country_code) {
+      const { data: countryPolicies, error: countryPolicyError } = await supabase
+        .from("leave_policies")
+        .select("leave_type, default_days_per_year, is_unlimited")
+        .eq("org_id", employee.org_id)
+        .eq("country_code", employee.country_code)
+        .is("deleted_at", null);
+
+      if (countryPolicyError) {
+        const msg = `  ERROR ${employee.full_name}: failed to fetch country policies - ${countryPolicyError.message}`;
+        console.error(msg);
+        errors.push(msg);
+        continue;
+      }
+
+      policies = countryPolicies ?? [];
+    }
+
     // Filter: skip unlimited and unpaid_personal_day (same logic as API)
-    const balanceTypes = (policies ?? []).filter(
+    const balanceTypes = policies.filter(
       (p) => !p.is_unlimited && p.leave_type !== "unpaid_personal_day"
     );
 
     if (balanceTypes.length === 0) {
       console.log(
-        `  SKIP ${employee.full_name} (${employee.email}): no applicable leave policies for ${employee.country_code}`
+        `  SKIP ${employee.full_name} (${employee.email}): no applicable leave policies`
       );
       skippedCount++;
       continue;

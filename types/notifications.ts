@@ -3,6 +3,7 @@ import type { ApiResponse } from "./auth";
 export const NOTIFICATION_TYPES = [
   "leave_submitted",
   "leave_status",
+  "leave_reminder",
   "payroll_approved",
   "payroll_completed",
   "expense_submitted",

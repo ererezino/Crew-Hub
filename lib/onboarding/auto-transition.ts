@@ -22,14 +22,35 @@ export async function createLeaveBalancesForActivation({
   try {
     const currentYear = new Date().getUTCFullYear();
 
-    const { data: policies } = await supabase
+    const { data: orgWidePolicies, error: orgWidePoliciesError } = await supabase
       .from("leave_policies")
       .select("leave_type, default_days_per_year, is_unlimited")
       .eq("org_id", orgId)
-      .eq("country_code", countryCode ?? "")
+      .is("country_code", null)
       .is("deleted_at", null);
 
-    const balanceTypes = (policies ?? []).filter(
+    if (orgWidePoliciesError) {
+      throw new Error(orgWidePoliciesError.message);
+    }
+
+    let policies = orgWidePolicies ?? [];
+
+    if (policies.length === 0 && countryCode) {
+      const { data: countryPolicies, error: countryPoliciesError } = await supabase
+        .from("leave_policies")
+        .select("leave_type, default_days_per_year, is_unlimited")
+        .eq("org_id", orgId)
+        .eq("country_code", countryCode)
+        .is("deleted_at", null);
+
+      if (countryPoliciesError) {
+        throw new Error(countryPoliciesError.message);
+      }
+
+      policies = countryPolicies ?? [];
+    }
+
+    const balanceTypes = policies.filter(
       (p: { is_unlimited: boolean; leave_type: string }) =>
         !p.is_unlimited && p.leave_type !== "unpaid_personal_day"
     );

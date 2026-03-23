@@ -61,6 +61,39 @@ export function utcDateToIsoDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export function addIsoDays(isoDate: string, days: number): string {
+  const date = isoDateToUtcDate(isoDate);
+
+  if (!date) {
+    return isoDate;
+  }
+
+  date.setUTCDate(date.getUTCDate() + days);
+  return utcDateToIsoDate(date);
+}
+
+export function differenceInCalendarDays(startDate: string, endDate: string): number {
+  const start = isoDateToUtcDate(startDate);
+  const end = isoDateToUtcDate(endDate);
+
+  if (!start || !end) {
+    return 0;
+  }
+
+  return Math.floor((end.getTime() - start.getTime()) / 86_400_000);
+}
+
+export function spansMultipleCalendarYears(startDate: string, endDate: string): boolean {
+  const start = isoDateToUtcDate(startDate);
+  const end = isoDateToUtcDate(endDate);
+
+  if (!start || !end) {
+    return false;
+  }
+
+  return start.getUTCFullYear() !== end.getUTCFullYear();
+}
+
 export function monthToDateRange(month: string): { startDate: string; endDate: string } | null {
   const parsed = /^(\d{4})-(\d{2})$/.exec(month);
 
@@ -143,6 +176,17 @@ export function calculateWorkingDays(
   return workingDays;
 }
 
+export function calculateBusinessDaysNotice(
+  requestDate: string,
+  leaveStartDate: string,
+  holidayDateKeys: ReadonlySet<string>
+): number {
+  const noticeStart = addIsoDays(requestDate, 1);
+  const noticeEnd = addIsoDays(leaveStartDate, -1);
+
+  return calculateWorkingDays(noticeStart, noticeEnd, holidayDateKeys);
+}
+
 export function normalizeCountryCode(countryCode: string | null | undefined): string | null {
   if (!countryCode) {
     return null;
@@ -213,48 +257,61 @@ export function parseNumeric(value: number | string): number {
 
 /**
  * Given an employee's DOB, compute the birthday date for a given year
- * and return up to 3 working-day options for birthday leave.
+ * and return the valid working-day options for birthday leave.
  *
  * If the birthday falls on a working day (not weekend, not holiday),
  * returns just that date (auto-granted, no choice needed).
  *
  * If the birthday falls on a weekend or public holiday,
- * returns up to 3 next working days after the birthday.
+ * returns every working day in the following 7 calendar days.
  */
 export function getBirthdayLeaveOptions(
   dateOfBirth: string,
   year: number,
   holidayDateKeys: ReadonlySet<string>
-): { birthdayDate: string; needsChoice: boolean; options: string[] } {
+): {
+  birthdayDate: string;
+  needsChoice: boolean;
+  options: string[];
+  isBirthdayWorkday: boolean;
+} {
   const dob = isoDateToUtcDate(dateOfBirth);
 
   if (!dob) {
-    return { birthdayDate: "", needsChoice: false, options: [] };
+    return {
+      birthdayDate: "",
+      needsChoice: false,
+      options: [],
+      isBirthdayWorkday: false
+    };
   }
 
   const birthday = new Date(Date.UTC(year, dob.getUTCMonth(), dob.getUTCDate()));
   const birthdayStr = utcDateToIsoDate(birthday);
   const isWorkday = !isWeekendUtc(birthday) && !holidayDateKeys.has(birthdayStr);
-
-  if (isWorkday) {
-    return { birthdayDate: birthdayStr, needsChoice: false, options: [birthdayStr] };
-  }
-
   const options: string[] = [];
   const cursor = new Date(birthday.getTime());
+  const deadline = new Date(birthday.getTime());
+  deadline.setUTCDate(deadline.getUTCDate() + 7);
+
+  if (isWorkday) {
+    options.push(birthdayStr);
+  }
+
   cursor.setUTCDate(cursor.getUTCDate() + 1);
 
-  while (options.length < 3) {
+  while (cursor.getTime() <= deadline.getTime()) {
     if (!isWeekendUtc(cursor) && !holidayDateKeys.has(utcDateToIsoDate(cursor))) {
       options.push(utcDateToIsoDate(cursor));
     }
 
     cursor.setUTCDate(cursor.getUTCDate() + 1);
-
-    if (options.length === 0 && cursor.getTime() - birthday.getTime() > 14 * 86_400_000) {
-      break;
-    }
   }
 
-  return { birthdayDate: birthdayStr, needsChoice: true, options };
+  return {
+    birthdayDate: birthdayStr,
+    needsChoice: !isWorkday,
+    options,
+    isBirthdayWorkday: isWorkday
+  };
 }

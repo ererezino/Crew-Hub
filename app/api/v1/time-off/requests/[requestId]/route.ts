@@ -12,7 +12,11 @@ import { sendLeaveCancelledEmail, sendLeaveStatusEmail } from "../../../../../..
 import { createNotification } from "../../../../../../lib/notifications/service";
 import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
-import { formatLeaveTypeLabel, parseNumeric } from "../../../../../../lib/time-off";
+import {
+  formatLeaveTypeLabel,
+  parseNumeric,
+  spansMultipleCalendarYears
+} from "../../../../../../lib/time-off";
 import { humanizeError } from "../../../../../../lib/errors";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
@@ -434,6 +438,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     if (parsedBody.data.action === "approve") {
+      if (spansMultipleCalendarYears(existingRequest.start_date, existingRequest.end_date)) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "CROSS_YEAR_REQUEST_NOT_SUPPORTED",
+            message: "This leave request spans multiple calendar years and cannot be approved. Please ask the employee to submit separate requests for each year."
+          },
+          meta: buildMeta()
+        });
+      }
+
       nextStatus = "approved";
       nextRejectionReason = null;
     } else {

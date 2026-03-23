@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import { createBulkNotifications } from "../../../../lib/notifications/service";
 import { formatDateRangeHuman } from "../../../../lib/datetime";
-import { formatLeaveTypeLabel } from "../../../../lib/time-off";
+import { addIsoDays, formatLeaveTypeLabel } from "../../../../lib/time-off";
 
 /**
- * Daily cron endpoint: creates announcements when someone's leave starts.
+ * Daily cron endpoint: creates start-of-leave announcements and pre-leave reminders.
  *
  * Triggered by Vercel Cron daily at 07:00 UTC (8am WAT).
  * Can also be called manually via POST for testing.
@@ -19,6 +19,56 @@ function todayIso(): string {
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(now.getUTCDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+type LeaveRow = {
+  id: string;
+  org_id: string;
+  employee_id: string;
+  start_date: string;
+  end_date: string;
+  total_days: number | string;
+  leave_type: string;
+};
+
+type ProfileRow = {
+  id: string;
+  full_name: string;
+  roles: unknown;
+  manager_id: string | null;
+  team_lead_id: string | null;
+  status: string | null;
+};
+
+function normalizeRoles(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((role): role is string => typeof role === "string")
+    : [];
+}
+
+function isNotificationEligible(profile: ProfileRow): boolean {
+  return profile.status === "active" || profile.status === null;
+}
+
+function getOperationalLeadId(profile: Pick<ProfileRow, "manager_id" | "team_lead_id">): string | null {
+  return profile.team_lead_id ?? profile.manager_id ?? null;
+}
+
+function getTeamRecipientIds(employee: ProfileRow, orgProfiles: ProfileRow[]): string[] {
+  const activeProfiles = orgProfiles.filter((profile) => isNotificationEligible(profile) && profile.id !== employee.id);
+  const operationalLeadId = getOperationalLeadId(employee);
+
+  if (operationalLeadId) {
+    return activeProfiles
+      .filter((profile) => profile.id === operationalLeadId || getOperationalLeadId(profile) === operationalLeadId)
+      .map((profile) => profile.id);
+  }
+
+  const reportIds = activeProfiles
+    .filter((profile) => getOperationalLeadId(profile) === employee.id)
+    .map((profile) => profile.id);
+
+  return reportIds;
 }
 
 /** @deprecated Use formatDateRangeHuman from lib/datetime instead. Kept as alias. */
@@ -36,14 +86,20 @@ export async function GET(request: Request) {
   }
 
   const today = todayIso();
+  const twoDaysOut = addIsoDays(today, 2);
+  const sevenDaysOut = addIsoDays(today, 7);
   const supabase = createSupabaseServiceRoleClient();
 
-  // Find all approved leave requests starting today across all orgs
-  const { data: startingLeaves, error: leaveError } = await supabase
+  // Find all approved leave requests we need to act on today:
+  // - starting today for announcements
+  // - starting in 2 days for team + super admin reminders
+  // - starting in 7 days for super admin reminders
+  const { data: candidateLeaves, error: leaveError } = await supabase
     .from("leave_requests")
     .select("id, org_id, employee_id, start_date, end_date, total_days, leave_type")
     .eq("status", "approved")
-    .eq("start_date", today)
+    .gte("start_date", today)
+    .lte("start_date", sevenDaysOut)
     .is("deleted_at", null);
 
   if (leaveError) {
@@ -51,53 +107,41 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Failed to fetch leave data" }, { status: 500 });
   }
 
-  if (!startingLeaves || startingLeaves.length === 0) {
-    return NextResponse.json({ message: "No leaves starting today", date: today });
+  if (!candidateLeaves || candidateLeaves.length === 0) {
+    return NextResponse.json({ message: "No leave reminders due today", date: today });
   }
 
-  // Get employee names for the announcements
-  const employeeIds = [...new Set(startingLeaves.map((l) => l.employee_id))];
-  const { data: employees } = await supabase
-    .from("profiles")
-    .select("id, full_name, org_id")
-    .in("id", employeeIds)
-    .is("deleted_at", null);
-
-  const employeeMap = new Map(
-    (employees ?? []).map((e) => [e.id, { name: e.full_name, orgId: e.org_id }])
-  );
-
   let announcementsCreated = 0;
+  let remindersSent = 0;
 
   // Group leaves by org for efficient processing
-  const leavesByOrg = new Map<string, typeof startingLeaves>();
-  for (const leave of startingLeaves) {
+  const leavesByOrg = new Map<string, LeaveRow[]>();
+  for (const leave of candidateLeaves as LeaveRow[]) {
     const existing = leavesByOrg.get(leave.org_id) ?? [];
     existing.push(leave);
     leavesByOrg.set(leave.org_id, existing);
   }
 
   for (const [orgId, leaves] of leavesByOrg) {
-    // Get all org members for notifications
-    const { data: orgMembers } = await supabase
+    const { data: orgProfilesRaw } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, full_name, roles, manager_id, team_lead_id, status")
       .eq("org_id", orgId)
       .is("deleted_at", null);
 
-    const memberIds = (orgMembers ?? []).map((m) => m.id);
+    const orgProfiles = (orgProfilesRaw ?? []) as ProfileRow[];
+    const employeeMap = new Map(orgProfiles.map((profile) => [profile.id, profile]));
+    const activeMemberIds = orgProfiles
+      .filter((profile) => isNotificationEligible(profile))
+      .map((profile) => profile.id);
+    const superAdminIds = orgProfiles
+      .filter((profile) => isNotificationEligible(profile) && normalizeRoles(profile.roles).includes("SUPER_ADMIN"))
+      .map((profile) => profile.id);
+    const creatorId = superAdminIds[0] ?? activeMemberIds[0];
 
-    // Find a super admin to use as announcement creator
-    const { data: adminRows } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("org_id", orgId)
-      .contains("roles", ["SUPER_ADMIN"])
-      .is("deleted_at", null)
-      .limit(1);
-
-    const creatorId = adminRows?.[0]?.id ?? memberIds[0];
-    if (!creatorId) continue;
+    if (!creatorId) {
+      continue;
+    }
 
     for (const leave of leaves) {
       const employee = employeeMap.get(leave.employee_id);
@@ -105,11 +149,62 @@ export async function GET(request: Request) {
 
       const dateRange = formatDateRange(leave.start_date, leave.end_date);
       const leaveLabel = formatLeaveTypeLabel(leave.leave_type);
-      const title = `${employee.name} is on ${leaveLabel.toLowerCase()}`;
+      const totalDays =
+        typeof leave.total_days === "number"
+          ? leave.total_days
+          : Number.parseFloat(leave.total_days);
+      const title = `${employee.full_name} is on ${leaveLabel.toLowerCase()}`;
       const body =
         leave.start_date === leave.end_date
-          ? `${employee.name} is on ${leaveLabel.toLowerCase()} on ${dateRange}.`
-          : `${employee.name} is on ${leaveLabel.toLowerCase()} from ${dateRange} (${leave.total_days} day${leave.total_days === 1 ? "" : "s"}).`;
+          ? `${employee.full_name} is on ${leaveLabel.toLowerCase()} on ${dateRange}.`
+          : `${employee.full_name} is on ${leaveLabel.toLowerCase()} from ${dateRange} (${totalDays} day${totalDays === 1 ? "" : "s"}).`;
+
+      if (leave.start_date === sevenDaysOut) {
+        const recipientIds = superAdminIds.filter((id) => id !== leave.employee_id);
+
+        if (recipientIds.length === 0) {
+          continue;
+        }
+
+        await createBulkNotifications({
+          orgId,
+          userIds: recipientIds,
+          type: "leave_reminder",
+          title: `${employee.full_name} starts ${leaveLabel.toLowerCase()} in one week`,
+          body: `${employee.full_name} is scheduled to be away ${dateRange}.`,
+          link: "/time-off",
+          dedupeKey: `leave-reminder:7:${leave.id}`
+        });
+
+        remindersSent++;
+      }
+
+      if (leave.start_date === twoDaysOut) {
+        const recipientIds = [
+          ...superAdminIds,
+          ...getTeamRecipientIds(employee, orgProfiles)
+        ].filter((id) => id !== leave.employee_id);
+
+        if (recipientIds.length === 0) {
+          continue;
+        }
+
+        await createBulkNotifications({
+          orgId,
+          userIds: recipientIds,
+          type: "leave_reminder",
+          title: `${employee.full_name} starts ${leaveLabel.toLowerCase()} in two days`,
+          body: `${employee.full_name} is scheduled to be away ${dateRange}.`,
+          link: "/time-off",
+          dedupeKey: `leave-reminder:2:${leave.id}`
+        });
+
+        remindersSent++;
+      }
+
+      if (leave.start_date !== today) {
+        continue;
+      }
 
       // Check if this announcement already exists (avoid duplicates on re-run)
       const { data: existing } = await supabase
@@ -137,7 +232,7 @@ export async function GET(request: Request) {
         .single();
 
       if (insertError || !announcement) {
-        console.error(`Failed to create leave announcement for ${employee.name}:`, insertError?.message);
+        console.error(`Failed to create leave announcement for ${employee.full_name}:`, insertError?.message);
         continue;
       }
 
@@ -148,7 +243,7 @@ export async function GET(request: Request) {
       );
 
       // Notify all org members except the person on leave
-      const recipientIds = memberIds.filter((id) => id !== leave.employee_id);
+      const recipientIds = activeMemberIds.filter((id) => id !== leave.employee_id);
       await createBulkNotifications({
         orgId,
         userIds: recipientIds,
@@ -164,8 +259,9 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    message: `Created ${announcementsCreated} leave announcement(s)`,
+    message: `Created ${announcementsCreated} leave announcement(s) and sent ${remindersSent} reminder batch(es)`,
     date: today,
-    leavesStarting: startingLeaves.length,
+    leavesStartingToday: candidateLeaves.filter((leave) => leave.start_date === today).length,
+    leavesReminded: candidateLeaves.filter((leave) => leave.start_date === twoDaysOut || leave.start_date === sevenDaysOut).length,
   });
 }

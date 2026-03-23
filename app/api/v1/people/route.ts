@@ -64,6 +64,14 @@ const createPersonSchema = z.object({
       "Start date must be in YYYY-MM-DD format."
     )
     .optional(),
+  dateOfBirth: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value.length === 0 || /^\d{4}-\d{2}-\d{2}$/.test(value),
+      "Date of birth must be in YYYY-MM-DD format."
+    )
+    .optional(),
   managerId: z.string().uuid("Manager must be a valid user id.").optional(),
   employmentType: z.enum(EMPLOYMENT_TYPES).default("contractor"),
   payrollMode: z.enum(PAYROLL_MODES).optional(),
@@ -367,6 +375,7 @@ export async function POST(request: Request) {
       ? "onboarding"
       : "active";
   const startDate = payload.startDate?.trim() || null;
+  const dateOfBirth = payload.dateOfBirth?.trim() || null;
   const payrollMode = normalizePayrollMode(payload.employmentType, payload.payrollMode);
   const primaryCurrency = payload.primaryCurrency.trim().toUpperCase();
   const effectiveSelection = resolveEffectiveUserNavSelection({
@@ -541,6 +550,7 @@ export async function POST(request: Request) {
         timezone: payload.timezone?.trim() || null,
         phone: payload.phone?.trim() || null,
         start_date: startDate,
+        date_of_birth: dateOfBirth,
         manager_id: payload.managerId ?? null,
         employment_type: payload.employmentType as EmploymentType,
         payroll_mode: payrollMode,
@@ -549,7 +559,7 @@ export async function POST(request: Request) {
         employee_type_at_creation: "pre_start"
       })
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
       )
       .single();
 
@@ -683,6 +693,7 @@ export async function POST(request: Request) {
       timezone: payload.timezone?.trim() || null,
       phone: payload.phone?.trim() || null,
       start_date: startDate,
+      date_of_birth: dateOfBirth,
       manager_id: payload.managerId ?? null,
       employment_type: payload.employmentType as EmploymentType,
       payroll_mode: payrollMode,
@@ -691,7 +702,7 @@ export async function POST(request: Request) {
       employee_type_at_creation: isNewEmployee ? "new_hire" : "existing"
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 

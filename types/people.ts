@@ -110,6 +110,7 @@ export type PeopleCreatePayload = {
   timezone?: string;
   phone?: string;
   startDate?: string;
+  dateOfBirth?: string;
   managerId?: string;
   employmentType: EmploymentType;
   payrollMode?: PayrollMode;

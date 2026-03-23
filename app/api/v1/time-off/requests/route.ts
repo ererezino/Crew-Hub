@@ -7,15 +7,21 @@ import { formatDateRangeHuman } from "../../../../../lib/datetime";
 import { logger } from "../../../../../lib/logger";
 import { createBulkNotifications } from "../../../../../lib/notifications/service";
 import {
+  applyPendingBalanceDelta,
+  fetchLeaveBalanceAvailability
+} from "../../../../../lib/time-off/balances";
+import {
+  calculateBusinessDaysNotice,
   calculateWorkingDays,
+  differenceInCalendarDays,
   formatLeaveTypeLabel,
   isIsoDate,
   isSickLeaveType,
-  parseNumeric
+  parseNumeric,
+  spansMultipleCalendarYears
 } from "../../../../../lib/time-off";
 import { sendLeaveRequestedEmail } from "../../../../../lib/notifications/email";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
-import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
   AUTO_GRANTED_LEAVE_TYPES,
@@ -74,13 +80,9 @@ const leaveRequestRowSchema = z.object({
   updated_at: z.string()
 });
 
-const leaveBalanceRowSchema = z.object({
-  id: z.string().uuid(),
-  total_days: z.union([z.number(), z.string()]),
-  used_days: z.union([z.number(), z.string()]),
-  pending_days: z.union([z.number(), z.string()]),
-  carried_days: z.union([z.number(), z.string()])
-});
+const ROUTINE_NOTICE_BUSINESS_DAYS = 5;
+const EXTENDED_LEAVE_MIN_WORKING_DAYS = 10;
+const EXTENDED_LEAVE_NOTICE_CALENDAR_DAYS = 28;
 
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
@@ -88,6 +90,10 @@ function buildMeta() {
 
 function jsonResponse<T>(status: number, payload: ApiResponse<T>) {
   return NextResponse.json(payload, { status });
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function toRequestRecord(
@@ -115,79 +121,6 @@ function toRequestRecord(
     createdAt: requestRow.created_at,
     updatedAt: requestRow.updated_at
   };
-}
-
-async function applyPendingBalanceDelta({
-  orgId,
-  employeeId,
-  leaveType,
-  year,
-  pendingDaysDelta,
-  fallbackTotalDays
-}: {
-  orgId: string;
-  employeeId: string;
-  leaveType: string;
-  year: number;
-  pendingDaysDelta: number;
-  fallbackTotalDays: number;
-}): Promise<void> {
-  const serviceClient = createSupabaseServiceRoleClient();
-
-  const { data: rawBalance, error: balanceFetchError } = await serviceClient
-    .from("leave_balances")
-    .select("id, total_days, used_days, pending_days, carried_days")
-    .eq("org_id", orgId)
-    .eq("employee_id", employeeId)
-    .eq("leave_type", leaveType)
-    .eq("year", year)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (balanceFetchError) {
-    throw new Error(`Unable to load leave balance: ${balanceFetchError.message}`);
-  }
-
-  if (!rawBalance) {
-    const nextPendingDays = Math.max(0, pendingDaysDelta);
-    const { error: balanceInsertError } = await serviceClient.from("leave_balances").insert({
-      org_id: orgId,
-      employee_id: employeeId,
-      leave_type: leaveType,
-      year,
-      total_days: Math.max(0, fallbackTotalDays),
-      used_days: 0,
-      pending_days: nextPendingDays,
-      carried_days: 0
-    });
-
-    if (balanceInsertError) {
-      throw new Error(`Unable to create leave balance: ${balanceInsertError.message}`);
-    }
-
-    return;
-  }
-
-  const parsedBalance = leaveBalanceRowSchema.safeParse(rawBalance);
-
-  if (!parsedBalance.success) {
-    throw new Error("Existing leave balance data is not in the expected shape.");
-  }
-
-  const currentPendingDays = parseNumeric(parsedBalance.data.pending_days);
-  const nextPendingDays = Math.max(0, currentPendingDays + pendingDaysDelta);
-
-  const { error: balanceUpdateError } = await serviceClient
-    .from("leave_balances")
-    .update({
-      pending_days: nextPendingDays
-    })
-    .eq("id", parsedBalance.data.id)
-    .eq("org_id", orgId);
-
-  if (balanceUpdateError) {
-    throw new Error(`Unable to update leave balance: ${balanceUpdateError.message}`);
-  }
 }
 
 export async function POST(request: Request) {
@@ -238,6 +171,30 @@ export async function POST(request: Request) {
       error: {
         code: "VALIDATION_ERROR",
         message: "End date must be on or after start date."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (spansMultipleCalendarYears(parsedBody.data.startDate, parsedBody.data.endDate)) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "CROSS_YEAR_REQUEST_NOT_SUPPORTED",
+        message: "Time off cannot span multiple calendar years. Please submit separate requests for each year."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const requestDate = todayIso();
+
+  if (parsedBody.data.startDate < requestDate) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "PAST_DATE_NOT_ALLOWED",
+        message: "Time off requests must start today or later."
       },
       meta: buildMeta()
     });
@@ -350,7 +307,7 @@ export async function POST(request: Request) {
     .select("date")
     .eq("org_id", employeeProfile.org_id)
     .eq("country_code", employeeProfile.country_code ?? "NG")
-    .gte("date", parsedBody.data.startDate)
+    .gte("date", requestDate)
     .lte("date", parsedBody.data.endDate)
     .is("deleted_at", null);
 
@@ -396,40 +353,66 @@ export async function POST(request: Request) {
     });
   }
 
+  if (parsedBody.data.leaveType === "annual_leave") {
+    const businessDaysNotice = calculateBusinessDaysNotice(
+      requestDate,
+      parsedBody.data.startDate,
+      holidayDateKeys
+    );
+
+    if (totalDays >= EXTENDED_LEAVE_MIN_WORKING_DAYS) {
+      const calendarDaysNotice = differenceInCalendarDays(
+        requestDate,
+        parsedBody.data.startDate
+      );
+
+      if (calendarDaysNotice < EXTENDED_LEAVE_NOTICE_CALENDAR_DAYS) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "INSUFFICIENT_ADVANCE_NOTICE",
+            message: "Leave requests that are 2 weeks or longer must be submitted at least 4 weeks in advance."
+          },
+          meta: buildMeta()
+        });
+      }
+    }
+
+    if (businessDaysNotice < ROUTINE_NOTICE_BUSINESS_DAYS) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "INSUFFICIENT_ADVANCE_NOTICE",
+          message: "Annual leave requests need at least 5 business days' notice."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
   const isUnlimitedType = selectedPolicy.is_unlimited || UNLIMITED_LEAVE_TYPES.has(parsedBody.data.leaveType);
 
   // Balance check for non-unlimited types
   if (!isUnlimitedType) {
     const requestYear = Number.parseInt(parsedBody.data.startDate.slice(0, 4), 10);
-    const serviceClient = createSupabaseServiceRoleClient();
 
-    const { data: rawBalance } = await serviceClient
-      .from("leave_balances")
-      .select("total_days, used_days, pending_days, carried_days")
-      .eq("org_id", employeeProfile.org_id)
-      .eq("employee_id", employeeProfile.id)
-      .eq("leave_type", parsedBody.data.leaveType)
-      .eq("year", requestYear)
-      .is("deleted_at", null)
-      .maybeSingle();
+    const balance = await fetchLeaveBalanceAvailability({
+      orgId: employeeProfile.org_id,
+      employeeId: employeeProfile.id,
+      leaveType: parsedBody.data.leaveType,
+      year: requestYear,
+      fallbackTotalDays: parseNumeric(selectedPolicy.default_days_per_year)
+    });
 
-    if (rawBalance) {
-      const balTotal = parseNumeric(rawBalance.total_days);
-      const balUsed = parseNumeric(rawBalance.used_days);
-      const balPending = parseNumeric(rawBalance.pending_days);
-      const balCarried = parseNumeric(rawBalance.carried_days);
-      const available = balTotal + balCarried - balUsed - balPending;
-
-      if (totalDays > available) {
-        return jsonResponse<null>(422, {
-          data: null,
-          error: {
-            code: "BALANCE_EXCEEDED",
-            message: `Requested days (${totalDays}) exceed your available balance (${available} days).`
-          },
-          meta: buildMeta()
-        });
-      }
+    if (totalDays > balance.availableDays) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "BALANCE_EXCEEDED",
+          message: `Requested days (${totalDays}) exceed your available balance (${balance.availableDays} days).`
+        },
+        meta: buildMeta()
+      });
     }
   }
 
