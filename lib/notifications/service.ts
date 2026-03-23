@@ -73,7 +73,7 @@ export async function createNotification({
     const serviceClient = createSupabaseServiceRoleClient();
 
     if (notificationDedupeKey) {
-      let dedupeQuery = serviceClient
+      const dedupeQuery = serviceClient
         .from("notifications")
         .select("id")
         .eq("org_id", orgId)
