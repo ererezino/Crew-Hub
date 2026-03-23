@@ -517,12 +517,18 @@ export function AnnouncementsClient({
     return unreadAnnouncements + unreadNotifications;
   }, [announcements, notificationsQuery.data?.unreadCount]);
 
-  const companyUpdateCount = announcements.length;
-  const alertCount = notificationsQuery.data?.notifications.length ?? 0;
-  const actionRequiredCount = useMemo(
+  const unreadCompanyUpdateCount = useMemo(
+    () => announcements.filter((announcement) => !announcement.isRead).length,
+    [announcements]
+  );
+  const unreadAlertCount = useMemo(
+    () => (notificationsQuery.data?.notifications ?? []).filter((notification) => !notification.isRead).length,
+    [notificationsQuery.data?.notifications]
+  );
+  const unreadActionRequiredCount = useMemo(
     () =>
       (notificationsQuery.data?.notifications ?? []).filter(
-        (notification) => (notification.actions?.length ?? 0) > 0
+        (notification) => !notification.isRead && (notification.actions?.length ?? 0) > 0
       ).length,
     [notificationsQuery.data?.notifications]
   );
@@ -1083,8 +1089,8 @@ export function AnnouncementsClient({
                 onClick={() => setActiveFilter("company")}
               >
                 {t("filterCompany")}
-                {companyUpdateCount > 0 ? (
-                  <span className="page-tab-badge numeric">{companyUpdateCount}</span>
+                {unreadCompanyUpdateCount > 0 ? (
+                  <span className="page-tab-badge numeric">{unreadCompanyUpdateCount}</span>
                 ) : null}
               </button>
               <button
@@ -1093,7 +1099,7 @@ export function AnnouncementsClient({
                 onClick={() => setActiveFilter("alerts")}
               >
                 {t("filterAlerts")}
-                {alertCount > 0 ? <span className="page-tab-badge numeric">{alertCount}</span> : null}
+                {unreadAlertCount > 0 ? <span className="page-tab-badge numeric">{unreadAlertCount}</span> : null}
               </button>
               <button
                 type="button"
@@ -1101,7 +1107,9 @@ export function AnnouncementsClient({
                 onClick={() => setActiveFilter("actionRequired")}
               >
                 {t("filterActionRequired")}
-                {actionRequiredCount > 0 ? <span className="page-tab-badge numeric">{actionRequiredCount}</span> : null}
+                {unreadActionRequiredCount > 0 ? (
+                  <span className="page-tab-badge numeric">{unreadActionRequiredCount}</span>
+                ) : null}
               </button>
             </div>
             <div className="page-header-actions">
