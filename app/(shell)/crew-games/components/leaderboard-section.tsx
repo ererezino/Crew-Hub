@@ -169,12 +169,14 @@ export function LeaderboardSection({
         title={t("adjustments")}
         onClose={() => setIsAdjustmentOpen(false)}
       >
-        <AdjustmentForm
-          orgId={orgId}
-          season={season}
-          onSaved={handleAdjustmentAdded}
-          onCancel={() => setIsAdjustmentOpen(false)}
-        />
+        {isAdjustmentOpen ? (
+          <AdjustmentForm
+            orgId={orgId}
+            season={season}
+            onSaved={handleAdjustmentAdded}
+            onCancel={() => setIsAdjustmentOpen(false)}
+          />
+        ) : null}
       </SlidePanel>
     </section>
   );

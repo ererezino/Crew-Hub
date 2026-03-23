@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "../../../components/shared/page-header";
 import { PageTabs, type PageTab } from "../../../components/shared/page-tabs";
@@ -42,6 +42,10 @@ export function CrewGamesClient({
     : "games-night";
 
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const handleTabChange = (tabKey: string) => {
     setActiveTab(tabKey);

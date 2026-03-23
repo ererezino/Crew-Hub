@@ -433,12 +433,14 @@ export function GamesNightTab({ orgId, currentUserId, isAdmin }: GamesNightTabPr
         title={t("event.createGamesNight")}
         onClose={() => setIsCreateOpen(false)}
       >
-        <EventFormPanel
-          eventType="games_night"
-          orgId={orgId}
-          onSaved={handleEventCreated}
-          onCancel={() => setIsCreateOpen(false)}
-        />
+        {isCreateOpen ? (
+          <EventFormPanel
+            eventType="games_night"
+            orgId={orgId}
+            onSaved={handleEventCreated}
+            onCancel={() => setIsCreateOpen(false)}
+          />
+        ) : null}
       </SlidePanel>
 
       {/* Edit panel */}

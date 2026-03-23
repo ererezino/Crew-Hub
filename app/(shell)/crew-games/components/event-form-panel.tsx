@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trash2, Upload } from "lucide-react";
 
 import { useCrewGamesMutations } from "../../../../hooks/use-crew-games";
+import { buildEventImageUploadPath } from "../../../../lib/crew-games/storage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import type { CrewNightEvent, CrewNightEventType } from "../../../../types/crew-games";
 import {
@@ -117,7 +118,7 @@ export function EventFormPanel({
       let eventImagePath: string | null | undefined;
 
       if (pendingImage) {
-        const uploadPath = `${orgId}/event-images`;
+        const uploadPath = buildEventImageUploadPath(orgId, pendingImage.name);
         const result = await mutations.uploadFile(pendingImage, "event_image", uploadPath);
         if (result) {
           eventImagePath = result.path;

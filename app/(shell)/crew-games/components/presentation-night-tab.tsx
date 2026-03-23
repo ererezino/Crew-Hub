@@ -312,12 +312,14 @@ export function PresentationNightTab({ orgId, currentUserId, isAdmin }: Presenta
         title={t("event.createPresentationNight")}
         onClose={() => setIsCreateOpen(false)}
       >
-        <EventFormPanel
-          eventType="presentation_night"
-          orgId={orgId}
-          onSaved={handleEventCreated}
-          onCancel={() => setIsCreateOpen(false)}
-        />
+        {isCreateOpen ? (
+          <EventFormPanel
+            eventType="presentation_night"
+            orgId={orgId}
+            onSaved={handleEventCreated}
+            onCancel={() => setIsCreateOpen(false)}
+          />
+        ) : null}
       </SlidePanel>
 
       {/* Edit panel */}

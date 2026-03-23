@@ -30,6 +30,7 @@ const createSchema = z.object({
   kahootLink: z.string().url().nullable().optional(),
   altGameLink: z.string().url().nullable().optional(),
   featuredGame: z.string().trim().max(200).nullable().optional(),
+  eventImagePath: z.string().nullable().optional(),
   highlights: z.string().trim().max(5000).nullable().optional()
 });
 
@@ -188,6 +189,7 @@ export async function POST(request: Request) {
     kahoot_link: payload.kahootLink ?? null,
     alt_game_link: payload.altGameLink ?? null,
     featured_game: payload.featuredGame ?? null,
+    event_image_path: payload.eventImagePath ?? null,
     highlights: payload.highlights ?? null,
     created_by: session.profile.id
   };
