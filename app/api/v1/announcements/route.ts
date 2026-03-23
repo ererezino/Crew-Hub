@@ -448,7 +448,8 @@ export async function POST(request: Request) {
       type: "announcement",
       title: `New announcement: ${parsedAnnouncement.data.title}`,
       body: parsedAnnouncement.data.body.slice(0, 220),
-      link: "/announcements"
+      link: "/announcements",
+      dedupeKey: `announcement-created:${parsedAnnouncement.data.id}`
     });
   }
 

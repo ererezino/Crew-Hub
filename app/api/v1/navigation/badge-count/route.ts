@@ -66,6 +66,7 @@ export async function GET(request: Request) {
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", profile.id)
+      .neq("type", "announcement")
       .is("read_at", null)
       .is("deleted_at", null)
   ]);

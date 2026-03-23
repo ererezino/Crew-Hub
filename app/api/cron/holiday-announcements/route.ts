@@ -178,6 +178,7 @@ export async function GET(request: Request) {
             title: `Happy ${holiday.name}! 🎉`,
             body: "You have the day off today. Enjoy!",
             link: "/announcements",
+            dedupeKey: `holiday:${announcement.id}:resident`,
           })
         )
       );
@@ -192,6 +193,7 @@ export async function GET(request: Request) {
             title: `Public Holiday (${countryLabels})`,
             body: `Today is ${holiday.name}. Team members in ${countryNames} have the day off.`,
             link: "/announcements",
+            dedupeKey: `holiday:${announcement.id}:nonresident`,
           })
         )
       );

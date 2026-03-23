@@ -143,7 +143,8 @@ export async function GET(request: Request) {
         type: "leave_status",
         title: "Happy birthday!",
         body: "You have the day off today for your birthday. Enjoy!",
-        link: "/time-off"
+        link: "/time-off",
+        dedupeKey: `birthday-leave:${today}:${emp.id}`
       });
 
       // Notify the team
@@ -162,7 +163,8 @@ export async function GET(request: Request) {
           type: "announcement",
           title: `It's ${emp.full_name}'s birthday!`,
           body: `${emp.full_name} is off today for their birthday.`,
-          link: "/time-off"
+          link: "/time-off",
+          dedupeKey: `birthday-team:${today}:${emp.id}`
         });
       }
 
@@ -177,7 +179,8 @@ export async function GET(request: Request) {
         type: "leave_status",
         title: "Choose your birthday leave date",
         body: `Your birthday falls on a non-working day this year. Please choose a day for your birthday leave in Crew Hub.`,
-        link: "/time-off"
+        link: "/time-off",
+        dedupeKey: `birthday-reminder:${today}:${emp.id}`
       });
 
       remindersSent++;

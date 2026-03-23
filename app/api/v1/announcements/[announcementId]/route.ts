@@ -279,7 +279,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       type: "announcement",
       title: `Announcement updated: ${parsedAnnouncement.data.title}`,
       body: parsedAnnouncement.data.body.slice(0, 220),
-      link: "/announcements"
+      link: "/announcements",
+      dedupeKey: `announcement-updated:${announcementId}`
     });
   }
 

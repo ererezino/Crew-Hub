@@ -156,6 +156,7 @@ export async function GET(request: Request) {
         title,
         body: body.slice(0, 220),
         link: "/time-off",
+        dedupeKey: `leave-announcement:${announcement.id}`,
       });
 
       announcementsCreated++;

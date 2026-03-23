@@ -111,6 +111,7 @@ export async function GET(request: Request) {
     .select("id, org_id, user_id, type, title, body, link, is_read, read_at, created_at, actions")
     .eq("org_id", session.profile.org_id)
     .eq("user_id", session.profile.id)
+    .neq("type", "announcement")
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(parsedQuery.data.limit);
@@ -129,6 +130,7 @@ export async function GET(request: Request) {
       .select("id", { count: "exact", head: true })
       .eq("org_id", session.profile.org_id)
       .eq("user_id", session.profile.id)
+      .neq("type", "announcement")
       .eq("is_read", false)
       .is("deleted_at", null)
   ]);

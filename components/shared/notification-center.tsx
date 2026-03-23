@@ -103,6 +103,7 @@ export function NotificationCenter() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const bootstrappedBrowserAlerts = useRef(false);
   const browserAlertedNotificationIds = useRef<Set<string>>(new Set());
+  const browserAlertedAnnouncementIds = useRef<Set<string>>(new Set());
 
   /* Ephemeral optimistic set — never persisted, resets on mount */
   const [optimisticDismissals, setOptimisticDismissals] = useState<Set<string>>(new Set());
@@ -156,10 +157,14 @@ export function NotificationCenter() {
 
   useEffect(() => {
     const currentNotifications = notifications.data?.notifications ?? [];
+    const currentAnnouncements = announcements;
 
     if (!bootstrappedBrowserAlerts.current) {
       for (const notification of currentNotifications) {
         browserAlertedNotificationIds.current.add(notification.id);
+      }
+      for (const announcement of currentAnnouncements) {
+        browserAlertedAnnouncementIds.current.add(announcement.id);
       }
       bootstrappedBrowserAlerts.current = true;
       return;
@@ -191,7 +196,25 @@ export function NotificationCenter() {
 
       browserAlertedNotificationIds.current.add(notification.id);
     }
-  }, [browserPushEnabled, notifications.data?.notifications]);
+
+    for (const announcement of currentAnnouncements) {
+      if (announcement.isRead || browserAlertedAnnouncementIds.current.has(announcement.id)) {
+        continue;
+      }
+
+      const browserNotification = new Notification(announcement.title, {
+        body: announcement.body
+      });
+
+      browserNotification.onclick = () => {
+        window.focus();
+        window.location.href = "/announcements";
+        browserNotification.close();
+      };
+
+      browserAlertedAnnouncementIds.current.add(announcement.id);
+    }
+  }, [announcements, browserPushEnabled, notifications.data?.notifications]);
 
   /* Build unified feed — only unread, filtered by optimistic dismissals */
   const feedItems: FeedItem[] = useMemo(() => {

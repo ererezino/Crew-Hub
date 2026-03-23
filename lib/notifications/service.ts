@@ -11,6 +11,7 @@ type CreateNotificationParams = {
   body: string;
   link?: string | null;
   actions?: NotificationAction[];
+  dedupeKey?: string | null;
   skipIfUnreadDuplicate?: boolean;
 };
 
@@ -22,6 +23,7 @@ type CreateBulkNotificationsParams = {
   body: string;
   link?: string | null;
   actions?: NotificationAction[];
+  dedupeKey?: string | null;
   skipIfUnreadDuplicate?: boolean;
 };
 
@@ -38,6 +40,15 @@ function normalizeLink(link: string | null | undefined): string | null {
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 }
 
+function normalizeDedupeKey(dedupeKey: string | null | undefined): string | null {
+  if (!dedupeKey) {
+    return null;
+  }
+
+  const trimmed = dedupeKey.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 export async function createNotification({
   orgId,
   userId,
@@ -46,12 +57,14 @@ export async function createNotification({
   body,
   link,
   actions,
+  dedupeKey,
   skipIfUnreadDuplicate = true
 }: CreateNotificationParams): Promise<void> {
   try {
     const notificationTitle = title.trim();
     const notificationBody = body.trim();
     const notificationLink = normalizeLink(link);
+    const notificationDedupeKey = normalizeDedupeKey(dedupeKey);
 
     if (!notificationTitle || !notificationBody) {
       return;
@@ -59,7 +72,30 @@ export async function createNotification({
 
     const serviceClient = createSupabaseServiceRoleClient();
 
-    if (skipIfUnreadDuplicate) {
+    if (notificationDedupeKey) {
+      let dedupeQuery = serviceClient
+        .from("notifications")
+        .select("id")
+        .eq("org_id", orgId)
+        .eq("user_id", userId)
+        .eq("dedupe_key", notificationDedupeKey)
+        .is("deleted_at", null)
+        .limit(1);
+
+      const { data: duplicateRows, error: duplicateError } = await dedupeQuery;
+
+      if (duplicateError) {
+        console.error("Unable to check notification dedupe key.", {
+          orgId,
+          userId,
+          type,
+          dedupeKey: notificationDedupeKey,
+          message: duplicateError.message
+        });
+      } else if ((duplicateRows ?? []).length > 0) {
+        return;
+      }
+    } else if (skipIfUnreadDuplicate) {
       let duplicateQuery = serviceClient
         .from("notifications")
         .select("id")
@@ -97,10 +133,15 @@ export async function createNotification({
       title: notificationTitle,
       body: notificationBody,
       link: notificationLink,
+      dedupe_key: notificationDedupeKey,
       ...(actions && actions.length > 0 ? { actions } : {})
     });
 
     if (insertError) {
+      if (notificationDedupeKey && insertError.code === "23505") {
+        return;
+      }
+
       console.error("Unable to create notification.", {
         orgId,
         userId,
@@ -126,6 +167,7 @@ export async function createBulkNotifications({
   body,
   link,
   actions,
+  dedupeKey,
   skipIfUnreadDuplicate = true
 }: CreateBulkNotificationsParams): Promise<void> {
   const uniqueUserIds = [...new Set(userIds.filter((value) => value.trim().length > 0))];
@@ -144,6 +186,7 @@ export async function createBulkNotifications({
         body,
         link,
         actions,
+        dedupeKey,
         skipIfUnreadDuplicate
       })
     )
