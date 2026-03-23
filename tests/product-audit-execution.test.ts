@@ -26,9 +26,9 @@ describe("Product audit execution hardening", () => {
     expect(decisionCard).toContain('t("tryAgain")');
   });
 
-  it("navigation keeps announcements label aligned with /announcements and non-conflicting shortcut", () => {
+  it("navigation exposes unified updates at /announcements with the existing shortcut", () => {
     const navigation = read("lib/navigation.ts");
-    expect(navigation).toContain('label: "Announcements"');
+    expect(navigation).toContain('label: "Updates"');
     expect(navigation).toContain('href: "/announcements"');
     expect(navigation).toContain('shortcut: "G C"');
     expect(navigation).not.toContain('label: "Notifications"');
@@ -39,6 +39,11 @@ describe("Product audit execution hardening", () => {
     const notificationCenter = read("components/shared/notification-center.tsx");
     expect(notificationCenter).toContain('href="/announcements"');
     expect(notificationCenter).not.toContain('href="/notifications"');
+  });
+
+  it("notifications page redirects into the unified updates experience", () => {
+    const notificationsPage = read("app/(shell)/notifications/page.tsx");
+    expect(notificationsPage).toContain('redirect("/announcements")');
   });
 
   it("team hub creation surfaces are no longer marked as coming soon", () => {

@@ -10,17 +10,34 @@ import {
 import { z } from "zod";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
+import {
+  Archive,
+  ArrowUpRight,
+  BellRing,
+  CheckCheck,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileText,
+  ImageIcon,
+  Maximize2,
+  Megaphone,
+  Paperclip,
+  Pin,
+  Sparkles,
+  X
+} from "lucide-react";
 
 import { ConfirmDialog } from "../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
+import { NotificationActionButton } from "../../../components/shared/notification-action-button";
 import { useAnnouncements } from "../../../hooks/use-announcements";
 import { useNotifications } from "../../../hooks/use-notifications";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
-import { Archive, ChevronLeft, ChevronRight, Download, FileText, ImageIcon, Maximize2, Megaphone, Paperclip, X } from "lucide-react";
 import type {
   Announcement,
   AnnouncementDismissResponse,
@@ -31,6 +48,7 @@ import type { NotificationRecord } from "../../../types/notifications";
 import { humanizeError } from "@/lib/errors";
 
 type AppLocale = "en" | "fr";
+type UpdatesFilter = "all" | "unread" | "company" | "alerts" | "actionRequired";
 
 const NOTIFICATION_TYPE_KEYS: Record<string, string> = {
   status_change: "typeStatusChange",
@@ -41,6 +59,7 @@ const NOTIFICATION_TYPE_KEYS: Record<string, string> = {
   expense_approved: "typeExpenseApproved",
   expense_rejected: "typeExpenseRejected",
   payroll_approved: "typePayrollApproved",
+  payroll_completed: "typePayrollApproved",
   schedule_published: "typeSchedulePublished",
   shift_swap_requested: "typeShiftSwap",
   shift_swap_accepted: "typeShiftSwap",
@@ -53,7 +72,9 @@ const NOTIFICATION_TYPE_KEYS: Record<string, string> = {
   signature_requested: "typeSignature",
   signature_signed: "typeSignature",
   signature_completed: "typeSignature",
-  compliance_policy_acknowledgment: "typeCompliance"
+  compliance_policy_acknowledgment: "typeCompliance",
+  payment_details_changed: "typePayrollApproved",
+  payslip_ready: "typePayrollApproved"
 };
 
 type AnnouncementsClientProps = {
@@ -75,9 +96,21 @@ type AnnouncementFormValues = {
   body: string;
   isPinned: boolean;
 };
+
 type AnnouncementFormField = "title" | "body";
 type AnnouncementFormErrors = Partial<Record<AnnouncementFormField, string>>;
 type AnnouncementFormTouched = Record<AnnouncementFormField, boolean>;
+
+type UnifiedItem =
+  | { source: "announcement"; data: Announcement }
+  | { source: "notification"; data: NotificationRecord };
+
+type LightboxData = {
+  announcementId: string;
+  images: { attachmentId: string; fileName: string }[];
+  activeIndex: number;
+  initialSrc: string;
+};
 
 const INITIAL_FORM_VALUES: AnnouncementFormValues = {
   title: "",
@@ -107,191 +140,42 @@ function hasAnyFormError(errors: AnnouncementFormErrors): boolean {
   return Boolean(errors.title || errors.body);
 }
 
-function AnnouncementCard({
-  announcement,
-  canManageAnnouncements,
-  isSuperAdmin,
-  isArchiveView,
-  isDismissing,
-  isMarkingRead,
-  onDismiss,
-  onMarkRead,
-  onEdit,
-  onDelete,
-  onOpenLightbox,
-  t,
-  locale
-}: {
-  announcement: Announcement;
-  canManageAnnouncements: boolean;
-  isSuperAdmin: boolean;
-  isArchiveView: boolean;
-  isDismissing: boolean;
-  isMarkingRead: boolean;
-  onDismiss: (announcementId: string) => void;
-  onMarkRead: (announcementId: string) => void;
-  onEdit: (announcement: Announcement) => void;
-  onDelete: (announcement: Announcement) => void;
-  onOpenLightbox: (announcementId: string, images: { attachmentId: string; fileName: string }[], index: number, preloadedSrc: string) => void;
-  t: (key: string, params?: Record<string, unknown>) => string;
-  locale: AppLocale;
-}) {
-  return (
-    <li
-      className={
-        announcement.isRead
-          ? "announcement-item"
-          : "announcement-item announcement-item-unread"
-      }
-    >
-      <article className="announcement-item-card">
-        <header className="announcement-item-header">
-          <div>
-            <h3 className="announcement-item-title">{announcement.title}</h3>
-            <p className="announcement-item-meta">
-              <time
-                dateTime={announcement.createdAt}
-                title={formatDateTimeTooltip(announcement.createdAt, locale)}
-              >
-                {formatRelativeTime(announcement.createdAt, locale)}
-              </time>
-              <span aria-hidden="true">&bull;</span>
-              <span>{announcement.creatorName}</span>
-            </p>
-          </div>
-          <div className="announcement-item-status">
-            {announcement.isPinned ? (
-              <StatusBadge tone="info">{t('pinned')}</StatusBadge>
-            ) : null}
-            {announcement.isRead ? (
-              <span className="announcement-read-check" title={t('read')}>
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M5 12.5l4.5 4.5L19 7.5"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                </svg>
-                {t('read')}
-              </span>
-            ) : (
-              <StatusBadge tone="pending">{t('unread')}</StatusBadge>
-            )}
-          </div>
-        </header>
-
-        <p className="announcement-item-body">{announcement.body}</p>
-
-        {announcement.attachments.length > 0 ? (
-          <div className="att-section">
-            {/* Inline images */}
-            {announcement.attachments.some((a) => a.mimeType.startsWith("image/")) ? (
-              <div className="att-gallery">
-                {(() => {
-                  const imageAtts = announcement.attachments.filter((a) => a.mimeType.startsWith("image/"));
-                  return imageAtts.map((attachment, idx) => (
-                    <AnnouncementImage
-                      key={attachment.id}
-                      announcementId={announcement.id}
-                      attachmentId={attachment.id}
-                      fileName={attachment.fileName}
-                      onOpen={(preloadedSrc: string) => {
-                        onOpenLightbox(
-                          announcement.id,
-                          imageAtts.map((a) => ({ attachmentId: a.id, fileName: a.fileName })),
-                          idx,
-                          preloadedSrc
-                        );
-                      }}
-                    />
-                  ));
-                })()}
-              </div>
-            ) : null}
-
-            {/* Non-image file attachments */}
-            {announcement.attachments.some((a) => !a.mimeType.startsWith("image/")) ? (
-              <div className="att-files">
-                {announcement.attachments
-                  .filter((a) => !a.mimeType.startsWith("image/"))
-                  .map((attachment) => (
-                    <AttachmentFileChip
-                      key={attachment.id}
-                      announcementId={announcement.id}
-                      attachmentId={attachment.id}
-                      fileName={attachment.fileName}
-                      mimeType={attachment.mimeType}
-                    />
-                  ))}
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="announcement-row-actions">
-          {!announcement.isRead ? (
-            <button
-              type="button"
-              className="table-row-action"
-              onClick={() => onMarkRead(announcement.id)}
-              disabled={isMarkingRead}
-            >
-              {isMarkingRead ? t('markingRead') : t('markRead')}
-            </button>
-          ) : null}
-          {announcement.isRead && !isArchiveView ? (
-            <button
-              type="button"
-              className="table-row-action"
-              onClick={() => onDismiss(announcement.id)}
-              disabled={isDismissing}
-            >
-              {isDismissing ? t('dismissing') : t('dismiss')}
-            </button>
-          ) : null}
-          {canManageAnnouncements && !isArchiveView ? (
-            <button
-              type="button"
-              className="table-row-action"
-              onClick={() => onEdit(announcement)}
-            >
-              {t('edit')}
-            </button>
-          ) : null}
-          {isSuperAdmin ? (
-            <button
-              type="button"
-              className="table-row-action table-row-action-danger"
-              onClick={() => onDelete(announcement)}
-            >
-              {t('delete')}
-            </button>
-          ) : null}
-        </div>
-      </article>
-    </li>
-  );
+function getUnifiedItemKey(item: UnifiedItem): string {
+  return `${item.source}:${item.data.id}`;
 }
 
-function AnnouncementsSkeleton() {
+function UpdatesSkeleton() {
   return (
-    <div className="announcements-skeleton-grid" aria-hidden="true">
-      {Array.from({ length: 2 }, (_, sectionIndex) => (
-        <section key={`announcement-skeleton-section-${sectionIndex}`} className="settings-card">
+    <div className="updates-shell" aria-hidden="true">
+      <section className="settings-card updates-brief-card">
+        <div className="announcements-skeleton-row announcements-skeleton-title" />
+        <div className="announcements-skeleton-row" />
+      </section>
+      <div className="metric-grid updates-metric-grid">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={`updates-metric-${index}`} className="settings-skeleton updates-metric-skeleton" />
+        ))}
+      </div>
+      <section className="notifications-toolbar">
+        <div className="announcements-skeleton-row announcements-skeleton-title" />
+      </section>
+      <div className="updates-layout">
+        <section className="settings-card">
           <div className="announcements-skeleton-row announcements-skeleton-title" />
-          {Array.from({ length: 3 }, (_, rowIndex) => (
-            <div key={`announcement-skeleton-${sectionIndex}-${rowIndex}`} className="announcements-skeleton-row" />
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={`updates-feed-${index}`} className="announcements-skeleton-row" />
           ))}
         </section>
-      ))}
+        <section className="settings-card">
+          <div className="announcements-skeleton-row announcements-skeleton-title" />
+          {Array.from({ length: 3 }, (_, index) => (
+            <div key={`updates-detail-${index}`} className="announcements-skeleton-row" />
+          ))}
+        </section>
+      </div>
     </div>
   );
 }
-
-/* ─── Lazy-loaded announcement image ─── */
 
 function AnnouncementImage({
   announcementId,
@@ -312,23 +196,28 @@ function AnnouncementImage({
 
     async function load() {
       try {
-        const res = await fetch(
-          `/api/v1/announcements/${announcementId}/attachments/${attachmentId}`
-        );
-        if (!res.ok) { setError(true); return; }
-        const json = await res.json();
+        const res = await fetch(`/api/v1/announcements/${announcementId}/attachments/${attachmentId}`);
+        if (!res.ok) {
+          setError(true);
+          return;
+        }
+        const json = (await res.json()) as { data?: { url?: string } };
         if (!cancelled && json.data?.url) {
           setSrc(json.data.url);
         } else {
           setError(true);
         }
       } catch {
-        if (!cancelled) setError(true);
+        if (!cancelled) {
+          setError(true);
+        }
       }
     }
 
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [announcementId, attachmentId]);
 
   if (error) {
@@ -360,8 +249,6 @@ function AnnouncementImage({
   );
 }
 
-/* ─── Attachment file chip ─── */
-
 function AttachmentFileChip({
   announcementId,
   attachmentId,
@@ -380,21 +267,21 @@ function AttachmentFileChip({
 
     async function load() {
       try {
-        const res = await fetch(
-          `/api/v1/announcements/${announcementId}/attachments/${attachmentId}`
-        );
+        const res = await fetch(`/api/v1/announcements/${announcementId}/attachments/${attachmentId}`);
         if (!res.ok) return;
-        const json = await res.json();
+        const json = (await res.json()) as { data?: { url?: string } };
         if (!cancelled && json.data?.url) {
           setHref(json.data.url);
         }
       } catch {
-        // silent
+        // Silent.
       }
     }
 
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [announcementId, attachmentId]);
 
   const isPdf = mimeType === "application/pdf";
@@ -414,15 +301,6 @@ function AttachmentFileChip({
   );
 }
 
-/* ─── Image lightbox ─── */
-
-type LightboxData = {
-  announcementId: string;
-  images: { attachmentId: string; fileName: string }[];
-  activeIndex: number;
-  initialSrc: string;
-};
-
 function ImageLightbox({
   data,
   onClose
@@ -434,43 +312,55 @@ function ImageLightbox({
   const [urls, setUrls] = useState<Map<string, string>>(() => {
     const initial = new Map<string, string>();
     const att = data.images[data.activeIndex];
-    if (att) initial.set(att.attachmentId, data.initialSrc);
+    if (att) {
+      initial.set(att.attachmentId, data.initialSrc);
+    }
     return initial;
   });
-  const [loading, setLoading] = useState(false);
-
   const activeImage = data.images[activeIndex];
   const activeUrl = activeImage ? urls.get(activeImage.attachmentId) : undefined;
 
   useEffect(() => {
     if (!activeImage || urls.has(activeImage.attachmentId)) return;
-    setLoading(true);
     let cancelled = false;
 
     fetch(`/api/v1/announcements/${data.announcementId}/attachments/${activeImage.attachmentId}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (!cancelled && json.data?.url) {
+      .then((response) => response.json())
+      .then((json: { data?: { url?: string } }) => {
+        const url = json.data?.url;
+        if (!cancelled && url) {
           setUrls((prev) => {
             const next = new Map(prev);
-            next.set(activeImage.attachmentId, json.data.url as string);
+            next.set(activeImage.attachmentId, url);
             return next;
           });
         }
       })
-      .catch(() => { /* silent */ })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .catch(() => {
+        // Silent.
+      })
+      .finally(() => undefined);
 
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeImage?.attachmentId, data.announcementId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeImage, data.announcementId, urls]);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { onClose(); return; }
-      if (e.key === "ArrowLeft" && activeIndex > 0) { setActiveIndex((i) => i - 1); return; }
-      if (e.key === "ArrowRight" && activeIndex < data.images.length - 1) { setActiveIndex((i) => i + 1); }
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key === "ArrowLeft" && activeIndex > 0) {
+        setActiveIndex((index) => index - 1);
+        return;
+      }
+      if (event.key === "ArrowRight" && activeIndex < data.images.length - 1) {
+        setActiveIndex((index) => index + 1);
+      }
     };
+
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [activeIndex, data.images.length, onClose]);
@@ -478,18 +368,20 @@ function ImageLightbox({
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
   return (
     <div className="lightbox-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={activeImage?.fileName ?? "Image"}>
-      <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
+      <div className="lightbox-inner" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="lightbox-close" onClick={onClose} aria-label="Close">
           <X size={20} />
         </button>
 
         <div className="lightbox-stage">
-          {loading || !activeUrl ? (
+          {!activeUrl ? (
             <div className="lightbox-spinner">
               <div className="lightbox-spinner-ring" />
             </div>
@@ -504,7 +396,7 @@ function ImageLightbox({
             <button
               type="button"
               className="lightbox-nav lightbox-nav-prev"
-              onClick={() => setActiveIndex((i) => i - 1)}
+              onClick={() => setActiveIndex((index) => index - 1)}
               disabled={activeIndex === 0}
               aria-label="Previous image"
             >
@@ -513,7 +405,7 @@ function ImageLightbox({
             <button
               type="button"
               className="lightbox-nav lightbox-nav-next"
-              onClick={() => setActiveIndex((i) => i + 1)}
+              onClick={() => setActiveIndex((index) => index + 1)}
               disabled={activeIndex === data.images.length - 1}
               aria-label="Next image"
             >
@@ -536,16 +428,20 @@ export function AnnouncementsClient({
   isSuperAdmin,
   currentUserName
 }: AnnouncementsClientProps) {
-  const t = useTranslations('announcements');
-  const tCommon = useTranslations('common');
+  const t = useTranslations("announcements");
+  const tCommon = useTranslations("common");
   const locale = useLocale() as AppLocale;
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 
-  const announcementFormSchema = useMemo(() => z.object({
-    title: z.string().trim().min(1, t('validationTitleRequired')).max(200, t('validationTitleTooLong')),
-    body: z.string().trim().min(1, t('validationBodyRequired')).max(5000, t('validationBodyTooLong')),
-    isPinned: z.boolean()
-  }), [t]);
+  const announcementFormSchema = useMemo(
+    () =>
+      z.object({
+        title: z.string().trim().min(1, t("validationTitleRequired")).max(200, t("validationTitleTooLong")),
+        body: z.string().trim().min(1, t("validationBodyRequired")).max(5000, t("validationBodyTooLong")),
+        isPinned: z.boolean()
+      }),
+    [t]
+  );
 
   function getValidationErrors(
     values: AnnouncementFormValues,
@@ -567,7 +463,7 @@ export function AnnouncementsClient({
 
   function getNotificationTypeLabel(type: string): string {
     const key = NOTIFICATION_TYPE_KEYS[type];
-    return key ? td(key) : td('notificationDefault');
+    return key ? td(key) : td("notificationDefault");
   }
 
   const {
@@ -578,7 +474,7 @@ export function AnnouncementsClient({
     setAnnouncements
   } = useAnnouncements();
 
-  const notificationsQuery = useNotifications({ limit: 20 });
+  const notificationsQuery = useNotifications({ limit: 100 });
 
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
@@ -594,40 +490,109 @@ export function AnnouncementsClient({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [confirmDeleteAnnouncement, setConfirmDeleteAnnouncement] = useState<Announcement | null>(null);
   const [isDeletingAnnouncement, setIsDeletingAnnouncement] = useState(false);
-  useUnsavedGuard(announcementFormDirty);
   const [lightbox, setLightbox] = useState<LightboxData | null>(null);
-
-  type UnifiedItem =
-    | { source: "announcement"; data: Announcement }
-    | { source: "notification"; data: NotificationRecord };
+  const [activeFilter, setActiveFilter] = useState<UpdatesFilter>("all");
+  const [selectedItemKey, setSelectedItemKey] = useState<string | null>(null);
+  useUnsavedGuard(announcementFormDirty);
 
   const unifiedFeed = useMemo((): UnifiedItem[] => {
     const items: UnifiedItem[] = [];
 
-    for (const a of announcements) {
-      items.push({ source: "announcement", data: a });
+    for (const announcement of announcements) {
+      items.push({ source: "announcement", data: announcement });
     }
 
-    for (const n of notificationsQuery.data?.notifications ?? []) {
-      items.push({ source: "notification", data: n });
+    for (const notification of notificationsQuery.data?.notifications ?? []) {
+      items.push({ source: "notification", data: notification });
     }
 
-    items.sort((a, b) => {
-      const aPinned = a.source === "announcement" ? a.data.isPinned : false;
-      const bPinned = b.source === "announcement" ? b.data.isPinned : false;
-      if (aPinned && !bPinned) return -1;
-      if (!aPinned && bPinned) return 1;
-      return new Date(b.data.createdAt).getTime() - new Date(a.data.createdAt).getTime();
+    items.sort((left, right) => {
+      const leftPinned = left.source === "announcement" ? left.data.isPinned : false;
+      const rightPinned = right.source === "announcement" ? right.data.isPinned : false;
+
+      if (leftPinned && !rightPinned) return -1;
+      if (!leftPinned && rightPinned) return 1;
+
+      return new Date(right.data.createdAt).getTime() - new Date(left.data.createdAt).getTime();
     });
 
     return items;
   }, [announcements, notificationsQuery.data?.notifications]);
 
   const totalUnreadCount = useMemo(() => {
-    const unreadAnnouncements = announcements.filter((a) => !a.isRead).length;
+    const unreadAnnouncements = announcements.filter((announcement) => !announcement.isRead).length;
     const unreadNotifications = notificationsQuery.data?.unreadCount ?? 0;
     return unreadAnnouncements + unreadNotifications;
   }, [announcements, notificationsQuery.data?.unreadCount]);
+
+  const companyUpdateCount = announcements.length;
+  const alertCount = notificationsQuery.data?.notifications.length ?? 0;
+  const actionRequiredCount = useMemo(
+    () =>
+      (notificationsQuery.data?.notifications ?? []).filter(
+        (notification) => (notification.actions?.length ?? 0) > 0
+      ).length,
+    [notificationsQuery.data?.notifications]
+  );
+
+  const filteredFeed = useMemo(() => {
+    return unifiedFeed.filter((item) => {
+      if (activeFilter === "unread" && item.data.isRead) {
+        return false;
+      }
+
+      if (activeFilter === "company" && item.source !== "announcement") {
+        return false;
+      }
+
+      if (activeFilter === "alerts" && item.source !== "notification") {
+        return false;
+      }
+
+      if (
+        activeFilter === "actionRequired" &&
+        (item.source !== "notification" || (item.data.actions?.length ?? 0) === 0)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [activeFilter, unifiedFeed]);
+
+  useEffect(() => {
+    if (filteredFeed.length === 0) {
+      setSelectedItemKey(null);
+      return;
+    }
+
+    if (!selectedItemKey || !filteredFeed.some((item) => getUnifiedItemKey(item) === selectedItemKey)) {
+      setSelectedItemKey(getUnifiedItemKey(filteredFeed[0]));
+    }
+  }, [filteredFeed, selectedItemKey]);
+
+  const selectedItem = useMemo(() => {
+    if (!selectedItemKey) {
+      return null;
+    }
+
+    return filteredFeed.find((item) => getUnifiedItemKey(item) === selectedItemKey) ?? null;
+  }, [filteredFeed, selectedItemKey]);
+
+  const dismissToast = (toastId: string) => {
+    setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
+  };
+
+  const showToast = (variant: ToastVariant, rawMessage: string) => {
+    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
+    const toastId = createToastId();
+
+    setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
+
+    window.setTimeout(() => {
+      dismissToast(toastId);
+    }, 4000);
+  };
 
   const openCreatePanel = () => {
     setEditingAnnouncementId(null);
@@ -662,21 +627,6 @@ export function AnnouncementsClient({
     setSubmitError(null);
     setSelectedFiles([]);
     setAnnouncementFormDirty(false);
-  };
-
-  const dismissToast = (toastId: string) => {
-    setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
-  };
-
-  const showToast = (variant: ToastVariant, rawMessage: string) => {
-    const message = variant === "error" ? humanizeError(rawMessage) : rawMessage;
-    const toastId = createToastId();
-
-    setToasts((currentToasts) => [...currentToasts, { id: toastId, variant, message }]);
-
-    window.setTimeout(() => {
-      dismissToast(toastId);
-    }, 4000);
   };
 
   const handleTitleOrBodyChange =
@@ -727,8 +677,8 @@ export function AnnouncementsClient({
     if (!files || files.length === 0) return;
 
     const validFiles: File[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
       if (file.size > MAX_FILE_SIZE_BYTES) {
         showToast("error", `${file.name}: file exceeds 25 MB limit.`);
         continue;
@@ -741,15 +691,14 @@ export function AnnouncementsClient({
       setAnnouncementFormDirty(true);
     }
 
-    // Reset the input so selecting the same file again triggers onChange
     event.currentTarget.value = "";
   };
 
   const handleRemoveFile = (index: number) => {
-    setSelectedFiles((current) => current.filter((_, i) => i !== index));
+    setSelectedFiles((current) => current.filter((_, fileIndex) => fileIndex !== index));
   };
 
-  const handleMarkRead = async (announcementId: string) => {
+  const handleMarkRead = async (announcementId: string, options?: { silent?: boolean }) => {
     setIsMarkingReadById((currentState) => ({
       ...currentState,
       [announcementId]: true
@@ -769,8 +718,10 @@ export function AnnouncementsClient({
       const payload = (await response.json()) as AnnouncementReadResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? t('toastMarkReadError'));
-        return;
+        if (!options?.silent) {
+          showToast("error", payload.error?.message ?? t("toastMarkReadError"));
+        }
+        return false;
       }
 
       setAnnouncements((currentAnnouncements) =>
@@ -786,12 +737,17 @@ export function AnnouncementsClient({
       );
 
       window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-      showToast("info", t('toastMarkedRead'));
+
+      if (!options?.silent) {
+        showToast("info", t("toastMarkedRead"));
+      }
+
+      return true;
     } catch (error) {
-      showToast(
-        "error",
-        error instanceof Error ? error.message : t('toastMarkReadError')
-      );
+      if (!options?.silent) {
+        showToast("error", error instanceof Error ? error.message : t("toastMarkReadError"));
+      }
+      return false;
     } finally {
       setIsMarkingReadById((currentState) => {
         const nextState = { ...currentState };
@@ -799,6 +755,24 @@ export function AnnouncementsClient({
         return nextState;
       });
     }
+  };
+
+  const handleMarkNotificationRead = async (notificationId: string, options?: { silent?: boolean }) => {
+    const success = await notificationsQuery.markRead(notificationId);
+
+    if (success) {
+      window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+      if (!options?.silent) {
+        showToast("info", t("toastMarkedRead"));
+      }
+      return true;
+    }
+
+    if (!options?.silent) {
+      showToast("error", t("toastMarkReadError"));
+    }
+
+    return false;
   };
 
   const handleDismiss = async (announcementId: string) => {
@@ -819,21 +793,22 @@ export function AnnouncementsClient({
       const payload = (await response.json()) as AnnouncementDismissResponse;
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? t('toastDismissError'));
+        showToast("error", payload.error?.message ?? t("toastDismissError"));
         return;
       }
 
       setAnnouncements((currentAnnouncements) =>
-        currentAnnouncements.filter((a) => a.id !== announcementId)
+        currentAnnouncements.filter((announcement) => announcement.id !== announcementId)
       );
 
+      if (selectedItemKey === `announcement:${announcementId}`) {
+        setSelectedItemKey(null);
+      }
+
       window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-      showToast("info", t('toastDismissed'));
+      showToast("info", t("toastDismissed"));
     } catch (error) {
-      showToast(
-        "error",
-        error instanceof Error ? error.message : t('toastDismissError')
-      );
+      showToast("error", error instanceof Error ? error.message : t("toastDismissError"));
     } finally {
       setIsDismissingById((currentState) => {
         const nextState = { ...currentState };
@@ -851,24 +826,62 @@ export function AnnouncementsClient({
         method: "DELETE"
       });
 
-      const payload = (await response.json()) as { data: { announcementId: string } | null; error?: { message: string } };
+      const payload = (await response.json()) as {
+        data: { announcementId: string } | null;
+        error?: { message: string };
+      };
 
       if (!response.ok || !payload.data) {
-        showToast("error", payload.error?.message ?? t('toastDeleteError'));
+        showToast("error", payload.error?.message ?? t("toastDeleteError"));
         return;
       }
 
-      setAnnouncements((current) => current.filter((a) => a.id !== announcement.id));
+      setAnnouncements((current) => current.filter((entry) => entry.id !== announcement.id));
+      if (selectedItemKey === `announcement:${announcement.id}`) {
+        setSelectedItemKey(null);
+      }
       window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-      showToast("success", t('toastDeleted'));
+      showToast("success", t("toastDeleted"));
     } catch (error) {
-      showToast(
-        "error",
-        error instanceof Error ? error.message : t('toastDeleteError')
-      );
+      showToast("error", error instanceof Error ? error.message : t("toastDeleteError"));
     } finally {
       setIsDeletingAnnouncement(false);
       setConfirmDeleteAnnouncement(null);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    const unreadAnnouncementIds = announcements
+      .filter((announcement) => !announcement.isRead)
+      .map((announcement) => announcement.id);
+
+    const [notificationsMarked, announcementResults] = await Promise.all([
+      notificationsQuery.markAllRead(),
+      Promise.all(unreadAnnouncementIds.map((announcementId) => handleMarkRead(announcementId, { silent: true })))
+    ]);
+
+    const announcementsMarked = announcementResults.every(Boolean);
+
+    window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+
+    if (notificationsMarked && announcementsMarked) {
+      showToast("success", t("toastMarkedAllRead"));
+      return;
+    }
+
+    showToast("error", t("toastMarkAllReadError"));
+  };
+
+  const handleOpenItem = (item: UnifiedItem) => {
+    setSelectedItemKey(getUnifiedItemKey(item));
+
+    if (item.source === "announcement" && !item.data.isRead) {
+      void handleMarkRead(item.data.id, { silent: true });
+      return;
+    }
+
+    if (item.source === "notification" && !item.data.isRead) {
+      void handleMarkNotificationRead(item.data.id, { silent: true });
     }
   };
 
@@ -909,7 +922,7 @@ export function AnnouncementsClient({
       const result = (await response.json()) as AnnouncementMutationResponse;
 
       if (!response.ok || !result.data?.announcement) {
-        const message = result.error?.message ?? t('toastSaveError');
+        const message = result.error?.message ?? t("toastSaveError");
         setSubmitError(message);
         showToast("error", message);
         return;
@@ -917,7 +930,6 @@ export function AnnouncementsClient({
 
       const savedAnnouncementId = result.data.announcement.id;
 
-      // Upload attachments sequentially after successful create/edit
       if (selectedFiles.length > 0) {
         for (const file of selectedFiles) {
           try {
@@ -930,22 +942,19 @@ export function AnnouncementsClient({
             );
 
             if (!uploadResponse.ok) {
-              showToast("error", t('uploadFailed'));
+              showToast("error", t("uploadFailed"));
             }
           } catch {
-            showToast("error", t('uploadFailed'));
+            showToast("error", t("uploadFailed"));
           }
         }
       }
 
-      showToast(
-        "success",
-        editingAnnouncementId ? t('toastUpdated') : t('toastPublished')
-      );
+      showToast("success", editingAnnouncementId ? t("toastUpdated") : t("toastPublished"));
       closePanel();
       refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('toastSaveError');
+      const message = error instanceof Error ? error.message : t("toastSaveError");
       setSubmitError(message);
       showToast("error", message);
     } finally {
@@ -953,33 +962,91 @@ export function AnnouncementsClient({
     }
   };
 
+  const renderAttachments = (announcement: Announcement) => {
+    if (announcement.attachments.length === 0) {
+      return null;
+    }
+
+    const imageAttachments = announcement.attachments.filter((attachment) =>
+      attachment.mimeType.startsWith("image/")
+    );
+    const fileAttachments = announcement.attachments.filter(
+      (attachment) => !attachment.mimeType.startsWith("image/")
+    );
+
+    return (
+      <section className="updates-detail-section">
+        <div className="updates-detail-section-header">
+          <h3 className="updates-detail-section-title">{t("detailsAttachments")}</h3>
+          <span className="pill numeric">{t("attachmentsCount", { count: announcement.attachments.length })}</span>
+        </div>
+        {imageAttachments.length > 0 ? (
+          <div className="att-gallery">
+            {imageAttachments.map((attachment, index) => (
+              <AnnouncementImage
+                key={attachment.id}
+                announcementId={announcement.id}
+                attachmentId={attachment.id}
+                fileName={attachment.fileName}
+                onOpen={(preloadedSrc: string) => {
+                  setLightbox({
+                    announcementId: announcement.id,
+                    images: imageAttachments.map((imageAttachment) => ({
+                      attachmentId: imageAttachment.id,
+                      fileName: imageAttachment.fileName
+                    })),
+                    activeIndex: index,
+                    initialSrc: preloadedSrc
+                  });
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
+        {fileAttachments.length > 0 ? (
+          <div className="att-files">
+            {fileAttachments.map((attachment) => (
+              <AttachmentFileChip
+                key={attachment.id}
+                announcementId={announcement.id}
+                attachmentId={attachment.id}
+                fileName={attachment.fileName}
+                mimeType={attachment.mimeType}
+              />
+            ))}
+          </div>
+        ) : null}
+      </section>
+    );
+  };
+
   return (
     <>
       <PageHeader
-        title={t('title')}
-        description={t('description')}
+        title={t("title")}
+        description={t("description")}
         actions={
           <div className="page-header-actions">
             <Link className="button" href="/announcements/archive">
               <Archive size={14} />
-              {t('archive')}
+              {t("archive")}
             </Link>
             {canManageAnnouncements ? (
               <button type="button" className="button button-accent" onClick={openCreatePanel}>
-                {t('newAnnouncement')}
+                {t("newAnnouncement")}
               </button>
             ) : null}
           </div>
         }
       />
 
-      {isLoading ? <AnnouncementsSkeleton /> : null}
+      {isLoading ? <UpdatesSkeleton /> : null}
 
       {!isLoading && errorMessage ? (
         <EmptyState
-          title={t('unavailable')}
+          title={t("unavailable")}
           description={errorMessage}
-          ctaLabel={t('retry')}
+          ctaLabel={t("retry")}
           ctaHref="/announcements"
         />
       ) : null}
@@ -987,144 +1054,377 @@ export function AnnouncementsClient({
       {!isLoading && !errorMessage && unifiedFeed.length === 0 ? (
         <>
           <EmptyState
-            icon={<Megaphone size={32} />}
-            title={t('noNotificationsTitle')}
-            description={t('noNotificationsDescription')}
+            icon={<BellRing size={32} />}
+            title={t("noNotificationsTitle")}
+            description={t("noNotificationsDescription")}
           />
           {canManageAnnouncements ? (
             <button type="button" className="button button-accent" onClick={openCreatePanel}>
-              {t('publishFirst')}
+              {t("publishFirst")}
             </button>
           ) : null}
         </>
       ) : null}
 
       {!isLoading && !errorMessage && unifiedFeed.length > 0 ? (
-        <div className="announcements-grid">
-          <section className="settings-card" aria-label={t('sectionTitle')}>
-            <header className="announcements-section-header">
-              <div>
-                <h2 className="section-title">{t('sectionTitle')}</h2>
-                <p className="settings-card-description">
-                  {t('sectionDescription')}
-                </p>
-              </div>
-              {totalUnreadCount > 0 ? (
-                <StatusBadge tone="pending">{t('unreadCount', { count: totalUnreadCount })}</StatusBadge>
-              ) : null}
-            </header>
+        <div className="updates-shell">
+          <section className="settings-card updates-brief-card" aria-label={t("briefTitle")}>
+            <div className="updates-brief-copy">
+              <span className="metric-label">{t("briefLabel")}</span>
+              <h2 className="section-title">{t("briefTitle")}</h2>
+              <p className="settings-card-description">{t("briefDescription")}</p>
+            </div>
+            <div className="page-header-actions">
+              <button type="button" className="button button-subtle" onClick={refresh}>
+                {t("refresh")}
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                disabled={totalUnreadCount === 0}
+                onClick={() => void handleMarkAllRead()}
+              >
+                <CheckCheck size={14} />
+                {t("markAllRead")}
+              </button>
+            </div>
+          </section>
 
-            <ul className="announcement-list">
-              {unifiedFeed.map((item) => {
-                if (item.source === "announcement") {
-                  return (
-                    <AnnouncementCard
-                      key={`announcement-${item.data.id}`}
-                      announcement={item.data}
-                      canManageAnnouncements={canManageAnnouncements}
-                      isSuperAdmin={isSuperAdmin}
-                      isArchiveView={false}
-                      isDismissing={Boolean(isDismissingById[item.data.id])}
-                      isMarkingRead={Boolean(isMarkingReadById[item.data.id])}
-                      onDismiss={handleDismiss}
-                      onMarkRead={handleMarkRead}
-                      onEdit={openEditPanel}
-                      onDelete={setConfirmDeleteAnnouncement}
-                      onOpenLightbox={(aId, imgs, idx, src) => setLightbox({ announcementId: aId, images: imgs, activeIndex: idx, initialSrc: src })}
-                      t={td}
-                      locale={locale}
-                    />
-                  );
-                }
+          <div className="metric-grid updates-metric-grid" aria-label={t("summaryTitle")}>
+            <article className="metric-card">
+              <span className="metric-label">{t("summaryUnreadLabel")}</span>
+              <strong className="metric-value">{totalUnreadCount}</strong>
+              <p className="metric-hint">{t("summaryUnreadHint")}</p>
+            </article>
+            <article className="metric-card">
+              <span className="metric-label">{t("summaryCompanyLabel")}</span>
+              <strong className="metric-value">{companyUpdateCount}</strong>
+              <p className="metric-hint">{t("summaryCompanyHint")}</p>
+            </article>
+            <article className="metric-card">
+              <span className="metric-label">{t("summaryAlertsLabel")}</span>
+              <strong className="metric-value">{alertCount}</strong>
+              <p className="metric-hint">{t("summaryAlertsHint")}</p>
+            </article>
+            <article className="metric-card">
+              <span className="metric-label">{t("summaryActionLabel")}</span>
+              <strong className="metric-value">{actionRequiredCount}</strong>
+              <p className="metric-hint">{t("summaryActionHint")}</p>
+            </article>
+          </div>
 
-                const notification = item.data;
-                return (
-                  <li
-                    key={`notification-${notification.id}`}
-                    className={
-                      notification.isRead
-                        ? "announcement-item"
-                        : "announcement-item announcement-item-unread"
-                    }
-                  >
-                    <article className="announcement-item-card">
-                      <header className="announcement-item-header">
-                        <div>
-                          <div className="notification-type-row">
-                            <span className="notification-type-label">
-                              {getNotificationTypeLabel(notification.type)}
-                            </span>
+          <section className="notifications-toolbar" aria-label={t("filterToolbarAriaLabel")}>
+            <div className="page-tabs">
+              <button
+                type="button"
+                className={activeFilter === "all" ? "page-tab page-tab-active" : "page-tab"}
+                onClick={() => setActiveFilter("all")}
+              >
+                {t("filterAll")}
+              </button>
+              <button
+                type="button"
+                className={activeFilter === "unread" ? "page-tab page-tab-active" : "page-tab"}
+                onClick={() => setActiveFilter("unread")}
+              >
+                {t("filterUnread")}
+                {totalUnreadCount > 0 ? <span className="page-tab-badge numeric">{totalUnreadCount}</span> : null}
+              </button>
+              <button
+                type="button"
+                className={activeFilter === "company" ? "page-tab page-tab-active" : "page-tab"}
+                onClick={() => setActiveFilter("company")}
+              >
+                {t("filterCompany")}
+              </button>
+              <button
+                type="button"
+                className={activeFilter === "alerts" ? "page-tab page-tab-active" : "page-tab"}
+                onClick={() => setActiveFilter("alerts")}
+              >
+                {t("filterAlerts")}
+              </button>
+              <button
+                type="button"
+                className={activeFilter === "actionRequired" ? "page-tab page-tab-active" : "page-tab"}
+                onClick={() => setActiveFilter("actionRequired")}
+              >
+                {t("filterActionRequired")}
+                {actionRequiredCount > 0 ? <span className="page-tab-badge numeric">{actionRequiredCount}</span> : null}
+              </button>
+            </div>
+          </section>
+
+          <div className="updates-layout">
+            <section className="settings-card updates-feed-card" aria-label={t("sectionTitle")}>
+              <header className="updates-feed-header">
+                <div>
+                  <h2 className="section-title">{t("sectionTitle")}</h2>
+                  <p className="settings-card-description">{t("sectionDescription")}</p>
+                </div>
+                <StatusBadge tone={totalUnreadCount > 0 ? "pending" : "success"}>
+                  {totalUnreadCount > 0 ? t("unreadCount", { count: totalUnreadCount }) : t("allCaughtUp")}
+                </StatusBadge>
+              </header>
+
+              {filteredFeed.length === 0 ? (
+                <EmptyState
+                  icon={<Sparkles size={28} />}
+                  title={t("emptyFilterTitle")}
+                  description={t("emptyFilterDescription")}
+                />
+              ) : (
+                <ul className="updates-feed-list">
+                  {filteredFeed.map((item) => {
+                    const announcement = item.source === "announcement" ? item.data : null;
+                    const notification = item.source === "notification" ? item.data : null;
+                    const sourceLabel =
+                      item.source === "announcement" ? t("sourceCompanyUpdate") : t("sourceWorkflowAlert");
+
+                    return (
+                      <li key={getUnifiedItemKey(item)}>
+                        <button
+                          type="button"
+                          className={[
+                            "updates-feed-item",
+                            !item.data.isRead ? "updates-feed-item-unread" : "",
+                            selectedItemKey === getUnifiedItemKey(item) ? "updates-feed-item-active" : "",
+                            announcement?.isPinned ? "updates-feed-item-pinned" : ""
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          onClick={() => handleOpenItem(item)}
+                        >
+                          <div className="updates-feed-item-top">
+                            <div className="updates-feed-item-badges">
+                              <span className="updates-source-chip">
+                                {item.source === "announcement" ? <Megaphone size={14} /> : <BellRing size={14} />}
+                                {sourceLabel}
+                              </span>
+                              {announcement?.isPinned ? (
+                                <span className="updates-source-chip updates-source-chip-muted">
+                                  <Pin size={12} />
+                                  {t("pinned")}
+                                </span>
+                              ) : null}
+                              {notification && (notification.actions?.length ?? 0) > 0 ? (
+                                <span className="updates-source-chip updates-source-chip-attention">
+                                  {t("needsAction")}
+                                </span>
+                              ) : null}
+                            </div>
+                            {item.data.isRead ? (
+                              <span className="announcement-read-check" title={t("read")}>
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                  <path
+                                    d="M5 12.5l4.5 4.5L19 7.5"
+                                    stroke="currentColor"
+                                    strokeWidth="1.8"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    fill="none"
+                                  />
+                                </svg>
+                                {t("read")}
+                              </span>
+                            ) : (
+                              <StatusBadge tone="pending">{t("unread")}</StatusBadge>
+                            )}
                           </div>
-                          <h3 className="announcement-item-title">{notification.title}</h3>
-                          <p className="announcement-item-meta">
-                            <time
-                              dateTime={notification.createdAt}
-                              title={formatDateTimeTooltip(notification.createdAt, locale)}
+
+                          <div className="updates-feed-item-copy">
+                            <h3 className="updates-feed-item-title">{item.data.title}</h3>
+                            <p className="updates-feed-item-body">{item.data.body}</p>
+                          </div>
+
+                          <div className="updates-feed-item-meta">
+                            <span
+                              className="updates-feed-item-time"
+                              title={formatDateTimeTooltip(item.data.createdAt, locale)}
                             >
-                              {formatRelativeTime(notification.createdAt, locale)}
-                            </time>
-                          </p>
-                        </div>
-                        <div className="announcement-item-status">
-                          {notification.isRead ? (
-                            <span className="announcement-read-check" title={t('read')}>
-                              <svg viewBox="0 0 24 24" aria-hidden="true">
-                                <path
-                                  d="M5 12.5l4.5 4.5L19 7.5"
-                                  stroke="currentColor"
-                                  strokeWidth="1.8"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  fill="none"
-                                />
-                              </svg>
-                              {t('read')}
+                              {formatRelativeTime(item.data.createdAt, locale)}
                             </span>
-                          ) : (
-                            <StatusBadge tone="pending">{t('unread')}</StatusBadge>
-                          )}
-                        </div>
-                      </header>
-                      <p className="announcement-item-body">{notification.body}</p>
-                      <div className="announcement-row-actions">
-                        {!notification.isRead ? (
+                            {announcement ? <span>{announcement.creatorName}</span> : null}
+                            {notification ? <span>{getNotificationTypeLabel(notification.type)}</span> : null}
+                            {announcement && announcement.attachments.length > 0 ? (
+                              <span>{t("attachmentsCount", { count: announcement.attachments.length })}</span>
+                            ) : null}
+                            {notification && (notification.actions?.length ?? 0) > 0 ? (
+                              <span>{t("actionCount", { count: notification.actions?.length ?? 0 })}</span>
+                            ) : null}
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <aside className="settings-card updates-focus-card" aria-label={t("detailsTitle")}>
+              {selectedItem ? (
+                <div className="updates-focus-panel">
+                  <div className="updates-focus-header">
+                    <div className="updates-feed-item-badges">
+                      <span className="updates-source-chip">
+                        {selectedItem.source === "announcement" ? <Megaphone size={14} /> : <BellRing size={14} />}
+                        {selectedItem.source === "announcement"
+                          ? t("sourceCompanyUpdate")
+                          : t("sourceWorkflowAlert")}
+                      </span>
+                      {selectedItem.source === "announcement" && selectedItem.data.isPinned ? (
+                        <span className="updates-source-chip updates-source-chip-muted">
+                          <Pin size={12} />
+                          {t("pinned")}
+                        </span>
+                      ) : null}
+                      {selectedItem.source === "notification" &&
+                      (selectedItem.data.actions?.length ?? 0) > 0 ? (
+                        <span className="updates-source-chip updates-source-chip-attention">
+                          {t("needsAction")}
+                        </span>
+                      ) : null}
+                    </div>
+                    {selectedItem.data.isRead ? (
+                      <StatusBadge tone="success">{t("read")}</StatusBadge>
+                    ) : (
+                      <StatusBadge tone="pending">{t("unread")}</StatusBadge>
+                    )}
+                  </div>
+
+                  <div className="updates-focus-body">
+                    <div className="updates-focus-copy">
+                      <h2 className="updates-focus-title">{selectedItem.data.title}</h2>
+                      <p className="updates-focus-meta">
+                        <time
+                          dateTime={selectedItem.data.createdAt}
+                          title={formatDateTimeTooltip(selectedItem.data.createdAt, locale)}
+                        >
+                          {formatRelativeTime(selectedItem.data.createdAt, locale)}
+                        </time>
+                        {selectedItem.source === "announcement" ? (
+                          <>
+                            <span aria-hidden="true">&bull;</span>
+                            <span>{selectedItem.data.creatorName}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span aria-hidden="true">&bull;</span>
+                            <span>{getNotificationTypeLabel(selectedItem.data.type)}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="updates-detail-section">
+                      <p className="updates-focus-text">{selectedItem.data.body}</p>
+                    </div>
+
+                    {selectedItem.source === "announcement" ? renderAttachments(selectedItem.data) : null}
+
+                    <section className="updates-detail-section">
+                      <div className="updates-detail-section-header">
+                        <h3 className="updates-detail-section-title">{t("detailsActionsTitle")}</h3>
+                      </div>
+                      <div className="updates-detail-actions">
+                        {!selectedItem.data.isRead ? (
                           <button
                             type="button"
-                            className="table-row-action"
+                            className="button button-subtle"
+                            disabled={Boolean(isMarkingReadById[selectedItem.data.id])}
                             onClick={() => {
-                              void notificationsQuery.markRead(notification.id).then(() => {
-                                window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
-                              });
+                              if (selectedItem.source === "announcement") {
+                                void handleMarkRead(selectedItem.data.id);
+                              } else {
+                                void handleMarkNotificationRead(selectedItem.data.id);
+                              }
                             }}
                           >
-                            {t('markRead')}
+                            {Boolean(isMarkingReadById[selectedItem.data.id]) ? t("markingRead") : t("markRead")}
                           </button>
                         ) : null}
-                        {notification.link ? (
-                          <Link href={notification.link} className="table-row-action">
-                            {t('view')}
-                          </Link>
-                        ) : null}
+
+                        {selectedItem.source === "announcement" ? (
+                          <>
+                            {!selectedItem.data.isDismissed ? (
+                              <button
+                                type="button"
+                                className="button button-subtle"
+                                disabled={Boolean(isDismissingById[selectedItem.data.id])}
+                                onClick={() => void handleDismiss(selectedItem.data.id)}
+                              >
+                                {Boolean(isDismissingById[selectedItem.data.id]) ? t("dismissing") : t("dismiss")}
+                              </button>
+                            ) : null}
+                            {canManageAnnouncements ? (
+                              <button
+                                type="button"
+                                className="button button-subtle"
+                                onClick={() => openEditPanel(selectedItem.data)}
+                              >
+                                {t("edit")}
+                              </button>
+                            ) : null}
+                            {isSuperAdmin ? (
+                              <button
+                                type="button"
+                                className="button button-danger"
+                                onClick={() => setConfirmDeleteAnnouncement(selectedItem.data)}
+                              >
+                                {t("delete")}
+                              </button>
+                            ) : null}
+                          </>
+                        ) : (
+                          <>
+                            {selectedItem.data.link ? (
+                              <Link href={selectedItem.data.link} className="button button-accent">
+                                <ArrowUpRight size={14} />
+                                {t("openLinkedRecord")}
+                              </Link>
+                            ) : null}
+                            {selectedItem.data.actions && selectedItem.data.actions.length > 0 ? (
+                              <div className="updates-detail-notification-actions">
+                                {selectedItem.data.actions.map((action) => (
+                                  <NotificationActionButton
+                                    key={`${selectedItem.data.id}-${action.label}`}
+                                    action={action}
+                                    onComplete={() => {
+                                      notificationsQuery.refresh();
+                                      window.dispatchEvent(new CustomEvent("crew-hub:badge-refresh"));
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                            ) : null}
+                          </>
+                        )}
                       </div>
-                    </article>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+                    </section>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<Sparkles size={28} />}
+                  title={t("detailsEmptyTitle")}
+                  description={t("detailsEmptyDescription")}
+                />
+              )}
+            </aside>
+          </div>
         </div>
       ) : null}
 
       <SlidePanel
         isOpen={isPanelOpen}
         onClose={closePanel}
-        title={editingAnnouncementId ? t('editPanelTitle') : t('createPanelTitle')}
-        description={t('panelDescription', { name: currentUserName })}
+        title={editingAnnouncementId ? t("editPanelTitle") : t("createPanelTitle")}
+        description={t("panelDescription", { name: currentUserName })}
       >
         <div className="slide-panel-form-wrapper">
           <form className="settings-form" noValidate onSubmit={handleSubmit}>
             <label className="form-field" htmlFor="announcement-title">
-              <span className="form-label">{t('titleLabel')}</span>
+              <span className="form-label">{t("titleLabel")}</span>
               <input
                 id="announcement-title"
                 name="title"
@@ -1145,7 +1445,7 @@ export function AnnouncementsClient({
             </label>
 
             <label className="form-field" htmlFor="announcement-body">
-              <span className="form-label">{t('bodyLabel')}</span>
+              <span className="form-label">{t("bodyLabel")}</span>
               <textarea
                 id="announcement-body"
                 name="body"
@@ -1174,38 +1474,31 @@ export function AnnouncementsClient({
                 onChange={handlePinnedToggle}
                 disabled={isSaving}
               />
-              <span>{t('pinLabel')}</span>
+              <span>{t("pinLabel")}</span>
             </label>
 
             <div className="form-field">
-              <label className="form-label" htmlFor="announcement-attachments">
-                {t('attachmentsLabel')}
-              </label>
+              <span className="form-label">{t("attachmentsLabel")}</span>
+              <p className="settings-card-description">{t("attachmentsHint")}</p>
               <input
-                id="announcement-attachments"
                 type="file"
-                className="form-input"
-                accept={ACCEPTED_FILE_TYPES}
                 multiple
+                accept={ACCEPTED_FILE_TYPES}
                 onChange={handleFilesSelected}
                 disabled={isSaving}
               />
-              <p className="form-hint">{t('attachmentsHint')}</p>
               {selectedFiles.length > 0 ? (
-                <ul className="attachment-list">
+                <ul className="attachment-upload-list">
                   {selectedFiles.map((file, index) => (
-                    <li key={`${file.name}-${index}`} className="attachment-list-item">
-                      <Paperclip size={14} aria-hidden="true" />
-                      <span className="attachment-file-name">{file.name}</span>
+                    <li key={`${file.name}-${index}`} className="attachment-upload-item">
+                      <span>{file.name}</span>
                       <button
                         type="button"
-                        className="button button-ghost attachment-remove-button"
+                        className="table-row-action"
                         onClick={() => handleRemoveFile(index)}
                         disabled={isSaving}
-                        aria-label={`${t('removeAttachment')}: ${file.name}`}
                       >
-                        <X size={14} />
-                        {t('removeAttachment')}
+                        {t("removeAttachment")}
                       </button>
                     </li>
                   ))}
@@ -1220,15 +1513,15 @@ export function AnnouncementsClient({
             ) : null}
 
             <div className="slide-panel-actions">
-              <button type="button" className="button" onClick={closePanel} disabled={isSaving}>
-                {tCommon('cancel')}
+              <button type="button" className="button button-subtle" onClick={closePanel} disabled={isSaving}>
+                {tCommon("cancel")}
               </button>
               <button type="submit" className="button button-accent" disabled={isSaving}>
                 {isSaving
-                  ? t('saving')
+                  ? t("saving")
                   : editingAnnouncementId
-                    ? t('saveChanges')
-                    : t('publishAnnouncement')}
+                    ? t("saveChanges")
+                    : t("publishAnnouncement")}
               </button>
             </div>
           </form>
@@ -1237,50 +1530,35 @@ export function AnnouncementsClient({
 
       <ConfirmDialog
         isOpen={confirmDeleteAnnouncement !== null}
-        title={t('deleteConfirmTitle')}
-        description={t('deleteConfirmDescription', { title: confirmDeleteAnnouncement?.title ?? "" })}
-        confirmLabel={t('deleteConfirmLabel')}
+        title={t("deleteConfirmTitle")}
+        description={
+          confirmDeleteAnnouncement
+            ? t("deleteConfirmDescription", { title: confirmDeleteAnnouncement.title })
+            : ""
+        }
+        confirmLabel={t("deleteConfirmLabel")}
         tone="danger"
         isConfirming={isDeletingAnnouncement}
-        onConfirm={() => {
-          if (confirmDeleteAnnouncement) {
-            void handleDeleteAnnouncement(confirmDeleteAnnouncement);
-          }
-        }}
+        onConfirm={() =>
+          confirmDeleteAnnouncement ? handleDeleteAnnouncement(confirmDeleteAnnouncement) : Promise.resolve()
+        }
         onCancel={() => setConfirmDeleteAnnouncement(null)}
       />
 
-      {lightbox ? (
-        <ImageLightbox
-          key={`${lightbox.announcementId}-${lightbox.images[lightbox.activeIndex]?.attachmentId}`}
-          data={lightbox}
-          onClose={() => setLightbox(null)}
-        />
-      ) : null}
+      {lightbox ? <ImageLightbox data={lightbox} onClose={() => setLightbox(null)} /> : null}
 
       {toasts.length > 0 ? (
-        <div className="toast-region" aria-live="polite" aria-atomic="true">
+        <div className="toast-stack" role="status" aria-live="polite">
           {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className={`toast-message toast-message-${toast.variant}`}
-              role="status"
-            >
-              <span>{toast.message}</span>
+            <div key={toast.id} className={`toast toast-${toast.variant}`}>
+              <p>{toast.message}</p>
               <button
                 type="button"
-                className="toast-dismiss"
+                className="icon-button"
+                aria-label={t("dismissAriaLabel")}
                 onClick={() => dismissToast(toast.id)}
-                aria-label={t('dismissAriaLabel')}
               >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M6 6l12 12M18 6L6 18"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <X size={16} aria-hidden="true" />
               </button>
             </div>
           ))}

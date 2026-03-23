@@ -190,7 +190,7 @@ export function NotificationCenter() {
 
       browserNotification.onclick = () => {
         window.focus();
-        window.location.href = notification.link ?? "/notifications";
+        window.location.href = notification.link ?? "/announcements";
         browserNotification.close();
       };
 
@@ -228,7 +228,7 @@ export function NotificationCenter() {
         source: "notification",
         title: n.title,
         body: n.body,
-        link: n.link ?? "/notifications",
+        link: n.link ?? "/announcements",
         createdAt: n.createdAt,
         isRead: n.isRead,
         actions: n.actions ?? []
@@ -266,7 +266,7 @@ export function NotificationCenter() {
     );
 
     return items;
-  }, [notifications.data?.notifications, announcements, optimisticDismissals]);
+  }, [notifications.data?.notifications, announcements, optimisticDismissals, t]);
 
   const totalCount = feedItems.length;
   const visibleItems = feedItems.slice(0, PREVIEW_LIMIT);

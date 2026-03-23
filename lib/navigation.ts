@@ -59,11 +59,11 @@ export const NAV_GROUPS: NavGroup[] = [
         shortcut: "G H"
       },
       {
-        label: "Announcements",
+        label: "Updates",
         labelKey: "announcements",
         href: "/announcements",
         icon: "Megaphone",
-        description: "Company announcements and updates",
+        description: "Announcements, alerts, and workflow updates in one inbox",
         shortcut: "G C"
       },
       {
