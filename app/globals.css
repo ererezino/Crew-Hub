@@ -10686,7 +10686,7 @@ button.att-img-link {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-default);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  z-index: 50;
+  z-index: 200;
   min-width: var(--radix-select-trigger-width);
   max-height: var(--radix-select-content-available-height, 320px);
 }
