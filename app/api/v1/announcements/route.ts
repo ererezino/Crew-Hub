@@ -29,8 +29,23 @@ const announcementRowSchema = z.object({
   is_pinned: z.boolean(),
   created_by: z.string().uuid(),
   created_at: z.string(),
-  updated_at: z.string()
+  updated_at: z.string(),
+  source: z.enum(["user", "system"]).default("user")
 });
+
+// Auto-generated announcements (leave start, holidays, birthdays) are attributed to "Operations"
+// rather than the super admin whose ID we store on created_by.
+const SYSTEM_AUTHOR_NAME = "Operations";
+
+function resolveCreatorName(
+  row: { created_by: string; source: "user" | "system" },
+  creatorNameById: ReadonlyMap<string, string>
+): string {
+  if (row.source === "system") {
+    return SYSTEM_AUTHOR_NAME;
+  }
+  return creatorNameById.get(row.created_by) ?? "Unknown user";
+}
 
 const profileRowSchema = z.object({
   id: z.string().uuid(),
@@ -81,7 +96,7 @@ function toAnnouncement(
     body: row.body,
     isPinned: row.is_pinned,
     createdBy: row.created_by,
-    creatorName: creatorNameById.get(row.created_by) ?? "Unknown user",
+    creatorName: resolveCreatorName(row, creatorNameById),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     isRead: Boolean(readAt),
@@ -128,7 +143,7 @@ export async function GET(request: Request) {
 
   let announcementsQuery = supabase
     .from("announcements")
-    .select("id, title, body, is_pinned, created_by, created_at, updated_at")
+    .select("id, title, body, is_pinned, created_by, created_at, updated_at, source")
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .order("is_pinned", { ascending: false })
@@ -363,7 +378,7 @@ export async function POST(request: Request) {
       is_pinned: parsedBody.data.isPinned,
       created_by: profile.id
     })
-    .select("id, title, body, is_pinned, created_by, created_at, updated_at")
+    .select("id, title, body, is_pinned, created_by, created_at, updated_at, source")
     .single();
 
   if (insertError || !insertedAnnouncement) {

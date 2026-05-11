@@ -139,7 +139,7 @@ export async function GET(request: Request) {
 
       if (existing && existing.length > 0) continue;
 
-      // Create the announcement (visible to everyone)
+      // Create the announcement (visible to everyone, attributed to Operations)
       const { data: announcement, error: insertError } = await supabase
         .from("announcements")
         .insert({
@@ -148,6 +148,7 @@ export async function GET(request: Request) {
           body,
           is_pinned: false,
           created_by: creatorId,
+          source: "system",
         })
         .select("id")
         .single();
