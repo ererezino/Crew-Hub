@@ -29,8 +29,12 @@ const announcementRowSchema = z.object({
   is_pinned: z.boolean(),
   created_by: z.string().uuid(),
   created_at: z.string(),
-  updated_at: z.string()
+  updated_at: z.string(),
+  source: z.enum(["user", "system"]).default("user")
 });
+
+// Auto-generated announcements display as authored by Operations, not whoever's UUID is on created_by.
+const SYSTEM_AUTHOR_NAME = "Operations";
 
 const readRowSchema = z.object({
   read_at: z.string()
@@ -189,7 +193,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     .eq("id", announcementId)
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
-    .select("id, title, body, is_pinned, created_by, created_at, updated_at")
+    .select("id, title, body, is_pinned, created_by, created_at, updated_at, source")
     .single();
 
   if (updateError || !updatedAnnouncement) {
@@ -229,7 +233,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   const creatorId = parsedAnnouncement.data.created_by;
   let creatorName = "Unknown user";
 
-  if (creatorId === session.profile.id) {
+  if (parsedAnnouncement.data.source === "system") {
+    creatorName = SYSTEM_AUTHOR_NAME;
+  } else if (creatorId === session.profile.id) {
     creatorName = profile.full_name;
   } else {
     const { data: creatorRow } = await supabase

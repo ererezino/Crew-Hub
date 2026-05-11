@@ -189,7 +189,8 @@ export async function GET(request: Request) {
               title: announcementTitle,
               body: announcementBody,
               is_pinned: false,
-              created_by: creatorId
+              created_by: creatorId,
+              source: "system"
             })
             .select("id")
             .single();

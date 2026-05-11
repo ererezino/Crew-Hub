@@ -41,4 +41,17 @@ describe("time-off policy guardrails", () => {
     expect(source).toContain("leave-reminder:2:");
     expect(source).toContain("getTeamRecipientIds");
   });
+
+  it("attributes cron-created announcements to Operations via source='system'", () => {
+    const leaveCron = read("app/api/cron/leave-announcements/route.ts");
+    const holidayCron = read("app/api/cron/holiday-announcements/route.ts");
+    const birthdayCron = read("app/api/cron/birthday-leave/route.ts");
+    const announcementsApi = read("app/api/v1/announcements/route.ts");
+
+    expect(leaveCron).toContain('source: "system"');
+    expect(holidayCron).toContain('source: "system"');
+    expect(birthdayCron).toContain('source: "system"');
+    expect(announcementsApi).toContain('SYSTEM_AUTHOR_NAME = "Operations"');
+    expect(announcementsApi).toContain('row.source === "system"');
+  });
 });
