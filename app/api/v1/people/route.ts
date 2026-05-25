@@ -108,7 +108,7 @@ function resolveAuthRedirectUrl(request: Request): string {
 }
 
 function canManagePeople(userRoles: readonly UserRole[]): boolean {
-  return hasRole(userRoles, "SUPER_ADMIN");
+  return hasRole(userRoles, "SUPER_ADMIN") || hasRole(userRoles, "HR_ADMIN");
 }
 
 function normalizeCountryCode(value: string | undefined): string | null {
@@ -211,7 +211,7 @@ export async function POST(request: Request) {
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only Super Admin users can add people."
+        message: "Only Super Admin and HR Admin users can add people."
       },
       meta: buildMeta()
     });
