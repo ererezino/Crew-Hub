@@ -21420,3 +21420,14 @@ html.dark .crew-games-platform-game:hover {
   border: 1px solid var(--color-border, #2a2f3a); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 0.8rem;
 }
 .schedule-grid-note-input:focus { outline: none; border-color: var(--color-accent, #f5870a); }
+
+/* Grid: add-slot control + on-leave flag */
+.schedule-grid-slot-add { margin: calc(var(--space-2) * -1) 0 var(--space-1); }
+.schedule-grid-slot-form { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.schedule-grid-slot-form .form-input { width: auto; }
+.schedule-grid-slot-form input[type="time"] { min-width: 110px; }
+.schedule-grid-chip.is-on-leave { opacity: 0.55; }
+.schedule-grid-leave-tag {
+  margin-left: 6px; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.03em;
+  color: var(--color-warning, #c47d00); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; white-space: nowrap;
+}

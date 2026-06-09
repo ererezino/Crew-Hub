@@ -374,7 +374,14 @@
       "copyWeek": "Copier la semaine précédente",
       "copying": "Copie…",
       "copyWeekDone": "{count, plural, one {# affectation copiée} other {# affectations copiées}} depuis la semaine précédente.",
-      "copyWeekEmpty": "Rien à copier de la semaine précédente."
+      "copyWeekEmpty": "Rien à copier de la semaine précédente.",
+      "addSlot": "Ajouter un type de quart",
+      "slotNamePlaceholder": "Nom du quart (ex. : Quart du matin)",
+      "slotAddConfirm": "Ajouter la colonne",
+      "slotInvalid": "Saisissez un nom et une heure de début/fin valide.",
+      "slotExists": "Ce type de quart existe déjà.",
+      "onLeaveTag": "en congé",
+      "onLeaveTooltip": "Ce membre a un congé approuvé pendant cette semaine."
     },
     "track": {
       "weekday": "Semaine",

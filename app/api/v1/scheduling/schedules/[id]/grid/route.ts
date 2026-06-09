@@ -100,6 +100,58 @@ function timesMatchSlot(
   return extractIsoTime(rowStart) === slotStart && extractIsoTime(rowEnd) === slotEnd;
 }
 
+/**
+ * Returns approved time off overlapping this schedule's date range, so the grid can flag
+ * who's away that week. Scoped to the org and the schedule's range — independent of the
+ * viewer's own department (which is what made team-availability the wrong source here).
+ */
+export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const session = await getAuthenticatedSession();
+  if (!session?.profile) {
+    return jsonResponse<null>(401, { data: null, error: { code: "UNAUTHORIZED", message: "You must be logged in." }, meta: buildMeta() });
+  }
+  if (!(await checkApiAccess("/scheduling", session.profile)) || !isSchedulingManager(session.profile.roles)) {
+    return jsonResponse<null>(403, { data: null, error: { code: "FORBIDDEN", message: "You do not have access to scheduling." }, meta: buildMeta() });
+  }
+
+  const { id: scheduleId } = await context.params;
+  if (!z.string().uuid().safeParse(scheduleId).success) {
+    return jsonResponse<null>(422, { data: null, error: { code: "VALIDATION_ERROR", message: "Schedule id must be a valid UUID." }, meta: buildMeta() });
+  }
+
+  const supabase = createSupabaseServiceRoleClient();
+  const { data: scheduleRaw } = await supabase
+    .from("schedules")
+    .select("id, start_date, end_date")
+    .eq("id", scheduleId)
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!scheduleRaw?.start_date || !scheduleRaw?.end_date) {
+    return jsonResponse<null>(404, { data: null, error: { code: "SCHEDULE_NOT_FOUND", message: "Schedule was not found." }, meta: buildMeta() });
+  }
+
+  const { data: leaveRows } = await supabase
+    .from("leave_requests")
+    .select("employee_id, start_date, end_date")
+    .eq("org_id", session.profile.org_id)
+    .eq("status", "approved")
+    .lte("start_date", scheduleRaw.end_date)
+    .gte("end_date", scheduleRaw.start_date)
+    .is("deleted_at", null);
+
+  const leave = (leaveRows ?? [])
+    .filter((r) => typeof r.employee_id === "string" && typeof r.start_date === "string" && typeof r.end_date === "string")
+    .map((r) => ({ employeeId: r.employee_id as string, start: r.start_date as string, end: r.end_date as string }));
+
+  return jsonResponse<{ leave: Array<{ employeeId: string; start: string; end: string }> }>(200, {
+    data: { leave },
+    error: null,
+    meta: buildMeta()
+  });
+}
+
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await getAuthenticatedSession();
 

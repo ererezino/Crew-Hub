@@ -116,6 +116,12 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
   const [addTarget, setAddTarget] = useState<string | null>(null); // `${weekIndex}:${slotKey}`
   const [notes, setNotes] = useState<Map<string, string>>(new Map()); // weekStart -> note
   const [copyingWeek, setCopyingWeek] = useState<string | null>(null);
+  const [leaveByEmployee, setLeaveByEmployee] = useState<Map<string, Array<{ start: string; end: string }>>>(new Map());
+  const [extraSlots, setExtraSlots] = useState<Slot[]>([]);
+  const [addingSlot, setAddingSlot] = useState(false);
+  const [newSlotName, setNewSlotName] = useState("");
+  const [newSlotStart, setNewSlotStart] = useState("08:00");
+  const [newSlotEnd, setNewSlotEnd] = useState("16:00");
 
   const addToast = useCallback((type: ToastMessage["type"], text: string) => {
     const id = ++toastSeq;
@@ -143,6 +149,33 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       cancelled = true;
     };
   }, [scheduleId]);
+
+  // Load approved leave across the schedule range (org-scoped to the schedule's crew),
+  // so we can flag who's away that week.
+  useEffect(() => {
+    if (!scheduleId) {
+      setLeaveByEmployee(new Map());
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/v1/scheduling/schedules/${scheduleId}/grid`)
+      .then((r) => r.json())
+      .then((payload) => {
+        if (cancelled) return;
+        const list: Array<{ employeeId: string; start: string; end: string }> = payload?.data?.leave ?? [];
+        const map = new Map<string, Array<{ start: string; end: string }>>();
+        for (const item of list) {
+          const arr = map.get(item.employeeId) ?? [];
+          arr.push({ start: item.start, end: item.end });
+          map.set(item.employeeId, arr);
+        }
+        setLeaveByEmployee(map);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [scheduleId, shifts]);
 
   const saveNote = useCallback(
     async (weekStart: string, note: string) => {
@@ -208,9 +241,24 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         map.set(key, { key, name, startTime: start, endTime: end });
       }
     }
+    // Merge in any slot columns the user added manually but hasn't filled yet.
+    for (const slot of extraSlots) {
+      if (!map.has(slot.key)) map.set(slot.key, slot);
+    }
     if (map.size === 0) return DEFAULT_SLOTS;
     return [...map.values()].sort((a, b) => a.startTime.localeCompare(b.startTime));
-  }, [shifts]);
+  }, [shifts, extraSlots]);
+
+  const isOnLeaveWeek = useCallback(
+    (employeeId: string, week: WeekRow): boolean => {
+      const intervals = leaveByEmployee.get(employeeId);
+      if (!intervals || week.rangeDates.length === 0) return false;
+      const weekStart = week.rangeDates[0]!;
+      const weekEnd = week.rangeDates[week.rangeDates.length - 1]!;
+      return intervals.some((iv) => iv.start <= weekEnd && iv.end >= weekStart);
+    },
+    [leaveByEmployee]
+  );
 
   // ---- Build cells: week × slot -> people with weekdays worked ----
   const cells = useMemo(() => {
@@ -331,6 +379,23 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
     [activeSchedule, weeks, slots, cells, shiftsQuery, addToast, t]
   );
 
+  const handleAddSlot = useCallback(() => {
+    const name = newSlotName.trim();
+    const timeOk = /^([01]\d|2[0-3]):[0-5]\d$/.test(newSlotStart) && /^([01]\d|2[0-3]):[0-5]\d$/.test(newSlotEnd);
+    if (!name || !timeOk || newSlotStart === newSlotEnd) {
+      addToast("error", t("grid.slotInvalid"));
+      return;
+    }
+    const key = slotKeyOf(newSlotStart, newSlotEnd);
+    if (slots.some((s) => s.key === key)) {
+      addToast("info", t("grid.slotExists"));
+    } else {
+      setExtraSlots((cur) => [...cur, { key, name, startTime: newSlotStart, endTime: newSlotEnd }]);
+    }
+    setNewSlotName("");
+    setAddingSlot(false);
+  }, [newSlotName, newSlotStart, newSlotEnd, slots, addToast, t]);
+
   if (schedulesQuery.isLoading) {
     return (
       <section className="compensation-layout">
@@ -373,6 +438,33 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       </div>
 
       <p className="settings-card-description">{t("grid.helpText")}</p>
+
+      <div className="schedule-grid-slot-add">
+        {addingSlot ? (
+          <div className="schedule-grid-slot-form">
+            <input
+              className="form-input"
+              placeholder={t("grid.slotNamePlaceholder")}
+              value={newSlotName}
+              onChange={(e) => setNewSlotName(e.target.value)}
+              maxLength={120}
+            />
+            <input type="time" className="form-input" value={newSlotStart} onChange={(e) => setNewSlotStart(e.target.value)} />
+            <span>–</span>
+            <input type="time" className="form-input" value={newSlotEnd} onChange={(e) => setNewSlotEnd(e.target.value)} />
+            <button type="button" className="button button-accent button-xs" onClick={handleAddSlot}>
+              {t("grid.slotAddConfirm")}
+            </button>
+            <button type="button" className="button button-subtle button-xs" onClick={() => setAddingSlot(false)}>
+              {tc("cancel")}
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="schedule-grid-add" style={{ width: "auto" }} onClick={() => setAddingSlot(true)}>
+            + {t("grid.addSlot")}
+          </button>
+        )}
+      </div>
 
       {shiftsQuery.isLoading ? (
         <div className="table-skeleton">
@@ -420,10 +512,17 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                       <td key={slot.key} className="schedule-grid-cell">
                         {people && people.size > 0 ? (
                           <ul className="schedule-grid-people">
-                            {[...people.values()].map((person) => (
-                              <li key={person.employeeId} className="schedule-grid-chip">
+                            {[...people.values()].map((person) => {
+                              const onLeave = isOnLeaveWeek(person.employeeId, week);
+                              return (
+                              <li
+                                key={person.employeeId}
+                                className={`schedule-grid-chip${onLeave ? " is-on-leave" : ""}`}
+                                title={onLeave ? t("grid.onLeaveTooltip") : undefined}
+                              >
                                 <span className="schedule-grid-chip-name">
                                   {rosterById.get(person.employeeId) ?? person.name}
+                                  {onLeave ? <span className="schedule-grid-leave-tag">{t("grid.onLeaveTag")}</span> : null}
                                 </span>
                                 <span className="schedule-grid-days">
                                   {week.rangeWeekdays.map((wd) => {
@@ -458,7 +557,8 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                                   ×
                                 </button>
                               </li>
-                            ))}
+                              );
+                            })}
                           </ul>
                         ) : null}
 
@@ -477,7 +577,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                               <SelectContent>
                                 {available.map((p) => (
                                   <SelectItem key={p.id} value={p.id}>
-                                    {p.fullName}
+                                    {isOnLeaveWeek(p.id, week) ? `${p.fullName} · ${t("grid.onLeaveTag")}` : p.fullName}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

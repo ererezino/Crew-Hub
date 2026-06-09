@@ -377,7 +377,14 @@
       "copyWeek": "Copy last week",
       "copying": "Copying…",
       "copyWeekDone": "Copied {count, plural, one {# assignment} other {# assignments}} from last week.",
-      "copyWeekEmpty": "Nothing to copy from last week."
+      "copyWeekEmpty": "Nothing to copy from last week.",
+      "addSlot": "Add shift type",
+      "slotNamePlaceholder": "Shift name (e.g. Morning Shift)",
+      "slotAddConfirm": "Add column",
+      "slotInvalid": "Enter a name and a valid start/end time.",
+      "slotExists": "That shift type already exists.",
+      "onLeaveTag": "on leave",
+      "onLeaveTooltip": "This crew member has approved time off during this week."
     },
     "track": {
       "weekday": "Weekday",
