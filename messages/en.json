@@ -484,7 +484,9 @@
       "allPublishedSummary": "All published schedules",
       "dragHelper": "Drag and drop any shift to a new day to reschedule it.",
       "scheduleLabel": "Schedule",
-      "scheduleDateRange": "{name}: {startDate} to {endDate}"
+      "scheduleDateRange": "{name}: {startDate} to {endDate}",
+      "addShift": "Add shift",
+      "addShiftOnDay": "Add shift on {date}"
     },
     "myCalendar": {
       "dayMon": "Mon",
@@ -626,6 +628,15 @@
       "save": "Save Changes",
       "validationRequired": "Date and time are required.",
       "validationTimeRange": "Start time and end time cannot be identical."
+    },
+    "shiftCreateModal": {
+      "title": "Add Shift",
+      "description": "Add a new shift to this schedule.",
+      "save": "Add Shift"
+    },
+    "shiftCreate": {
+      "toastSuccess": "Shift added successfully.",
+      "toastError": "Unable to add shift."
     }
   },
   "dashboard": {

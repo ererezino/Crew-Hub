@@ -6,7 +6,10 @@
  *  - Weekend dates: "weekend_primary" (full Sat+Sun), "weekend_rotation" (evenly distributed), "flexible"
  *  - If `respectEmployeeScheduleType` is false, selected roster members are all eligible
  *  - Blocked dates (approved leave, holidays) are skipped
- *  - No back-to-back close+open (ending >= 21:00 blocks next-day start <= 09:00)
+ *  - Weekend-boundary rest rule: an evening/closing shift (ending >= 21:00) blocks
+ *    the same person from the next day's morning shift (start <= 09:00) ONLY when
+ *    that morning falls on a Saturday, Sunday or Monday. Weekday mornings are not
+ *    restricted, since crew typically repeat the same shift Mon–Fri.
  *  - Hours balanced within 10% across employees
  *  - Randomised to avoid predictable patterns
  */
@@ -104,7 +107,24 @@ function shuffle<T>(array: T[]): T[] {
   return array;
 }
 
-/** Check if assigning `slot` on `date` would create a close-then-open conflict. */
+// Days whose morning shifts are protected by the weekend-boundary rest rule.
+// 0 = Sunday, 1 = Monday, 6 = Saturday.
+const REST_PROTECTED_MORNING_DAYS = new Set([0, 1, 6]);
+
+/** Whether the morning of `dateStr` is rest-protected (Sat / Sun / Mon). */
+function isRestProtectedMorning(dateStr: string): boolean {
+  return REST_PROTECTED_MORNING_DAYS.has(
+    new Date(`${dateStr}T00:00:00Z`).getUTCDay()
+  );
+}
+
+/**
+ * Check if assigning `slot` on `date` would create a close-then-open conflict.
+ *
+ * The rest rule only fires for morning shifts that land on a weekend boundary
+ * (Saturday, Sunday or Monday) — weekday mornings are intentionally exempt so
+ * crew can repeat the same shift Mon–Fri.
+ */
 function isBackToBack(
   slot: ShiftSlot,
   date: string,
@@ -115,10 +135,11 @@ function isBackToBack(
   const CLOSE_THRESHOLD = timeToMinutes("21:00");
   const OPEN_THRESHOLD = timeToMinutes("09:00");
 
-  // Check if the current slot starts early and employee had a late shift yesterday
+  // Check if the current slot is a protected morning and the employee worked a
+  // late/closing shift the day before.
   const slotStart = timeToMinutes(slot.startTime);
 
-  if (slotStart <= OPEN_THRESHOLD) {
+  if (slotStart <= OPEN_THRESHOLD && isRestProtectedMorning(date)) {
     const prevDate = new Date(`${date}T00:00:00Z`);
     prevDate.setUTCDate(prevDate.getUTCDate() - 1);
     const prevDateStr = prevDate.toISOString().slice(0, 10);
@@ -156,14 +177,16 @@ function isBackToBack(
     nextDate.setUTCDate(nextDate.getUTCDate() + 1);
     const nextDateStr = nextDate.toISOString().slice(0, 10);
 
-    const nextAssignments = assignments.filter(
-      (a) => a.employeeId === employeeId && a.shiftDate === nextDateStr
-    );
+    if (isRestProtectedMorning(nextDateStr)) {
+      const nextAssignments = assignments.filter(
+        (a) => a.employeeId === employeeId && a.shiftDate === nextDateStr
+      );
 
-    for (const next of nextAssignments) {
-      const nextSlot = slots.find((s) => s.name === next.slotName);
-      if (nextSlot && timeToMinutes(nextSlot.startTime) <= OPEN_THRESHOLD) {
-        return true;
+      for (const next of nextAssignments) {
+        const nextSlot = slots.find((s) => s.name === next.slotName);
+        if (nextSlot && timeToMinutes(nextSlot.startTime) <= OPEN_THRESHOLD) {
+          return true;
+        }
       }
     }
   }

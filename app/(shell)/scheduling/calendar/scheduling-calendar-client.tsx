@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
+import { ShiftCreateModal } from "../../../../components/scheduling/shift-create-modal";
 import { ShiftEditModal } from "../../../../components/scheduling/shift-edit-modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { TeamScheduleCalendar } from "../../../../components/scheduling/team-schedule-calendar";
@@ -74,8 +75,10 @@ export function SchedulingCalendarClient({
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
+  const [addingShiftDate, setAddingShiftDate] = useState<string | null>(null);
   const [isMovingShift, setIsMovingShift] = useState(false);
   const [isSavingShiftEdit, setIsSavingShiftEdit] = useState(false);
+  const [isCreatingShift, setIsCreatingShift] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const peopleQuery = usePeople({ scope: "all", enabled: canManageShifts });
 
@@ -322,6 +325,44 @@ export function SchedulingCalendarClient({
     }
   }, [addToast, editingShift, shiftsQuery]);
 
+  const handleCreateShift = useCallback(async (values: ShiftEditFormValues) => {
+    const scheduleId = activeSchedule?.id;
+    if (!scheduleId) {
+      return;
+    }
+
+    setIsCreatingShift(true);
+
+    try {
+      const response = await fetch("/api/v1/scheduling/shifts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          scheduleId,
+          employeeId: values.employeeId,
+          shiftDate: values.shiftDate,
+          startTime: values.startTime,
+          endTime: values.endTime
+        })
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message ?? t("shiftCreate.toastError"));
+      }
+
+      addToast("success", t("shiftCreate.toastSuccess"));
+      setAddingShiftDate(null);
+      shiftsQuery.refresh();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : t("shiftCreate.toastError"));
+    } finally {
+      setIsCreatingShift(false);
+    }
+  }, [activeSchedule?.id, addToast, shiftsQuery, t]);
+
   if (isLoading) {
     return (
       <section className="compensation-layout">
@@ -374,9 +415,18 @@ export function SchedulingCalendarClient({
               {scheduleSummary}
             </p>
             {canManageActiveSchedule ? (
-              <p className="teamcal-helper-text">
-                {t("calendar.dragHelper")}
-              </p>
+              <div className="teamcal-title-actions">
+                <p className="teamcal-helper-text">
+                  {t("calendar.dragHelper")}
+                </p>
+                <button
+                  type="button"
+                  className="button button-accent"
+                  onClick={() => setAddingShiftDate(activeStartDate)}
+                >
+                  {t("calendar.addShift")}
+                </button>
+              </div>
             ) : null}
           </div>
           <TeamScheduleCalendar
@@ -386,6 +436,7 @@ export function SchedulingCalendarClient({
             canManage={canManageActiveSchedule}
             onRequestMove={handleRequestMove}
             onShiftSelect={canManageActiveSchedule ? setEditingShift : undefined}
+            onRequestAdd={canManageActiveSchedule ? setAddingShiftDate : undefined}
           />
         </>
       ) : (
@@ -420,6 +471,21 @@ export function SchedulingCalendarClient({
         onCancel={() => setPendingMove(null)}
         isConfirming={isMovingShift}
       />
+
+      {addingShiftDate && canManageActiveSchedule ? (
+        <ShiftCreateModal
+          isOpen
+          assignees={activeScheduleMembers}
+          defaultDate={addingShiftDate}
+          minDate={activeStartDate}
+          maxDate={activeEndDate}
+          isSubmitting={isCreatingShift}
+          onClose={() => setAddingShiftDate(null)}
+          onSubmit={(values) => {
+            void handleCreateShift(values);
+          }}
+        />
+      ) : null}
 
       {editingShift ? (
         <ShiftEditModal

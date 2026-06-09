@@ -141,8 +141,8 @@ export function RosterSelector({ employees, track, selected, onChange }: RosterS
           const entry = selected.get(emp.id);
           const flag = getCountryFlag(emp.countryCode);
 
-          // Show a section divider between Operations (pilot) and other departments
-          const pilotDept = "operations";
+          // Show a section divider between the pilot team (Customer Success) and other departments
+          const pilotDept = "customer success";
           const prevDept = idx > 0 ? filtered[idx - 1]?.department : null;
           const isFirstNonPilot =
             idx > 0 &&

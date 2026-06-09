@@ -86,7 +86,9 @@ export function ShiftSlotsSelector({ slots, onChange }: ShiftSlotsSelectorProps)
 
       <div className="schedule-slot-list">
         {slots.map((slot, index) => (
-          <div key={`${index}-${slot.name}`} className="schedule-slot-row">
+          // Key must stay stable while typing — including `slot.name` here would
+          // remount the row on every keystroke and steal focus from the name field.
+          <div key={index} className="schedule-slot-row">
             <div className="schedule-slot-name-field">
               <label className="form-label" htmlFor={`schedule-slot-name-${index}`}>
                 {t("slots.shiftName")}

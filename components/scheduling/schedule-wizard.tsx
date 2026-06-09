@@ -100,11 +100,12 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
   const currentStepIndex = STEPS.indexOf(step);
   const isCustomPeriod = months === 0;
 
-  // Auto-select Operations (pilot) members the first time the roster step appears
+  // Auto-select the pilot department's members the first time the roster step appears.
+  // Scheduling is piloted by the Customer Success team (the crew that runs shift coverage).
   const [pilotAutoSelected, setPilotAutoSelected] = useState(false);
 
   if (step === "roster" && !pilotAutoSelected && rosterSelected.size === 0 && employees.length > 0) {
-    const pilotDept = "operations";
+    const pilotDept = "customer success";
     const preselected = new Map<string, RosterSelection>();
     for (const emp of employees) {
       if (emp.department?.toLowerCase() === pilotDept) {
@@ -240,6 +241,10 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             scheduleType: track,
+            // The user hand-picked this roster, so every selected member is eligible
+            // regardless of their profile schedule_type. Without this, weekday-typed
+            // crew get filtered out of a weekend schedule and produce no shifts.
+            respectEmployeeScheduleType: false,
             slots: slots.map((slot) => ({
               name: slot.name.trim(),
               startTime: slot.startTime,

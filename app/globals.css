@@ -3625,7 +3625,62 @@ button.att-img-link {
   line-height: 1.2;
 }
 
+.teamcal-shift-label {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamcal-cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.teamcal-add-shift-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.mycal-cell:hover .teamcal-add-shift-button,
+.teamcal-add-shift-button:focus-visible {
+  opacity: 1;
+}
+
+.teamcal-add-shift-button:hover {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 26%, var(--border-subtle));
+}
+
+.teamcal-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 @media (max-width: 640px) {
+  /* No hover on touch — keep the per-day add affordance visible. */
+  .teamcal-add-shift-button {
+    opacity: 1;
+  }
+
   .mycal-cell {
     min-height: 56px;
     padding: 2px;

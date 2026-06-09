@@ -481,7 +481,9 @@
       "allPublishedSummary": "Tous les horaires publiés",
       "dragHelper": "Glissez-déposez un quart vers un nouveau jour pour le reprogrammer.",
       "scheduleLabel": "Horaire",
-      "scheduleDateRange": "{name} : {startDate} au {endDate}"
+      "scheduleDateRange": "{name} : {startDate} au {endDate}",
+      "addShift": "Ajouter un quart",
+      "addShiftOnDay": "Ajouter un quart le {date}"
     },
     "myCalendar": {
       "dayMon": "Lun",
@@ -623,6 +625,15 @@
       "save": "Enregistrer les modifications",
       "validationRequired": "La date et l'heure sont requises.",
       "validationTimeRange": "L'heure de début et l'heure de fin ne peuvent pas être identiques."
+    },
+    "shiftCreateModal": {
+      "title": "Ajouter un quart",
+      "description": "Ajoutez un nouveau quart à cet horaire.",
+      "save": "Ajouter le quart"
+    },
+    "shiftCreate": {
+      "toastSuccess": "Quart ajouté avec succès.",
+      "toastError": "Impossible d'ajouter le quart."
     }
   },
   "dashboard": {

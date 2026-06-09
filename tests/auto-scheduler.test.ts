@@ -299,4 +299,62 @@ describe("autoGenerateSchedule", () => {
     expect(firstWeekendAssignees).toEqual(new Set(["rotation-a", "rotation-c"]));
     expect(secondWeekendAssignees).toEqual(new Set(["rotation-b", "rotation-d"]));
   });
+
+  describe("weekend-boundary rest rule", () => {
+    const restSlots: ShiftSlot[] = [
+      { name: "Morning", startTime: "07:00", endTime: "15:00" },
+      { name: "Evening", startTime: "16:00", endTime: "00:00" }
+    ];
+
+    it("does not put a Saturday-evening worker on the Sunday-morning shift", () => {
+      // Two people forces distinct assignees where possible; if the rest rule
+      // works, whoever takes Saturday evening must not take Sunday morning.
+      const employees: EmployeeScheduleInfo[] = [
+        { id: "alpha", fullName: "Alpha", scheduleType: "weekend_primary", blockedDates: [] },
+        { id: "bravo", fullName: "Bravo", scheduleType: "weekend_primary", blockedDates: [] }
+      ];
+
+      const assignments = autoGenerateSchedule({
+        employees,
+        slots: restSlots,
+        startDate: "2026-03-07", // Saturday
+        endDate: "2026-03-08", // Sunday
+        scheduleType: "weekend",
+        respectEmployeeScheduleType: false
+      });
+
+      const satEvening = assignments.find(
+        (a) => a.shiftDate === "2026-03-07" && a.slotName === "Evening"
+      );
+      const sunMorning = assignments.find(
+        (a) => a.shiftDate === "2026-03-08" && a.slotName === "Morning"
+      );
+
+      expect(satEvening).toBeDefined();
+      expect(sunMorning).toBeDefined();
+      expect(sunMorning!.employeeId).not.toBe(satEvening!.employeeId);
+    });
+
+    it("allows evening-then-morning on consecutive weekdays (rule is weekend-only)", () => {
+      // A lone weekday worker must cover both the Tuesday evening and the
+      // Wednesday morning — a weekday morning is intentionally exempt.
+      const assignments = autoGenerateSchedule({
+        employees: [
+          { id: "solo", fullName: "Solo", scheduleType: "weekday", blockedDates: [] }
+        ],
+        slots: restSlots,
+        startDate: "2026-03-03", // Tuesday
+        endDate: "2026-03-04", // Wednesday
+        scheduleType: "weekday",
+        respectEmployeeScheduleType: false
+      });
+
+      const wedMorning = assignments.find(
+        (a) => a.shiftDate === "2026-03-04" && a.slotName === "Morning"
+      );
+
+      expect(wedMorning).toBeDefined();
+      expect(wedMorning!.employeeId).toBe("solo");
+    });
+  });
 });
