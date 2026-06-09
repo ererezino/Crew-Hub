@@ -127,6 +127,8 @@ export type SchedulingScheduleMutationResponseData = {
 
 export type SchedulingShiftMutationResponseData = {
   shift: ShiftRecord;
+  /** Advisory, non-blocking conflict notices (e.g. overlap, time off). Present when a save still succeeded. */
+  warnings?: string[];
 };
 
 export type SchedulingTemplateMutationResponseData = {
