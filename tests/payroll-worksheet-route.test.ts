@@ -22,6 +22,7 @@ const {
 
   function chain(table: string): Record<string, unknown> {
     const obj: Record<string, unknown> = {};
+    let isUpdate = false;
     for (const method of ["select", "eq", "in", "is", "maybeSingle"]) {
       if (method === "maybeSingle") {
         obj[method] = () => Promise.resolve(dequeue(table));
@@ -30,11 +31,12 @@ const {
       }
     }
     obj.update = (payload: Record<string, unknown>) => {
+      isUpdate = true;
       updateCalls.push({ table, payload });
       return obj;
     };
     obj.then = (resolve?: (value: QResult) => unknown, reject?: (reason: unknown) => unknown) =>
-      Promise.resolve(dequeue(table)).then(resolve, reject);
+      Promise.resolve(isUpdate ? { data: null, error: null } : dequeue(table)).then(resolve, reject);
     return obj;
   }
 
@@ -181,6 +183,10 @@ describe("PATCH /items/[itemId]/worksheet", () => {
       },
       error: null
     });
+    enqueue("payroll_items", {
+      data: [{ gross_amount: 310000, net_amount: 310000, pay_currency: "USD" }],
+      error: null
+    });
 
     const { PATCH } = await importRoute();
     const res = await PATCH(
@@ -248,6 +254,13 @@ describe("PATCH /items/[itemId]/worksheet", () => {
       },
       error: null
     });
+    enqueue("payroll_items", {
+      data: [
+        { gross_amount: 56000, net_amount: 56000, pay_currency: "USD" },
+        { gross_amount: 100000, net_amount: 90000, pay_currency: "NGN" }
+      ],
+      error: null
+    });
 
     const { PATCH } = await importRoute();
     const res = await PATCH(
@@ -273,5 +286,10 @@ describe("PATCH /items/[itemId]/worksheet", () => {
     expect(payrollItemUpdate?.payload.cycle_1_overtime_amount).toBe(5000);
     expect(payrollItemUpdate?.payload.net_amount).toBe(56000);
     expect(payrollItemUpdate?.payload.gross_amount).toBe(56000);
+
+    const payrollRunUpdate = updateCalls.find((call) => call.table === "payroll_runs");
+    expect(payrollRunUpdate?.payload.total_gross).toEqual({ USD: 56000, NGN: 100000 });
+    expect(payrollRunUpdate?.payload.total_net).toEqual({ USD: 56000, NGN: 90000 });
+    expect(payrollRunUpdate?.payload.total_deductions).toEqual({ USD: 0, NGN: 10000 });
   });
 });

@@ -3,6 +3,10 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../../../lib/audit";
 import { calculateOvertimeCompensation } from "../../../../../../../../../lib/payroll/overtime";
+import {
+  calculatePayrollRunCurrencyTotals,
+  calculatePayrollWorksheetMonthlyTotal
+} from "../../../../../../../../../lib/payroll/runs";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../../../../lib/supabase/service-role";
 import {
@@ -51,6 +55,12 @@ const itemRowSchema = z.object({
   bonus: z.union([z.number(), z.string()]).optional().default(0),
   comment: z.string().nullable().optional().default(null),
   exception_reason: z.string().nullable().optional().default(null)
+});
+
+const runTotalsItemRowSchema = z.object({
+  gross_amount: z.union([z.number(), z.string()]),
+  net_amount: z.union([z.number(), z.string()]),
+  pay_currency: z.string().length(3)
 });
 
 function parseAmount(value: string | number): number {
@@ -388,7 +398,14 @@ export async function PATCH(
 
   /* Monthly total = C1 base + C2 base + overtime + bonus + fees. Fees are a
    * payable earning (like bonus), so they roll into the worksheet total. */
-  const monthlyTotal = c1Base + c2Base + totalOtAmount + bonusAmount + feesAmount;
+  const monthlyTotal = calculatePayrollWorksheetMonthlyTotal({
+    cycle1BaseAmount: c1Base,
+    cycle2BaseAmount: c2Base,
+    cycle1OvertimeAmount: c1OtAmount,
+    cycle2OvertimeAmount: c2OtAmount,
+    bonus: bonusAmount,
+    fees: feesAmount
+  });
 
   /* Update gross and net to reflect worksheet totals */
   updatePayload.gross_amount = monthlyTotal;
@@ -439,6 +456,55 @@ export async function PATCH(
 
   /* Construct a minimal item response — the client will refresh to get the full row */
   const r = updatedRaw as Record<string, unknown> | null;
+
+  const { data: rawRunTotalItems, error: runTotalItemsError } = await serviceClient
+    .from("payroll_items")
+    .select("gross_amount, net_amount, pay_currency")
+    .eq("payroll_run_id", runId)
+    .eq("org_id", profile.org_id)
+    .is("deleted_at", null);
+
+  const parsedRunTotalItems = z.array(runTotalsItemRowSchema).safeParse(rawRunTotalItems ?? []);
+
+  if (runTotalItemsError || !parsedRunTotalItems.success) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "PAYROLL_RUN_TOTALS_SYNC_FAILED",
+        message: "Worksheet row was updated, but payroll run totals could not be refreshed."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const runTotals = calculatePayrollRunCurrencyTotals(
+    parsedRunTotalItems.data.map((item) => ({
+      grossAmount: parseAmount(item.gross_amount),
+      netAmount: parseAmount(item.net_amount),
+      payCurrency: item.pay_currency
+    }))
+  );
+
+  const { error: runTotalsUpdateError } = await serviceClient
+    .from("payroll_runs")
+    .update({
+      total_gross: runTotals.totalGross,
+      total_net: runTotals.totalNet,
+      total_deductions: runTotals.totalDeductions
+    })
+    .eq("id", runId)
+    .eq("org_id", profile.org_id);
+
+  if (runTotalsUpdateError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "PAYROLL_RUN_TOTALS_SYNC_FAILED",
+        message: "Worksheet row was updated, but payroll run totals could not be refreshed."
+      },
+      meta: buildMeta()
+    });
+  }
 
   /* Helper to safely extract a numeric value from the refetched row */
   function refetchNum(key: string, fallback: number): number {

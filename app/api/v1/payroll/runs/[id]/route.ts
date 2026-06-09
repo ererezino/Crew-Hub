@@ -3,6 +3,8 @@ import { z } from "zod";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import {
   adjustmentTotal,
+  calculatePayrollRunCurrencyTotals,
+  calculatePayrollWorksheetMonthlyTotal,
   deductionTotal,
   derivePayrollRunStatusFromCycles
 } from "../../../../../../lib/payroll/runs";
@@ -556,6 +558,12 @@ export async function GET(
       const employerContributions = parseEmployerContributions(row.employer_contributions);
       const grossAmount = parseAmount(row.gross_amount);
       const netAmount = parseAmount(row.net_amount);
+      const cycle1BaseAmount = parseAmount(row.cycle_1_base_amount ?? 0);
+      const cycle2BaseAmount = parseAmount(row.cycle_2_base_amount ?? 0);
+      const cycle1OvertimeAmount = parseAmount(row.cycle_1_overtime_amount ?? 0);
+      const cycle2OvertimeAmount = parseAmount(row.cycle_2_overtime_amount ?? 0);
+      const fees = parseAmount(row.fees ?? 0);
+      const bonus = parseAmount(row.bonus ?? 0);
       const previousGrossAmount = previousComparison?.grossAmount ?? null;
       const previousNetAmount = previousComparison?.netAmount ?? null;
 
@@ -597,26 +605,28 @@ export async function GET(
           previousNetAmount === null ? null : netAmount - previousNetAmount,
         deductionTotal: deductionTotal(deductions),
         adjustmentTotal: adjustmentTotal(adjustments),
-        cycle1BaseAmount: parseAmount(row.cycle_1_base_amount ?? 0),
-        cycle2BaseAmount: parseAmount(row.cycle_2_base_amount ?? 0),
+        cycle1BaseAmount,
+        cycle2BaseAmount,
         cycle1OvertimeHours: Number(row.cycle_1_overtime_hours ?? 0),
         cycle2OvertimeHours: Number(row.cycle_2_overtime_hours ?? 0),
-        cycle1OvertimeAmount: parseAmount(row.cycle_1_overtime_amount ?? 0),
-        cycle2OvertimeAmount: parseAmount(row.cycle_2_overtime_amount ?? 0),
+        cycle1OvertimeAmount,
+        cycle2OvertimeAmount,
         cycle1Included: row.cycle_1_included ?? true,
         cycle2Included: row.cycle_2_included ?? true,
-        fees: parseAmount(row.fees ?? 0),
-        bonus: parseAmount(row.bonus ?? 0),
+        fees,
+        bonus,
         comment: row.comment ?? null,
         exceptionReason: row.exception_reason ?? null,
         designation: row.designation ?? null,
         accrueUsername: row.accrue_username ?? null,
-        monthlyTotal:
-          parseAmount(row.cycle_1_base_amount ?? 0)
-          + parseAmount(row.cycle_2_base_amount ?? 0)
-          + parseAmount(row.cycle_1_overtime_amount ?? 0)
-          + parseAmount(row.cycle_2_overtime_amount ?? 0)
-          + parseAmount(row.bonus ?? 0),
+        monthlyTotal: calculatePayrollWorksheetMonthlyTotal({
+          cycle1BaseAmount,
+          cycle2BaseAmount,
+          cycle1OvertimeAmount,
+          cycle2OvertimeAmount,
+          bonus,
+          fees
+        }),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       };
@@ -626,6 +636,13 @@ export async function GET(
     const cycles = parsedCycles.success
       ? parsedCycles.data.map(toPayrollCycleSummary)
       : [];
+    const currentRunTotals = calculatePayrollRunCurrencyTotals(
+      items.map((item) => ({
+        grossAmount: item.grossAmount,
+        netAmount: item.netAmount,
+        payCurrency: item.payCurrency
+      }))
+    );
     const runSummary = {
       ...toPayrollRunSummary(
         parsedRun.data,
@@ -639,6 +656,13 @@ export async function GET(
             : null
         }
       ),
+      ...(items.length > 0
+        ? {
+            totalGross: currentRunTotals.totalGross,
+            totalNet: currentRunTotals.totalNet,
+            totalDeductions: currentRunTotals.totalDeductions
+          }
+        : {}),
       status: derivePayrollRunStatusFromCycles(
         cycles.map((cycle) => cycle.status),
         parsedRun.data.status

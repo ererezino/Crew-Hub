@@ -59,6 +59,52 @@ export function addCurrencyTotal(
   };
 }
 
+export function calculatePayrollWorksheetMonthlyTotal(input: {
+  cycle1BaseAmount: number;
+  cycle2BaseAmount: number;
+  cycle1OvertimeAmount: number;
+  cycle2OvertimeAmount: number;
+  bonus: number;
+  fees: number;
+}): number {
+  return (
+    input.cycle1BaseAmount
+    + input.cycle2BaseAmount
+    + input.cycle1OvertimeAmount
+    + input.cycle2OvertimeAmount
+    + input.bonus
+    + input.fees
+  );
+}
+
+export function calculatePayrollRunCurrencyTotals(
+  rows: ReadonlyArray<{
+    grossAmount: number;
+    netAmount: number;
+    payCurrency: string;
+  }>
+): {
+  totalGross: PayrollCurrencyTotals;
+  totalNet: PayrollCurrencyTotals;
+  totalDeductions: PayrollCurrencyTotals;
+} {
+  let totalGross: PayrollCurrencyTotals = {};
+  let totalNet: PayrollCurrencyTotals = {};
+  let totalDeductions: PayrollCurrencyTotals = {};
+
+  for (const row of rows) {
+    totalGross = addCurrencyTotal(totalGross, row.payCurrency, row.grossAmount);
+    totalNet = addCurrencyTotal(totalNet, row.payCurrency, row.netAmount);
+    totalDeductions = addCurrencyTotal(
+      totalDeductions,
+      row.payCurrency,
+      row.grossAmount - row.netAmount
+    );
+  }
+
+  return { totalGross, totalNet, totalDeductions };
+}
+
 export function getCurrencyTotal(
   totals: PayrollCurrencyTotals,
   currency: string = "USD"
