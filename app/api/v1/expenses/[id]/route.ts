@@ -19,6 +19,7 @@ import {
 } from "../../../../../lib/notifications/email";
 import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
 import { parseIntegerAmount } from "../../../../../lib/expenses";
+import { loadExpenseAttachments } from "../../../../../lib/expenses/fetch-expense-attachments";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
@@ -662,7 +663,12 @@ export async function PATCH(
   }
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
-  const updatedExpense = toExpenseRecord(parsedUpdatedExpense.data, profileById);
+  const attachmentsByExpenseId = await loadExpenseAttachments({
+    supabase: svcClient,
+    orgId: session.profile.org_id,
+    expenseIds: [parsedUpdatedExpense.data.id]
+  });
+  const updatedExpense = toExpenseRecord(parsedUpdatedExpense.data, profileById, attachmentsByExpenseId);
 
   await logAudit({
     action: auditActionFromExpenseAction(payload.action),

@@ -33,6 +33,7 @@ import {
   toExpenseRecord
 } from "../_helpers";
 import { loadLatestExpenseCommentStates } from "../_comment-state";
+import { loadExpenseAttachments } from "../../../../../lib/expenses/fetch-expense-attachments";
 
 const approvalsQuerySchema = z.object({
   month: z
@@ -333,6 +334,11 @@ export async function GET(request: Request) {
     orgId: profile.org_id,
     expenseIds: parsedExpenses.data.map((row) => row.id)
   });
+  const attachmentsByExpenseId = await loadExpenseAttachments({
+    supabase: svcClient,
+    orgId: profile.org_id,
+    expenseIds: parsedExpenses.data.map((row) => row.id)
+  });
   const commentAuthorIds = [...new Set(
     [...latestCommentStates.values()]
       .map((state) => state.updatedBy)
@@ -373,7 +379,7 @@ export async function GET(request: Request) {
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
   const expenses = parsedExpenses.data.map((row) => {
-    const baseExpense = toExpenseRecord(row, profileById);
+    const baseExpense = toExpenseRecord(row, profileById, attachmentsByExpenseId);
     const commentState = latestCommentStates.get(row.id);
 
     if (!commentState) {
@@ -759,7 +765,14 @@ export async function POST(request: Request) {
   }
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
-  const expenses = parsedUpdatedRows.data.map((row) => toExpenseRecord(row, profileById));
+  const bulkAttachmentsByExpenseId = await loadExpenseAttachments({
+    supabase: svcClient,
+    orgId: profile.org_id,
+    expenseIds: parsedUpdatedRows.data.map((row) => row.id)
+  });
+  const expenses = parsedUpdatedRows.data.map((row) =>
+    toExpenseRecord(row, profileById, bulkAttachmentsByExpenseId)
+  );
   const employeeIds = [...new Set(expenses.map((expense) => expense.employeeId))];
 
   await logAudit({

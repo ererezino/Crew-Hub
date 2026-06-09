@@ -8,6 +8,7 @@ import type { ApiResponse } from "../../../../types/auth";
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_STATUSES,
+  type ExpenseAttachment,
   type ExpenseRecord
 } from "../../../../types/expenses";
 
@@ -75,6 +76,38 @@ export const expenseRowSchema = z.object({
   updated_at: z.string()
 });
 
+export const expenseAttachmentSelectColumns =
+  "id, expense_id, file_name, file_path, file_size_bytes, mime_type, sort_order, created_at";
+
+export const expenseAttachmentRowSchema = z.object({
+  id: z.string().uuid(),
+  expense_id: z.string().uuid(),
+  file_name: z.string(),
+  file_path: z.string(),
+  file_size_bytes: z.union([z.number(), z.string()]).nullable().default(null),
+  mime_type: z.string().nullable().default(null),
+  sort_order: z.number().default(0),
+  created_at: z.string()
+});
+
+export function toExpenseAttachment(
+  row: z.infer<typeof expenseAttachmentRowSchema>
+): ExpenseAttachment {
+  const sizeBytes =
+    row.file_size_bytes === null || row.file_size_bytes === undefined
+      ? null
+      : parseIntegerAmount(row.file_size_bytes);
+
+  return {
+    id: row.id,
+    fileName: row.file_name,
+    filePath: row.file_path,
+    mimeType: row.mime_type ?? null,
+    fileSizeBytes: sizeBytes,
+    createdAt: row.created_at
+  };
+}
+
 export const profileRowSchema = z.object({
   id: z.string().uuid(),
   full_name: z.string(),
@@ -125,9 +158,35 @@ export function isExpenseAdmin(roles: readonly UserRole[]): boolean {
 
 export function toExpenseRecord(
   row: z.infer<typeof expenseRowSchema>,
-  profileById: ReadonlyMap<string, z.infer<typeof profileRowSchema>>
+  profileById: ReadonlyMap<string, z.infer<typeof profileRowSchema>>,
+  attachmentsByExpenseId?: ReadonlyMap<string, ExpenseAttachment[]>
 ): ExpenseRecord {
   const employee = profileById.get(row.employee_id);
+
+  /* Attachments are the source of truth for an expense's documents. When no map
+   * is supplied (a caller that hasn't fetched them), fall back to a synthetic
+   * single attachment built from the legacy receipt_file_path so every viewer
+   * still gets at least the primary document. */
+  const fetchedAttachments = attachmentsByExpenseId?.get(row.id) ?? [];
+  const attachments: ExpenseAttachment[] =
+    fetchedAttachments.length > 0
+      ? fetchedAttachments
+      : row.receipt_file_path
+        ? [
+            {
+              id: `primary:${row.id}`,
+              fileName: receiptFileNameFromPath(row.receipt_file_path),
+              filePath: row.receipt_file_path,
+              mimeType: null,
+              fileSizeBytes: null,
+              createdAt: row.created_at
+            }
+          ]
+        : [];
+  const primaryAttachment = attachments[0] ?? null;
+  const receiptFilePath = primaryAttachment?.filePath ?? row.receipt_file_path;
+  const receiptFileName =
+    primaryAttachment?.fileName ?? receiptFileNameFromPath(row.receipt_file_path);
   const managerApprovedBy = row.manager_approved_by
     ? profileById.get(row.manager_approved_by)
     : null;
@@ -165,8 +224,9 @@ export function toExpenseRecord(
     description: row.description,
     amount: parseIntegerAmount(row.amount),
     currency: row.currency,
-    receiptFilePath: row.receipt_file_path,
-    receiptFileName: receiptFileNameFromPath(row.receipt_file_path),
+    receiptFilePath,
+    receiptFileName,
+    attachments,
     expenseDate: row.expense_date,
     status: row.status,
     vendorName: row.vendor_name ?? null,

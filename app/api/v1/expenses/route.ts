@@ -4,18 +4,16 @@ import { logAudit } from "../../../../lib/audit";
 import { formatCurrency } from "../../../../lib/format-currency";
 import { getAuthenticatedSession } from "../../../../lib/auth/session";
 import { fetchExpensesData } from "../../../../lib/expenses/fetch-expenses-data";
+import { loadExpenseAttachments } from "../../../../lib/expenses/fetch-expense-attachments";
 import { sendExpenseSubmittedEmail } from "../../../../lib/notifications/email";
 import { createBulkNotifications } from "../../../../lib/notifications/service";
 import {
-  ALLOWED_RECEIPT_EXTENSIONS,
-  isAllowedReceiptUpload,
   isIsoMonth,
-  MAX_RECEIPT_FILE_BYTES,
   normalizeCurrency,
   sanitizeFileName,
   RECEIPTS_BUCKET_NAME
 } from "../../../../lib/expenses";
-import { validateUploadMagicBytes } from "../../../../lib/security/upload-signatures";
+import { collectAndValidateReceiptFiles } from "../../../../lib/expenses/receipt-upload";
 import { createSupabaseServerClient } from "../../../../lib/supabase/server";
 import { resolveExpenseRoute } from "../../../../lib/expense-routing";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
@@ -71,10 +69,14 @@ function getFormString(formData: FormData, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
-async function cleanupUploadedFile(filePath: string): Promise<void> {
+async function cleanupUploadedFiles(filePaths: string[]): Promise<void> {
+  if (filePaths.length === 0) {
+    return;
+  }
+
   try {
     const supabase = await createSupabaseServerClient();
-    await supabase.storage.from(RECEIPTS_BUCKET_NAME).remove([filePath]);
+    await supabase.storage.from(RECEIPTS_BUCKET_NAME).remove(filePaths);
   } catch {
     // Cleanup failure should not override the original mutation error.
   }
@@ -165,69 +167,20 @@ export async function POST(request: Request) {
     });
   }
 
-  const rawFile = formData.get("receipt");
+  const receiptCollection = await collectAndValidateReceiptFiles(formData);
 
-  if (!(rawFile instanceof File)) {
+  if ("error" in receiptCollection) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
         code: "VALIDATION_ERROR",
-        message: "Receipt or invoice file is required."
+        message: receiptCollection.error
       },
       meta: buildMeta()
     });
   }
 
-  if (rawFile.size <= 0) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Uploaded receipt/invoice is empty."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  if (rawFile.size > MAX_RECEIPT_FILE_BYTES) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Receipt/invoice exceeds the 10MB upload limit."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  if (!isAllowedReceiptUpload(rawFile.name, rawFile.type)) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Unsupported file type. Allowed formats for receipt/invoice: pdf, png, jpg."
-      },
-      meta: buildMeta()
-    });
-  }
-
-  const magicBytesResult = await validateUploadMagicBytes({
-    file: rawFile,
-    fileName: rawFile.name,
-    allowedExtensions: ALLOWED_RECEIPT_EXTENSIONS
-  });
-
-  if (!magicBytesResult.valid) {
-    return jsonResponse<null>(422, {
-      data: null,
-      error: {
-        code: "VALIDATION_ERROR",
-        message:
-          "Receipt/invoice signature validation failed. Upload a file whose binary format matches the selected extension."
-      },
-      meta: buildMeta()
-    });
-  }
+  const receiptFiles = receiptCollection.files;
 
   const parsedPayload = createExpensePayloadSchema.safeParse({
     category: getFormString(formData, "category"),
@@ -317,29 +270,51 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const timestamp = Date.now();
-  const safeFileName = sanitizeFileName(rawFile.name);
   const expenseId = crypto.randomUUID();
-  const filePath = `${session.profile.org_id}/${session.profile.id}/${expenseId}/${timestamp}-${safeFileName}`;
-  const contentType = rawFile.type || "application/octet-stream";
 
-  const { error: uploadError } = await supabase.storage
-    .from(RECEIPTS_BUCKET_NAME)
-    .upload(filePath, rawFile, {
-      upsert: false,
-      contentType
-    });
+  const uploadedAttachments: Array<{
+    filePath: string;
+    fileName: string;
+    fileSizeBytes: number;
+    mimeType: string;
+  }> = [];
 
-  if (uploadError) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: {
-        code: "RECEIPT_UPLOAD_FAILED",
-        message: "Unable to upload receipt file."
-      },
-      meta: buildMeta()
+  for (const [index, file] of receiptFiles.entries()) {
+    const safeFileName = sanitizeFileName(file.name);
+    const storagePath = `${session.profile.org_id}/${session.profile.id}/${expenseId}/${Date.now()}-${index}-${safeFileName}`;
+    const contentType = file.type || "application/octet-stream";
+
+    const { error: uploadError } = await supabase.storage
+      .from(RECEIPTS_BUCKET_NAME)
+      .upload(storagePath, file, {
+        upsert: false,
+        contentType
+      });
+
+    if (uploadError) {
+      await cleanupUploadedFiles(uploadedAttachments.map((attachment) => attachment.filePath));
+
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "RECEIPT_UPLOAD_FAILED",
+          message: "Unable to upload receipt file."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    uploadedAttachments.push({
+      filePath: storagePath,
+      fileName: safeFileName,
+      fileSizeBytes: file.size,
+      mimeType: contentType
     });
   }
+
+  /* The first uploaded file is the "primary" receipt kept on the expense row
+   * for backward compatibility; all files are recorded in expense_attachments. */
+  const filePath = uploadedAttachments[0]!.filePath;
 
   const mutationPayload: Record<string, unknown> = {
     id: expenseId,
@@ -376,7 +351,7 @@ export async function POST(request: Request) {
     .single();
 
   if (insertExpenseError || !insertedExpense) {
-    await cleanupUploadedFile(filePath);
+    await cleanupUploadedFiles(uploadedAttachments.map((attachment) => attachment.filePath));
 
     return jsonResponse<null>(500, {
       data: null,
@@ -386,6 +361,27 @@ export async function POST(request: Request) {
       },
       meta: buildMeta()
     });
+  }
+
+  /* Record every uploaded document. The expense already carries the primary
+   * receipt in receipt_file_path, so a failure here degrades to single-receipt
+   * display rather than failing the whole submission. */
+  const { error: attachmentsInsertError } = await supabase
+    .from("expense_attachments")
+    .insert(
+      uploadedAttachments.map((attachment, index) => ({
+        org_id: session.profile!.org_id,
+        expense_id: expenseId,
+        file_name: attachment.fileName,
+        file_path: attachment.filePath,
+        file_size_bytes: attachment.fileSizeBytes,
+        mime_type: attachment.mimeType,
+        sort_order: index
+      }))
+    );
+
+  if (attachmentsInsertError) {
+    console.error("expense_attachments insert failed", attachmentsInsertError);
   }
 
   // Evaluate routing rules to determine if additional approval is needed
@@ -429,7 +425,7 @@ export async function POST(request: Request) {
   const parsedExpense = expenseRowSchema.safeParse(routedExpense ?? insertedExpense);
 
   if (!parsedExpense.success) {
-    await cleanupUploadedFile(filePath);
+    await cleanupUploadedFiles(uploadedAttachments.map((attachment) => attachment.filePath));
 
     return jsonResponse<null>(500, {
       data: null,
@@ -473,7 +469,12 @@ export async function POST(request: Request) {
   }
 
   const profileById = new Map(parsedProfiles.data.map((row) => [row.id, row] as const));
-  const expense = toExpenseRecord(parsedExpense.data, profileById);
+  const attachmentsByExpenseId = await loadExpenseAttachments({
+    supabase,
+    orgId: session.profile.org_id,
+    expenseIds: [expenseId]
+  });
+  const expense = toExpenseRecord(parsedExpense.data, profileById, attachmentsByExpenseId);
   const employeeProfile = profileById.get(expense.employeeId) ?? null;
 
   await logAudit({

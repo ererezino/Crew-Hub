@@ -13,6 +13,7 @@ import {
   toExpenseRecord
 } from "../../app/api/v1/expenses/_helpers";
 import { loadLatestExpenseCommentStates } from "../../app/api/v1/expenses/_comment-state";
+import { loadExpenseAttachments } from "./fetch-expense-attachments";
 import type { ExpensesListResponseData } from "../../types/expenses";
 
 /* ── Types ── */
@@ -69,11 +70,20 @@ export async function fetchExpensesData(
     throw new Error("Expense records are not in the expected shape.");
   }
 
-  const latestCommentStates = await loadLatestExpenseCommentStates({
-    supabase,
-    orgId: profile.org_id,
-    expenseIds: parsedExpenses.data.map((row) => row.id)
-  });
+  const expenseIds = parsedExpenses.data.map((row) => row.id);
+
+  const [latestCommentStates, attachmentsByExpenseId] = await Promise.all([
+    loadLatestExpenseCommentStates({
+      supabase,
+      orgId: profile.org_id,
+      expenseIds
+    }),
+    loadExpenseAttachments({
+      supabase,
+      orgId: profile.org_id,
+      expenseIds
+    })
+  ]);
 
   const commentAuthorIds = [
     ...new Set(
@@ -112,7 +122,7 @@ export async function fetchExpensesData(
   }
 
   const expenses = parsedExpenses.data.map((row) => {
-    const baseExpense = toExpenseRecord(row, profileById);
+    const baseExpense = toExpenseRecord(row, profileById, attachmentsByExpenseId);
     const commentState = latestCommentStates.get(row.id);
 
     if (!commentState) {

@@ -6,6 +6,7 @@ import {
   type ChangeEvent,
   type DragEvent,
   type FormEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -40,6 +41,7 @@ import {
   getExpenseCategoryLabel,
   getExpenseStatusLabel,
   isAllowedReceiptUpload,
+  MAX_EXPENSE_ATTACHMENTS,
   MAX_RECEIPT_FILE_BYTES,
   toneForExpenseStatus
 } from "../../../lib/expenses";
@@ -50,8 +52,9 @@ import {
 } from "../../../lib/expenses/csv-import";
 import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries";
 import { useMePaymentDetails } from "../../../hooks/use-payment-details";
-import { Receipt, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Receipt, X } from "lucide-react";
 import type {
+  ExpenseAttachmentsListResponse,
   ExpenseCommentAttachmentSignedUrlResponse,
   CreateExpenseCommentResponse,
   CreateExpenseResponse,
@@ -262,7 +265,7 @@ function parseMoneyToMinorUnits(value: string): number | null {
   return amount;
 }
 
-function buildExpenseSubmissionFormData(values: ExpenseFormValues, receiptFile: File): FormData {
+function buildExpenseSubmissionFormData(values: ExpenseFormValues, receiptFiles: File[]): FormData {
   const amountMinorUnits = parseMoneyToMinorUnits(values.amount);
 
   if (amountMinorUnits === null) {
@@ -279,7 +282,9 @@ function buildExpenseSubmissionFormData(values: ExpenseFormValues, receiptFile: 
   formData.set("amount", String(amountMinorUnits));
   formData.set("expenseDate", values.expenseDate);
   formData.set("currency", values.currency.trim().toUpperCase());
-  formData.set("receipt", receiptFile);
+  for (const file of receiptFiles) {
+    formData.append("receipts", file);
+  }
 
   if (values.expenseType === "work_expense") {
     formData.set("vendorName", values.vendorName.trim());
@@ -307,17 +312,19 @@ function hasFormErrors(errors: ExpenseFormErrors): boolean {
   return Object.values(errors).some((error) => Boolean(error));
 }
 
-function validateReceipt(file: File | null, td: (key: string) => string): string | undefined {
-  if (!file) {
+function validateReceipt(files: File[], td: (key: string) => string): string | undefined {
+  if (files.length === 0) {
     return td("validation.receiptRequired");
   }
 
-  if (file.size > MAX_RECEIPT_FILE_BYTES) {
-    return td("validation.receiptTooLarge");
-  }
+  for (const file of files) {
+    if (file.size > MAX_RECEIPT_FILE_BYTES) {
+      return td("validation.receiptTooLarge");
+    }
 
-  if (!isAllowedReceiptUpload(file.name, file.type)) {
-    return td("validation.receiptUnsupportedType");
+    if (!isAllowedReceiptUpload(file.name, file.type)) {
+      return td("validation.receiptUnsupportedType");
+    }
   }
 
   return undefined;
@@ -326,7 +333,7 @@ function validateReceipt(file: File | null, td: (key: string) => string): string
 function getFormErrors(
   values: ExpenseFormValues,
   touched: ExpenseFormTouched,
-  receipt: File | null,
+  receipt: File[],
   td: (key: string) => string
 ): ExpenseFormErrors {
   const parsed = expenseFormSchema.safeParse(values);
@@ -483,7 +490,7 @@ function normalizeImportedExpenseRow(
   const validationErrors = getFormErrors(
     values,
     { ...ALL_TOUCHED, receipt: false },
-    null,
+    [],
     td
   );
   const firstError = firstExpenseFormError(validationErrors);
@@ -729,9 +736,14 @@ function ExpenseTimelineItem({
 
 /* ─── Receipt / payment-proof lightbox ─── */
 
-type ReceiptLightboxData = {
+type ReceiptLightboxItem = {
   url: string;
   fileName: string;
+};
+
+type ReceiptLightboxData = {
+  items: ReceiptLightboxItem[];
+  index: number;
   label: string;
 };
 
@@ -742,22 +754,38 @@ function ReceiptLightbox({
   data: ReceiptLightboxData;
   onClose: () => void;
 }) {
-  const isPdf = data.fileName.toLowerCase().endsWith(".pdf");
+  const [activeIndex, setActiveIndex] = useState(data.index);
+  const total = data.items.length;
+  const current = data.items[Math.min(activeIndex, total - 1)] ?? data.items[0];
+  const isPdf = (current?.fileName ?? "").toLowerCase().endsWith(".pdf");
   const [imageLoaded, setImageLoaded] = useState(isPdf);
+
+  const goTo = useCallback((next: number) => {
+    if (total === 0) return;
+    const wrapped = (next + total) % total;
+    setActiveIndex(wrapped);
+    setImageLoaded(false);
+  }, [total]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") goTo(activeIndex + 1);
+      if (e.key === "ArrowLeft") goTo(activeIndex - 1);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, goTo, activeIndex]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, []);
+
+  if (!current) {
+    return null;
+  }
 
   return (
     <div className="lightbox-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={data.label}>
@@ -766,11 +794,33 @@ function ReceiptLightbox({
           <X size={20} />
         </button>
 
+        {total > 1 ? (
+          <>
+            <button
+              type="button"
+              className="lightbox-nav lightbox-nav-prev"
+              onClick={() => goTo(activeIndex - 1)}
+              aria-label="Previous document"
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <button
+              type="button"
+              className="lightbox-nav lightbox-nav-next"
+              onClick={() => goTo(activeIndex + 1)}
+              aria-label="Next document"
+            >
+              <ChevronRight size={22} />
+            </button>
+          </>
+        ) : null}
+
         <div className={isPdf ? "lightbox-stage lightbox-stage-doc" : "lightbox-stage"}>
           {isPdf ? (
             <iframe
-              src={`${data.url}#toolbar=1&navpanes=0`}
-              title={data.fileName}
+              key={current.url}
+              src={`${current.url}#toolbar=1&navpanes=0`}
+              title={current.fileName}
               className="lightbox-pdf"
             />
           ) : (
@@ -782,9 +832,9 @@ function ReceiptLightbox({
               ) : null}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                key={data.url}
-                src={data.url}
-                alt={data.fileName}
+                key={current.url}
+                src={current.url}
+                alt={current.fileName}
                 className="lightbox-img lightbox-img-expense"
                 loading="eager"
                 onLoad={() => setImageLoaded(true)}
@@ -795,7 +845,10 @@ function ReceiptLightbox({
           )}
         </div>
 
-        <div className="lightbox-filename">{data.label}</div>
+        <div className="lightbox-filename">
+          {current.fileName}
+          {total > 1 ? <span className="lightbox-counter"> · {activeIndex + 1} / {total}</span> : null}
+        </div>
       </div>
     </div>
   );
@@ -828,7 +881,7 @@ export function ExpensesClient({
   const [selectedVendorId, setSelectedVendorId] = useState("");
   const [formTouched, setFormTouched] = useState<ExpenseFormTouched>(INITIAL_TOUCHED);
   const [formErrors, setFormErrors] = useState<ExpenseFormErrors>({});
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptFiles, setReceiptFiles] = useState<File[]>([]);
   const [importedExpenseRows, setImportedExpenseRows] = useState<ExpenseCsvImportRow[]>([]);
   const [importedExpenseFileName, setImportedExpenseFileName] = useState<string | null>(null);
   const [importCsvError, setImportCsvError] = useState<string | null>(null);
@@ -955,7 +1008,7 @@ export function ExpensesClient({
     setSelectedVendorId("");
     setFormTouched(INITIAL_TOUCHED);
     setFormErrors({});
-    setReceiptFile(null);
+    setReceiptFiles([]);
     setImportedExpenseRows([]);
     setImportedExpenseFileName(null);
     setImportCsvError(null);
@@ -973,7 +1026,7 @@ export function ExpensesClient({
     setSelectedVendorId("");
     setFormTouched(INITIAL_TOUCHED);
     setFormErrors({});
-    setReceiptFile(null);
+    setReceiptFiles([]);
     setImportedExpenseRows([]);
     setImportedExpenseFileName(null);
     setImportCsvError(null);
@@ -1000,7 +1053,7 @@ export function ExpensesClient({
       setExpenseFormDirty(true);
 
       if (formTouched[field]) {
-        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile, td));
+        setFormErrors(getFormErrors(nextValues, formTouched, receiptFiles, td));
       }
 
       if (submitError) {
@@ -1018,7 +1071,7 @@ export function ExpensesClient({
     setExpenseFormDirty(true);
 
     if (formTouched[field as ExpenseFormField]) {
-      setFormErrors(getFormErrors(nextValues, formTouched, receiptFile, td));
+      setFormErrors(getFormErrors(nextValues, formTouched, receiptFiles, td));
     }
 
     if (submitError) {
@@ -1033,7 +1086,7 @@ export function ExpensesClient({
     };
 
     setFormTouched(nextTouched);
-    setFormErrors(getFormErrors(formValues, nextTouched, receiptFile, td));
+    setFormErrors(getFormErrors(formValues, nextTouched, receiptFiles, td));
   };
 
   const handleVendorInputChange =
@@ -1052,7 +1105,7 @@ export function ExpensesClient({
       setExpenseFormDirty(true);
 
       if (formTouched[field]) {
-        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile, td));
+        setFormErrors(getFormErrors(nextValues, formTouched, receiptFiles, td));
       }
 
       if (submitError) {
@@ -1060,22 +1113,34 @@ export function ExpensesClient({
       }
     };
 
-  const handleReceiptSelection = (file: File | null) => {
+  const handleReceiptSelection = (incoming: File[]) => {
     const nextTouched = {
       ...formTouched,
       receipt: true
     };
 
-    setReceiptFile(file);
+    const merged = [...receiptFiles, ...incoming].slice(0, MAX_EXPENSE_ATTACHMENTS);
+    setReceiptFiles(merged);
     setFormTouched(nextTouched);
-    setFormErrors(getFormErrors(formValues, nextTouched, file, td));
+    setFormErrors(getFormErrors(formValues, nextTouched, merged, td));
     setSubmitError(null);
     setUploadProgress(0);
   };
 
+  const removeReceiptAt = (index: number) => {
+    const merged = receiptFiles.filter((_, fileIndex) => fileIndex !== index);
+    setReceiptFiles(merged);
+    setFormErrors(getFormErrors(formValues, { ...formTouched, receipt: true }, merged, td));
+    setSubmitError(null);
+  };
+
   const handleReceiptInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0] ?? null;
-    handleReceiptSelection(file);
+    const files = Array.from(event.currentTarget.files ?? []);
+    if (files.length > 0) {
+      handleReceiptSelection(files);
+    }
+    // Allow re-selecting the same file after removal.
+    event.currentTarget.value = "";
   };
 
   const clearImportedExpenses = () => {
@@ -1083,7 +1148,7 @@ export function ExpensesClient({
     setImportedExpenseFileName(null);
     setImportCsvError(null);
     setSubmitError(null);
-    setExpenseFormDirty(Boolean(receiptFile));
+    setExpenseFormDirty(receiptFiles.length > 0);
     if (importCsvInputRef.current) {
       importCsvInputRef.current.value = "";
     }
@@ -1155,15 +1220,17 @@ export function ExpensesClient({
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDraggingReceipt(false);
-    const droppedFile = event.dataTransfer.files?.[0] ?? null;
-    handleReceiptSelection(droppedFile);
+    const droppedFiles = Array.from(event.dataTransfer.files ?? []);
+    if (droppedFiles.length > 0) {
+      handleReceiptSelection(droppedFiles);
+    }
   };
 
   const handleSubmitExpense = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (importedExpenseRows.length > 0) {
-      if (!receiptFile) {
+      if (receiptFiles.length === 0) {
         setFormTouched((currentTouched) => ({
           ...currentTouched,
           receipt: true
@@ -1198,7 +1265,7 @@ export function ExpensesClient({
 
       try {
         for (const [index, rowValues] of validRows.entries()) {
-          const formData = buildExpenseSubmissionFormData(rowValues, receiptFile);
+          const formData = buildExpenseSubmissionFormData(rowValues, receiptFiles);
           const result = await uploadExpenseWithProgress(formData, (progress) => {
             const normalizedProgress = Math.round(
               ((index + progress / 100) / validRows.length) * 100
@@ -1245,11 +1312,11 @@ export function ExpensesClient({
     }
 
     setFormTouched(ALL_TOUCHED);
-    const nextErrors = getFormErrors(formValues, ALL_TOUCHED, receiptFile, td);
+    const nextErrors = getFormErrors(formValues, ALL_TOUCHED, receiptFiles, td);
     setFormErrors(nextErrors);
     setSubmitError(null);
 
-    if (hasFormErrors(nextErrors) || !receiptFile) {
+    if (hasFormErrors(nextErrors) || receiptFiles.length === 0) {
       return;
     }
 
@@ -1272,7 +1339,7 @@ export function ExpensesClient({
           ...formValues,
           saveVendor: formValues.saveVendor && !selectedVendorId
         },
-        receiptFile
+        receiptFiles
       );
       const result = await uploadExpenseWithProgress(formData, setUploadProgress);
 
@@ -1301,20 +1368,32 @@ export function ExpensesClient({
     }));
 
     try {
-      const response = await fetch(`/api/v1/expenses/${expense.id}/receipt`, {
+      const response = await fetch(`/api/v1/expenses/${expense.id}/attachments`, {
         method: "GET"
       });
 
-      const payload = (await response.json()) as ExpenseReceiptSignedUrlResponse;
+      const payload = (await response.json()) as ExpenseAttachmentsListResponse;
+      const items = (payload.data?.attachments ?? [])
+        .filter((attachment) => attachment.url)
+        .map((attachment) => ({ url: attachment.url, fileName: attachment.fileName }));
 
-      if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? td("toast.unableToOpenReceipt"));
+      if (response.ok && items.length > 0) {
+        setReceiptLightbox({ items, index: 0, label: expense.receiptFileName });
+        return;
+      }
+
+      // Fallback to the legacy single-receipt endpoint.
+      const legacyResponse = await fetch(`/api/v1/expenses/${expense.id}/receipt`, { method: "GET" });
+      const legacyPayload = (await legacyResponse.json()) as ExpenseReceiptSignedUrlResponse;
+
+      if (!legacyResponse.ok || !legacyPayload.data?.url) {
+        showToast("error", legacyPayload.error?.message ?? td("toast.unableToOpenReceipt"));
         return;
       }
 
       setReceiptLightbox({
-        url: payload.data.url,
-        fileName: expense.receiptFileName,
+        items: [{ url: legacyPayload.data.url, fileName: expense.receiptFileName }],
+        index: 0,
         label: expense.receiptFileName
       });
     } catch (error) {
@@ -1350,8 +1429,8 @@ export function ExpensesClient({
       const proofFileName = proofPath.split("/").pop() ?? "payment-proof";
 
       setReceiptLightbox({
-        url: payload.data.url,
-        fileName: proofFileName,
+        items: [{ url: payload.data.url, fileName: proofFileName }],
+        index: 0,
         label: td("transactionDetails.viewPaymentProof")
       });
     } catch (error) {
@@ -1389,8 +1468,8 @@ export function ExpensesClient({
       }
 
       setReceiptLightbox({
-        url: payload.data.url,
-        fileName: payload.data.fileName || fileName,
+        items: [{ url: payload.data.url, fileName: payload.data.fileName || fileName }],
+        index: 0,
         label: payload.data.fileName || fileName
       });
     } catch (error) {
@@ -2630,7 +2709,7 @@ export function ExpensesClient({
                           saveVendor: false
                         };
                         setFormValues(nextValues);
-                        setFormErrors(getFormErrors(nextValues, formTouched, receiptFile, td));
+                        setFormErrors(getFormErrors(nextValues, formTouched, receiptFiles, td));
                         setExpenseFormDirty(true);
                       } else {
                         setExpenseFormDirty(true);
@@ -2890,13 +2969,34 @@ export function ExpensesClient({
               style={{ cursor: "pointer" }}
             >
               <p className="document-dropzone-title">
-                {receiptFile ? receiptFile.name : t('submitPanel.dropzoneTitle')}
+                {receiptFiles.length > 0
+                  ? t('submitPanel.documentsSelected', { count: receiptFiles.length })
+                  : t('submitPanel.dropzoneTitle')}
               </p>
               <p className="document-dropzone-hint">
                 {t('submitPanel.dropzoneHint')}
               </p>
-              {receiptFile ? (
-                <p className="document-dropzone-hint numeric">{Math.round(receiptFile.size / 1024)} KB</p>
+              {receiptFiles.length > 0 ? (
+                <ul
+                  className="expenses-receipt-file-list"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {receiptFiles.map((file, index) => (
+                    <li key={`${file.name}-${file.size}-${index}`} className="expenses-receipt-file">
+                      <span className="expenses-receipt-file-name">{file.name}</span>
+                      <span className="document-dropzone-hint numeric">{Math.round(file.size / 1024)} KB</span>
+                      <button
+                        type="button"
+                        className="expenses-receipt-file-remove"
+                        aria-label={t('submitPanel.removeDocument')}
+                        onClick={(event) => { event.stopPropagation(); removeReceiptAt(index); }}
+                        disabled={isSubmitting}
+                      >
+                        <X size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
             </div>
             <div className="expenses-receipt-actions">
@@ -2920,6 +3020,7 @@ export function ExpensesClient({
             <input
               ref={receiptInputRef}
               type="file"
+              multiple
               className="expenses-hidden-input"
               accept={uploadAcceptValue}
               onChange={handleReceiptInputChange}
@@ -2966,7 +3067,7 @@ export function ExpensesClient({
 
       {receiptLightbox ? (
         <ReceiptLightbox
-          key={receiptLightbox.url}
+          key={receiptLightbox.items[0]?.url ?? receiptLightbox.label}
           data={receiptLightbox}
           onClose={() => setReceiptLightbox(null)}
         />

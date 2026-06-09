@@ -46,6 +46,16 @@ export type ExpenseType = (typeof EXPENSE_TYPES)[number];
 export const VENDOR_PAYMENT_METHODS = ["bank_transfer", "mobile_money", "crew_tag", "international_wire"] as const;
 export type VendorPaymentMethod = (typeof VENDOR_PAYMENT_METHODS)[number];
 
+/** A single receipt/document attached to an expense. An expense may have many. */
+export type ExpenseAttachment = {
+  id: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string | null;
+  fileSizeBytes: number | null;
+  createdAt: string;
+};
+
 export type ExpenseRecord = {
   id: string;
   orgId: string;
@@ -59,8 +69,11 @@ export type ExpenseRecord = {
   description: string;
   amount: number;
   currency: string;
+  /** Primary document path/name, kept for backward compatibility. Equals the first attachment. */
   receiptFilePath: string;
   receiptFileName: string;
+  /** All receipts/documents attached to this expense, ordered (primary first). */
+  attachments: ExpenseAttachment[];
   expenseDate: string;
   status: ExpenseStatus;
   vendorName: string | null;
@@ -233,6 +246,17 @@ export type ExpenseReceiptSignedUrlResponseData = {
   url: string;
   expiresInSeconds: number;
 };
+
+export type ExpenseAttachmentWithUrl = ExpenseAttachment & {
+  url: string;
+};
+
+export type ExpenseAttachmentsListResponseData = {
+  attachments: ExpenseAttachmentWithUrl[];
+  expiresInSeconds: number;
+};
+
+export type ExpenseAttachmentsListResponse = ApiResponse<ExpenseAttachmentsListResponseData>;
 
 export type ExpenseCommentAttachmentSignedUrlResponseData = {
   url: string;

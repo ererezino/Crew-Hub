@@ -2094,6 +2094,42 @@ button.att-img-link {
   white-space: nowrap;
 }
 
+.lightbox-counter {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ── Multi-document gallery navigation ── */
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.15s ease;
+}
+
+.lightbox-nav:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.lightbox-nav-prev {
+  left: var(--space-3);
+}
+
+.lightbox-nav-next {
+  right: var(--space-3);
+}
+
 /* ── Document / PDF lightbox variant ── */
 
 .lightbox-inner-doc {
@@ -4160,6 +4196,56 @@ button.att-img-link {
 
 .document-hidden-file-input {
   display: none;
+}
+
+/* ── Selected receipt/document list (multi-upload) ── */
+
+.expenses-receipt-file-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  text-align: left;
+}
+
+.expenses-receipt-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+}
+
+.expenses-receipt-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+
+.expenses-receipt-file-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.expenses-receipt-file-remove:hover:not(:disabled) {
+  color: var(--danger, #c0392b);
+}
+
+.expenses-receipt-file-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .document-selected-file {
