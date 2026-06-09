@@ -423,7 +423,12 @@ async function handleSubmit({
     const monthlySalary = parseAmount(item.base_salary_amount);
     const itemCurrency = normalizeCurrencyCode(item.pay_currency ?? parsedCycle.currency);
 
-    const finalPayable = cycleBaseAmount + cycleOvertimeAmount + itemBonus - itemFees;
+    /* Bonus and fees are whole-month amounts (a single shared field, not split
+     * per cycle). Pay them once, in Cycle 1, so the two cycle payouts sum to the
+     * monthly worksheet total instead of double-counting across both cycles. */
+    const cycleBonus = cycleNumber === 1 ? itemBonus : 0;
+    const cycleFees = cycleNumber === 1 ? itemFees : 0;
+    const finalPayable = cycleBaseAmount + cycleOvertimeAmount + cycleBonus + cycleFees;
 
     const emp = profileById.get(item.employee_id);
 
@@ -439,23 +444,23 @@ async function handleSubmit({
       overtimeHours: cycleOvertimeHours,
       overtimeRate: deriveOvertimeRate(cycleOvertimeAmount, cycleOvertimeHours),
       overtimeAmount: cycleOvertimeAmount,
-      bonus: itemBonus,
-      fees: itemFees,
+      bonus: cycleBonus,
+      fees: cycleFees,
       finalPayable,
       comment: item.comment ?? null,
       exceptionReason: item.exception_reason ?? null
     });
 
-    totalGross += cycleBaseAmount + cycleOvertimeAmount + itemBonus;
+    totalGross += finalPayable;
     totalNet += finalPayable;
     totalOvertime += cycleOvertimeAmount;
-    totalBonus += itemBonus;
-    totalFees += itemFees;
-    totalGrossByCurrency = addCurrencyTotal(totalGrossByCurrency, itemCurrency, cycleBaseAmount + cycleOvertimeAmount + itemBonus);
+    totalBonus += cycleBonus;
+    totalFees += cycleFees;
+    totalGrossByCurrency = addCurrencyTotal(totalGrossByCurrency, itemCurrency, finalPayable);
     totalNetByCurrency = addCurrencyTotal(totalNetByCurrency, itemCurrency, finalPayable);
     totalOvertimeByCurrency = addCurrencyTotal(totalOvertimeByCurrency, itemCurrency, cycleOvertimeAmount);
-    totalBonusByCurrency = addCurrencyTotal(totalBonusByCurrency, itemCurrency, itemBonus);
-    totalFeesByCurrency = addCurrencyTotal(totalFeesByCurrency, itemCurrency, itemFees);
+    totalBonusByCurrency = addCurrencyTotal(totalBonusByCurrency, itemCurrency, cycleBonus);
+    totalFeesByCurrency = addCurrencyTotal(totalFeesByCurrency, itemCurrency, cycleFees);
   }
 
   totalDeductions = totalGross - totalNet;

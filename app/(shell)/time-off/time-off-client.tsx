@@ -33,6 +33,7 @@ import {
   enumerateIsoDatesInRange,
   formatLeaveTypeLabel,
   getBirthdayLeaveOptions,
+  hasBirthdayConfigured,
   getCurrentMonthKey,
   isSickLeaveType,
   isoDateToUtcDate,
@@ -353,7 +354,11 @@ export function TimeOffClient({
 
   const currentBirthdayYear = new Date().getUTCFullYear();
   const birthdayProfile = summaryQuery.data?.profile ?? null;
-  const hasBirthdayConfigured = Boolean(birthdayProfile?.dateOfBirth);
+  const birthdayProfileConfigured = hasBirthdayConfigured({
+    dateOfBirth: birthdayProfile?.dateOfBirth,
+    birthdayMonth: birthdayProfile?.birthdayMonth,
+    birthdayDay: birthdayProfile?.birthdayDay
+  });
 
   const holidayDateKeys = useMemo(
     () => new Set(summaryQuery.data?.holidays.map((holiday) => holiday.date) ?? []),
@@ -361,16 +366,27 @@ export function TimeOffClient({
   );
 
   const birthdayLeaveInfo = useMemo(() => {
-    if (!birthdayProfile?.dateOfBirth) {
+    if (!birthdayProfileConfigured) {
       return null;
     }
 
     return getBirthdayLeaveOptions(
-      birthdayProfile.dateOfBirth,
+      {
+        dateOfBirth: birthdayProfile?.dateOfBirth,
+        birthdayMonth: birthdayProfile?.birthdayMonth,
+        birthdayDay: birthdayProfile?.birthdayDay
+      },
       currentBirthdayYear,
       holidayDateKeys
     );
-  }, [birthdayProfile?.dateOfBirth, currentBirthdayYear, holidayDateKeys]);
+  }, [
+    birthdayProfile?.birthdayDay,
+    birthdayProfile?.birthdayMonth,
+    birthdayProfile?.dateOfBirth,
+    birthdayProfileConfigured,
+    currentBirthdayYear,
+    holidayDateKeys
+  ]);
 
   const birthdayLeaveRequestForCurrentYear = useMemo(() => {
     return (summaryQuery.data?.requests ?? []).find(
@@ -386,7 +402,7 @@ export function TimeOffClient({
     return [...new Set([...policyTypes, ...balanceTypes])]
       .filter((leaveType) => {
         if (leaveType === "birthday_leave") {
-          return hasBirthdayConfigured;
+          return birthdayProfileConfigured;
         }
 
         return !AUTO_GRANTED_LEAVE_TYPES.has(leaveType);
@@ -396,7 +412,7 @@ export function TimeOffClient({
         if (rightValue === "birthday_leave") return -1;
         return leftValue.localeCompare(rightValue);
       });
-  }, [hasBirthdayConfigured, summaryQuery.data?.balances, summaryQuery.data?.policies]);
+  }, [birthdayProfileConfigured, summaryQuery.data?.balances, summaryQuery.data?.policies]);
 
   const isSelectedTypeUnlimited = useMemo(() => {
     if (!formValues.leaveType) return false;

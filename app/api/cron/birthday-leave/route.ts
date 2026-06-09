@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
 import { createBulkNotifications, createNotification } from "../../../../lib/notifications/service";
-import { getBirthdayLeaveOptions, isoDateToUtcDate } from "../../../../lib/time-off";
+import { formatDate as formatDateLib } from "../../../../lib/datetime";
+import {
+  getBirthdayLeaveOptions,
+  getBirthdayParts,
+  hasBirthdayConfigured,
+  isoDateToUtcDate
+} from "../../../../lib/time-off";
 
 /**
  * Daily cron endpoint: handles birthday leave auto-granting and reminders.
@@ -10,7 +16,9 @@ import { getBirthdayLeaveOptions, isoDateToUtcDate } from "../../../../lib/time-
  *
  * Logic:
  * 1. Find employees whose birthday is today (weekday, not holiday) → auto-create approved birthday_leave
- * 2. Find employees whose birthday is 7 days from now and falls on weekend/holiday → send reminder to choose a date
+ * 2. Find employees whose birthday is today → send a birthday greeting notification
+ * 3. Find employees whose birthday is 7 days from now → notify HR Admin / Super Admin so they can prepare
+ * 4. Find employees whose birthday is 7 days from now and falls on weekend/holiday → remind the employee to choose a date
  */
 
 function todayIso(): string {
@@ -77,8 +85,8 @@ export async function GET(request: Request) {
   // Find all employees with DOBs across all orgs
   const { data: employees, error: empError } = await supabase
     .from("profiles")
-    .select("id, org_id, full_name, date_of_birth, country_code, status")
-    .not("date_of_birth", "is", null)
+    .select("id, org_id, full_name, date_of_birth, birthday_month, birthday_day, country_code, status")
+    .or("date_of_birth.not.is.null,birthday_month.not.is.null")
     .is("deleted_at", null);
 
   if (empError) {
@@ -93,9 +101,10 @@ export async function GET(request: Request) {
   let autoGranted = 0;
   let birthdayAnnouncements = 0;
   let remindersSent = 0;
+  let adminRemindersSent = 0;
   const orgContextCache = new Map<
     string,
-    { activeMemberIds: string[]; creatorId: string | null }
+    { activeMemberIds: string[]; creatorId: string | null; birthdayAdminIds: string[] }
   >();
 
   async function getOrgContext(orgId: string) {
@@ -115,10 +124,17 @@ export async function GET(request: Request) {
     const superAdmin = activeProfiles.find((profile) =>
       normalizeRoles(profile.roles).includes("SUPER_ADMIN")
     );
+    const birthdayAdminIds = activeProfiles
+      .filter((profile) => {
+        const roles = normalizeRoles(profile.roles);
+        return roles.includes("HR_ADMIN");
+      })
+      .map((profile) => profile.id);
     const creatorId = superAdmin?.id ?? activeProfiles[0]?.id ?? null;
     const context = {
       activeMemberIds: activeProfiles.map((profile) => profile.id),
-      creatorId
+      creatorId,
+      birthdayAdminIds
     };
 
     orgContextCache.set(orgId, context);
@@ -126,13 +142,29 @@ export async function GET(request: Request) {
   }
 
   for (const emp of employees) {
-    if (!emp.date_of_birth || emp.status === "onboarding") continue;
+    if (emp.status === "onboarding") continue;
 
-    const dob = isoDateToUtcDate(emp.date_of_birth);
-    if (!dob) continue;
+    if (!hasBirthdayConfigured({
+      dateOfBirth: emp.date_of_birth,
+      birthdayMonth: emp.birthday_month,
+      birthdayDay: emp.birthday_day
+    })) {
+      continue;
+    }
 
-    const dobMonth = dob.getUTCMonth() + 1;
-    const dobDay = dob.getUTCDate();
+    const birthdayParts = getBirthdayParts({
+      dateOfBirth: emp.date_of_birth,
+      birthdayMonth: emp.birthday_month,
+      birthdayDay: emp.birthday_day
+    });
+
+    const dobMonth = birthdayParts?.month ?? null;
+    const dobDay = birthdayParts?.day ?? null;
+
+    if (!dobMonth || !dobDay) {
+      continue;
+    }
+
     const isBirthdayToday = dobMonth === todayMonth && dobDay === todayDay;
     const isBirthdayIn7Days = dobMonth === reminderMonth && dobDay === reminderDay;
 
@@ -149,7 +181,15 @@ export async function GET(request: Request) {
       .is("deleted_at", null);
 
     const holidayDateKeys = new Set((holidays ?? []).map((h) => h.date));
-    const birthdayOptions = getBirthdayLeaveOptions(emp.date_of_birth, currentYear, holidayDateKeys);
+    const birthdayOptions = getBirthdayLeaveOptions(
+      {
+        dateOfBirth: emp.date_of_birth,
+        birthdayMonth: emp.birthday_month,
+        birthdayDay: emp.birthday_day
+      },
+      currentYear,
+      holidayDateKeys
+    );
 
     if (isBirthdayToday) {
       const { activeMemberIds, creatorId } = await getOrgContext(emp.org_id);
@@ -167,10 +207,10 @@ export async function GET(request: Request) {
       });
 
       if (creatorId) {
-        const announcementTitle = `Happy birthday, ${emp.full_name}!`;
+        const announcementTitle = `It's ${emp.full_name}'s birthday today!`;
         const announcementBody = birthdayOptions.needsChoice
-          ? `Join us in wishing ${emp.full_name} a happy birthday today.`
-          : `Join us in wishing ${emp.full_name} a happy birthday today. They are also out on birthday leave.`;
+          ? `Join us in celebrating ${emp.full_name} today. Send them some warm wishes and help make their birthday feel special.`
+          : `Join us in celebrating ${emp.full_name} today. Send them some warm wishes and help make their birthday feel special. They are also out on birthday leave today.`;
 
         const { data: existingAnnouncement } = await supabase
           .from("announcements")
@@ -226,6 +266,25 @@ export async function GET(request: Request) {
             birthdayAnnouncements++;
           }
         }
+      }
+    }
+
+    if (isBirthdayIn7Days) {
+      const { birthdayAdminIds } = await getOrgContext(emp.org_id);
+      const adminRecipientIds = birthdayAdminIds.filter((id) => id !== emp.id);
+
+      if (adminRecipientIds.length > 0) {
+        await createBulkNotifications({
+          orgId: emp.org_id,
+          userIds: adminRecipientIds,
+          type: "announcement",
+          title: "Upcoming birthday",
+          body: `${emp.full_name}'s birthday is on ${formatDateLib(reminderDate)}. Plan any gift or celebration now.`,
+          link: "/people",
+          dedupeKey: `birthday-admin-reminder:${today}:${emp.id}`
+        });
+
+        adminRemindersSent += adminRecipientIds.length;
       }
     }
 
@@ -293,7 +352,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    message: `Birthday leave: ${autoGranted} auto-granted, ${birthdayAnnouncements} announcement(s), ${remindersSent} reminders sent`,
+    message: `Birthday leave: ${autoGranted} auto-granted, ${birthdayAnnouncements} announcement(s), ${adminRemindersSent} admin reminder(s), ${remindersSent} employee reminder(s) sent`,
     date: today
   });
 }

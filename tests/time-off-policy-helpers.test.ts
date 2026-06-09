@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateBusinessDaysNotice,
   differenceInCalendarDays,
+  getBirthdayDisplayDate,
   getBirthdayLeaveOptions,
   spansMultipleCalendarYears
 } from "../lib/time-off";
@@ -46,5 +47,26 @@ describe("time-off policy helpers", () => {
       "2026-03-30",
       "2026-03-31"
     ]);
+  });
+
+  it("supports month/day-only birthdays for display and leave eligibility", () => {
+    expect(
+      getBirthdayDisplayDate({
+        birthdayMonth: 6,
+        birthdayDay: 30
+      })
+    ).toBe("2000-06-30");
+
+    const result = getBirthdayLeaveOptions(
+      {
+        birthdayMonth: 6,
+        birthdayDay: 30
+      },
+      2026,
+      new Set()
+    );
+
+    expect(result.birthdayDate).toBe("2026-06-30");
+    expect(result.options[0]).toBe("2026-06-30");
   });
 });

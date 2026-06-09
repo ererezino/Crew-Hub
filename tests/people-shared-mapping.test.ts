@@ -20,7 +20,7 @@ import {
 
 // ── Fixtures ──
 
-/** Simulates a row returned by the list route's SELECT (has social, no dob/notice). */
+/** Simulates a row returned by the list route's SELECT (has social and partial birthday data, no dob/notice). */
 const LIST_ROUTE_ROW = {
   id: "a0000000-0000-4000-8000-000000000001",
   email: "alice@test.com",
@@ -32,6 +32,8 @@ const LIST_ROUTE_ROW = {
   timezone: "America/New_York",
   phone: "+15551234567",
   start_date: "2024-06-01",
+  birthday_month: 3,
+  birthday_day: 25,
   // date_of_birth: absent
   // notice_period_end_date: absent
   manager_id: "b0000000-0000-4000-8000-000000000002",
@@ -93,6 +95,8 @@ const DETAIL_ROUTE_ROW = {
   emergency_contact_name: "Bob Smith",
   emergency_contact_phone: "+15559876543",
   emergency_contact_relationship: "Spouse",
+  home_address: "123 Main Street",
+  government_id_url: "https://example.com/id/alice",
   favorite_music: "Jazz",
   favorite_books: "Sci-fi",
   favorite_sports: "Tennis",
@@ -118,6 +122,8 @@ describe("profileRowSchema (W2.1)", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.date_of_birth).toBeNull();
+      expect(result.data.birthday_month).toBe(3);
+      expect(result.data.birthday_day).toBe(25);
       expect(result.data.notice_period_end_date).toBeNull();
       expect(result.data.social_linkedin).toBe("https://linkedin.com/in/alice");
       expect(result.data.social_github).toBe("alice-gh");
@@ -185,6 +191,8 @@ describe("mapProfileRow (W2.1)", () => {
     expect(person.roles).toEqual(["EMPLOYEE", "MANAGER"]);
     expect(person.managerName).toBe("Bob Manager");
     expect(person.dateOfBirth).toBeNull();
+    expect(person.birthdayMonth).toBe(3);
+    expect(person.birthdayDay).toBe(25);
     expect(person.noticePeriodEndDate).toBeNull();
     expect(person.socialLinkedin).toBe("https://linkedin.com/in/alice");
     expect(person.socialGithub).toBe("alice-gh");
@@ -198,6 +206,8 @@ describe("mapProfileRow (W2.1)", () => {
     const person = mapProfileRow(parsed, MANAGER_NAMES, "CT-001");
 
     expect(person.dateOfBirth).toBe("1990-03-25");
+    expect(person.homeAddress).toBe("123 Main Street");
+    expect(person.governmentIdUrl).toBe("https://example.com/id/alice");
     expect(person.noticePeriodEndDate).toBe("2025-01-31");
     expect(person.socialLinkedin).toBeNull();
     expect(person.socialTwitter).toBeNull();

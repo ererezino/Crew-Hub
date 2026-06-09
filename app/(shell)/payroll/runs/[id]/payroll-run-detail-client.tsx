@@ -29,10 +29,12 @@ import {
 import type { GeneratePayslipsResponse } from "../../../../../types/payslips";
 import type {
   AddPayrollAdjustmentResponse,
+  ApproveMonthlyOvertimeResponse,
   CalculatePayrollRunResponse,
   CreateAmendmentRunResponse,
   EditPayrollItemResponse,
   EmployeeRemainingEntry,
+  PayrollCurrencyTotals,
   MarkCyclePaidResponse,
   PayrollAdjustmentType,
   PayrollCycle,
@@ -156,6 +158,125 @@ function itemTableSkeleton() {
         <div key={`payroll-run-row-skeleton-${index}`} className="table-skeleton-row" />
       ))}
     </section>
+  );
+}
+
+type PayrollRunCurrencySummaryProps = {
+  totals: PayrollCurrencyTotals | null | undefined;
+  items: PayrollRunItem[];
+  locale?: string;
+  emptyLabel?: string;
+  preferredCurrency?: string;
+  cyclesLabel: (count: number) => string;
+  localPayrollLabel: string;
+  otherCurrenciesLabel: string;
+};
+
+type CurrencySummaryEntry = {
+  currency: string;
+  amount: number;
+  employeeCount: number;
+};
+
+function buildCurrencySummaryEntries({
+  totals,
+  items,
+  preferredCurrency = "USD"
+}: {
+  totals: PayrollCurrencyTotals | null | undefined;
+  items: PayrollRunItem[];
+  preferredCurrency?: string;
+}): CurrencySummaryEntry[] {
+  const employeeCountByCurrency = new Map<string, number>();
+
+  for (const item of items) {
+    const currency = item.payCurrency.trim().toUpperCase() || "USD";
+    employeeCountByCurrency.set(currency, (employeeCountByCurrency.get(currency) ?? 0) + 1);
+  }
+
+  return Object.entries(totals ?? {})
+    .map(([currency, amount]) => {
+      const normalizedCurrency = currency.trim().toUpperCase() || "USD";
+      return {
+        currency: normalizedCurrency,
+        amount,
+        employeeCount: employeeCountByCurrency.get(normalizedCurrency) ?? 0
+      };
+    })
+    .filter(({ amount }) => Number.isFinite(amount) && amount !== 0)
+    .sort((left, right) => {
+      const leftIsPreferred = left.currency === preferredCurrency ? 1 : 0;
+      const rightIsPreferred = right.currency === preferredCurrency ? 1 : 0;
+
+      if (leftIsPreferred !== rightIsPreferred) {
+        return rightIsPreferred - leftIsPreferred;
+      }
+
+      if (left.employeeCount !== right.employeeCount) {
+        return right.employeeCount - left.employeeCount;
+      }
+
+      return right.amount - left.amount;
+    });
+}
+
+function PayrollRunCurrencySummary({
+  totals,
+  items,
+  locale,
+  emptyLabel = "--",
+  preferredCurrency = "USD",
+  cyclesLabel,
+  localPayrollLabel,
+  otherCurrenciesLabel
+}: PayrollRunCurrencySummaryProps) {
+  const entries = buildCurrencySummaryEntries({ totals, items, preferredCurrency });
+
+  if (entries.length === 0) {
+    return <span>{emptyLabel}</span>;
+  }
+
+  const [primary, ...secondary] = entries;
+  const secondaryTotals = Object.fromEntries(
+    secondary.map((entry) => [entry.currency, entry.amount])
+  );
+  const secondaryEmployeeCount = secondary.reduce(
+    (total, entry) => total + entry.employeeCount,
+    0
+  );
+  const secondaryLabel =
+    primary.currency === preferredCurrency && secondary.length === 1
+      ? localPayrollLabel
+      : otherCurrenciesLabel;
+
+  return (
+    <span className="payroll-run-currency-summary">
+      <CurrencyDisplay
+        amount={primary.amount}
+        currency={primary.currency}
+        locale={locale}
+        className="payroll-run-currency-summary-primary"
+      />
+
+      {secondary.length > 0 ? (
+        <span className="payroll-run-currency-summary-secondary">
+          <span className="payroll-run-currency-summary-secondary-label">
+            {secondaryLabel}
+          </span>
+          <CurrencyTotalsDisplay
+            totals={secondaryTotals}
+            locale={locale}
+            layout="inline"
+            className="payroll-run-currency-summary-secondary-amounts"
+          />
+          {secondaryEmployeeCount > 0 ? (
+            <span className="payroll-run-currency-summary-secondary-count">
+              {cyclesLabel(secondaryEmployeeCount)}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -334,6 +455,7 @@ export function PayrollRunDetailClient({
   const [markingPaidCycleId, setMarkingPaidCycleId] = useState<string | null>(null);
   const [isCreatingAmendment, setIsCreatingAmendment] = useState(false);
   const [isPerformingHistoricalAction, setIsPerformingHistoricalAction] = useState(false);
+  const [isApprovingMonthlyOvertime, setIsApprovingMonthlyOvertime] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [detailView, setDetailView] = useState<"worksheet" | "items">("worksheet");
   const [worksheetViewMode, setWorksheetViewMode] = useState<WorksheetViewMode>("worksheet");
@@ -350,6 +472,7 @@ export function PayrollRunDetailClient({
   }, [runQuery.data?.items, sortDirection]);
 
   const run = runQuery.data?.run ?? null;
+  const overtimeSummary = runQuery.data?.overtimeSummary ?? null;
   const isApproved = run?.status === "approved";
   const isProcessing = run?.status === "processing";
   const isCompleted = run?.status === "completed";
@@ -396,6 +519,12 @@ export function PayrollRunDetailClient({
     canManage &&
     !isHistorical &&
     (run ? run.status !== "completed" && run.status !== "cancelled" : false);
+  const canApprovePreviousMonthOvertime =
+    canApprove &&
+    !!run &&
+    !!overtimeSummary &&
+    overtimeSummary.pendingCount > 0 &&
+    (run.status === "draft" || run.status === "calculated" || run.status === "rejected");
 
   const dismissToast = (toastId: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== toastId));
@@ -445,6 +574,50 @@ export function PayrollRunDetailClient({
       showToast("error", err instanceof Error ? err.message : "Action failed.");
     } finally {
       setIsPerformingHistoricalAction(false);
+    }
+  };
+
+  const approvePreviousMonthOvertime = async () => {
+    if (!run || isApprovingMonthlyOvertime) {
+      return;
+    }
+
+    setIsApprovingMonthlyOvertime(true);
+
+    try {
+      const response = await fetch(`/api/v1/payroll/runs/${runId}/overtime`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: "approve_previous_month" })
+      });
+
+      const payload = (await response.json()) as ApproveMonthlyOvertimeResponse;
+
+      if (!response.ok || !payload.data) {
+        showToast(
+          "error",
+          payload.error?.message ?? td("overtime.toast.unableToApprove")
+        );
+        return;
+      }
+
+      showToast(
+        "success",
+        payload.data.approvedCount > 0
+          ? td("overtime.toast.approved", { count: payload.data.approvedCount })
+          : td("overtime.toast.nothingPending")
+      );
+
+      runQuery.refresh();
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : td("overtime.toast.unableToApprove")
+      );
+    } finally {
+      setIsApprovingMonthlyOvertime(false);
     }
   };
 
@@ -1193,7 +1366,14 @@ export function PayrollRunDetailClient({
             <article className="metric-card">
               <p className="metric-label">{t('metrics.grossTotal')}</p>
               <p className="metric-value">
-                <CurrencyTotalsDisplay totals={runQuery.data.run.totalGross} locale={locale} />
+                <PayrollRunCurrencySummary
+                  totals={runQuery.data.run.totalGross}
+                  items={runQuery.data.items}
+                  locale={locale}
+                  cyclesLabel={(count) => td("cycles.employeeCount", { count })}
+                  localPayrollLabel={t("metrics.localPayroll")}
+                  otherCurrenciesLabel={t("metrics.otherCurrencies")}
+                />
               </p>
               <p className="metric-hint">{t('metrics.grossTotalHint')}</p>
             </article>
@@ -1201,7 +1381,14 @@ export function PayrollRunDetailClient({
             <article className="metric-card">
               <p className="metric-label">{t('metrics.netTotal')}</p>
               <p className="metric-value">
-                <CurrencyTotalsDisplay totals={runQuery.data.run.totalNet} locale={locale} />
+                <PayrollRunCurrencySummary
+                  totals={runQuery.data.run.totalNet}
+                  items={runQuery.data.items}
+                  locale={locale}
+                  cyclesLabel={(count) => td("cycles.employeeCount", { count })}
+                  localPayrollLabel={t("metrics.localPayroll")}
+                  otherCurrenciesLabel={t("metrics.otherCurrencies")}
+                />
               </p>
               <p className="metric-hint">{t('metrics.netTotalHint')}</p>
             </article>
@@ -1328,6 +1515,99 @@ export function PayrollRunDetailClient({
                   </div>
                 </div>
               ) : null}
+            </section>
+          ) : null}
+
+          {!isHistorical && overtimeSummary ? (
+            <section className="settings-card payroll-approval-card" aria-label={td("overtime.title")}>
+              <div className="payroll-approval-header">
+                <h2 className="section-title">{td("overtime.title", { month: overtimeSummary.sourceMonth })}</h2>
+                <StatusBadge
+                  tone={
+                    overtimeSummary.hasPendingEntries
+                      ? "warning"
+                      : overtimeSummary.hasApprovedEntries
+                        ? "success"
+                        : "draft"
+                  }
+                >
+                  {overtimeSummary.hasPendingEntries
+                    ? td("overtime.statusPending")
+                    : overtimeSummary.hasApprovedEntries
+                      ? td("overtime.statusApproved")
+                      : td("overtime.statusEmpty")}
+                </StatusBadge>
+              </div>
+
+              <p className="settings-card-description">
+                {td("overtime.description", {
+                  month: overtimeSummary.sourceMonth,
+                  cycle: 1
+                })}
+              </p>
+
+              <div className="metrics-grid">
+                <article className="metric-card">
+                  <p className="metric-label">{td("overtime.metrics.approvedTotal")}</p>
+                  <p className="metric-value">
+                    <CurrencyTotalsDisplay totals={overtimeSummary.approvedTotals} locale={locale} />
+                  </p>
+                  <p className="metric-hint">
+                    {td("overtime.metrics.approvedHours", { hours: overtimeSummary.approvedHours })}
+                  </p>
+                </article>
+
+                <article className="metric-card">
+                  <p className="metric-label">{td("overtime.metrics.pendingTotal")}</p>
+                  <p className="metric-value">
+                    <CurrencyTotalsDisplay totals={overtimeSummary.pendingTotals} locale={locale} />
+                  </p>
+                  <p className="metric-hint">
+                    {td("overtime.metrics.pendingHours", { hours: overtimeSummary.pendingHours })}
+                  </p>
+                </article>
+
+                <article className="metric-card">
+                  <p className="metric-label">{td("overtime.metrics.entries")}</p>
+                  <p className="metric-value numeric">
+                    {overtimeSummary.approvedCount + overtimeSummary.pendingCount + overtimeSummary.rejectedCount}
+                  </p>
+                  <p className="metric-hint">
+                    {td("overtime.metrics.entryBreakdown", {
+                      approved: overtimeSummary.approvedCount,
+                      pending: overtimeSummary.pendingCount,
+                      rejected: overtimeSummary.rejectedCount
+                    })}
+                  </p>
+                </article>
+
+                <article className="metric-card">
+                  <p className="metric-label">{td("overtime.metrics.employees")}</p>
+                  <p className="metric-value numeric">{overtimeSummary.employeeCount}</p>
+                  <p className="metric-hint">
+                    {td("overtime.metrics.linked", { count: overtimeSummary.linkedApprovedCount })}
+                  </p>
+                </article>
+              </div>
+
+              <p className="settings-card-description">
+                {td("overtime.cycleRule")}
+              </p>
+
+              <div className="settings-actions payroll-approval-actions">
+                {canApprovePreviousMonthOvertime ? (
+                  <button
+                    type="button"
+                    className="button button-accent"
+                    disabled={isApprovingMonthlyOvertime}
+                    onClick={() => void approvePreviousMonthOvertime()}
+                  >
+                    {isApprovingMonthlyOvertime
+                      ? td("overtime.actions.approving")
+                      : td("overtime.actions.approve")}
+                  </button>
+                ) : null}
+              </div>
             </section>
           ) : null}
 

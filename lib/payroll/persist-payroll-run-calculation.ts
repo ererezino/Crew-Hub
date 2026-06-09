@@ -4,6 +4,11 @@ import { z } from "zod";
 import { logAudit } from "../audit";
 import { calculatePayrollItem } from "./calculate-payroll-item";
 import {
+  aggregateApprovedMonthlyOvertimeByEmployee,
+  calculateOvertimeCompensation,
+  getPreviousMonthWindow
+} from "./overtime";
+import {
   addCurrencyTotal,
   normalizeCurrencyCode,
   parseCurrencyTotals
@@ -52,6 +57,22 @@ const allowanceRowSchema = z.object({
 const paymentDetailsRowSchema = z.object({
   id: z.string().uuid(),
   employee_id: z.string().uuid()
+});
+
+const overtimeEntryRowSchema = z.object({
+  id: z.string().uuid(),
+  employee_id: z.string().uuid(),
+  entry_date: z.string(),
+  hours: z.union([z.number(), z.string()]),
+  amount: z.union([z.number(), z.string()]),
+  currency: z.string().length(3),
+  status: z.enum(["pending", "approved", "rejected"]),
+  payroll_item_id: z.string().uuid().nullable()
+});
+
+const linkedPayrollItemRowSchema = z.object({
+  id: z.string().uuid(),
+  payroll_run_id: z.string().uuid()
 });
 
 const payrollAdjustmentSchema = z.object({
@@ -235,6 +256,92 @@ export async function persistPayrollRunCalculation({
     throw new Error("Payroll calculation inputs are not in the expected format.");
   }
 
+  const previousMonthWindow = getPreviousMonthWindow(run.pay_period_start);
+  const { data: rawPreviousMonthOvertimeEntries, error: previousMonthOvertimeError } =
+    eligibleEmployeeIds.length > 0
+      ? await supabase
+          .from("overtime_entries")
+          .select("id, employee_id, entry_date, hours, amount, currency, status, payroll_item_id")
+          .eq("org_id", actor.orgId)
+          .in("employee_id", eligibleEmployeeIds)
+          .gte("entry_date", previousMonthWindow.periodStart)
+          .lte("entry_date", previousMonthWindow.periodEnd)
+          .is("deleted_at", null)
+      : { data: [], error: null };
+
+  if (previousMonthOvertimeError) {
+    throw new Error(
+      `Unable to load previous-month overtime entries: ${previousMonthOvertimeError.message}`
+    );
+  }
+
+  const parsedPreviousMonthOvertimeEntries = z
+    .array(overtimeEntryRowSchema)
+    .safeParse(rawPreviousMonthOvertimeEntries ?? []);
+
+  if (!parsedPreviousMonthOvertimeEntries.success) {
+    throw new Error("Previous-month overtime entries are not in the expected format.");
+  }
+
+  const linkedPayrollItemIds = [
+    ...new Set(
+      parsedPreviousMonthOvertimeEntries.data
+        .map((entry) => entry.payroll_item_id)
+        .filter((value): value is string => typeof value === "string")
+    )
+  ];
+
+  const { data: rawLinkedPayrollItems, error: linkedPayrollItemsError } =
+    linkedPayrollItemIds.length > 0
+      ? await supabase
+          .from("payroll_items")
+          .select("id, payroll_run_id")
+          .eq("org_id", actor.orgId)
+          .in("id", linkedPayrollItemIds)
+      : { data: [], error: null };
+
+  if (linkedPayrollItemsError) {
+    throw new Error(
+      `Unable to load linked payroll items for overtime entries: ${linkedPayrollItemsError.message}`
+    );
+  }
+
+  const parsedLinkedPayrollItems = z
+    .array(linkedPayrollItemRowSchema)
+    .safeParse(rawLinkedPayrollItems ?? []);
+
+  if (!parsedLinkedPayrollItems.success) {
+    throw new Error("Linked payroll items for overtime entries are invalid.");
+  }
+
+  const linkedRunIdByPayrollItemId = new Map(
+    parsedLinkedPayrollItems.data.map((row) => [row.id, row.payroll_run_id])
+  );
+  const approvedPreviousMonthOvertimeByEmployee =
+    aggregateApprovedMonthlyOvertimeByEmployee({
+      entries: parsedPreviousMonthOvertimeEntries.data.map((entry) => ({
+        id: entry.id,
+        employeeId: entry.employee_id,
+        hours: Number(entry.hours),
+        amount: parseAmount(entry.amount),
+        currency: entry.currency,
+        status: entry.status,
+        payrollItemId: entry.payroll_item_id
+      })),
+      currentRunId: run.id,
+      linkedRunIdByPayrollItemId
+    });
+  const pendingPreviousMonthOvertimeCountByEmployee = new Map<string, number>();
+
+  for (const entry of parsedPreviousMonthOvertimeEntries.data) {
+    if (entry.status !== "pending") {
+      continue;
+    }
+
+    const currentPending = pendingPreviousMonthOvertimeCountByEmployee.get(entry.employee_id) ?? 0;
+    pendingPreviousMonthOvertimeCountByEmployee.set(entry.employee_id, currentPending + 1);
+  }
+
   const compensationByEmployeeId = new Map<string, z.infer<typeof compensationRowSchema>>();
 
   for (const row of parsedCompensationRows.data) {
@@ -363,7 +470,6 @@ export async function persistPayrollRunCalculation({
       }));
 
       const adjustmentsTotal = adjustmentAmountTotal(adjustments);
-      const netAmount = calculated.net_amount + adjustmentsTotal;
       const existingItem = existingItemsByEmployeeId.get(employee.id) ?? null;
       const previousBaseSalaryAmount = existingItem ? parseAmount(existingItem.base_salary_amount) : 0;
       const existingCycle1BaseAmount = existingItem ? parseAmount(existingItem.cycle_1_base_amount) : 0;
@@ -383,10 +489,27 @@ export async function persistPayrollRunCalculation({
       const cycle2BaseAmount = splitWasCustomized
         ? existingCycle2BaseAmount
         : nextDefaultSplit.cycle2;
-      const cycle1OvertimeHours = existingItem ? Number(existingItem.cycle_1_overtime_hours ?? 0) : 0;
-      const cycle2OvertimeHours = existingItem ? Number(existingItem.cycle_2_overtime_hours ?? 0) : 0;
-      const cycle1OvertimeAmount = existingItem ? parseAmount(existingItem.cycle_1_overtime_amount) : 0;
-      const cycle2OvertimeAmount = existingItem ? parseAmount(existingItem.cycle_2_overtime_amount) : 0;
+      const approvedPreviousMonthOvertime =
+        approvedPreviousMonthOvertimeByEmployee.get(employee.id) ?? null;
+      const fallbackCycle1OvertimeHours = existingItem ? Number(existingItem.cycle_1_overtime_hours ?? 0) : 0;
+      const fallbackCycle1OvertimeAmount = calculateOvertimeCompensation({
+        monthlyCompensationAmount: baseSalaryAmount,
+        overtimeHours: fallbackCycle1OvertimeHours
+      });
+      const approvedOvertimeMatchesCurrency =
+        approvedPreviousMonthOvertime &&
+        approvedPreviousMonthOvertime.currency &&
+        approvedPreviousMonthOvertime.currency === payCurrency;
+      const cycle1OvertimeHours =
+        approvedPreviousMonthOvertime && approvedOvertimeMatchesCurrency
+          ? approvedPreviousMonthOvertime.hours
+          : fallbackCycle1OvertimeHours;
+      const cycle1OvertimeAmount =
+        approvedPreviousMonthOvertime && approvedOvertimeMatchesCurrency
+          ? approvedPreviousMonthOvertime.amount
+          : fallbackCycle1OvertimeAmount;
+      const cycle2OvertimeHours = 0;
+      const cycle2OvertimeAmount = 0;
       const fees = existingItem ? parseAmount(existingItem.fees) : 0;
       const bonus = existingItem ? parseAmount(existingItem.bonus) : 0;
       const comment = existingItem?.comment ?? null;
@@ -407,6 +530,16 @@ export async function persistPayrollRunCalculation({
         flagReasons.push(`Calculation error: ${calcError}`);
       }
 
+      if ((pendingPreviousMonthOvertimeCountByEmployee.get(employee.id) ?? 0) > 0) {
+        flagReasons.push("Previous-month overtime is still pending approval");
+      }
+
+      if (approvedPreviousMonthOvertime?.hasCurrencyMismatch) {
+        flagReasons.push("Previous-month overtime has mixed currencies");
+      } else if (approvedPreviousMonthOvertime && !approvedOvertimeMatchesCurrency) {
+        flagReasons.push("Previous-month overtime currency does not match payroll currency");
+      }
+
       if (
         employee.start_date &&
         employee.start_date >= run.pay_period_start &&
@@ -423,11 +556,16 @@ export async function persistPayrollRunCalculation({
         flagReasons.push("Salary changed this month");
       }
 
+      const totalOvertimeHours = cycle1OvertimeHours + cycle2OvertimeHours;
+      const totalOvertimeAmount = cycle1OvertimeAmount + cycle2OvertimeAmount;
+      const plannedGrossAmount = grossAmount + totalOvertimeAmount + bonus + fees;
+      const plannedNetAmount = calculated.net_amount + adjustmentsTotal + totalOvertimeAmount + bonus + fees;
+
       return {
         payroll_run_id: run.id,
         employee_id: employee.id,
         org_id: actor.orgId,
-        gross_amount: grossAmount,
+        gross_amount: plannedGrossAmount,
         currency,
         pay_currency: payCurrency,
         base_salary_amount: baseSalaryAmount,
@@ -435,9 +573,9 @@ export async function persistPayrollRunCalculation({
         adjustments,
         deductions: mappedDeductions,
         employer_contributions: mappedEmployerContributions,
-        overtime_hours: cycle1OvertimeHours + cycle2OvertimeHours,
-        overtime_amount: cycle1OvertimeAmount + cycle2OvertimeAmount,
-        net_amount: netAmount,
+        overtime_hours: totalOvertimeHours,
+        overtime_amount: totalOvertimeAmount,
+        net_amount: plannedNetAmount,
         withholding_applied: calculated.withholding_applied,
         payment_status: "pending" as const,
         payment_reference: null,
@@ -481,14 +619,23 @@ export async function persistPayrollRunCalculation({
     );
   }
 
+  let persistedPayrollItems: Array<{ id: string; employee_id: string }> = [];
+
   if (nextItemRows.length > 0) {
-    const { error: upsertError } = await supabase
+    const { data: upsertedPayrollItems, error: upsertError } = await supabase
       .from("payroll_items")
-      .upsert(nextItemRows, { onConflict: "payroll_run_id,employee_id" });
+      .upsert(nextItemRows, { onConflict: "payroll_run_id,employee_id" })
+      .select("id, employee_id");
 
     if (upsertError) {
       throw new Error(`Unable to write payroll items: ${upsertError.message}`);
     }
+
+    persistedPayrollItems = (upsertedPayrollItems ?? [])
+      .filter(
+        (row): row is { id: string; employee_id: string } =>
+          typeof row?.id === "string" && typeof row?.employee_id === "string"
+      );
   }
 
   if (staleItemIds.length > 0) {
@@ -501,6 +648,60 @@ export async function persistPayrollRunCalculation({
 
     if (staleError) {
       throw new Error(`Unable to archive stale payroll items: ${staleError.message}`);
+    }
+  }
+
+  const currentRunPayrollItemIds = persistedPayrollItems.map((row) => row.id);
+
+  if (currentRunPayrollItemIds.length > 0) {
+    const { error: clearLinkedOvertimeError } = await supabase
+      .from("overtime_entries")
+      .update({ payroll_item_id: null })
+      .eq("org_id", actor.orgId)
+      .eq("status", "approved")
+      .gte("entry_date", previousMonthWindow.periodStart)
+      .lte("entry_date", previousMonthWindow.periodEnd)
+      .in("payroll_item_id", currentRunPayrollItemIds);
+
+    if (clearLinkedOvertimeError) {
+      throw new Error(
+        `Unable to clear existing overtime links for this payroll run: ${clearLinkedOvertimeError.message}`
+      );
+    }
+  }
+
+  const payrollItemIdByEmployeeId = new Map(
+    persistedPayrollItems.map((row) => [row.employee_id, row.id])
+  );
+  const overtimeEntryIdsByPayrollItemId = new Map<string, string[]>();
+
+  for (const [employeeId, overtimeAggregate] of approvedPreviousMonthOvertimeByEmployee) {
+    if (overtimeAggregate.hasCurrencyMismatch) {
+      continue;
+    }
+
+    const targetPayrollItemId = payrollItemIdByEmployeeId.get(employeeId);
+
+    if (!targetPayrollItemId) {
+      continue;
+    }
+
+    const currentEntryIds = overtimeEntryIdsByPayrollItemId.get(targetPayrollItemId) ?? [];
+    currentEntryIds.push(...overtimeAggregate.entryIds);
+    overtimeEntryIdsByPayrollItemId.set(targetPayrollItemId, currentEntryIds);
+  }
+
+  for (const [payrollItemId, overtimeEntryIds] of overtimeEntryIdsByPayrollItemId) {
+    const { error: linkOvertimeError } = await supabase
+      .from("overtime_entries")
+      .update({ payroll_item_id: payrollItemId })
+      .eq("org_id", actor.orgId)
+      .in("id", overtimeEntryIds);
+
+    if (linkOvertimeError) {
+      throw new Error(
+        `Unable to link approved overtime entries into payroll cycle 1: ${linkOvertimeError.message}`
+      );
     }
   }
 

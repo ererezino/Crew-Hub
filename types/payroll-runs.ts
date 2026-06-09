@@ -222,6 +222,23 @@ export type OvertimeEntry = {
   updatedAt: string;
 };
 
+export type PayrollOvertimeSummary = {
+  sourceMonth: string;
+  periodStart: string;
+  periodEnd: string;
+  employeeCount: number;
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+  linkedApprovedCount: number;
+  pendingHours: number;
+  approvedHours: number;
+  pendingTotals: PayrollCurrencyTotals;
+  approvedTotals: PayrollCurrencyTotals;
+  hasPendingEntries: boolean;
+  hasApprovedEntries: boolean;
+};
+
 export type PayslipStatementType = "native" | "historical";
 
 export type PayrollRunDashboardMetrics = {
@@ -330,6 +347,7 @@ export type PayrollRunDetailResponseData = {
   items: PayrollRunItem[];
   cycles: PayrollCycle[];
   flaggedCount: number;
+  overtimeSummary: PayrollOvertimeSummary;
 };
 
 export type CreatePayrollRunPayload = {
@@ -378,12 +396,19 @@ export type PayrollRunActionResponseData = {
   run: PayrollRunSummary;
 };
 
+export type ApproveMonthlyOvertimeResponseData = {
+  summary: PayrollOvertimeSummary;
+  approvedCount: number;
+  recalculated: boolean;
+};
+
 export type PayrollRunsDashboardResponse = ApiResponse<PayrollRunsDashboardResponseData>;
 export type PayrollRunDetailResponse = ApiResponse<PayrollRunDetailResponseData>;
 export type CreatePayrollRunResponse = ApiResponse<CreatePayrollRunResponseData>;
 export type CalculatePayrollRunResponse = ApiResponse<CalculatePayrollRunResponseData>;
 export type AddPayrollAdjustmentResponse = ApiResponse<AddPayrollAdjustmentResponseData>;
 export type PayrollRunActionResponse = ApiResponse<PayrollRunActionResponseData>;
+export type ApproveMonthlyOvertimeResponse = ApiResponse<ApproveMonthlyOvertimeResponseData>;
 export type HistoricalActionResponse = ApiResponse<HistoricalActionResponseData>;
 
 export type PreparePayoutResponseData = {

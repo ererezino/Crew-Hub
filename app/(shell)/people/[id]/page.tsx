@@ -163,10 +163,14 @@ export default async function PeopleProfilePage({
         <PeopleOverviewClient
           employeeId={parsedId.data}
           isSelf={isSelf}
-          isAdmin={
+          canSeePrivateFields={
             hasRole(profile.roles, "HR_ADMIN") ||
             hasRole(profile.roles, "FINANCE_ADMIN") ||
             hasRole(profile.roles, "FINANCE_APPROVER") ||
+            hasRole(profile.roles, "SUPER_ADMIN")
+          }
+          canManageSensitiveProfile={
+            hasRole(profile.roles, "HR_ADMIN") ||
             hasRole(profile.roles, "SUPER_ADMIN")
           }
           isSuperAdmin={hasRole(profile.roles, "SUPER_ADMIN")}

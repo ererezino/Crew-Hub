@@ -360,6 +360,11 @@ export async function getAuthenticatedSession(
 export type SettingsProfileFields = {
   phone: string | null;
   notification_preferences: Record<string, unknown> | null;
+  date_of_birth: string | null;
+  birthday_month: number | null;
+  birthday_day: number | null;
+  home_address: string | null;
+  government_id_url: string | null;
   bio: string | null;
   pronouns: string | null;
   emergency_contact_name: string | null;
@@ -383,7 +388,7 @@ export async function getSettingsProfileFields(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "phone, notification_preferences, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_tiktok, social_website, favorite_music, favorite_books, favorite_sports"
+      "phone, notification_preferences, date_of_birth, birthday_month, birthday_day, home_address, government_id_url, bio, pronouns, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, social_linkedin, social_twitter, social_instagram, social_github, social_tiktok, social_website, favorite_music, favorite_books, favorite_sports"
     )
     .eq("id", userId)
     .is("deleted_at", null)

@@ -24,3 +24,7 @@ pnpm-debug.log*
 next-env.d.ts
 .vercel
 .codex
+
+# local agent worktrees and QA artifacts (never commit)
+.claude/worktrees/
+qa-artifacts/

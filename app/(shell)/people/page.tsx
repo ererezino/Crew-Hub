@@ -76,6 +76,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   const canInvitePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const canEditPeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const canResetAuthenticator = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
+  const canManageWorkTools = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");
   const isAdmin = hasRole(roles, "HR_ADMIN") || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER") || hasRole(roles, "SUPER_ADMIN");
   const isSuperAdmin = hasRole(roles, "SUPER_ADMIN");
   const scope = resolveScope(roles);
@@ -90,8 +91,8 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
     // Graceful degradation: client will fetch on mount
   }
 
-  // Super Admins get the tabbed view with org chart access
-  if (isSuperAdmin) {
+  // HR Admins and Super Admins get the tabbed people workspace.
+  if (isSuperAdmin || canManageWorkTools) {
     const resolvedSearchParams = await searchParams;
     const requestedTab = resolveRequestedTab(resolvedSearchParams);
 
@@ -107,6 +108,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
         canResetAuthenticator={canResetAuthenticator}
         isAdmin={isAdmin}
         isSuperAdmin={isSuperAdmin}
+        canManageWorkTools={canManageWorkTools}
         initialPeopleData={initialPeopleData}
       />
     );

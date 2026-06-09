@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../../../lib/audit";
+import { calculateOvertimeCompensation } from "../../../../../../../../../lib/payroll/overtime";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../../../../lib/supabase/service-role";
 import {
@@ -120,6 +121,18 @@ export async function PATCH(
       error: {
         code: "VALIDATION_ERROR",
         message: "At least one worksheet field must be provided."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (edits.cycle2OvertimeHours !== undefined) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message:
+          "Cycle 2 overtime is disabled. Previous-month overtime must be paid in payroll cycle 1."
       },
       meta: buildMeta()
     });
@@ -350,16 +363,21 @@ export async function PATCH(
   const c1Base = edits.cycle1BaseAmount ?? parseAmount(old.cycle_1_base_amount);
   const c2Base = edits.cycle2BaseAmount ?? parseAmount(old.cycle_2_base_amount);
   const c1OtHours = edits.cycle1OvertimeHours ?? Number(old.cycle_1_overtime_hours);
-  const c2OtHours = edits.cycle2OvertimeHours ?? Number(old.cycle_2_overtime_hours);
+  const c2OtHours = 0;
   const baseSalary = parseAmount(old.base_salary_amount);
 
-  /* Derive overtime rate from monthly salary (monthly salary / 160 hours * 1.5) */
-  const overtimeRate = baseSalary > 0 ? Math.round((baseSalary / 160) * 1.5) : 0;
-  const c1OtAmount = Math.round(c1OtHours * overtimeRate);
-  const c2OtAmount = Math.round(c2OtHours * overtimeRate);
+  const c1OtAmount = calculateOvertimeCompensation({
+    monthlyCompensationAmount: baseSalary,
+    overtimeHours: c1OtHours
+  });
+  const c2OtAmount = calculateOvertimeCompensation({
+    monthlyCompensationAmount: baseSalary,
+    overtimeHours: c2OtHours
+  });
   const totalOtHours = c1OtHours + c2OtHours;
   const totalOtAmount = c1OtAmount + c2OtAmount;
 
+  updatePayload.cycle_2_overtime_hours = 0;
   updatePayload.cycle_1_overtime_amount = c1OtAmount;
   updatePayload.cycle_2_overtime_amount = c2OtAmount;
   updatePayload.overtime_hours = totalOtHours;
@@ -368,11 +386,12 @@ export async function PATCH(
   const bonusAmount = edits.bonus ?? parseAmount(old.bonus);
   const feesAmount = edits.fees ?? parseAmount(old.fees);
 
-  /* Monthly total = C1 base + C2 base + overtime + bonus - fees */
-  const monthlyTotal = c1Base + c2Base + totalOtAmount + bonusAmount - feesAmount;
+  /* Monthly total = C1 base + C2 base + overtime + bonus + fees. Fees are a
+   * payable earning (like bonus), so they roll into the worksheet total. */
+  const monthlyTotal = c1Base + c2Base + totalOtAmount + bonusAmount + feesAmount;
 
   /* Update gross and net to reflect worksheet totals */
-  updatePayload.gross_amount = c1Base + c2Base + totalOtAmount + bonusAmount;
+  updatePayload.gross_amount = monthlyTotal;
   updatePayload.net_amount = monthlyTotal;
 
   /* Apply update using service role client to bypass RLS */

@@ -559,7 +559,7 @@ export async function POST(request: Request) {
         employee_type_at_creation: "pre_start"
       })
       .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
+        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, birthday_month, birthday_day, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
       )
       .single();
 
@@ -702,7 +702,7 @@ export async function POST(request: Request) {
       employee_type_at_creation: isNewEmployee ? "new_hire" : "existing"
     })
     .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
+      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, birthday_month, birthday_day, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, avatar_url, directory_visible, account_setup_at, last_seen_at, created_at, updated_at"
     )
     .single();
 

@@ -82,6 +82,11 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           fullName: session.profile.full_name,
           avatarUrl: session.profile.avatar_url ?? "",
           phone: settingsFields?.phone ?? "",
+          dateOfBirth: settingsFields?.date_of_birth ?? null,
+          birthdayMonth: settingsFields?.birthday_month ?? null,
+          birthdayDay: settingsFields?.birthday_day ?? null,
+          homeAddress: settingsFields?.home_address ?? "",
+          governmentIdUrl: settingsFields?.government_id_url ?? "",
           email: session.profile.email,
           roles: session.profile.roles,
           notificationPreferences: normalizeNotificationPreferences(

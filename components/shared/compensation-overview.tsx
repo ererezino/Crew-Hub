@@ -6,8 +6,9 @@ import { useLocale, useTranslations } from "next-intl";
 import type { CompensationSnapshot } from "../../types/compensation";
 import type { AppLocale } from "../../i18n/locales";
 import { countryFlagFromCode, countryNameFromCode } from "../../lib/countries";
-import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
+import { formatDate, formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
 import {
+  calculateGrantExpirationDate,
   calculateVestingProgress,
   formatAllowanceTypeLabel,
   formatEmploymentTypeLabel,
@@ -53,12 +54,31 @@ function approvalLabel(
   return approvedByName ? t("approvedBy", { name: approvedByName } as Record<string, string>) : t("approved");
 }
 
+function equityApprovalLabel(
+  approvedBy: string | null,
+  approvedByName: string | null,
+  boardApprovalDate: string | null,
+  t: CompensationTranslator
+) {
+  if (!approvedBy) {
+    return boardApprovalDate ? t("boardApproved") : t("pendingApproval");
+  }
+
+  return approvedByName ? t("approvedBy", { name: approvedByName } as Record<string, string>) : t("approved");
+}
+
 function taxableTone(isTaxable: boolean) {
   return isTaxable ? "warning" : "success";
 }
 
 function taxableLabel(isTaxable: boolean, t: CompensationTranslator) {
   return isTaxable ? t("taxable") : t("nonTaxable");
+}
+
+function formatShareCount(value: number, locale: AppLocale): string {
+  return new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-US", {
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 4
+  }).format(value);
 }
 
 export function CompensationOverview({
@@ -202,6 +222,10 @@ export function CompensationOverview({
                 </dd>
               </div>
             </dl>
+
+            {snapshot.employee.payrollMode === "contractor_usd_no_withholding" ? (
+              <p className="settings-card-description">{t("salaryGrossResponsibility")}</p>
+            ) : null}
           </article>
         ) : (
           <EmptyState
@@ -282,18 +306,13 @@ export function CompensationOverview({
         ) : null}
       </section>
 
-      <section className="compensation-section" aria-label={t("allowancesHeading")}>
+      {sortedAllowances.length > 0 ? (
+        <section className="compensation-section" aria-label={t("allowancesHeading")}>
         <div className="timeoff-section-header">
           <h2 className="section-title">{t("allowancesHeading")}</h2>
           <p className="settings-card-description">{t("allowancesDescription")}</p>
         </div>
 
-        {sortedAllowances.length === 0 ? (
-          <EmptyState
-            title={t("noAllowancesTitle")}
-            description={t("noAllowancesDescription")}
-          />
-        ) : (
           <>
             <div className="data-table-container">
               <table className="data-table" aria-label={t("allowancesTableAriaLabel")}>
@@ -373,8 +392,8 @@ export function CompensationOverview({
               </article>
             ) : null}
           </>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <section className="compensation-section" aria-label={t("equityGrantsAriaLabel")}>
         <div className="timeoff-section-header">
@@ -391,29 +410,104 @@ export function CompensationOverview({
           <div className="compensation-equity-grid">
             {snapshot.equityGrants.map((grant) => {
               const vesting = calculateVestingProgress(grant);
+              const expirationDate = calculateGrantExpirationDate(grant.grantDate);
+              const statusLabel =
+                grant.status === "vested" || vesting.isFullyVested
+                  ? t("fullyVestedStatus")
+                  : grant.status === "active"
+                    ? t("vestingInProgressStatus")
+                    : grant.status;
+              const nextVestingValue = vesting.isFullyVested
+                ? t("fullyVestedValue", {
+                    date: vesting.fullyVestedDate ? formatDate(vesting.fullyVestedDate, locale) : "--"
+                  })
+                : vesting.nextVestingDate
+                  ? t("nextVestingValue", {
+                      shares: formatShareCount(vesting.nextVestingShares, locale),
+                      date: formatDate(vesting.nextVestingDate, locale)
+                    })
+                  : "--";
+              const summaryText = vesting.isFullyVested
+                ? t("equitySummaryFullyVested", {
+                    shares: formatShareCount(vesting.totalShares, locale)
+                  })
+                : vesting.cliffReached
+                  ? t("equitySummaryNextVest", {
+                      vested: formatShareCount(vesting.vestedShares, locale),
+                      nextShares: formatShareCount(vesting.nextVestingShares, locale),
+                      date: vesting.nextVestingDate ? formatDate(vesting.nextVestingDate, locale) : "--"
+                    })
+                  : t("equitySummaryPreCliff", {
+                      date: vesting.cliffDate ? formatDate(vesting.cliffDate, locale) : "--",
+                      shares: formatShareCount(vesting.nextVestingShares, locale)
+                    });
 
               return (
                 <article key={grant.id} className="compensation-equity-card">
                   <header className="compensation-equity-header">
-                    <div>
+                    <div className="compensation-equity-heading">
                       <h3 className="section-title">{t("grantTypeLabel", { type: grant.grantType })}</h3>
                       <p className="settings-card-description numeric">
-                        {t("sharesCount", { count: grant.numberOfShares.toLocaleString() })}
+                        {t("sharesCount", { count: formatShareCount(grant.numberOfShares, locale) })}
                       </p>
+                      <p className="compensation-equity-summary">{summaryText}</p>
                     </div>
-                    <StatusBadge tone={toneForEquityStatus(grant.status)}>{grant.status}</StatusBadge>
+                    <StatusBadge tone={grant.status === "vested" || vesting.isFullyVested ? "success" : toneForEquityStatus(grant.status)}>
+                      {statusLabel}
+                    </StatusBadge>
                   </header>
 
                   <div className="compensation-equity-progress">
                     <ProgressRing value={vesting.vestedPercent} label={t("vested")} />
-                    <dl className="compensation-equity-meta">
+                    <div className="compensation-equity-progress-copy">
+                      <div className="compensation-equity-highlights">
+                        <div className="compensation-equity-highlight">
+                          <span className="metric-label">{t("vestedNow")}</span>
+                          <strong className="numeric">{formatShareCount(vesting.vestedShares, locale)}</strong>
+                        </div>
+                        <div className="compensation-equity-highlight">
+                          <span className="metric-label">{t("unvestedShares")}</span>
+                          <strong className="numeric">{formatShareCount(vesting.unvestedShares, locale)}</strong>
+                        </div>
+                        <div className="compensation-equity-highlight">
+                          <span className="metric-label">
+                            {vesting.isFullyVested ? t("fullyVestedOn") : t("nextVesting")}
+                          </span>
+                          <strong>{nextVestingValue}</strong>
+                        </div>
+                      </div>
+
+                      <VestingBar
+                        vestedPercent={vesting.vestedPercent}
+                        cliffPercent={vesting.cliffPercent}
+                        todayOffsetPercent={vesting.todayOffsetPercent}
+                      />
+                    </div>
+                  </div>
+
+                  <dl className="compensation-equity-meta">
                       <div>
                         <dt>{t("grantDate")}</dt>
                         <dd>
                           <time dateTime={grant.grantDate} title={formatDateTimeTooltip(grant.grantDate)}>
-                            {formatRelativeTime(grant.grantDate)}
+                            {formatDate(grant.grantDate, locale)}
                           </time>
                         </dd>
+                      </div>
+                      <div>
+                        <dt>{t("vestingStart")}</dt>
+                        <dd>
+                          <time
+                            dateTime={grant.vestingStartDate}
+                            title={formatDateTimeTooltip(grant.vestingStartDate)}
+                          >
+                            {formatDate(grant.vestingStartDate, locale)}
+                          </time>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>{t("optionExpires")}</dt>
+                        <dd>{expirationDate ? formatDate(expirationDate, locale) : "--"}</dd>
                       </div>
                       <div>
                         <dt>{t("exercisePrice")}</dt>
@@ -421,25 +515,22 @@ export function CompensationOverview({
                           {grant.exercisePriceCents === null ? (
                             "--"
                           ) : (
-                            <CurrencyDisplay
-                              amount={grant.exercisePriceCents}
-                              currency={snapshot.employee.primaryCurrency}
-                            />
+                            <>
+                              <CurrencyDisplay amount={grant.exercisePriceCents} currency="USD" />
+                              <span className="settings-card-description"> {t("perShare")}</span>
+                            </>
                           )}
                         </dd>
                       </div>
                       <div>
                         <dt>{t("approval")}</dt>
-                        <dd>{approvalLabel(grant.approvedBy, grant.approvedByName, t)}</dd>
+                        <dd>{equityApprovalLabel(grant.approvedBy, grant.approvedByName, grant.boardApprovalDate, t)}</dd>
                       </div>
-                    </dl>
-                  </div>
-
-                  <VestingBar
-                    vestedPercent={vesting.vestedPercent}
-                    cliffPercent={vesting.cliffPercent}
-                    todayOffsetPercent={vesting.todayOffsetPercent}
-                  />
+                      <div>
+                        <dt>{t("monthsRemaining")}</dt>
+                        <dd>{vesting.isFullyVested ? t("complete") : t("monthsRemainingValue", { count: vesting.remainingMonths })}</dd>
+                      </div>
+                  </dl>
                 </article>
               );
             })}

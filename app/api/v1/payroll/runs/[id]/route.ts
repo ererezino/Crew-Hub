@@ -6,6 +6,10 @@ import {
   deductionTotal,
   derivePayrollRunStatusFromCycles
 } from "../../../../../../lib/payroll/runs";
+import {
+  getPreviousMonthWindow,
+  summarizeMonthlyOvertime
+} from "../../../../../../lib/payroll/overtime";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
 import type {
   PayrollRunAdjustment,
@@ -82,6 +86,10 @@ const profileRowSchema = z.object({
   country_code: z.string().nullable()
 });
 
+const eligiblePayrollProfileRowSchema = z.object({
+  id: z.string().uuid()
+});
+
 const previousRunRowSchema = z.object({
   id: z.string().uuid(),
   pay_period_end: z.string()
@@ -93,6 +101,21 @@ const previousPayrollItemRowSchema = z.object({
   gross_amount: z.union([z.number(), z.string()]),
   net_amount: z.union([z.number(), z.string()]),
   pay_currency: z.string().length(3)
+});
+
+const overtimeEntryRowSchema = z.object({
+  id: z.string().uuid(),
+  employee_id: z.string().uuid(),
+  hours: z.union([z.number(), z.string()]),
+  amount: z.union([z.number(), z.string()]),
+  currency: z.string().length(3),
+  status: z.enum(["pending", "approved", "rejected"]),
+  payroll_item_id: z.string().uuid().nullable()
+});
+
+const linkedPayrollItemRowSchema = z.object({
+  id: z.string().uuid(),
+  payroll_run_id: z.string().uuid()
 });
 
 type PayrollComparisonRow = {
@@ -222,7 +245,14 @@ export async function GET(
     if (parsedRun.data.first_approved_by) userIdsToResolve.add(parsedRun.data.first_approved_by);
     if (parsedRun.data.final_approved_by) userIdsToResolve.add(parsedRun.data.final_approved_by);
 
-    const [{ data: rawItems, error: itemsError }, { data: rawActorProfiles, error: actorError }, { data: rawCycles, error: cyclesError }] =
+    const previousMonthWindow = getPreviousMonthWindow(parsedRun.data.pay_period_start);
+
+    const [
+      { data: rawItems, error: itemsError },
+      { data: rawActorProfiles, error: actorError },
+      { data: rawCycles, error: cyclesError },
+      { data: rawEligiblePayrollProfiles, error: eligiblePayrollProfilesError }
+    ] =
       await Promise.all([
         supabase
           .from("payroll_items")
@@ -246,14 +276,24 @@ export async function GET(
           .eq("org_id", session.profile.org_id)
           .eq("payroll_run_id", runId)
           .is("deleted_at", null)
-          .order("created_at", { ascending: true })
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("profiles")
+          .select("id")
+          .eq("org_id", session.profile.org_id)
+          .in("payroll_mode", [
+            "contractor_usd_no_withholding",
+            "employee_local_withholding"
+          ])
+          .eq("status", "active")
+          .is("deleted_at", null)
       ]);
 
     const actorNameById = new Map(
       (rawActorProfiles ?? []).map((p: { id: string; full_name: string }) => [p.id, p.full_name])
     );
 
-    if (itemsError || actorError || cyclesError) {
+    if (itemsError || actorError || cyclesError || eligiblePayrollProfilesError) {
       return jsonResponse<null>(500, {
         data: null,
         error: {
@@ -261,6 +301,7 @@ export async function GET(
           message:
             itemsError?.message ??
             actorError?.message ??
+            eligiblePayrollProfilesError?.message ??
             "Unable to load payroll run item data."
         },
         meta: buildMeta()
@@ -279,6 +320,120 @@ export async function GET(
         meta: buildMeta()
       });
     }
+
+    const parsedEligiblePayrollProfiles = z
+      .array(eligiblePayrollProfileRowSchema)
+      .safeParse(rawEligiblePayrollProfiles ?? []);
+
+    if (!parsedEligiblePayrollProfiles.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PAYROLL_RUN_PARSE_FAILED",
+          message: "Eligible payroll employee metadata is invalid."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const eligiblePayrollEmployeeIds = parsedEligiblePayrollProfiles.data.map((row) => row.id);
+    const { data: rawOvertimeEntries, error: overtimeEntriesError } =
+      eligiblePayrollEmployeeIds.length > 0
+        ? await supabase
+            .from("overtime_entries")
+            .select("id, employee_id, hours, amount, currency, status, payroll_item_id")
+            .eq("org_id", session.profile.org_id)
+            .in("employee_id", eligiblePayrollEmployeeIds)
+            .gte("entry_date", previousMonthWindow.periodStart)
+            .lte("entry_date", previousMonthWindow.periodEnd)
+            .is("deleted_at", null)
+        : { data: [], error: null };
+
+    if (overtimeEntriesError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PAYROLL_RUN_FETCH_FAILED",
+          message: `Unable to load previous-month overtime entries: ${overtimeEntriesError.message}`
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedOvertimeEntries = z.array(overtimeEntryRowSchema).safeParse(rawOvertimeEntries ?? []);
+
+    if (!parsedOvertimeEntries.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PAYROLL_RUN_PARSE_FAILED",
+          message: "Previous-month overtime entries are invalid."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const linkedPayrollItemIds = [
+      ...new Set(
+        parsedOvertimeEntries.data
+          .map((entry) => entry.payroll_item_id)
+          .filter((value): value is string => typeof value === "string")
+      )
+    ];
+    const { data: rawLinkedPayrollItems, error: linkedPayrollItemsError } =
+      linkedPayrollItemIds.length > 0
+        ? await supabase
+            .from("payroll_items")
+            .select("id, payroll_run_id")
+            .eq("org_id", session.profile.org_id)
+            .in("id", linkedPayrollItemIds)
+        : { data: [], error: null };
+
+    if (linkedPayrollItemsError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PAYROLL_RUN_FETCH_FAILED",
+          message: `Unable to load overtime payroll links: ${linkedPayrollItemsError.message}`
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedLinkedPayrollItems = z
+      .array(linkedPayrollItemRowSchema)
+      .safeParse(rawLinkedPayrollItems ?? []);
+
+    if (!parsedLinkedPayrollItems.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PAYROLL_RUN_PARSE_FAILED",
+          message: "Overtime payroll links are invalid."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const linkedRunIdByPayrollItemId = new Map(
+      parsedLinkedPayrollItems.data.map((row) => [row.id, row.payroll_run_id])
+    );
+    const overtimeSummary = summarizeMonthlyOvertime({
+      entries: parsedOvertimeEntries.data.map((entry) => ({
+        id: entry.id,
+        employeeId: entry.employee_id,
+        hours: Number(entry.hours),
+        amount: parseAmount(entry.amount),
+        currency: entry.currency,
+        status: entry.status,
+        payrollItemId: entry.payroll_item_id
+      })),
+      currentRunId: runId,
+      linkedRunIdByPayrollItemId,
+      sourceMonth: previousMonthWindow.sourceMonth,
+      periodStart: previousMonthWindow.periodStart,
+      periodEnd: previousMonthWindow.periodEnd
+    });
 
     const employeeIds = [...new Set(parsedItems.data.map((row) => row.employee_id))];
     const profileById = new Map<string, z.infer<typeof profileRowSchema>>();
@@ -461,8 +616,7 @@ export async function GET(
           + parseAmount(row.cycle_2_base_amount ?? 0)
           + parseAmount(row.cycle_1_overtime_amount ?? 0)
           + parseAmount(row.cycle_2_overtime_amount ?? 0)
-          + parseAmount(row.bonus ?? 0)
-          - parseAmount(row.fees ?? 0),
+          + parseAmount(row.bonus ?? 0),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       };
@@ -495,7 +649,8 @@ export async function GET(
       run: runSummary,
       items,
       cycles,
-      flaggedCount: items.filter((item) => item.flagged).length
+      flaggedCount: items.filter((item) => item.flagged).length,
+      overtimeSummary
     };
 
     return jsonResponse<PayrollRunDetailResponseData>(200, {

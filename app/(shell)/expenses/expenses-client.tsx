@@ -43,6 +43,11 @@ import {
   MAX_RECEIPT_FILE_BYTES,
   toneForExpenseStatus
 } from "../../../lib/expenses";
+import {
+  buildExpenseImportTemplateCsv,
+  parseExpenseImportCsv,
+  type ExpenseCsvImportRow
+} from "../../../lib/expenses/csv-import";
 import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries";
 import { useMePaymentDetails } from "../../../hooks/use-payment-details";
 import { Receipt, X } from "lucide-react";
@@ -101,6 +106,12 @@ type ExpenseFormValues = {
 type ExpenseFormField = keyof ExpenseFormValues | "receipt";
 type ExpenseFormErrors = Partial<Record<ExpenseFormField, string>>;
 type ExpenseFormTouched = Record<ExpenseFormField, boolean>;
+
+type ImportedExpensePreview = {
+  rowNumber: number;
+  values: ExpenseFormValues | null;
+  error: string | null;
+};
 
 const expenseFormSchema = z.object({
   category: z.enum([
@@ -251,6 +262,47 @@ function parseMoneyToMinorUnits(value: string): number | null {
   return amount;
 }
 
+function buildExpenseSubmissionFormData(values: ExpenseFormValues, receiptFile: File): FormData {
+  const amountMinorUnits = parseMoneyToMinorUnits(values.amount);
+
+  if (amountMinorUnits === null) {
+    throw new Error("Amount must be a positive value with up to 2 decimals.");
+  }
+
+  const formData = new FormData();
+  formData.set("expenseType", values.expenseType);
+  formData.set("category", values.category);
+  if (values.category === "other" && values.customCategory.trim()) {
+    formData.set("customCategory", values.customCategory.trim());
+  }
+  formData.set("description", values.description.trim());
+  formData.set("amount", String(amountMinorUnits));
+  formData.set("expenseDate", values.expenseDate);
+  formData.set("currency", values.currency.trim().toUpperCase());
+  formData.set("receipt", receiptFile);
+
+  if (values.expenseType === "work_expense") {
+    formData.set("vendorName", values.vendorName.trim());
+    formData.set("vendorPaymentMethod", values.vendorPaymentMethod);
+    formData.set("vendorBankAccountName", values.vendorBankAccountName.trim());
+    formData.set("vendorBankAccountNumber", values.vendorBankAccountNumber.trim());
+    formData.set("vendorMobileMoneyProvider", values.vendorMobileMoneyProvider.trim());
+    formData.set("vendorMobileMoneyNumber", values.vendorMobileMoneyNumber.trim());
+    formData.set("vendorCrewTag", values.vendorCrewTag.trim());
+    formData.set("vendorWireBankName", values.vendorWireBankName.trim());
+    formData.set("vendorWireAccountNumber", values.vendorWireAccountNumber.trim());
+    formData.set("vendorWireSwiftBic", values.vendorWireSwiftBic.trim());
+    formData.set("vendorWireIban", values.vendorWireIban.trim());
+    formData.set("vendorWireBankCountry", values.vendorWireBankCountry.trim());
+    formData.set("vendorWireCurrency", values.vendorWireCurrency.trim());
+    if (values.saveVendor) {
+      formData.set("saveVendor", "true");
+    }
+  }
+
+  return formData;
+}
+
 function hasFormErrors(errors: ExpenseFormErrors): boolean {
   return Object.values(errors).some((error) => Boolean(error));
 }
@@ -319,6 +371,130 @@ function getFormErrors(
   }
 
   return errors;
+}
+
+function firstExpenseFormError(errors: ExpenseFormErrors): string | null {
+  const orderedFields: ExpenseFormField[] = [
+    "expenseType",
+    "category",
+    "customCategory",
+    "description",
+    "amount",
+    "expenseDate",
+    "currency",
+    "vendorName",
+    "vendorPaymentMethod",
+    "vendorBankAccountName",
+    "vendorBankAccountNumber",
+    "vendorMobileMoneyProvider",
+    "vendorMobileMoneyNumber",
+    "vendorCrewTag",
+    "vendorWireBankName",
+    "vendorWireAccountNumber",
+    "vendorWireSwiftBic",
+    "vendorWireIban",
+    "vendorWireBankCountry",
+    "vendorWireCurrency",
+    "receipt"
+  ];
+
+  for (const field of orderedFields) {
+    const error = errors[field];
+    if (error) {
+      return error;
+    }
+  }
+
+  return null;
+}
+
+function normalizeImportedExpenseRow(
+  row: ExpenseCsvImportRow,
+  td: (key: string, params?: Record<string, unknown>) => string
+): ImportedExpensePreview {
+  const expenseType = row.expenseType === "work_expense" || row.expenseType === "personal_reimbursement"
+    ? row.expenseType
+    : null;
+  if (!expenseType) {
+    return {
+      rowNumber: row.rowNumber,
+      values: null,
+      error: td("validation.csvInvalidExpenseType", {
+        row: row.rowNumber,
+        value: row.expenseType
+      })
+    };
+  }
+
+  const category = categoryOptions.includes(row.category as ExpenseCategory)
+    ? (row.category as ExpenseCategory)
+    : null;
+  if (!category) {
+    return {
+      rowNumber: row.rowNumber,
+      values: null,
+      error: td("validation.csvInvalidCategory", {
+        row: row.rowNumber,
+        value: row.category
+      })
+    };
+  }
+
+  const vendorPaymentMethod = (
+    ["bank_transfer", "mobile_money", "crew_tag", "international_wire"] as const
+  ).includes(row.vendorPaymentMethod as VendorPaymentMethodOption)
+    ? (row.vendorPaymentMethod as VendorPaymentMethodOption)
+    : null;
+  if (!vendorPaymentMethod) {
+    return {
+      rowNumber: row.rowNumber,
+      values: null,
+      error: td("validation.csvInvalidVendorPaymentMethod", {
+        row: row.rowNumber,
+        value: row.vendorPaymentMethod
+      })
+    };
+  }
+
+  const values: ExpenseFormValues = {
+    expenseType,
+    category,
+    customCategory: row.customCategory,
+    description: row.description,
+    amount: row.amount,
+    expenseDate: row.expenseDate,
+    currency: row.currency.toUpperCase(),
+    vendorName: row.vendorName,
+    vendorPaymentMethod,
+    vendorBankAccountName: row.vendorBankAccountName,
+    vendorBankAccountNumber: row.vendorBankAccountNumber,
+    vendorMobileMoneyProvider: row.vendorMobileMoneyProvider,
+    vendorMobileMoneyNumber: row.vendorMobileMoneyNumber,
+    vendorCrewTag: row.vendorCrewTag,
+    vendorWireBankName: row.vendorWireBankName,
+    vendorWireAccountNumber: row.vendorWireAccountNumber,
+    vendorWireSwiftBic: row.vendorWireSwiftBic,
+    vendorWireIban: row.vendorWireIban,
+    vendorWireBankCountry: row.vendorWireBankCountry,
+    vendorWireCurrency: row.vendorWireCurrency.toUpperCase(),
+    saveVendor: false
+  };
+
+  const validationErrors = getFormErrors(
+    values,
+    { ...ALL_TOUCHED, receipt: false },
+    null,
+    td
+  );
+  const firstError = firstExpenseFormError(validationErrors);
+
+  return {
+    rowNumber: row.rowNumber,
+    values,
+    error: firstError
+      ? td("validation.csvRowError", { row: row.rowNumber, message: firstError })
+      : null
+  };
 }
 
 function uploadExpenseWithProgress(
@@ -653,6 +829,9 @@ export function ExpensesClient({
   const [formTouched, setFormTouched] = useState<ExpenseFormTouched>(INITIAL_TOUCHED);
   const [formErrors, setFormErrors] = useState<ExpenseFormErrors>({});
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [importedExpenseRows, setImportedExpenseRows] = useState<ExpenseCsvImportRow[]>([]);
+  const [importedExpenseFileName, setImportedExpenseFileName] = useState<string | null>(null);
+  const [importCsvError, setImportCsvError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [, setUploadProgress] = useState(0);
@@ -670,6 +849,7 @@ export function ExpensesClient({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const receiptInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const importCsvInputRef = useRef<HTMLInputElement | null>(null);
   const [expenseFormDirty, setExpenseFormDirty] = useState(false);
   useUnsavedGuard(expenseFormDirty);
 
@@ -696,6 +876,35 @@ export function ExpensesClient({
     const rows = expensesQuery.data?.expenses ?? [];
     return rows.length > 0 ? rows[0].currency : "USD";
   }, [expensesQuery.data?.expenses]);
+
+  const importedExpensePreviews = useMemo(
+    () => importedExpenseRows.map((row) => normalizeImportedExpenseRow(row, td)),
+    [importedExpenseRows, td]
+  );
+
+  const importedExpenseRowErrorCount = useMemo(
+    () => importedExpensePreviews.filter((row) => row.error).length,
+    [importedExpensePreviews]
+  );
+
+  const importedExpenseTotalByCurrency = useMemo(() => {
+    return importedExpensePreviews.reduce<Record<string, number>>((totals, row) => {
+      if (!row.values) {
+        return totals;
+      }
+
+      const amount = parseMoneyToMinorUnits(row.values.amount);
+      if (amount === null) {
+        return totals;
+      }
+
+      const currency = row.values.currency.toUpperCase();
+      return {
+        ...totals,
+        [currency]: (totals[currency] ?? 0) + amount
+      };
+    }, {});
+  }, [importedExpensePreviews]);
 
   const expenses = useMemo(() => {
     const rows = expensesQuery.data?.expenses ?? [];
@@ -747,6 +956,9 @@ export function ExpensesClient({
     setFormTouched(INITIAL_TOUCHED);
     setFormErrors({});
     setReceiptFile(null);
+    setImportedExpenseRows([]);
+    setImportedExpenseFileName(null);
+    setImportCsvError(null);
     setSubmitError(null);
     setUploadProgress(0);
   };
@@ -762,6 +974,9 @@ export function ExpensesClient({
     setFormTouched(INITIAL_TOUCHED);
     setFormErrors({});
     setReceiptFile(null);
+    setImportedExpenseRows([]);
+    setImportedExpenseFileName(null);
+    setImportCsvError(null);
     setSubmitError(null);
     setUploadProgress(0);
     setIsDraggingReceipt(false);
@@ -863,6 +1078,70 @@ export function ExpensesClient({
     handleReceiptSelection(file);
   };
 
+  const clearImportedExpenses = () => {
+    setImportedExpenseRows([]);
+    setImportedExpenseFileName(null);
+    setImportCsvError(null);
+    setSubmitError(null);
+    setExpenseFormDirty(Boolean(receiptFile));
+    if (importCsvInputRef.current) {
+      importCsvInputRef.current.value = "";
+    }
+  };
+
+  const handleImportCsvSelection = async (file: File | null) => {
+    if (!file) {
+      clearImportedExpenses();
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setImportCsvError(td("validation.csvUnsupportedType"));
+      return;
+    }
+
+    try {
+      const csvText = await file.text();
+      const parsed = parseExpenseImportCsv(csvText);
+
+      if (parsed.errors.length > 0) {
+        setImportedExpenseRows([]);
+        setImportedExpenseFileName(file.name);
+        setImportCsvError(parsed.errors[0] ?? td("toast.unableToImportCsv"));
+        return;
+      }
+
+      setImportedExpenseRows(parsed.rows);
+      setImportedExpenseFileName(file.name);
+      setImportCsvError(null);
+      setSubmitError(null);
+      setExpenseFormDirty(true);
+      showToast("success", td("toast.csvImportedReady", { count: parsed.rows.length }));
+    } catch {
+      setImportedExpenseRows([]);
+      setImportedExpenseFileName(file.name);
+      setImportCsvError(td("toast.unableToImportCsv"));
+    }
+  };
+
+  const handleImportCsvInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0] ?? null;
+    await handleImportCsvSelection(file);
+  };
+
+  const downloadCsvTemplate = () => {
+    const csv = buildExpenseImportTemplateCsv();
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "crew-hub-expense-import-template.csv";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDraggingReceipt(true);
@@ -882,6 +1161,88 @@ export function ExpensesClient({
 
   const handleSubmitExpense = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (importedExpenseRows.length > 0) {
+      if (!receiptFile) {
+        setFormTouched((currentTouched) => ({
+          ...currentTouched,
+          receipt: true
+        }));
+        setFormErrors((currentErrors) => ({
+          ...currentErrors,
+          receipt: td("validation.receiptRequired")
+        }));
+        return;
+      }
+
+      if (importedExpenseRowErrorCount > 0) {
+        setSubmitError(td("toast.csvImportHasErrors", { count: importedExpenseRowErrorCount }));
+        return;
+      }
+
+      const validRows = importedExpensePreviews
+        .map((row) => row.values)
+        .filter((row): row is ExpenseFormValues => row !== null);
+
+      if (validRows.length === 0) {
+        setSubmitError(td("validation.csvNoRows"));
+        return;
+      }
+
+      setIsSubmitting(true);
+      setSubmitError(null);
+      setUploadProgress(0);
+
+      let createdCount = 0;
+      let shouldRefreshVendors = false;
+
+      try {
+        for (const [index, rowValues] of validRows.entries()) {
+          const formData = buildExpenseSubmissionFormData(rowValues, receiptFile);
+          const result = await uploadExpenseWithProgress(formData, (progress) => {
+            const normalizedProgress = Math.round(
+              ((index + progress / 100) / validRows.length) * 100
+            );
+            setUploadProgress(normalizedProgress);
+          });
+
+          if (result.status < 200 || result.status > 299 || !result.payload?.data?.expense) {
+            setSubmitError(
+              td("toast.csvImportPartialFailure", {
+                created: createdCount,
+                total: validRows.length,
+                row: importedExpensePreviews[index]?.rowNumber ?? index + 2
+              })
+            );
+            expensesQuery.refresh();
+            return;
+          }
+
+          createdCount += 1;
+          shouldRefreshVendors = shouldRefreshVendors || rowValues.saveVendor;
+        }
+
+        closePanel();
+        expensesQuery.refresh();
+        if (shouldRefreshVendors) {
+          vendorBeneficiaries.refresh();
+        }
+        showToast("success", td("toast.csvImportSubmitted", { count: createdCount }));
+      } catch {
+        setSubmitError(
+          td("toast.csvImportPartialFailure", {
+            created: createdCount,
+            total: validRows.length,
+            row: importedExpensePreviews[createdCount]?.rowNumber ?? createdCount + 2
+          })
+        );
+        expensesQuery.refresh();
+      } finally {
+        setIsSubmitting(false);
+      }
+
+      return;
+    }
 
     setFormTouched(ALL_TOUCHED);
     const nextErrors = getFormErrors(formValues, ALL_TOUCHED, receiptFile, td);
@@ -905,37 +1266,14 @@ export function ExpensesClient({
     setIsSubmitting(true);
     setUploadProgress(0);
 
-    const formData = new FormData();
-    formData.set("expenseType", formValues.expenseType);
-    formData.set("category", formValues.category);
-    if (formValues.category === "other" && formValues.customCategory.trim()) {
-      formData.set("customCategory", formValues.customCategory.trim());
-    }
-    formData.set("description", formValues.description.trim());
-    formData.set("amount", String(amountMinorUnits));
-    formData.set("expenseDate", formValues.expenseDate);
-    formData.set("currency", formValues.currency.trim().toUpperCase());
-    formData.set("receipt", receiptFile);
-    if (formValues.expenseType === "work_expense") {
-      formData.set("vendorName", formValues.vendorName.trim());
-      formData.set("vendorPaymentMethod", formValues.vendorPaymentMethod);
-      formData.set("vendorBankAccountName", formValues.vendorBankAccountName.trim());
-      formData.set("vendorBankAccountNumber", formValues.vendorBankAccountNumber.trim());
-      formData.set("vendorMobileMoneyProvider", formValues.vendorMobileMoneyProvider.trim());
-      formData.set("vendorMobileMoneyNumber", formValues.vendorMobileMoneyNumber.trim());
-      formData.set("vendorCrewTag", formValues.vendorCrewTag.trim());
-      formData.set("vendorWireBankName", formValues.vendorWireBankName.trim());
-      formData.set("vendorWireAccountNumber", formValues.vendorWireAccountNumber.trim());
-      formData.set("vendorWireSwiftBic", formValues.vendorWireSwiftBic.trim());
-      formData.set("vendorWireIban", formValues.vendorWireIban.trim());
-      formData.set("vendorWireBankCountry", formValues.vendorWireBankCountry.trim());
-      formData.set("vendorWireCurrency", formValues.vendorWireCurrency.trim());
-      if (formValues.saveVendor && !selectedVendorId) {
-        formData.set("saveVendor", "true");
-      }
-    }
-
     try {
+      const formData = buildExpenseSubmissionFormData(
+        {
+          ...formValues,
+          saveVendor: formValues.saveVendor && !selectedVendorId
+        },
+        receiptFile
+      );
       const result = await uploadExpenseWithProgress(formData, setUploadProgress);
 
       if (result.status < 200 || result.status > 299 || !result.payload?.data?.expense) {
@@ -1926,6 +2264,142 @@ export function ExpensesClient({
             </StatusBadge>
           </div>
 
+          <section className="expenses-batch-import-card" aria-label={t('submitPanel.batchImportTitle')}>
+            <div className="expenses-batch-import-header">
+              <div>
+                <h3 className="section-title">{t('submitPanel.batchImportTitle')}</h3>
+                <p className="settings-card-description">{t('submitPanel.batchImportDescription')}</p>
+              </div>
+              <div className="expenses-batch-import-actions">
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => importCsvInputRef.current?.click()}
+                  disabled={isSubmitting}
+                >
+                  {t('submitPanel.uploadCsv')}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={downloadCsvTemplate}
+                  disabled={isSubmitting}
+                >
+                  {t('submitPanel.downloadCsvTemplate')}
+                </button>
+                {importedExpenseRows.length > 0 ? (
+                  <button
+                    type="button"
+                    className="button"
+                    onClick={clearImportedExpenses}
+                    disabled={isSubmitting}
+                  >
+                    {t('submitPanel.clearCsv')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <input
+              ref={importCsvInputRef}
+              type="file"
+              className="expenses-hidden-input"
+              accept=".csv,text/csv"
+              onChange={(event) => { void handleImportCsvInputChange(event); }}
+            />
+
+            {importCsvError ? <p className="form-field-error">{importCsvError}</p> : null}
+
+            {importedExpenseRows.length > 0 ? (
+              <div className="expenses-batch-import-preview">
+                <div className="expenses-info-banner">
+                  <p>
+                    {t('submitPanel.batchImportLoaded', {
+                      count: importedExpenseRows.length,
+                      fileName: importedExpenseFileName ?? t('submitPanel.csvFileFallback')
+                    })}
+                  </p>
+                </div>
+
+                <div className="expenses-batch-import-summary">
+                  <span className="status-badge status-badge-info">
+                    {t('submitPanel.batchImportSummaryRows', { count: importedExpenseRows.length })}
+                  </span>
+                  {Object.entries(importedExpenseTotalByCurrency).map(([currency, amount]) => (
+                    <span key={currency} className="status-badge status-badge-draft">
+                      <CurrencyDisplay amount={amount} currency={currency} locale={locale} />
+                    </span>
+                  ))}
+                  {importedExpenseRowErrorCount > 0 ? (
+                    <span className="status-badge status-badge-warning">
+                      {t('submitPanel.batchImportSummaryErrors', { count: importedExpenseRowErrorCount })}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="data-table-container">
+                  <table className="data-table" aria-label={t('submitPanel.batchImportPreviewTableAriaLabel')}>
+                    <thead>
+                      <tr>
+                        <th>{t('submitPanel.batchImportColumns.row')}</th>
+                        <th>{t('submitPanel.batchImportColumns.type')}</th>
+                        <th>{t('submitPanel.batchImportColumns.category')}</th>
+                        <th>{t('submitPanel.batchImportColumns.vendor')}</th>
+                        <th>{t('submitPanel.batchImportColumns.amount')}</th>
+                        <th>{t('submitPanel.batchImportColumns.date')}</th>
+                        <th>{t('submitPanel.batchImportColumns.status')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importedExpensePreviews.slice(0, 8).map((row) => (
+                        <tr key={`expense-csv-row-${row.rowNumber}`}>
+                          <td className="numeric">{row.rowNumber}</td>
+                          <td>{row.values ? t(`submitPanel.batchImportTypes.${row.values.expenseType}`) : "—"}</td>
+                          <td>{row.values ? getExpenseCategoryLabel(row.values.category) : "—"}</td>
+                          <td>{row.values?.vendorName || "—"}</td>
+                          <td>
+                            {row.values ? (
+                              <CurrencyDisplay
+                                amount={parseMoneyToMinorUnits(row.values.amount) ?? 0}
+                                currency={row.values.currency}
+                                locale={locale}
+                              />
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td>{row.values?.expenseDate ?? "—"}</td>
+                          <td>
+                            {row.error ? (
+                              <span className="expenses-batch-import-row-error">{row.error}</span>
+                            ) : (
+                              <StatusBadge tone="success">{t('submitPanel.batchImportRowReady')}</StatusBadge>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {importedExpensePreviews.length > 8 ? (
+                  <p className="settings-card-description">
+                    {t('submitPanel.batchImportPreviewLimit', {
+                      shown: 8,
+                      total: importedExpensePreviews.length
+                    })}
+                  </p>
+                ) : null}
+
+                <p className="settings-card-description">
+                  {t('submitPanel.batchImportReceiptNote')}
+                </p>
+              </div>
+            ) : null}
+          </section>
+
+          {importedExpenseRows.length === 0 ? (
+          <>
           <div className="form-field">
             <span className="form-label">{t('submitPanel.expenseTypeLabel')}</span>
             <div className="expenses-type-toggle">
@@ -2085,6 +2559,7 @@ export function ExpensesClient({
                   <SelectItem value="KES">{"\ud83c\uddf0\ud83c\uddea"} KES</SelectItem>
                   <SelectItem value="ZAR">{"\ud83c\uddff\ud83c\udde6"} ZAR</SelectItem>
                   <SelectItem value="XAF">{"\ud83c\udde8\ud83c\uddf2"} XAF</SelectItem>
+                  <SelectItem value="XOF">{"\ud83c\udde7\ud83c\uddef"} XOF</SelectItem>
                   <SelectItem value="CAD">{"\ud83c\udde8\ud83c\udde6"} CAD</SelectItem>
                 </SelectContent>
               </Select>
@@ -2398,6 +2873,8 @@ export function ExpensesClient({
               ) : null}
             </div>
           ) : null}
+          </>
+          ) : null}
 
           <div className="form-field">
             <span className="form-label">{t('submitPanel.receiptLabel')} <span className="form-required">*</span></span>
@@ -2477,7 +2954,11 @@ export function ExpensesClient({
               {tCommon('cancel')}
             </button>
             <button type="submit" className="button button-accent" disabled={isSubmitting}>
-              {isSubmitting ? t('submitPanel.submitting') : t('actions.submitExpense')}
+              {isSubmitting
+                ? t('submitPanel.submitting')
+                : importedExpenseRows.length > 0
+                  ? t('actions.submitImportedExpenses')
+                  : t('actions.submitExpense')}
             </button>
           </div>
         </form>

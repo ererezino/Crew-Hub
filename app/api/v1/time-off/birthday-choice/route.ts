@@ -3,7 +3,11 @@ import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { todayIsoDate } from "../../../../../lib/datetime";
-import { isIsoDate, getBirthdayLeaveOptions } from "../../../../../lib/time-off";
+import {
+  getBirthdayLeaveOptions,
+  hasBirthdayConfigured,
+  isIsoDate
+} from "../../../../../lib/time-off";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
@@ -71,7 +75,7 @@ export async function POST(request: Request) {
   // Fetch employee profile with DOB
   const { data: profileRow, error: profileError } = await supabase
     .from("profiles")
-    .select("id, org_id, full_name, country_code, date_of_birth, status")
+    .select("id, org_id, full_name, country_code, date_of_birth, birthday_month, birthday_day, status")
     .eq("id", session.profile.id)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -88,7 +92,11 @@ export async function POST(request: Request) {
     });
   }
 
-  if (!profileRow.date_of_birth) {
+  if (!hasBirthdayConfigured({
+    dateOfBirth: profileRow.date_of_birth,
+    birthdayMonth: profileRow.birthday_month,
+    birthdayDay: profileRow.birthday_day
+  })) {
     return jsonResponse<null>(422, {
       data: null,
       error: {
@@ -139,7 +147,11 @@ export async function POST(request: Request) {
 
   const holidayDateKeys = new Set((holidays ?? []).map((h) => h.date));
   const birthdayOptions = getBirthdayLeaveOptions(
-    profileRow.date_of_birth,
+    {
+      dateOfBirth: profileRow.date_of_birth,
+      birthdayMonth: profileRow.birthday_month,
+      birthdayDay: profileRow.birthday_day
+    },
     currentYear,
     holidayDateKeys
   );

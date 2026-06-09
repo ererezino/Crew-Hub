@@ -137,6 +137,51 @@ export async function POST(
     });
   }
 
+  const { data: workToolRows, error: workToolError } = await serviceClient
+    .from("work_tools")
+    .select("id, item_name, serial_number, status")
+    .eq("org_id", profile.org_id)
+    .eq("employee_id", employeeId)
+    .is("deleted_at", null);
+
+  if (workToolError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "WORK_TOOLS_FETCH_FAILED",
+        message: "Unable to verify work tool recovery before finalising offboarding."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const outstandingTools = (workToolRows ?? []).filter((row) => {
+    const status = typeof row?.status === "string" ? row.status : "";
+    return status === "assigned" || status === "maintenance";
+  });
+
+  if (outstandingTools.length > 0) {
+    const toolList = outstandingTools
+      .map((tool) => {
+        const itemName = typeof tool.item_name === "string" ? tool.item_name : "Work tool";
+        const serialNumber =
+          typeof tool.serial_number === "string" && tool.serial_number.trim().length > 0
+            ? ` (${tool.serial_number.trim()})`
+            : "";
+        return `${itemName}${serialNumber}`;
+      })
+      .join(", ");
+
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "OUTSTANDING_WORK_TOOLS",
+        message: `Collect or close out assigned work tools before finalising offboarding: ${toolList}.`
+      },
+      meta: buildMeta()
+    });
+  }
+
   // Both gates passed — finalise
   try {
     await completeOffboarding({

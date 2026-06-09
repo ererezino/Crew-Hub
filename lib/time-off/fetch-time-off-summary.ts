@@ -17,8 +17,10 @@ import {
 
 /* ── Zod row schemas ── */
 
-const profileDobRowSchema = z.object({
-  date_of_birth: z.string().nullable().optional().default(null)
+const profileBirthdayRowSchema = z.object({
+  date_of_birth: z.string().nullable().optional().default(null),
+  birthday_month: z.number().int().nullable().optional().default(null),
+  birthday_day: z.number().int().nullable().optional().default(null)
 });
 
 const policyRowSchema = z.object({
@@ -113,32 +115,39 @@ export async function fetchTimeOffSummaryData(
     department: profile.department,
     country_code: profile.country_code,
     status: profile.status,
-    date_of_birth: null as string | null
+    date_of_birth: null as string | null,
+    birthday_month: null as number | null,
+    birthday_day: null as number | null
   };
 
-  // Fetch date_of_birth separately (optional column, may not exist on older schemas)
-  const profileDobResult = await supabase
+  // Fetch birthday fields separately (optional columns, may not exist on older schemas)
+  const profileBirthdayResult = await supabase
     .from("profiles")
-    .select("date_of_birth")
+    .select("date_of_birth, birthday_month, birthday_day")
     .eq("id", profile.id)
     .eq("org_id", profile.org_id)
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (profileDobResult.error) {
-    const message = profileDobResult.error.message.toLowerCase();
+  if (profileBirthdayResult.error) {
+    const message = profileBirthdayResult.error.message.toLowerCase();
     const missingDateOfBirthColumn =
-      profileDobResult.error.code === "42703" || message.includes("date_of_birth");
+      profileBirthdayResult.error.code === "42703" ||
+      message.includes("date_of_birth") ||
+      message.includes("birthday_month") ||
+      message.includes("birthday_day");
 
     if (!missingDateOfBirthColumn) {
       throw new Error("Unable to resolve employee profile for time off.");
     }
-  } else if (profileDobResult.data) {
-    const parsedProfileDob = profileDobRowSchema.safeParse(profileDobResult.data);
-    if (!parsedProfileDob.success) {
+  } else if (profileBirthdayResult.data) {
+    const parsedProfileBirthday = profileBirthdayRowSchema.safeParse(profileBirthdayResult.data);
+    if (!parsedProfileBirthday.success) {
       throw new Error("Employee profile data is not in the expected shape.");
     }
-    employeeProfile.date_of_birth = parsedProfileDob.data.date_of_birth;
+    employeeProfile.date_of_birth = parsedProfileBirthday.data.date_of_birth;
+    employeeProfile.birthday_month = parsedProfileBirthday.data.birthday_month;
+    employeeProfile.birthday_day = parsedProfileBirthday.data.birthday_day;
   }
 
   const orgId = profile.org_id;
@@ -335,6 +344,8 @@ export async function fetchTimeOffSummaryData(
       department: employeeProfile.department,
       countryCode: employeeProfile.country_code,
       dateOfBirth: employeeProfile.date_of_birth,
+      birthdayMonth: employeeProfile.birthday_month,
+      birthdayDay: employeeProfile.birthday_day,
       status: employeeProfile.status
     },
     policies,

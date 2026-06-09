@@ -111,7 +111,7 @@ export function PayrollWorksheet({
   const hasFrozenCycle = isCycle1Frozen || isCycle2Frozen;
 
   const cycle1Fields: Array<keyof WorksheetRowEditPayload> = ["cycle1BaseAmount", "cycle1OvertimeHours", "cycle1Included"];
-  const cycle2Fields: Array<keyof WorksheetRowEditPayload> = ["cycle2BaseAmount", "cycle2OvertimeHours", "cycle2Included"];
+  const cycle2Fields: Array<keyof WorksheetRowEditPayload> = ["cycle2BaseAmount", "cycle2Included"];
   const sharedFields: Array<keyof WorksheetRowEditPayload> = ["bonus", "fees", "comment", "exceptionReason"];
 
   function isFieldFrozen(field: keyof WorksheetRowEditPayload): boolean {
@@ -143,6 +143,23 @@ export function PayrollWorksheet({
       timeStyle: "short"
     }).format(date);
   }
+
+  const previousMonthLabel = useMemo(() => {
+    const anchor = new Date(`${run.payPeriodStart}T00:00:00.000Z`);
+
+    if (Number.isNaN(anchor.getTime())) {
+      return null;
+    }
+
+    const previousMonth = new Date(
+      Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 1, 1)
+    );
+
+    return new Intl.DateTimeFormat(locale === "fr" ? "fr-FR" : "en-US", {
+      month: "long",
+      year: "numeric"
+    }).format(previousMonth);
+  }, [locale, run.payPeriodStart]);
 
   const liveRows = useMemo<WorksheetDisplayRow[]>(
     () =>
@@ -767,6 +784,12 @@ export function PayrollWorksheet({
         </section>
       ) : null}
 
+      <p className="settings-card-description">
+        {t("overtimePolicyNote", {
+          sourceMonth: previousMonthLabel ?? t("previousMonthFallback")
+        })}
+      </p>
+
       {/* Worksheet table */}
       <div className="data-table-container payroll-worksheet-table-container">
         <table className="data-table payroll-worksheet-table">
@@ -789,16 +812,14 @@ export function PayrollWorksheet({
                 <>
                   {viewMode === "worksheet" ? <th className="text-center">{t("col.c1Included")}</th> : null}
                   <th className="text-right">{t("col.c1Amount")}</th>
-                  <th className="text-right">{t("col.c1OtHours")}</th>
-                  <th className="text-right">{t("col.c1Overtime")}</th>
+                  <th className="text-right">{t("col.previousMonthOtHours")}</th>
+                  <th className="text-right">{t("col.previousMonthOtAmount")}</th>
                 </>
               ) : null}
               {viewMode !== "cycle1" ? (
                 <>
                   {viewMode === "worksheet" ? <th className="text-center">{t("col.c2Included")}</th> : null}
                   <th className="text-right">{t("col.c2Amount")}</th>
-                  <th className="text-right">{t("col.c2OtHours")}</th>
-                  <th className="text-right">{t("col.c2Overtime")}</th>
                 </>
               ) : null}
               <th className="text-right">{t("col.bonus")}</th>
@@ -864,12 +885,6 @@ export function PayrollWorksheet({
                     <td className="text-right">
                       <EditableCell itemId={item.id} field="cycle2BaseAmount" value={item.cycle2BaseAmount} currency={item.payCurrency} isAmount />
                     </td>
-                    <td className="text-right">
-                      <EditableCell itemId={item.id} field="cycle2OvertimeHours" value={item.cycle2OvertimeHours} className="numeric" />
-                    </td>
-                    <td className="text-right">
-                      <CurrencyDisplay amount={item.cycle2OvertimeAmount} currency={item.payCurrency} locale={locale} />
-                    </td>
                   </>
                 ) : null}
                 <td className="text-right">
@@ -921,12 +936,6 @@ export function PayrollWorksheet({
                   {viewMode === "worksheet" ? <td /> : null}
                   <td className="text-right">
                     <CurrencyTotalsDisplay totals={totals.c2Base} locale={locale} />
-                  </td>
-                  <td className="text-right">
-                    <strong className="numeric">{totals.c2OtHours}</strong>
-                  </td>
-                  <td className="text-right">
-                    <CurrencyTotalsDisplay totals={totals.c2OtAmount} locale={locale} />
                   </td>
                 </>
               ) : null}

@@ -18,6 +18,10 @@ const DelegationsClient = lazy(() =>
   import("./delegations/delegations-client").then((m) => ({ default: m.DelegationsClient }))
 );
 
+const WorkToolsClient = lazy(() =>
+  import("./work-tools/work-tools-client").then((m) => ({ default: m.WorkToolsClient }))
+);
+
 type PeopleScope = "all" | "reports" | "me";
 
 type PeopleTabsClientProps = {
@@ -31,6 +35,7 @@ type PeopleTabsClientProps = {
   canResetAuthenticator: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  canManageWorkTools: boolean;
   initialPeopleData?: PeopleListResponseData;
 };
 
@@ -53,6 +58,7 @@ export function PeopleTabsClient({
   canResetAuthenticator,
   isAdmin,
   isSuperAdmin,
+  canManageWorkTools,
   initialPeopleData
 }: PeopleTabsClientProps) {
   const tNav = useTranslations("nav");
@@ -83,8 +89,15 @@ export function PeopleTabsClient({
       });
     }
 
+    if (canManageWorkTools) {
+      items.push({
+        key: "work-tools",
+        label: "Work Tools"
+      });
+    }
+
     return items;
-  }, [t, isSuperAdmin]);
+  }, [t, canManageWorkTools, isSuperAdmin]);
 
   const [activeTab, setActiveTab] = useState(() => resolveInitialTab(requestedTab, tabs));
 
@@ -191,6 +204,18 @@ export function PeopleTabsClient({
             }
           >
             <DelegationsClient />
+          </Suspense>
+        ) : null}
+
+        {activeTab === "work-tools" ? (
+          <Suspense
+            fallback={
+              <div className="delegations-loading">
+                <div className="spinner" />
+              </div>
+            }
+          >
+            <WorkToolsClient />
           </Suspense>
         ) : null}
       </section>

@@ -24,9 +24,13 @@ import {
 } from "../../../../../lib/people/shared";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
+import { getBirthdayParts } from "../../../../../lib/time-off";
 import type { AppRole } from "../../../../../types/auth";
 import {
   PROFILE_STATUSES,
+  type AddressHistoryRecord,
+  type GovernmentIdHistoryRecord,
+  type PeopleDetailResponseData,
   type PeopleUpdateResponseData,
   type ProfileStatus
 } from "../../../../../types/people";
@@ -35,40 +39,422 @@ const paramsSchema = z.object({
   id: z.string().uuid("Person id must be a valid UUID.")
 });
 
-const updatePersonSchema = z.object({
-  fullName: z.string().trim().min(1, "Name is required.").max(200, "Name is too long.").optional(),
-  roles: z.array(z.enum(USER_ROLES)).min(1, "Select at least one role.").optional(),
-  department: z.string().trim().max(100, "Department is too long.").nullable().optional(),
-  title: z.string().trim().max(200, "Title is too long.").nullable().optional(),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD.").nullable().optional(),
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be YYYY-MM-DD.").nullable().optional(),
-  managerId: z.string().uuid("Manager must be a valid user id.").nullable().optional(),
-  teamLeadId: z.string().uuid("Team lead must be a valid user id.").nullable().optional(),
-  status: z.enum(PROFILE_STATUSES).optional(),
-  bio: z.string().trim().max(500, "Bio must be 500 characters or fewer.").nullable().optional(),
-  favoriteMusic: z.string().trim().max(200, "Favorite music must be 200 characters or fewer.").nullable().optional(),
-  favoriteBooks: z.string().trim().max(200, "Favorite books must be 200 characters or fewer.").nullable().optional(),
-  favoriteSports: z.string().trim().max(200, "Favorite sports must be 200 characters or fewer.").nullable().optional(),
-  crewTag: z.string().trim().max(50, "Crew Tag must be 50 characters or fewer.").nullable().optional(),
-  directoryVisible: z.boolean().optional(),
-  privacySettings: z.object({
-    showEmail: z.boolean().optional(),
-    showPhone: z.boolean().optional(),
-    showDepartment: z.boolean().optional(),
-    showBio: z.boolean().optional(),
-    showInterests: z.boolean().optional()
-  }).optional(),
-  accessOverrides: z
-    .object({
-      granted: z.array(z.string().trim().min(1).max(100)).default([]),
-      revoked: z.array(z.string().trim().min(1).max(100)).default([])
-    })
-    .optional()
-    .default({
-      granted: [],
-      revoked: []
-    })
+const PEOPLE_DETAIL_SELECT =
+  "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, birthday_month, birthday_day, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, home_address, government_id_url, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at";
+
+const nullableOptionalUrl = z
+  .string()
+  .trim()
+  .max(1000, "URL is too long.")
+  .refine((value) => value.length === 0 || /^https?:\/\//.test(value), {
+    message: "URL must start with http:// or https://."
+  })
+  .nullable()
+  .optional();
+
+const governmentIdHistoryRowSchema = z.object({
+  id: z.string().uuid(),
+  document_url: z.string(),
+  replaced_by_url: z.string().nullable().default(null),
+  archived_at: z.string(),
+  removed_at: z.string().nullable().default(null)
 });
+
+const addressHistoryRowSchema = z.object({
+  id: z.string().uuid(),
+  address_text: z.string(),
+  replaced_by_address: z.string().nullable().default(null),
+  archived_at: z.string(),
+  removed_at: z.string().nullable().default(null)
+});
+
+function canViewAllPeople(roles: readonly AppRole[]) {
+  return (
+    hasRole(roles, "HR_ADMIN") ||
+    hasRole(roles, "FINANCE_ADMIN") ||
+    hasRole(roles, "FINANCE_APPROVER") ||
+    hasRole(roles, "SUPER_ADMIN")
+  );
+}
+
+function canViewReports(roles: readonly AppRole[]) {
+  return hasRole(roles, "MANAGER") || hasRole(roles, "TEAM_LEAD") || canViewAllPeople(roles);
+}
+
+function canManageSensitiveProfile(roles: readonly AppRole[]) {
+  return hasRole(roles, "HR_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+}
+
+const updatePersonSchema = z
+  .object({
+    fullName: z.string().trim().min(1, "Name is required.").max(200, "Name is too long.").optional(),
+    roles: z.array(z.enum(USER_ROLES)).min(1, "Select at least one role.").optional(),
+    department: z.string().trim().max(100, "Department is too long.").nullable().optional(),
+    title: z.string().trim().max(200, "Title is too long.").nullable().optional(),
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date must be YYYY-MM-DD.").nullable().optional(),
+    dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be YYYY-MM-DD.").nullable().optional(),
+    birthdayMonth: z.number().int().min(1).max(12).nullable().optional(),
+    birthdayDay: z.number().int().min(1).max(31).nullable().optional(),
+    managerId: z.string().uuid("Manager must be a valid user id.").nullable().optional(),
+    teamLeadId: z.string().uuid("Team lead must be a valid user id.").nullable().optional(),
+    status: z.enum(PROFILE_STATUSES).optional(),
+    bio: z.string().trim().max(500, "Bio must be 500 characters or fewer.").nullable().optional(),
+    favoriteMusic: z.string().trim().max(200, "Favorite music must be 200 characters or fewer.").nullable().optional(),
+    favoriteBooks: z.string().trim().max(200, "Favorite books must be 200 characters or fewer.").nullable().optional(),
+    favoriteSports: z.string().trim().max(200, "Favorite sports must be 200 characters or fewer.").nullable().optional(),
+    homeAddress: z.string().trim().max(500, "Home address must be 500 characters or fewer.").nullable().optional(),
+    governmentIdUrl: nullableOptionalUrl,
+    crewTag: z.string().trim().max(50, "Crew Tag must be 50 characters or fewer.").nullable().optional(),
+    directoryVisible: z.boolean().optional(),
+    privacySettings: z.object({
+      showEmail: z.boolean().optional(),
+      showPhone: z.boolean().optional(),
+      showDepartment: z.boolean().optional(),
+      showBio: z.boolean().optional(),
+      showInterests: z.boolean().optional()
+    }).optional(),
+    accessOverrides: z
+      .object({
+        granted: z.array(z.string().trim().min(1).max(100)).default([]),
+        revoked: z.array(z.string().trim().min(1).max(100)).default([])
+      })
+      .optional()
+      .default({
+        granted: [],
+        revoked: []
+      })
+  })
+  .superRefine((value, ctx) => {
+    const hasBirthdayMonthField = value.birthdayMonth !== undefined;
+    const hasBirthdayDayField = value.birthdayDay !== undefined;
+
+    if (hasBirthdayMonthField !== hasBirthdayDayField) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["birthdayMonth"],
+        message: "Birthday month and day must be updated together."
+      });
+      return;
+    }
+
+    if (value.dateOfBirth) {
+      const parts = getBirthdayParts(value.dateOfBirth);
+
+      if (!parts) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["dateOfBirth"],
+          message: "Date of birth must be a real calendar date."
+        });
+      }
+    }
+
+    if (value.birthdayMonth !== null && value.birthdayMonth !== undefined &&
+        value.birthdayDay !== null && value.birthdayDay !== undefined) {
+      const partialBirthday = getBirthdayParts({
+        birthdayMonth: value.birthdayMonth,
+        birthdayDay: value.birthdayDay
+      });
+
+      if (!partialBirthday) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["birthdayDay"],
+          message: "Birthday month/day must form a real calendar date."
+        });
+      }
+    }
+  });
+
+function getBirthdayUpdateValues(
+  payload: z.infer<typeof updatePersonSchema>,
+  existingProfile: z.infer<typeof profileRowSchema>
+) {
+  const updateValues: {
+    date_of_birth?: string | null;
+    birthday_month?: number | null;
+    birthday_day?: number | null;
+  } = {};
+
+  const hasExplicitBirthdayMonth = payload.birthdayMonth !== undefined;
+  const hasExplicitBirthdayDay = payload.birthdayDay !== undefined;
+
+  if (payload.dateOfBirth !== undefined) {
+    updateValues.date_of_birth = payload.dateOfBirth ?? null;
+
+    if (payload.dateOfBirth) {
+      return updateValues;
+    }
+
+    if (hasExplicitBirthdayMonth || hasExplicitBirthdayDay) {
+      updateValues.birthday_month = payload.birthdayMonth ?? null;
+      updateValues.birthday_day = payload.birthdayDay ?? null;
+      return updateValues;
+    }
+
+    if (existingProfile.date_of_birth) {
+      updateValues.birthday_month = null;
+      updateValues.birthday_day = null;
+    }
+
+    return updateValues;
+  }
+
+  if (hasExplicitBirthdayMonth || hasExplicitBirthdayDay) {
+    updateValues.date_of_birth = null;
+    updateValues.birthday_month = payload.birthdayMonth ?? null;
+    updateValues.birthday_day = payload.birthdayDay ?? null;
+  }
+
+  return updateValues;
+}
+
+export async function GET(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be logged in to view this profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedParams = paramsSchema.safeParse(await context.params);
+
+  if (!parsedParams.success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsedParams.error.issues[0]?.message ?? "Invalid user id."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const personId = parsedParams.data.id;
+  const isSelf = personId === session.profile.id;
+  const roles = session.profile.roles as AppRole[];
+  const { checkApiAccess } = await import("../../../../../lib/auth/check-api-access");
+  const hasConfigAccess = await checkApiAccess("/people", session.profile);
+  const canViewEveryProfile = canViewAllPeople(roles) || hasConfigAccess;
+
+  if (!isSelf && !canViewEveryProfile && !canViewReports(roles)) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You do not have permission to view this profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const serviceRoleClient = createSupabaseServiceRoleClient();
+  let profileQuery = serviceRoleClient
+    .from("profiles")
+    .select(PEOPLE_DETAIL_SELECT)
+    .eq("id", personId)
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null);
+
+  if (!isSelf && !canViewEveryProfile) {
+    if (hasRole(roles, "MANAGER")) {
+      profileQuery = profileQuery.eq("manager_id", session.profile.id);
+    } else if (hasRole(roles, "TEAM_LEAD") && session.profile.department) {
+      profileQuery = profileQuery.ilike("department", session.profile.department);
+    } else {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "You do not have permission to view this profile."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
+  const { data: profileRow, error: profileError } = await profileQuery.maybeSingle();
+
+  if (profileError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "PROFILE_FETCH_FAILED",
+        message: "Unable to load this profile."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const parsedProfile = profileRowSchema.safeParse(profileRow);
+
+  if (!parsedProfile.success) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: {
+        code: "NOT_FOUND",
+        message: "User was not found in this organization."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const lookupIds = [
+    parsedProfile.data.manager_id,
+    parsedProfile.data.team_lead_id ?? null
+  ].filter((id): id is string => Boolean(id));
+
+  let nameById = new Map<string, string>();
+
+  if (lookupIds.length > 0) {
+    const { data: nameRows } = await serviceRoleClient
+      .from("profiles")
+      .select("id, full_name")
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .in("id", [...new Set(lookupIds)]);
+
+    nameById = new Map(
+      (nameRows ?? [])
+        .filter(
+          (row): row is { id: string; full_name: string } =>
+            typeof row?.id === "string" && typeof row?.full_name === "string"
+        )
+        .map((row) => [row.id, row.full_name])
+    );
+  }
+
+  const { data: crewTagRow } = await serviceRoleClient
+    .from("employee_payment_details")
+    .select("crew_tag")
+    .eq("org_id", session.profile.org_id)
+    .eq("employee_id", personId)
+    .not("crew_tag", "is", null)
+    .maybeSingle();
+
+  const person = mapProfileRow(
+    parsedProfile.data,
+    nameById,
+    typeof crewTagRow?.crew_tag === "string" ? crewTagRow.crew_tag : null
+  );
+
+  const canViewSensitiveFields = canManageSensitiveProfile(roles);
+  const canViewGovernmentId = isSelf || canViewEveryProfile;
+  const canViewGovernmentIdHistory = canViewEveryProfile;
+  const canViewAddressHistory = canViewSensitiveFields;
+
+  if (!canViewSensitiveFields) {
+    person.homeAddress = null;
+  }
+
+  if (!canViewGovernmentId) {
+    person.governmentIdUrl = null;
+  }
+
+  let governmentIdHistory: GovernmentIdHistoryRecord[] = [];
+  let addressHistory: AddressHistoryRecord[] = [];
+
+  if (canViewGovernmentIdHistory) {
+    const { data: historyRows, error: historyError } = await serviceRoleClient
+      .from("profile_id_document_history")
+      .select("id, document_url, replaced_by_url, archived_at, removed_at")
+      .eq("org_id", session.profile.org_id)
+      .eq("employee_id", personId)
+      .order("archived_at", { ascending: false });
+
+    if (historyError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PROFILE_FETCH_FAILED",
+          message: "Unable to load this profile."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedHistory = z.array(governmentIdHistoryRowSchema).safeParse(historyRows ?? []);
+
+    if (!parsedHistory.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PROFILE_FETCH_FAILED",
+          message: "Unable to load this profile."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    governmentIdHistory = parsedHistory.data.map((row) => ({
+      id: row.id,
+      documentUrl: row.document_url,
+      replacedByUrl: row.replaced_by_url,
+      archivedAt: row.archived_at,
+      removedAt: row.removed_at
+    }));
+  }
+
+  if (canViewAddressHistory) {
+    const { data: addressRows, error: addressError } = await serviceRoleClient
+      .from("profile_address_history")
+      .select("id, address_text, replaced_by_address, archived_at, removed_at")
+      .eq("org_id", session.profile.org_id)
+      .eq("employee_id", personId)
+      .order("archived_at", { ascending: false });
+
+    if (addressError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PROFILE_FETCH_FAILED",
+          message: "Unable to load this profile."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const parsedAddressHistory = z.array(addressHistoryRowSchema).safeParse(addressRows ?? []);
+
+    if (!parsedAddressHistory.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: {
+          code: "PROFILE_FETCH_FAILED",
+          message: "Unable to load this profile."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    addressHistory = parsedAddressHistory.data.map((row) => ({
+      id: row.id,
+      address: row.address_text,
+      replacedByAddress: row.replaced_by_address,
+      archivedAt: row.archived_at,
+      removedAt: row.removed_at
+    }));
+  }
+
+  return jsonResponse<PeopleDetailResponseData>(200, {
+    data: {
+      person,
+      governmentIdHistory,
+      addressHistory
+    },
+    error: null,
+    meta: buildMeta()
+  });
+}
 
 export async function PUT(
   request: Request,
@@ -178,9 +564,7 @@ export async function PUT(
 
   const { data: existingProfile, error: existingProfileError } = await serviceRoleClient
     .from("profiles")
-    .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
-    )
+    .select(PEOPLE_DETAIL_SELECT)
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -505,6 +889,8 @@ export async function PUT(
     title?: string | null;
     start_date?: string | null;
     date_of_birth?: string | null;
+    birthday_month?: number | null;
+    birthday_day?: number | null;
     manager_id?: string | null;
     team_lead_id?: string | null;
     status?: ProfileStatus;
@@ -512,6 +898,8 @@ export async function PUT(
     favorite_music?: string | null;
     favorite_books?: string | null;
     favorite_sports?: string | null;
+    home_address?: string | null;
+    government_id_url?: string | null;
     privacy_settings?: Record<string, boolean>;
     directory_visible?: boolean;
   } = {};
@@ -540,8 +928,18 @@ export async function PUT(
     updateValues.start_date = payload.startDate ?? null;
   }
 
-  if (payload.dateOfBirth !== undefined) {
-    updateValues.date_of_birth = payload.dateOfBirth ?? null;
+  const birthdayUpdateValues = getBirthdayUpdateValues(payload, parsedExistingProfile.data);
+
+  if (birthdayUpdateValues.date_of_birth !== undefined) {
+    updateValues.date_of_birth = birthdayUpdateValues.date_of_birth;
+  }
+
+  if (birthdayUpdateValues.birthday_month !== undefined) {
+    updateValues.birthday_month = birthdayUpdateValues.birthday_month;
+  }
+
+  if (birthdayUpdateValues.birthday_day !== undefined) {
+    updateValues.birthday_day = birthdayUpdateValues.birthday_day;
   }
 
   if (payload.managerId !== undefined) {
@@ -583,6 +981,14 @@ export async function PUT(
     updateValues.favorite_sports = payload.favoriteSports?.trim() || null;
   }
 
+  if (payload.homeAddress !== undefined) {
+    updateValues.home_address = payload.homeAddress?.trim() || null;
+  }
+
+  if (payload.governmentIdUrl !== undefined) {
+    updateValues.government_id_url = payload.governmentIdUrl?.trim() || null;
+  }
+
   if (payload.privacySettings !== undefined) {
     updateValues.privacy_settings = payload.privacySettings as Record<string, boolean>;
   }
@@ -595,9 +1001,7 @@ export async function PUT(
       .update(updateValues)
       .eq("id", personId)
       .eq("org_id", session.profile.org_id)
-      .select(
-        "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
-      )
+      .select(PEOPLE_DETAIL_SELECT)
       .single();
 
     if (updateError || !updatedRow) {
@@ -1032,9 +1436,7 @@ export async function PATCH(
     .update(updateValues)
     .eq("id", personId)
     .eq("org_id", session.profile.org_id)
-    .select(
-      "id, email, full_name, roles, department, title, country_code, timezone, phone, start_date, date_of_birth, manager_id, team_lead_id, employment_type, payroll_mode, primary_currency, status, notice_period_end_date, avatar_url, bio, favorite_music, favorite_books, favorite_sports, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, pronouns, directory_visible, privacy_settings, crew_hub_joined_at, first_invited_at, account_setup_at, last_seen_at, created_at, updated_at"
-    )
+    .select(PEOPLE_DETAIL_SELECT)
     .single();
 
   if (updateError || !updatedRow) {

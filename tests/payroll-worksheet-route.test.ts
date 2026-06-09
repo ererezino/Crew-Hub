@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type QResult = { data: unknown; error: unknown };
+type UpdateCall = { table: string; payload: Record<string, unknown> };
 
 const {
   getAuthenticatedSessionMock,
   fromFn,
-  tableQueues
+  tableQueues,
+  updateCalls
 } = vi.hoisted(() => {
   const tableQueues: Record<string, QResult[]> = {};
+  const updateCalls: UpdateCall[] = [];
 
   function dequeue(table: string): QResult {
     const queue = tableQueues[table];
@@ -26,7 +29,10 @@ const {
         obj[method] = (..._args: unknown[]) => obj;
       }
     }
-    obj.update = (_payload: unknown) => obj;
+    obj.update = (payload: Record<string, unknown>) => {
+      updateCalls.push({ table, payload });
+      return obj;
+    };
     obj.then = (resolve?: (value: QResult) => unknown, reject?: (reason: unknown) => unknown) =>
       Promise.resolve(dequeue(table)).then(resolve, reject);
     return obj;
@@ -35,7 +41,8 @@ const {
   return {
     getAuthenticatedSessionMock: vi.fn(),
     fromFn: (table: string) => chain(table),
-    tableQueues
+    tableQueues,
+    updateCalls
   };
 });
 
@@ -96,6 +103,7 @@ describe("PATCH /items/[itemId]/worksheet", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     for (const key of Object.keys(tableQueues)) delete tableQueues[key];
+    updateCalls.length = 0;
   });
 
   async function importRoute() {
@@ -191,5 +199,79 @@ describe("PATCH /items/[itemId]/worksheet", () => {
     expect(res.status).toBe(200);
     expect(json.error).toBeNull();
     expect(json.data.item.cycle2BaseAmount).toBe(160000);
+  });
+
+  it("uses salary divided by 160 for overtime and includes fees in payable totals", async () => {
+    getAuthenticatedSessionMock.mockResolvedValueOnce(session);
+    enqueue("payroll_runs", { data: runRow("calculated"), error: null });
+    enqueue("payroll_cycles", { data: [], error: null });
+    enqueue("payroll_items", {
+      data: {
+        id: ITEM,
+        payroll_run_id: RUN,
+        employee_id: "00000000-0000-4000-a000-000000000005",
+        org_id: ORG,
+        base_salary_amount: 50000,
+        overtime_amount: 0,
+        overtime_hours: 0,
+        cycle_1_base_amount: 25000,
+        cycle_2_base_amount: 25000,
+        cycle_1_overtime_hours: 0,
+        cycle_2_overtime_hours: 0,
+        cycle_1_overtime_amount: 0,
+        cycle_2_overtime_amount: 0,
+        cycle_1_included: true,
+        cycle_2_included: true,
+        fees: 1000,
+        bonus: 0,
+        comment: null,
+        exception_reason: null
+      },
+      error: null
+    });
+    enqueue("payroll_items", {
+      data: {
+        cycle_2_base_amount: 25000,
+        cycle_1_base_amount: 25000,
+        cycle_1_overtime_hours: 16,
+        cycle_2_overtime_hours: 0,
+        cycle_1_overtime_amount: 5000,
+        cycle_2_overtime_amount: 0,
+        cycle_1_included: true,
+        cycle_2_included: true,
+        fees: 1000,
+        bonus: 0,
+        comment: null,
+        exception_reason: null,
+        net_amount: 56000,
+        gross_amount: 56000
+      },
+      error: null
+    });
+
+    const { PATCH } = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost/test", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cycle1OvertimeHours: 16,
+          fees: 1000
+        })
+      }),
+      { params: Promise.resolve({ id: RUN, itemId: ITEM }) }
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.error).toBeNull();
+    expect(json.data.item.cycle1OvertimeAmount).toBe(5000);
+    expect(json.data.item.monthlyTotal).toBe(56000);
+    expect(json.data.item.netAmount).toBe(56000);
+
+    const payrollItemUpdate = updateCalls.find((call) => call.table === "payroll_items");
+    expect(payrollItemUpdate?.payload.cycle_1_overtime_amount).toBe(5000);
+    expect(payrollItemUpdate?.payload.net_amount).toBe(56000);
+    expect(payrollItemUpdate?.payload.gross_amount).toBe(56000);
   });
 });

@@ -9,7 +9,9 @@ const CURRENCY_CONFIG: Record<
   ZAR: { symbol: "R", locale: "en-ZA", decimals: 2 },
   CAD: { symbol: "CA$", locale: "en-CA", decimals: 2 },
   GBP: { symbol: "\u00A3", locale: "en-GB", decimals: 2 },
-  EUR: { symbol: "\u20AC", locale: "en-IE", decimals: 2 }
+  EUR: { symbol: "\u20AC", locale: "en-IE", decimals: 2 },
+  XOF: { symbol: "CFA ", locale: "fr-BJ", decimals: 0 },
+  XAF: { symbol: "FCFA ", locale: "fr-CM", decimals: 0 }
 };
 
 export function formatCurrency(

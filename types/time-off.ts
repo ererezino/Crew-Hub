@@ -101,6 +101,8 @@ export type TimeOffSummaryProfile = {
   department: string | null;
   countryCode: string | null;
   dateOfBirth: string | null;
+  birthdayMonth: number | null;
+  birthdayDay: number | null;
   status: string | null;
 };
 

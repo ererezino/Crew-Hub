@@ -80,6 +80,10 @@ function parseIsoDate(dateValue: string): Date | null {
   return parsedDate;
 }
 
+function toIsoDate(dateValue: Date): string {
+  return dateValue.toISOString().slice(0, 10);
+}
+
 function fullMonthsBetween(startDate: Date, endDate: Date): number {
   if (endDate.getTime() < startDate.getTime()) {
     return 0;
@@ -102,6 +106,58 @@ function fullMonthsBetween(startDate: Date, endDate: Date): number {
   return Math.max(0, months);
 }
 
+function addUtcMonths(dateValue: Date, monthsToAdd: number): Date {
+  const nextDate = new Date(dateValue.getTime());
+  nextDate.setUTCMonth(nextDate.getUTCMonth() + monthsToAdd);
+  return nextDate;
+}
+
+function hasFractionalShares(value: number): boolean {
+  return Math.abs(value - Math.round(value)) > 0.0001;
+}
+
+function clampToFourDecimals(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function calculateSharesAtCompletedMonths(
+  totalShares: number,
+  cliffMonths: number,
+  vestingDurationMonths: number,
+  completedMonths: number
+): number {
+  if (totalShares <= 0 || vestingDurationMonths <= 0 || completedMonths <= 0) {
+    return 0;
+  }
+
+  if (completedMonths < cliffMonths) {
+    return 0;
+  }
+
+  if (completedMonths >= vestingDurationMonths) {
+    return totalShares;
+  }
+
+  if (hasFractionalShares(totalShares)) {
+    return clampToFourDecimals((totalShares * completedMonths) / vestingDurationMonths);
+  }
+
+  const cliffShares = Math.floor((totalShares * cliffMonths) / vestingDurationMonths);
+
+  if (vestingDurationMonths === cliffMonths) {
+    return completedMonths >= cliffMonths ? totalShares : 0;
+  }
+
+  const remainingShares = totalShares - cliffShares;
+  const postCliffCompletedMonths = completedMonths - cliffMonths;
+  const postCliffDurationMonths = vestingDurationMonths - cliffMonths;
+  const vestedPostCliffShares = Math.floor(
+    (remainingShares * postCliffCompletedMonths) / postCliffDurationMonths
+  );
+
+  return cliffShares + vestedPostCliffShares;
+}
+
 export type VestingProgress = {
   totalShares: number;
   vestedShares: number;
@@ -109,9 +165,17 @@ export type VestingProgress = {
   vestedPercent: number;
   cliffPercent: number;
   elapsedMonths: number;
+  completedMonths: number;
   cliffMonths: number;
   vestingDurationMonths: number;
   todayOffsetPercent: number;
+  cliffDate: string | null;
+  fullyVestedDate: string | null;
+  nextVestingDate: string | null;
+  nextVestingShares: number;
+  remainingMonths: number;
+  isFullyVested: boolean;
+  cliffReached: boolean;
 };
 
 export function calculateVestingProgress(
@@ -132,32 +196,66 @@ export function calculateVestingProgress(
       vestedPercent: 0,
       cliffPercent: 0,
       elapsedMonths: 0,
+      completedMonths: 0,
       cliffMonths: Math.max(0, grant.cliffMonths),
       vestingDurationMonths: Math.max(1, grant.vestingDurationMonths),
-      todayOffsetPercent: 0
+      todayOffsetPercent: 0,
+      cliffDate: null,
+      fullyVestedDate: null,
+      nextVestingDate: null,
+      nextVestingShares: 0,
+      remainingMonths: Math.max(1, grant.vestingDurationMonths),
+      isFullyVested: false,
+      cliffReached: false
     };
   }
 
   const elapsedMonths = fullMonthsBetween(vestingStart, asOfDate);
   const vestingDurationMonths = Math.max(1, grant.vestingDurationMonths);
   const cliffMonths = Math.max(0, grant.cliffMonths);
-
-  const vestedMonths =
-    elapsedMonths < cliffMonths
-      ? 0
-      : Math.min(vestingDurationMonths, elapsedMonths + 1);
-
-  const vestedPercentRaw = (vestedMonths / vestingDurationMonths) * 100;
-  const vestedPercent = Math.max(0, Math.min(100, vestedPercentRaw));
-  const cliffPercent = Math.max(0, Math.min(100, (cliffMonths / vestingDurationMonths) * 100));
-
-  const vestedShares = (totalShares * vestedPercent) / 100;
-  const unvestedShares = Math.max(0, totalShares - vestedShares);
-
-  const todayOffsetPercent = Math.max(
-    0,
-    Math.min(100, ((elapsedMonths + 1) / vestingDurationMonths) * 100)
+  const completedMonths = Math.min(vestingDurationMonths, elapsedMonths);
+  const vestedShares = clampToFourDecimals(
+    calculateSharesAtCompletedMonths(
+      totalShares,
+      cliffMonths,
+      vestingDurationMonths,
+      completedMonths
+    )
   );
+  const unvestedShares = clampToFourDecimals(Math.max(0, totalShares - vestedShares));
+  const vestedPercentRaw = totalShares <= 0 ? 0 : (vestedShares / totalShares) * 100;
+  const vestedPercent = Math.max(0, Math.min(100, vestedPercentRaw));
+  const cliffShares = calculateSharesAtCompletedMonths(
+    totalShares,
+    cliffMonths,
+    vestingDurationMonths,
+    cliffMonths
+  );
+  const cliffPercent = totalShares <= 0 ? 0 : Math.max(0, Math.min(100, (cliffShares / totalShares) * 100));
+  const fullyVestedDateValue = addUtcMonths(vestingStart, vestingDurationMonths);
+  const cliffDateValue = cliffMonths > 0 ? addUtcMonths(vestingStart, cliffMonths) : vestingStart;
+  const totalVestingWindowMs = fullyVestedDateValue.getTime() - vestingStart.getTime();
+  const elapsedWindowMs = Math.max(0, Math.min(totalVestingWindowMs, asOfDate.getTime() - vestingStart.getTime()));
+  const todayOffsetPercent =
+    totalVestingWindowMs <= 0 ? (vestedPercent >= 100 ? 100 : 0) : (elapsedWindowMs / totalVestingWindowMs) * 100;
+  const isFullyVested = vestedShares >= totalShares;
+  const cliffReached = completedMonths >= cliffMonths;
+  const nextCompletedMonths = completedMonths < cliffMonths ? cliffMonths : completedMonths + 1;
+  const nextVestingDate = isFullyVested ? null : toIsoDate(addUtcMonths(vestingStart, nextCompletedMonths));
+  const nextVestingShares = isFullyVested
+    ? 0
+    : clampToFourDecimals(
+        Math.max(
+          0,
+          calculateSharesAtCompletedMonths(
+            totalShares,
+            cliffMonths,
+            vestingDurationMonths,
+            Math.min(vestingDurationMonths, nextCompletedMonths)
+          ) - vestedShares
+        )
+      );
+  const remainingMonths = Math.max(0, vestingDurationMonths - completedMonths);
 
   return {
     totalShares,
@@ -166,8 +264,26 @@ export function calculateVestingProgress(
     vestedPercent,
     cliffPercent,
     elapsedMonths,
+    completedMonths,
     cliffMonths,
     vestingDurationMonths,
-    todayOffsetPercent
+    todayOffsetPercent,
+    cliffDate: toIsoDate(cliffDateValue),
+    fullyVestedDate: toIsoDate(fullyVestedDateValue),
+    nextVestingDate,
+    nextVestingShares,
+    remainingMonths,
+    isFullyVested,
+    cliffReached
   };
+}
+
+export function calculateGrantExpirationDate(grantDate: string): string | null {
+  const parsedGrantDate = parseIsoDate(grantDate);
+
+  if (!parsedGrantDate) {
+    return null;
+  }
+
+  return toIsoDate(addUtcMonths(parsedGrantDate, 120));
 }

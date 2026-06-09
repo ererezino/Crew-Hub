@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { Employee360 } from "../../../../components/people/employee-360";
+import { ProfileWorkToolsCard } from "../../../../components/people/profile-work-tools-card";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
@@ -14,8 +15,12 @@ import { formatProfileStatus } from "../../../../lib/format-labels";
 import { formatDate as formatDateLib, formatDateNoYear, formatRelativeTime } from "../../../../lib/datetime";
 import { DEPARTMENTS } from "../../../../lib/departments";
 import { USER_ROLES } from "../../../../lib/navigation";
+import { buildIsoDateFromParts, getBirthdayDisplayDate, getBirthdayParts } from "../../../../lib/time-off";
 import type { ApiResponse, AppRole } from "../../../../types/auth";
 import type {
+  AddressHistoryRecord,
+  GovernmentIdHistoryRecord,
+  PeopleDetailResponse,
   PersonRecord,
   PeopleListResponse,
   PeopleUpdateResponse,
@@ -30,7 +35,8 @@ type AppLocale = "en" | "fr";
 type PeopleOverviewClientProps = {
   employeeId: string;
   isSelf: boolean;
-  isAdmin: boolean;
+  canSeePrivateFields: boolean;
+  canManageSensitiveProfile: boolean;
   isSuperAdmin: boolean;
   canInitiateOffboarding: boolean;
 };
@@ -131,7 +137,8 @@ async function parseJsonResponse<T>(response: Response): Promise<T | null> {
 export function PeopleOverviewClient({
   employeeId,
   isSelf,
-  isAdmin,
+  canSeePrivateFields,
+  canManageSensitiveProfile,
   isSuperAdmin,
   canInitiateOffboarding
 }: PeopleOverviewClientProps) {
@@ -141,6 +148,8 @@ export function PeopleOverviewClient({
   const _td = t as (key: string, params?: Record<string, unknown>) => string;
 
   const [person, setPerson] = useState<PersonRecord | null>(null);
+  const [governmentIdHistory, setGovernmentIdHistory] = useState<GovernmentIdHistoryRecord[]>([]);
+  const [addressHistory, setAddressHistory] = useState<AddressHistoryRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -168,7 +177,11 @@ export function PeopleOverviewClient({
     teamLeadId: "",
     title: "",
     startDate: "",
-    dateOfBirth: "",
+    birthdayMonth: "",
+    birthdayDay: "",
+    birthdayYear: "",
+    homeAddress: "",
+    governmentIdUrl: "",
     status: "active" as string
   });
   const [adminEditError, setAdminEditError] = useState<string | null>(null);
@@ -215,32 +228,42 @@ export function PeopleOverviewClient({
       setErrorMessage(null);
 
       try {
-        const response = await fetch("/api/v1/people?scope=all", {
+        const detailResponse = await fetch(`/api/v1/people/${employeeId}`, {
           method: "GET",
           signal: abortController.signal
         });
 
-        const payload = (await response.json()) as PeopleListResponse;
+        const detailPayload = (await detailResponse.json()) as PeopleDetailResponse;
 
-        if (!response.ok || !payload.data) {
+        if (!detailResponse.ok || !detailPayload.data?.person) {
           setPerson(null);
-          setErrorMessage(payload.error?.message ?? t('errorState.unableToLoad'));
+          setGovernmentIdHistory([]);
+          setAddressHistory([]);
+          setErrorMessage(detailPayload.error?.message ?? t('errorState.unableToLoad'));
           return;
         }
 
-        const found = payload.data.people.find((p) => p.id === employeeId);
+        setPerson(detailPayload.data.person);
+        setGovernmentIdHistory(detailPayload.data.governmentIdHistory ?? []);
+        setAddressHistory(detailPayload.data.addressHistory ?? []);
 
-        if (!found) {
-          setPerson(null);
-          setErrorMessage(t('errorState.notFound'));
-          return;
+        if (canManageSensitiveProfile) {
+          const listResponse = await fetch("/api/v1/people?scope=all", {
+            method: "GET",
+            signal: abortController.signal
+          });
+
+          const listPayload = (await listResponse.json()) as PeopleListResponse;
+
+          if (listResponse.ok && listPayload.data?.people) {
+            setAllPeople(listPayload.data.people);
+          }
         }
-
-        setPerson(found);
-        setAllPeople(payload.data.people);
       } catch (error) {
         if (abortController.signal.aborted) return;
         setPerson(null);
+        setGovernmentIdHistory([]);
+        setAddressHistory([]);
         setErrorMessage(error instanceof Error ? error.message : t('errorState.unableToLoad'));
       } finally {
         if (!abortController.signal.aborted) {
@@ -254,7 +277,7 @@ export function PeopleOverviewClient({
     return () => {
       abortController.abort();
     };
-  }, [employeeId, reloadToken, t]);
+  }, [canManageSensitiveProfile, employeeId, reloadToken, t]);
 
   const refresh = useCallback(() => {
     setReloadToken((v) => v + 1);
@@ -318,6 +341,11 @@ export function PeopleOverviewClient({
   // Admin edit handlers
   const openAdminEdit = useCallback(() => {
     if (!person) return;
+    const birthdayParts = getBirthdayParts({
+      dateOfBirth: person.dateOfBirth,
+      birthdayMonth: person.birthdayMonth,
+      birthdayDay: person.birthdayDay
+    });
     setAdminEditValues({
       roles: person.roles.length > 0 ? [...person.roles] : ["EMPLOYEE"],
       department: person.department ?? "",
@@ -325,7 +353,14 @@ export function PeopleOverviewClient({
       teamLeadId: person.teamLeadId ?? "",
       title: person.title ?? "",
       startDate: person.startDate ?? "",
-      dateOfBirth: person.dateOfBirth ?? "",
+      birthdayMonth: birthdayParts ? String(birthdayParts.month) : "",
+      birthdayDay: birthdayParts ? String(birthdayParts.day) : "",
+      birthdayYear:
+        birthdayParts?.year !== null && birthdayParts?.year !== undefined
+          ? String(birthdayParts.year)
+          : "",
+      homeAddress: person.homeAddress ?? "",
+      governmentIdUrl: person.governmentIdUrl ?? "",
       status: person.status ?? "active"
     });
     setAdminEditError(null);
@@ -357,6 +392,23 @@ export function PeopleOverviewClient({
       setAdminEditError(null);
 
       try {
+        const birthdayMonth =
+          adminEditValues.birthdayMonth.trim().length > 0
+            ? Number.parseInt(adminEditValues.birthdayMonth, 10)
+            : null;
+        const birthdayDay =
+          adminEditValues.birthdayDay.trim().length > 0
+            ? Number.parseInt(adminEditValues.birthdayDay, 10)
+            : null;
+        const birthdayYear =
+          adminEditValues.birthdayYear.trim().length > 0
+            ? Number.parseInt(adminEditValues.birthdayYear, 10)
+            : null;
+        const dateOfBirth =
+          birthdayMonth !== null && birthdayDay !== null && birthdayYear !== null
+            ? buildIsoDateFromParts(birthdayYear, birthdayMonth, birthdayDay)
+            : null;
+
         const response = await fetch(`/api/v1/people/${person.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -367,7 +419,11 @@ export function PeopleOverviewClient({
             teamLeadId: adminEditValues.teamLeadId.trim() || null,
             title: adminEditValues.title.trim() || null,
             startDate: adminEditValues.startDate.trim() || null,
-            dateOfBirth: adminEditValues.dateOfBirth.trim() || null,
+            dateOfBirth,
+            birthdayMonth,
+            birthdayDay,
+            homeAddress: adminEditValues.homeAddress.trim() || null,
+            governmentIdUrl: adminEditValues.governmentIdUrl.trim() || null,
             status: adminEditValues.status || undefined
           })
         });
@@ -379,15 +435,15 @@ export function PeopleOverviewClient({
           return;
         }
 
-        setPerson(payload.data.person);
         setIsAdminEditOpen(false);
+        refresh();
       } catch (error) {
         setAdminEditError(error instanceof Error ? error.message : t('toast.unableToSave'));
       } finally {
         setIsAdminEditSaving(false);
       }
     },
-    [person, adminEditValues, t]
+    [adminEditValues, person, refresh, t]
   );
 
   // Invite handler
@@ -756,7 +812,17 @@ export function PeopleOverviewClient({
   /* ── Privacy ── */
 
   const privacy = resolvePrivacy(person.privacySettings);
-  const canSeeAll = isSelf || isAdmin;
+  const canSeeAll = isSelf || canSeePrivateFields;
+  const canViewGovernmentId = canSeeAll;
+  const canViewGovernmentIdHistory = canSeePrivateFields;
+  const showSensitiveProfileCard =
+    canManageSensitiveProfile ||
+    (canViewGovernmentId && (person.governmentIdUrl || governmentIdHistory.length > 0));
+  const birthdayDisplayDate = getBirthdayDisplayDate({
+    dateOfBirth: person.dateOfBirth,
+    birthdayMonth: person.birthdayMonth,
+    birthdayDay: person.birthdayDay
+  });
 
   return (
     <section className="profile-overview-section" aria-label={t('header.ariaLabel')}>
@@ -841,7 +907,7 @@ export function PeopleOverviewClient({
               {t('header.editProfile')}
             </button>
           ) : null}
-          {isAdmin && !isSelf ? (
+          {canManageSensitiveProfile && !isSelf ? (
             <>
               <button
                 type="button"
@@ -954,10 +1020,10 @@ export function PeopleOverviewClient({
               </>
             ) : null}
 
-            {person.dateOfBirth ? (
+            {birthdayDisplayDate ? (
               <>
                 <dt>{t('basicInfo.birthday')}</dt>
-                <dd>{formatDateNoYear(person.dateOfBirth, locale)}</dd>
+                <dd>{formatDateNoYear(birthdayDisplayDate, locale)}</dd>
               </>
             ) : null}
 
@@ -1041,6 +1107,89 @@ export function PeopleOverviewClient({
           </div>
         ) : null}
 
+        {showSensitiveProfileCard ? (
+          <div className="profile-overview-card">
+            <h3 className="profile-overview-card-title">{t('sensitiveProfile.title')}</h3>
+            {canManageSensitiveProfile || person.governmentIdUrl || governmentIdHistory.length > 0 ? (
+              <>
+                <dl className="profile-overview-dl">
+                  {canManageSensitiveProfile ? (
+                    <>
+                      <dt>{t('sensitiveProfile.homeAddress')}</dt>
+                      <dd>{person.homeAddress ?? "--"}</dd>
+                    </>
+                  ) : null}
+
+                  {canViewGovernmentId ? (
+                    <>
+                      <dt>{t('sensitiveProfile.currentGovernmentId')}</dt>
+                      <dd>
+                        {person.governmentIdUrl ? (
+                          <a
+                            href={person.governmentIdUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="people-name-link"
+                          >
+                            {t('sensitiveProfile.openDocument')}
+                          </a>
+                        ) : (
+                          "--"
+                        )}
+                      </dd>
+                    </>
+                  ) : null}
+                </dl>
+
+                {canManageSensitiveProfile && addressHistory.length > 0 ? (
+                  <div style={{ marginTop: "var(--space-4)" }}>
+                    <p className="settings-card-description" style={{ marginBottom: "var(--space-2)" }}>
+                      <strong>{t('sensitiveProfile.archivedAddresses')}</strong>
+                    </p>
+                    <ul className="profile-overview-meta-list">
+                      {addressHistory.map((entry) => (
+                        <li key={entry.id}>
+                          <span>{entry.address}</span>{" "}
+                          <span className="profile-overview-meta">
+                            {formatRelativeTime(entry.archivedAt, locale)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {canViewGovernmentIdHistory && governmentIdHistory.length > 0 ? (
+                  <div style={{ marginTop: "var(--space-4)" }}>
+                    <p className="settings-card-description" style={{ marginBottom: "var(--space-2)" }}>
+                      <strong>{t('sensitiveProfile.archivedIds')}</strong>
+                    </p>
+                    <ul className="profile-overview-meta-list">
+                      {governmentIdHistory.map((entry) => (
+                        <li key={entry.id}>
+                          <a
+                            href={entry.documentUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="people-name-link"
+                          >
+                            {t('sensitiveProfile.openArchivedDocument')}
+                          </a>{" "}
+                          <span className="profile-overview-meta">
+                            {formatRelativeTime(entry.archivedAt, locale)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <p className="profile-overview-empty">{t('sensitiveProfile.empty')}</p>
+            )}
+          </div>
+        ) : null}
+
         {/* Work Information (read-only) */}
         <div className="profile-overview-card">
           <h3 className="profile-overview-card-title">{t('workInfo.title')}</h3>
@@ -1096,7 +1245,7 @@ export function PeopleOverviewClient({
         </div>
 
         {/* System Info (admin only) */}
-        {isAdmin ? (
+        {canSeePrivateFields ? (
           <div className="profile-overview-card">
             <h3 className="profile-overview-card-title">{t('systemInfo.title')}</h3>
             <dl className="profile-overview-dl">
@@ -1137,6 +1286,15 @@ export function PeopleOverviewClient({
               <dd>{person.lastSeenAt ? formatRelativeTime(person.lastSeenAt) : t('systemInfo.never')}</dd>
             </dl>
           </div>
+        ) : null}
+
+        {isSelf || canManageSensitiveProfile ? (
+          <ProfileWorkToolsCard
+            employeeId={employeeId}
+            employeeName={person.fullName}
+            isSelf={isSelf}
+            canManageWorkTools={canManageSensitiveProfile}
+          />
         ) : null}
 
         {/* Privacy Settings (self only) */}
@@ -1664,16 +1822,81 @@ export function PeopleOverviewClient({
               />
             </label>
 
-            <label className="form-field" htmlFor="admin-edit-date-of-birth">
+            <div className="form-field">
               <span className="form-label">{t('adminEditPanel.dateOfBirth')}</span>
-              <input
-                id="admin-edit-date-of-birth"
-                type="date"
+              <div className="settings-emergency-fields">
+                <label className="form-field" htmlFor="admin-edit-birthday-month">
+                  <span className="form-label-sm">{t('adminEditPanel.birthdayMonth')}</span>
+                  <input
+                    id="admin-edit-birthday-month"
+                    inputMode="numeric"
+                    className="form-input"
+                    placeholder="MM"
+                    value={adminEditValues.birthdayMonth}
+                    onChange={(event) => {
+                      const val = event.currentTarget.value;
+                      setAdminEditValues((prev) => ({ ...prev, birthdayMonth: val }));
+                    }}
+                  />
+                </label>
+                <label className="form-field" htmlFor="admin-edit-birthday-day">
+                  <span className="form-label-sm">{t('adminEditPanel.birthdayDay')}</span>
+                  <input
+                    id="admin-edit-birthday-day"
+                    inputMode="numeric"
+                    className="form-input"
+                    placeholder="DD"
+                    value={adminEditValues.birthdayDay}
+                    onChange={(event) => {
+                      const val = event.currentTarget.value;
+                      setAdminEditValues((prev) => ({ ...prev, birthdayDay: val }));
+                    }}
+                  />
+                </label>
+                <label className="form-field" htmlFor="admin-edit-birthday-year">
+                  <span className="form-label-sm">{t('adminEditPanel.birthdayYear')}</span>
+                  <input
+                    id="admin-edit-birthday-year"
+                    inputMode="numeric"
+                    className="form-input"
+                    placeholder="YYYY"
+                    value={adminEditValues.birthdayYear}
+                    onChange={(event) => {
+                      const val = event.currentTarget.value;
+                      setAdminEditValues((prev) => ({ ...prev, birthdayYear: val }));
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <label className="form-field" htmlFor="admin-edit-home-address">
+              <span className="form-label">{t('adminEditPanel.homeAddress')}</span>
+              <textarea
+                id="admin-edit-home-address"
                 className="form-input"
-                value={adminEditValues.dateOfBirth}
+                maxLength={500}
+                rows={3}
+                placeholder={t('adminEditPanel.homeAddressPlaceholder')}
+                value={adminEditValues.homeAddress}
                 onChange={(event) => {
                   const val = event.currentTarget.value;
-                  setAdminEditValues((prev) => ({ ...prev, dateOfBirth: val }));
+                  setAdminEditValues((prev) => ({ ...prev, homeAddress: val }));
+                }}
+              />
+            </label>
+
+            <label className="form-field" htmlFor="admin-edit-government-id">
+              <span className="form-label">{t('adminEditPanel.governmentIdUrl')}</span>
+              <input
+                id="admin-edit-government-id"
+                className="form-input"
+                maxLength={1000}
+                placeholder={t('adminEditPanel.governmentIdUrlPlaceholder')}
+                value={adminEditValues.governmentIdUrl}
+                onChange={(event) => {
+                  const val = event.currentTarget.value;
+                  setAdminEditValues((prev) => ({ ...prev, governmentIdUrl: val }));
                 }}
               />
             </label>

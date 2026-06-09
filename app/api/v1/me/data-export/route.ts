@@ -46,11 +46,13 @@ export async function GET() {
     documentsResult,
     expensesResult,
     notificationsResult,
-    performanceResult
+    performanceResult,
+    workToolsResult,
+    workToolRequestsResult
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, email, department, title, phone, timezone, country_code, start_date, date_of_birth, employment_type, status, bio, pronouns, created_at")
+      .select("full_name, email, department, title, phone, timezone, country_code, start_date, date_of_birth, birthday_month, birthday_day, home_address, government_id_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, employment_type, status, bio, pronouns, created_at")
       .eq("id", userId)
       .eq("org_id", orgId)
       .is("deleted_at", null)
@@ -92,6 +94,18 @@ export async function GET() {
       .select("cycle_id, reviewer_id, status, due_at, created_at")
       .eq("employee_id", userId)
       .eq("org_id", orgId)
+      .is("deleted_at", null),
+    supabase
+      .from("work_tools")
+      .select("item_type, item_name, serial_number, transaction_currency, cost_amount, status, assigned_at, returned_at, notes, created_at, updated_at")
+      .eq("employee_id", userId)
+      .eq("org_id", orgId)
+      .is("deleted_at", null),
+    supabase
+      .from("work_tool_requests")
+      .select("request_kind, requested_item_type, issue_type, details, status, hr_notes, created_at, updated_at, resolved_at")
+      .eq("employee_id", userId)
+      .eq("org_id", orgId)
       .is("deleted_at", null)
   ]);
 
@@ -104,6 +118,8 @@ export async function GET() {
   if (expensesResult.error) queryErrors.push(`expenses: ${expensesResult.error.message}`);
   if (notificationsResult.error) queryErrors.push(`notifications: ${notificationsResult.error.message}`);
   if (performanceResult.error) queryErrors.push(`review_assignments: ${performanceResult.error.message}`);
+  if (workToolsResult.error) queryErrors.push(`work_tools: ${workToolsResult.error.message}`);
+  if (workToolRequestsResult.error) queryErrors.push(`work_tool_requests: ${workToolRequestsResult.error.message}`);
 
   if (queryErrors.length > 0) {
     logger.error("Personal data export failed.", {
@@ -142,7 +158,9 @@ export async function GET() {
     documents: documentsResult.data ?? [],
     expenses: expensesResult.data ?? [],
     notifications: notificationsResult.data ?? [],
-    performanceReviews: performanceResult.data ?? []
+    performanceReviews: performanceResult.data ?? [],
+    workTools: workToolsResult.data ?? [],
+    workToolRequests: workToolRequestsResult.data ?? []
   };
 
   await logAudit({

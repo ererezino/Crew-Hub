@@ -18,6 +18,7 @@ import { getModuleState } from "../../../lib/feature-state";
 import { LOCALE_META, SUPPORTED_LOCALES, type AppLocale } from "../../../i18n/locales";
 import { updateLocale } from "../../../lib/i18n/update-locale";
 import type { UserRole } from "../../../lib/navigation";
+import { buildIsoDateFromParts, getBirthdayParts } from "../../../lib/time-off";
 import { type NotificationPreferences, type SettingsTab } from "../../../types/settings";
 import { AuditLogViewer } from "./audit-log-viewer";
 
@@ -32,6 +33,11 @@ type SettingsClientProps = {
     fullName: string;
     avatarUrl: string;
     phone: string;
+    dateOfBirth: string | null;
+    birthdayMonth: number | null;
+    birthdayDay: number | null;
+    homeAddress: string;
+    governmentIdUrl: string;
     email: string;
     roles: UserRole[];
     notificationPreferences: NotificationPreferences;
@@ -62,6 +68,11 @@ type SettingsClientProps = {
 type ProfileFormValues = {
   fullName: string;
   phone: string;
+  birthdayMonth: string;
+  birthdayDay: string;
+  birthdayYear: string;
+  homeAddress: string;
+  governmentIdUrl: string;
   bio: string;
   pronouns: string;
   countryCode: string;
@@ -124,20 +135,102 @@ function makeProfileSchema(msgs: {
   nameRequired: string;
   nameTooLong: string;
   phoneTooLong: string;
+  homeAddressTooLong: string;
+  governmentIdUrlInvalid: string;
+  governmentIdUrlTooLong: string;
+  birthdayMonthRequired: string;
+  birthdayDayRequired: string;
+  birthdayYearRequired: string;
+  birthdayYearFormat: string;
+  birthdayInvalid: string;
   emergencyNameRequired: string;
   emergencyPhoneRequired: string;
   emergencyRelationshipRequired: string;
 }) {
-  return z.object({
-    fullName: z.string().trim().min(1, msgs.nameRequired).max(200, msgs.nameTooLong),
-    phone: z.string().trim().max(30, msgs.phoneTooLong),
-    bio: z.string().trim().max(500).optional(),
-    pronouns: z.string().trim().max(50).optional(),
-    countryCode: z.string().trim().max(2).optional(),
-    emergencyContactName: z.string().trim().min(1, msgs.emergencyNameRequired).max(200),
-    emergencyContactPhone: z.string().trim().min(1, msgs.emergencyPhoneRequired).max(30),
-    emergencyContactRelationship: z.string().trim().min(1, msgs.emergencyRelationshipRequired).max(100)
-  });
+  return z
+    .object({
+      fullName: z.string().trim().min(1, msgs.nameRequired).max(200, msgs.nameTooLong),
+      phone: z.string().trim().max(30, msgs.phoneTooLong),
+      birthdayMonth: z.string().trim().optional(),
+      birthdayDay: z.string().trim().optional(),
+      birthdayYear: z.string().trim().optional(),
+      homeAddress: z.string().trim().max(500, msgs.homeAddressTooLong).optional(),
+      governmentIdUrl: z
+        .string()
+        .trim()
+        .max(1000, msgs.governmentIdUrlTooLong)
+        .refine((value) => value.length === 0 || /^https?:\/\//.test(value), {
+          message: msgs.governmentIdUrlInvalid
+        })
+        .optional(),
+      bio: z.string().trim().max(500).optional(),
+      pronouns: z.string().trim().max(50).optional(),
+      countryCode: z.string().trim().max(2).optional(),
+      emergencyContactName: z.string().trim().min(1, msgs.emergencyNameRequired).max(200),
+      emergencyContactPhone: z.string().trim().min(1, msgs.emergencyPhoneRequired).max(30),
+      emergencyContactRelationship: z.string().trim().min(1, msgs.emergencyRelationshipRequired).max(100)
+    })
+    .superRefine((value, ctx) => {
+      const birthdayMonth = value.birthdayMonth ?? "";
+      const birthdayDay = value.birthdayDay ?? "";
+      const birthdayYear = value.birthdayYear ?? "";
+      const hasMonth = birthdayMonth.length > 0;
+      const hasDay = birthdayDay.length > 0;
+      const hasYear = birthdayYear.length > 0;
+      const hasAnyBirthdayField = hasMonth || hasDay || hasYear;
+
+      if (!hasAnyBirthdayField) {
+        return;
+      }
+
+      if (!hasMonth) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["birthdayMonth"],
+          message: msgs.birthdayMonthRequired
+        });
+      }
+
+      if (!hasDay) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["birthdayDay"],
+          message: msgs.birthdayDayRequired
+        });
+      }
+
+      if (!hasYear) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["birthdayYear"],
+          message: msgs.birthdayYearRequired
+        });
+        return;
+      }
+
+      if (!/^\d{4}$/.test(birthdayYear)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["birthdayYear"],
+          message: msgs.birthdayYearFormat
+        });
+        return;
+      }
+
+      const birthdayIso = buildIsoDateFromParts(
+        Number.parseInt(birthdayYear, 10),
+        Number.parseInt(birthdayMonth, 10),
+        Number.parseInt(birthdayDay, 10)
+      );
+
+      if (!birthdayIso) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["birthdayDay"],
+          message: msgs.birthdayInvalid
+        });
+      }
+    });
 }
 
 function makeOrganizationSchema(msgs: { orgNameRequired: string; nameTooLong: string }) {
@@ -157,6 +250,11 @@ function validateProfile(values: ProfileFormValues, schema: ReturnType<typeof ma
   return {
     fullName: fieldErrors.fullName?.[0],
     phone: fieldErrors.phone?.[0],
+    birthdayMonth: fieldErrors.birthdayMonth?.[0],
+    birthdayDay: fieldErrors.birthdayDay?.[0],
+    birthdayYear: fieldErrors.birthdayYear?.[0],
+    homeAddress: fieldErrors.homeAddress?.[0],
+    governmentIdUrl: fieldErrors.governmentIdUrl?.[0],
     emergencyContactName: fieldErrors.emergencyContactName?.[0],
     emergencyContactPhone: fieldErrors.emergencyContactPhone?.[0],
     emergencyContactRelationship: fieldErrors.emergencyContactRelationship?.[0]
@@ -187,6 +285,20 @@ function getInitials(fullName: string): string {
   return `${tokens[0][0] ?? ""}${tokens[1][0] ?? ""}`.toUpperCase();
 }
 
+function getInitialBirthdayValues(profile: SettingsClientProps["profile"]) {
+  const parts = getBirthdayParts({
+    dateOfBirth: profile.dateOfBirth,
+    birthdayMonth: profile.birthdayMonth,
+    birthdayDay: profile.birthdayDay
+  });
+
+  return {
+    birthdayMonth: parts ? String(parts.month) : "",
+    birthdayDay: parts ? String(parts.day) : "",
+    birthdayYear: parts?.year !== null && parts?.year !== undefined ? String(parts.year) : ""
+  };
+}
+
 export function SettingsClient({
   initialTab,
   preferredLocale,
@@ -215,6 +327,14 @@ export function SettingsClient({
     nameRequired: t('validation.nameRequired'),
     nameTooLong: t('validation.nameTooLong'),
     phoneTooLong: t('validation.phoneTooLong'),
+    homeAddressTooLong: t('validation.homeAddressTooLong'),
+    governmentIdUrlInvalid: t('validation.governmentIdUrlInvalid'),
+    governmentIdUrlTooLong: t('validation.governmentIdUrlTooLong'),
+    birthdayMonthRequired: t('validation.birthdayMonthRequired'),
+    birthdayDayRequired: t('validation.birthdayDayRequired'),
+    birthdayYearRequired: t('validation.birthdayYearRequired'),
+    birthdayYearFormat: t('validation.birthdayYearFormat'),
+    birthdayInvalid: t('validation.birthdayInvalid'),
     emergencyNameRequired: t('validation.emergencyNameRequired'),
     emergencyPhoneRequired: t('validation.emergencyPhoneRequired'),
     emergencyRelationshipRequired: t('validation.emergencyRelationshipRequired')
@@ -247,10 +367,16 @@ export function SettingsClient({
     : fallbackTab;
 
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialActiveTab);
+  const initialBirthdayValues = useMemo(() => getInitialBirthdayValues(profile), [profile]);
 
   const [profileValues, setProfileValues] = useState<ProfileFormValues>({
     fullName: profile.fullName,
     phone: profile.phone,
+    birthdayMonth: initialBirthdayValues.birthdayMonth,
+    birthdayDay: initialBirthdayValues.birthdayDay,
+    birthdayYear: initialBirthdayValues.birthdayYear,
+    homeAddress: profile.homeAddress,
+    governmentIdUrl: profile.governmentIdUrl,
     bio: profile.bio,
     pronouns: profile.pronouns,
     countryCode: profile.countryCode,
@@ -491,12 +617,32 @@ export function SettingsClient({
     setIsProfileSaving(true);
 
     try {
+      const birthdayMonth =
+        profileValues.birthdayMonth.trim().length > 0
+          ? Number.parseInt(profileValues.birthdayMonth, 10)
+          : null;
+      const birthdayDay =
+        profileValues.birthdayDay.trim().length > 0
+          ? Number.parseInt(profileValues.birthdayDay, 10)
+          : null;
+      const birthdayYear =
+        profileValues.birthdayYear.trim().length > 0
+          ? Number.parseInt(profileValues.birthdayYear, 10)
+          : null;
+      const dateOfBirth =
+        birthdayMonth !== null && birthdayDay !== null && birthdayYear !== null
+          ? buildIsoDateFromParts(birthdayYear, birthdayMonth, birthdayDay)
+          : null;
+
       const response = await fetch("/api/v1/settings/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...profileValues,
           avatarUrl,
+          dateOfBirth,
+          birthdayMonth,
+          birthdayDay,
           socialLinkedin: buildSocialUrl(profileValues.socialLinkedin, SOCIAL_PREFIXES.linkedin),
           socialTwitter: buildSocialUrl(profileValues.socialTwitter, SOCIAL_PREFIXES.twitter),
           socialInstagram: buildSocialUrl(profileValues.socialInstagram, SOCIAL_PREFIXES.instagram),
@@ -782,6 +928,68 @@ export function SettingsClient({
                 <input id="profile-email" className="form-input" value={profile.email} disabled />
               </label>
 
+              <fieldset className="form-field">
+                <legend className="form-label">{t('profile.birthdayTitle')}</legend>
+                <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
+                  <strong>{t('profile.birthdayDescription')}</strong>
+                </p>
+                <div className="settings-emergency-fields">
+                  <label className="form-field" htmlFor="profile-birthday-month">
+                    <span className="form-label-sm">{t('profile.birthdayMonthLabel')}</span>
+                    <input
+                      id="profile-birthday-month"
+                      inputMode="numeric"
+                      className={profileErrors.birthdayMonth ? "form-input form-input-error" : "form-input"}
+                      placeholder="MM"
+                      value={profileValues.birthdayMonth}
+                      onChange={(event) => {
+                        const nextValues = { ...profileValues, birthdayMonth: event.currentTarget.value };
+                        setProfileValues(nextValues);
+                        setProfileErrors(validateProfile(nextValues, profileSchema));
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-birthday-day">
+                    <span className="form-label-sm">{t('profile.birthdayDayLabel')}</span>
+                    <input
+                      id="profile-birthday-day"
+                      inputMode="numeric"
+                      className={profileErrors.birthdayDay ? "form-input form-input-error" : "form-input"}
+                      placeholder="DD"
+                      value={profileValues.birthdayDay}
+                      onChange={(event) => {
+                        const nextValues = { ...profileValues, birthdayDay: event.currentTarget.value };
+                        setProfileValues(nextValues);
+                        setProfileErrors(validateProfile(nextValues, profileSchema));
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                  <label className="form-field" htmlFor="profile-birthday-year">
+                    <span className="form-label-sm">{t('profile.birthdayYearLabel')}</span>
+                    <input
+                      id="profile-birthday-year"
+                      inputMode="numeric"
+                      className={profileErrors.birthdayYear ? "form-input form-input-error" : "form-input"}
+                      placeholder="YYYY"
+                      value={profileValues.birthdayYear}
+                      onChange={(event) => {
+                        const nextValues = { ...profileValues, birthdayYear: event.currentTarget.value };
+                        setProfileValues(nextValues);
+                        setProfileErrors(validateProfile(nextValues, profileSchema));
+                        setFormDirty(true);
+                      }}
+                    />
+                  </label>
+                </div>
+                {profileErrors.birthdayYear || profileErrors.birthdayDay || profileErrors.birthdayMonth ? (
+                  <p className="form-field-error">
+                    {profileErrors.birthdayYear ?? profileErrors.birthdayDay ?? profileErrors.birthdayMonth}
+                  </p>
+                ) : null}
+              </fieldset>
+
               <div className="form-field">
                 <span className="form-label">{t('profile.countryLabel')}</span>
                 <Select
@@ -820,6 +1028,54 @@ export function SettingsClient({
                   }}
                 />
               </label>
+
+              <fieldset className="form-field">
+                <legend className="form-label">{t('profile.privateProfileTitle')}</legend>
+                <p className="settings-card-description" style={{ marginBottom: "var(--space-3)" }}>
+                  <strong>{t('profile.privateProfileDescription')}</strong>
+                </p>
+                <label className="form-field" htmlFor="profile-home-address">
+                  <span className="form-label-sm">{t('profile.homeAddressLabel')}</span>
+                  <textarea
+                    id="profile-home-address"
+                    className={profileErrors.homeAddress ? "form-input form-input-error" : "form-input"}
+                    maxLength={500}
+                    rows={3}
+                    placeholder={t('profile.homeAddressPlaceholder')}
+                    value={profileValues.homeAddress}
+                    onChange={(event) => {
+                      const nextValues = { ...profileValues, homeAddress: event.currentTarget.value };
+                      setProfileValues(nextValues);
+                      setProfileErrors(validateProfile(nextValues, profileSchema));
+                      setFormDirty(true);
+                    }}
+                  />
+                  {profileErrors.homeAddress ? (
+                    <p className="form-field-error">{profileErrors.homeAddress}</p>
+                  ) : null}
+                </label>
+
+                <label className="form-field" htmlFor="profile-government-id">
+                  <span className="form-label-sm">{t('profile.governmentIdUrlLabel')}</span>
+                  <input
+                    id="profile-government-id"
+                    className={profileErrors.governmentIdUrl ? "form-input form-input-error" : "form-input"}
+                    maxLength={1000}
+                    placeholder={t('profile.governmentIdUrlPlaceholder')}
+                    value={profileValues.governmentIdUrl}
+                    onChange={(event) => {
+                      const nextValues = { ...profileValues, governmentIdUrl: event.currentTarget.value };
+                      setProfileValues(nextValues);
+                      setProfileErrors(validateProfile(nextValues, profileSchema));
+                      setFormDirty(true);
+                    }}
+                  />
+                  <p className="settings-card-description">{t('profile.governmentIdUrlHelp')}</p>
+                  {profileErrors.governmentIdUrl ? (
+                    <p className="form-field-error">{profileErrors.governmentIdUrl}</p>
+                  ) : null}
+                </label>
+              </fieldset>
 
               {/* ── Social links (The Crew) ── */}
               <fieldset className="form-field">

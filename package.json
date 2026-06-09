@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed": "npx tsx scripts/seed/seed-foundation.ts",
+    "seed:customer-success-qa": "node --env-file=.env.local --import tsx scripts/seed/ensure-customer-success-qa.ts",
     "reset-team": "npx tsx scripts/seed/reset-to-real-team.ts",
     "auth:reset-mfa": "npx tsx scripts/auth/reset-mfa.ts",
     "i18n:parity": "node scripts/check-i18n-parity.cjs",

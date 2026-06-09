@@ -16,6 +16,10 @@ const CONTENT_SECURITY_POLICY = [
   "base-uri 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
+  /* Receipt/invoice PDFs are streamed from Supabase Storage signed URLs and
+   * previewed in an <iframe>. Without an explicit frame-src these fall back to
+   * default-src 'self' and the browser blocks them ("content is blocked"). */
+  "frame-src 'self' blob: https://*.supabase.co",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",

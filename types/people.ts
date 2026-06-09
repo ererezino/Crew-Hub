@@ -42,6 +42,8 @@ export type PersonRecord = {
   phone: string | null;
   startDate: string | null;
   dateOfBirth: string | null;
+  birthdayMonth: number | null;
+  birthdayDay: number | null;
   managerId: string | null;
   managerName: string | null;
   teamLeadId: string | null;
@@ -59,6 +61,8 @@ export type PersonRecord = {
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
   emergencyContactRelationship: string | null;
+  homeAddress: string | null;
+  governmentIdUrl: string | null;
   pronouns: string | null;
   socialLinkedin: string | null;
   socialTwitter: string | null;
@@ -77,6 +81,22 @@ export type PersonRecord = {
   lastSeenAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type GovernmentIdHistoryRecord = {
+  id: string;
+  documentUrl: string;
+  replacedByUrl: string | null;
+  archivedAt: string;
+  removedAt: string | null;
+};
+
+export type AddressHistoryRecord = {
+  id: string;
+  address: string;
+  replacedByAddress: string | null;
+  archivedAt: string;
+  removedAt: string | null;
 };
 
 export type PeopleListResponseData = {
@@ -150,6 +170,8 @@ export type PeopleUpdatePayload = {
   title?: string | null;
   startDate?: string | null;
   dateOfBirth?: string | null;
+  birthdayMonth?: number | null;
+  birthdayDay?: number | null;
   managerId?: string | null;
   status?: ProfileStatus;
   accessOverrides?: PeopleAccessOverrides;
@@ -159,6 +181,8 @@ export type PeopleUpdatePayload = {
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
   emergencyContactRelationship?: string | null;
+  homeAddress?: string | null;
+  governmentIdUrl?: string | null;
   avatarUrl?: string | null;
   bio?: string | null;
   favoriteMusic?: string | null;
@@ -178,6 +202,14 @@ export type PeopleUpdateResponseData = {
 };
 
 export type PeopleUpdateResponse = ApiResponse<PeopleUpdateResponseData>;
+
+export type PeopleDetailResponseData = {
+  person: PersonRecord;
+  governmentIdHistory: GovernmentIdHistoryRecord[];
+  addressHistory: AddressHistoryRecord[];
+};
+
+export type PeopleDetailResponse = ApiResponse<PeopleDetailResponseData>;
 
 export type PeopleInviteResponseData = {
   personId: string;

@@ -14,7 +14,7 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { usePeople } from "../../../hooks/use-people";
 import { usePresence, type PresenceState } from "../../../hooks/use-presence";
 import { countryFlagFromCode, countryNameFromCode, getCountryDefaults } from "../../../lib/countries";
-import { formatDateNoYear, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
+import { formatDate as formatDateLib, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { DEPARTMENTS } from "../../../lib/departments";
 import { formatEmploymentType, formatProfileStatus } from "../../../lib/format-labels";
 import { USER_ROLES } from "../../../lib/navigation";
@@ -444,42 +444,6 @@ function getInitials(name: string): string {
   return (parts[0]?.[0] ?? "?").toUpperCase();
 }
 
-function getBirthdayOccurrence(dateOfBirth: string, year: number): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
-  if (!match) {
-    return null;
-  }
-
-  return `${year}-${match[2]}-${match[3]}`;
-}
-
-function getNextBirthday(dateOfBirth: string, referenceDate = new Date()): string | null {
-  const currentYear = referenceDate.getUTCFullYear();
-  const currentIso = referenceDate.toISOString().slice(0, 10);
-  const thisYear = getBirthdayOccurrence(dateOfBirth, currentYear);
-
-  if (!thisYear) {
-    return null;
-  }
-
-  if (thisYear >= currentIso) {
-    return thisYear;
-  }
-
-  return getBirthdayOccurrence(dateOfBirth, currentYear + 1);
-}
-
-function differenceInDays(startIso: string, endIso: string): number {
-  const start = Date.parse(`${startIso}T00:00:00.000Z`);
-  const end = Date.parse(`${endIso}T00:00:00.000Z`);
-
-  if (!Number.isFinite(start) || !Number.isFinite(end)) {
-    return 0;
-  }
-
-  return Math.round((end - start) / 86_400_000);
-}
-
 function PresenceDot({ state, label }: { state: PresenceState; label: string }) {
   return (
     <span
@@ -641,37 +605,6 @@ export function PeopleClient({
       }),
     [people, sortDirection]
   );
-
-  const upcomingBirthdays = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-
-    return people
-      .filter((person) => person.directoryVisible !== false && Boolean(person.dateOfBirth))
-      .map((person) => {
-        const nextBirthday = getNextBirthday(person.dateOfBirth!);
-        if (!nextBirthday) {
-          return null;
-        }
-
-        return {
-          id: person.id,
-          fullName: person.fullName,
-          department: person.department,
-          avatarUrl: person.avatarUrl,
-          birthday: person.dateOfBirth!,
-          nextBirthday,
-          daysUntil: differenceInDays(today, nextBirthday)
-        };
-      })
-      .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-      .sort((leftEntry, rightEntry) => {
-        if (leftEntry.daysUntil !== rightEntry.daysUntil) {
-          return leftEntry.daysUntil - rightEntry.daysUntil;
-        }
-
-        return leftEntry.fullName.localeCompare(rightEntry.fullName);
-      });
-  }, [people]);
 
   const managerOptions = useMemo(
     () =>
@@ -1434,69 +1367,6 @@ export function PeopleClient({
         </>
       ) : null}
 
-      {!isLoading && !errorMessage ? (
-        <section className="settings-card" aria-label={t('birthdays.title')}>
-          <header className="timeoff-section-header">
-            <div>
-              <h2 className="section-title">{t('birthdays.title')}</h2>
-              <p className="settings-card-description">{t('birthdays.description')}</p>
-            </div>
-          </header>
-
-          {upcomingBirthdays.length === 0 ? (
-            <p className="settings-card-description">{t('birthdays.empty')}</p>
-          ) : (
-            <div className="data-table-container">
-              <table className="data-table" aria-label={t('birthdays.tableAriaLabel')}>
-                <thead>
-                  <tr>
-                    <th>{t('birthdays.name')}</th>
-                    <th>{t('birthdays.birthday')}</th>
-                    <th>{t('birthdays.nextCelebration')}</th>
-                    <th>{t('birthdays.department')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {upcomingBirthdays.map((entry) => (
-                    <tr key={`birthday-${entry.id}`} className="data-table-row">
-                      <td>
-                        <Link href={`/people/${entry.id}`} className="people-name-cell people-name-link">
-                          <div className="people-avatar-wrap">
-                            {entry.avatarUrl ? (
-                              <Image
-                                src={entry.avatarUrl}
-                                alt=""
-                                width={36}
-                                height={36}
-                                className="people-avatar-image"
-                              />
-                            ) : (
-                              <div className="people-avatar-fallback" aria-hidden="true">
-                                {getInitials(entry.fullName)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="people-cell-copy">
-                            <p className="people-cell-title">{entry.fullName}</p>
-                          </div>
-                        </Link>
-                      </td>
-                      <td>{formatDateNoYear(entry.nextBirthday, locale)}</td>
-                      <td>
-                        {entry.daysUntil === 0
-                          ? t('birthdays.today')
-                          : td('birthdays.inDays', { count: entry.daysUntil })}
-                      </td>
-                      <td>{entry.department ?? "--"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      ) : null}
-
       {!isLoading && !errorMessage && sortedPeople.length > 0 ? (
         <div className="data-table-container">
           <table className="data-table" aria-label={t('table.ariaLabel')}>
@@ -1622,9 +1492,9 @@ export function PeopleClient({
                     {person.startDate ? (
                       <time
                         dateTime={toDateTimeValue(person.startDate)}
-                        title={formatDateTimeTooltip(toDateTimeValue(person.startDate), locale)}
+                        title={formatDateLib(person.startDate, locale)}
                       >
-                        {formatRelativeTime(toDateTimeValue(person.startDate), locale)}
+                        {formatDateLib(person.startDate, locale)}
                       </time>
                     ) : (
                       <span className="text-muted">{"\u2014"}</span>

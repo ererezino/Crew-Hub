@@ -4,6 +4,12 @@ type ParsedDate = {
   day: number;
 };
 
+export type BirthdayProfileInput = {
+  dateOfBirth?: string | null;
+  birthdayMonth?: number | null;
+  birthdayDay?: number | null;
+};
+
 function padDatePart(value: number): string {
   return String(value).padStart(2, "0");
 }
@@ -40,8 +46,87 @@ function parseIsoDateParts(value: string): ParsedDate | null {
   return { year, month, day };
 }
 
+function parseBirthdayParts(
+  value: string | BirthdayProfileInput
+): ParsedDate | { year: null; month: number; day: number } | null {
+  if (typeof value === "string") {
+    return parseIsoDateParts(value);
+  }
+
+  if (typeof value.dateOfBirth === "string" && value.dateOfBirth.trim().length > 0) {
+    return parseIsoDateParts(value.dateOfBirth);
+  }
+
+  const month = value.birthdayMonth;
+  const day = value.birthdayDay;
+
+  if (!Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+
+  const normalizedMonth = Number(month);
+  const normalizedDay = Number(day);
+
+  const validator = new Date(Date.UTC(2000, normalizedMonth - 1, normalizedDay));
+
+  if (
+    validator.getUTCMonth() + 1 !== normalizedMonth ||
+    validator.getUTCDate() !== normalizedDay
+  ) {
+    return null;
+  }
+
+  return { year: null, month: normalizedMonth, day: normalizedDay };
+}
+
 export function isIsoDate(value: string): boolean {
   return Boolean(parseIsoDateParts(value));
+}
+
+export function buildIsoDateFromParts(
+  year: number,
+  month: number,
+  day: number
+): string | null {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+
+  const isoDate = `${String(year).padStart(4, "0")}-${padDatePart(month)}-${padDatePart(day)}`;
+  return isIsoDate(isoDate) ? isoDate : null;
+}
+
+export function getBirthdayParts(
+  value: string | BirthdayProfileInput
+): ParsedDate | { year: null; month: number; day: number } | null {
+  return parseBirthdayParts(value);
+}
+
+export function hasBirthdayConfigured(value: string | BirthdayProfileInput): boolean {
+  return Boolean(parseBirthdayParts(value));
+}
+
+export function getBirthdayDisplayDate(value: string | BirthdayProfileInput): string | null {
+  const parts = parseBirthdayParts(value);
+
+  if (!parts) {
+    return null;
+  }
+
+  return buildIsoDateFromParts(2000, parts.month, parts.day);
+}
+
+export function getBirthdayOccurrenceDate(
+  value: string | BirthdayProfileInput,
+  year: number
+): string | null {
+  const parts = parseBirthdayParts(value);
+
+  if (!parts || !Number.isInteger(year)) {
+    return null;
+  }
+
+  return utcDateToIsoDate(new Date(Date.UTC(year, parts.month - 1, parts.day)));
 }
 
 export function isoDateToUtcDate(value: string): Date | null {
@@ -266,7 +351,7 @@ export function parseNumeric(value: number | string): number {
  * returns every working day in the following 7 calendar days.
  */
 export function getBirthdayLeaveOptions(
-  dateOfBirth: string,
+  birthday: string | BirthdayProfileInput,
   year: number,
   holidayDateKeys: ReadonlySet<string>
 ): {
@@ -275,9 +360,9 @@ export function getBirthdayLeaveOptions(
   options: string[];
   isBirthdayWorkday: boolean;
 } {
-  const dob = isoDateToUtcDate(dateOfBirth);
+  const birthdayStr = getBirthdayOccurrenceDate(birthday, year);
 
-  if (!dob) {
+  if (!birthdayStr) {
     return {
       birthdayDate: "",
       needsChoice: false,
@@ -286,12 +371,21 @@ export function getBirthdayLeaveOptions(
     };
   }
 
-  const birthday = new Date(Date.UTC(year, dob.getUTCMonth(), dob.getUTCDate()));
-  const birthdayStr = utcDateToIsoDate(birthday);
-  const isWorkday = !isWeekendUtc(birthday) && !holidayDateKeys.has(birthdayStr);
+  const birthdayDate = isoDateToUtcDate(birthdayStr);
+
+  if (!birthdayDate) {
+    return {
+      birthdayDate: "",
+      needsChoice: false,
+      options: [],
+      isBirthdayWorkday: false
+    };
+  }
+
+  const isWorkday = !isWeekendUtc(birthdayDate) && !holidayDateKeys.has(birthdayStr);
   const options: string[] = [];
-  const cursor = new Date(birthday.getTime());
-  const deadline = new Date(birthday.getTime());
+  const cursor = new Date(birthdayDate.getTime());
+  const deadline = new Date(birthdayDate.getTime());
   deadline.setUTCDate(deadline.getUTCDate() + 7);
 
   if (isWorkday) {
