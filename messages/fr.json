@@ -367,7 +367,14 @@
       "toastError": "Impossible de mettre à jour cette cellule.",
       "managerOnly": "Seuls les responsables peuvent composer les horaires.",
       "noSchedules": "Créez d'abord un horaire, puis composez-le ici.",
-      "untitledSchedule": "Horaire sans titre"
+      "untitledSchedule": "Horaire sans titre",
+      "notesColumn": "Notes",
+      "notesPlaceholder": "ex. : Favour est en congé à partir du 26",
+      "notesError": "Impossible d'enregistrer la note.",
+      "copyWeek": "Copier la semaine précédente",
+      "copying": "Copie…",
+      "copyWeekDone": "{count, plural, one {# affectation copiée} other {# affectations copiées}} depuis la semaine précédente.",
+      "copyWeekEmpty": "Rien à copier de la semaine précédente."
     },
     "track": {
       "weekday": "Semaine",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
@@ -114,12 +114,55 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [savingCell, setSavingCell] = useState<string | null>(null);
   const [addTarget, setAddTarget] = useState<string | null>(null); // `${weekIndex}:${slotKey}`
+  const [notes, setNotes] = useState<Map<string, string>>(new Map()); // weekStart -> note
+  const [copyingWeek, setCopyingWeek] = useState<string | null>(null);
 
   const addToast = useCallback((type: ToastMessage["type"], text: string) => {
     const id = ++toastSeq;
     setToasts((cur) => [...cur, { id, type, text }]);
     setTimeout(() => setToasts((cur) => cur.filter((x) => x.id !== id)), 4500);
   }, []);
+
+  // Load per-week notes for the active schedule.
+  const scheduleId = activeSchedule?.id;
+  useEffect(() => {
+    if (!scheduleId) {
+      setNotes(new Map());
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/v1/scheduling/schedules/${scheduleId}/week-notes`)
+      .then((r) => r.json())
+      .then((payload) => {
+        if (cancelled) return;
+        const list: Array<{ weekStart: string; note: string }> = payload?.data?.notes ?? [];
+        setNotes(new Map(list.map((n) => [n.weekStart, n.note] as const)));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [scheduleId]);
+
+  const saveNote = useCallback(
+    async (weekStart: string, note: string) => {
+      if (!scheduleId) return;
+      try {
+        const res = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/week-notes`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ weekStart, note })
+        });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => null);
+          throw new Error(payload?.error?.message ?? t("grid.notesError"));
+        }
+      } catch (err) {
+        addToast("error", err instanceof Error ? err.message : t("grid.notesError"));
+      }
+    },
+    [scheduleId, addToast, t]
+  );
 
   // ---- Derive weeks ----
   const weeks: WeekRow[] = useMemo(() => {
@@ -238,6 +281,56 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
     [activeSchedule, addToast, shiftsQuery, t]
   );
 
+  const copyWeek = useCallback(
+    async (targetWeek: WeekRow) => {
+      if (!activeSchedule) return;
+      const source = weeks.find((w) => w.index === targetWeek.index - 1);
+      if (!source) return;
+
+      setCopyingWeek(targetWeek.weekStart);
+      try {
+        let count = 0;
+        const allWarnings = new Set<string>();
+        for (const slot of slots) {
+          const sourcePeople = cells.get(`${source.index}:${slot.key}`);
+          if (!sourcePeople) continue;
+          for (const person of sourcePeople.values()) {
+            // Map the source person's worked weekdays onto the target week's in-range days.
+            const weekdays = [...person.weekdays].filter((d) => targetWeek.rangeWeekdays.includes(d));
+            if (weekdays.length === 0) continue;
+            const res = await fetch(`/api/v1/scheduling/schedules/${activeSchedule.id}/grid`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                employeeId: person.employeeId,
+                slot: { name: slot.name, startTime: slot.startTime, endTime: slot.endTime },
+                weekStart: targetWeek.weekStart,
+                weekdays
+              })
+            });
+            const payload = await res.json().catch(() => null);
+            if (res.ok) {
+              count += 1;
+              for (const w of payload?.data?.warnings ?? []) allWarnings.add(w);
+            }
+          }
+        }
+        shiftsQuery.refresh();
+        if (count > 0) {
+          addToast("success", t("grid.copyWeekDone", { count }));
+          for (const w of allWarnings) addToast("info", w);
+        } else {
+          addToast("info", t("grid.copyWeekEmpty"));
+        }
+      } catch (err) {
+        addToast("error", err instanceof Error ? err.message : t("grid.toastError"));
+      } finally {
+        setCopyingWeek(null);
+      }
+    },
+    [activeSchedule, weeks, slots, cells, shiftsQuery, addToast, t]
+  );
+
   if (schedulesQuery.isLoading) {
     return (
       <section className="compensation-layout">
@@ -298,12 +391,25 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                     <span className="schedule-grid-slot-time">{slot.startTime}–{slot.endTime}</span>
                   </th>
                 ))}
+                <th className="schedule-grid-notes-col">{t("grid.notesColumn")}</th>
               </tr>
             </thead>
             <tbody>
               {weeks.map((week) => (
                 <tr key={week.index}>
-                  <th scope="row" className="schedule-grid-week-col">{week.label}</th>
+                  <th scope="row" className="schedule-grid-week-col">
+                    <span className="schedule-grid-week-label">{week.label}</span>
+                    {week.index > 0 ? (
+                      <button
+                        type="button"
+                        className="schedule-grid-copy"
+                        disabled={copyingWeek !== null || savingCell !== null}
+                        onClick={() => void copyWeek(week)}
+                      >
+                        {copyingWeek === week.weekStart ? t("grid.copying") : t("grid.copyWeek")}
+                      </button>
+                    ) : null}
+                  </th>
                   {slots.map((slot) => {
                     const cellKey = `${week.index}:${slot.key}`;
                     const people = cells.get(cellKey);
@@ -397,6 +503,26 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                       </td>
                     );
                   })}
+                  <td className="schedule-grid-notes-cell">
+                    <textarea
+                      className="schedule-grid-note-input"
+                      rows={2}
+                      placeholder={t("grid.notesPlaceholder")}
+                      defaultValue={notes.get(week.weekStart) ?? ""}
+                      key={`${week.weekStart}:${notes.get(week.weekStart) ?? ""}`}
+                      onBlur={(event) => {
+                        const next = event.currentTarget.value;
+                        if (next !== (notes.get(week.weekStart) ?? "")) {
+                          setNotes((cur) => {
+                            const map = new Map(cur);
+                            map.set(week.weekStart, next);
+                            return map;
+                          });
+                          void saveNote(week.weekStart, next);
+                        }
+                      }}
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

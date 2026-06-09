@@ -370,7 +370,14 @@
       "toastError": "Unable to update this cell.",
       "managerOnly": "Only managers can build schedules.",
       "noSchedules": "Create a schedule first, then build it here.",
-      "untitledSchedule": "Untitled schedule"
+      "untitledSchedule": "Untitled schedule",
+      "notesColumn": "Notes",
+      "notesPlaceholder": "e.g. Favour is on leave from the 26th",
+      "notesError": "Unable to save the note.",
+      "copyWeek": "Copy last week",
+      "copying": "Copying…",
+      "copyWeekDone": "Copied {count, plural, one {# assignment} other {# assignments}} from last week.",
+      "copyWeekEmpty": "Nothing to copy from last week."
     },
     "track": {
       "weekday": "Weekday",
