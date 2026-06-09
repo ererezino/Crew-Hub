@@ -13,7 +13,9 @@ describe("People access consistency", () => {
   it("derives explicit action-level permissions in people page", () => {
     const pageFile = read("app/(shell)/people/page.tsx");
 
-    expect(pageFile).toContain('const canCreatePeople = hasRole(roles, "SUPER_ADMIN");');
+    expect(pageFile).toContain(
+      'const canCreatePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");'
+    );
     expect(pageFile).toContain(
       'const canInvitePeople = hasRole(roles, "SUPER_ADMIN") || hasRole(roles, "HR_ADMIN");'
     );
@@ -45,11 +47,13 @@ describe("People access consistency", () => {
     expect(clientFile).toContain("resetDialog.copyLink");
   });
 
-  it("server-side people create route remains super-admin protected and reset route requires super-admin or hr-admin", () => {
+  it("server-side people create route allows super-admin or hr-admin and reset route requires super-admin or hr-admin", () => {
     const createRoute = read("app/api/v1/people/route.ts");
     const resetRoute = read("app/api/v1/people/[id]/reset-password/route.ts");
 
-    expect(createRoute).toContain("return hasRole(userRoles, \"SUPER_ADMIN\");");
+    expect(createRoute).toContain(
+      "return hasRole(userRoles, \"SUPER_ADMIN\") || hasRole(userRoles, \"HR_ADMIN\");"
+    );
     expect(resetRoute).toContain("Only Super Admin or HR Admin can reset authenticator access.");
   });
 });
