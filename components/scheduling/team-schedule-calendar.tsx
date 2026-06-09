@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { ChevronLeft, ChevronRight, Move } from "lucide-react";
+import { ChevronLeft, ChevronRight, Move, Plus } from "lucide-react";
 
 import { EmptyState } from "../shared/empty-state";
 import { formatMonth } from "../../lib/datetime";
@@ -24,6 +24,7 @@ type TeamScheduleCalendarProps = {
   canManage: boolean;
   onRequestMove: (shift: ShiftRecord, targetDate: string) => void;
   onShiftSelect?: (shift: ShiftRecord) => void;
+  onRequestAdd?: (date: string) => void;
 };
 
 // DAY_NAMES moved inside component for i18n
@@ -61,6 +62,21 @@ function formatTime(iso: string): string {
   const suffix = hours >= 12 ? "PM" : "AM";
   const h12 = hours % 12 || 12;
   return minutes === 0 ? `${h12}${suffix}` : `${h12}:${pad2(minutes)}${suffix}`;
+}
+
+/** Human-readable shift name, e.g. "Support Shift", when one was recorded. */
+function shiftLabel(shift: ShiftRecord): string | null {
+  if (shift.templateName && shift.templateName.trim().length > 0) {
+    return shift.templateName.trim();
+  }
+
+  const notes = shift.notes ?? "";
+  const match = notes.match(/^Auto-generated:\s*(.+)$/);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+
+  return null;
 }
 
 function shiftSortKey(shift: ShiftRecord): string {
@@ -193,7 +209,8 @@ export function TeamScheduleCalendar({
   scheduleEndDate,
   canManage,
   onRequestMove,
-  onShiftSelect
+  onShiftSelect,
+  onRequestAdd
 }: TeamScheduleCalendarProps) {
   const t = useTranslations("scheduling");
   const scheduleStart = new Date(`${scheduleStartDate}T00:00:00`);
@@ -341,12 +358,29 @@ export function TeamScheduleCalendar({
                   setDraggingShiftId(null);
                 }}
               >
-                <span className="mycal-date-number">{day.dayOfMonth}</span>
+                <div className="teamcal-cell-head">
+                  <span className="mycal-date-number">{day.dayOfMonth}</span>
+                  {canManage && day.isInScheduleRange && onRequestAdd ? (
+                    <button
+                      type="button"
+                      className="teamcal-add-shift-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRequestAdd(day.date);
+                      }}
+                      aria-label={t("calendar.addShiftOnDay", { date: day.date })}
+                      title={t("calendar.addShift")}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  ) : null}
+                </div>
 
                 {day.shifts.map((shift) => {
                   const isDraggable = canManage && shift.status !== "cancelled";
                   const isSelectable = Boolean(onShiftSelect);
                   const shiftTimeLabel = `${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
+                  const shiftNameLabel = shiftLabel(shift);
                   return (
                     <article
                       key={shift.id}
@@ -379,6 +413,9 @@ export function TeamScheduleCalendar({
                       <span className="teamcal-shift-time">
                         {shiftTimeLabel}
                       </span>
+                      {shiftNameLabel ? (
+                        <span className="teamcal-shift-label">{shiftNameLabel}</span>
+                      ) : null}
                     </article>
                   );
                 })}
