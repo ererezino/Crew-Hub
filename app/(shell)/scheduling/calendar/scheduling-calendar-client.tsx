@@ -35,6 +35,8 @@ type ShiftEditFormValues = {
 let toastCounter = 0;
 const SHIFT_EDIT_TOAST_SUCCESS = "Shift updated successfully.";
 const SHIFT_EDIT_TOAST_ERROR = "Unable to update shift.";
+const SHIFT_DELETE_TOAST_SUCCESS = "Shift removed.";
+const SHIFT_DELETE_TOAST_ERROR = "Unable to remove shift.";
 const ALL_PUBLISHED_SCHEDULE_ID = "__all_published__";
 
 function formatShiftMoveDate(isoDate: string): string {
@@ -78,6 +80,7 @@ export function SchedulingCalendarClient({
   const [addingShiftDate, setAddingShiftDate] = useState<string | null>(null);
   const [isMovingShift, setIsMovingShift] = useState(false);
   const [isSavingShiftEdit, setIsSavingShiftEdit] = useState(false);
+  const [isDeletingShift, setIsDeletingShift] = useState(false);
   const [isCreatingShift, setIsCreatingShift] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const peopleQuery = usePeople({ scope: "all", enabled: canManageShifts });
@@ -310,18 +313,50 @@ export function SchedulingCalendarClient({
         })
       });
 
+      const payload = await response.json().catch(() => null);
+
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
         throw new Error(payload?.error?.message ?? SHIFT_EDIT_TOAST_ERROR);
       }
 
       addToast("success", SHIFT_EDIT_TOAST_SUCCESS);
+      const warnings: string[] = payload?.data?.warnings ?? [];
+      for (const warning of warnings) {
+        addToast("info", warning);
+      }
       setEditingShift(null);
       shiftsQuery.refresh();
     } catch (error) {
       addToast("error", error instanceof Error ? error.message : SHIFT_EDIT_TOAST_ERROR);
     } finally {
       setIsSavingShiftEdit(false);
+    }
+  }, [addToast, editingShift, shiftsQuery]);
+
+  const handleDeleteShift = useCallback(async () => {
+    if (!editingShift) {
+      return;
+    }
+
+    setIsDeletingShift(true);
+
+    try {
+      const response = await fetch(`/api/v1/scheduling/shifts/${editingShift.id}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error?.message ?? SHIFT_DELETE_TOAST_ERROR);
+      }
+
+      addToast("success", SHIFT_DELETE_TOAST_SUCCESS);
+      setEditingShift(null);
+      shiftsQuery.refresh();
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : SHIFT_DELETE_TOAST_ERROR);
+    } finally {
+      setIsDeletingShift(false);
     }
   }, [addToast, editingShift, shiftsQuery]);
 
@@ -348,12 +383,17 @@ export function SchedulingCalendarClient({
         })
       });
 
+      const payload = await response.json().catch(() => null);
+
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
         throw new Error(payload?.error?.message ?? t("shiftCreate.toastError"));
       }
 
       addToast("success", t("shiftCreate.toastSuccess"));
+      const warnings: string[] = payload?.data?.warnings ?? [];
+      for (const warning of warnings) {
+        addToast("info", warning);
+      }
       setAddingShiftDate(null);
       shiftsQuery.refresh();
     } catch (error) {
@@ -496,7 +536,11 @@ export function SchedulingCalendarClient({
           minDate={activeStartDate}
           maxDate={activeEndDate}
           isSubmitting={isSavingShiftEdit}
+          isDeleting={isDeletingShift}
           onClose={() => setEditingShift(null)}
+          onDelete={() => {
+            void handleDeleteShift();
+          }}
           onSubmit={(values) => {
             void handleSaveShiftEdit(values);
           }}

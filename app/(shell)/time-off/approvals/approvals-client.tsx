@@ -160,6 +160,56 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
     }
   };
 
+  const handleChangeDecision = async (
+    requestRecord: LeaveRequestRecord,
+    decision: "approve_change" | "reject_change"
+  ) => {
+    setIsMutatingRequestId(requestRecord.id);
+
+    try {
+      const response = await fetch(`/api/v1/time-off/requests/${requestRecord.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ action: decision })
+      });
+
+      const payload = (await response.json()) as TimeOffRequestMutationResponse;
+
+      if (!response.ok || !payload.data?.request) {
+        showToast("error", payload.error?.message ?? t('toastChangeError'));
+        return;
+      }
+
+      approvalsQuery.refresh();
+      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      if (contextTarget?.id === requestRecord.id) {
+        setContextTarget(null);
+      }
+      showToast(
+        "success",
+        decision === "approve_change" ? t('toastChangeApproved') : t('toastChangeDeclined')
+      );
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : t('toastChangeError'));
+    } finally {
+      setIsMutatingRequestId(null);
+    }
+  };
+
+  const describeChange = (requestRecord: LeaveRequestRecord): string => {
+    if (requestRecord.pendingChangeType === "cancel") {
+      return t('changeWantsCancel');
+    }
+    if (requestRecord.pendingChangeType === "edit" && requestRecord.pendingStartDate && requestRecord.pendingEndDate) {
+      return t('changeWantsMove', {
+        dates: formatDateRangeHuman(requestRecord.pendingStartDate, requestRecord.pendingEndDate, locale)
+      });
+    }
+    return "";
+  };
+
   const openRejectPanel = (requestRecord: LeaveRequestRecord) => {
     setRejectTarget(requestRecord);
     setRejectValues({ rejectionReason: "" });
@@ -346,6 +396,14 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                     >
                       {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate, locale)}
                     </time>
+                    {requestRecord.pendingChangeType ? (
+                      <p className="documents-cell-description" style={{ color: "var(--color-warning, #c47d00)" }}>
+                        {describeChange(requestRecord)}
+                        {requestRecord.changeRequestedByName
+                          ? ` · ${t('changeRequestedBy', { name: requestRecord.changeRequestedByName })}`
+                          : ""}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="numeric">{formatDays(requestRecord.totalDays, locale)}</td>
                   <td>
@@ -371,22 +429,45 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       >
                         {t('review')}
                       </button>
-                      <button
-                        type="button"
-                        className="table-row-action table-row-action-success"
-                        onClick={() => openApproveDialog(requestRecord)}
-                        disabled={isMutatingRequestId === requestRecord.id}
-                      >
-                        {isMutatingRequestId === requestRecord.id ? t('saving') : t('approve')}
-                      </button>
-                      <button
-                        type="button"
-                        className="table-row-action table-row-action-danger"
-                        onClick={() => openRejectPanel(requestRecord)}
-                        disabled={isMutatingRequestId === requestRecord.id}
-                      >
-                        {t('reject')}
-                      </button>
+                      {requestRecord.pendingChangeType ? (
+                        <>
+                          <button
+                            type="button"
+                            className="table-row-action table-row-action-success"
+                            onClick={() => void handleChangeDecision(requestRecord, "approve_change")}
+                            disabled={isMutatingRequestId === requestRecord.id}
+                          >
+                            {isMutatingRequestId === requestRecord.id ? t('saving') : t('approveChange')}
+                          </button>
+                          <button
+                            type="button"
+                            className="table-row-action table-row-action-danger"
+                            onClick={() => void handleChangeDecision(requestRecord, "reject_change")}
+                            disabled={isMutatingRequestId === requestRecord.id}
+                          >
+                            {t('declineChange')}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="table-row-action table-row-action-success"
+                            onClick={() => openApproveDialog(requestRecord)}
+                            disabled={isMutatingRequestId === requestRecord.id}
+                          >
+                            {isMutatingRequestId === requestRecord.id ? t('saving') : t('approve')}
+                          </button>
+                          <button
+                            type="button"
+                            className="table-row-action table-row-action-danger"
+                            onClick={() => openRejectPanel(requestRecord)}
+                            disabled={isMutatingRequestId === requestRecord.id}
+                          >
+                            {t('reject')}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

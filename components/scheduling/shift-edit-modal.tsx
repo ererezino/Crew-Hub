@@ -26,7 +26,9 @@ type ShiftEditModalProps = {
   minDate: string;
   maxDate: string;
   isSubmitting: boolean;
+  isDeleting?: boolean;
   onClose: () => void;
+  onDelete?: () => void;
   onSubmit: (values: ShiftEditValues) => void;
 };
 
@@ -92,7 +94,9 @@ export function ShiftEditModal({
   minDate,
   maxDate,
   isSubmitting,
+  isDeleting = false,
   onClose,
+  onDelete,
   onSubmit
 }: ShiftEditModalProps) {
   const tc = useTranslations("common");
@@ -103,6 +107,9 @@ export function ShiftEditModal({
   const [startTime, setStartTime] = useState(() => toTimeInput(shift.startTime));
   const [endTime, setEndTime] = useState(() => toTimeInput(shift.endTime));
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const busy = isSubmitting || isDeleting;
 
   useEffect(() => {
     if (!isOpen) {
@@ -110,14 +117,14 @@ export function ShiftEditModal({
     }
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isSubmitting) {
+      if (event.key === "Escape" && !busy) {
         onClose();
       }
     };
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isOpen, isSubmitting, onClose]);
+  }, [isOpen, busy, onClose]);
 
   const submitDisabled = useMemo(() => {
     if (!shiftDate || !startTime || !endTime) {
@@ -151,7 +158,7 @@ export function ShiftEditModal({
     <div
       className="modal-overlay"
       onClick={() => {
-        if (!isSubmitting) {
+        if (!busy) {
           onClose();
         }
       }}
@@ -264,19 +271,58 @@ export function ShiftEditModal({
 
         {error ? <p className="swap-error">{error}</p> : null}
 
-        <div className="modal-actions">
+        <div
+          className="modal-actions"
+          style={{ justifyContent: onDelete ? "space-between" : undefined }}
+        >
+          {onDelete ? (
+            confirmingDelete ? (
+              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+                <span className="settings-card-description">{tSched("shiftEditModal.removePrompt")}</span>
+                <button
+                  type="button"
+                  className="button button-subtle"
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={busy}
+                >
+                  {tSched("shiftEditModal.keep")}
+                </button>
+                <button
+                  type="button"
+                  className="button button-danger"
+                  onClick={() => onDelete()}
+                  disabled={busy}
+                >
+                  {isDeleting ? tSched("shiftEditModal.removing") : tSched("shiftEditModal.removeConfirm")}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="button button-danger-outline"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={busy}
+              >
+                {tSched("shiftEditModal.remove")}
+              </button>
+            )
+          ) : (
+            <span />
+          )}
+
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
           <button
             type="button"
             className="button button-subtle"
             onClick={onClose}
-            disabled={isSubmitting}
+            disabled={busy}
           >
             {tc("cancel")}
           </button>
           <button
             type="button"
             className="button button-accent"
-            disabled={submitDisabled || isSubmitting}
+            disabled={submitDisabled || busy}
             onClick={() => {
               if (!shiftDate || !startTime || !endTime) {
                 setError(tSched("shiftEditModal.validationRequired"));
@@ -296,6 +342,7 @@ export function ShiftEditModal({
           >
             {isSubmitting ? tc("saving") : tSched("shiftEditModal.save")}
           </button>
+          </div>
         </div>
       </section>
     </div>

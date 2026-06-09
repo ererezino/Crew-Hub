@@ -13,6 +13,7 @@ import { createNotification } from "../../../../../../lib/notifications/service"
 import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
 import {
+  calculateWorkingDays,
   formatLeaveTypeLabel,
   parseNumeric,
   spansMultipleCalendarYears
@@ -32,10 +33,35 @@ const paramsSchema = z.object({
   requestId: z.string().uuid()
 });
 
-const mutationSchema = z.object({
-  action: z.enum(["approve", "reject", "cancel"]),
-  rejectionReason: z.string().trim().max(2000).optional()
-});
+const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+const mutationSchema = z
+  .object({
+    action: z.enum([
+      "approve",
+      "reject",
+      "cancel",
+      "request_change",
+      "approve_change",
+      "reject_change"
+    ]),
+    rejectionReason: z.string().trim().max(2000).optional(),
+    // request_change fields
+    changeType: z.enum(["cancel", "edit"]).optional(),
+    newStartDate: z.string().regex(isoDatePattern, "newStartDate must be YYYY-MM-DD.").optional(),
+    newEndDate: z.string().regex(isoDatePattern, "newEndDate must be YYYY-MM-DD.").optional(),
+    changeReason: z.string().trim().max(2000).optional()
+  })
+  .refine(
+    (value) =>
+      value.action !== "request_change" ||
+      value.changeType === "cancel" ||
+      (value.changeType === "edit" && Boolean(value.newStartDate) && Boolean(value.newEndDate)),
+    {
+      message: "A date change requires both a new start date and a new end date.",
+      path: ["newStartDate"]
+    }
+  );
 
 const leaveRequestRowSchema = z.object({
   id: z.string().uuid(),
@@ -51,9 +77,19 @@ const leaveRequestRowSchema = z.object({
   acting_for: z.string().uuid().nullable().optional(),
   delegate_type: z.string().nullable().optional(),
   rejection_reason: z.string().nullable(),
+  pending_change_type: z.enum(["cancel", "edit"]).nullable().optional(),
+  pending_start_date: z.string().nullable().optional(),
+  pending_end_date: z.string().nullable().optional(),
+  pending_total_days: z.union([z.number(), z.string()]).nullable().optional(),
+  change_reason: z.string().nullable().optional(),
+  change_requested_by: z.string().uuid().nullable().optional(),
+  change_requested_at: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string()
 });
+
+const SELECT_COLUMNS =
+  "id, org_id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, pending_change_type, pending_start_date, pending_end_date, pending_total_days, change_reason, change_requested_by, change_requested_at, created_at, updated_at";
 
 const employeeProfileSchema = z.object({
   id: z.string().uuid(),
@@ -177,12 +213,14 @@ function toLeaveRequestRecord({
   requestRow,
   employeeRow,
   approverName,
-  actingForName
+  actingForName,
+  changeRequestedByName
 }: {
   requestRow: z.infer<typeof leaveRequestRowSchema>;
   employeeRow: z.infer<typeof employeeProfileSchema>;
   approverName: string | null;
   actingForName?: string | null;
+  changeRequestedByName?: string | null;
 }): LeaveRequestRecord {
   return {
     id: requestRow.id,
@@ -202,9 +240,52 @@ function toLeaveRequestRecord({
     actingFor: requestRow.acting_for ?? null,
     actingForName: actingForName ?? null,
     delegateType: requestRow.delegate_type ?? null,
+    pendingChangeType: requestRow.pending_change_type ?? null,
+    pendingStartDate: requestRow.pending_start_date ?? null,
+    pendingEndDate: requestRow.pending_end_date ?? null,
+    pendingTotalDays:
+      requestRow.pending_total_days === null || requestRow.pending_total_days === undefined
+        ? null
+        : parseNumeric(requestRow.pending_total_days),
+    changeReason: requestRow.change_reason ?? null,
+    changeRequestedBy: requestRow.change_requested_by ?? null,
+    changeRequestedByName: changeRequestedByName ?? null,
+    changeRequestedAt: requestRow.change_requested_at ?? null,
     createdAt: requestRow.created_at,
     updatedAt: requestRow.updated_at
   };
+}
+
+/** Working days for a date range, excluding weekends and the org's holidays for that country. */
+async function workingDaysForRange({
+  svcClient,
+  orgId,
+  countryCode,
+  startDate,
+  endDate
+}: {
+  svcClient: ReturnType<typeof createSupabaseServiceRoleClient>;
+  orgId: string;
+  countryCode: string | null;
+  startDate: string;
+  endDate: string;
+}): Promise<number> {
+  const { data: rawHolidays } = await svcClient
+    .from("holiday_calendars")
+    .select("date")
+    .eq("org_id", orgId)
+    .eq("country_code", countryCode ?? "NG")
+    .gte("date", startDate)
+    .lte("date", endDate)
+    .is("deleted_at", null);
+
+  const holidayKeys = new Set(
+    (rawHolidays ?? [])
+      .map((row) => (typeof row.date === "string" ? row.date : null))
+      .filter((value): value is string => Boolean(value))
+  );
+
+  return calculateWorkingDays(startDate, endDate, holidayKeys);
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -281,9 +362,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const { data: requestRow, error: requestError } = await svcClient
     .from("leave_requests")
-    .select(
-      "id, org_id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"
-    )
+    .select(SELECT_COLUMNS)
     .eq("id", parsedParams.data.requestId)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -371,6 +450,361 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (isOperationalLeadOrDelegate) {
       delegationCtx = resolveDelegationContext(existingRequest.employee_id, scope);
     }
+  }
+
+  // --- Retrospective change flow: cancel or move an already-approved leave (manager approval required) ---
+  // Employees request the change; a manager (or HR) approves it. Until approval, the leave stays
+  // approved and the person stays "on leave" on the schedule — exactly what we want for accuracy.
+  if (
+    parsedBody.data.action === "request_change" ||
+    parsedBody.data.action === "approve_change" ||
+    parsedBody.data.action === "reject_change"
+  ) {
+    const err = (status: number, code: string, message: string) =>
+      jsonResponse<null>(status, { data: null, error: { code, message }, meta: buildMeta() });
+
+    // Capture the narrowed org id so the nested finalize() closure keeps the non-null narrowing.
+    const actorOrgId = session.profile.org_id;
+
+    const leaveLabel = formatLeaveTypeLabel(existingRequest.leave_type);
+    const dateLabel = formatDateRangeHuman(existingRequest.start_date, existingRequest.end_date);
+    const isUnlimitedType = UNLIMITED_LEAVE_TYPES.has(existingRequest.leave_type);
+    const existingTotalDays = parseNumeric(existingRequest.total_days);
+
+    const finalize = async (updatedRow: unknown) => {
+      const parsed = leaveRequestRowSchema.safeParse(updatedRow);
+      if (!parsed.success) {
+        return err(500, "REQUEST_PARSE_FAILED", "Updated leave request data is not in the expected shape.");
+      }
+
+      const ids = [parsed.data.approver_id, parsed.data.change_requested_by].filter(
+        (value): value is string => Boolean(value)
+      );
+      let approverName: string | null = null;
+      let changeRequestedByName: string | null = null;
+
+      if (ids.length > 0) {
+        const { data: nameRows } = await svcClient
+          .from("profiles")
+          .select("id, full_name")
+          .eq("org_id", actorOrgId)
+          .is("deleted_at", null)
+          .in("id", ids);
+        const nameMap = new Map(
+          (nameRows ?? [])
+            .map((row) => {
+              const parsedName = approverProfileSchema.safeParse(row);
+              return parsedName.success ? ([parsedName.data.id, parsedName.data.full_name] as const) : null;
+            })
+            .filter((entry): entry is readonly [string, string] => entry !== null)
+        );
+        approverName = parsed.data.approver_id ? nameMap.get(parsed.data.approver_id) ?? null : null;
+        changeRequestedByName = parsed.data.change_requested_by
+          ? nameMap.get(parsed.data.change_requested_by) ?? null
+          : null;
+      }
+
+      return jsonResponse<TimeOffRequestMutationResponseData>(200, {
+        data: {
+          request: toLeaveRequestRecord({
+            requestRow: parsed.data,
+            employeeRow: employeeProfile,
+            approverName,
+            changeRequestedByName
+          })
+        },
+        error: null,
+        meta: buildMeta()
+      });
+    };
+
+    // 1) Employee (or HR) stages a change on an approved leave.
+    if (parsedBody.data.action === "request_change") {
+      if (!(isEmployeeOwner || isOverrideUser)) {
+        return err(403, "FORBIDDEN", "You are not allowed to request a change to this leave request.");
+      }
+      if (existingRequest.status !== "approved") {
+        return err(
+          422,
+          "INVALID_STATUS",
+          "Only approved leave can be changed retrospectively. A pending request can be cancelled directly."
+        );
+      }
+      if (existingRequest.pending_change_type) {
+        return err(422, "INVALID_STATUS", "A change is already awaiting approval for this leave request.");
+      }
+
+      const changeType = parsedBody.data.changeType;
+      let pendingStartDate: string | null = null;
+      let pendingEndDate: string | null = null;
+      let pendingTotalDays: number | null = null;
+
+      if (changeType === "edit") {
+        const newStart = parsedBody.data.newStartDate as string;
+        const newEnd = parsedBody.data.newEndDate as string;
+
+        if (newEnd < newStart) {
+          return err(422, "VALIDATION_ERROR", "The new end date cannot be before the new start date.");
+        }
+        if (spansMultipleCalendarYears(newStart, newEnd)) {
+          return err(
+            422,
+            "VALIDATION_ERROR",
+            "The new dates span multiple calendar years. Please request separate leaves for each year."
+          );
+        }
+
+        pendingStartDate = newStart;
+        pendingEndDate = newEnd;
+        pendingTotalDays = await workingDaysForRange({
+          svcClient,
+          orgId: session.profile.org_id,
+          countryCode: employeeProfile.country_code,
+          startDate: newStart,
+          endDate: newEnd
+        });
+
+        if (pendingTotalDays <= 0) {
+          return err(
+            422,
+            "VALIDATION_ERROR",
+            "The new dates contain no working days after excluding weekends and holidays."
+          );
+        }
+      }
+
+      const { data: updatedRow, error: updateErr } = await svcClient
+        .from("leave_requests")
+        .update({
+          pending_change_type: changeType,
+          pending_start_date: pendingStartDate,
+          pending_end_date: pendingEndDate,
+          pending_total_days: pendingTotalDays,
+          change_reason: parsedBody.data.changeReason?.trim() || null,
+          change_requested_by: session.profile.id,
+          change_requested_at: new Date().toISOString()
+        })
+        .eq("id", existingRequest.id)
+        .eq("org_id", session.profile.org_id)
+        .select(SELECT_COLUMNS)
+        .single();
+
+      if (updateErr || !updatedRow) {
+        return err(500, "REQUEST_UPDATE_FAILED", "Unable to record the change request.");
+      }
+
+      // Notify whoever decides: the original approver, else the employee's manager.
+      const notifyTargetId = existingRequest.approver_id ?? employeeProfile.manager_id;
+      if (notifyTargetId) {
+        const actionLabel =
+          changeType === "cancel"
+            ? `cancel their ${leaveLabel}`
+            : `move their ${leaveLabel} to ${formatDateRangeHuman(pendingStartDate as string, pendingEndDate as string)}`;
+        await createNotification({
+          orgId: session.profile.org_id,
+          userId: notifyTargetId,
+          type: "leave_status",
+          title: `${leaveLabel} change request`,
+          body: `${employeeProfile.full_name} requested to ${actionLabel} (originally ${dateLabel}). It needs your approval.`,
+          link: "/time-off/approvals"
+        }).catch(() => undefined);
+      }
+
+      await logAudit({
+        action: "updated",
+        tableName: "leave_requests",
+        recordId: existingRequest.id,
+        oldValue: { pending_change_type: existingRequest.pending_change_type ?? null },
+        newValue: { pending_change_type: changeType, pending_start_date: pendingStartDate, pending_end_date: pendingEndDate }
+      }).catch(() => undefined);
+
+      return finalize(updatedRow);
+    }
+
+    // 2) Manager approves or rejects the staged change.
+    if (isEmployeeOwner) {
+      return err(403, "FORBIDDEN", "You cannot decide on a change to your own leave request.");
+    }
+    if (!(isOverrideUser || isOperationalLeadOrDelegate)) {
+      return err(403, "FORBIDDEN", "You are not allowed to decide on this change request.");
+    }
+    if (!existingRequest.pending_change_type) {
+      return err(422, "INVALID_STATUS", "There is no pending change to act on for this leave request.");
+    }
+
+    const clearPendingChange = {
+      pending_change_type: null,
+      pending_start_date: null,
+      pending_end_date: null,
+      pending_total_days: null,
+      change_reason: null,
+      change_requested_by: null,
+      change_requested_at: null
+    } as const;
+
+    if (parsedBody.data.action === "reject_change") {
+      const { data: updatedRow, error: updateErr } = await svcClient
+        .from("leave_requests")
+        .update(clearPendingChange)
+        .eq("id", existingRequest.id)
+        .eq("org_id", session.profile.org_id)
+        .select(SELECT_COLUMNS)
+        .single();
+
+      if (updateErr || !updatedRow) {
+        return err(500, "REQUEST_UPDATE_FAILED", "Unable to reject the change request.");
+      }
+
+      await createNotification({
+        orgId: session.profile.org_id,
+        userId: employeeProfile.id,
+        type: "leave_status",
+        title: `${leaveLabel} change declined`,
+        body: `Your request to change your ${leaveLabel} (${dateLabel}) was declined by ${session.profile.full_name}.`,
+        link: "/time-off"
+      }).catch(() => undefined);
+
+      await logAudit({
+        action: "rejected",
+        tableName: "leave_requests",
+        recordId: existingRequest.id,
+        oldValue: { pending_change_type: existingRequest.pending_change_type },
+        newValue: { pending_change_type: null, change_decision: "rejected" }
+      }).catch(() => undefined);
+
+      return finalize(updatedRow);
+    }
+
+    // approve_change — apply the staged change and adjust balances.
+    const changeType = existingRequest.pending_change_type;
+    let updatePayload: Record<string, unknown> = { ...clearPendingChange };
+
+    if (changeType === "cancel") {
+      updatePayload = { ...updatePayload, status: "cancelled" };
+    } else {
+      // edit
+      const newStart = existingRequest.pending_start_date;
+      const newEnd = existingRequest.pending_end_date;
+      const newTotal =
+        existingRequest.pending_total_days === null || existingRequest.pending_total_days === undefined
+          ? existingTotalDays
+          : parseNumeric(existingRequest.pending_total_days);
+
+      if (!newStart || !newEnd) {
+        return err(422, "INVALID_STATUS", "The staged change is missing its new dates.");
+      }
+
+      updatePayload = {
+        ...updatePayload,
+        start_date: newStart,
+        end_date: newEnd,
+        total_days: newTotal
+      };
+    }
+
+    const { data: updatedRow, error: updateErr } = await svcClient
+      .from("leave_requests")
+      .update(updatePayload)
+      .eq("id", existingRequest.id)
+      .eq("org_id", session.profile.org_id)
+      .select(SELECT_COLUMNS)
+      .single();
+
+    if (updateErr || !updatedRow) {
+      return err(500, "REQUEST_UPDATE_FAILED", "Unable to apply the change request.");
+    }
+
+    // Adjust used-day balances for limited leave types (best-effort; the change is already applied).
+    if (!isUnlimitedType) {
+      try {
+        if (changeType === "cancel") {
+          if (existingTotalDays > 0) {
+            await applyBalanceDeltas({
+              orgId: session.profile.org_id,
+              employeeId: existingRequest.employee_id,
+              leaveType: existingRequest.leave_type,
+              year: Number.parseInt(existingRequest.start_date.slice(0, 4), 10),
+              usedDaysDelta: existingTotalDays * -1,
+              pendingDaysDelta: 0
+            });
+          }
+        } else {
+          const newStart = existingRequest.pending_start_date as string;
+          const newTotal =
+            existingRequest.pending_total_days === null || existingRequest.pending_total_days === undefined
+              ? existingTotalDays
+              : parseNumeric(existingRequest.pending_total_days);
+          const oldYear = Number.parseInt(existingRequest.start_date.slice(0, 4), 10);
+          const newYear = Number.parseInt(newStart.slice(0, 4), 10);
+
+          if (oldYear === newYear) {
+            await applyBalanceDeltas({
+              orgId: session.profile.org_id,
+              employeeId: existingRequest.employee_id,
+              leaveType: existingRequest.leave_type,
+              year: oldYear,
+              usedDaysDelta: newTotal - existingTotalDays,
+              pendingDaysDelta: 0
+            });
+          } else {
+            await applyBalanceDeltas({
+              orgId: session.profile.org_id,
+              employeeId: existingRequest.employee_id,
+              leaveType: existingRequest.leave_type,
+              year: oldYear,
+              usedDaysDelta: existingTotalDays * -1,
+              pendingDaysDelta: 0
+            });
+            await applyBalanceDeltas({
+              orgId: session.profile.org_id,
+              employeeId: existingRequest.employee_id,
+              leaveType: existingRequest.leave_type,
+              year: newYear,
+              usedDaysDelta: newTotal,
+              pendingDaysDelta: 0
+            });
+          }
+        }
+      } catch {
+        // Balance reconciliation is best-effort; the leave change itself has been applied.
+      }
+    }
+
+    const resultLabel =
+      changeType === "cancel"
+        ? `Your ${leaveLabel} (${dateLabel}) was cancelled as requested, approved by ${session.profile.full_name}.`
+        : `Your ${leaveLabel} was moved to ${formatDateRangeHuman(
+            existingRequest.pending_start_date as string,
+            existingRequest.pending_end_date as string
+          )}, approved by ${session.profile.full_name}.`;
+
+    await createNotification({
+      orgId: session.profile.org_id,
+      userId: employeeProfile.id,
+      type: "leave_status",
+      title: changeType === "cancel" ? `${leaveLabel} cancelled` : `${leaveLabel} dates updated`,
+      body: resultLabel,
+      link: "/time-off"
+    }).catch(() => undefined);
+
+    await logAudit({
+      action: changeType === "cancel" ? "cancelled" : "updated",
+      tableName: "leave_requests",
+      recordId: existingRequest.id,
+      oldValue: {
+        status: existingRequest.status,
+        start_date: existingRequest.start_date,
+        end_date: existingRequest.end_date
+      },
+      newValue: {
+        change_decision: "approved",
+        change_type: changeType,
+        start_date: existingRequest.pending_start_date ?? existingRequest.start_date,
+        end_date: existingRequest.pending_end_date ?? existingRequest.end_date
+      }
+    }).catch(() => undefined);
+
+    return finalize(updatedRow);
   }
 
   let nextStatus = existingRequest.status;
@@ -628,9 +1062,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     })
     .eq("id", existingRequest.id)
     .eq("org_id", session.profile.org_id)
-    .select(
-      "id, org_id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"
-    )
+    .select(SELECT_COLUMNS)
     .single();
 
   if (updateError || !updatedRequestRow) {

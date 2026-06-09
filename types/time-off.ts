@@ -83,9 +83,21 @@ export type LeaveRequestRecord = {
   delegateType: string | null;
   requiresDocumentation?: boolean;
   medicalEvidencePath?: string | null;
+  /** A pending retrospective change awaiting manager approval: cancel the leave or move its dates. */
+  pendingChangeType?: "cancel" | "edit" | null;
+  pendingStartDate?: string | null;
+  pendingEndDate?: string | null;
+  pendingTotalDays?: number | null;
+  changeReason?: string | null;
+  changeRequestedBy?: string | null;
+  changeRequestedByName?: string | null;
+  changeRequestedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
+
+export const LEAVE_CHANGE_TYPES = ["cancel", "edit"] as const;
+export type LeaveChangeType = (typeof LEAVE_CHANGE_TYPES)[number];
 
 export type HolidayCalendarDay = {
   id: string;

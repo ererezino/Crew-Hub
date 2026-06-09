@@ -232,7 +232,9 @@ async function detectShiftConflicts({
   startTime: string;
   endTime: string;
   excludeShiftId?: string;
-}): Promise<string | null> {
+}): Promise<string[]> {
+  const warnings: string[] = [];
+
   let existingShiftsQuery = supabase
     .from("shifts")
     .select("id, start_time, end_time")
@@ -248,33 +250,32 @@ async function detectShiftConflicts({
 
   const { data: rawRows, error } = await existingShiftsQuery;
 
-  if (error) {
-    return "Unable to validate shift overlap.";
-  }
+  if (!error) {
+    for (const row of rawRows ?? []) {
+      const existingStart = typeof row.start_time === "string" ? row.start_time : null;
+      const existingEnd = typeof row.end_time === "string" ? row.end_time : null;
 
-  for (const row of rawRows ?? []) {
-    const existingStart = typeof row.start_time === "string" ? row.start_time : null;
-    const existingEnd = typeof row.end_time === "string" ? row.end_time : null;
+      if (!existingStart || !existingEnd) {
+        continue;
+      }
 
-    if (!existingStart || !existingEnd) {
-      continue;
-    }
-
-    if (
-      areTimeRangesOverlapping({
-        startA: startTime,
-        endA: endTime,
-        startB: existingStart,
-        endB: existingEnd
-      })
-    ) {
-      return "This crew member already has an overlapping shift.";
+      if (
+        areTimeRangesOverlapping({
+          startA: startTime,
+          endA: endTime,
+          startB: existingStart,
+          endB: existingEnd
+        })
+      ) {
+        warnings.push("This crew member already has an overlapping shift at this time.");
+        break;
+      }
     }
   }
 
   const { data: leaveRows, error: leaveError } = await supabase
     .from("leave_requests")
-    .select("id")
+    .select("id, status")
     .eq("org_id", orgId)
     .eq("employee_id", employeeId)
     .in("status", ["approved", "pending"])
@@ -283,15 +284,16 @@ async function detectShiftConflicts({
     .is("deleted_at", null)
     .limit(1);
 
-  if (leaveError) {
-    return "Unable to validate leave conflicts.";
+  if (!leaveError && (leaveRows ?? []).length > 0) {
+    const isApproved = (leaveRows ?? []).some((row) => row.status === "approved");
+    warnings.push(
+      isApproved
+        ? "This crew member has approved time off on the selected day."
+        : "This crew member has a pending time-off request on the selected day."
+    );
   }
 
-  if ((leaveRows ?? []).length > 0) {
-    return "This crew member has time off on the selected day.";
-  }
-
-  return null;
+  return warnings;
 }
 
 export async function GET(request: Request) {
@@ -641,27 +643,17 @@ export async function POST(request: Request) {
     }
   }
 
-  if (parsedBody.data.employeeId) {
-    const conflictMessage = await detectShiftConflicts({
-      supabase,
-      orgId: session.profile.org_id,
-      employeeId: parsedBody.data.employeeId,
-      shiftDate: parsedBody.data.shiftDate,
-      startTime: shiftStart,
-      endTime: shiftEnd
-    });
-
-    if (conflictMessage) {
-      return jsonResponse<null>(409, {
-        data: null,
-        error: {
-          code: "SHIFT_CONFLICT",
-          message: conflictMessage
-        },
-        meta: buildMeta()
-      });
-    }
-  }
+  // Advisory only — collect conflict warnings but never block creation.
+  const conflictWarnings = parsedBody.data.employeeId
+    ? await detectShiftConflicts({
+        supabase,
+        orgId: session.profile.org_id,
+        employeeId: parsedBody.data.employeeId,
+        shiftDate: parsedBody.data.shiftDate,
+        startTime: shiftStart,
+        endTime: shiftEnd
+      })
+    : [];
 
   const { data: rawRow, error } = await supabase
     .from("shifts")
@@ -739,7 +731,8 @@ export async function POST(request: Request) {
 
   return jsonResponse<SchedulingShiftMutationResponseData>(201, {
     data: {
-      shift: createdShift
+      shift: createdShift,
+      warnings: conflictWarnings
     },
     error: null,
     meta: buildMeta()

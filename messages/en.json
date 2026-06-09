@@ -356,7 +356,21 @@
     "tab": {
       "mySchedule": "My Schedule",
       "teamCalendar": "Team Calendar",
+      "build": "Build",
       "manage": "Manage"
+    },
+    "grid": {
+      "scheduleLabel": "Schedule",
+      "helpText": "Pick who works each shift, week by week. Click a name's day letters to set which days they work (great for part-time crew). Conflicts are flagged, never blocked — you're in control.",
+      "weekColumn": "Week",
+      "addPerson": "Add",
+      "pickPerson": "Choose crew member",
+      "removePerson": "Remove from this shift",
+      "toggleDay": "Toggle this day",
+      "toastError": "Unable to update this cell.",
+      "managerOnly": "Only managers can build schedules.",
+      "noSchedules": "Create a schedule first, then build it here.",
+      "untitledSchedule": "Untitled schedule"
     },
     "track": {
       "weekday": "Weekday",
@@ -627,7 +641,12 @@
       "endTime": "End time",
       "save": "Save Changes",
       "validationRequired": "Date and time are required.",
-      "validationTimeRange": "Start time and end time cannot be identical."
+      "validationTimeRange": "Start time and end time cannot be identical.",
+      "remove": "Remove shift",
+      "removePrompt": "Remove this shift?",
+      "removeConfirm": "Remove",
+      "removing": "Removing…",
+      "keep": "Keep"
     },
     "shiftCreateModal": {
       "title": "Add Shift",
@@ -2133,6 +2152,14 @@
   "timeOffApprovals": {
     "title": "Time Off Approvals",
     "description": "Approve or decline team leave requests with full date context and clear decision history.",
+    "approveChange": "Approve change",
+    "declineChange": "Decline change",
+    "changeWantsCancel": "Wants to cancel this leave",
+    "changeWantsMove": "Wants to move to {dates}",
+    "changeRequestedBy": "requested by {name}",
+    "toastChangeApproved": "Change approved.",
+    "toastChangeDeclined": "Change declined.",
+    "toastChangeError": "Unable to update the change request.",
     "unavailable": "Approvals are unavailable",
     "noApprovals": "No pending approvals",
     "noApprovalsDescription": "Pending leave requests from your team will appear here.",
@@ -3859,6 +3886,28 @@
   "timeOff": {
     "title": "Time Off",
     "description": "Request time off, check balances, and track approval status.",
+    "changeRequest": {
+      "changeDates": "Change dates",
+      "cancelLeave": "Cancel leave",
+      "pendingBadge": "Change pending approval",
+      "cancelTitle": "Request leave cancellation?",
+      "cancelDescription": "This asks your manager to cancel this approved leave. It stays active until they approve the request.",
+      "cancelConfirm": "Request cancellation",
+      "panelTitle": "Request a date change",
+      "panelDescription": "Propose new dates for this approved leave. Your manager approves the change before it takes effect.",
+      "newStartLabel": "New start date",
+      "newEndLabel": "New end date",
+      "reasonLabel": "Reason (optional)",
+      "needsApprovalNote": "This change needs manager approval before it takes effect.",
+      "submit": "Send for approval",
+      "validationDatesRequired": "Both a new start date and a new end date are required.",
+      "validationOrder": "The end date cannot be before the start date.",
+      "toastSubmitted": "Change request sent for approval.",
+      "toastError": "Unable to send the change request.",
+      "calloutCancel": "Cancellation requested",
+      "calloutMove": "Date change requested: {dates}",
+      "awaitingApproval": "awaiting manager approval"
+    },
     "errorTitle": "Time Off data is unavailable",
     "errorDefault": "Unable to load time off summary.",
     "contextualHelp": {

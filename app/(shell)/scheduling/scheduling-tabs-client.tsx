@@ -10,6 +10,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import type { UserRole } from "../../../lib/navigation";
 
 import { SchedulingCalendarClient } from "./calendar/scheduling-calendar-client";
+import { SchedulingGridClient } from "./grid/scheduling-grid-client";
 import { SchedulingManageClient } from "./manage/scheduling-manage-client";
 import { SchedulingClient } from "./scheduling-client";
 
@@ -61,6 +62,10 @@ export function SchedulingTabsClient({
       ];
 
       if (canManage) {
+        nextTabs.push({
+          key: "build",
+          label: t("tab.build")
+        });
         nextTabs.push({
           key: "manage",
           label: t("tab.manage")
@@ -134,6 +139,9 @@ export function SchedulingTabsClient({
             canManageShifts={canManage}
             initialScheduleId={requestedScheduleId}
           />
+        ) : null}
+        {activeTab === "build" && canManage ? (
+          <SchedulingGridClient canManage={canManage} />
         ) : null}
         {activeTab === "manage" && canManage ? (
           <SchedulingManageClient

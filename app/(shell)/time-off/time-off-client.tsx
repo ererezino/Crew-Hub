@@ -333,6 +333,12 @@ export function TimeOffClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [medicalEvidenceFile, setMedicalEvidenceFile] = useState<File | null>(null);
   const [isCancellingRequestId, setIsCancellingRequestId] = useState<string | null>(null);
+  const [changeTarget, setChangeTarget] = useState<LeaveRequestRecord | null>(null);
+  const [changeStart, setChangeStart] = useState("");
+  const [changeEnd, setChangeEnd] = useState("");
+  const [changeReason, setChangeReason] = useState("");
+  const [isSubmittingChange, setIsSubmittingChange] = useState(false);
+  const [changeError, setChangeError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isAfkPanelOpen, setIsAfkPanelOpen] = useState(false);
   const [afkDate, setAfkDate] = useState("");
@@ -885,6 +891,104 @@ export function TimeOffClient({
     }
   };
 
+  const handleRequestCancellation = async (requestRecord: LeaveRequestRecord) => {
+    const shouldRequest = await confirm({
+      title: td("changeRequest.cancelTitle"),
+      description: td("changeRequest.cancelDescription"),
+      confirmLabel: td("changeRequest.cancelConfirm"),
+      tone: "danger"
+    });
+
+    if (!shouldRequest) {
+      return;
+    }
+
+    setIsCancellingRequestId(requestRecord.id);
+
+    try {
+      const response = await fetch(`/api/v1/time-off/requests/${requestRecord.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request_change", changeType: "cancel" })
+      });
+
+      const payload = (await response.json()) as TimeOffRequestMutationResponse;
+
+      if (!response.ok || !payload.data?.request) {
+        showToast("error", payload.error?.message ?? td("changeRequest.toastError"));
+        return;
+      }
+
+      summaryQuery.refresh();
+      showToast("info", td("changeRequest.toastSubmitted"));
+    } catch (error) {
+      showToast("error", error instanceof Error ? error.message : td("changeRequest.toastError"));
+    } finally {
+      setIsCancellingRequestId(null);
+    }
+  };
+
+  const openChangePanel = (requestRecord: LeaveRequestRecord) => {
+    setChangeTarget(requestRecord);
+    setChangeStart(requestRecord.startDate);
+    setChangeEnd(requestRecord.endDate);
+    setChangeReason("");
+    setChangeError(null);
+  };
+
+  const closeChangePanel = () => {
+    setChangeTarget(null);
+    setChangeError(null);
+  };
+
+  const submitDateChange = async () => {
+    if (!changeTarget) {
+      return;
+    }
+
+    if (!changeStart || !changeEnd) {
+      setChangeError(td("changeRequest.validationDatesRequired"));
+      return;
+    }
+
+    if (changeEnd < changeStart) {
+      setChangeError(td("changeRequest.validationOrder"));
+      return;
+    }
+
+    setIsSubmittingChange(true);
+    setChangeError(null);
+
+    try {
+      const response = await fetch(`/api/v1/time-off/requests/${changeTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "request_change",
+          changeType: "edit",
+          newStartDate: changeStart,
+          newEndDate: changeEnd,
+          changeReason: changeReason.trim() || undefined
+        })
+      });
+
+      const payload = (await response.json()) as TimeOffRequestMutationResponse;
+
+      if (!response.ok || !payload.data?.request) {
+        setChangeError(payload.error?.message ?? td("changeRequest.toastError"));
+        return;
+      }
+
+      summaryQuery.refresh();
+      showToast("info", td("changeRequest.toastSubmitted"));
+      closeChangePanel();
+    } catch (error) {
+      setChangeError(error instanceof Error ? error.message : td("changeRequest.toastError"));
+    } finally {
+      setIsSubmittingChange(false);
+    }
+  };
+
   if (summaryQuery.isLoading) {
     return (
       <>
@@ -1133,6 +1237,29 @@ export function TimeOffClient({
                             >
                               {isCancellingRequestId === requestRecord.id ? t('requests.cancelling') : tCommon('cancel')}
                             </button>
+                          ) : requestRecord.status === "approved" && requestRecord.pendingChangeType ? (
+                            <span className="settings-card-description">{td('changeRequest.pendingBadge')}</span>
+                          ) : requestRecord.status === "approved" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="table-row-action"
+                                onClick={() => openChangePanel(requestRecord)}
+                                disabled={isCancellingRequestId === requestRecord.id}
+                              >
+                                {td('changeRequest.changeDates')}
+                              </button>
+                              <button
+                                type="button"
+                                className="table-row-action table-row-action-danger"
+                                onClick={() => handleRequestCancellation(requestRecord)}
+                                disabled={isCancellingRequestId === requestRecord.id}
+                              >
+                                {isCancellingRequestId === requestRecord.id
+                                  ? t('requests.cancelling')
+                                  : td('changeRequest.cancelLeave')}
+                              </button>
+                            </>
                           ) : (
                             <span className="settings-card-description">{t('requests.noActions')}</span>
                           )}
@@ -1147,6 +1274,30 @@ export function TimeOffClient({
                         <td colSpan={7}>
                           <div className="rejection-callout rejection-callout-inline">
                             <p><strong>{t('requestPanel.reasonLabel')}:</strong> {requestRecord.rejectionReason}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  if (requestRecord.pendingChangeType) {
+                    const summary =
+                      requestRecord.pendingChangeType === "cancel"
+                        ? td("changeRequest.calloutCancel")
+                        : requestRecord.pendingStartDate && requestRecord.pendingEndDate
+                          ? td("changeRequest.calloutMove", {
+                              dates: formatDateRangeHuman(
+                                requestRecord.pendingStartDate,
+                                requestRecord.pendingEndDate,
+                                locale
+                              )
+                            })
+                          : "";
+                    rows.push(
+                      <tr key={`${requestRecord.id}-pending-change`} className="rejection-callout-row">
+                        <td colSpan={7}>
+                          <div className="rejection-callout rejection-callout-inline">
+                            <p>{summary} · {td("changeRequest.awaitingApproval")}</p>
                           </div>
                         </td>
                       </tr>
@@ -1588,6 +1739,76 @@ export function TimeOffClient({
             </button>
             <button type="submit" className="button button-accent" disabled={isAfkSubmitting}>
               {isAfkSubmitting ? t('afkPanel.logging') : t('afkPanel.logAfkButton')}
+            </button>
+          </div>
+        </form>
+      </SlidePanel>
+
+      <SlidePanel
+        isOpen={Boolean(changeTarget)}
+        title={td('changeRequest.panelTitle')}
+        description={td('changeRequest.panelDescription')}
+        onClose={closeChangePanel}
+      >
+        <form
+          className="slide-panel-form-wrapper"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitDateChange();
+          }}
+          noValidate
+        >
+          <div className="timeoff-form-grid">
+            <label className="form-field" htmlFor="change-start-date">
+              <span className="form-label">{td('changeRequest.newStartLabel')}</span>
+              <input
+                id="change-start-date"
+                type="date"
+                className="form-input"
+                value={changeStart}
+                onChange={(event) => {
+                  setChangeStart(event.currentTarget.value);
+                  setChangeError(null);
+                }}
+              />
+            </label>
+            <label className="form-field" htmlFor="change-end-date">
+              <span className="form-label">{td('changeRequest.newEndLabel')}</span>
+              <input
+                id="change-end-date"
+                type="date"
+                className="form-input"
+                value={changeEnd}
+                onChange={(event) => {
+                  setChangeEnd(event.currentTarget.value);
+                  setChangeError(null);
+                }}
+              />
+            </label>
+          </div>
+
+          <label className="form-field" htmlFor="change-reason">
+            <span className="form-label">{td('changeRequest.reasonLabel')}</span>
+            <textarea
+              id="change-reason"
+              rows={3}
+              className="form-input"
+              value={changeReason}
+              onChange={(event) => setChangeReason(event.currentTarget.value)}
+              maxLength={2000}
+            />
+          </label>
+
+          <p className="settings-card-description">{td('changeRequest.needsApprovalNote')}</p>
+
+          {changeError ? <p className="form-submit-error">{changeError}</p> : null}
+
+          <div className="slide-panel-actions">
+            <button type="button" className="button" onClick={closeChangePanel}>
+              {tCommon('cancel')}
+            </button>
+            <button type="submit" className="button button-accent" disabled={isSubmittingChange}>
+              {isSubmittingChange ? t('requestPanel.submitting') : td('changeRequest.submit')}
             </button>
           </div>
         </form>

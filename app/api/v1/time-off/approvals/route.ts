@@ -35,9 +35,19 @@ const requestRowSchema = z.object({
   acting_for: z.string().uuid().nullable(),
   delegate_type: z.string().nullable(),
   rejection_reason: z.string().nullable(),
+  pending_change_type: z.enum(["cancel", "edit"]).nullable().optional(),
+  pending_start_date: z.string().nullable().optional(),
+  pending_end_date: z.string().nullable().optional(),
+  pending_total_days: z.union([z.number(), z.string()]).nullable().optional(),
+  change_reason: z.string().nullable().optional(),
+  change_requested_by: z.string().uuid().nullable().optional(),
+  change_requested_at: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string()
 });
+
+const APPROVALS_SELECT_COLUMNS =
+  "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, acting_for, delegate_type, rejection_reason, pending_change_type, pending_start_date, pending_end_date, pending_total_days, change_reason, change_requested_by, change_requested_at, created_at, updated_at";
 
 const profileRowSchema = z.object({
   id: z.string().uuid(),
@@ -147,9 +157,7 @@ export async function GET(request: Request) {
 
   let requestsQuery = svcClient
     .from("leave_requests")
-    .select(
-      "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, acting_for, delegate_type, rejection_reason, created_at, updated_at"
-    )
+    .select(APPROVALS_SELECT_COLUMNS)
     .eq("org_id", session.profile.org_id)
     .eq("status", query.status)
     .is("deleted_at", null)
@@ -173,7 +181,37 @@ export async function GET(request: Request) {
     });
   }
 
-  const parsedRequests = z.array(requestRowSchema).safeParse(rawRequests ?? []);
+  // On the default (pending) approvals view, also surface already-approved leaves that have a
+  // retrospective change awaiting a decision (cancel or move dates). These carry pendingChangeType
+  // so the UI can render distinct "approve change / decline change" actions.
+  let rawChangeRequests: unknown[] = [];
+  if (query.status === "pending") {
+    let changeQuery = svcClient
+      .from("leave_requests")
+      .select(APPROVALS_SELECT_COLUMNS)
+      .eq("org_id", session.profile.org_id)
+      .not("pending_change_type", "is", null)
+      .is("deleted_at", null)
+      .order("change_requested_at", { ascending: false })
+      .limit(query.limit);
+
+    if (reportIds.length > 0) {
+      changeQuery = changeQuery.in("employee_id", reportIds);
+    }
+
+    const { data: changeRows } = await changeQuery;
+    rawChangeRequests = changeRows ?? [];
+  }
+
+  const mergedRawById = new Map<string, unknown>();
+  for (const row of [...(rawRequests ?? []), ...rawChangeRequests]) {
+    const id = (row as { id?: unknown }).id;
+    if (typeof id === "string") {
+      mergedRawById.set(id, row);
+    }
+  }
+
+  const parsedRequests = z.array(requestRowSchema).safeParse([...mergedRawById.values()]);
 
   if (!parsedRequests.success) {
     return jsonResponse<null>(500, {
@@ -214,7 +252,16 @@ export async function GET(request: Request) {
         .filter((value): value is string => Boolean(value))
     )
   ];
-  const actorIds = [...new Set([...employeeIds, ...approverIds, ...actingForIds])];
+  const changeRequesterIds = [
+    ...new Set(
+      parsedRequests.data
+        .map((row) => row.change_requested_by)
+        .filter((value): value is string => Boolean(value))
+    )
+  ];
+  const actorIds = [
+    ...new Set([...employeeIds, ...approverIds, ...actingForIds, ...changeRequesterIds])
+  ];
 
   const { data: rawProfiles, error: profilesError } = await svcClient
     .from("profiles")
@@ -272,6 +319,19 @@ export async function GET(request: Request) {
       actingFor: row.acting_for,
       actingForName: actingForProfile?.full_name ?? null,
       delegateType: row.delegate_type,
+      pendingChangeType: row.pending_change_type ?? null,
+      pendingStartDate: row.pending_start_date ?? null,
+      pendingEndDate: row.pending_end_date ?? null,
+      pendingTotalDays:
+        row.pending_total_days === null || row.pending_total_days === undefined
+          ? null
+          : parseNumeric(row.pending_total_days),
+      changeReason: row.change_reason ?? null,
+      changeRequestedBy: row.change_requested_by ?? null,
+      changeRequestedByName: row.change_requested_by
+        ? profileById.get(row.change_requested_by)?.full_name ?? null
+        : null,
+      changeRequestedAt: row.change_requested_at ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     };

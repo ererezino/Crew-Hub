@@ -16,6 +16,7 @@ import {
   parseInteger
 } from "../../../../../../lib/scheduling";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
   SHIFT_STATUSES,
@@ -114,6 +115,16 @@ function dateWindowForConflictCheck(isoDate: string): string[] {
   ];
 }
 
+/**
+ * Inspect a proposed assignment for things the scheduler should *flag* — a genuine
+ * time overlap with another of this crew member's shifts, or approved/pending time off
+ * on the day. These are advisory warnings only: the team lead is the expert and is always
+ * allowed to save (Shalewa's feedback — the tool should advise, never block). The caller
+ * surfaces the returned messages as a dismissible notice.
+ *
+ * Open shifts (employee_id null) and cancelled shifts never count against anyone, so
+ * reassigning a shift to "Open" frees that crew member to be placed elsewhere.
+ */
 async function detectShiftConflicts({
   supabase,
   orgId,
@@ -130,7 +141,9 @@ async function detectShiftConflicts({
   startTime: string;
   endTime: string;
   shiftId: string;
-}): Promise<string | null> {
+}): Promise<string[]> {
+  const warnings: string[] = [];
+
   const { data: rawRows, error } = await supabase
     .from("shifts")
     .select("id, start_time, end_time")
@@ -141,33 +154,32 @@ async function detectShiftConflicts({
     .neq("status", "cancelled")
     .neq("id", shiftId);
 
-  if (error) {
-    return "Unable to validate shift overlap.";
-  }
+  if (!error) {
+    for (const row of rawRows ?? []) {
+      const existingStart = typeof row.start_time === "string" ? row.start_time : null;
+      const existingEnd = typeof row.end_time === "string" ? row.end_time : null;
 
-  for (const row of rawRows ?? []) {
-    const existingStart = typeof row.start_time === "string" ? row.start_time : null;
-    const existingEnd = typeof row.end_time === "string" ? row.end_time : null;
+      if (!existingStart || !existingEnd) {
+        continue;
+      }
 
-    if (!existingStart || !existingEnd) {
-      continue;
-    }
-
-    if (
-      areTimeRangesOverlapping({
-        startA: startTime,
-        endA: endTime,
-        startB: existingStart,
-        endB: existingEnd
-      })
-    ) {
-      return "This crew member already has an overlapping shift.";
+      if (
+        areTimeRangesOverlapping({
+          startA: startTime,
+          endA: endTime,
+          startB: existingStart,
+          endB: existingEnd
+        })
+      ) {
+        warnings.push("This crew member already has an overlapping shift at this time.");
+        break;
+      }
     }
   }
 
   const { data: leaveRows, error: leaveError } = await supabase
     .from("leave_requests")
-    .select("id")
+    .select("id, status")
     .eq("org_id", orgId)
     .eq("employee_id", employeeId)
     .in("status", ["approved", "pending"])
@@ -176,15 +188,16 @@ async function detectShiftConflicts({
     .is("deleted_at", null)
     .limit(1);
 
-  if (leaveError) {
-    return "Unable to validate leave conflicts.";
+  if (!leaveError && (leaveRows ?? []).length > 0) {
+    const isApproved = (leaveRows ?? []).some((row) => row.status === "approved");
+    warnings.push(
+      isApproved
+        ? "This crew member has approved time off on the selected day."
+        : "This crew member has a pending time-off request on the selected day."
+    );
   }
 
-  if ((leaveRows ?? []).length > 0) {
-    return "This crew member has time off on the selected day.";
-  }
-
-  return null;
+  return warnings;
 }
 
 async function mapShift({
@@ -549,28 +562,19 @@ export async function PUT(
     }
   }
 
-  if (nextEmployeeId) {
-    const conflictMessage = await detectShiftConflicts({
-      supabase,
-      orgId: session.profile.org_id,
-      employeeId: nextEmployeeId,
-      shiftDate: nextShiftDate,
-      startTime: nextStartTime,
-      endTime: nextEndTime,
-      shiftId
-    });
-
-    if (conflictMessage) {
-      return jsonResponse<null>(409, {
-        data: null,
-        error: {
-          code: "SHIFT_CONFLICT",
-          message: conflictMessage
-        },
-        meta: buildMeta()
-      });
-    }
-  }
+  // Advisory only — collect any conflict warnings but never block the save.
+  // The team lead decides; we just make sure they can see what we noticed.
+  const conflictWarnings = nextEmployeeId
+    ? await detectShiftConflicts({
+        supabase,
+        orgId: session.profile.org_id,
+        employeeId: nextEmployeeId,
+        shiftDate: nextShiftDate,
+        startTime: nextStartTime,
+        endTime: nextEndTime,
+        shiftId
+      })
+    : [];
 
   const { data: rawUpdatedRow, error: updateError } = await supabase
     .from("shifts")
@@ -666,7 +670,181 @@ export async function PUT(
   });
 
   return jsonResponse<SchedulingShiftMutationResponseData>(200, {
-    data: { shift: updatedShift },
+    data: { shift: updatedShift, warnings: conflictWarnings },
+    error: null,
+    meta: buildMeta()
+  });
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const session = await getAuthenticatedSession();
+
+  if (!session?.profile) {
+    return jsonResponse<null>(401, {
+      data: null,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be logged in to remove shifts."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!(await checkApiAccess("/scheduling", session.profile))) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "You do not have access to scheduling."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!isSchedulingManager(session.profile.roles)) {
+    return jsonResponse<null>(403, {
+      data: null,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only managers and admins can remove shifts."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const params = await context.params;
+  const shiftId = params.id;
+
+  if (!z.string().uuid().safeParse(shiftId).success) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: "Shift id must be a valid UUID."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
+
+  const { data: rawExistingRow, error: existingError } = await supabase
+    .from("shifts")
+    .select("id, schedule_id, employee_id, shift_date, status")
+    .eq("id", shiftId)
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existingError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SHIFT_FETCH_FAILED",
+        message: "Unable to load shift."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!rawExistingRow) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: {
+        code: "SHIFT_NOT_FOUND",
+        message: "Shift was not found."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (isScopedTeamLead) {
+    if (!session.profile.department) {
+      return jsonResponse<null>(422, {
+        data: null,
+        error: {
+          code: "TEAM_LEAD_DEPARTMENT_REQUIRED",
+          message: "Team lead scheduling requires a department on your profile."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    const { data: scheduleRow, error: scheduleError } = await supabase
+      .from("schedules")
+      .select("id, department")
+      .eq("id", rawExistingRow.schedule_id)
+      .eq("org_id", session.profile.org_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (scheduleError || !scheduleRow?.id) {
+      return jsonResponse<null>(404, {
+        data: null,
+        error: {
+          code: "SCHEDULE_NOT_FOUND",
+          message: "Shift schedule was not found."
+        },
+        meta: buildMeta()
+      });
+    }
+
+    if (!areDepartmentsEqual(scheduleRow.department, session.profile.department)) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Team lead can only remove shifts in their own department."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
+  // Soft-delete with the service-role client to bypass the RLS WITH CHECK that keeps
+  // deleted_at null (same pattern the schedule delete uses).
+  const serviceClient = createSupabaseServiceRoleClient();
+  const { error: deleteError } = await serviceClient
+    .from("shifts")
+    .update({
+      deleted_at: new Date().toISOString(),
+      status: "cancelled"
+    })
+    .eq("id", shiftId)
+    .eq("org_id", session.profile.org_id);
+
+  if (deleteError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: {
+        code: "SHIFT_DELETE_FAILED",
+        message: "Unable to remove shift."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  void logAudit({
+    action: "deleted",
+    tableName: "shifts",
+    recordId: shiftId,
+    oldValue: {
+      employee_id: rawExistingRow.employee_id,
+      shift_date: rawExistingRow.shift_date,
+      status: rawExistingRow.status
+    },
+    newValue: {
+      status: "cancelled",
+      deleted: true
+    }
+  });
+
+  return jsonResponse<{ id: string }>(200, {
+    data: { id: shiftId },
     error: null,
     meta: buildMeta()
   });
