@@ -397,7 +397,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
                       {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate, locale)}
                     </time>
                     {requestRecord.pendingChangeType ? (
-                      <p className="documents-cell-description" style={{ color: "var(--color-warning, #c47d00)" }}>
+                      <p className="documents-cell-description" style={{ color: "var(--status-warning-text)" }}>
                         {describeChange(requestRecord)}
                         {requestRecord.changeRequestedByName
                           ? ` · ${t('changeRequestedBy', { name: requestRecord.changeRequestedByName })}`
