@@ -18,7 +18,9 @@ const ZOD_AUDIT_WAIVERS: Record<string, string> = {
   "approvals/counts/route.ts": "Thin HTTP wrapper — data-fetching and validation in lib/approvals/fetch-approvals-counts.ts.",
   "payroll/runs/[id]/import-csv/route.ts": "CSV import uses manual field validation via parseIntegerAmount from _helpers.ts.",
   "admin/role-permissions/route.ts": "Deprecated tombstone endpoint — returns 410 Gone with no input processing.",
-  "payroll/runs/[id]/amend/route.ts": "No request body — Zod validation via payrollRunRowSchema imported from _helpers.ts."
+  "payroll/runs/[id]/amend/route.ts": "No request body — Zod validation via payrollRunRowSchema imported from _helpers.ts.",
+  "work-tools/route.ts": "Zod validation via workToolCreateSchema imported from ./_shared.ts.",
+  "work-tools/requests/route.ts": "Zod validation via workToolRequestCreateSchema imported from ./_shared.ts."
 };
 
 function collectRouteFiles(directory: string): string[] {
