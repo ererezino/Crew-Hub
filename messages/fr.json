@@ -6294,6 +6294,38 @@
     "sidePanelDescription": "Configurez qui peut approuver au nom de quelqu'un d'autre.",
     "tableAriaLabel": "Tableau des délégations",
     "expiredCannotReactivate": "Expirée : créez une nouvelle délégation avec des dates mises à jour.",
+    "queues": {
+      "title": "Files d'approbation",
+      "description": "Approbations en attente pour chaque approbateur. Les approbateurs orphelins ne sont plus actifs : leurs éléments doivent être réattribués ou couverts.",
+      "tableAriaLabel": "Tableau des files d'approbation",
+      "empty": "Aucune approbation en attente pour le moment.",
+      "errorLoading": "Impossible de charger les files d'approbation.",
+      "statusActive": "Actif",
+      "statusOrphaned": "Orphelin",
+      "column": {
+        "approver": "Approbateur",
+        "status": "Statut",
+        "expensesManagerStage": "Dépenses (étape manager)",
+        "expensesAdditionalStage": "Dépenses (approbation supplémentaire)",
+        "leaveRequests": "Demandes de congés",
+        "actions": "Actions"
+      },
+      "reassign": "Réattribuer",
+      "reassignTitle": "Réattribuer les approbations",
+      "reassignDescription": "Déplacer les dépenses en attente d'approbation supplémentaire de {name} vers un autre approbateur.",
+      "field": {
+        "destination": "Nouvel approbateur",
+        "destinationHint": "La personne active qui reprendra ces approbations en attente."
+      },
+      "reassignSummary": "{count, plural, one {# approbation en attente sera déplacée.} other {# approbations en attente seront déplacées.}}",
+      "reassignConfirm": "Réattribuer",
+      "reassigning": "Réattribution…",
+      "reassignSuccess": "{count, plural, one {# approbation réattribuée.} other {# approbations réattribuées.}}",
+      "reassignSuccessWithSkipped": "{count, plural, one {# approbation réattribuée.} other {# approbations réattribuées.}} {skipped, plural, one {# élément ignoré pour éviter l'auto-approbation.} other {# éléments ignorés pour éviter l'auto-approbation.}}",
+      "reassignFailed": "Impossible de réattribuer les approbations. Veuillez réessayer.",
+      "delegationHint": "Les dépenses à l'étape manager et les demandes de congés suivent le manager du demandeur — couvrez-les avec les délégations ci-dessus.",
+      "dismissNotification": "Fermer la notification"
+    },
     "filter": {
       "active": "Actives",
       "expired": "Expirées",
