@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { EmptyState } from "../../../../components/shared/empty-state";
+import { ApprovalQueuesSection } from "../../../../components/people/approval-queues-section";
 import { DelegationSidePanel } from "../../../../components/delegations/delegation-side-panel";
 import { DelegationTable } from "../../../../components/delegations/delegation-table";
 import type {
@@ -288,6 +289,9 @@ export function DelegationsClient() {
           onReactivate={handleReactivate}
         />
       )}
+
+      {/* Approval queues (per-approver pending workload + reassignment) */}
+      <ApprovalQueuesSection />
 
       {/* Side panel */}
       <DelegationSidePanel

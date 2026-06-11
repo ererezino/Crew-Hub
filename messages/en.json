@@ -6294,6 +6294,38 @@
     "sidePanelDescription": "Configure who can approve on behalf of someone else.",
     "tableAriaLabel": "Delegations table",
     "expiredCannotReactivate": "Expired. Create a new delegation with updated dates.",
+    "queues": {
+      "title": "Approval queues",
+      "description": "Pending approvals currently waiting on each approver. Orphaned approvers are no longer active and need their items reassigned or covered.",
+      "tableAriaLabel": "Approval queues table",
+      "empty": "No pending approvals right now.",
+      "errorLoading": "Unable to load approval queues.",
+      "statusActive": "Active",
+      "statusOrphaned": "Orphaned",
+      "column": {
+        "approver": "Approver",
+        "status": "Status",
+        "expensesManagerStage": "Expenses (manager stage)",
+        "expensesAdditionalStage": "Expenses (additional approval)",
+        "leaveRequests": "Leave requests",
+        "actions": "Actions"
+      },
+      "reassign": "Reassign",
+      "reassignTitle": "Reassign approvals",
+      "reassignDescription": "Move pending additional-approval expenses from {name} to another approver.",
+      "field": {
+        "destination": "New approver",
+        "destinationHint": "The active person who will take over these pending approvals."
+      },
+      "reassignSummary": "{count, plural, one {# pending approval will be moved.} other {# pending approvals will be moved.}}",
+      "reassignConfirm": "Reassign",
+      "reassigning": "Reassigning…",
+      "reassignSuccess": "{count, plural, one {# approval reassigned.} other {# approvals reassigned.}}",
+      "reassignSuccessWithSkipped": "{count, plural, one {# approval reassigned.} other {# approvals reassigned.}} {skipped, plural, one {# item was skipped to prevent self-approval.} other {# items were skipped to prevent self-approval.}}",
+      "reassignFailed": "Unable to reassign approvals. Please try again.",
+      "delegationHint": "Manager-stage expenses and leave requests follow the requester's manager — cover them with the delegations above.",
+      "dismissNotification": "Dismiss notification"
+    },
     "filter": {
       "active": "Active",
       "expired": "Expired",
