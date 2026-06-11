@@ -15,7 +15,8 @@
     "auth:reset-mfa": "npx tsx scripts/auth/reset-mfa.ts",
     "i18n:parity": "node scripts/check-i18n-parity.cjs",
     "i18n:icu": "node scripts/check-i18n-icu.cjs",
-    "i18n:check": "node scripts/check-i18n-parity.cjs && node scripts/check-i18n-icu.cjs"
+    "i18n:check": "node scripts/check-i18n-parity.cjs && node scripts/check-i18n-icu.cjs && node scripts/generate-route-namespaces.cjs --check",
+    "i18n:routes": "node scripts/generate-route-namespaces.cjs"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.2.6",
