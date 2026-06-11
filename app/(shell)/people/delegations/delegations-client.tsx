@@ -72,7 +72,8 @@ export function DelegationsClient() {
 
   const fetchPeople = useCallback(async () => {
     try {
-      const response = await fetch("/api/v1/people?scope=all");
+      // Explicit high limit: the delegation pickers need the full people list.
+      const response = await fetch("/api/v1/people?scope=all&limit=250");
       const json = await response.json();
 
       if (response.ok && json.data?.people) {

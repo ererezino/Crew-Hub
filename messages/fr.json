@@ -61,7 +61,9 @@
       "offboarding": "Départ",
       "suspended": "Suspendu",
       "terminated": "Résilié",
-      "label": "Statut"
+      "label": "Statut",
+      "hr_draft": "Brouillon Ops",
+      "pending_signature": "En attente de signature"
     },
     "role": {
       "EMPLOYEE": "Employé",
@@ -337,7 +339,8 @@
     "lastSeen": "Vu il y a {dur}",
     "offlineLastSeen": "Hors ligne - Vu il y a {dur}",
     "neverSeen": "Jamais vu",
-    "offlineNeverSeen": "Hors ligne - Jamais vu"
+    "offlineNeverSeen": "Hors ligne - Jamais vu",
+    "offlineSection": "Hors ligne ({count})"
   },
   "theme": {
     "toggleLabel": "Changer le mode de couleur"
@@ -835,7 +838,7 @@
       "message": "Impossible de charger ce widget. Les autres widgets restent disponibles.",
       "tryAgain": "Réessayer"
     },
-  "announcementsWidget": {
+    "announcementsWidget": {
       "title": "Mises à jour d'entreprise",
       "viewAll": "Tout voir",
       "unavailable": "Les annonces sont indisponibles",
@@ -999,7 +1002,11 @@
       "favoritesTitle": "Favoris",
       "favoriteMusicLabel": "Musique",
       "favoriteBooksLabel": "Livres",
-      "favoriteSportsLabel": "Sports"
+      "favoriteSportsLabel": "Sports",
+      "emergencyContactDescription": "Dans le cas peu probable où nous ne pourrions pas vous joindre, ou si nous devions contacter un proche en votre nom lors d'une urgence, ces informations nous aident à agir rapidement et de manière responsable.",
+      "socialLinksDescription": "Entièrement facultatif. Ces liens apparaissent sur votre profil Crew afin que vos collègues puissent rester en contact avec vous en dehors du travail. Ne partagez que ce avec quoi vous êtes à l'aise.",
+      "socialTiktokLabel": "TikTok",
+      "favoritesDescription": "Entièrement facultatif. Partagez quelques-uns de vos centres d'intérêt ; ils apparaissent sur votre profil Crew et aident vos collègues à trouver des points communs."
     },
     "notificationSettings": {
       "heading": "Notifications",
@@ -1737,7 +1744,13 @@
     "lastWorkingDay": "Dernier jour de travail : {date}",
     "awaitingLastDay": "Toutes les tâches sont terminées. Votre départ sera finalisé à votre dernier jour de travail.",
     "offboardingNoInstance": "Aucune instance de départ assignée",
-    "offboardingNoInstanceDescription": "Vos tâches de départ apparaîtront ici une fois que votre équipe les aura mises en place."
+    "offboardingNoInstanceDescription": "Vos tâches de départ apparaîtront ici une fois que votre équipe les aura mises en place.",
+    "welcomeTitle": "Bienvenue dans votre parcours d'intégration !",
+    "welcomeSubtitle": "Parcourez chaque section à votre rythme. Votre équipe prépare tout ce dont vous avez besoin.",
+    "completedTitle": "Intégration terminée !",
+    "completedSubtitle": "Félicitations, tout est prêt ! Bienvenue dans l'équipe.",
+    "yourProgress": "Votre progression",
+    "opsProgressLabel": "La préparation de votre équipe"
   },
   "learning": {
     "title": "Formations",
@@ -2713,6 +2726,13 @@
       "countryKenya": "Kenya",
       "countrySouthAfrica": "Afrique du Sud",
       "countryCanada": "Canada"
+    },
+    "delete": "Supprimer",
+    "deleteDialog": {
+      "title": "Supprimer le document",
+      "description": "Voulez-vous vraiment supprimer « {title} » ? Cette action est irréversible.",
+      "confirm": "Supprimer le document",
+      "deleting": "Suppression..."
     }
   },
   "analytics": {
@@ -3323,7 +3343,9 @@
       "requested": "Demandée le",
       "approvedBy": "Approuvée par",
       "reviewedBy": "Examinée par",
-      "reason": "Motif"
+      "reason": "Motif",
+      "draftedBy": "Rédigé par",
+      "countries": "Destinations"
     },
     "requestPanel": {
       "title": "Demander une lettre de soutien au voyage",
@@ -3343,7 +3365,9 @@
       "additionalNotesOptional": "(facultatif)",
       "additionalNotesPlaceholder": "Toute information complémentaire à inclure",
       "submitting": "Envoi...",
-      "submitRequest": "Soumettre la demande"
+      "submitRequest": "Soumettre la demande",
+      "destinationCountries": "Pays de destination",
+      "destinationCountriesHint": "Saisissez les pays séparés par des virgules (ex. Royaume-Uni, France)"
     },
     "adminApprovals": {
       "title": "Approbations en attente",
@@ -3358,7 +3382,8 @@
       "entityAddressPlaceholder": "Adresse complète pour l'en-tête",
       "entityAddressHint": "Cette adresse apparaîtra sur l'en-tête et sera enregistrée pour une utilisation future.",
       "approving": "Approbation...",
-      "approveAndGenerate": "Approuver et générer le PDF"
+      "approveAndGenerate": "Approuver et générer le PDF",
+      "letterPreviewLabel": "Corps de la lettre (rédigé par les Opérations)"
     },
     "rejectPanel": {
       "title": "Refuser la lettre de voyage",
@@ -3378,9 +3403,32 @@
       "travelApproved": "Lettre de soutien au voyage approuvée et générée.",
       "unableToApprove": "Impossible d'approuver la demande.",
       "travelRejected": "Demande de lettre de voyage refusée.",
-      "unableToReject": "Impossible de refuser la demande."
+      "unableToReject": "Impossible de refuser la demande.",
+      "travelDraftSaved": "Brouillon de lettre enregistré.",
+      "unableToSaveDraft": "Impossible d'enregistrer le brouillon de la lettre.",
+      "travelSubmittedForSignature": "Lettre soumise pour signature du cofondateur.",
+      "unableToSubmitForSignature": "Impossible de soumettre la lettre pour signature."
     },
-    "dismissNotification": "Fermer la notification"
+    "dismissNotification": "Fermer la notification",
+    "hrDraftSection": {
+      "title": "Demandes à rédiger",
+      "description": "Ces demandes de lettre de voyage nécessitent un brouillon avant de pouvoir être signées."
+    },
+    "signatureSection": {
+      "title": "En attente de signature",
+      "description": "Ces lettres de soutien au voyage ont été rédigées par les Opérations et sont prêtes pour votre relecture et signature."
+    },
+    "draftPanel": {
+      "title": "Rédiger la lettre de voyage",
+      "description": "Rédigez ou modifiez le corps de la lettre de soutien au voyage de {employeeName} pour {country}.",
+      "letterBody": "Corps de la lettre",
+      "letterBodyPlaceholder": "Rédigez le corps complet de la lettre de soutien au voyage. Il apparaîtra dans le PDF final.",
+      "letterBodyHint": "Utilisez des doubles sauts de ligne pour séparer les paragraphes. La salutation, la formule de clôture et la signature seront ajoutées automatiquement.",
+      "saving": "Enregistrement du brouillon...",
+      "saveDraft": "Enregistrer le brouillon",
+      "submittingForSignature": "Envoi...",
+      "submitForSignature": "Soumettre pour signature"
+    }
   },
   "payrollRunDetail": {
     "title": "Cycle de paie",
@@ -3423,7 +3471,9 @@
       "cancelRun": "Annuler",
       "markProcessing": "En traitement",
       "markCompleted": "Finaliser",
-      "reopenRun": "Rouvrir"
+      "reopenRun": "Rouvrir",
+      "marking": "Mise à jour...",
+      "importCsv": "Importer un CSV"
     },
     "approval": {
       "title": "Flux d'approbation",
@@ -3549,31 +3599,9 @@
       "confirmLabel": "Annuler le cycle"
     },
     "toast": {
-      "unableToCalculate": "Impossible de calculer le cycle de paie.",
-      "calculationComplete": "Calcul terminé pour {count} personnes.",
-      "unableToGenerateStatements": "Impossible de générer les bulletins de paie.",
-      "statementsGenerated": "{count, plural, one {# bulletin généré.} other {# bulletins générés.}}",
-      "noStatementsGenerated": "Aucun bulletin n'a été généré.",
-      "statementsSkipped": "{count, plural, one {# bulletin ignoré en raison de données manquantes ou d'un problème de téléversement.} other {# bulletins ignorés en raison de données manquantes ou de problèmes de téléversement.}}",
-      "unableToUpdateApproval": "Impossible de mettre à jour l'état d'approbation.",
-      "submittedForApproval": "Cycle soumis pour approbation.",
-      "approvalComplete": "Cycle approuvé et verrouillé.",
-      "runRejected": "Cycle refusé.",
-      "runCancelled": "Cycle annulé.",
-      "adjustmentApplied": "Ajustement de paie appliqué.",
-      "unableToAddAdjustment": "Impossible d'ajouter l'ajustement de paie.",
-      "payoutPrepared": "Cycles de paiement créés.",
-      "payoutPrepFailed": "Impossible de préparer les cycles de paiement.",
-      "cycleReady": "Cycle marqué comme prêt.",
-      "cycleReadyFailed": "Impossible de marquer le cycle comme prêt.",
-      "cycleProcessing": "Cycle marqué en traitement.",
-      "cycleProcessingFailed": "Impossible de marquer le cycle en traitement.",
-      "cyclePaid": "Cycle marqué comme payé.",
-      "cyclePaidFailed": "Impossible de marquer le cycle comme payé.",
-      "amendmentCreated": "Cycle correctif créé.",
-      "amendmentFailed": "Impossible de créer le cycle correctif.",
-      "flaggedItemsBlock": "Les postes signalés doivent être résolus ou remplacés avant le paiement.",
-      "reopenBlockedByCycles": "Impossible de rouvrir. Ce cycle de paie a des paiements effectués. Créez un correctif."
+      "historicalReviewed": "Cycle historique marqué comme vérifié.",
+      "historicalAuthorized": "Cycle historique autorisé pour publication.",
+      "historicalPublished": "Cycle historique publié. Les bulletins de paie sont maintenant visibles pour les employés."
     },
     "cycles": {
       "title": "Cycles de paiement",
@@ -3693,11 +3721,6 @@
       "publishedBy": "Publié par {name} le {date}",
       "separationOfDuty": "Le vérificateur ne peut pas autoriser. Un approbateur différent est requis."
     },
-    "toast": {
-      "historicalReviewed": "Cycle historique marqué comme vérifié.",
-      "historicalAuthorized": "Cycle historique autorisé pour publication.",
-      "historicalPublished": "Cycle historique publié. Les bulletins de paie sont maintenant visibles pour les employés."
-    },
     "paymentStatus": {
       "pending": "En attente",
       "processing": "En traitement",
@@ -3711,7 +3734,55 @@
       "worksheet": "Feuille de calcul",
       "items": "Détail des éléments"
     },
-    "cycleApprovalNote": "Soumettez et approuvez chaque cycle individuellement depuis les onglets Cycle 1 / Cycle 2 dans la feuille de calcul ci-dessous. Les heures supplémentaires approuvées du mois précédent sont payées uniquement dans le cycle 1."
+    "cycleApprovalNote": "Soumettez et approuvez chaque cycle individuellement depuis les onglets Cycle 1 / Cycle 2 dans la feuille de calcul ci-dessous. Les heures supplémentaires approuvées du mois précédent sont payées uniquement dans le cycle 1.",
+    "confirmSubmit": {
+      "title": "Soumettre pour approbation ?",
+      "description": "Ce cycle sera soumis pour approbation. Assurez-vous que tous les postes et ajustements ont été vérifiés.",
+      "confirmLabel": "Soumettre pour approbation"
+    },
+    "confirmApprove": {
+      "title": "Approuver ce cycle de paie ?",
+      "description": "L'approbation verrouille ce cycle de paie. Les postes deviennent immuables et les relevés de paiement peuvent être générés. Cette action ne peut être annulée qu'en rouvrant le cycle.",
+      "confirmLabel": "Oui, approuver ce cycle"
+    },
+    "reopenDialog": {
+      "title": "Rouvrir le cycle de paie ?",
+      "description": "La réouverture ramène le cycle au statut calculé. Toutes les approbations seront effacées et devront être refaites. À n'utiliser que pour de véritables corrections.",
+      "reasonLabel": "Motif de la réouverture",
+      "reopening": "Réouverture...",
+      "confirmReopen": "Rouvrir le cycle",
+      "reasonRequired": "Un motif de réouverture est requis.",
+      "reasonTooLong": "Le motif doit comporter 500 caractères ou moins."
+    },
+    "confirmMarkCompleted": {
+      "title": "Marquer la paie comme terminée ?",
+      "description": "Ceci confirme que tous les paiements ont été envoyés et que le cycle est finalisé. Il s'agit de l'état final.",
+      "confirmLabel": "Marquer comme terminé"
+    },
+    "editItem": {
+      "editButton": "Modifier",
+      "title": "Modifier le poste de paie",
+      "description": "Les modifications réinitialiseront la retenue et nécessiteront un recalcul.",
+      "baseSalaryField": "Salaire de base (plus petite unité)",
+      "currencyField": "Devise (code ISO à 3 lettres)",
+      "allowancesTitle": "Indemnités",
+      "allowanceLabel": "Libellé",
+      "allowanceAmount": "Montant (plus petite unité)",
+      "allowanceTaxable": "Imposable",
+      "addAllowance": "Ajouter une indemnité",
+      "removeAllowance": "Retirer",
+      "reasonField": "Motif de la modification (obligatoire)",
+      "saving": "Enregistrement...",
+      "saveChanges": "Enregistrer les modifications",
+      "manuallyEdited": "Modifié manuellement",
+      "reasonRequired": "Un motif de modification est requis.",
+      "reasonTooLong": "Le motif doit comporter 500 caractères ou moins.",
+      "baseSalaryPositive": "Le salaire de base doit être un nombre entier positif.",
+      "currencyInvalid": "La devise doit être un code ISO à 3 lettres (ex. NGN, USD).",
+      "allowanceLabelRequired": "Le libellé de l'indemnité est requis.",
+      "allowanceAmountInvalid": "Le montant de l'indemnité doit être un nombre entier non négatif.",
+      "noFieldsChanged": "Aucun champ n'a été modifié."
+    }
   },
   "payrollWorksheet": {
     "title": "Feuille de paie mensuelle",
@@ -3764,23 +3835,23 @@
     },
     "cycleActions": {
       "submitCycle": "Soumettre le cycle pour approbation",
-      "submitting": "Soumission\u2026",
+      "submitting": "Soumission…",
       "approveCycle": "Approuver le cycle",
-      "approving": "Approbation\u2026",
+      "approving": "Approbation…",
       "rejectCycle": "Rejeter le cycle",
       "confirmReject": "Confirmer le rejet",
       "cancelReject": "Annuler",
-      "rejectReasonPlaceholder": "Raison du rejet\u2026",
+      "rejectReasonPlaceholder": "Raison du rejet…",
       "markPaid": "Enregistrer le paiement",
-      "markingPaid": "Marquage\u2026",
+      "markingPaid": "Marquage…",
       "confirmMarkPaid": "Confirmer le paiement",
       "cancelMarkPaid": "Annuler",
       "paymentReferencePlaceholder": "Référence de paiement ou lot",
       "paymentNotePlaceholder": "Note de paiement (facultatif)",
       "exportCsv": "Exporter CSV",
       "exportPdf": "Exporter PDF",
-      "exporting": "Exportation\u2026",
-      "exportingPdf": "Génération du PDF\u2026",
+      "exporting": "Exportation…",
+      "exportingPdf": "Génération du PDF…",
       "actionFailed": "L'action du cycle a échoué.",
       "exportFailed": "L'exportation a échoué.",
       "exportSuccess": "CSV téléchargé.",
@@ -5559,6 +5630,8 @@
       "accessNotSignedInTooltip": "Cette personne ne s'est pas encore connectée à Crew Hub.",
       "actions": "Actions",
       "ariaLabel": "Tableau de l’annuaire du personnel",
+      "loadMore": "Charger plus",
+      "loadingMore": "Chargement…",
       "country": "Pays",
       "department": "Département",
       "edit": "Modifier",
@@ -5816,8 +5889,10 @@
       "save": "Enregistrer",
       "saving": "Enregistrement…",
       "saved": "Profil mis à jour.",
-      "failed": "Impossible de mettre à jour le profil."
-    }
+      "failed": "Impossible de mettre à jour le profil.",
+      "tiktokLabel": "URL TikTok"
+    },
+    "viewByTeam": "Par équipe"
   },
   "email": {
     "greeting": "Bonjour {name},",
@@ -6472,5 +6547,57 @@
       "kahoot": "Kahoot",
       "openGame": "Ouvrir le jeu"
     }
+  },
+  "csvImport": {
+    "title": "Importer la paie depuis un CSV",
+    "description": "Téléversez un fichier CSV avec les données de paie des employés. Le fichier sera validé et vous pourrez prévisualiser toutes les lignes avant de confirmer.",
+    "downloadTemplate": "Télécharger le modèle CSV",
+    "selectFile": "Sélectionner le fichier CSV",
+    "uploading": "Validation...",
+    "uploadAndPreview": "Téléverser et prévisualiser",
+    "backToUpload": "Retour au téléversement",
+    "committing": "Importation...",
+    "commitImport": "Importer {count, plural, one {# ligne} other {# lignes}}",
+    "commitSuccess": "Importation terminée",
+    "commitSuccessDescription": "{count, plural, one {# ligne de paie importée} other {# lignes de paie importées}} avec succès. Le cycle a été remis en brouillon. Vous devez lancer le calcul pour appliquer les règles de retenue avant que le cycle puisse être soumis pour approbation.",
+    "summary": {
+      "totalRows": "Lignes au total",
+      "valid": "Valides",
+      "errors": "Erreurs",
+      "duplicates": "Doublons",
+      "conflicts": "Postes existants"
+    },
+    "fileSize": "{name} ({size} Ko)",
+    "errorRow": "Ligne {row}",
+    "errorsFound": "{count, plural, one {# erreur de validation} other {# erreurs de validation}}",
+    "andMoreErrors": "...et {count} autres erreurs",
+    "duplicatesFound": "{count, plural, one {# e-mail en double} other {# e-mails en double}}",
+    "conflictsFound": "{count, plural, one {# conflit avec un poste existant} other {# conflits avec des postes existants}}",
+    "conflictsBlockedDescription": "Ces employés ont déjà des postes de paie dans ce cycle. L'importation est bloquée par défaut. Pour continuer, vous devez confirmer explicitement que vous souhaitez écraser les données existantes. Cette action est irréversible.",
+    "confirmOverwrite": "Je comprends et je souhaite écraser les postes de paie existants listés ci-dessus.",
+    "preview": {
+      "employee": "Employé",
+      "baseSalary": "Salaire de base",
+      "allowances": "Indemnités",
+      "bonus": "Prime",
+      "deduction": "Retenue",
+      "notes": "Notes"
+    },
+    "errors": {
+      "notCsv": "Le fichier doit être au format .csv.",
+      "tooLarge": "Le fichier est trop volumineux. La taille maximale est de 2 Mo.",
+      "uploadFailed": "Impossible de téléverser le fichier CSV.",
+      "commitFailed": "Impossible d'importer les données de paie."
+    }
+  },
+  "documentViewer": {
+    "openNewTab": "Ouvrir dans un nouvel onglet",
+    "download": "Télécharger",
+    "print": "Imprimer",
+    "close": "Fermer",
+    "loading": "Chargement du document...",
+    "unsupportedType": "Ce type de fichier ne peut pas être prévisualisé dans le navigateur.",
+    "downloadInstead": "Téléchargez-le pour le consulter.",
+    "loadError": "Impossible de charger le document. Essayez plutôt de le télécharger."
   }
 }

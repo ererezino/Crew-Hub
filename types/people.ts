@@ -101,6 +101,10 @@ export type AddressHistoryRecord = {
 
 export type PeopleListResponseData = {
   people: PersonRecord[];
+  /** Total number of people matching the scope (across all pages). */
+  total: number;
+  /** True when more records exist beyond the returned page. */
+  hasMore: boolean;
 };
 
 export type PeopleListResponse = ApiResponse<PeopleListResponseData>;

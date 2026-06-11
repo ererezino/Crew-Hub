@@ -20,7 +20,11 @@ import {
   profileRowSchema,
   mapProfileRow
 } from "../../../../lib/people/shared";
-import { fetchPeopleData } from "../../../../lib/people/fetch-people-data";
+import {
+  fetchPeopleData,
+  PEOPLE_DEFAULT_PAGE_SIZE,
+  PEOPLE_FULL_LIST_LIMIT
+} from "../../../../lib/people/fetch-people-data";
 import { deriveSystemPassword } from "../../../../lib/auth/system-password";
 import { createNotification } from "../../../../lib/notifications/service";
 import { createOnboardingInstance } from "../../../../lib/onboarding/create-instance";
@@ -40,7 +44,13 @@ import {
 
 const listQuerySchema = z.object({
   scope: z.enum(["all", "reports", "me"]).default("all"),
-  limit: z.coerce.number().int().min(1).max(250).default(250)
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(PEOPLE_FULL_LIST_LIMIT)
+    .default(PEOPLE_DEFAULT_PAGE_SIZE),
+  offset: z.coerce.number().int().min(0).default(0)
 });
 
 const createPersonSchema = z.object({

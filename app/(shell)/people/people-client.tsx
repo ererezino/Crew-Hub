@@ -11,7 +11,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
-import { usePeople } from "../../../hooks/use-people";
+import { usePeople, usePeopleInfinite } from "../../../hooks/use-people";
 import { usePresence, type PresenceState } from "../../../hooks/use-presence";
 import { countryFlagFromCode, countryNameFromCode, getCountryDefaults } from "../../../lib/countries";
 import { formatDate as formatDateLib, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
@@ -517,7 +517,16 @@ export function PeopleClient({
     return t('toast.unableToSendInvite');
   }, [t]);
 
-  const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({
+  const {
+    people,
+    isLoading,
+    errorMessage,
+    refresh,
+    setPeople,
+    hasMore,
+    isLoadingMore,
+    loadMore
+  } = usePeopleInfinite({
     scope: initialScope,
     initialData: initialPeopleData
   });
@@ -549,6 +558,15 @@ export function PeopleClient({
   });
   const [editErrors, setEditErrors] = useState<EditPersonFormErrors>({});
   const [isEditSaving, setIsEditSaving] = useState(false);
+
+  // Manager/team-lead pickers need the FULL people list, not just the loaded
+  // pages. Fetched lazily (only while a create/edit panel is open) with an
+  // explicit high limit so the paginated directory stays lightweight.
+  const { people: fullPeopleList } = usePeople({
+    scope: initialScope,
+    enabled: isCreateOpen || isEditOpen
+  });
+  const pickerPeople = fullPeopleList.length > 0 ? fullPeopleList : people;
 
   // Pre-start actions state
   const [isBeginningOnboarding, setIsBeginningOnboarding] = useState(false);
@@ -608,10 +626,10 @@ export function PeopleClient({
 
   const managerOptions = useMemo(
     () =>
-      people
+      pickerPeople
         .filter((person) => person.id !== currentUserId && person.status === "active")
         .sort((leftPerson, rightPerson) => leftPerson.fullName.localeCompare(rightPerson.fullName)),
-    [currentUserId, people]
+    [currentUserId, pickerPeople]
   );
 
   const canViewAccessState = canInvitePeople || canResetAuthenticator;
@@ -1588,6 +1606,25 @@ export function PeopleClient({
         </div>
       ) : null}
 
+      {!isLoading && !errorMessage && hasMore ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: "var(--space-3) 0"
+          }}
+        >
+          <button
+            type="button"
+            className="button"
+            disabled={isLoadingMore}
+            onClick={loadMore}
+          >
+            {isLoadingMore ? t('table.loadingMore') : t('table.loadMore')}
+          </button>
+        </div>
+      ) : null}
+
       <SlidePanel
         isOpen={isCreateOpen}
         title={t('createPanel.title')}
@@ -2266,7 +2303,7 @@ export function PeopleClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">{t('createPanel.noManager')}</SelectItem>
-                  {people
+                  {pickerPeople
                     .filter((p) => p.id !== editPerson.id && p.status === "active")
                     .sort((a, b) => a.fullName.localeCompare(b.fullName))
                     .map((p) => (
@@ -2295,7 +2332,7 @@ export function PeopleClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">{t('editPanel.noTeamLead')}</SelectItem>
-                  {people
+                  {pickerPeople
                     .filter((p) => p.id !== editPerson.id && p.status === "active")
                     .sort((a, b) => a.fullName.localeCompare(b.fullName))
                     .map((p) => (

@@ -838,7 +838,7 @@
       "message": "Unable to load this widget. Other widgets are still available.",
       "tryAgain": "Try again"
     },
-  "announcementsWidget": {
+    "announcementsWidget": {
       "title": "Company updates",
       "viewAll": "View all",
       "unavailable": "Announcements are unavailable",
@@ -1019,8 +1019,8 @@
       "permissionStatus": "Permission status:",
       "permUnsupported": "Unsupported",
       "permGranted": "Granted",
-      "permBlocked": "Blocked \u2014 click the lock icon in your browser address bar to allow notifications",
-      "permNotGranted": "Not yet granted \u2014 check the box above to enable",
+      "permBlocked": "Blocked — click the lock icon in your browser address bar to allow notifications",
+      "permNotGranted": "Not yet granted — check the box above to enable",
       "saveNotifications": "Save notifications",
       "saved": "Notification settings saved.",
       "unableToUpdate": "Unable to update notification settings.",
@@ -1140,7 +1140,8 @@
     "markRead": "Mark read",
     "deleteConfirmTitle": "Delete notification company-wide?",
     "deleteConfirmDescription": "This will permanently remove this notification for everyone in the company. This action cannot be undone.",
-    "deleteConfirmLabel": "Delete for everyone"
+    "deleteConfirmLabel": "Delete for everyone",
+    "colCycles": "Cycle dates"
   },
   "pay": {
     "title": "Pay",
@@ -3612,9 +3613,9 @@
       "reasonTooLong": "Reason must be 500 characters or fewer."
     },
     "confirmMarkProcessing": {
-      "title": "Mark as processing?",
-      "description": "This indicates that payments are being processed. The run will remain locked.",
-      "confirmLabel": "Mark as processing"
+      "title": "Mark cycle as processing?",
+      "description": "This indicates disbursement has been initiated. The payroll run will move to processing.",
+      "confirmLabel": "Mark processing"
     },
     "confirmMarkCompleted": {
       "title": "Mark payroll as completed?",
@@ -3627,37 +3628,9 @@
       "confirmLabel": "Cancel run"
     },
     "toast": {
-      "unableToCalculate": "Unable to calculate payroll run.",
-      "calculationComplete": "Calculation complete for {count} people.",
-      "unableToGenerateStatements": "Unable to generate payment statements.",
-      "statementsGenerated": "{count, plural, one {Generated # payment statement.} other {Generated # payment statements.}}",
-      "noStatementsGenerated": "No payment statements were generated.",
-      "statementsSkipped": "{count, plural, one {# statement skipped due to missing data or file upload issues.} other {# statements skipped due to missing data or file upload issues.}}",
-      "unableToUpdateApproval": "Unable to update approval state.",
-      "submittedForApproval": "Run submitted for approval.",
-      "approvalComplete": "Payroll approved and locked.",
-      "runRejected": "Run rejected.",
-      "runCancelled": "Run cancelled.",
-      "runReopened": "Run reopened and returned to calculated state.",
-      "runMarkedProcessing": "Run marked as processing.",
-      "runMarkedCompleted": "Run marked as completed.",
-      "csvImportComplete": "CSV data imported. Run Calculate to apply withholding rules.",
-      "adjustmentApplied": "Payroll adjustment applied.",
-      "unableToAddAdjustment": "Unable to add payroll adjustment.",
-      "editItemSuccess": "Payroll item updated. Run Calculate to apply withholding rules.",
-      "editItemFailed": "Unable to update payroll item.",
-      "payoutPrepared": "Payout cycles created.",
-      "payoutPrepFailed": "Unable to prepare payout cycles.",
-      "cycleReady": "Cycle marked as ready.",
-      "cycleReadyFailed": "Unable to mark cycle as ready.",
-      "cycleProcessing": "Cycle marked as processing.",
-      "cycleProcessingFailed": "Unable to mark cycle as processing.",
-      "cyclePaid": "Cycle marked as paid.",
-      "cyclePaidFailed": "Unable to mark cycle as paid.",
-      "amendmentCreated": "Amendment run created.",
-      "amendmentFailed": "Unable to create amendment run.",
-      "flaggedItemsBlock": "Flagged items must be resolved or overridden before payout.",
-      "reopenBlockedByCycles": "Cannot reopen. This run has paid payout cycles. Create an amendment instead."
+      "historicalReviewed": "Historical run marked as reviewed.",
+      "historicalAuthorized": "Historical run authorized for publication.",
+      "historicalPublished": "Historical run published. Payslips are now visible to employees."
     },
     "paymentStatus": {
       "pending": "Pending",
@@ -3767,11 +3740,6 @@
       "description": "This confirms the cycle has been reviewed and is ready for disbursement.",
       "confirmLabel": "Mark ready"
     },
-    "confirmMarkProcessing": {
-      "title": "Mark cycle as processing?",
-      "description": "This indicates disbursement has been initiated. The payroll run will move to processing.",
-      "confirmLabel": "Mark processing"
-    },
     "confirmMarkPaid": {
       "title": "Mark cycle as paid?",
       "description": "This confirms disbursement is complete for all items in this cycle. The cycle will be locked.",
@@ -3809,11 +3777,6 @@
       "authorizedBy": "Authorized by {name} at {date}",
       "publishedBy": "Published by {name} at {date}",
       "separationOfDuty": "The reviewer cannot authorize. A different approver is required."
-    },
-    "toast": {
-      "historicalReviewed": "Historical run marked as reviewed.",
-      "historicalAuthorized": "Historical run authorized for publication.",
-      "historicalPublished": "Historical run published. Payslips are now visible to employees."
     },
     "viewToggle": {
       "worksheet": "Worksheet",
@@ -3872,23 +3835,23 @@
     },
     "cycleActions": {
       "submitCycle": "Submit cycle for approval",
-      "submitting": "Submitting\u2026",
+      "submitting": "Submitting…",
       "approveCycle": "Approve cycle",
-      "approving": "Approving\u2026",
+      "approving": "Approving…",
       "rejectCycle": "Reject cycle",
       "confirmReject": "Confirm rejection",
       "cancelReject": "Cancel",
-      "rejectReasonPlaceholder": "Reason for rejection\u2026",
+      "rejectReasonPlaceholder": "Reason for rejection…",
       "markPaid": "Record payment",
-      "markingPaid": "Marking paid\u2026",
+      "markingPaid": "Marking paid…",
       "confirmMarkPaid": "Confirm payment",
       "cancelMarkPaid": "Cancel",
       "paymentReferencePlaceholder": "Payment reference or batch ID",
       "paymentNotePlaceholder": "Payment note (optional)",
       "exportCsv": "Export CSV",
       "exportPdf": "Export PDF",
-      "exporting": "Exporting\u2026",
-      "exportingPdf": "Generating PDF\u2026",
+      "exporting": "Exporting…",
+      "exportingPdf": "Generating PDF…",
       "actionFailed": "Cycle action failed.",
       "exportFailed": "Export failed.",
       "exportSuccess": "CSV downloaded.",
@@ -5649,6 +5612,8 @@
     },
     "table": {
       "ariaLabel": "People directory table",
+      "loadMore": "Load more",
+      "loadingMore": "Loading more…",
       "name": "Name",
       "role": "Role",
       "department": "Department",
