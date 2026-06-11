@@ -21442,3 +21442,191 @@ html.dark .crew-games-platform-game:hover {
   margin-left: 6px; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.03em;
   color: var(--status-warning-text); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; white-space: nowrap;
 }
+
+/* ══════════════════════════════════════════════════════
+   Touch targets — raise interactive hit areas to ≥44px
+   ──────────────────────────────────────────────────────
+   Why `(pointer: coarse), (max-width: 768px)`:
+   - `pointer: coarse` matches devices whose PRIMARY input is a finger
+     (phones, tablets) regardless of viewport size, so large-screen
+     tablets still get big targets.
+   - `max-width: 768px` is a safety net for older Android browsers and
+     embedded webviews that misreport `pointer` (or report `none`):
+     a narrow viewport almost always means touch.
+   Desktop/fine-pointer rendering is untouched — a desktop browser is
+   `pointer: fine` and wider than 768px, so nothing here applies.
+
+   Two techniques, per control density:
+   1. Enlarge: min-height/min-width + auto height so text never clips.
+   2. Hit-area overlay (dense layouts where growing the control would
+      wreck the layout): keep the visual size, add an absolutely
+      positioned ::before that pads the tappable box out to 44px.
+      `inset: min(0px, calc((100% - 44px) / 2))` expands each axis only
+      when that axis is under 44px, so wide-but-short buttons only grow
+      vertically and never overlap horizontal neighbours needlessly.
+   Sizing only — zero color/theme changes, both themes unaffected.
+   ══════════════════════════════════════════════════════ */
+@media (pointer: coarse), (max-width: 768px) {
+  /* ── 1. Enlarged controls ─────────────────────────── */
+
+  /* Base button: 36px fixed → 44px minimum (height freed so text wraps
+     instead of clipping). Covers all variants that ride on .button:
+     .button-accent/-primary/-subtle/-ghost/-approve/-consequential,
+     pagination buttons (.audit-pagination-actions uses .button), etc. */
+  .button {
+    height: auto;
+    min-height: 44px;
+  }
+
+  /* Icon-only buttons: 36px square → 44px minimum. width/height freed
+     so hybrids with labels (.locale-trigger) keep their auto width. */
+  .icon-button {
+    width: auto;
+    height: auto;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Topbar command palette trigger: 36px → 44px min. */
+  .command-trigger {
+    height: auto;
+    min-height: 44px;
+  }
+
+  /* Select triggers: 38px → 44px min. Native <select> row actions are
+     included here because <select> cannot host ::before overlays. */
+  .select-trigger,
+  .table-row-action-select {
+    min-height: 44px;
+  }
+
+  /* Tab controls (canonical + legacy aliases). */
+  .page-tab,
+  .expenses-report-tab,
+  .compliance-country-tab,
+  .performance-tab {
+    min-height: 44px;
+  }
+
+  /* Segmented/view toggles and chip-style choice buttons. */
+  .schedule-manage-view-toggle button,
+  .schedule-team-setup-type-toggle button,
+  .payroll-view-toggle-btn,
+  .crew-view-toggle,
+  .signature-toggle-button,
+  .org-chart-toolbar-toggle,
+  .swap-scope-chip,
+  .schedule-duration-btn {
+    min-height: 44px;
+  }
+
+  /* Checkbox/radio label wrappers: the tiny native input stays its
+     size (inputs can't host overlays), but the tappable label row
+     reaches 44px. .expenses-checkbox also gets min-width — it wraps a
+     bare row-select checkbox in a table cell. */
+  .settings-checkbox,
+  .delegation-checkbox-label,
+  .delegation-radio-label,
+  .crew-games-checkbox-label,
+  .csv-import-overwrite-toggle,
+  .profile-privacy-toggle,
+  .crew-mod-toggle {
+    min-height: 44px;
+  }
+
+  .expenses-checkbox {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Standalone icon buttons in non-dense contexts: enlarge outright.
+     (lightbox 40px, csv close 32px, doc viewer 36px, sidebar 32px) */
+  .lightbox-close,
+  .lightbox-nav,
+  .csv-import-close,
+  .document-viewer-action,
+  .sidebar-collapse-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* ── 2. Hit-area overlays (dense layouts) ─────────── */
+
+  /* Keep visual size; extend the tappable box to 44px per axis.
+     .crew-games-image-preview-remove is already position:absolute, so
+     it is excluded from the position:relative reset below. */
+  .button-sm,
+  .button-xs,
+  .table-row-action,
+  .table-sort-trigger,
+  .schedule-grid-remove,
+  .schedule-grid-copy,
+  .schedule-grid-add,
+  .teamcal-add-shift-button,
+  .journey-check-button,
+  .rac-override-remove-btn,
+  .browser-notification-prompt-dismiss,
+  .setup-checklist-toggle,
+  .setup-checklist-dismiss,
+  .org-chart-toolbar-button {
+    position: relative;
+  }
+
+  .button-sm::before,
+  .button-xs::before,
+  .table-row-action::before,
+  .table-sort-trigger::before,
+  .schedule-grid-remove::before,
+  .schedule-grid-copy::before,
+  .schedule-grid-add::before,
+  .teamcal-add-shift-button::before,
+  .journey-check-button::before,
+  .rac-override-remove-btn::before,
+  .browser-notification-prompt-dismiss::before,
+  .setup-checklist-toggle::before,
+  .setup-checklist-dismiss::before,
+  .org-chart-toolbar-button::before,
+  .crew-games-image-preview-remove::before {
+    content: "";
+    position: absolute;
+    inset: min(0px, calc((100% - 44px) / 2));
+  }
+
+  /* .button-sm/.button-xs would otherwise inherit the 44px min-height
+     from the .button rule above — re-pin their compact visual size
+     (28px / 36px) since they live in dense inline layouts; the
+     ::before overlay supplies the 44px hit area instead. */
+  .button-sm {
+    height: 28px;
+    min-height: 28px;
+  }
+
+  .button-xs {
+    height: 36px;
+    min-height: 36px;
+  }
+
+  /* Scheduling-grid day pips: 18px squares packed 2px apart. A full
+     44px-wide overlay would cover the neighbouring days and misroute
+     taps, so extend the hit area vertically only. */
+  .schedule-grid-day {
+    position: relative;
+  }
+
+  .schedule-grid-day::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: min(0px, calc((100% - 44px) / 2));
+    bottom: min(0px, calc((100% - 44px) / 2));
+  }
+
+  /* Payroll worksheet editable cells: an overlay would bleed into the
+     adjacent rows/columns and misroute taps in an editing surface, so
+     grow padding modestly instead (1px→10px vertical). Combined with
+     the cell's own padding the target clears 44px. */
+  .worksheet-cell-editable {
+    padding: 10px 4px;
+  }
+}

@@ -28,9 +28,20 @@ function canViewReports(roles: readonly UserRole[]): boolean {
 
 /* ── Query params ── */
 
+/**
+ * Default page size for the People list. Kept small so payloads stay light
+ * on slow networks — callers that genuinely need the full list must pass
+ * an explicit `limit` (e.g. `PEOPLE_FULL_LIST_LIMIT`).
+ */
+export const PEOPLE_DEFAULT_PAGE_SIZE = 50;
+
+/** Maximum (and historical default) page size — used by full-list callers. */
+export const PEOPLE_FULL_LIST_LIMIT = 250;
+
 export type PeopleQuery = {
   scope?: PeopleScope;
   limit?: number;
+  offset?: number;
 };
 
 /* ── Main data-fetching function ── */
@@ -45,7 +56,8 @@ export async function fetchPeopleData(
   query: PeopleQuery = {},
   hasConfigAccess = false
 ): Promise<PeopleListResponseData> {
-  const limit = query.limit ?? 250;
+  const limit = query.limit ?? PEOPLE_DEFAULT_PAGE_SIZE;
+  const offset = query.offset ?? 0;
   let scope = query.scope ?? "all";
 
   // Enforce scope access rules
@@ -110,11 +122,11 @@ export async function fetchPeopleData(
   function buildPeopleQuery(selectString: string) {
     let q = supabase
       .from("profiles")
-      .select(selectString)
+      .select(selectString, { count: "exact" })
       .eq("org_id", profile.org_id)
       .is("deleted_at", null)
       .order("full_name", { ascending: true })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
 
     if (scope === "me") {
       q = q.eq("id", profile.id);
@@ -127,7 +139,11 @@ export async function fetchPeopleData(
     return q;
   }
 
-  let { data: rawPeople, error: peopleError } = await buildPeopleQuery(PEOPLE_SELECT_FULL);
+  let {
+    data: rawPeople,
+    error: peopleError,
+    count: totalCount
+  } = await buildPeopleQuery(PEOPLE_SELECT_FULL);
 
   // Fallback: if the query fails (e.g. schedule_type/weekend_shift_hours columns
   // don't exist yet), retry without those columns
@@ -135,6 +151,7 @@ export async function fetchPeopleData(
     const fallback = await buildPeopleQuery(PEOPLE_SELECT_COMPAT);
     rawPeople = fallback.data;
     peopleError = fallback.error;
+    totalCount = fallback.count;
   }
 
   if (peopleError) {
@@ -208,5 +225,11 @@ export async function fetchPeopleData(
     mapProfileRow(row, nameById, crewTagById.get(row.id) ?? null)
   );
 
-  return { people };
+  const total = totalCount ?? offset + people.length;
+  const hasMore =
+    totalCount !== null && totalCount !== undefined
+      ? offset + people.length < totalCount
+      : people.length === limit;
+
+  return { people, total, hasMore };
 }

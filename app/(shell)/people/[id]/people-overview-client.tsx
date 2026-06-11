@@ -248,7 +248,8 @@ export function PeopleOverviewClient({
         setAddressHistory(detailPayload.data.addressHistory ?? []);
 
         if (canManageSensitiveProfile) {
-          const listResponse = await fetch("/api/v1/people?scope=all", {
+          // Explicit high limit: manager/team-lead pickers need the full list.
+          const listResponse = await fetch("/api/v1/people?scope=all&limit=250", {
             method: "GET",
             signal: abortController.signal
           });
