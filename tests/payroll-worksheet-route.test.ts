@@ -292,4 +292,82 @@ describe("PATCH /items/[itemId]/worksheet", () => {
     expect(payrollRunUpdate?.payload.total_net).toEqual({ USD: 56000, NGN: 90000 });
     expect(payrollRunUpdate?.payload.total_deductions).toEqual({ USD: 0, NGN: 10000 });
   });
+
+  it("preserves stored deductions and adjustments in net when recalculating worksheet totals", async () => {
+    getAuthenticatedSessionMock.mockResolvedValueOnce(session);
+    enqueue("payroll_runs", { data: runRow("calculated"), error: null });
+    enqueue("payroll_cycles", { data: [], error: null });
+    enqueue("payroll_items", {
+      data: {
+        id: ITEM,
+        payroll_run_id: RUN,
+        employee_id: "00000000-0000-4000-a000-000000000005",
+        org_id: ORG,
+        base_salary_amount: 300000,
+        overtime_amount: 0,
+        overtime_hours: 0,
+        cycle_1_base_amount: 150000,
+        cycle_2_base_amount: 150000,
+        cycle_1_overtime_hours: 0,
+        cycle_2_overtime_hours: 0,
+        cycle_1_overtime_amount: 0,
+        cycle_2_overtime_amount: 0,
+        cycle_1_included: true,
+        cycle_2_included: true,
+        fees: 0,
+        bonus: 0,
+        comment: null,
+        exception_reason: null,
+        deductions: [
+          { ruleType: "paye", ruleName: "PAYE", amount: 40000 },
+          { ruleType: "pension", ruleName: "Pension", amount: 5000 }
+        ],
+        adjustments: [{ label: "Backpay", amount: 2000 }]
+      },
+      error: null
+    });
+    enqueue("payroll_items", {
+      data: {
+        cycle_2_base_amount: 150000,
+        cycle_1_base_amount: 150000,
+        cycle_1_overtime_hours: 0,
+        cycle_2_overtime_hours: 0,
+        cycle_1_overtime_amount: 0,
+        cycle_2_overtime_amount: 0,
+        cycle_1_included: true,
+        cycle_2_included: true,
+        fees: 0,
+        bonus: 10000,
+        comment: null,
+        exception_reason: null,
+        net_amount: 267000,
+        gross_amount: 310000
+      },
+      error: null
+    });
+    enqueue("payroll_items", {
+      data: [{ gross_amount: 310000, net_amount: 267000, pay_currency: "NGN" }],
+      error: null
+    });
+
+    const { PATCH } = await importRoute();
+    const res = await PATCH(
+      new Request("http://localhost/test", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonus: 10000 })
+      }),
+      { params: Promise.resolve({ id: RUN, itemId: ITEM }) }
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.error).toBeNull();
+
+    const payrollItemUpdate = updateCalls.find((call) => call.table === "payroll_items");
+    /* monthlyTotal = 150000 + 150000 + 10000 = 310000 (gross) */
+    expect(payrollItemUpdate?.payload.gross_amount).toBe(310000);
+    /* net = 310000 - (40000 + 5000) deductions + 2000 adjustments = 267000 */
+    expect(payrollItemUpdate?.payload.net_amount).toBe(267000);
+  });
 });

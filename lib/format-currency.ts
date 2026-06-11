@@ -46,3 +46,7 @@ export function formatCurrency(
 export function getCurrencySymbol(currencyCode: string): string {
   return CURRENCY_CONFIG[currencyCode.toUpperCase()]?.symbol ?? currencyCode;
 }
+
+export function getCurrencyDecimals(currencyCode: string): number {
+  return CURRENCY_CONFIG[currencyCode.toUpperCase()]?.decimals ?? 2;
+}

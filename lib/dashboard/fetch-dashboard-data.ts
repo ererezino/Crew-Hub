@@ -1398,10 +1398,19 @@ export async function fetchDashboardData(
     ? "manager"
     : null;
 
-  const activeOnboarding = roleBasedPersona
-    ? null
-    : (
-        await supabase
+  /* The onboarding-instance check, widget visibility config, and universal
+   * data are independent — fetch them in one parallel batch instead of three
+   * sequential round-trips (each costs a full RTT on high-latency links). */
+  const [
+    activeOnboardingResult,
+    allowedWidgetKeys,
+    announcements,
+    teamOnLeaveToday,
+    upcomingHolidays
+  ] = await Promise.all([
+    roleBasedPersona
+      ? Promise.resolve(null)
+      : supabase
           .from("onboarding_instances")
           .select("id, status, started_at")
           .eq("employee_id", profile.id)
@@ -1410,8 +1419,14 @@ export async function fetchDashboardData(
           .is("deleted_at", null)
           .order("started_at", { ascending: false })
           .limit(1)
-          .maybeSingle()
-      ).data;
+          .maybeSingle(),
+    resolveAllowedWidgetKeys(supabase, profile.org_id, roles),
+    fetchAnnouncements(supabase, profile.org_id),
+    fetchTeamOnLeaveToday(supabase, profile.org_id),
+    fetchUpcomingHolidays(supabase, profile.org_id, profile.country_code)
+  ]);
+
+  const activeOnboarding = activeOnboardingResult?.data ?? null;
 
   const persona =
     roleBasedPersona ??
@@ -1419,23 +1434,9 @@ export async function fetchDashboardData(
       { roles, startDate: profile.start_date },
       activeOnboarding ? { status: activeOnboarding.status } : null
     );
-  const allowedWidgetKeys = await resolveAllowedWidgetKeys(
-    supabase,
-    profile.org_id,
-    roles
-  );
 
   const greeting = buildGreeting(profile.full_name, roles);
   const response = buildEmptyResponse(persona, greeting);
-
-  /* Step 2: Fetch universal data (all personas) */
-
-  const [announcements, teamOnLeaveToday, upcomingHolidays] =
-    await Promise.all([
-      fetchAnnouncements(supabase, profile.org_id),
-      fetchTeamOnLeaveToday(supabase, profile.org_id),
-      fetchUpcomingHolidays(supabase, profile.org_id, profile.country_code)
-    ]);
 
   response.announcements = announcements;
   response.teamOnLeaveToday = teamOnLeaveToday;

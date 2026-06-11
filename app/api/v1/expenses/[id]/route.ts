@@ -57,8 +57,10 @@ const approverProfileSchema = z.object({
 function auditActionFromExpenseAction(action: ExpenseAction): "approved" | "rejected" | "cancelled" | "updated" {
   switch (action) {
     case "approve":
+    case "additional_approve":
       return "approved";
     case "reject":
+    case "additional_reject":
       return "rejected";
     case "cancel":
       return "cancelled";
@@ -594,16 +596,33 @@ export async function PATCH(
     });
   }
 
+  /* Guard the transition against concurrent writers: the action above was
+   * authorized against the status read earlier, so the update must only apply
+   * if the row still holds that status. Zero rows matched → state changed
+   * between read and write → surface a conflict instead of applying blindly. */
   const { data: updatedExpenseRaw, error: updateExpenseError } = await svcClient
     .from("expenses")
     .update(updatePayload)
     .eq("id", expenseId)
     .eq("org_id", session.profile.org_id)
+    .eq("status", expense.status)
     .select(expenseSelectColumns)
     .single();
 
   if (updateExpenseError || !updatedExpenseRaw) {
     const isPermissionError = updateExpenseError?.code === "42501" || updateExpenseError?.code === "PGRST301";
+    const isStaleState = updateExpenseError?.code === "PGRST116";
+
+    if (isStaleState) {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "INVALID_STATE",
+          message: "This expense was updated by someone else. Refresh and try again."
+        },
+        meta: buildMeta()
+      });
+    }
 
     return jsonResponse<null>(isPermissionError ? 403 : 500, {
       data: null,

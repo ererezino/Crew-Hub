@@ -121,7 +121,7 @@ export function ScheduleReview({
                       ))}
                       {shiftDetails.length > 100 ? (
                         <tr>
-                          <td colSpan={4} style={{ textAlign: "center", color: "#7A8A99" }}>
+                          <td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)" }}>
                             {t("review.moreShifts", { count: shiftDetails.length - 100 })}
                           </td>
                         </tr>

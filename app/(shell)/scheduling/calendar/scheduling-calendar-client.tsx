@@ -33,10 +33,6 @@ type ShiftEditFormValues = {
 };
 
 let toastCounter = 0;
-const SHIFT_EDIT_TOAST_SUCCESS = "Shift updated successfully.";
-const SHIFT_EDIT_TOAST_ERROR = "Unable to update shift.";
-const SHIFT_DELETE_TOAST_SUCCESS = "Shift removed.";
-const SHIFT_DELETE_TOAST_ERROR = "Unable to remove shift.";
 const ALL_PUBLISHED_SCHEDULE_ID = "__all_published__";
 
 function formatShiftMoveDate(isoDate: string): string {
@@ -316,10 +312,10 @@ export function SchedulingCalendarClient({
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        throw new Error(payload?.error?.message ?? SHIFT_EDIT_TOAST_ERROR);
+        throw new Error(payload?.error?.message ?? t("shiftEditModal.toastError"));
       }
 
-      addToast("success", SHIFT_EDIT_TOAST_SUCCESS);
+      addToast("success", t("shiftEditModal.toastSuccess"));
       const warnings: string[] = payload?.data?.warnings ?? [];
       for (const warning of warnings) {
         addToast("info", warning);
@@ -327,11 +323,11 @@ export function SchedulingCalendarClient({
       setEditingShift(null);
       shiftsQuery.refresh();
     } catch (error) {
-      addToast("error", error instanceof Error ? error.message : SHIFT_EDIT_TOAST_ERROR);
+      addToast("error", error instanceof Error ? error.message : t("shiftEditModal.toastError"));
     } finally {
       setIsSavingShiftEdit(false);
     }
-  }, [addToast, editingShift, shiftsQuery]);
+  }, [addToast, editingShift, shiftsQuery, t]);
 
   const handleDeleteShift = useCallback(async () => {
     if (!editingShift) {
@@ -347,18 +343,18 @@ export function SchedulingCalendarClient({
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error?.message ?? SHIFT_DELETE_TOAST_ERROR);
+        throw new Error(payload?.error?.message ?? t("shiftEditModal.removeToastError"));
       }
 
-      addToast("success", SHIFT_DELETE_TOAST_SUCCESS);
+      addToast("success", t("shiftEditModal.removeToastSuccess"));
       setEditingShift(null);
       shiftsQuery.refresh();
     } catch (error) {
-      addToast("error", error instanceof Error ? error.message : SHIFT_DELETE_TOAST_ERROR);
+      addToast("error", error instanceof Error ? error.message : t("shiftEditModal.removeToastError"));
     } finally {
       setIsDeletingShift(false);
     }
-  }, [addToast, editingShift, shiftsQuery]);
+  }, [addToast, editingShift, shiftsQuery, t]);
 
   const handleCreateShift = useCallback(async (values: ShiftEditFormValues) => {
     const scheduleId = activeSchedule?.id;
