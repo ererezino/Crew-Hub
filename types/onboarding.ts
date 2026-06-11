@@ -57,6 +57,9 @@ export type OnboardingTemplateTask = {
   actionUrl?: string | null;
   actionLabel?: string | null;
   completionGuidance?: string | null;
+  /** Positions of prerequisite tasks within the same template's tasks array.
+   *  Absent/empty = no dependencies (backward compatible). */
+  dependsOnTaskIndexes?: number[];
 };
 
 export type OnboardingTemplateTaskInput = {
@@ -73,6 +76,8 @@ export type OnboardingTemplateTaskInput = {
   actionUrl?: string | null;
   actionLabel?: string | null;
   completionGuidance?: string | null;
+  /** Positions of prerequisite tasks within the same template's tasks array. */
+  dependsOnTaskIndexes?: number[];
 };
 
 export type OnboardingTemplate = {
@@ -134,6 +139,9 @@ export type OnboardingTask = {
   actionUrl: string | null;
   actionLabel: string | null;
   completionGuidance: string | null;
+  /** Ids of prerequisite onboarding_tasks rows in the same instance.
+   *  The task stays 'blocked' until every prerequisite is completed. */
+  dependsOnTaskIds: string[];
 };
 
 export type OnboardingTemplatesResponseData = {

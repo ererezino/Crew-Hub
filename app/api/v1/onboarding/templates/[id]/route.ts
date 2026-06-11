@@ -8,7 +8,11 @@ import { logAudit } from "../../../../../../lib/audit";
 import type { UserRole } from "../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../lib/supabase/server";
-import { actionUrlSchema } from "../../../../../../lib/onboarding/validation";
+import {
+  actionUrlSchema,
+  dependsOnTaskIndexesSchema,
+  validateTaskDependencies
+} from "../../../../../../lib/onboarding/validation";
 import type { ApiResponse } from "../../../../../../types/auth";
 import {
   ONBOARDING_TYPES,
@@ -33,7 +37,8 @@ const updateTemplateTaskInputSchema = z.object({
     .trim()
     .max(1000, "Completion guidance is too long.")
     .nullable()
-    .optional()
+    .optional(),
+  dependsOnTaskIndexes: dependsOnTaskIndexesSchema.optional()
 });
 
 const updateTemplateSchema = z.object({
@@ -84,7 +89,9 @@ const existingTaskSchema = z.object({
   actionLabel: z.string().nullable().optional(),
   action_label: z.string().nullable().optional(),
   completionGuidance: z.string().nullable().optional(),
-  completion_guidance: z.string().nullable().optional()
+  completion_guidance: z.string().nullable().optional(),
+  dependsOnTaskIndexes: z.array(z.number().int().min(0)).optional(),
+  depends_on_task_indexes: z.array(z.number().int().min(0)).optional()
 });
 
 type ExistingTaskParsed = z.infer<typeof existingTaskSchema>;
@@ -264,7 +271,15 @@ function mergeTasksWithPreservation(
       linkUrl: linkUrl,
       actionUrl: incoming.actionUrl?.trim() || null,
       actionLabel: incoming.actionLabel?.trim() || null,
-      completionGuidance: incoming.completionGuidance?.trim() || null
+      completionGuidance: incoming.completionGuidance?.trim() || null,
+      // Dependencies are positional (indexes into the incoming tasks array),
+      // so they are taken from the incoming payload ONLY — never preserved
+      // from the existing template. Preserving stale indexes across a reorder
+      // would silently repoint dependencies at the wrong tasks.
+      dependsOnTaskIndexes:
+        incoming.dependsOnTaskIndexes && incoming.dependsOnTaskIndexes.length > 0
+          ? [...new Set(incoming.dependsOnTaskIndexes)]
+          : undefined
     };
   });
 }
@@ -297,7 +312,9 @@ function mapTemplateRow(row: z.infer<typeof templateRowSchema>): OnboardingTempl
       linkUrl: task.linkUrl ?? task.link_url ?? null,
       actionUrl: task.actionUrl ?? task.action_url ?? null,
       actionLabel: task.actionLabel ?? task.action_label ?? null,
-      completionGuidance: task.completionGuidance ?? task.completion_guidance ?? null
+      completionGuidance: task.completionGuidance ?? task.completion_guidance ?? null,
+      dependsOnTaskIndexes:
+        task.dependsOnTaskIndexes ?? task.depends_on_task_indexes ?? undefined
     })),
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -360,6 +377,23 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   const payload = parsedBody.data;
+
+  // Dependency indexes are positional within the incoming tasks array, and
+  // mergeTasksWithPreservation keeps the incoming order — so validating the
+  // payload is equivalent to validating the merged result.
+  const dependencyValidation = validateTaskDependencies(payload.tasks);
+
+  if (!dependencyValidation.ok) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: dependencyValidation.message
+      },
+      meta: buildMeta()
+    });
+  }
+
   const supabase = await createSupabaseServerClient();
 
   // Fetch existing template to preserve hidden fields

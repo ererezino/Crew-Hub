@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState, type FormEvent } from "react";
 
+import { DependencyGraph, type DependencyGraphNode } from "../../../components/onboarding/dependency-graph";
 import { EmptyState } from "../../../components/shared/empty-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
@@ -69,6 +70,7 @@ type TemplateTaskDraft = {
   actionUrl: string;
   actionLabel: string;
   completionGuidance: string;
+  dependsOnTaskIndexes: number[];
 };
 
 type TemplateTaskDraftErrors = {
@@ -107,8 +109,66 @@ const initialTemplateTaskDraft: TemplateTaskDraft = {
   dueOffsetDays: "",
   actionUrl: "",
   actionLabel: "",
-  completionGuidance: ""
+  completionGuidance: "",
+  dependsOnTaskIndexes: []
 };
+
+/** Swap two tasks and remap every dependsOnTaskIndexes entry so references
+ *  keep pointing at the same logical tasks after the reorder. */
+function swapTasksWithDependencyRemap(
+  tasks: readonly TemplateTaskDraft[],
+  indexA: number,
+  indexB: number
+): TemplateTaskDraft[] {
+  const reordered = [...tasks];
+  const swapped = reordered[indexA]!;
+  reordered[indexA] = reordered[indexB]!;
+  reordered[indexB] = swapped;
+
+  return reordered.map((task) => ({
+    ...task,
+    dependsOnTaskIndexes: task.dependsOnTaskIndexes.map((depIndex) =>
+      depIndex === indexA ? indexB : depIndex === indexB ? indexA : depIndex
+    )
+  }));
+}
+
+/** Remove a task, dropping references to it and shifting higher indexes down. */
+function removeTaskWithDependencyRemap(
+  tasks: readonly TemplateTaskDraft[],
+  removedIndex: number
+): TemplateTaskDraft[] {
+  return tasks
+    .filter((_, taskIndex) => taskIndex !== removedIndex)
+    .map((task) => ({
+      ...task,
+      dependsOnTaskIndexes: task.dependsOnTaskIndexes
+        .filter((depIndex) => depIndex !== removedIndex)
+        .map((depIndex) => (depIndex > removedIndex ? depIndex - 1 : depIndex))
+    }));
+}
+
+/** Toggle a prerequisite on one task, keeping indexes sorted for stable payloads. */
+function toggleTaskDependency(
+  tasks: readonly TemplateTaskDraft[],
+  taskIndex: number,
+  dependencyIndex: number
+): TemplateTaskDraft[] {
+  return tasks.map((task, currentIndex) => {
+    if (currentIndex !== taskIndex) {
+      return task;
+    }
+
+    const hasDependency = task.dependsOnTaskIndexes.includes(dependencyIndex);
+    const nextIndexes = hasDependency
+      ? task.dependsOnTaskIndexes.filter((depIndex) => depIndex !== dependencyIndex)
+      : [...task.dependsOnTaskIndexes, dependencyIndex].sort(
+          (left, right) => left - right
+        );
+
+    return { ...task, dependsOnTaskIndexes: nextIndexes };
+  });
+}
 
 const initialStartOnboardingFormValues: StartOnboardingFormValues = {
   employeeId: "",
@@ -430,6 +490,42 @@ export function OnboardingClient({
     [peopleQuery.people]
   );
 
+  const editorGraphNodes = useMemo<DependencyGraphNode[]>(
+    () =>
+      templateValues.tasks.map((task, index) => ({
+        id: String(index),
+        title:
+          task.title.trim().length > 0
+            ? task.title.trim()
+            : td('templateEditorPanel.taskFallbackTitle', { number: index + 1 }),
+        dependsOn: task.dependsOnTaskIndexes.map(String)
+      })),
+    [templateValues.tasks, td]
+  );
+  const editorHasDependencies = useMemo(
+    () => templateValues.tasks.some((task) => task.dependsOnTaskIndexes.length > 0),
+    [templateValues.tasks]
+  );
+  const previewGraphNodes = useMemo<DependencyGraphNode[]>(
+    () =>
+      (templatePreview?.tasks ?? []).map((task, index) => ({
+        id: String(index),
+        title:
+          task.title.trim().length > 0
+            ? task.title.trim()
+            : td('templateEditorPanel.taskFallbackTitle', { number: index + 1 }),
+        dependsOn: (task.dependsOnTaskIndexes ?? []).map(String)
+      })),
+    [templatePreview, td]
+  );
+  const previewHasDependencies = useMemo(
+    () =>
+      (templatePreview?.tasks ?? []).some(
+        (task) => (task.dependsOnTaskIndexes ?? []).length > 0
+      ),
+    [templatePreview]
+  );
+
   const instancesForTab = activeTab === "active" ? activeInstances : completedInstances;
   const activeInstancesQueryForTab =
     activeTab === "active" ? activeInstancesQuery : completedInstancesQuery;
@@ -601,7 +697,11 @@ export function OnboardingClient({
             completionGuidance:
               task.completionGuidance.trim().length === 0
                 ? null
-                : task.completionGuidance.trim()
+                : task.completionGuidance.trim(),
+            dependsOnTaskIndexes:
+              task.dependsOnTaskIndexes.length > 0
+                ? task.dependsOnTaskIndexes
+                : undefined
           }))
         })
       });
@@ -649,7 +749,8 @@ export function OnboardingClient({
               : "",
             actionUrl: task.actionUrl ?? "",
             actionLabel: task.actionLabel ?? "",
-            completionGuidance: task.completionGuidance ?? ""
+            completionGuidance: task.completionGuidance ?? "",
+            dependsOnTaskIndexes: task.dependsOnTaskIndexes ?? []
           }))
         : [{ ...initialTemplateTaskDraft }]
     });
@@ -706,7 +807,11 @@ export function OnboardingClient({
               completionGuidance:
                 task.completionGuidance.trim().length === 0
                   ? null
-                  : task.completionGuidance.trim()
+                  : task.completionGuidance.trim(),
+              dependsOnTaskIndexes:
+                task.dependsOnTaskIndexes.length > 0
+                  ? task.dependsOnTaskIndexes
+                  : undefined
             }))
           })
         });
@@ -1278,6 +1383,20 @@ export function OnboardingClient({
                       </li>
                     ))}
                   </ul>
+                  {previewHasDependencies ? (
+                    <div className="onboarding-deps-graph-section">
+                      <h3 className="section-title">
+                        {t('templateEditorPanel.dependenciesHeading')}
+                      </h3>
+                      <DependencyGraph
+                        nodes={previewGraphNodes}
+                        labels={{
+                          aria: td('templateEditorPanel.dependencyGraphAria'),
+                          independentHeading: td('templateEditorPanel.independentTasks')
+                        }}
+                      />
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
             </>
@@ -1541,13 +1660,12 @@ export function OnboardingClient({
                         className="table-row-action"
                         disabled={index === 0}
                         aria-label={t('templateEditorPanel.moveUp')}
-                        onClick={() => {
-                          const nextTasks = [...templateValues.tasks];
-                          const swapped = nextTasks[index - 1];
-                          nextTasks[index - 1] = nextTasks[index]!;
-                          nextTasks[index] = swapped!;
-                          updateTemplateValues({ ...templateValues, tasks: nextTasks });
-                        }}
+                        onClick={() =>
+                          updateTemplateValues({
+                            ...templateValues,
+                            tasks: swapTasksWithDependencyRemap(templateValues.tasks, index - 1, index)
+                          })
+                        }
                       >
                         {t('templateEditorPanel.moveUpLabel')}
                       </button>
@@ -1556,13 +1674,12 @@ export function OnboardingClient({
                         className="table-row-action"
                         disabled={index === templateValues.tasks.length - 1}
                         aria-label={t('templateEditorPanel.moveDown')}
-                        onClick={() => {
-                          const nextTasks = [...templateValues.tasks];
-                          const swapped = nextTasks[index + 1];
-                          nextTasks[index + 1] = nextTasks[index]!;
-                          nextTasks[index] = swapped!;
-                          updateTemplateValues({ ...templateValues, tasks: nextTasks });
-                        }}
+                        onClick={() =>
+                          updateTemplateValues({
+                            ...templateValues,
+                            tasks: swapTasksWithDependencyRemap(templateValues.tasks, index, index + 1)
+                          })
+                        }
                       >
                         {t('templateEditorPanel.moveDownLabel')}
                       </button>
@@ -1572,7 +1689,7 @@ export function OnboardingClient({
                         onClick={() =>
                           updateTemplateValues({
                             ...templateValues,
-                            tasks: templateValues.tasks.filter((_, taskIndex) => taskIndex !== index)
+                            tasks: removeTaskWithDependencyRemap(templateValues.tasks, index)
                           })
                         }
                         disabled={templateValues.tasks.length === 1}
@@ -1774,9 +1891,67 @@ export function OnboardingClient({
                       <p className="form-field-error">{taskErrors.completionGuidance}</p>
                     ) : null}
                   </label>
+
+                  {templateValues.tasks.length > 1 ? (
+                    <fieldset className="onboarding-deps-fieldset">
+                      <legend className="form-label">
+                        {t('templateEditorPanel.dependsOnLabel')}
+                      </legend>
+                      <p className="settings-card-description">
+                        {t('templateEditorPanel.dependsOnHint')}
+                      </p>
+                      <div className="onboarding-deps-options">
+                        {templateValues.tasks.map((otherTask, otherIndex) =>
+                          otherIndex === index ? null : (
+                            <label
+                              key={`template-task-${index}-dep-${otherIndex}`}
+                              className="onboarding-deps-option"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={task.dependsOnTaskIndexes.includes(otherIndex)}
+                                onChange={() =>
+                                  updateTemplateValues({
+                                    ...templateValues,
+                                    tasks: toggleTaskDependency(
+                                      templateValues.tasks,
+                                      index,
+                                      otherIndex
+                                    )
+                                  })
+                                }
+                              />
+                              <span>
+                                {otherTask.title.trim().length > 0
+                                  ? otherTask.title.trim()
+                                  : t('templateEditorPanel.taskFallbackTitle', {
+                                      number: otherIndex + 1
+                                    })}
+                              </span>
+                            </label>
+                          )
+                        )}
+                      </div>
+                    </fieldset>
+                  ) : null}
                 </article>
               );
             })}
+
+            {editorHasDependencies ? (
+              <div className="onboarding-deps-graph-section">
+                <h3 className="section-title">
+                  {t('templateEditorPanel.dependenciesHeading')}
+                </h3>
+                <DependencyGraph
+                  nodes={editorGraphNodes}
+                  labels={{
+                    aria: td('templateEditorPanel.dependencyGraphAria'),
+                    independentHeading: td('templateEditorPanel.independentTasks')
+                  }}
+                />
+              </div>
+            ) : null}
           </section>
 
           {templateErrors.form ? <p className="form-submit-error">{templateErrors.form}</p> : null}

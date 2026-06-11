@@ -10,7 +10,7 @@ import {
   type OnboardingTrack,
   type OnboardingType
 } from "../../types/onboarding";
-import { actionUrlSchema } from "./validation";
+import { actionUrlSchema, validateTaskDependencies } from "./validation";
 
 type OnboardingEmployee = {
   id: string;
@@ -63,7 +63,9 @@ const templateTaskSchema = z.object({
   actionLabel: z.string().max(120).nullable().optional(),
   action_label: z.string().max(120).nullable().optional(),
   completionGuidance: z.string().max(1000).nullable().optional(),
-  completion_guidance: z.string().max(1000).nullable().optional()
+  completion_guidance: z.string().max(1000).nullable().optional(),
+  dependsOnTaskIndexes: z.array(z.number().int().min(0)).optional(),
+  depends_on_task_indexes: z.array(z.number().int().min(0)).optional()
 });
 
 const createdInstanceRowSchema = z.object({
@@ -106,6 +108,8 @@ export type NormalizedTemplateTask = {
   actionUrl: string | null;
   actionLabel: string | null;
   completionGuidance: string | null;
+  /** Positions of prerequisite tasks within the template's tasks array. */
+  dependsOnTaskIndexes: number[];
 };
 
 /**
@@ -154,7 +158,12 @@ export function normalizeTemplateTasks(value: unknown): NormalizedTemplateTask[]
       actionUrl: parsedTask.data.actionUrl ?? parsedTask.data.action_url ?? null,
       actionLabel: parsedTask.data.actionLabel ?? parsedTask.data.action_label ?? null,
       completionGuidance:
-        parsedTask.data.completionGuidance ?? parsedTask.data.completion_guidance ?? null
+        parsedTask.data.completionGuidance ?? parsedTask.data.completion_guidance ?? null,
+      dependsOnTaskIndexes: [
+        ...new Set(
+          parsedTask.data.dependsOnTaskIndexes ?? parsedTask.data.depends_on_task_indexes ?? []
+        )
+      ]
     });
   }
 
@@ -200,12 +209,23 @@ export async function createOnboardingInstance({
   }
 
   const normalizedTemplateTasks = normalizeTemplateTasks(template.tasks);
+
+  // Sanitize the dependency graph defensively. Templates are validated at
+  // write time, but legacy/seeded jsonb may predate that validation. If the
+  // graph is invalid (out-of-range index, self-reference, or cycle), ignore
+  // dependencies entirely for this instance rather than risk tasks that can
+  // never unlock.
+  const dependencyGraphIsValid = validateTaskDependencies(normalizedTemplateTasks).ok;
+  const taskDependencyIndexes: number[][] = normalizedTemplateTasks.map((task) =>
+    dependencyGraphIsValid ? task.dependsOnTaskIndexes : []
+  );
+
   const baseDate = new Date(startTimestamp);
   const dueDateAnchor = anchorDate
     ? new Date(resolveOnboardingStartTimestamp(anchorDate))
     : baseDate;
 
-  const taskRows = normalizedTemplateTasks.map((task) => {
+  const taskRows = normalizedTemplateTasks.map((task, taskIndex) => {
     const dueDate =
       task.dueOffsetDays === null
         ? null
@@ -223,7 +243,12 @@ export async function createOnboardingInstance({
       description: task.description || null,
       category: task.category,
       track: task.track,
-      status: ONBOARDING_TASK_STATUSES[0],
+      // Tasks with prerequisites start 'blocked'; they flip to 'pending' when
+      // the last prerequisite completes (see the task completion route).
+      status:
+        (taskDependencyIndexes[taskIndex] ?? []).length > 0
+          ? "blocked"
+          : ONBOARDING_TASK_STATUSES[0],
       assigned_to: task.track === "operations" && creatingAdminId
         ? creatingAdminId
         : employee.id,
@@ -254,7 +279,53 @@ export async function createOnboardingInstance({
       throw new Error("Onboarding instance was created but tasks could not be generated.");
     }
 
-    // Auto-trigger signature requests for e_signature tasks with a document_id
+    // Second pass: resolve template-task positions to the inserted row uuids
+    // and persist them as depends_on_task_ids. Supabase returns inserted rows
+    // in insert order, so insertedTasks[i] corresponds to taskRows[i] (the
+    // e-signature loop below already relies on this positional matching).
+    if (insertedTasks && insertedTasks.length === taskRows.length) {
+      for (let taskIndex = 0; taskIndex < taskDependencyIndexes.length; taskIndex++) {
+        const dependencyIndexes = taskDependencyIndexes[taskIndex] ?? [];
+        const taskId = insertedTasks[taskIndex]?.id;
+
+        if (dependencyIndexes.length === 0 || !taskId) {
+          continue;
+        }
+
+        const dependsOnTaskIds = dependencyIndexes
+          .map((dependencyIndex) => insertedTasks[dependencyIndex]?.id)
+          .filter((value): value is string => Boolean(value));
+
+        if (dependsOnTaskIds.length === 0) {
+          continue;
+        }
+
+        const { error: dependencyUpdateError } = await supabase
+          .from("onboarding_tasks")
+          .update({ depends_on_task_ids: dependsOnTaskIds })
+          .eq("id", taskId)
+          .eq("org_id", orgId);
+
+        if (dependencyUpdateError) {
+          // Non-fatal: the task stays 'blocked' without recorded prerequisites.
+          // Surface loudly so it can be repaired, but don't fail creation.
+          console.error("Unable to persist onboarding task dependencies.", {
+            taskId,
+            message: dependencyUpdateError.message
+          });
+        }
+      }
+    }
+
+    // Auto-trigger signature requests for e_signature tasks with a document_id.
+    //
+    // DECISION (task dependencies): signature requests still fire at creation
+    // even when the e-signature task starts 'blocked'. Deferring them to
+    // unlock time would require the signatures flow to participate in the
+    // dependency model (the sign route completes linked onboarding tasks
+    // directly), which is out of scope here. Practical consequence: a blocked
+    // e-signature task's document can be signed early, which completes the
+    // task via the signatures route regardless of its blocked status.
     if (insertedTasks) {
       for (const insertedTask of insertedTasks) {
         if (

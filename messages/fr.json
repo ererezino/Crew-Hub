@@ -1713,7 +1713,11 @@
     "openTaskAction": "Ouvrir l'action de la tâche",
     "noNotes": "Aucune note",
     "completing": "En cours…",
-    "markComplete": "Marquer terminé"
+    "markComplete": "Marquer terminé",
+    "dependenciesHeading": "Dépendances",
+    "unlocksAfter": "Se débloque après : {titles}",
+    "independentTasks": "Tâches indépendantes",
+    "dependencyGraphAria": "Graphe des dépendances entre tâches"
   },
   "myOnboarding": {
     "title": "Mon intégration",
@@ -4722,7 +4726,13 @@
       "moveUp": "Déplacer la tâche vers le haut",
       "moveDown": "Déplacer la tâche vers le bas",
       "moveUpLabel": "Haut",
-      "moveDownLabel": "Bas"
+      "moveDownLabel": "Bas",
+      "dependsOnLabel": "Dépend de",
+      "dependsOnHint": "Sélectionnez les tâches à terminer avant celle-ci.",
+      "taskFallbackTitle": "Tâche {number}",
+      "dependenciesHeading": "Dépendances",
+      "independentTasks": "Tâches indépendantes",
+      "dependencyGraphAria": "Graphe des dépendances entre tâches"
     },
     "toast": {
       "onboardingStarted": "Instance d'intégration lancée.",

@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../../../lib/auth/session";
+import { diffAuditValues, logAudit } from "../../../../../../../../../lib/audit";
 import { logger } from "../../../../../../../../../lib/logger";
+import { createNotification } from "../../../../../../../../../lib/notifications/service";
 import { completeOnboarding, completeOffboarding } from "../../../../../../../../../lib/onboarding/auto-transition";
+import {
+  findReblockableTasks,
+  findUnlockableTasks
+} from "../../../../../../../../../lib/onboarding/task-dependencies";
 import { hasRole } from "../../../../../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../../../../../lib/supabase/service-role";
@@ -85,7 +91,7 @@ export async function POST(request: Request, context: RouteContext) {
   const [taskResult, instanceResult] = await Promise.all([
     supabase
       .from("onboarding_tasks")
-      .select("id, instance_id, title, task_type, status, assigned_to, completed_by")
+      .select("id, instance_id, title, task_type, status, assigned_to, completed_by, depends_on_task_ids")
       .eq("id", taskId)
       .eq("instance_id", instanceId)
       .eq("org_id", profile.org_id)
@@ -158,6 +164,56 @@ export async function POST(request: Request, context: RouteContext) {
     }
   }
 
+  // Dependency enforcement: a task with prerequisites cannot be completed
+  // until every task in depends_on_task_ids is completed. This applies to
+  // admins too. A 'blocked' task whose prerequisites are in fact all complete
+  // (e.g. a previously missed unlock pass) is allowed through.
+  if (action === "complete") {
+    const dependsOnTaskIds: string[] = Array.isArray(task.depends_on_task_ids)
+      ? task.depends_on_task_ids
+      : [];
+
+    if (dependsOnTaskIds.length > 0) {
+      const { data: prerequisiteTasks, error: prerequisiteError } = await supabase
+        .from("onboarding_tasks")
+        .select("id, title, status")
+        .in("id", dependsOnTaskIds)
+        .eq("org_id", profile.org_id)
+        .is("deleted_at", null);
+
+      if (prerequisiteError) {
+        logger.error("Failed to check onboarding task prerequisites.", {
+          error: prerequisiteError.message,
+          taskId
+        });
+        return jsonResponse<null>(500, {
+          data: null,
+          error: { code: "DEPENDENCY_CHECK_FAILED", message: "Unable to verify task prerequisites." },
+          meta: buildMeta()
+        });
+      }
+
+      const incompletePrerequisites = (prerequisiteTasks ?? []).filter(
+        (prerequisite) => prerequisite.status !== "completed"
+      );
+
+      if (incompletePrerequisites.length > 0) {
+        const blockingTitles = incompletePrerequisites
+          .map((prerequisite) => `"${prerequisite.title}"`)
+          .join(", ");
+
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "DEPENDENCIES_NOT_MET",
+            message: `This task is blocked until the following prerequisite task(s) are completed: ${blockingTitles}.`
+          },
+          meta: buildMeta()
+        });
+      }
+    }
+  }
+
   // Perform the update
   const serviceClient = createSupabaseServiceRoleClient();
 
@@ -202,10 +258,11 @@ export async function POST(request: Request, context: RouteContext) {
     }
   }
 
-  // Recompute per-track progress
+  // Fetch all sibling tasks once: used for the dependency unlock/re-block
+  // pass and for the per-track progress recompute below.
   const { data: allTasks, error: tasksError } = await serviceClient
     .from("onboarding_tasks")
-    .select("id, status, track")
+    .select("id, status, track, title, assigned_to, depends_on_task_ids")
     .eq("instance_id", instanceId)
     .eq("org_id", profile.org_id)
     .is("deleted_at", null);
@@ -218,6 +275,90 @@ export async function POST(request: Request, context: RouteContext) {
       error: null,
       meta: buildMeta()
     });
+  }
+
+  if (action === "complete") {
+    // Unlock pass: flip 'blocked' → 'pending' for every task whose
+    // prerequisites are now all completed (self-healing: not limited to
+    // direct dependents of the task that just completed).
+    const unlockableTasks = findUnlockableTasks(allTasks);
+
+    for (const unlockableTask of unlockableTasks) {
+      const { error: unlockError } = await serviceClient
+        .from("onboarding_tasks")
+        .update({ status: "pending" })
+        .eq("id", unlockableTask.id)
+        .eq("org_id", profile.org_id);
+
+      if (unlockError) {
+        logger.error("Failed to unlock dependent onboarding task.", {
+          error: unlockError.message,
+          taskId: unlockableTask.id
+        });
+        continue;
+      }
+
+      unlockableTask.status = "pending";
+
+      const { oldValue, newValue } = diffAuditValues(
+        { status: "blocked" },
+        { status: "pending" }
+      );
+
+      await logAudit({
+        action: "updated",
+        tableName: "onboarding_tasks",
+        recordId: unlockableTask.id,
+        oldValue,
+        newValue
+      });
+
+      if (unlockableTask.assigned_to) {
+        await createNotification({
+          orgId: profile.org_id,
+          userId: unlockableTask.assigned_to,
+          type: "onboarding_task",
+          title: `Task unlocked: ${unlockableTask.title}`,
+          body: "All prerequisite tasks are complete. This task is now ready to start.",
+          link: `/onboarding/${instanceId}`
+        });
+      }
+    }
+  } else {
+    // Reopen (undo) pass: re-block direct dependents that are still 'pending'
+    // — their prerequisites are no longer all met.
+    const reblockableTasks = findReblockableTasks(allTasks, taskId);
+
+    for (const reblockableTask of reblockableTasks) {
+      const { error: reblockError } = await serviceClient
+        .from("onboarding_tasks")
+        .update({ status: "blocked" })
+        .eq("id", reblockableTask.id)
+        .eq("org_id", profile.org_id);
+
+      if (reblockError) {
+        logger.error("Failed to re-block dependent onboarding task.", {
+          error: reblockError.message,
+          taskId: reblockableTask.id
+        });
+        continue;
+      }
+
+      reblockableTask.status = "blocked";
+
+      const { oldValue, newValue } = diffAuditValues(
+        { status: "pending" },
+        { status: "blocked" }
+      );
+
+      await logAudit({
+        action: "updated",
+        tableName: "onboarding_tasks",
+        recordId: reblockableTask.id,
+        oldValue,
+        newValue
+      });
+    }
   }
 
   const totalTasks = allTasks.length;

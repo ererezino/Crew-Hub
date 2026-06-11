@@ -50,7 +50,8 @@ const taskRowSchema = z.object({
   signature_request_id: z.string().uuid().nullable().default(null),
   action_url: z.string().nullable().default(null),
   action_label: z.string().nullable().default(null),
-  completion_guidance: z.string().nullable().default(null)
+  completion_guidance: z.string().nullable().default(null),
+  depends_on_task_ids: z.array(z.string().uuid()).nullable().default([])
 });
 
 const profileRowSchema = z.object({
@@ -212,7 +213,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { data: rawTasks, error: tasksError } = await supabase
     .from("onboarding_tasks")
     .select(
-      "id, instance_id, template_task_id, title, description, category, track, status, task_type, assigned_to, due_date, completed_at, completed_by, notes, document_id, signature_request_id, action_url, action_label, completion_guidance"
+      "id, instance_id, template_task_id, title, description, category, track, status, task_type, assigned_to, due_date, completed_at, completed_by, notes, document_id, signature_request_id, action_url, action_label, completion_guidance, depends_on_task_ids"
     )
     .eq("instance_id", instance.id)
     .eq("org_id", profile.org_id)
@@ -363,7 +364,8 @@ export async function GET(_request: Request, context: RouteContext) {
     signatureRequestId: task.signature_request_id,
     actionUrl: task.action_url,
     actionLabel: task.action_label,
-    completionGuidance: task.completion_guidance
+    completionGuidance: task.completion_guidance,
+    dependsOnTaskIds: task.depends_on_task_ids ?? []
   }));
 
   const reminderTasks = tasksRows.filter((task) => {
