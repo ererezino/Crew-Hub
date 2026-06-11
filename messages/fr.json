@@ -114,7 +114,13 @@
     "hoursValue": "{value} h",
     "minutesValue": "{value} min",
     "daysValue": "{value} j",
-    "percentValue": "{value} %"
+    "percentValue": "{value} %",
+    "offlineQueue": {
+      "pending": "{count, plural, one {# envoi en attente de synchronisation} other {# envois en attente de synchronisation}}",
+      "description": "Enregistré sur cet appareil — il sera soumis automatiquement dès que vous serez de nouveau en ligne.",
+      "retryNow": "Réessayer maintenant",
+      "queuedToast": "Vous semblez être hors ligne. Votre envoi a été enregistré sur cet appareil et sera envoyé automatiquement dès que vous serez de nouveau en ligne."
+    }
   },
   "nav": {
     "group": {

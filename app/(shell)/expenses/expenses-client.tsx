@@ -26,6 +26,12 @@ import { MoneyInput } from "../../../components/ui/money-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { useExpenses } from "../../../hooks/use-expenses";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
+import { OfflineQueueBanner } from "../../../components/shared/offline-queue-banner";
+import {
+  enqueueSubmission,
+  isNetworkFailure,
+  splitFormData
+} from "../../../lib/offline/submission-queue";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import {
   formatDateTimeTooltip,
@@ -523,7 +529,10 @@ function uploadExpenseWithProgress(
     };
 
     request.onerror = () => {
-      reject(new Error("Expense submission failed."));
+      /* XHR onerror fires only on network-level failures — surface it as a
+       * TypeError (like fetch does) so isNetworkFailure() recognizes it and
+       * the submission can be queued for offline replay. */
+      reject(new TypeError("Network error during expense submission."));
     };
 
     request.onload = () => {
@@ -1333,8 +1342,10 @@ export function ExpensesClient({
     setIsSubmitting(true);
     setUploadProgress(0);
 
+    let formData: FormData | null = null;
+
     try {
-      const formData = buildExpenseSubmissionFormData(
+      formData = buildExpenseSubmissionFormData(
         {
           ...formValues,
           saveVendor: formValues.saveVendor && !selectedVendorId
@@ -1354,7 +1365,27 @@ export function ExpensesClient({
         vendorBeneficiaries.refresh();
       }
       showToast("success", td("toast.expenseSubmitted"));
-    } catch {
+    } catch (error) {
+      /* Network failure — save on-device for idempotent auto-replay and
+       * tell the user, instead of losing their work to a dead connection. */
+      if (formData && isNetworkFailure(error)) {
+        try {
+          const { fields, files } = splitFormData(formData);
+          await enqueueSubmission({
+            id: crypto.randomUUID(),
+            kind: "expense",
+            url: "/api/v1/expenses",
+            encoding: "form",
+            fields,
+            files
+          });
+          closePanel();
+          showToast("info", tCommon("offlineQueue.queuedToast"));
+          return;
+        } catch {
+          /* IndexedDB unavailable — fall through to the normal error */
+        }
+      }
       setSubmitError(td("toast.unableToSubmit"));
     } finally {
       setIsSubmitting(false);
@@ -1663,6 +1694,7 @@ export function ExpensesClient({
 
   return (
     <>
+      <OfflineQueueBanner kind="expense" />
       <PageHeader
         title={t('pageTitle')}
         description={t('pageDescription')}

@@ -138,6 +138,56 @@ export async function GET(request: Request) {
   }
 }
 
+/* ── Offline-queue idempotency ────────────────────────────────────────
+ * Replays from the offline submission queue carry a client-generated
+ * clientRequestId. If a previous attempt already created the expense
+ * (e.g. the response was lost on a flaky connection), return that row
+ * instead of creating a duplicate. */
+async function findExistingExpenseResponse(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  orgId: string,
+  clientRequestId: string
+): Promise<Response | null> {
+  const { data: existingRaw } = await supabase
+    .from("expenses")
+    .select(expenseSelectColumns)
+    .eq("org_id", orgId)
+    .eq("client_request_id", clientRequestId)
+    .maybeSingle();
+
+  if (!existingRaw) {
+    return null;
+  }
+
+  const parsedExisting = expenseRowSchema.safeParse(existingRaw);
+  if (!parsedExisting.success) {
+    return null;
+  }
+
+  const { data: rawProfileRows } = await supabase
+    .from("profiles")
+    .select("id, full_name, department, country_code, manager_id")
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .in("id", [parsedExisting.data.employee_id]);
+
+  const parsedProfiles = z.array(profileRowSchema).safeParse(rawProfileRows ?? []);
+  const profileById = new Map(
+    (parsedProfiles.success ? parsedProfiles.data : []).map((row) => [row.id, row] as const)
+  );
+  const attachmentsByExpenseId = await loadExpenseAttachments({
+    supabase,
+    orgId,
+    expenseIds: [parsedExisting.data.id]
+  });
+
+  return jsonResponse<ExpenseMutationResponseData>(200, {
+    data: { expense: toExpenseRecord(parsedExisting.data, profileById, attachmentsByExpenseId) },
+    error: null,
+    meta: buildMeta()
+  });
+}
+
 export async function POST(request: Request) {
   const session = await getAuthenticatedSession();
 
@@ -270,6 +320,27 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+
+  /* Offline-queue replays send a client-generated UUID; if a prior attempt
+   * already created this expense, return it instead of duplicating. The
+   * check runs before receipt upload so replays don't re-upload files. */
+  const clientRequestIdRaw = getFormString(formData, "clientRequestId");
+  const clientRequestId =
+    clientRequestIdRaw && z.string().uuid().safeParse(clientRequestIdRaw).success
+      ? clientRequestIdRaw
+      : null;
+
+  if (clientRequestId) {
+    const existingResponse = await findExistingExpenseResponse(
+      supabase,
+      session.profile.org_id,
+      clientRequestId
+    );
+    if (existingResponse) {
+      return existingResponse;
+    }
+  }
+
   const expenseId = crypto.randomUUID();
 
   const uploadedAttachments: Array<{
@@ -341,7 +412,8 @@ export async function POST(request: Request) {
     vendor_wire_swift_bic: payload.expenseType === "work_expense" ? (payload.vendorWireSwiftBic?.trim() || null) : null,
     vendor_wire_iban: payload.expenseType === "work_expense" ? (payload.vendorWireIban?.trim() || null) : null,
     vendor_wire_bank_country: payload.expenseType === "work_expense" ? (payload.vendorWireBankCountry?.trim() || null) : null,
-    vendor_wire_currency: payload.expenseType === "work_expense" ? (payload.vendorWireCurrency?.trim() || null) : null
+    vendor_wire_currency: payload.expenseType === "work_expense" ? (payload.vendorWireCurrency?.trim() || null) : null,
+    client_request_id: clientRequestId
   };
 
   const { data: insertedExpense, error: insertExpenseError } = await supabase
@@ -352,6 +424,19 @@ export async function POST(request: Request) {
 
   if (insertExpenseError || !insertedExpense) {
     await cleanupUploadedFiles(uploadedAttachments.map((attachment) => attachment.filePath));
+
+    /* Unique violation on (org_id, client_request_id): a concurrent replay
+     * won the race after the pre-insert check. Return the winner's row. */
+    if (insertExpenseError?.code === "23505" && clientRequestId) {
+      const existingResponse = await findExistingExpenseResponse(
+        supabase,
+        session.profile.org_id,
+        clientRequestId
+      );
+      if (existingResponse) {
+        return existingResponse;
+      }
+    }
 
     return jsonResponse<null>(500, {
       data: null,

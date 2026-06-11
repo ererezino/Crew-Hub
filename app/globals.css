@@ -21630,3 +21630,31 @@ html.dark .crew-games-platform-game:hover {
     padding: 10px 4px;
   }
 }
+
+/* ── Offline submission queue banner ─────────────────────────────────
+   Visible pending-sync state for submissions saved on-device while
+   offline (expenses, time-off). Nothing retries silently. */
+.offline-queue-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--status-warning-bg);
+  border: 1px solid var(--status-warning-text);
+  border-radius: var(--radius-card);
+  color: var(--status-warning-text);
+}
+
+.offline-queue-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.offline-queue-banner-text strong {
+  font-size: 14px;
+}
