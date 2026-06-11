@@ -5,6 +5,8 @@ import { getLocale, getMessages } from "next-intl/server";
 
 import { EnvironmentBanner } from "../components/shared/environment-banner";
 import { ThemeProvider } from "../components/shared/theme-provider";
+import { pickMessages } from "../lib/i18n/pick-messages";
+import routeNamespaces from "../lib/i18n/route-namespaces.generated.json";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -45,11 +47,18 @@ export default async function RootLayout({
   const locale = await getLocale();
   const messages = await getMessages();
 
+  /* Ship only the shell namespaces (~10KB) to the client here — the app
+   * chrome (sidebar, top bar, notifications) plus all routes outside
+   * (shell). Each (shell) area provides its own namespaces via its
+   * layout's AreaMessages wrapper, so the full ~250KB bundle is never
+   * serialized into the RSC payload. Map: lib/i18n/route-namespaces.generated.json */
+  const shellMessages = pickMessages(messages, routeNamespaces.shell);
+
   return (
     <html lang={locale} suppressHydrationWarning>
       <body className={`${playfair.variable} ${dmSans.variable}`}>
         <EnvironmentBanner />
-        <NextIntlClientProvider messages={messages}>
+        <NextIntlClientProvider locale={locale} messages={shellMessages}>
           <ThemeProvider>{children}</ThemeProvider>
         </NextIntlClientProvider>
       </body>

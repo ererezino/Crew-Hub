@@ -1,0 +1,272 @@
+{
+  "shell": [
+    "appShell",
+    "commandPalette",
+    "common",
+    "errorBoundary",
+    "locale",
+    "nav",
+    "notifications",
+    "presence",
+    "shortcuts",
+    "theme"
+  ],
+  "areas": {
+    "[...slug]": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "theme"
+    ],
+    "admin": [
+      "accessControl",
+      "adminCompensation",
+      "adminSurveys",
+      "adminUsers",
+      "common",
+      "compensationBands",
+      "errorBoundary",
+      "expenseRouting",
+      "learningAdmin",
+      "learningPage",
+      "learningReports",
+      "locale",
+      "nav",
+      "newLearningCourse",
+      "newSurvey",
+      "schedulingTemplates",
+      "surveyResults",
+      "surveys",
+      "theme"
+    ],
+    "analytics": [
+      "analytics",
+      "analyticsPage",
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "theme"
+    ],
+    "announcements": [
+      "announcements",
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "notifications",
+      "theme"
+    ],
+    "approvals": [
+      "approvalsPage",
+      "common",
+      "errorBoundary",
+      "expenseApprovals",
+      "locale",
+      "nav",
+      "theme",
+      "timeOff",
+      "timeOffApprovals"
+    ],
+    "compliance": [
+      "common",
+      "compliance",
+      "compliancePage",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "theme"
+    ],
+    "crew-games": [
+      "common",
+      "crewGames",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "theme"
+    ],
+    "dashboard": [
+      "common",
+      "dashboard",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "theme"
+    ],
+    "documents": [
+      "common",
+      "documentViewer",
+      "documents",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "theme"
+    ],
+    "expenses": [
+      "common",
+      "errorBoundary",
+      "expenseApprovals",
+      "expenseReports",
+      "expenses",
+      "locale",
+      "nav",
+      "theme"
+    ],
+    "learning": [
+      "certificates",
+      "common",
+      "errorBoundary",
+      "learning",
+      "learningCourse",
+      "learningPage",
+      "locale",
+      "nav",
+      "surveys",
+      "theme"
+    ],
+    "me": [
+      "common",
+      "compensation",
+      "documentViewer",
+      "documents",
+      "errorBoundary",
+      "locale",
+      "myDocuments",
+      "myOnboarding",
+      "nav",
+      "pay",
+      "paymentDetails",
+      "payslips",
+      "theme"
+    ],
+    "notifications": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "notifications",
+      "notificationsPage",
+      "theme"
+    ],
+    "onboarding": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "onboarding",
+      "onboardingInstance",
+      "onboardingPage",
+      "theme"
+    ],
+    "payroll": [
+      "common",
+      "csvImport",
+      "dashboard",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "payrollCreate",
+      "payrollDashboard",
+      "payrollPage",
+      "payrollRunDetail",
+      "payrollSettings",
+      "payrollWorksheet",
+      "theme"
+    ],
+    "people": [
+      "common",
+      "compensation",
+      "compensationPaymentDetails",
+      "delegations",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "orgChart",
+      "people",
+      "peopleOverview",
+      "peoplePage",
+      "theme"
+    ],
+    "performance": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "performance",
+      "performanceAdmin",
+      "theme"
+    ],
+    "scheduling": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "scheduling",
+      "theme"
+    ],
+    "settings": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "settings",
+      "theme"
+    ],
+    "signatures": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "signatures",
+      "theme"
+    ],
+    "support": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "support",
+      "theme"
+    ],
+    "surveys": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "surveyDetail",
+      "surveys",
+      "theme"
+    ],
+    "team-hub": [
+      "common",
+      "errorBoundary",
+      "hubHome",
+      "locale",
+      "nav",
+      "teamHub",
+      "teamHubPage",
+      "teamHubSection",
+      "theme"
+    ],
+    "the-crew": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "theCrew",
+      "theme"
+    ],
+    "time-off": [
+      "common",
+      "errorBoundary",
+      "locale",
+      "nav",
+      "theme",
+      "timeOff",
+      "timeOffApprovals",
+      "timeOffCalendar",
+      "timeOffPage"
+    ]
+  }
+}
