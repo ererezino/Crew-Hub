@@ -40,7 +40,10 @@ const createLeaveRequestSchema = z.object({
     .string()
     .refine((value) => isIsoDate(value), "End date must be in YYYY-MM-DD format"),
   reason: z.string().trim().min(1, "Reason is required").max(2000, "Reason is too long"),
-  medicalEvidencePath: z.string().trim().max(500).optional()
+  medicalEvidencePath: z.string().trim().max(500).optional(),
+  /* Offline-queue replays send a client-generated UUID so retries after
+   * network failures cannot create duplicate requests. */
+  clientRequestId: z.string().uuid().optional()
 });
 
 const profileRowSchema = z.object({
@@ -235,6 +238,32 @@ export async function POST(request: Request) {
   }
 
   const employeeProfile = parsedProfile.data;
+  const clientRequestId = parsedBody.data.clientRequestId ?? null;
+
+  /* Offline-queue idempotency: if a prior attempt already created this
+   * request (response lost on a flaky connection), return it instead of
+   * creating a duplicate. Runs before any balance side effects. */
+  if (clientRequestId) {
+    const { data: existingRaw } = await supabase
+      .from("leave_requests")
+      .select(
+        "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"
+      )
+      .eq("org_id", employeeProfile.org_id)
+      .eq("client_request_id", clientRequestId)
+      .maybeSingle();
+
+    if (existingRaw) {
+      const parsedExisting = leaveRequestRowSchema.safeParse(existingRaw);
+      if (parsedExisting.success) {
+        return jsonResponse<TimeOffRequestMutationResponseData>(200, {
+          data: { request: toRequestRecord(parsedExisting.data, employeeProfile) },
+          error: null,
+          meta: buildMeta()
+        });
+      }
+    }
+  }
 
   // Block auto-granted leave types from manual requests
   if (AUTO_GRANTED_LEAVE_TYPES.has(parsedBody.data.leaveType)) {
@@ -442,7 +471,8 @@ export async function POST(request: Request) {
       status: "pending",
       reason: parsedBody.data.reason.trim(),
       requires_documentation: requiresDocumentation,
-      medical_evidence_path: parsedBody.data.medicalEvidencePath ?? null
+      medical_evidence_path: parsedBody.data.medicalEvidencePath ?? null,
+      client_request_id: clientRequestId
     })
     .select(
       "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"
@@ -450,6 +480,28 @@ export async function POST(request: Request) {
     .single();
 
   if (requestInsertError || !insertedRequest) {
+    /* Unique violation on (org_id, client_request_id): a concurrent replay
+     * won the race after the pre-insert check. Return the winner's row. */
+    if (requestInsertError?.code === "23505" && clientRequestId) {
+      const { data: existingRaw } = await supabase
+        .from("leave_requests")
+        .select(
+          "id, employee_id, leave_type, start_date, end_date, total_days, status, reason, approver_id, rejection_reason, created_at, updated_at"
+        )
+        .eq("org_id", employeeProfile.org_id)
+        .eq("client_request_id", clientRequestId)
+        .maybeSingle();
+
+      const parsedExisting = leaveRequestRowSchema.safeParse(existingRaw);
+      if (parsedExisting.success) {
+        return jsonResponse<TimeOffRequestMutationResponseData>(200, {
+          data: { request: toRequestRecord(parsedExisting.data, employeeProfile) },
+          error: null,
+          meta: buildMeta()
+        });
+      }
+    }
+
     return jsonResponse<null>(500, {
       data: null,
       error: {

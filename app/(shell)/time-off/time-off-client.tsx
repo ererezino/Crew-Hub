@@ -15,6 +15,8 @@ import { StatusBadge } from "../../../components/shared/status-badge";
 import { TeamAvailabilityPanel } from "../../../components/time-off/team-availability-panel";
 import { useConfirmAction } from "../../../hooks/use-confirm-action";
 import { useAfkLogs, useTimeOffSummary } from "../../../hooks/use-time-off";
+import { OfflineQueueBanner } from "../../../components/shared/offline-queue-banner";
+import { enqueueSubmission, isNetworkFailure } from "../../../lib/offline/submission-queue";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import {
   formatDays,
@@ -785,9 +787,9 @@ export function TimeOffClient({
 
     setIsSubmitting(true);
 
-    try {
-      let medicalEvidencePath: string | undefined;
+    let medicalEvidencePath: string | undefined;
 
+    try {
       if (isSickLeaveOverTwoDays && medicalEvidenceFile) {
         const uploadFormData = new FormData();
         uploadFormData.append("file", medicalEvidenceFile);
@@ -839,6 +841,35 @@ export function TimeOffClient({
       summaryQuery.refresh();
       showToast("success", td("toast.leaveRequestSubmitted"));
     } catch (error) {
+      /* Network failure — save on-device for idempotent auto-replay. Only
+       * queueable when no medical evidence is pending upload (the evidence
+       * file must reach storage first; if its upload failed, the user must
+       * retry online). */
+      const canQueue = !isSickLeaveOverTwoDays || Boolean(medicalEvidencePath);
+
+      if (isNetworkFailure(error) && canQueue) {
+        try {
+          await enqueueSubmission({
+            id: crypto.randomUUID(),
+            kind: "leave_request",
+            url: "/api/v1/time-off/requests",
+            encoding: "json",
+            fields: {
+              leaveType: formValues.leaveType.trim(),
+              startDate: formValues.startDate,
+              endDate: formValues.endDate,
+              reason: formValues.reason.trim(),
+              ...(medicalEvidencePath ? { medicalEvidencePath } : {})
+            }
+          });
+          closeRequestPanel();
+          showToast("info", tCommon("offlineQueue.queuedToast"));
+          return;
+        } catch {
+          /* IndexedDB unavailable — fall through to the normal error */
+        }
+      }
+
       const message = error instanceof Error ? error.message : td("toast.unableToSubmitLeave");
       setSubmitError(message);
       showToast("error", message);
@@ -1023,6 +1054,7 @@ export function TimeOffClient({
 
   return (
     <>
+      <OfflineQueueBanner kind="leave_request" />
       {!embedded ? (
         <PageHeader
           title={t('title')}
