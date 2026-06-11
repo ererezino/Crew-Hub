@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { diffAuditValues, logAudit } from "../../../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import {
   loadNigeriaRuleConfig,
   upsertNigeriaRuleConfig
 } from "../../../../../../../lib/payroll/engines/nigeria";
-import { validateNigeriaRuleConfig } from "../../../../../../../lib/payroll/engines/nigeria-calculation";
+import {
+  validateNigeriaRuleConfig,
+  type NigeriaRuleConfig
+} from "../../../../../../../lib/payroll/engines/nigeria-calculation";
 import type { UserRole } from "../../../../../../../lib/navigation";
 import { hasRole } from "../../../../../../../lib/roles";
 import type { ApiResponse } from "../../../../../../../types/auth";
@@ -184,6 +188,18 @@ export async function PUT(request: Request) {
   }
 
   try {
+    let previousConfig: NigeriaRuleConfig | null = null;
+
+    try {
+      previousConfig = await loadNigeriaRuleConfig({
+        orgId: session.profile.org_id,
+        effectiveDate: parsedBody.data.effectiveFrom
+      });
+    } catch {
+      /* No rules configured yet — audit will diff against an empty config. */
+      previousConfig = null;
+    }
+
     await upsertNigeriaRuleConfig({
       orgId: session.profile.org_id,
       effectiveFrom: parsedBody.data.effectiveFrom,
@@ -194,6 +210,21 @@ export async function PUT(request: Request) {
       orgId: session.profile.org_id,
       effectiveDate: parsedBody.data.effectiveFrom
     });
+
+    const { oldValue, newValue, changedFields } = diffAuditValues(
+      previousConfig ?? {},
+      refreshedConfig
+    );
+
+    if (changedFields.length > 0) {
+      void logAudit({
+        action: "updated",
+        tableName: "deduction_rules",
+        recordId: null,
+        oldValue,
+        newValue: { ...newValue, effectiveFrom: parsedBody.data.effectiveFrom }
+      });
+    }
 
     return jsonResponse<NigeriaSettingsResponseData>(200, {
       data: {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
-import { logAudit } from "../../../../../../../lib/audit";
+import { diffAuditValues, logAudit } from "../../../../../../../lib/audit";
 import { fetchCompensationSnapshot } from "../../../../../../../lib/compensation-store";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import {
@@ -54,7 +54,7 @@ function allowanceAuditValue(row: z.infer<typeof allowanceRowSchema>) {
     employeeId: row.employee_id,
     type: row.type,
     label: row.label,
-    amount: row.amount,
+    amount: parseIntegerValue(row.amount),
     currency: row.currency,
     isTaxable: row.is_taxable,
     effectiveFrom: row.effective_from,
@@ -246,21 +246,27 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
+  const oldAuditRecord = allowanceAuditValue(parsedExisting.data);
+
+  const newAuditRecord = {
+    employeeId: allowance.employeeId,
+    type: allowance.type,
+    label: allowance.label,
+    amount: allowance.amount,
+    currency: allowance.currency,
+    isTaxable: allowance.isTaxable,
+    effectiveFrom: allowance.effectiveFrom,
+    effectiveTo: allowance.effectiveTo
+  };
+
+  const { oldValue, newValue, changedFields } = diffAuditValues(oldAuditRecord, newAuditRecord);
+
   await logAudit({
     action: "updated",
     tableName: "allowances",
     recordId: allowance.id,
-    oldValue: allowanceAuditValue(parsedExisting.data),
-    newValue: {
-      employeeId: allowance.employeeId,
-      type: allowance.type,
-      label: allowance.label,
-      amount: allowance.amount,
-      currency: allowance.currency,
-      isTaxable: allowance.isTaxable,
-      effectiveFrom: allowance.effectiveFrom,
-      effectiveTo: allowance.effectiveTo
-    }
+    oldValue: changedFields.length > 0 ? oldValue : oldAuditRecord,
+    newValue: changedFields.length > 0 ? newValue : newAuditRecord
   });
 
   const response: CompensationMutationResponseData = {

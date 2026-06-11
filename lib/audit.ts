@@ -5,6 +5,50 @@ import { headers } from "next/headers";
 import { createSupabaseServerClient } from "./supabase/server";
 import { createSupabaseServiceRoleClient } from "./supabase/service-role";
 
+/**
+ * Builds field-level audit payloads: compares two camelCase records and
+ * returns only the fields that changed, paired as oldValue/newValue. This is
+ * the standard shape for `logAudit` on mutations — auditors need
+ * "baseSalaryAmount: 5000000 → 5500000", not a snapshot of the new row.
+ *
+ * Values are compared structurally (JSON), so arrays/objects work. Fields
+ * absent from one side diff against null.
+ */
+export function diffAuditValues(
+  oldRecord: Record<string, unknown>,
+  newRecord: Record<string, unknown>
+): {
+  oldValue: Record<string, unknown>;
+  newValue: Record<string, unknown>;
+  changedFields: string[];
+} {
+  const oldValue: Record<string, unknown> = {};
+  const newValue: Record<string, unknown> = {};
+  const changedFields: string[] = [];
+
+  const keys = new Set([...Object.keys(oldRecord), ...Object.keys(newRecord)]);
+
+  for (const key of keys) {
+    const before = oldRecord[key] === undefined ? null : oldRecord[key];
+    const after = newRecord[key] === undefined ? null : newRecord[key];
+
+    if (JSON.stringify(before) !== JSON.stringify(after)) {
+      oldValue[key] = before;
+      newValue[key] = after;
+      changedFields.push(key);
+    }
+  }
+
+  return { oldValue, newValue, changedFields };
+}
+
+/**
+ * Marker for sensitive values whose CHANGE must be auditable but whose
+ * CONTENT must not be persisted in the audit log (document URLs, government
+ * IDs). Use `value ? AUDIT_REDACTED : null` on both sides of a diff.
+ */
+export const AUDIT_REDACTED = "[redacted]";
+
 export const AUDIT_ACTIONS = [
   "created",
   "updated",

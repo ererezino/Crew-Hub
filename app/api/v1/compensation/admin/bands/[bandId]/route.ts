@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
-import { logAudit } from "../../../../../../../lib/audit";
+import { diffAuditValues, logAudit } from "../../../../../../../lib/audit";
 import { fetchCompensationBandsData } from "../../../../../../../lib/compensation-bands-store";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import {
@@ -369,28 +369,46 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
+  const oldAuditRecord = {
+    title: existingBand.title,
+    level: existingBand.level,
+    department: existingBand.department,
+    locationType: existingBand.location_type,
+    locationValue: existingBand.location_value,
+    currency: existingBand.currency,
+    minSalaryAmount: Number.parseInt(String(existingBand.min_salary_amount), 10),
+    midSalaryAmount: Number.parseInt(String(existingBand.mid_salary_amount), 10),
+    maxSalaryAmount: Number.parseInt(String(existingBand.max_salary_amount), 10),
+    equityMin: existingBand.equity_min,
+    equityMax: existingBand.equity_max,
+    effectiveFrom: existingBand.effective_from,
+    effectiveTo: existingBand.effective_to
+  };
+
+  const newAuditRecord = {
+    title: updatedBand.title,
+    level: updatedBand.level,
+    department: updatedBand.department,
+    locationType: updatedBand.locationType,
+    locationValue: updatedBand.locationValue,
+    currency: updatedBand.currency,
+    minSalaryAmount: updatedBand.minSalaryAmount,
+    midSalaryAmount: updatedBand.midSalaryAmount,
+    maxSalaryAmount: updatedBand.maxSalaryAmount,
+    equityMin: updatedBand.equityMin,
+    equityMax: updatedBand.equityMax,
+    effectiveFrom: updatedBand.effectiveFrom,
+    effectiveTo: updatedBand.effectiveTo
+  };
+
+  const { oldValue, newValue, changedFields } = diffAuditValues(oldAuditRecord, newAuditRecord);
+
   await logAudit({
     action: "updated",
     tableName: "compensation_bands",
     recordId: updatedBand.id,
-    oldValue: {
-      title: existingBand.title,
-      level: existingBand.level,
-      locationType: existingBand.location_type,
-      locationValue: existingBand.location_value,
-      minSalaryAmount: Number.parseInt(String(existingBand.min_salary_amount), 10),
-      midSalaryAmount: Number.parseInt(String(existingBand.mid_salary_amount), 10),
-      maxSalaryAmount: Number.parseInt(String(existingBand.max_salary_amount), 10)
-    },
-    newValue: {
-      title: updatedBand.title,
-      level: updatedBand.level,
-      locationType: updatedBand.locationType,
-      locationValue: updatedBand.locationValue,
-      minSalaryAmount: updatedBand.minSalaryAmount,
-      midSalaryAmount: updatedBand.midSalaryAmount,
-      maxSalaryAmount: updatedBand.maxSalaryAmount
-    }
+    oldValue: changedFields.length > 0 ? oldValue : oldAuditRecord,
+    newValue: changedFields.length > 0 ? newValue : newAuditRecord
   });
 
   return jsonResponse<CompensationBandCreateResponseData>(200, {

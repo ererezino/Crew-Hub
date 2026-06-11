@@ -5,7 +5,7 @@ import {
   applyUserNavigationAccess,
   resolveEffectiveUserNavSelection
 } from "../../../../../lib/auth/navigation-access";
-import { logAudit } from "../../../../../lib/audit";
+import { AUDIT_REDACTED, diffAuditValues, logAudit } from "../../../../../lib/audit";
 import { logger } from "../../../../../lib/logger";
 import {
   getDepartmentsValidationMessage,
@@ -83,6 +83,47 @@ function canViewReports(roles: readonly AppRole[]) {
 
 function canManageSensitiveProfile(roles: readonly AppRole[]) {
   return hasRole(roles, "HR_ADMIN") || hasRole(roles, "SUPER_ADMIN");
+}
+
+/* ── Field-level audit support ────────────────────────────────────────
+ * Maps a profile row to the camelCase audit record used by diffAuditValues,
+ * covering every field the PUT/PATCH handlers can change. Document URLs are
+ * redacted: the audit must show THAT they changed, never their content. */
+function profileAuditRecord(
+  row: z.infer<typeof profileRowSchema>,
+  roles: readonly string[],
+  nameById: Map<string, string>
+): Record<string, unknown> {
+  return {
+    fullName: row.full_name,
+    roles: [...roles],
+    department: row.department,
+    title: row.title,
+    startDate: row.start_date,
+    dateOfBirth: row.date_of_birth,
+    birthdayMonth: row.birthday_month,
+    birthdayDay: row.birthday_day,
+    managerId: row.manager_id,
+    managerName: row.manager_id ? nameById.get(row.manager_id) ?? null : null,
+    teamLeadId: row.team_lead_id,
+    teamLeadName: row.team_lead_id ? nameById.get(row.team_lead_id) ?? null : null,
+    status: row.status,
+    phone: row.phone,
+    timezone: row.timezone,
+    pronouns: row.pronouns,
+    bio: row.bio,
+    favoriteMusic: row.favorite_music,
+    favoriteBooks: row.favorite_books,
+    favoriteSports: row.favorite_sports,
+    homeAddress: row.home_address,
+    governmentIdUrl: row.government_id_url ? AUDIT_REDACTED : null,
+    avatarUrl: row.avatar_url ? AUDIT_REDACTED : null,
+    emergencyContactName: row.emergency_contact_name,
+    emergencyContactPhone: row.emergency_contact_phone,
+    emergencyContactRelationship: row.emergency_contact_relationship,
+    directoryVisible: row.directory_visible,
+    privacySettings: row.privacy_settings ?? null
+  };
 }
 
 const updatePersonSchema = z
@@ -1213,36 +1254,19 @@ export async function PUT(
     }
   }
 
+  /* Field-level diff across every updatable field — auditors see exactly
+   * which values changed and from what, not a snapshot. */
+  const adminAuditDiff = diffAuditValues(
+    profileAuditRecord(parsedExistingProfile.data, existingRoles, nameById),
+    profileAuditRecord(parsedUpdatedRow.data, person.roles, nameById)
+  );
+
   await logAudit({
     action: "updated",
     tableName: "profiles",
     recordId: person.id,
-    oldValue: {
-      roles: existingRoles,
-      department: parsedExistingProfile.data.department,
-      title: parsedExistingProfile.data.title,
-      startDate: parsedExistingProfile.data.start_date,
-      managerId: parsedExistingProfile.data.manager_id,
-      managerName: parsedExistingProfile.data.manager_id
-        ? nameById.get(parsedExistingProfile.data.manager_id) ?? null
-        : null,
-      teamLeadId: parsedExistingProfile.data.team_lead_id,
-      teamLeadName: parsedExistingProfile.data.team_lead_id
-        ? nameById.get(parsedExistingProfile.data.team_lead_id) ?? null
-        : null,
-      status: parsedExistingProfile.data.status
-    },
-    newValue: {
-      roles: person.roles,
-      department: person.department,
-      title: person.title,
-      startDate: person.startDate,
-      managerId: person.managerId,
-      managerName: person.managerName,
-      teamLeadId: person.teamLeadId,
-      teamLeadName: person.teamLeadName,
-      status: person.status
-    }
+    oldValue: adminAuditDiff.oldValue,
+    newValue: adminAuditDiff.newValue
   });
 
   if (accessConfigChangedKeys.length > 0) {
@@ -1365,6 +1389,16 @@ export async function PATCH(
 
   const payload = parsedBody.data;
   const serviceRoleClient = createSupabaseServiceRoleClient();
+
+  /* Pre-state for the field-level audit diff written after the update. */
+  const { data: existingSelfRow } = await serviceRoleClient
+    .from("profiles")
+    .select(PEOPLE_DETAIL_SELECT)
+    .eq("id", personId)
+    .eq("org_id", session.profile.org_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const parsedExistingSelf = profileRowSchema.safeParse(existingSelfRow);
 
   const updateValues: Record<string, unknown> = {};
 
@@ -1502,6 +1536,27 @@ export async function PATCH(
     selfNameById,
     typeof selfCrewTagRow?.crew_tag === "string" ? selfCrewTagRow.crew_tag : null
   );
+
+  /* Self-service profile updates were previously unaudited — log a
+   * field-level diff (PII like emergency contacts and phone is exactly what
+   * HR audits need; document URLs are redacted by profileAuditRecord). */
+  if (parsedExistingSelf.success) {
+    const selfRoles = person.roles;
+    const selfAuditDiff = diffAuditValues(
+      profileAuditRecord(parsedExistingSelf.data, selfRoles, selfNameById),
+      profileAuditRecord(parsedUpdatedRow.data, selfRoles, selfNameById)
+    );
+
+    if (selfAuditDiff.changedFields.length > 0) {
+      await logAudit({
+        action: "updated",
+        tableName: "profiles",
+        recordId: person.id,
+        oldValue: selfAuditDiff.oldValue,
+        newValue: selfAuditDiff.newValue
+      });
+    }
+  }
 
   return jsonResponse<PeopleUpdateResponseData>(200, {
     data: {

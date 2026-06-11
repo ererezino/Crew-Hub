@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
-import { logAudit } from "../../../../../../../lib/audit";
+import { diffAuditValues, logAudit } from "../../../../../../../lib/audit";
 import { fetchCompensationSnapshot } from "../../../../../../../lib/compensation-store";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import {
@@ -63,8 +63,9 @@ function equityAuditValue(row: z.infer<typeof equityRowSchema>) {
   return {
     employeeId: row.employee_id,
     grantType: row.grant_type,
-    numberOfShares: row.number_of_shares,
-    exercisePriceCents: row.exercise_price_cents,
+    numberOfShares: parseDecimalValue(row.number_of_shares),
+    exercisePriceCents:
+      row.exercise_price_cents === null ? null : parseIntegerValue(row.exercise_price_cents),
     grantDate: row.grant_date,
     vestingStartDate: row.vesting_start_date,
     cliffMonths: row.cliff_months,
@@ -291,26 +292,32 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const action = payload.approve === true ? "approved" : "updated";
 
+  const oldAuditRecord = equityAuditValue(parsedExisting.data);
+
+  const newAuditRecord = {
+    employeeId: equityGrant.employeeId,
+    grantType: equityGrant.grantType,
+    numberOfShares: equityGrant.numberOfShares,
+    exercisePriceCents: equityGrant.exercisePriceCents,
+    grantDate: equityGrant.grantDate,
+    vestingStartDate: equityGrant.vestingStartDate,
+    cliffMonths: equityGrant.cliffMonths,
+    vestingDurationMonths: equityGrant.vestingDurationMonths,
+    schedule: equityGrant.schedule,
+    status: equityGrant.status,
+    approvedBy: equityGrant.approvedBy,
+    boardApprovalDate: equityGrant.boardApprovalDate,
+    notes: equityGrant.notes
+  };
+
+  const { oldValue, newValue, changedFields } = diffAuditValues(oldAuditRecord, newAuditRecord);
+
   await logAudit({
     action,
     tableName: "equity_grants",
     recordId: equityGrant.id,
-    oldValue: equityAuditValue(parsedExisting.data),
-    newValue: {
-      employeeId: equityGrant.employeeId,
-      grantType: equityGrant.grantType,
-      numberOfShares: equityGrant.numberOfShares,
-      exercisePriceCents: equityGrant.exercisePriceCents,
-      grantDate: equityGrant.grantDate,
-      vestingStartDate: equityGrant.vestingStartDate,
-      cliffMonths: equityGrant.cliffMonths,
-      vestingDurationMonths: equityGrant.vestingDurationMonths,
-      schedule: equityGrant.schedule,
-      status: equityGrant.status,
-      approvedBy: equityGrant.approvedBy,
-      boardApprovalDate: equityGrant.boardApprovalDate,
-      notes: equityGrant.notes
-    }
+    oldValue: changedFields.length > 0 ? oldValue : oldAuditRecord,
+    newValue: changedFields.length > 0 ? newValue : newAuditRecord
   });
 
   const response: CompensationMutationResponseData = {
