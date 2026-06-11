@@ -163,3 +163,56 @@ export async function logAudit({
     });
   }
 }
+
+/**
+ * Write many audit entries in one call. Resolves the actor context once and
+ * performs a single multi-row insert — use for bulk operations where calling
+ * logAudit per record would repeat the auth + profile lookups N times.
+ */
+export async function logAuditBatch(records: LogAuditParams[]): Promise<void> {
+  if (records.length === 0) {
+    return;
+  }
+
+  try {
+    const { actorUserId, orgId, ipAddress } = await resolveAuditContext();
+
+    if (!actorUserId || !orgId) {
+      console.error("Audit context is missing actor or org for batch.", {
+        count: records.length,
+        actorUserId,
+        orgId
+      });
+      return;
+    }
+
+    const serviceRoleClient = createSupabaseServiceRoleClient();
+    const createdAt = new Date().toISOString();
+
+    const { error } = await serviceRoleClient.from("audit_log").insert(
+      records.map((record) => ({
+        org_id: orgId,
+        actor_user_id: actorUserId,
+        action: record.action,
+        table_name: record.tableName,
+        record_id: record.recordId ?? null,
+        old_value: record.oldValue ?? null,
+        new_value: record.newValue ?? null,
+        ip_address: ipAddress,
+        created_at: createdAt
+      }))
+    );
+
+    if (error) {
+      console.error("Failed to write audit log batch.", {
+        count: records.length,
+        message: error.message
+      });
+    }
+  } catch (error) {
+    console.error("Unexpected audit batch logging error.", {
+      count: records.length,
+      error
+    });
+  }
+}

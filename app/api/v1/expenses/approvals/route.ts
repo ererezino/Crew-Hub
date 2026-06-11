@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { logAudit } from "../../../../../lib/audit";
+import { logAuditBatch } from "../../../../../lib/audit";
 import { formatCurrency } from "../../../../../lib/format-currency";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import {
@@ -517,6 +517,15 @@ export async function POST(request: Request) {
     targetQuery = targetQuery
       .eq("status", "manager_approved")
       .eq("requires_additional_approval", true);
+  } else {
+    /* Finance stage: only expenses actually ready for payment can be bulk
+     * reimbursed — mirrors the approvals listing eligibility. Without this,
+     * arbitrary expense IDs (pending, rejected) could be marked reimbursed. */
+    targetQuery = targetQuery.or(
+      "and(status.eq.manager_approved,requires_additional_approval.eq.false)," +
+      "status.eq.additional_approved," +
+      "status.eq.approved"
+    );
   }
 
   const { data: rawTargetRows, error: targetRowsError } = await targetQuery;
@@ -567,11 +576,29 @@ export async function POST(request: Request) {
     );
   }
 
+  let additionalStageScope: ApproverScope | null = null;
+
   if (stage === "additional" && !isSuperAdmin) {
-    // Only allow expenses where this user is the additional approver
-    allowedRows = allowedRows.filter(
-      (row) => row.additional_approver_id === profile.id && row.employee_id !== profile.id
+    // Allow expenses where this user is the additional approver, or is a
+    // delegate covering for the assigned additional approver — the same
+    // rules canApproveAtStage applies on the individual route.
+    additionalStageScope = await getManagerStageScope({
+      supabase,
+      orgId: profile.org_id,
+      userId: profile.id
+    });
+    const coveredPrincipalIds = new Set(
+      additionalStageScope.coveringFor.map((entry) => entry.principalId)
     );
+
+    allowedRows = allowedRows.filter((row) => {
+      const approverId = row.additional_approver_id ?? null;
+      return (
+        row.employee_id !== profile.id &&
+        approverId !== null &&
+        (approverId === profile.id || coveredPrincipalIds.has(approverId))
+      );
+    });
   }
 
   const allowedIds = allowedRows.map((row) => row.id);
@@ -598,25 +625,71 @@ export async function POST(request: Request) {
   let updatedRowsError: { code?: string; message: string } | null = null;
 
   if (stage === "additional") {
-    // Bulk approve at additional stage — simpler, no delegation grouping needed
-    const { data: additionalRows, error: additionalError } = await svcClient
-      .from("expenses")
-      .update({
-        status: "additional_approved" as const,
-        additional_approved_by: profile.id,
-        additional_approved_at: nowIso,
-        additional_acting_for: null,
-        additional_delegate_type: null,
-        additional_rejected_by: null,
-        additional_rejected_at: null,
-        additional_rejection_reason: null
-      })
-      .eq("org_id", profile.org_id)
-      .in("id", allowedIds)
-      .select(expenseSelectColumns);
+    // Group by delegation context (direct vs covering for the assigned
+    // additional approver) so each update records the correct
+    // additional_acting_for / additional_delegate_type for the audit trail.
+    type AdditionalGroup = {
+      ids: string[];
+      actingFor: string | null;
+      delegateType: string | null;
+    };
 
-    updatedRowsRaw = additionalRows;
-    updatedRowsError = additionalError;
+    const additionalGroups = new Map<string, AdditionalGroup>();
+
+    for (const row of allowedRows) {
+      const approverId = row.additional_approver_id ?? null;
+      const coveringEntry =
+        approverId && approverId !== profile.id && additionalStageScope
+          ? additionalStageScope.coveringFor.find((entry) => entry.principalId === approverId) ?? null
+          : null;
+      const key = coveringEntry ? coveringEntry.principalId : "direct";
+
+      if (!additionalGroups.has(key)) {
+        additionalGroups.set(key, {
+          ids: [],
+          actingFor: coveringEntry ? coveringEntry.principalId : null,
+          delegateType: coveringEntry ? coveringEntry.delegateType : null
+        });
+      }
+
+      additionalGroups.get(key)!.ids.push(row.id);
+    }
+
+    const allUpdatedAdditionalRows: unknown[] = [];
+
+    for (const group of additionalGroups.values()) {
+      const { data: groupRows, error: groupError } = await svcClient
+        .from("expenses")
+        .update({
+          status: "additional_approved" as const,
+          additional_approved_by: profile.id,
+          additional_approved_at: nowIso,
+          additional_acting_for: group.actingFor,
+          additional_delegate_type: group.delegateType,
+          additional_rejected_by: null,
+          additional_rejected_at: null,
+          additional_rejection_reason: null
+        })
+        .eq("org_id", profile.org_id)
+        .in("id", group.ids)
+        /* Apply only to rows still awaiting this stage — concurrent
+         * transitions must not be overwritten. */
+        .eq("status", "manager_approved")
+        .select(expenseSelectColumns);
+
+      if (groupError) {
+        updatedRowsError = groupError;
+        break;
+      }
+
+      if (groupRows) {
+        allUpdatedAdditionalRows.push(...groupRows);
+      }
+    }
+
+    if (!updatedRowsError) {
+      updatedRowsRaw = allUpdatedAdditionalRows;
+    }
   } else if (stage === "manager") {
     type DelegationGroup = {
       ids: string[];
@@ -666,6 +739,9 @@ export async function POST(request: Request) {
         })
         .eq("org_id", profile.org_id)
         .in("id", group.ids)
+        /* Apply only to rows still awaiting this stage — concurrent
+         * transitions must not be overwritten. */
+        .eq("status", "pending")
         .select(expenseSelectColumns);
 
       if (groupError) {
@@ -698,6 +774,13 @@ export async function POST(request: Request) {
       })
       .eq("org_id", profile.org_id)
       .in("id", allowedIds)
+      /* Apply only to rows still in a payable state — concurrent
+       * transitions must not be overwritten. */
+      .or(
+        "and(status.eq.manager_approved,requires_additional_approval.eq.false)," +
+        "status.eq.additional_approved," +
+        "status.eq.approved"
+      )
       .select(expenseSelectColumns);
 
     updatedRowsRaw = financeResult.data;
@@ -775,18 +858,23 @@ export async function POST(request: Request) {
   );
   const employeeIds = [...new Set(expenses.map((expense) => expense.employeeId))];
 
-  await logAudit({
-    action: stage === "manager" ? "approved" : "updated",
-    tableName: "expenses",
-    recordId: null,
-    oldValue: null,
-    newValue: {
-      bulk: true,
-      stage,
-      approvedCount: expenses.length,
-      expenseIds: allowedIds
-    }
-  });
+  /* One audit record per expense so "who approved expense X" is queryable by
+   * recordId, plus the bulk context on every entry. All stages are approvals,
+   * so they log as "approved" with the stage disambiguated in newValue. */
+  await logAuditBatch(
+    parsedUpdatedRows.data.map((row) => ({
+      action: "approved" as const,
+      tableName: "expenses",
+      recordId: row.id,
+      oldValue: null,
+      newValue: {
+        bulk: true,
+        stage,
+        status: row.status,
+        batchSize: expenses.length
+      }
+    }))
+  );
 
   if (stage === "additional") {
     await createBulkNotifications({

@@ -657,7 +657,11 @@
       "removePrompt": "Supprimer ce quart ?",
       "removeConfirm": "Supprimer",
       "removing": "Suppression…",
-      "keep": "Conserver"
+      "keep": "Conserver",
+      "toastSuccess": "Quart mis à jour avec succès.",
+      "toastError": "Impossible de mettre à jour le quart.",
+      "removeToastSuccess": "Quart supprimé.",
+      "removeToastError": "Impossible de supprimer le quart."
     },
     "shiftCreateModal": {
       "title": "Ajouter un quart",

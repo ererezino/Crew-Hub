@@ -3763,6 +3763,12 @@ button.att-img-link {
   animation: modal-fade-in 0.18s ease-out;
 }
 
+/* A 45% black scrim disappears against the dark canvas — strengthen it so
+ * open modals still read as a separate layer in dark mode. */
+html.dark .modal-overlay {
+  background: rgba(0, 0, 0, 0.65);
+}
+
 @keyframes modal-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -11197,6 +11203,11 @@ button.att-img-link {
   z-index: 200;
   min-width: var(--radix-select-trigger-width);
   max-height: var(--radix-select-content-available-height, 320px);
+}
+
+/* Dark surfaces need a stronger shadow for the dropdown to read as a layer */
+html.dark .select-content {
+  box-shadow: var(--shadow-md);
 }
 
 .select-content[data-state="open"] {

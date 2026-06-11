@@ -55,18 +55,32 @@ export async function createLeaveBalancesForActivation({
         !p.is_unlimited && p.leave_type !== "unpaid_personal_day"
     );
 
-    for (const policy of balanceTypes) {
-      const { data: existingBalance } = await supabase
-        .from("leave_balances")
-        .select("id")
-        .eq("org_id", orgId)
-        .eq("employee_id", employeeId)
-        .eq("year", currentYear)
-        .eq("leave_type", policy.leave_type)
-        .is("deleted_at", null)
-        .maybeSingle();
+    if (balanceTypes.length === 0) {
+      return;
+    }
 
-      if (!existingBalance) {
+    /* One round-trip for the existence check and one for the inserts —
+     * a per-policy loop costs 2N sequential queries on high-latency links. */
+    const { data: existingBalances, error: existingBalancesError } = await supabase
+      .from("leave_balances")
+      .select("leave_type")
+      .eq("org_id", orgId)
+      .eq("employee_id", employeeId)
+      .eq("year", currentYear)
+      .in("leave_type", balanceTypes.map((policy) => policy.leave_type))
+      .is("deleted_at", null);
+
+    if (existingBalancesError) {
+      throw new Error(existingBalancesError.message);
+    }
+
+    const existingTypes = new Set(
+      (existingBalances ?? []).map((row: { leave_type: string }) => row.leave_type)
+    );
+
+    const rowsToInsert = balanceTypes
+      .filter((policy) => !existingTypes.has(policy.leave_type))
+      .map((policy) => {
         let totalDays = policy.leave_type === "annual_leave" ? 20 : 5;
 
         if (policy.default_days_per_year) {
@@ -80,27 +94,30 @@ export async function createLeaveBalancesForActivation({
           }
         }
 
-        const { error: balanceError } = await supabase
-          .from("leave_balances")
-          .insert({
-            org_id: orgId,
-            employee_id: employeeId,
-            leave_type: policy.leave_type,
-            year: currentYear,
-            total_days: totalDays,
-            used_days: 0,
-            pending_days: 0,
-            carried_days: 0
-          });
+        return {
+          org_id: orgId,
+          employee_id: employeeId,
+          leave_type: policy.leave_type,
+          year: currentYear,
+          total_days: totalDays,
+          used_days: 0,
+          pending_days: 0,
+          carried_days: 0
+        };
+      });
 
-        if (balanceError) {
-          logger.error("Unable to auto-create leave balance on activation.", {
-            employeeId,
-            leaveType: policy.leave_type,
-            year: currentYear,
-            message: balanceError.message
-          });
-        }
+    if (rowsToInsert.length > 0) {
+      const { error: balanceError } = await supabase
+        .from("leave_balances")
+        .insert(rowsToInsert);
+
+      if (balanceError) {
+        logger.error("Unable to auto-create leave balances on activation.", {
+          employeeId,
+          leaveTypes: rowsToInsert.map((row) => row.leave_type),
+          year: currentYear,
+          message: balanceError.message
+        });
       }
     }
   } catch (error) {

@@ -660,7 +660,11 @@
       "removePrompt": "Remove this shift?",
       "removeConfirm": "Remove",
       "removing": "Removing…",
-      "keep": "Keep"
+      "keep": "Keep",
+      "toastSuccess": "Shift updated successfully.",
+      "toastError": "Unable to update shift.",
+      "removeToastSuccess": "Shift removed.",
+      "removeToastError": "Unable to remove shift."
     },
     "shiftCreateModal": {
       "title": "Add Shift",

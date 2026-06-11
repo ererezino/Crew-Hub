@@ -1,4 +1,4 @@
-import { getCurrencySymbol } from "../../lib/format-currency";
+import { getCurrencyDecimals, getCurrencySymbol } from "../../lib/format-currency";
 
 type MoneyInputProps = {
   id: string;
@@ -11,13 +11,14 @@ type MoneyInputProps = {
   hasError?: boolean;
 };
 
-function sanitizeMoneyInput(value: string): string {
+function sanitizeMoneyInput(value: string, currency: string): string {
+  const decimals = getCurrencyDecimals(currency);
   const normalized = value.replace(",", ".");
   const sanitized = normalized.replace(/[^\d.]/g, "");
   const [integerPart = "", decimalPart = ""] = sanitized.split(".");
 
-  if (sanitized.includes(".")) {
-    return `${integerPart}.${decimalPart.slice(0, 2)}`;
+  if (sanitized.includes(".") && decimals > 0) {
+    return `${integerPart}.${decimalPart.slice(0, decimals)}`;
   }
 
   return integerPart;
@@ -29,7 +30,7 @@ export function MoneyInput({
   onChange,
   onBlur,
   currency = "USD",
-  placeholder = "0.00",
+  placeholder,
   disabled = false,
   hasError = false
 }: MoneyInputProps) {
@@ -42,9 +43,9 @@ export function MoneyInput({
         type="text"
         inputMode="decimal"
         autoComplete="off"
-        placeholder={placeholder}
+        placeholder={placeholder ?? (getCurrencyDecimals(currency) > 0 ? "0.00" : "0")}
         value={value}
-        onChange={(event) => onChange(sanitizeMoneyInput(event.currentTarget.value))}
+        onChange={(event) => onChange(sanitizeMoneyInput(event.currentTarget.value, currency))}
         onBlur={onBlur}
         disabled={disabled}
       />

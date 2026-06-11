@@ -571,10 +571,25 @@ export async function POST(
       })
       .eq("org_id", profile.org_id)
       .eq("id", runId)
+      /* The action was authorized against the status read above — apply the
+       * transition only if the run still holds that status, so concurrent
+       * actions cannot double-apply or skip approval states. */
+      .eq("status", parsedRun.data.status)
       .select(PAYROLL_RUN_SELECT_COLUMNS)
       .single();
 
     if (updateError || !updatedRun) {
+      if (updateError?.code === "PGRST116") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "INVALID_STATE",
+            message: "This payroll run was updated by someone else. Refresh and try again."
+          },
+          meta: buildMeta()
+        });
+      }
+
       return jsonResponse<null>(500, {
         data: null,
         error: {

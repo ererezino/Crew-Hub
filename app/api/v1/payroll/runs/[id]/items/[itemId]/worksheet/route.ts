@@ -54,7 +54,15 @@ const itemRowSchema = z.object({
   fees: z.union([z.number(), z.string()]).optional().default(0),
   bonus: z.union([z.number(), z.string()]).optional().default(0),
   comment: z.string().nullable().optional().default(null),
-  exception_reason: z.string().nullable().optional().default(null)
+  exception_reason: z.string().nullable().optional().default(null),
+  deductions: z
+    .array(z.object({ amount: z.union([z.number(), z.string()]).optional().default(0) }))
+    .nullish()
+    .transform((rows) => rows ?? []),
+  adjustments: z
+    .array(z.object({ amount: z.union([z.number(), z.string()]).optional().default(0) }))
+    .nullish()
+    .transform((rows) => rows ?? [])
 });
 
 const runTotalsItemRowSchema = z.object({
@@ -252,7 +260,7 @@ export async function PATCH(
   const { data: rawItem, error: itemError } = await supabase
     .from("payroll_items")
     .select(
-      "id, payroll_run_id, employee_id, org_id, base_salary_amount, overtime_amount, overtime_hours, cycle_1_base_amount, cycle_2_base_amount, cycle_1_overtime_hours, cycle_2_overtime_hours, cycle_1_overtime_amount, cycle_2_overtime_amount, cycle_1_included, cycle_2_included, fees, bonus, comment, exception_reason"
+      "id, payroll_run_id, employee_id, org_id, base_salary_amount, overtime_amount, overtime_hours, cycle_1_base_amount, cycle_2_base_amount, cycle_1_overtime_hours, cycle_2_overtime_hours, cycle_1_overtime_amount, cycle_2_overtime_amount, cycle_1_included, cycle_2_included, fees, bonus, comment, exception_reason, deductions, adjustments"
     )
     .eq("id", itemId)
     .eq("payroll_run_id", runId)
@@ -407,9 +415,16 @@ export async function PATCH(
     fees: feesAmount
   });
 
-  /* Update gross and net to reflect worksheet totals */
+  /* Update gross and net to reflect worksheet totals. The worksheet monthly
+   * total is a gross earnings figure; net must retain the item's stored
+   * deductions (engine withholding) and adjustments instead of being
+   * overwritten by gross — cycle disbursements pay out from net_amount. */
+  const totalDeductions = old.deductions.reduce((sum, row) => sum + parseAmount(row.amount), 0);
+  const adjustmentsTotal = old.adjustments.reduce((sum, row) => sum + parseAmount(row.amount), 0);
+  const netTotal = monthlyTotal - totalDeductions + adjustmentsTotal;
+
   updatePayload.gross_amount = monthlyTotal;
-  updatePayload.net_amount = monthlyTotal;
+  updatePayload.net_amount = netTotal;
 
   /* Apply update using service role client to bypass RLS */
   const serviceClient = createSupabaseServiceRoleClient();
@@ -530,9 +545,9 @@ export async function PATCH(
         bonus: refetchNum("bonus", bonusAmount),
         comment: (r?.comment as string | null) ?? null,
         exceptionReason: (r?.exception_reason as string | null) ?? null,
-        monthlyTotal: refetchNum("net_amount", monthlyTotal),
-        grossAmount: refetchNum("gross_amount", c1Base + c2Base + totalOtAmount + bonusAmount),
-        netAmount: refetchNum("net_amount", monthlyTotal),
+        monthlyTotal: refetchNum("net_amount", netTotal),
+        grossAmount: refetchNum("gross_amount", monthlyTotal),
+        netAmount: refetchNum("net_amount", netTotal),
         overtimeAmount: refetchNum("overtime_amount", totalOtAmount),
         overtimeHours: refetchNum("overtime_hours", totalOtHours)
       } as unknown as PayrollRunItem
