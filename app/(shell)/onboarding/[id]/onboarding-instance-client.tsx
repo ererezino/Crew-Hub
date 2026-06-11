@@ -5,6 +5,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 
+import { DependencyGraph, type DependencyGraphNode } from "../../../../components/onboarding/dependency-graph";
 import { EmptyState } from "../../../../components/shared/empty-state";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
@@ -64,9 +65,46 @@ function OnboardingDetailsSkeleton() {
 
 /* ── Track Section (admin can complete ops tasks) ── */
 
+function unmetPrerequisiteTitles(
+  task: OnboardingTask,
+  allTasksById: Map<string, OnboardingTask>
+): string[] {
+  const prerequisites = task.dependsOnTaskIds
+    .map((taskId) => allTasksById.get(taskId))
+    .filter((prerequisite): prerequisite is OnboardingTask => Boolean(prerequisite));
+  const unmet = prerequisites.filter((prerequisite) => prerequisite.status !== "completed");
+
+  return (unmet.length > 0 ? unmet : prerequisites).map((prerequisite) => prerequisite.title);
+}
+
+function TaskLockIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect
+        x="5"
+        y="11"
+        width="14"
+        height="9"
+        rx="2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M8 11V8a4 4 0 0 1 8 0v3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function TrackSection({
   track,
   tasks,
+  allTasksById,
   instanceId,
   completingTaskId,
   onComplete,
@@ -75,6 +113,7 @@ function TrackSection({
 }: {
   track: OnboardingTrack;
   tasks: OnboardingTask[];
+  allTasksById: Map<string, OnboardingTask>;
   instanceId: string;
   completingTaskId: string | null;
   onComplete: (instanceId: string, taskId: string) => void;
@@ -124,6 +163,21 @@ function TrackSection({
                   <StatusBadge tone={toneForTaskStatus(task.status)}>
                     {toSentenceCase(task.status)}
                   </StatusBadge>
+                  {task.status === "blocked" && task.dependsOnTaskIds.length > 0 ? (
+                    <p
+                      className="onboarding-task-unlocks"
+                      title={t("unlocksAfter", {
+                        titles: unmetPrerequisiteTitles(task, allTasksById).join(", ")
+                      })}
+                    >
+                      <TaskLockIcon />
+                      <span>
+                        {t("unlocksAfter", {
+                          titles: unmetPrerequisiteTitles(task, allTasksById).join(", ")
+                        })}
+                      </span>
+                    </p>
+                  ) : null}
                   <p className="settings-card-description">
                     {t("assigned", { name: task.assignedToName })}
                   </p>
@@ -160,7 +214,7 @@ function TrackSection({
                     <button
                       type="button"
                       className="button button-accent button-sm"
-                      disabled={completingTaskId === task.id}
+                      disabled={completingTaskId === task.id || task.status === "blocked"}
                       onClick={() => onComplete(instanceId, task.id)}
                     >
                       {completingTaskId === task.id ? t("completing") : t("markComplete")}
@@ -224,6 +278,27 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
     [detail?.tasks]
   );
 
+  const allTasksById = useMemo(
+    () => new Map((detail?.tasks ?? []).map((task) => [task.id, task])),
+    [detail?.tasks]
+  );
+
+  const dependencyGraphNodes = useMemo<DependencyGraphNode[]>(
+    () =>
+      (detail?.tasks ?? []).map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        dependsOn: task.dependsOnTaskIds
+      })),
+    [detail?.tasks]
+  );
+
+  const hasDependencies = useMemo(
+    () => (detail?.tasks ?? []).some((task) => task.dependsOnTaskIds.length > 0),
+    [detail?.tasks]
+  );
+
   if (isLoading) {
     return <OnboardingDetailsSkeleton />;
   }
@@ -276,6 +351,19 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
         </div>
       </section>
 
+      {hasDependencies ? (
+        <section className="onboarding-deps-section">
+          <h2 className="section-title">{t("dependenciesHeading")}</h2>
+          <DependencyGraph
+            nodes={dependencyGraphNodes}
+            labels={{
+              aria: t("dependencyGraphAria"),
+              independentHeading: t("independentTasks")
+            }}
+          />
+        </section>
+      ) : null}
+
       {detail.tasks.length === 0 ? (
         <EmptyState
           title={t("noTasks")}
@@ -289,6 +377,7 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
             <TrackSection
               track="employee"
               tasks={employeeTasks}
+              allTasksById={allTasksById}
               instanceId={instanceId}
               completingTaskId={completingTaskId}
               onComplete={handleCompleteTask}
@@ -300,6 +389,7 @@ export function OnboardingInstanceClient({ instanceId }: OnboardingInstanceClien
             <TrackSection
               track="operations"
               tasks={opsTasks}
+              allTasksById={allTasksById}
               instanceId={instanceId}
               completingTaskId={completingTaskId}
               onComplete={handleCompleteTask}

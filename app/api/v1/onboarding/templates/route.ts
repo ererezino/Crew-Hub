@@ -8,7 +8,11 @@ import { logAudit } from "../../../../../lib/audit";
 import type { UserRole } from "../../../../../lib/navigation";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
-import { actionUrlSchema } from "../../../../../lib/onboarding/validation";
+import {
+  actionUrlSchema,
+  dependsOnTaskIndexesSchema,
+  validateTaskDependencies
+} from "../../../../../lib/onboarding/validation";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
   ONBOARDING_TYPES,
@@ -38,7 +42,8 @@ const templateTaskInputSchema = z.object({
     .trim()
     .max(1000, "Completion guidance is too long.")
     .nullable()
-    .optional()
+    .optional(),
+  dependsOnTaskIndexes: dependsOnTaskIndexesSchema.optional()
 });
 
 const createTemplateSchema = z.object({
@@ -80,7 +85,9 @@ const templateTaskSchema = z.object({
   actionLabel: z.string().nullable().optional(),
   action_label: z.string().nullable().optional(),
   completionGuidance: z.string().nullable().optional(),
-  completion_guidance: z.string().nullable().optional()
+  completion_guidance: z.string().nullable().optional(),
+  dependsOnTaskIndexes: z.array(z.number().int().min(0)).optional(),
+  depends_on_task_indexes: z.array(z.number().int().min(0)).optional()
 });
 
 function buildMeta() {
@@ -150,7 +157,9 @@ function normalizeTemplateTasks(value: unknown): OnboardingTemplateTask[] {
       actionUrl: parsedTask.data.actionUrl ?? parsedTask.data.action_url ?? null,
       actionLabel: parsedTask.data.actionLabel ?? parsedTask.data.action_label ?? null,
       completionGuidance:
-        parsedTask.data.completionGuidance ?? parsedTask.data.completion_guidance ?? null
+        parsedTask.data.completionGuidance ?? parsedTask.data.completion_guidance ?? null,
+      dependsOnTaskIndexes:
+        parsedTask.data.dependsOnTaskIndexes ?? parsedTask.data.depends_on_task_indexes ?? undefined
     });
   }
 
@@ -306,6 +315,20 @@ export async function POST(request: Request) {
   }
 
   const payload = parsedBody.data;
+
+  const dependencyValidation = validateTaskDependencies(payload.tasks);
+
+  if (!dependencyValidation.ok) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: dependencyValidation.message
+      },
+      meta: buildMeta()
+    });
+  }
+
   const supabase = await createSupabaseServerClient();
 
   const normalizedCountryCode =
@@ -327,7 +350,11 @@ export async function POST(request: Request) {
     dueOffsetDays: task.dueOffsetDays ?? null,
     actionUrl: task.actionUrl?.trim() || null,
     actionLabel: task.actionLabel?.trim() || null,
-    completionGuidance: task.completionGuidance?.trim() || null
+    completionGuidance: task.completionGuidance?.trim() || null,
+    dependsOnTaskIndexes:
+      task.dependsOnTaskIndexes && task.dependsOnTaskIndexes.length > 0
+        ? [...new Set(task.dependsOnTaskIndexes)]
+        : undefined
   }));
 
   const { data: insertedTemplate, error: insertError } = await supabase

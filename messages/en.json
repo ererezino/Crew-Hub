@@ -1591,7 +1591,11 @@
     "openTaskAction": "Open task action",
     "noNotes": "No notes",
     "completing": "Completing…",
-    "markComplete": "Mark complete"
+    "markComplete": "Mark complete",
+    "dependenciesHeading": "Dependencies",
+    "unlocksAfter": "Unlocks after: {titles}",
+    "independentTasks": "Independent tasks",
+    "dependencyGraphAria": "Task dependency graph"
   },
   "myOnboarding": {
     "title": "My Onboarding",
@@ -4722,7 +4726,13 @@
       "moveUp": "Move task up",
       "moveDown": "Move task down",
       "moveUpLabel": "Up",
-      "moveDownLabel": "Down"
+      "moveDownLabel": "Down",
+      "dependsOnLabel": "Depends on",
+      "dependsOnHint": "Select tasks that must be completed before this one.",
+      "taskFallbackTitle": "Task {number}",
+      "dependenciesHeading": "Dependencies",
+      "independentTasks": "Independent tasks",
+      "dependencyGraphAria": "Task dependency graph"
     },
     "toast": {
       "onboardingStarted": "Onboarding instance started.",
