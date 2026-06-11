@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { diffAuditValues, logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
@@ -85,6 +86,12 @@ export async function PATCH(request: Request) {
 
   const serviceClient = createSupabaseServiceRoleClient();
 
+  const { data: existingOrg } = await serviceClient
+    .from("orgs")
+    .select("name, logo_url")
+    .eq("id", session.profile.org_id)
+    .single();
+
   const { data, error } = await serviceClient
     .from("orgs")
     .update({
@@ -103,6 +110,27 @@ export async function PATCH(request: Request) {
         message: "Unable to update organization settings."
       },
       meta: buildMeta()
+    });
+  }
+
+  const { oldValue, newValue, changedFields } = diffAuditValues(
+    {
+      name: existingOrg?.name ?? null,
+      logoUrl: existingOrg?.logo_url ?? null
+    },
+    {
+      name: data.name,
+      logoUrl: data.logo_url
+    }
+  );
+
+  if (changedFields.length > 0) {
+    void logAudit({
+      action: "updated",
+      tableName: "orgs",
+      recordId: session.profile.org_id,
+      oldValue,
+      newValue
     });
   }
 

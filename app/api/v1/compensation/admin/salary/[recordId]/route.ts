@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { logAudit } from "../../../../../../../lib/audit";
+import { diffAuditValues, logAudit } from "../../../../../../../lib/audit";
 import { fetchCompensationSnapshot } from "../../../../../../../lib/compensation-store";
 import { createSupabaseServerClient } from "../../../../../../../lib/supabase/server";
 import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
@@ -30,6 +30,7 @@ const salaryRecordRowSchema = z.object({
   employee_id: z.string().uuid(),
   salary_status: z.enum(["pending", "approved"]),
   approved_by: z.string().uuid().nullable(),
+  approved_at: z.string().nullable(),
   created_by: z.string().uuid().nullable(),
   base_salary_amount: z.union([z.string(), z.number()]),
   currency: z.string(),
@@ -110,7 +111,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { data: existingRow, error: fetchError } = await supabase
     .from("compensation_records")
     .select(
-      "id, employee_id, salary_status, approved_by, created_by, base_salary_amount, currency, pay_frequency, employment_type, effective_from, effective_to"
+      "id, employee_id, salary_status, approved_by, approved_at, created_by, base_salary_amount, currency, pay_frequency, employment_type, effective_from, effective_to"
     )
     .eq("id", parsedParams.data.recordId)
     .eq("org_id", session.profile.org_id)
@@ -222,19 +223,38 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
+  const oldAuditRecord = {
+    baseSalaryAmount: Number.parseInt(String(parsedExisting.data.base_salary_amount), 10),
+    currency: parsedExisting.data.currency,
+    payFrequency: parsedExisting.data.pay_frequency,
+    employmentType: parsedExisting.data.employment_type,
+    effectiveFrom: parsedExisting.data.effective_from,
+    effectiveTo: parsedExisting.data.effective_to,
+    salaryStatus: parsedExisting.data.salary_status,
+    approvedBy: parsedExisting.data.approved_by,
+    approvedAt: parsedExisting.data.approved_at
+  };
+
+  const newAuditRecord = {
+    baseSalaryAmount: salaryRecord.baseSalaryAmount,
+    currency: salaryRecord.currency,
+    payFrequency: salaryRecord.payFrequency,
+    employmentType: salaryRecord.employmentType,
+    effectiveFrom: salaryRecord.effectiveFrom,
+    effectiveTo: salaryRecord.effectiveTo,
+    salaryStatus: salaryRecord.salaryStatus,
+    approvedBy: salaryRecord.approvedBy,
+    approvedAt: salaryRecord.approvedAt
+  };
+
+  const { oldValue, newValue, changedFields } = diffAuditValues(oldAuditRecord, newAuditRecord);
+
   await logAudit({
     action: isApproveAction ? "approved" : "updated",
     tableName: "compensation_records",
     recordId: salaryRecord.id,
-    oldValue: {
-      salaryStatus: parsedExisting.data.salary_status,
-      approvedBy: parsedExisting.data.approved_by
-    },
-    newValue: {
-      salaryStatus: salaryRecord.salaryStatus,
-      approvedBy: salaryRecord.approvedBy,
-      approvedAt: salaryRecord.approvedAt
-    }
+    oldValue: changedFields.length > 0 ? oldValue : oldAuditRecord,
+    newValue: changedFields.length > 0 ? newValue : newAuditRecord
   });
 
   const response: CompensationMutationResponseData = {

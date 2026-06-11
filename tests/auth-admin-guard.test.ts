@@ -25,6 +25,11 @@ vi.mock("../lib/supabase/service-role", () => ({
   })
 }));
 
+vi.mock("../lib/audit", () => ({
+  diffAuditValues: () => ({ oldValue: {}, newValue: {}, changedFields: [] }),
+  logAudit: vi.fn(async () => undefined)
+}));
+
 import { PATCH } from "../app/api/v1/settings/organization/route";
 
 describe("Organization settings auth guard", () => {

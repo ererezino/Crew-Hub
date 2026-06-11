@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { AUDIT_REDACTED, diffAuditValues, logAudit } from "../../../../../lib/audit";
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import { getBirthdayParts } from "../../../../../lib/time-off";
@@ -186,6 +187,17 @@ export async function PATCH(request: Request) {
 
   const serviceClient = createSupabaseServiceRoleClient();
 
+  const { data: existingProfile } = await serviceClient
+    .from("profiles")
+    .select(
+      `full_name, avatar_url, phone, date_of_birth, birthday_month, birthday_day, home_address, government_id_url, bio, pronouns, country_code,
+       emergency_contact_name, emergency_contact_phone, emergency_contact_relationship,
+       social_linkedin, social_twitter, social_instagram, social_github, social_tiktok, social_website,
+       favorite_music, favorite_books, favorite_sports`
+    )
+    .eq("id", session.profile.id)
+    .single();
+
   const { data, error } = await serviceClient
     .from("profiles")
     .update({
@@ -230,6 +242,77 @@ export async function PATCH(request: Request) {
         message: "Unable to update profile settings."
       },
       meta: buildMeta()
+    });
+  }
+
+  const { oldValue, newValue, changedFields } = diffAuditValues(
+    {
+      fullName: existingProfile?.full_name ?? null,
+      avatarUrl: existingProfile?.avatar_url ?? null,
+      phone: existingProfile?.phone ?? null,
+      dateOfBirth: existingProfile?.date_of_birth ?? null,
+      birthdayMonth: existingProfile?.birthday_month ?? null,
+      birthdayDay: existingProfile?.birthday_day ?? null,
+      homeAddress: existingProfile?.home_address ?? null,
+      governmentIdUrl: existingProfile?.government_id_url ?? null,
+      bio: existingProfile?.bio ?? null,
+      pronouns: existingProfile?.pronouns ?? null,
+      countryCode: existingProfile?.country_code ?? null,
+      emergencyContactName: existingProfile?.emergency_contact_name ?? null,
+      emergencyContactPhone: existingProfile?.emergency_contact_phone ?? null,
+      emergencyContactRelationship: existingProfile?.emergency_contact_relationship ?? null,
+      socialLinkedin: existingProfile?.social_linkedin ?? null,
+      socialTwitter: existingProfile?.social_twitter ?? null,
+      socialInstagram: existingProfile?.social_instagram ?? null,
+      socialGithub: existingProfile?.social_github ?? null,
+      socialTiktok: existingProfile?.social_tiktok ?? null,
+      socialWebsite: existingProfile?.social_website ?? null,
+      favoriteMusic: existingProfile?.favorite_music ?? null,
+      favoriteBooks: existingProfile?.favorite_books ?? null,
+      favoriteSports: existingProfile?.favorite_sports ?? null
+    },
+    {
+      fullName: data.full_name,
+      avatarUrl: data.avatar_url,
+      phone: data.phone,
+      dateOfBirth: data.date_of_birth,
+      birthdayMonth: data.birthday_month,
+      birthdayDay: data.birthday_day,
+      homeAddress: data.home_address,
+      governmentIdUrl: data.government_id_url,
+      bio: data.bio,
+      pronouns: data.pronouns,
+      countryCode: parsed.data.countryCode || null,
+      emergencyContactName: data.emergency_contact_name,
+      emergencyContactPhone: data.emergency_contact_phone,
+      emergencyContactRelationship: data.emergency_contact_relationship,
+      socialLinkedin: data.social_linkedin,
+      socialTwitter: data.social_twitter,
+      socialInstagram: data.social_instagram,
+      socialGithub: data.social_github,
+      socialTiktok: data.social_tiktok,
+      socialWebsite: data.social_website,
+      favoriteMusic: data.favorite_music,
+      favoriteBooks: data.favorite_books,
+      favoriteSports: data.favorite_sports
+    }
+  );
+
+  /* Document URLs: the change must be auditable, the content must not persist. */
+  for (const sensitiveField of ["avatarUrl", "governmentIdUrl"]) {
+    if (sensitiveField in oldValue) {
+      oldValue[sensitiveField] = oldValue[sensitiveField] ? AUDIT_REDACTED : null;
+      newValue[sensitiveField] = newValue[sensitiveField] ? AUDIT_REDACTED : null;
+    }
+  }
+
+  if (changedFields.length > 0) {
+    void logAudit({
+      action: "updated",
+      tableName: "profiles",
+      recordId: session.profile.id,
+      oldValue,
+      newValue
     });
   }
 

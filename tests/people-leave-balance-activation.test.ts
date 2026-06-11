@@ -34,7 +34,25 @@ vi.mock("../lib/onboarding/auto-transition", () => ({
 }));
 
 vi.mock("../lib/audit", () => ({
-  logAudit: vi.fn().mockResolvedValue(undefined)
+  logAudit: vi.fn().mockResolvedValue(undefined),
+  logAuditBatch: vi.fn().mockResolvedValue(undefined),
+  AUDIT_REDACTED: "[redacted]",
+  diffAuditValues: (oldRecord: Record<string, unknown>, newRecord: Record<string, unknown>) => {
+    const keys = new Set([...Object.keys(oldRecord), ...Object.keys(newRecord)]);
+    const oldValue: Record<string, unknown> = {};
+    const newValue: Record<string, unknown> = {};
+    const changedFields: string[] = [];
+    for (const key of keys) {
+      const before = oldRecord[key] === undefined ? null : oldRecord[key];
+      const after = newRecord[key] === undefined ? null : newRecord[key];
+      if (JSON.stringify(before) !== JSON.stringify(after)) {
+        oldValue[key] = before;
+        newValue[key] = after;
+        changedFields.push(key);
+      }
+    }
+    return { oldValue, newValue, changedFields };
+  }
 }));
 
 vi.mock("../lib/logger", () => ({
