@@ -5109,12 +5109,6 @@ html.dark .modal-overlay {
   height: 6.75rem;
 }
 
-.timeoff-balance-grid {
-  display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .timeoff-balance-card {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-card);
@@ -5122,41 +5116,6 @@ html.dark .modal-overlay {
   padding: var(--space-4);
   display: grid;
   gap: var(--space-2);
-}
-
-.timeoff-balance-card-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.timeoff-balance-metric {
-  font-size: var(--text-xl);
-  line-height: 1.25;
-  font-weight: 600;
-}
-
-.timeoff-balance-breakdown {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.timeoff-balance-breakdown div {
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-default);
-  background: var(--bg-surface);
-  padding: var(--space-2) var(--space-2);
-}
-
-.timeoff-balance-breakdown dt {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.timeoff-balance-breakdown dd {
-  margin: var(--space-1) 0 0;
 }
 
 .timeoff-section-header {
@@ -5244,11 +5203,6 @@ html.dark .modal-overlay {
     );
 }
 
-.timeoff-calendar-day-pending {
-  border-color: var(--status-pending-border);
-  background: color-mix(in srgb, var(--status-pending-bg) 40%, var(--bg-canvas));
-}
-
 .timeoff-calendar-day-afk {
   border-color: color-mix(in srgb, var(--crew-navy) 18%, var(--border-default));
 }
@@ -5276,11 +5230,6 @@ html.dark .modal-overlay {
   box-shadow: 0 0 4px rgba(52, 211, 153, 0.5);
 }
 
-.timeoff-calendar-badge-pending {
-  background: #fbbf24;
-  box-shadow: 0 0 4px rgba(251, 191, 36, 0.5);
-}
-
 .timeoff-calendar-badge-afk {
   background: var(--status-info-text);
   box-shadow: 0 0 4px color-mix(in srgb, var(--status-info-text) 40%, transparent);
@@ -5293,14 +5242,6 @@ html.dark .modal-overlay {
 .timeoff-calendar-badge-holiday {
   background: #fb923c;
   box-shadow: 0 0 4px rgba(251, 146, 60, 0.5);
-}
-
-.timeoff-calendar-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  min-height: 10px;
 }
 
 .timeoff-calendar-day-holiday {
@@ -5415,13 +5356,6 @@ html.dark .modal-overlay {
   border: 1px solid color-mix(in srgb, #fb923c 25%, transparent);
   border-radius: var(--radius-default);
   padding: var(--space-1) var(--space-2);
-}
-
-.timeoff-country-summary {
-  margin-top: var(--space-3);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
 }
 
 .timeoff-form-grid {
@@ -11464,7 +11398,6 @@ html.dark .select-content {
     grid-template-columns: 1fr;
   }
 
-  .timeoff-balance-grid,
   .timeoff-balance-skeleton-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -11820,7 +11753,6 @@ html.dark .select-content {
     display: none;
   }
 
-  .timeoff-balance-grid,
   .timeoff-balance-skeleton-grid,
   .timeoff-form-grid,
   .timeoff-filter-grid {
@@ -21969,6 +21901,232 @@ html.dark .crew-games-platform-game:hover {
   }
 
   .teamcal-shift-selectable {
+    min-height: 44px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   Time Off page re-layout: hero balance chips + primary CTA,
+   attention list (pending/upcoming), collapsed history.
+   Tokens only — both themes adapt automatically.
+   ══════════════════════════════════════════════════════ */
+
+.timeoff-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.timeoff-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.timeoff-hero-chip {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--bg-canvas);
+  box-shadow: var(--shadow-sm);
+  min-width: 11rem;
+  transition: box-shadow var(--transition-hover), border-color var(--transition-hover);
+}
+
+.timeoff-hero-chip:hover,
+.timeoff-hero-chip[open] {
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-lg);
+}
+
+.timeoff-hero-chip-summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+}
+
+.timeoff-hero-chip-summary::-webkit-details-marker {
+  display: none;
+}
+
+.timeoff-hero-chip-summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.timeoff-hero-chip-value {
+  font-size: var(--text-2xl);
+  line-height: 1.1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeoff-hero-chip-label {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.timeoff-hero-chip-note {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}
+
+.timeoff-hero-chip-detail {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.timeoff-hero-chip-detail p {
+  margin: 0;
+}
+
+.timeoff-hero-chip-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.timeoff-hero-chip-breakdown dt {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.timeoff-hero-chip-breakdown dd {
+  margin: var(--space-1) 0 0;
+  color: var(--text-primary);
+}
+
+.timeoff-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.timeoff-attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.timeoff-attention-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-default);
+  background: var(--bg-surface);
+  padding: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.timeoff-attention-main {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.timeoff-attention-headline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.timeoff-attention-type {
+  font-weight: 600;
+}
+
+.timeoff-attention-meta {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.timeoff-history-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.timeoff-history-summary::-webkit-details-marker {
+  display: none;
+}
+
+.timeoff-history-summary:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-default);
+}
+
+.timeoff-history-chevron {
+  color: var(--text-secondary);
+  transition: transform var(--transition-hover);
+}
+
+.timeoff-history[open] .timeoff-history-chevron {
+  transform: rotate(180deg);
+}
+
+.timeoff-history-body {
+  margin-top: var(--space-3);
+}
+
+.timeoff-availability-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .timeoff-hero {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .timeoff-hero-chips {
+    width: 100%;
+  }
+
+  .timeoff-hero-chip {
+    flex: 1 1 10rem;
+  }
+
+  .timeoff-hero-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Touch targets ≥44px on coarse pointers for the new disclosure
+   controls and the availability link. Sizing only — no theme changes. */
+@media (pointer: coarse), (max-width: 768px) {
+  .timeoff-hero-chip-summary,
+  .timeoff-history-summary,
+  .timeoff-availability-link {
     min-height: 44px;
   }
 }

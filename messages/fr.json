@@ -3912,26 +3912,22 @@
     },
     "errorTitle": "Les données de congés sont indisponibles",
     "errorDefault": "Impossible de charger le résumé des congés.",
-    "contextualHelp": {
-      "title": "Planifiez vos congés en toute sérénité",
-      "description": "Quelques rappels utiles pour partir l'esprit tranquille.",
-      "workingDayTitle": "Calcul des jours ouvrés",
-      "workingDayDescription": "Les jours de congé sont calculés automatiquement sur les jours ouvrés, hors week-ends et jours fériés du pays.",
-      "approvalTitle": "Processus d'approbation",
-      "approvalDescription": "Les demandes sont d'abord envoyées à votre responsable direct. Ajoutez des motifs clairs pour éviter les allers-retours.",
-      "teamCoverageTitle": "Couverture d'équipe",
-      "teamCoverageDescription": "Pour assurer la continuité pendant votre absence, vérifiez qui d'autre est en congé à la même période.",
-      "viewAvailability": "Voir les disponibilités",
-      "useItTitle": "À utiliser avant la fin de l'année",
-      "useItDescription": "Les jours de congé non utilisés expirent le 31 décembre de chaque année : ne les laissez pas se perdre ! Que ce soit un coucher de soleil sur la plage ou une escapade enneigée, nous serions ravis que vous profitiez du temps que vous avez mérité."
+    "hero": {
+      "daysLeft": "jours restants · {type}",
+      "expiryNote": "Les jours non utilisés expirent le 31 déc."
+    },
+    "attention": {
+      "title": "À venir et en attente",
+      "empty": "Aucun congé en attente ou à venir."
+    },
+    "history": {
+      "title": "Demandes passées ({count})"
     },
     "balances": {
       "unlimited": "Illimité",
       "daysUsedThisYear": "{days} jours utilisés cette année",
       "noDaysUsed": "Aucun jour utilisé cette année",
       "doctorsNote": "Un certificat médical est requis après 2 jours ouvrés consécutifs.",
-      "available": "Disponible",
-      "depleted": "Épuisé",
       "daysLabel": "{days} jours",
       "balanceExpiry": "Solde {year} : les jours non utilisés expirent le 31 déc.",
       "allocated": "Attribués",
@@ -3953,9 +3949,6 @@
       "requestTimeOff": "Demander un congé",
       "logAfk": "Enregistrer une absence",
       "startDateSort": "Date de début",
-      "emptyTitle": "Aucune demande de congé",
-      "emptyDescription": "Vos demandes de congé soumises apparaîtront ici une fois que vous en aurez créé une.",
-      "requestTimeOffCta": "Demander un congé",
       "noActions": "Aucune action",
       "cancelling": "Annulation..."
     },
@@ -3968,23 +3961,6 @@
       "approver": "Approbateur",
       "submitted": "Soumise le",
       "actionsColumn": "Actions"
-    },
-    "calendar": {
-      "title": "Mini calendrier",
-      "previous": "Précédent",
-      "next": "Suivant",
-      "legendLeave": "Congé",
-      "legendHoliday": "Jour férié",
-      "legendPending": "En attente"
-    },
-    "weekdays": {
-      "sun": "Dim",
-      "mon": "Lun",
-      "tue": "Mar",
-      "wed": "Mer",
-      "thu": "Jeu",
-      "fri": "Ven",
-      "sat": "Sam"
     },
     "afk": {
       "title": "Journal des absences",
@@ -4025,7 +4001,9 @@
       "medicalEvidenceLabel": "Justificatif médical",
       "sickLeaveUploadNote": "Un justificatif médical est requis pour les congés maladie de plus de 2 jours.",
       "medicalEvidenceRequired": "Veuillez télécharger un justificatif médical avant de soumettre.",
-      "noPoliciesConfigured": "Aucune politique de congé n'est configurée pour votre pays. Contactez votre administrateur RH."
+      "noPoliciesConfigured": "Aucune politique de congé n'est configurée pour votre pays. Contactez votre administrateur RH.",
+      "approvalNote": "Envoyée à votre manager pour approbation.",
+      "viewTeamAvailability": "Voir les disponibilités de l'équipe"
     },
     "birthdayOverrideDialog": {
       "title": "Déplacer le congé anniversaire ?",

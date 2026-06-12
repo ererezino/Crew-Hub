@@ -3912,26 +3912,22 @@
     },
     "errorTitle": "Time Off data is unavailable",
     "errorDefault": "Unable to load time off summary.",
-    "contextualHelp": {
-      "title": "Plan your leave with confidence",
-      "description": "A few helpful reminders so you can relax knowing everything is covered.",
-      "workingDayTitle": "Working day calculation",
-      "workingDayDescription": "Leave days are auto-calculated from working days, excluding weekends and country holidays.",
-      "approvalTitle": "Approval expectation",
-      "approvalDescription": "Requests are sent to your direct manager first. Add clear reasons to reduce back-and-forth.",
-      "teamCoverageTitle": "Team coverage",
-      "teamCoverageDescription": "To keep things running smoothly while you're away, take a quick look at who else is off around the same time.",
-      "viewAvailability": "View availability",
-      "useItTitle": "Use it or lose it",
-      "useItDescription": "Unused leave days expire on December 31 each year -- so don't let them go to waste! Whether it's a beach sunset or a snowy getaway, we'd love for you to take the time you've earned."
+    "hero": {
+      "daysLeft": "days left · {type}",
+      "expiryNote": "Unused days expire Dec 31"
+    },
+    "attention": {
+      "title": "Upcoming & pending",
+      "empty": "No pending or upcoming time off."
+    },
+    "history": {
+      "title": "Past requests ({count})"
     },
     "balances": {
       "unlimited": "Unlimited",
       "daysUsedThisYear": "{days} days used this year",
       "noDaysUsed": "No days used this year",
       "doctorsNote": "Doctor's note required after 2 consecutive working days.",
-      "available": "Available",
-      "depleted": "Depleted",
       "daysLabel": "{days} days",
       "balanceExpiry": "{year} balance -- unused days expire Dec 31",
       "allocated": "Allocated",
@@ -3953,9 +3949,6 @@
       "requestTimeOff": "Request Time Off",
       "logAfk": "Log AFK",
       "startDateSort": "Start date",
-      "emptyTitle": "No leave requests yet",
-      "emptyDescription": "Your submitted leave requests will appear here once you create one.",
-      "requestTimeOffCta": "Request time off",
       "noActions": "No actions",
       "cancelling": "Cancelling..."
     },
@@ -3968,23 +3961,6 @@
       "approver": "Approver",
       "submitted": "Submitted",
       "actionsColumn": "Actions"
-    },
-    "calendar": {
-      "title": "Mini Calendar",
-      "previous": "Previous",
-      "next": "Next",
-      "legendLeave": "Leave",
-      "legendHoliday": "Public holiday",
-      "legendPending": "Pending"
-    },
-    "weekdays": {
-      "sun": "Sun",
-      "mon": "Mon",
-      "tue": "Tue",
-      "wed": "Wed",
-      "thu": "Thu",
-      "fri": "Fri",
-      "sat": "Sat"
     },
     "afk": {
       "title": "AFK Log",
@@ -4025,7 +4001,9 @@
       "medicalEvidenceLabel": "Medical evidence",
       "sickLeaveUploadNote": "Medical documentation is required for sick leave longer than 2 days.",
       "medicalEvidenceRequired": "Please upload medical evidence before submitting.",
-      "noPoliciesConfigured": "No leave policies are configured for your country. Contact your HR administrator."
+      "noPoliciesConfigured": "No leave policies are configured for your country. Contact your HR administrator.",
+      "approvalNote": "Goes to your manager for approval.",
+      "viewTeamAvailability": "View team availability"
     },
     "birthdayOverrideDialog": {
       "title": "Move birthday leave?",
