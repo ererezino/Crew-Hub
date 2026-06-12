@@ -516,6 +516,7 @@ export function SchedulingCalendarClient({
           minDate={activeStartDate}
           maxDate={activeEndDate}
           isSubmitting={isCreatingShift}
+          scheduleShifts={shifts}
           onClose={() => setAddingShiftDate(null)}
           onSubmit={(values) => {
             void handleCreateShift(values);
@@ -533,6 +534,7 @@ export function SchedulingCalendarClient({
           maxDate={activeEndDate}
           isSubmitting={isSavingShiftEdit}
           isDeleting={isDeletingShift}
+          scheduleShifts={shifts}
           onClose={() => setEditingShift(null)}
           onDelete={() => {
             void handleDeleteShift();

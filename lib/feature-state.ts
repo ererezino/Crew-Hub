@@ -174,8 +174,9 @@ export const MODULE_STATES: Record<ModuleId, FeatureState> = {
   announcements: "LIVE",
   compensation: "LIVE",
 
-  // Pilot with known limitations
-  scheduling: "LIMITED_PILOT",
+  // Viewing is org-wide (who's working when); schedule building/management
+  // remains role-gated to HR_ADMIN/SUPER_ADMIN via access control.
+  scheduling: "LIVE",
   scheduling_auto_generate: "SETUP_REQUIRED",
   payroll: "LIMITED_PILOT",
 

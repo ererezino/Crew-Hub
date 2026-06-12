@@ -54,11 +54,22 @@ function isValidSlot(slot: ShiftSlotSelection): boolean {
   return slot.startTime !== slot.endTime;
 }
 
+export type ScheduleWizardResult = {
+  /** Whether the schedule itself was created (generation may still have failed). */
+  scheduleCreated: boolean;
+  /** Whether the "generate automatically" toggle was on. */
+  autoGenerateEnabled: boolean;
+  /** Number of shifts saved by auto-generation (0 when off, skipped, or failed). */
+  generatedCount: number;
+  /** True when the schedule was created but auto-generation failed — the grid is empty. */
+  generationFailed: boolean;
+};
+
 type ScheduleWizardProps = {
   isOpen: boolean;
   onClose: () => void;
   employees: RosterEmployee[];
-  onSubmit: () => Promise<void>;
+  onSubmit: (result: ScheduleWizardResult) => Promise<void>;
 };
 
 export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: ScheduleWizardProps) {
@@ -83,6 +94,8 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
   const [customStartDate, setCustomStartDate] = useState(getDefaultCustomStart);
   const [customEndDate, setCustomEndDate] = useState(getDefaultCustomEnd);
   const [rosterSelected, setRosterSelected] = useState<Map<string, RosterSelection>>(new Map());
+  const [autoGenerate, setAutoGenerate] = useState(true);
+  const [wizardResult, setWizardResult] = useState<ScheduleWizardResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewData, setPreviewData] = useState<{
@@ -193,14 +206,14 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
 
     const nextStep = STEPS[nextIndex]!;
 
-    // When moving to review, generate the preview
+    // When moving to review, create the schedule and (optionally) auto-generate
     if (nextStep === "review" && track) {
       setIsGenerating(true);
       setPreviewData(null);
+      setWizardResult(null);
       setStep(nextStep);
 
       try {
-        // Create schedule + auto-generate in one flow
         const rosterEntries = [...rosterSelected.values()];
         const { startDate, endDate } = computedDateRange;
 
@@ -235,77 +248,121 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
           throw new Error(t("wizard.noScheduleId"));
         }
 
-        // Auto-generate shifts
-        const genRes = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            scheduleType: track,
-            // The user hand-picked this roster, so every selected member is eligible
-            // regardless of their profile schedule_type. Without this, weekday-typed
-            // crew get filtered out of a weekend schedule and produce no shifts.
-            respectEmployeeScheduleType: false,
-            slots: slots.map((slot) => ({
-              name: slot.name.trim(),
-              startTime: slot.startTime,
-              endTime: slot.endTime
-            }))
-          })
-        });
-
-        if (!genRes.ok) {
-          const err = await genRes.json().catch(() => null);
-          throw new Error(err?.error?.message ?? t("wizard.failedGenerate"));
+        // Auto-generation is opt-out: when off, the schedule starts empty and
+        // assignments are composed manually in the grid.
+        if (!autoGenerate) {
+          setWizardResult({
+            scheduleCreated: true,
+            autoGenerateEnabled: false,
+            generatedCount: 0,
+            generationFailed: false
+          });
+          setPreviewData({
+            estimatedShifts: 0,
+            warnings: [{ message: t("wizard.autoGenerateOffNote") }],
+            shiftDetails: []
+          });
+          return;
         }
 
-        const genData = await genRes.json();
-        const assignments = genData?.data?.assignments ?? [];
-        const genWarnings = genData?.data?.warnings ?? [];
-
-        // Confirm (save) the generated assignments
-        if (assignments.length > 0) {
-          const saveRes = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
+        // Generation failures are non-fatal: the schedule already exists, so
+        // surface a warning and leave the grid empty instead of erroring out.
+        try {
+          const genRes = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              confirm: true,
-              assignments: assignments.map((a: Record<string, string>) => ({
-                employeeId: a.employeeId,
-                shiftDate: a.shiftDate,
-                slotName: a.slotName,
-                startTime: a.startTime,
-                endTime: a.endTime
+              scheduleType: track,
+              // The user hand-picked this roster, so every selected member is eligible
+              // regardless of their profile schedule_type. Without this, weekday-typed
+              // crew get filtered out of a weekend schedule and produce no shifts.
+              respectEmployeeScheduleType: false,
+              slots: slots.map((slot) => ({
+                name: slot.name.trim(),
+                startTime: slot.startTime,
+                endTime: slot.endTime
               }))
             })
           });
 
-          if (!saveRes.ok) {
-            const err = await saveRes.json().catch(() => null);
+          if (!genRes.ok) {
+            const err = await genRes.json().catch(() => null);
             throw new Error(err?.error?.message ?? t("wizard.failedGenerate"));
           }
-        }
 
-        // Count warnings about employees on leave
-        const leaveWarnings: Array<{ message: string }> = [];
-        if (genWarnings.length > 0) {
-          const uniqueDates = new Set(genWarnings.map((w: string) => w.split(":")[0]));
-          leaveWarnings.push({
-            message: t("wizard.warningUnfilledShifts", { count: uniqueDates.size })
+          const genData = await genRes.json();
+          const assignments = genData?.data?.assignments ?? [];
+          const genWarnings = genData?.data?.warnings ?? [];
+
+          // Confirm (save) the generated assignments
+          if (assignments.length > 0) {
+            const saveRes = await fetch(`/api/v1/scheduling/schedules/${scheduleId}/auto-generate`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                confirm: true,
+                assignments: assignments.map((a: Record<string, string>) => ({
+                  employeeId: a.employeeId,
+                  shiftDate: a.shiftDate,
+                  slotName: a.slotName,
+                  startTime: a.startTime,
+                  endTime: a.endTime
+                }))
+              })
+            });
+
+            if (!saveRes.ok) {
+              const err = await saveRes.json().catch(() => null);
+              throw new Error(err?.error?.message ?? t("wizard.failedGenerate"));
+            }
+          }
+
+          // Count warnings about employees on leave
+          const leaveWarnings: Array<{ message: string }> = [];
+          if (genWarnings.length > 0) {
+            const uniqueDates = new Set(genWarnings.map((w: string) => w.split(":")[0]));
+            leaveWarnings.push({
+              message: t("wizard.warningUnfilledShifts", { count: uniqueDates.size })
+            });
+          }
+
+          setWizardResult({
+            scheduleCreated: true,
+            autoGenerateEnabled: true,
+            generatedCount: assignments.length,
+            generationFailed: false
+          });
+          setPreviewData({
+            estimatedShifts: assignments.length,
+            warnings: leaveWarnings,
+            shiftDetails: assignments.map((a: Record<string, string>) => ({
+              employeeName: a.employeeName ?? t("wizard.unknownEmployee"),
+              shiftDate: a.shiftDate,
+              slotName: a.slotName,
+              startTime: a.startTime,
+              endTime: a.endTime
+            }))
+          });
+        } catch {
+          setWizardResult({
+            scheduleCreated: true,
+            autoGenerateEnabled: true,
+            generatedCount: 0,
+            generationFailed: true
+          });
+          setPreviewData({
+            estimatedShifts: 0,
+            warnings: [{ message: t("wizard.warningGenerationFailed") }],
+            shiftDetails: []
           });
         }
-
-        setPreviewData({
-          estimatedShifts: assignments.length,
-          warnings: leaveWarnings,
-          shiftDetails: assignments.map((a: Record<string, string>) => ({
-            employeeName: a.employeeName ?? t("wizard.unknownEmployee"),
-            shiftDate: a.shiftDate,
-            slotName: a.slotName,
-            startTime: a.startTime,
-            endTime: a.endTime
-          }))
-        });
       } catch (err) {
+        setWizardResult({
+          scheduleCreated: false,
+          autoGenerateEnabled: autoGenerate,
+          generatedCount: 0,
+          generationFailed: false
+        });
         setPreviewData({
           estimatedShifts: 0,
           warnings: [{ message: err instanceof Error ? err.message : t("wizard.failedGenerateSchedule") }],
@@ -329,6 +386,7 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     isCustomPeriod,
     selectedDepartment,
     slots,
+    autoGenerate,
     t
   ]);
 
@@ -343,7 +401,14 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     setIsSubmitting(true);
 
     try {
-      await onSubmit();
+      await onSubmit(
+        wizardResult ?? {
+          scheduleCreated: false,
+          autoGenerateEnabled: autoGenerate,
+          generatedCount: 0,
+          generationFailed: false
+        }
+      );
 
       // Reset wizard state
       setStep("track");
@@ -354,13 +419,15 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
       setCustomStartDate(getDefaultCustomStart());
       setCustomEndDate(getDefaultCustomEnd());
       setRosterSelected(new Map());
+      setAutoGenerate(true);
+      setWizardResult(null);
       setPreviewData(null);
       setPilotAutoSelected(false);
       onClose();
     } finally {
       setIsSubmitting(false);
     }
-  }, [track, isSubmitting, onSubmit, onClose]);
+  }, [track, isSubmitting, onSubmit, onClose, wizardResult, autoGenerate]);
 
   const handleCloseWizard = useCallback(() => {
     setStep("track");
@@ -371,6 +438,8 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
     setCustomStartDate(getDefaultCustomStart());
     setCustomEndDate(getDefaultCustomEnd());
     setRosterSelected(new Map());
+    setAutoGenerate(true);
+    setWizardResult(null);
     setPreviewData(null);
     setPilotAutoSelected(false);
     onClose();
@@ -433,12 +502,22 @@ export function ScheduleWizard({ isOpen, onClose, employees, onSubmit }: Schedul
           ) : null}
 
           {step === "roster" && track ? (
-            <RosterSelector
-              employees={employees}
-              track={track}
-              selected={rosterSelected}
-              onChange={setRosterSelected}
-            />
+            <>
+              <RosterSelector
+                employees={employees}
+                track={track}
+                selected={rosterSelected}
+                onChange={setRosterSelected}
+              />
+              <label className="settings-checkbox schedule-wizard-autogen">
+                <input
+                  type="checkbox"
+                  checked={autoGenerate}
+                  onChange={(event) => setAutoGenerate(event.target.checked)}
+                />
+                <span>{t("wizard.autoGenerateLabel")}</span>
+              </label>
+            </>
           ) : null}
 
           {step === "review" && track ? (

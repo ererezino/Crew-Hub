@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { checkApiAccess } from "../../../../../../lib/auth/check-api-access";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
-import { logAudit } from "../../../../../../lib/audit";
+import { diffAuditValues, logAudit, type AuditAction } from "../../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../../lib/department";
 import { sendSwapAcceptedEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
@@ -502,6 +502,9 @@ export async function PUT(
   let nextApprovedAt: string | null = swap.approved_at;
   let shouldTransferShift = false;
   let shiftStatusOverride: string | null = null;
+  /* Tracks whether this request already wrote to the shift row so a stale
+   * swap update can best-effort revert it (no cross-table transactions here). */
+  let shiftWriteApplied = false;
 
   if (action === "cancel") {
     nextStatus = "cancelled";
@@ -650,7 +653,11 @@ export async function PUT(
       }
     }
 
-    const { error: shiftUpdateError } = await supabase
+    /* Apply the swap to the shift, guarded by the status the swap flow expects.
+     * If the shift left "swap_requested" since this swap was created (already
+     * applied by a concurrent approval, cancelled, edited), zero rows match and
+     * PostgREST returns PGRST116 — surface a conflict instead of clobbering. */
+    const { data: transferredShiftRow, error: shiftUpdateError } = await supabase
       .from("shifts")
       .update({
         employee_id: effectiveTargetId,
@@ -663,9 +670,23 @@ export async function PUT(
             : undefined
       })
       .eq("id", shift.id)
-      .eq("org_id", session.profile.org_id);
+      .eq("org_id", session.profile.org_id)
+      .eq("status", "swap_requested")
+      .select("id, employee_id, status")
+      .single();
 
-    if (shiftUpdateError) {
+    if (shiftUpdateError || !transferredShiftRow) {
+      if (shiftUpdateError?.code === "PGRST116") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "SHIFT_SWAP_SHIFT_STATE_CHANGED",
+            message: "The linked shift was modified by someone else. Refresh and try again."
+          },
+          meta: buildMeta()
+        });
+      }
+
       return jsonResponse<null>(500, {
         data: null,
         error: {
@@ -675,16 +696,34 @@ export async function PUT(
         meta: buildMeta()
       });
     }
+
+    shiftWriteApplied = true;
   } else if (shiftStatusOverride) {
-    const { error: shiftResetError } = await supabase
+    /* Same guard for the reset path: only a shift still parked in
+     * "swap_requested" may be flipped back to scheduled by a cancel/reject. */
+    const { data: resetShiftRow, error: shiftResetError } = await supabase
       .from("shifts")
       .update({
         status: shiftStatusOverride
       })
       .eq("id", shift.id)
-      .eq("org_id", session.profile.org_id);
+      .eq("org_id", session.profile.org_id)
+      .eq("status", "swap_requested")
+      .select("id")
+      .single();
 
-    if (shiftResetError) {
+    if (shiftResetError || !resetShiftRow) {
+      if (shiftResetError?.code === "PGRST116") {
+        return jsonResponse<null>(409, {
+          data: null,
+          error: {
+            code: "SHIFT_SWAP_SHIFT_STATE_CHANGED",
+            message: "The linked shift was modified by someone else. Refresh and try again."
+          },
+          meta: buildMeta()
+        });
+      }
+
       return jsonResponse<null>(500, {
         data: null,
         error: {
@@ -694,8 +733,13 @@ export async function PUT(
         meta: buildMeta()
       });
     }
+
+    shiftWriteApplied = true;
   }
 
+  /* The swap row update is guarded by the status the action was authorized
+   * against. Zero rows matched (PGRST116) means a concurrent writer moved the
+   * swap between our read and this write → 409, never a blind overwrite. */
   const { data: rawUpdatedSwap, error: updateSwapError } = await supabase
     .from("shift_swaps")
     .update({
@@ -706,12 +750,37 @@ export async function PUT(
     })
     .eq("id", swap.id)
     .eq("org_id", session.profile.org_id)
+    .eq("status", swap.status)
     .select(
       "id, org_id, shift_id, requester_id, target_id, reason, status, approved_by, approved_at, created_at, updated_at"
     )
     .single();
 
   if (updateSwapError || !rawUpdatedSwap) {
+    /* Best-effort compensation: if we already wrote the shift for this
+     * transition, put it back the way the swap found it. */
+    if (shiftWriteApplied) {
+      await supabase
+        .from("shifts")
+        .update({
+          employee_id: shift.employee_id,
+          status: shift.status
+        })
+        .eq("id", shift.id)
+        .eq("org_id", session.profile.org_id);
+    }
+
+    if (updateSwapError?.code === "PGRST116") {
+      return jsonResponse<null>(409, {
+        data: null,
+        error: {
+          code: "SHIFT_SWAP_STATE_CHANGED",
+          message: "This swap request was modified by someone else. Refresh and try again."
+        },
+        meta: buildMeta()
+      });
+    }
+
     return jsonResponse<null>(500, {
       data: null,
       error: {
@@ -806,21 +875,68 @@ export async function PUT(
     });
   }
 
+  /* Every transition is audited with field-level diffs. The swap audit also
+   * carries the shift consequence (employee/status) so "who ended up covering
+   * this shift, and via which transition" is answerable from one entry. */
+  const transferApplied = shouldTransferShift && Boolean(effectiveTargetId);
+  const finalShiftEmployeeId = transferApplied ? effectiveTargetId : shift.employee_id;
+  const finalShiftStatus = transferApplied
+    ? shiftStatusOverride ?? "swapped"
+    : shiftStatusOverride ?? shift.status;
+  const auditAction: AuditAction =
+    action === "cancel"
+      ? "cancelled"
+      : action === "reject"
+        ? "rejected"
+        : action === "approve" || (action === "accept" && isManager)
+          ? "approved"
+          : "updated";
+
+  const swapAuditDiff = diffAuditValues(
+    {
+      status: swap.status,
+      approvedBy: swap.approved_by,
+      targetId: swap.target_id,
+      shiftEmployeeId: shift.employee_id,
+      shiftStatus: shift.status
+    },
+    {
+      status: parsedUpdatedSwap.data.status,
+      approvedBy: parsedUpdatedSwap.data.approved_by,
+      targetId: parsedUpdatedSwap.data.target_id,
+      shiftEmployeeId: finalShiftEmployeeId,
+      shiftStatus: finalShiftStatus
+    }
+  );
+
   void logAudit({
-    action: "updated",
+    action: auditAction,
     tableName: "shift_swaps",
     recordId: swap.id,
-    oldValue: {
-      status: swap.status,
-      approved_by: swap.approved_by,
-      target_id: swap.target_id
-    },
-    newValue: {
-      status: parsedUpdatedSwap.data.status,
-      approved_by: parsedUpdatedSwap.data.approved_by,
-      target_id: parsedUpdatedSwap.data.target_id
-    }
+    oldValue: swapAuditDiff.oldValue,
+    newValue: swapAuditDiff.newValue
   });
+
+  if (transferApplied) {
+    const shiftAuditDiff = diffAuditValues(
+      {
+        employeeId: shift.employee_id,
+        status: shift.status
+      },
+      {
+        employeeId: effectiveTargetId,
+        status: finalShiftStatus
+      }
+    );
+
+    void logAudit({
+      action: "updated",
+      tableName: "shifts",
+      recordId: shift.id,
+      oldValue: shiftAuditDiff.oldValue,
+      newValue: shiftAuditDiff.newValue
+    });
+  }
 
   return jsonResponse<SchedulingSwapMutationResponseData>(200, {
     data: {

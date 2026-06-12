@@ -725,7 +725,10 @@ export async function POST(request: Request) {
     newValue: {
       schedule_id: createdShift.scheduleId,
       employee_id: createdShift.employeeId,
-      shift_date: createdShift.shiftDate
+      shift_date: createdShift.shiftDate,
+      /* Conflict warnings stay advisory (deliberate, commit 2579c23), but
+       * proceeding past them is auditable: record exactly what was flagged. */
+      ...(conflictWarnings.length > 0 ? { warningsAcknowledged: conflictWarnings } : {})
     }
   });
 

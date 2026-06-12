@@ -628,7 +628,23 @@ export async function POST(request: Request) {
       type: "shift_swap_requested",
       title: "Shift swap request",
       body: `${session.profile.full_name} wants to swap their ${shift.shift_date} shift with yours.`,
-      link: "/scheduling"
+      link: "/scheduling",
+      actions: [
+        {
+          label: "Accept",
+          variant: "primary",
+          action_type: "api",
+          api_endpoint: `/api/v1/scheduling/swaps/${parsedSwapRow.data.id}`,
+          api_method: "PUT",
+          api_body: { action: "accept" }
+        },
+        {
+          label: "View",
+          variant: "outline",
+          action_type: "navigate",
+          navigate_url: "/scheduling/swaps"
+        }
+      ]
     });
 
     sendSwapRequestedEmail({
@@ -653,7 +669,15 @@ export async function POST(request: Request) {
         type: "shift_swap_requested",
         title: "Open shift swap request",
         body: `${session.profile.full_name} wants to swap their ${shift.shift_date} shift.`,
-        link: "/scheduling"
+        link: "/scheduling",
+        actions: [
+          {
+            label: "View requests",
+            variant: "outline",
+            action_type: "navigate",
+            navigate_url: "/scheduling/swaps"
+          }
+        ]
       });
     }
   }

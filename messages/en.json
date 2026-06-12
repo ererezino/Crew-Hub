@@ -413,7 +413,10 @@
       "failedGenerate": "Failed to generate shifts",
       "failedGenerateSchedule": "Failed to generate schedule.",
       "warningUnfilledShifts": "{count} day(s) have unfilled shifts due to limited availability.",
-      "unknownEmployee": "Unknown"
+      "unknownEmployee": "Unknown",
+      "autoGenerateLabel": "Generate assignments automatically (fair distribution)",
+      "autoGenerateOffNote": "Automatic generation is off — the schedule will start empty. Compose assignments in the grid.",
+      "warningGenerationFailed": "The schedule was created, but automatic shift generation failed — the grid is empty."
     },
     "period": {
       "duration": "Duration",
@@ -481,6 +484,9 @@
       "toastPublished": "Schedule published successfully.",
       "toastDeleted": "Schedule deleted.",
       "toastCreated": "Schedule created with auto-generated shifts.",
+      "toastCreatedWithCount": "Schedule created — {count, plural, one {# shift} other {# shifts}} generated.",
+      "toastCreatedEmpty": "Schedule created without assignments — compose it in the grid.",
+      "toastGenerationFailed": "Schedule created, but automatic shift generation failed — the grid is empty.",
       "failedPublish": "Failed to publish schedule.",
       "failedDelete": "Failed to delete schedule."
     },
@@ -680,6 +686,11 @@
     "shiftCreate": {
       "toastSuccess": "Shift added successfully.",
       "toastError": "Unable to add shift."
+    },
+    "weeklyHours": {
+      "badge": "{hours}h",
+      "total": "{hours}h this week",
+      "overLimit": "Over {hours}h this week"
     }
   },
   "dashboard": {

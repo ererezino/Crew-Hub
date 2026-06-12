@@ -413,7 +413,10 @@
       "failedGenerate": "Échec de la génération des quarts",
       "failedGenerateSchedule": "Échec de la génération de l'horaire.",
       "warningUnfilledShifts": "{count} jour(s) ont des quarts non pourvus en raison d'une disponibilité limitée.",
-      "unknownEmployee": "Inconnu"
+      "unknownEmployee": "Inconnu",
+      "autoGenerateLabel": "Générer les affectations automatiquement (répartition équitable)",
+      "autoGenerateOffNote": "La génération automatique est désactivée — l'horaire commencera vide. Composez les affectations dans la grille.",
+      "warningGenerationFailed": "L'horaire a été créé, mais la génération automatique des quarts a échoué — la grille est vide."
     },
     "period": {
       "duration": "Durée",
@@ -481,6 +484,9 @@
       "toastPublished": "Horaire publié avec succès.",
       "toastDeleted": "Horaire supprimé.",
       "toastCreated": "Horaire créé avec des quarts auto-générés.",
+      "toastCreatedWithCount": "Horaire créé — {count, plural, one {# quart généré} other {# quarts générés}}.",
+      "toastCreatedEmpty": "Horaire créé sans affectations — composez-le dans la grille.",
+      "toastGenerationFailed": "Horaire créé, mais la génération automatique des quarts a échoué — la grille est vide.",
       "failedPublish": "Échec de la publication de l'horaire.",
       "failedDelete": "Échec de la suppression de l'horaire."
     },
@@ -680,6 +686,11 @@
     "shiftCreate": {
       "toastSuccess": "Quart ajouté avec succès.",
       "toastError": "Impossible d'ajouter le quart."
+    },
+    "weeklyHours": {
+      "badge": "{hours} h",
+      "total": "{hours} h cette semaine",
+      "overLimit": "Plus de {hours} h cette semaine"
     }
   },
   "dashboard": {

@@ -436,7 +436,15 @@ export async function POST(
       type: "shift_claimed",
       title: "Open shift claimed",
       body: `${parsedClaimerProfile.data.full_name} claimed an open shift on ${existingShift.shift_date}.`,
-      link: "/scheduling/manage"
+      link: "/scheduling/manage",
+      actions: [
+        {
+          label: "View schedule",
+          variant: "outline",
+          action_type: "navigate",
+          navigate_url: "/scheduling/manage"
+        }
+      ]
     });
   }
 
