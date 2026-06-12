@@ -1,13 +1,13 @@
 "use client";
 
 import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { z } from "zod";
 
 type AppLocale = "en" | "fr";
 
 import { EmptyState } from "../../../components/shared/empty-state";
-import { ContextualHelp } from "../../../components/shared/contextual-help";
 import { ErrorState } from "../../../components/shared/error-state";
 import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
@@ -17,13 +17,10 @@ import { useConfirmAction } from "../../../hooks/use-confirm-action";
 import { useAfkLogs, useTimeOffSummary } from "../../../hooks/use-time-off";
 import { OfflineQueueBanner } from "../../../components/shared/offline-queue-banner";
 import { enqueueSubmission, isNetworkFailure } from "../../../lib/offline/submission-queue";
-import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import {
   formatDays,
   formatDateRangeHuman,
   formatDateTimeTooltip,
-  formatDateNoYear,
-  formatMonth,
   formatRelativeTime,
   formatSingleDateHuman,
   todayIsoDate
@@ -32,25 +29,20 @@ import { formatLeaveStatus } from "../../../lib/format-labels";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import {
   calculateWorkingDays,
-  enumerateIsoDatesInRange,
   formatLeaveTypeLabel,
   getBirthdayLeaveOptions,
   hasBirthdayConfigured,
   getCurrentMonthKey,
   isSickLeaveType,
-  isoDateToUtcDate,
-  isIsoDate,
-  monthToDateRange
+  isIsoDate
 } from "../../../lib/time-off";
 import type {
-  LeaveBalance,
   LeaveRequestRecord,
   LeaveRequestStatus,
   TimeOffRequestMutationResponse,
   TimeOffSummaryResponseData
 } from "../../../types/time-off";
 import { AUTO_GRANTED_LEAVE_TYPES, UNLIMITED_LEAVE_TYPES } from "../../../types/time-off";
-import { CalendarOff } from "lucide-react";
 import { humanizeError } from "@/lib/errors";
 
 
@@ -109,29 +101,6 @@ const ALL_FORM_TOUCHED: RequestFormTouched = {
   endDate: true,
   reason: true
 };
-
-function buildContextualHelpItems(t: (key: string) => string) {
-  return [
-    {
-      title: t("contextualHelp.workingDayTitle"),
-      description: t("contextualHelp.workingDayDescription")
-    },
-    {
-      title: t("contextualHelp.approvalTitle"),
-      description: t("contextualHelp.approvalDescription")
-    },
-    {
-      title: t("contextualHelp.teamCoverageTitle"),
-      description: t("contextualHelp.teamCoverageDescription"),
-      ctaLabel: t("contextualHelp.viewAvailability"),
-      ctaHref: "/time-off?tab=calendar"
-    },
-    {
-      title: t("contextualHelp.useItTitle"),
-      description: t("contextualHelp.useItDescription")
-    }
-  ];
-}
 
 function createToastId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -197,100 +166,6 @@ function toneForRequestStatus(status: LeaveRequestStatus) {
   }
 }
 
-function toneForBalance(balance: LeaveBalance) {
-  const availableDays = balance.availableDays;
-
-  if (availableDays <= 0) {
-    return "error" as const;
-  }
-
-  if (availableDays <= balance.totalDays * 0.25) {
-    return "warning" as const;
-  }
-
-  return "success" as const;
-}
-
-function shiftMonth(month: string, delta: number): string {
-  const range = monthToDateRange(month);
-
-  if (!range) {
-    return getCurrentMonthKey();
-  }
-
-  const baseDate = isoDateToUtcDate(range.startDate);
-
-  if (!baseDate) {
-    return getCurrentMonthKey();
-  }
-
-  const shiftedDate = new Date(baseDate.getTime());
-  shiftedDate.setUTCMonth(shiftedDate.getUTCMonth() + delta);
-
-  const year = shiftedDate.getUTCFullYear();
-  const monthValue = String(shiftedDate.getUTCMonth() + 1).padStart(2, "0");
-  return `${year}-${monthValue}`;
-}
-
-function monthLabel(month: string, locale: AppLocale): string {
-  const range = monthToDateRange(month);
-
-  if (!range) {
-    return month;
-  }
-
-  return formatMonth(range.startDate, locale);
-}
-
-type CalendarCell = {
-  dateKey: string;
-  dayNumber: number;
-  isCurrentMonth: boolean;
-};
-
-function buildCalendarCells(month: string): CalendarCell[] {
-  const range = monthToDateRange(month);
-
-  if (!range) {
-    return [];
-  }
-
-  const monthStart = isoDateToUtcDate(range.startDate);
-  const monthEnd = isoDateToUtcDate(range.endDate);
-
-  if (!monthStart || !monthEnd) {
-    return [];
-  }
-
-  const monthStartDay = monthStart.getUTCDay();
-  const gridStart = new Date(monthStart.getTime());
-  gridStart.setUTCDate(gridStart.getUTCDate() - monthStartDay);
-
-  const monthEndDay = monthEnd.getUTCDay();
-  const trailingDays = 6 - monthEndDay;
-  const gridEnd = new Date(monthEnd.getTime());
-  gridEnd.setUTCDate(gridEnd.getUTCDate() + trailingDays);
-
-  const cells: CalendarCell[] = [];
-  const cursor = new Date(gridStart.getTime());
-
-  while (cursor.getTime() <= gridEnd.getTime()) {
-    const year = cursor.getUTCFullYear();
-    const monthValue = String(cursor.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(cursor.getUTCDate()).padStart(2, "0");
-
-    cells.push({
-      dateKey: `${year}-${monthValue}-${day}`,
-      dayNumber: cursor.getUTCDate(),
-      isCurrentMonth: cursor.getUTCMonth() === monthStart.getUTCMonth()
-    });
-
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-
-  return cells;
-}
-
 function TimeOffSkeleton() {
   return (
     <section className="timeoff-skeleton-layout" aria-hidden="true">
@@ -305,7 +180,6 @@ function TimeOffSkeleton() {
           <div key={`timeoff-row-skeleton-${index}`} className="table-skeleton-row" />
         ))}
       </div>
-      <div className="timeoff-calendar-skeleton" />
     </section>
   );
 }
@@ -323,9 +197,8 @@ export function TimeOffClient({
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 
   const requestFormSchema = useMemo(() => buildRequestFormSchema(td), [td]);
-  const contextualHelpItems = useMemo(() => buildContextualHelpItems(td), [td]);
 
-  const [activeMonth, setActiveMonth] = useState(getCurrentMonthKey());
+  const [activeMonth] = useState(getCurrentMonthKey());
   const [requestSortDirection, setRequestSortDirection] = useState<SortDirection>("desc");
   const [isRequestPanelOpen, setIsRequestPanelOpen] = useState(false);
   const [formValues, setFormValues] = useState<RequestFormValues>(INITIAL_FORM_VALUES);
@@ -470,47 +343,30 @@ export function TimeOffClient({
     });
   }, [requestSortDirection, summaryQuery.data?.requests]);
 
-  const calendarCells = useMemo(() => buildCalendarCells(activeMonth), [activeMonth]);
+  /* Requests needing the user's attention up top: anything pending approval,
+   * plus approved leave that has not finished yet. Everything else is history. */
+  const todayIso = todayIsoDate();
 
-  const holidayMapByDate = useMemo(() => {
-    const map = new Map<string, string[]>();
+  const attentionRequests = useMemo(() => {
+    const requests = summaryQuery.data?.requests ?? [];
+    return requests
+      .filter(
+        (requestRecord) =>
+          requestRecord.status === "pending" ||
+          (requestRecord.status === "approved" && requestRecord.endDate >= todayIso)
+      )
+      .sort((leftRequest, rightRequest) => leftRequest.startDate.localeCompare(rightRequest.startDate));
+  }, [summaryQuery.data?.requests, todayIso]);
 
-    for (const holiday of summaryQuery.data?.holidays ?? []) {
-      const existingHolidays = map.get(holiday.date) ?? [];
-      existingHolidays.push(holiday.name);
-      map.set(holiday.date, existingHolidays);
-    }
-
-    return map;
-  }, [summaryQuery.data?.holidays]);
-
-  const requestStatusByDate = useMemo(() => {
-    const map = new Map<string, LeaveRequestStatus[]>();
-    const monthRange = monthToDateRange(activeMonth);
-
-    if (!monthRange) {
-      return map;
-    }
-
-    for (const request of summaryQuery.data?.requests ?? []) {
-      const rangeStart =
-        request.startDate > monthRange.startDate ? request.startDate : monthRange.startDate;
-      const rangeEnd =
-        request.endDate < monthRange.endDate ? request.endDate : monthRange.endDate;
-
-      if (rangeStart > rangeEnd) {
-        continue;
-      }
-
-      for (const dateKey of enumerateIsoDatesInRange(rangeStart, rangeEnd)) {
-        const statuses = map.get(dateKey) ?? [];
-        statuses.push(request.status);
-        map.set(dateKey, statuses);
-      }
-    }
-
-    return map;
-  }, [activeMonth, summaryQuery.data?.requests]);
+  const pastRequests = useMemo(() => {
+    return sortedRequests.filter(
+      (requestRecord) =>
+        !(
+          requestRecord.status === "pending" ||
+          (requestRecord.status === "approved" && requestRecord.endDate >= todayIso)
+        )
+    );
+  }, [sortedRequests, todayIso]);
 
   const dismissToast = (toastId: string) => {
     setToasts((currentToasts) => currentToasts.filter((toast) => toast.id !== toastId));
@@ -1062,85 +918,97 @@ export function TimeOffClient({
         />
       ) : null}
 
-      <ContextualHelp
-        title={t('contextualHelp.title')}
-        description={t('contextualHelp.description')}
-        items={contextualHelpItems}
-        ariaLabel={td('contextualHelp.title')}
-      />
+      {/* Hero row: compact balance chips + primary actions. Answers
+          "how many days do I have left, and where do I click?" at a glance. */}
+      <section className="timeoff-hero" aria-label={td('title')}>
+        <div className="timeoff-hero-chips">
+          {/* Unlimited leave type chips (e.g. sick leave) */}
+          {(summaryQuery.data.policies ?? [])
+            .filter((p) => p.isUnlimited)
+            .map((policy) => {
+              const usedRequests = (summaryQuery.data?.requests ?? []).filter(
+                (r) => r.leaveType === policy.leaveType && (r.status === "approved" || r.status === "pending")
+              );
+              const usedDays = usedRequests.reduce((sum, r) => sum + r.totalDays, 0);
 
-      <section className="timeoff-balance-grid" aria-label={td('title')}>
-        {/* Unlimited leave type cards (e.g. sick leave) */}
-        {(summaryQuery.data.policies ?? [])
-          .filter((p) => p.isUnlimited)
-          .map((policy) => {
-            const usedRequests = (summaryQuery.data?.requests ?? []).filter(
-              (r) => r.leaveType === policy.leaveType && (r.status === "approved" || r.status === "pending")
-            );
-            const usedDays = usedRequests.reduce((sum, r) => sum + r.totalDays, 0);
-
-            return (
-              <article key={policy.id} className="timeoff-balance-card">
-                <header className="timeoff-balance-card-header">
-                  <h2 className="section-title">{formatLeaveTypeLabel(policy.leaveType, locale)}</h2>
-                  <StatusBadge tone="processing">{t('balances.unlimited')}</StatusBadge>
-                </header>
-                <div className="timeoff-balance-metric numeric">{t('balances.unlimited')}</div>
-                <p className="settings-card-description">
-                  {usedDays > 0 ? td('balances.daysUsedThisYear', { days: formatDays(usedDays, locale) }) : t('balances.noDaysUsed')}
-                </p>
-                <p className="settings-card-description">
-                  {t('balances.doctorsNote')}
-                </p>
-              </article>
-            );
-          })}
-
-        {/* Standard balance cards */}
-        {summaryQuery.data.balances.length === 0 && summaryQuery.data.policies.filter((p) => p.isUnlimited).length === 0 ? (
-          <EmptyState
-            title={t('balances.emptyTitle')}
-            description={t('balances.emptyDescription')}
-          />
-        ) : (
-          summaryQuery.data.balances.map((balance) => {
-            const scheduledDays = balance.pendingDays;
-            const available = balance.totalDays - balance.usedDays - scheduledDays;
-
-            return (
-              <article key={balance.id} className="timeoff-balance-card">
-                <header className="timeoff-balance-card-header">
-                  <h2 className="section-title">{formatLeaveTypeLabel(balance.leaveType, locale)}</h2>
-                  <StatusBadge tone={toneForBalance(balance)}>
-                    {available > 0 ? t('balances.available') : t('balances.depleted')}
-                  </StatusBadge>
-                </header>
-                <div className="timeoff-balance-metric numeric">
-                  {td('balances.daysLabel', { days: formatDays(available, locale) })}
-                </div>
-                <p className="settings-card-description">
-                  {td('balances.balanceExpiry', { year: balance.year })}
-                </p>
-                <dl className="timeoff-balance-breakdown">
-                  <div>
-                    <dt>{t('balances.allocated')}</dt>
-                    <dd className="numeric">{formatDays(balance.totalDays, locale)}</dd>
+              return (
+                <details key={policy.id} className="timeoff-hero-chip">
+                  <summary className="timeoff-hero-chip-summary">
+                    <span className="timeoff-hero-chip-value">{t('balances.unlimited')}</span>
+                    <span className="timeoff-hero-chip-label">
+                      {formatLeaveTypeLabel(policy.leaveType, locale)}
+                    </span>
+                  </summary>
+                  <div className="timeoff-hero-chip-detail">
+                    <p>
+                      {usedDays > 0
+                        ? td('balances.daysUsedThisYear', { days: formatDays(usedDays, locale) })
+                        : t('balances.noDaysUsed')}
+                    </p>
+                    <p>{t('balances.doctorsNote')}</p>
                   </div>
-                  <div>
-                    <dt>{t('balances.used')}</dt>
-                    <dd className="numeric">{formatDays(balance.usedDays, locale)}</dd>
+                </details>
+              );
+            })}
+
+          {/* Standard balance chips */}
+          {summaryQuery.data.balances.length === 0 && summaryQuery.data.policies.filter((p) => p.isUnlimited).length === 0 ? (
+            <EmptyState
+              title={t('balances.emptyTitle')}
+              description={t('balances.emptyDescription')}
+            />
+          ) : (
+            summaryQuery.data.balances.map((balance) => {
+              const scheduledDays = balance.pendingDays;
+              const available = balance.totalDays - balance.usedDays - scheduledDays;
+              const isAnnual = balance.leaveType === "annual_leave" || balance.leaveType === "annual";
+
+              return (
+                <details key={balance.id} className="timeoff-hero-chip">
+                  <summary className="timeoff-hero-chip-summary">
+                    <span className="timeoff-hero-chip-value numeric">
+                      {formatDays(available, locale)}
+                    </span>
+                    <span className="timeoff-hero-chip-label">
+                      {td('hero.daysLeft', { type: formatLeaveTypeLabel(balance.leaveType, locale) })}
+                    </span>
+                    {isAnnual ? (
+                      <span className="timeoff-hero-chip-note">{t('hero.expiryNote')}</span>
+                    ) : null}
+                  </summary>
+                  <div className="timeoff-hero-chip-detail">
+                    <dl className="timeoff-hero-chip-breakdown">
+                      <div>
+                        <dt>{t('balances.allocated')}</dt>
+                        <dd className="numeric">{formatDays(balance.totalDays, locale)}</dd>
+                      </div>
+                      <div>
+                        <dt>{t('balances.used')}</dt>
+                        <dd className="numeric">{formatDays(balance.usedDays, locale)}</dd>
+                      </div>
+                      {scheduledDays > 0 ? (
+                        <div>
+                          <dt>{t('balances.scheduled')}</dt>
+                          <dd className="numeric">{formatDays(scheduledDays, locale)}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                    <p>{td('balances.balanceExpiry', { year: balance.year })}</p>
                   </div>
-                  {scheduledDays > 0 ? (
-                    <div>
-                      <dt>{t('balances.scheduled')}</dt>
-                      <dd className="numeric">{formatDays(scheduledDays, locale)}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-              </article>
-            );
-          })
-        )}
+                </details>
+              );
+            })
+          )}
+        </div>
+
+        <div className="timeoff-hero-actions">
+          <button type="button" className="button button-accent" onClick={openRequestPanel}>
+            {t('requests.requestTimeOff')}
+          </button>
+          <button type="button" className="button" onClick={openAfkPanel}>
+            {t('requests.logAfk')}
+          </button>
+        </div>
       </section>
 
       {/* Birthday choice banner */}
@@ -1178,16 +1046,121 @@ export function TimeOffClient({
         </section>
       ) : null}
 
-      <section className="settings-card" aria-label={td('requests.title')}>
+      {/* Attention section: pending approvals and approved upcoming leave */}
+      <section className="settings-card" aria-label={td('attention.title')}>
         <header className="timeoff-section-header">
-          <h2 className="section-title">{t('requests.title')}</h2>
-          <div className="documents-row-actions" style={{ opacity: 1, transform: "none", pointerEvents: "auto" }}>
-            <button type="button" className="button button-accent" onClick={openRequestPanel}>
-              {t('requests.requestTimeOff')}
-            </button>
-            <button type="button" className="button" onClick={openAfkPanel}>
-              {t('requests.logAfk')}
-            </button>
+          <h2 className="section-title">{t('attention.title')}</h2>
+        </header>
+
+        {attentionRequests.length === 0 ? (
+          <p className="settings-card-description">{t('attention.empty')}</p>
+        ) : (
+          <ul className="timeoff-attention-list">
+            {attentionRequests.map((requestRecord) => {
+              const pendingChangeSummary = requestRecord.pendingChangeType
+                ? requestRecord.pendingChangeType === "cancel"
+                  ? td("changeRequest.calloutCancel")
+                  : requestRecord.pendingStartDate && requestRecord.pendingEndDate
+                    ? td("changeRequest.calloutMove", {
+                        dates: formatDateRangeHuman(
+                          requestRecord.pendingStartDate,
+                          requestRecord.pendingEndDate,
+                          locale
+                        )
+                      })
+                    : ""
+                : null;
+
+              return (
+                <li key={requestRecord.id} className="timeoff-attention-card">
+                  <div className="timeoff-attention-main">
+                    <div className="timeoff-attention-headline">
+                      <span className="timeoff-attention-type">
+                        {formatLeaveTypeLabel(requestRecord.leaveType, locale)}
+                      </span>
+                      <StatusBadge tone={toneForRequestStatus(requestRecord.status)}>
+                        {formatLeaveStatus(requestRecord.status, locale)}
+                      </StatusBadge>
+                    </div>
+                    <p className="timeoff-attention-meta">
+                      <time
+                        dateTime={requestRecord.startDate}
+                        title={formatDateTimeTooltip(requestRecord.startDate, locale)}
+                      >
+                        {formatDateRangeHuman(requestRecord.startDate, requestRecord.endDate, locale)}
+                      </time>
+                      {" · "}
+                      <span className="numeric">
+                        {td('balances.daysLabel', { days: formatDays(requestRecord.totalDays, locale) })}
+                      </span>
+                    </p>
+                    {requestRecord.approverName ? (
+                      <p className="timeoff-attention-meta">
+                        {t('requestTable.approver')}:{" "}
+                        {requestRecord.actingForName
+                          ? t('approverOnBehalfOf', { approver: requestRecord.approverName, principal: requestRecord.actingForName })
+                          : requestRecord.approverName}
+                      </p>
+                    ) : null}
+                    {pendingChangeSummary ? (
+                      <p className="timeoff-attention-meta">
+                        {pendingChangeSummary} · {td("changeRequest.awaitingApproval")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="timeoff-row-actions">
+                    {requestRecord.status === "pending" ? (
+                      <button
+                        type="button"
+                        className="table-row-action"
+                        onClick={() => handleCancelRequest(requestRecord)}
+                        disabled={isCancellingRequestId === requestRecord.id}
+                      >
+                        {isCancellingRequestId === requestRecord.id ? t('requests.cancelling') : tCommon('cancel')}
+                      </button>
+                    ) : requestRecord.pendingChangeType ? (
+                      <span className="settings-card-description">{td('changeRequest.pendingBadge')}</span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="table-row-action"
+                          onClick={() => openChangePanel(requestRecord)}
+                          disabled={isCancellingRequestId === requestRecord.id}
+                        >
+                          {td('changeRequest.changeDates')}
+                        </button>
+                        <button
+                          type="button"
+                          className="table-row-action table-row-action-danger"
+                          onClick={() => handleRequestCancellation(requestRecord)}
+                          disabled={isCancellingRequestId === requestRecord.id}
+                        >
+                          {isCancellingRequestId === requestRecord.id
+                            ? t('requests.cancelling')
+                            : td('changeRequest.cancelLeave')}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {/* History: past requests collapsed behind a disclosure, default closed */}
+      {pastRequests.length > 0 ? (
+      <details className="settings-card timeoff-history" aria-label={td('requests.title')}>
+        <summary className="timeoff-history-summary">
+          <span className="section-title">{td('history.title', { count: pastRequests.length })}</span>
+          <svg className="timeoff-history-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </summary>
+        <div className="timeoff-history-body">
+          <div className="timeoff-section-header">
             <button
               type="button"
               className="table-sort-trigger"
@@ -1200,17 +1173,6 @@ export function TimeOffClient({
               {t('requests.startDateSort')} {requestSortDirection === "asc" ? "↑" : "↓"}
             </button>
           </div>
-        </header>
-
-        {sortedRequests.length === 0 ? (
-          <EmptyState
-            icon={<CalendarOff size={32} />}
-            title={t('requests.emptyTitle')}
-            description={t('requests.emptyDescription')}
-            ctaLabel={t('requests.requestTimeOffCta')}
-            ctaHref="/time-off"
-          />
-        ) : (
           <div className="data-table-container">
             <table className="data-table" aria-label={td('requests.title')}>
               <thead>
@@ -1225,7 +1187,7 @@ export function TimeOffClient({
                 </tr>
               </thead>
               <tbody>
-                {sortedRequests.flatMap((requestRecord) => {
+                {pastRequests.flatMap((requestRecord) => {
                   const rows = [
                     <tr key={requestRecord.id} className="data-table-row">
                       <td>{formatLeaveTypeLabel(requestRecord.leaveType, locale)}</td>
@@ -1341,87 +1303,9 @@ export function TimeOffClient({
               </tbody>
             </table>
           </div>
-        )}
-      </section>
-
-      <section className="settings-card" aria-label={td('calendar.title')}>
-        <header className="timeoff-section-header">
-          <h2 className="section-title">{t('calendar.title')}</h2>
-          <div className="timeoff-month-controls">
-            <button
-              type="button"
-              className="button"
-              onClick={() => setActiveMonth((currentMonth) => shiftMonth(currentMonth, -1))}
-            >
-              {t('calendar.previous')}
-            </button>
-            <p className="numeric">{monthLabel(activeMonth, locale)}</p>
-            <button
-              type="button"
-              className="button"
-              onClick={() => setActiveMonth((currentMonth) => shiftMonth(currentMonth, 1))}
-            >
-              {t('calendar.next')}
-            </button>
-          </div>
-        </header>
-
-        <div className="timeoff-mini-calendar">
-          {(["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const).map((dayKey) => (
-            <p key={dayKey} className="timeoff-calendar-weekday">
-              {t(`weekdays.${dayKey}`)}
-            </p>
-          ))}
-          {calendarCells.map((cell) => {
-            const holidays = holidayMapByDate.get(cell.dateKey) ?? [];
-            const statuses = requestStatusByDate.get(cell.dateKey) ?? [];
-            const hasApproved = statuses.includes("approved");
-            const hasPending = statuses.includes("pending");
-            const isHoliday = holidays.length > 0;
-
-            const className = [
-              "timeoff-calendar-day",
-              cell.isCurrentMonth ? "timeoff-calendar-day-current" : "timeoff-calendar-day-muted",
-              hasApproved ? "timeoff-calendar-day-approved" : "",
-              hasPending ? "timeoff-calendar-day-pending" : "",
-              isHoliday ? "timeoff-calendar-day-holiday" : ""
-            ]
-              .filter(Boolean)
-              .join(" ");
-
-            return (
-              <article key={cell.dateKey} className={className} title={isHoliday ? holidays.join(", ") : undefined}>
-                <p className="numeric">{cell.dayNumber}</p>
-                <span className="timeoff-calendar-dots">
-                  {hasApproved ? <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" /> : null}
-                  {hasPending ? <span className="timeoff-calendar-badge timeoff-calendar-badge-pending" /> : null}
-                  {isHoliday ? <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" /> : null}
-                </span>
-              </article>
-            );
-          })}
         </div>
-
-        <div className="timeoff-calendar-legend">
-          <div className="timeoff-calendar-legend-item">
-            <span className="timeoff-calendar-badge timeoff-calendar-badge-approved" />
-            <span>{t('calendar.legendLeave')}</span>
-          </div>
-          <div className="timeoff-calendar-legend-item">
-            <span className="timeoff-calendar-badge timeoff-calendar-badge-holiday" />
-            <span>{t('calendar.legendHoliday')}</span>
-          </div>
-          <div className="timeoff-calendar-legend-item">
-            <span className="timeoff-calendar-badge timeoff-calendar-badge-pending" />
-            <span>{t('calendar.legendPending')}</span>
-          </div>
-        </div>
-
-        <div className="timeoff-country-summary">
-          <span>{countryFlagFromCode(summaryQuery.data.profile.countryCode)}</span>
-          <span>{countryNameFromCode(summaryQuery.data.profile.countryCode, locale)}</span>
-        </div>
-      </section>
+      </details>
+      ) : null}
 
       <section className="settings-card" aria-label={td('afk.title')}>
         <header className="timeoff-section-header">
@@ -1617,6 +1501,10 @@ export function TimeOffClient({
             </label>
           </div>
 
+          <Link className="timeoff-availability-link" href="/time-off?tab=calendar">
+            {t('requestPanel.viewTeamAvailability')}
+          </Link>
+
           {isIsoDate(formValues.startDate) && isIsoDate(formValues.endDate) && formValues.endDate >= formValues.startDate ? (
             <TeamAvailabilityPanel startDate={formValues.startDate} endDate={formValues.endDate} />
           ) : null}
@@ -1638,13 +1526,13 @@ export function TimeOffClient({
 
           <section className="timeoff-request-summary">
             <p>
-              {t('requestPanel.workingDays')}: <span className="numeric">{formatDays(calculatedWorkingDays, locale)}</span>
+              {t('requestPanel.workingDays')} <span className="numeric">{formatDays(calculatedWorkingDays, locale)}</span>
             </p>
             {isSelectedTypeUnlimited ? (
               <p className="settings-card-description">{t('requestPanel.unlimitedBalance')}</p>
             ) : selectedLeaveBalance ? (
               <p>
-                {t('requestPanel.availableBalance')}:{" "}
+                {t('requestPanel.availableBalance')}{" "}
                 <span className="numeric">{formatDays(selectedLeaveBalance.availableDays, locale)}</span>
               </p>
             ) : null}
@@ -1676,6 +1564,8 @@ export function TimeOffClient({
           ) : null}
 
           {submitError ? <p className="form-submit-error">{submitError}</p> : null}
+
+          <p className="settings-card-description">{t('requestPanel.approvalNote')}</p>
 
           <div className="slide-panel-actions">
             <button type="button" className="button" onClick={closeRequestPanel}>
@@ -1745,7 +1635,7 @@ export function TimeOffClient({
           <section className="timeoff-request-summary">
             {afkDurationMinutes > 0 ? (
               <p>
-                {t('afkPanel.duration')}:{" "}
+                {t('afkPanel.duration')}{" "}
                 <span className="numeric">
                   {afkDurationMinutes >= 60
                     ? `${Math.floor(afkDurationMinutes / 60)}h ${afkDurationMinutes % 60}m`
