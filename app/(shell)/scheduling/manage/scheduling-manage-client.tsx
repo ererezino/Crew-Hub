@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { ScheduleCardGrid } from "../../../../components/scheduling/schedule-card-grid";
-import { ScheduleWizard } from "../../../../components/scheduling/schedule-wizard";
+import { ScheduleWizard, type ScheduleWizardResult } from "../../../../components/scheduling/schedule-wizard";
 import { TeamSetupPanel } from "../../../../components/scheduling/team-setup-panel";
 import type { RosterEmployee } from "../../../../components/scheduling/roster-selector";
 import { useSchedulingSchedules } from "../../../../hooks/use-scheduling";
@@ -17,7 +17,7 @@ import { hasRole } from "../../../../lib/roles";
 
 type ToastMessage = {
   id: number;
-  type: "success" | "error" | "info";
+  type: "success" | "error" | "info" | "warning";
   text: string;
 };
 
@@ -216,11 +216,27 @@ export function SchedulingManageClient({
     router.replace(`/scheduling?tab=team-calendar&scheduleId=${encodeURIComponent(scheduleId)}`);
   }, [router]);
 
-  const handleWizardSubmit = useCallback(async () => {
-    // The wizard already created the schedule and generated shifts
-    // Just refresh the list
+  const handleWizardSubmit = useCallback(async (result: ScheduleWizardResult) => {
+    // The wizard already created the schedule (and generated shifts when
+    // auto-generation was on) — refresh the list and report the outcome.
     refreshSchedules();
-    addToast("success", t("manage.toastCreated"));
+
+    if (!result.scheduleCreated) {
+      // Creation failed; the wizard already surfaced the error in its review step.
+      return;
+    }
+
+    if (result.generationFailed) {
+      addToast("warning", t("manage.toastGenerationFailed"));
+      return;
+    }
+
+    if (result.autoGenerateEnabled && result.generatedCount > 0) {
+      addToast("success", t("manage.toastCreatedWithCount", { count: result.generatedCount }));
+      return;
+    }
+
+    addToast("success", t("manage.toastCreatedEmpty"));
   }, [refreshSchedules, addToast, t]);
 
   const handleTeamMemberUpdated = useCallback(

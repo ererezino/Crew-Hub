@@ -4,6 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import {
+  WEEKLY_HOURS_SOFT_LIMIT,
+  employeeWeekHours,
+  isOverWeeklyLimit,
+  roundHours,
+  shiftDurationHours,
+  weeklyHoursByEmployee
+} from "../../lib/scheduling/shift-hours";
 
 import type { ShiftRecord } from "../../types/scheduling";
 
@@ -27,6 +35,8 @@ type ShiftEditModalProps = {
   maxDate: string;
   isSubmitting: boolean;
   isDeleting?: boolean;
+  /** Already-loaded sibling shifts, used for the soft weekly-hours warning (never blocking). */
+  scheduleShifts?: ShiftRecord[];
   onClose: () => void;
   onDelete?: () => void;
   onSubmit: (values: ShiftEditValues) => void;
@@ -95,6 +105,7 @@ export function ShiftEditModal({
   maxDate,
   isSubmitting,
   isDeleting = false,
+  scheduleShifts,
   onClose,
   onDelete,
   onSubmit
@@ -149,6 +160,22 @@ export function ShiftEditModal({
 
     return false;
   }, [employeeId, endTime, shift, shiftDate, startTime]);
+
+  // Soft weekly-hours guardrail: warn (never block) when the edited assignment
+  // would push the employee past 48h in the shift's ISO week. Uses only the
+  // sibling shifts already loaded by the parent — no extra API calls. The shift
+  // being edited is excluded so its proposed times replace its saved ones.
+  const projectedWeekHours = useMemo(() => {
+    if (!employeeId || !scheduleShifts || !shiftDate || !startTime || !endTime || startTime === endTime) {
+      return null;
+    }
+
+    const siblingShifts = scheduleShifts.filter((record) => record.id !== shift.id);
+    const existing = employeeWeekHours(weeklyHoursByEmployee(siblingShifts), employeeId, shiftDate);
+    return existing + shiftDurationHours(startTime, endTime, shift.breakMinutes);
+  }, [employeeId, scheduleShifts, shift.breakMinutes, shift.id, shiftDate, startTime, endTime]);
+
+  const showWeeklyHoursWarning = projectedWeekHours !== null && isOverWeeklyLimit(projectedWeekHours);
 
   if (!isOpen) {
     return null;
@@ -268,6 +295,14 @@ export function ShiftEditModal({
             />
           </div>
         </div>
+
+        {showWeeklyHoursWarning && projectedWeekHours !== null ? (
+          <p className="shift-modal-hours-warning" role="status">
+            {tSched("weeklyHours.overLimit", { hours: WEEKLY_HOURS_SOFT_LIMIT })}
+            {" · "}
+            {tSched("weeklyHours.total", { hours: roundHours(projectedWeekHours) })}
+          </p>
+        ) : null}
 
         {error ? <p className="swap-error">{error}</p> : null}
 

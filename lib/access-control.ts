@@ -53,10 +53,12 @@ export const DASHBOARD_WIDGET_DEFINITIONS: ReadonlyArray<{
 const ALL_ROLES = USER_ROLES as readonly UserRole[];
 const ADMIN_ROLES: readonly UserRole[] = ["HR_ADMIN", "FINANCE_ADMIN", "FINANCE_APPROVER", "SUPER_ADMIN"];
 const SUPER_ONLY: readonly UserRole[] = ["SUPER_ADMIN"];
-const SCHEDULING_ROLES: readonly UserRole[] = [
-  "HR_ADMIN",
-  "SUPER_ADMIN"
-];
+/* Any role can OPEN the scheduling area (my shifts + team calendar), but
+ * RLS scopes what they see: shifts only from PUBLISHED schedules of their
+ * own department (e.g. Customer Success) or schedules they're rostered on.
+ * Employees outside scheduled departments simply see an empty calendar.
+ * Building/managing schedules stays with the manage roles below. */
+const SCHEDULING_ROLES: readonly UserRole[] = ALL_ROLES;
 const SCHEDULING_MANAGE_ROLES: readonly UserRole[] = [
   "HR_ADMIN",
   "SUPER_ADMIN"

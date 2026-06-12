@@ -21903,3 +21903,72 @@ html.dark .crew-games-platform-game:hover {
   height: 14px;
   flex-shrink: 0;
 }
+
+/* ── Scheduling: weekly-hours soft guardrail (48h, warn-only) ─────────
+   Per-employee "hours this week" badges in the manual grid plus inline
+   modal warnings. SOFT visual treatment only — never blocks saving. */
+.schedule-grid-hours {
+  margin-left: 6px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-grid-hours.is-over {
+  color: var(--status-warning-text);
+  background: var(--status-warning-bg);
+  border: 1px solid var(--status-warning-border);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+.shift-modal-hours-warning {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* Warning-toned toast (e.g. schedule created but auto-generation failed). */
+.toast-message-warning {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+/* Schedule wizard: auto-generate opt-out on the roster step. */
+.schedule-wizard-autogen {
+  margin-top: var(--space-3);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.schedule-wizard-autogen input[type="checkbox"] {
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+}
+
+/* ── Scheduling touch targets (extends the main coarse-pointer block) ──
+   Gaps found while auditing the scheduling grid + my-shifts calendar:
+   - .mycal-shift (my-shifts calendar shift taps): ~22px tall buttons.
+   - .teamcal-shift-selectable (team calendar shift taps in manage mode):
+     ~38px articles acting as buttons.
+   Both are stacked vertically inside calendar cells, so a ::before
+   overlay would cover the stacked sibling above/below and misroute
+   taps — enlarge the controls instead (cells grow; nothing overlaps).
+   Sizing only — zero color/theme changes. */
+@media (pointer: coarse), (max-width: 768px) {
+  .mycal-shift {
+    min-height: 44px;
+  }
+
+  .teamcal-shift-selectable {
+    min-height: 44px;
+  }
+}

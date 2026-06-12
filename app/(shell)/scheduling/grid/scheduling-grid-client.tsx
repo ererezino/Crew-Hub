@@ -7,6 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { useSchedulingSchedules, useSchedulingShifts } from "../../../../hooks/use-scheduling";
 import { usePeople } from "../../../../hooks/use-people";
 import { areDepartmentsEqual } from "../../../../lib/department";
+import {
+  WEEKLY_HOURS_SOFT_LIMIT,
+  isOverWeeklyLimit,
+  roundHours,
+  weeklyHoursByEmployee
+} from "../../../../lib/scheduling/shift-hours";
 import type { ScheduleRecord, ShiftRecord } from "../../../../types/scheduling";
 
 type ToastMessage = { id: number; type: "success" | "error" | "info"; text: string };
@@ -297,6 +303,9 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
 
   const rosterById = useMemo(() => new Map(roster.map((p) => [p.id, p.fullName] as const)), [roster]);
 
+  // Per-employee scheduled hours per ISO week (Monday start) — soft 48h guardrail, never blocking.
+  const weeklyHours = useMemo(() => weeklyHoursByEmployee(shifts), [shifts]);
+
   const saveCell = useCallback(
     async (week: WeekRow, slot: Slot, employeeId: string, weekdays: number[]) => {
       if (!activeSchedule) return;
@@ -514,6 +523,8 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                           <ul className="schedule-grid-people">
                             {[...people.values()].map((person) => {
                               const onLeave = isOnLeaveWeek(person.employeeId, week);
+                              const hoursThisWeek = weeklyHours.get(person.employeeId)?.get(week.weekStart) ?? 0;
+                              const overLimit = isOverWeeklyLimit(hoursThisWeek);
                               return (
                               <li
                                 key={person.employeeId}
@@ -523,6 +534,18 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                                 <span className="schedule-grid-chip-name">
                                   {rosterById.get(person.employeeId) ?? person.name}
                                   {onLeave ? <span className="schedule-grid-leave-tag">{t("grid.onLeaveTag")}</span> : null}
+                                  {hoursThisWeek > 0 ? (
+                                    <span
+                                      className={`schedule-grid-hours${overLimit ? " is-over" : ""}`}
+                                      title={
+                                        overLimit
+                                          ? t("weeklyHours.overLimit", { hours: WEEKLY_HOURS_SOFT_LIMIT })
+                                          : t("weeklyHours.total", { hours: roundHours(hoursThisWeek) })
+                                      }
+                                    >
+                                      {t("weeklyHours.badge", { hours: roundHours(hoursThisWeek) })}
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span className="schedule-grid-days">
                                   {week.rangeWeekdays.map((wd) => {

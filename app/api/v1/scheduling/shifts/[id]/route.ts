@@ -466,6 +466,22 @@ export async function PUT(
     });
   }
 
+  /* A shift parked in "swap_requested" is the premise of a pending swap —
+   * editing it (time, date, assignee) would corrupt what the target agreed to
+   * cover. Swap resolution flows update the shift through the swaps endpoint,
+   * never through this PUT, so there is no carve-out to honor here. */
+  if (existingShift.status === "swap_requested") {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "SHIFT_HAS_PENDING_SWAP",
+        message:
+          "This shift has a pending swap request. Resolve or cancel the swap before editing the shift."
+      },
+      meta: buildMeta()
+    });
+  }
+
   const nextScheduleId = changes.scheduleId ?? existingShift.schedule_id;
   const nextTemplateId =
     changes.templateId === undefined ? existingShift.template_id : changes.templateId;
@@ -665,7 +681,10 @@ export async function PUT(
     newValue: {
       employee_id: parsedUpdatedRow.data.employee_id,
       shift_date: parsedUpdatedRow.data.shift_date,
-      status: parsedUpdatedRow.data.status
+      status: parsedUpdatedRow.data.status,
+      /* Conflict warnings stay advisory (deliberate, commit 2579c23), but
+       * proceeding past them is auditable: record exactly what was flagged. */
+      ...(conflictWarnings.length > 0 ? { warningsAcknowledged: conflictWarnings } : {})
     }
   });
 

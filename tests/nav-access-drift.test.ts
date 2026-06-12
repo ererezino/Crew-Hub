@@ -50,11 +50,20 @@ describe("Nav visibility alignment (W2.6)", () => {
     expect(access).not.toContain("/onboarding");
   });
 
-  // ── TEAM_LEAD: /scheduling moved to per-person overrides (W2.6) ──
+  // ── /scheduling viewing opened to all roles (2026-06-11): "who's working
+  //    when" is department-scoped by RLS (published schedules only), so nav
+  //    access is universal. Managing stays gated — see the /scheduling/manage
+  //    assertions below. Supersedes the W2.6 per-person-override approach
+  //    for VIEWING; per-person overrides remain for manage-level grants. ──
 
-  it("TEAM_LEAD does NOT see /scheduling in default nav visibility", () => {
+  it("TEAM_LEAD sees /scheduling in default nav visibility (org-wide viewing)", () => {
     const visible = navVisibleForRole("TEAM_LEAD");
-    expect(visible).not.toContain("/scheduling");
+    expect(visible).toContain("/scheduling");
+  });
+
+  it("EMPLOYEE sees /scheduling in default nav visibility (org-wide viewing)", () => {
+    const visible = navVisibleForRole("EMPLOYEE");
+    expect(visible).toContain("/scheduling");
   });
 
   it("TEAM_LEAD still sees /team-hub in nav visibility", () => {
@@ -135,9 +144,19 @@ describe("Nav visibility alignment (W2.6)", () => {
     expect(roles).toContain("HR_ADMIN");
   });
 
-  it("/scheduling visible-to-roles does NOT include TEAM_LEAD (per-person override)", () => {
+  it("/scheduling visible-to-roles includes every role (org-wide viewing, RLS-scoped)", () => {
     const roles = getDefaultVisibleRolesForNavItem("/scheduling");
+    expect(roles).toContain("EMPLOYEE");
+    expect(roles).toContain("TEAM_LEAD");
+    expect(roles).toContain("HR_ADMIN");
+    expect(roles).toContain("SUPER_ADMIN");
+  });
+
+  it("/scheduling/manage stays gated to HR_ADMIN and SUPER_ADMIN only", () => {
+    const roles = getDefaultVisibleRolesForNavItem("/scheduling/manage");
+    expect(roles).not.toContain("EMPLOYEE");
     expect(roles).not.toContain("TEAM_LEAD");
+    expect(roles).not.toContain("MANAGER");
     expect(roles).toContain("HR_ADMIN");
     expect(roles).toContain("SUPER_ADMIN");
   });
