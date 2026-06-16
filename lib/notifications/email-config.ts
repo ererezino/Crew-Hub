@@ -36,6 +36,7 @@ export const EMAIL_FEATURES = {
   onboardingOverdue: true,
   onboardingCompleted: true,
   schedulePublished: true,
+  scheduleReminder: true,
   swapRequested: true,
   swapAccepted: true,
   payrollApproval: true

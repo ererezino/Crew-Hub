@@ -22130,3 +22130,40 @@ html.dark .crew-games-platform-game:hover {
     min-height: 44px;
   }
 }
+
+/* ── Scheduling: read-only team roster (mobile-first) ───────────────── */
+.roster-layout { display: grid; gap: var(--space-3); }
+.roster-weeks { display: grid; gap: var(--space-4); }
+.roster-week {
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  padding: var(--space-3);
+}
+.roster-week-title { margin: 0 0 var(--space-2); font-size: var(--text-md); font-weight: 600; }
+.roster-empty-week { margin: 0; }
+.roster-slot { padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
+.roster-slot:first-of-type { border-top: none; padding-top: 0; }
+.roster-slot-head { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; margin-bottom: 6px; }
+.roster-slot-name { font-weight: 600; }
+.roster-slot-time { font-size: var(--text-sm); color: var(--text-muted); }
+.roster-people { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.roster-person {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: 8px 10px; border-radius: 8px; background: var(--bg-warm); min-height: 40px;
+}
+.roster-person.is-you { outline: 2px solid var(--color-accent); }
+.roster-person-name { font-size: var(--text-base); }
+.roster-you-tag {
+  margin-left: 8px; font-size: var(--text-xs); font-weight: 700; text-transform: uppercase;
+  color: var(--color-accent); border: 1px solid currentColor; border-radius: 4px; padding: 0 5px;
+}
+.roster-days { display: inline-flex; gap: 2px; flex-shrink: 0; }
+.roster-day {
+  width: 18px; height: 18px; line-height: 18px; text-align: center; font-size: 0.65rem;
+  border-radius: 4px; border: 1px solid var(--border-default); color: var(--text-muted);
+}
+.roster-day.is-on { background: var(--color-accent); border-color: var(--color-accent); color: #1a1205; font-weight: 700; }
+@media (max-width: 640px) {
+  .roster-person { flex-wrap: wrap; }
+}

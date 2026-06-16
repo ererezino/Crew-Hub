@@ -362,6 +362,7 @@
     "tab": {
       "mySchedule": "Mon horaire",
       "teamCalendar": "Calendrier d'équipe",
+      "roster": "Effectif",
       "build": "Composer",
       "manage": "Gérer"
     },
@@ -443,7 +444,14 @@
       "cycleHoursTooltip": "Cliquez pour changer : 8h → 4h → 3h → 2h",
       "hoursLabel": "{hours}h",
       "noSearchResults": "Aucun membre ne correspond à votre recherche.",
-      "noActiveMembers": "Aucun membre actif trouvé."
+      "noActiveMembers": "Aucun membre actif trouvé.",
+      "scheduleLabel": "Horaire",
+      "helpText": "Toute l'équipe sur l'horaire publié, semaine par semaine. Les jours en surbrillance indiquent les jours travaillés.",
+      "untitled": "Horaire sans titre",
+      "noPublishedTitle": "Aucun horaire publié pour l'instant",
+      "noPublishedDesc": "Une fois l'horaire de votre équipe publié, vous verrez ici qui travaille chaque quart.",
+      "noOneScheduled": "Personne n'est planifié cette semaine.",
+      "youTag": "Vous"
     },
     "review": {
       "generating": "Génération de l'horaire…",
@@ -6198,6 +6206,12 @@
         "preheader": "Consultez vos quarts de travail",
         "subject": "Horaire {scheduleName} publié pour {month} {year}",
         "body": "L'horaire {scheduleName} pour {month} {year} a été publié. Consultez vos quarts assignés dans Crew Hub.",
+        "cta": "Voir l'horaire"
+      },
+      "reminder": {
+        "preheader": "Vos quarts pour {period}",
+        "subject": "Vos quarts pour {period}",
+        "body": "Voici vos quarts pour {period} :",
         "cta": "Voir l'horaire"
       }
     },

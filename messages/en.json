@@ -362,6 +362,7 @@
     "tab": {
       "mySchedule": "My Schedule",
       "teamCalendar": "Team Calendar",
+      "roster": "Roster",
       "build": "Build",
       "manage": "Manage"
     },
@@ -443,7 +444,14 @@
       "cycleHoursTooltip": "Click to cycle: 8hr → 4hr → 3hr → 2hr",
       "hoursLabel": "{hours}hr",
       "noSearchResults": "No team members match your search.",
-      "noActiveMembers": "No active team members found."
+      "noActiveMembers": "No active team members found.",
+      "scheduleLabel": "Schedule",
+      "helpText": "Everyone working the published schedule, week by week. Highlighted days show which days each person works.",
+      "untitled": "Untitled schedule",
+      "noPublishedTitle": "No published schedule yet",
+      "noPublishedDesc": "Once your team's schedule is published, you'll see who's working each shift here.",
+      "noOneScheduled": "No one scheduled this week.",
+      "youTag": "You"
     },
     "review": {
       "generating": "Generating schedule…",
@@ -6198,6 +6206,12 @@
         "preheader": "Check your shifts",
         "subject": "{scheduleName} schedule published for {month} {year}",
         "body": "The {scheduleName} schedule for {month} {year} has been published. Check your assigned shifts in Crew Hub.",
+        "cta": "View Schedule"
+      },
+      "reminder": {
+        "preheader": "Your shifts for {period}",
+        "subject": "Your shifts for {period}",
+        "body": "Here are your shifts for {period}:",
         "cta": "View Schedule"
       }
     },
