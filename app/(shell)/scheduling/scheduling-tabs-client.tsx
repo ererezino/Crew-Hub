@@ -12,6 +12,7 @@ import type { UserRole } from "../../../lib/navigation";
 import { SchedulingCalendarClient } from "./calendar/scheduling-calendar-client";
 import { SchedulingGridClient } from "./grid/scheduling-grid-client";
 import { SchedulingManageClient } from "./manage/scheduling-manage-client";
+import { SchedulingRosterClient } from "./roster/scheduling-roster-client";
 import { SchedulingClient } from "./scheduling-client";
 
 type SchedulingTabsClientProps = {
@@ -54,6 +55,10 @@ export function SchedulingTabsClient({
         {
           key: "my-shifts",
           label: t("tab.mySchedule")
+        },
+        {
+          key: "roster",
+          label: t("tab.roster")
         },
         {
           key: "team-calendar",
@@ -133,6 +138,9 @@ export function SchedulingTabsClient({
             currentUserId={currentUserId}
             canManageSwaps={canManage}
           />
+        ) : null}
+        {activeTab === "roster" ? (
+          <SchedulingRosterClient currentUserId={currentUserId} />
         ) : null}
         {activeTab === "team-calendar" ? (
           <SchedulingCalendarClient

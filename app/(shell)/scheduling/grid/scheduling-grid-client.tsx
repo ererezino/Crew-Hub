@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
@@ -73,6 +73,17 @@ function shortDate(iso: string, locale: string): string {
 function slotKeyOf(startHHMM: string, endHHMM: string): string {
   return `${startHHMM}-${endHHMM}`;
 }
+/** Default working days when adding someone, respecting the schedule's track:
+ *  weekend track → Sat/Sun only; weekday track → Mon–Fri. Falls back to all in-range
+ *  days if the track yields none (e.g. a partial week with no matching days). */
+function defaultWeekdaysForTrack(week: WeekRow, track: string | null | undefined): number[] {
+  const isWeekend = track === "weekend";
+  const filtered = week.rangeWeekdays.filter((d) => (isWeekend ? d >= 5 : d <= 4));
+  return filtered.length > 0 ? filtered : week.rangeWeekdays;
+}
+function editKey(cellKey: string, employeeId: string): string {
+  return `${cellKey}__${employeeId}`;
+}
 
 const DEFAULT_SLOTS: Slot[] = [
   { key: "08:00-16:00", name: "Morning Shift", startTime: "08:00", endTime: "16:00" },
@@ -118,7 +129,12 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
   }, [peopleQuery.people, activeSchedule?.department]);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [savingCell, setSavingCell] = useState<string | null>(null);
+  // Optimistic cell edits: applied to the UI instantly, saved in the background (debounced).
+  // Keyed by `${cellKey}__${employeeId}` → desired weekday set ([] means removed).
+  const [edits, setEdits] = useState<
+    Map<string, { cellKey: string; employeeId: string; name: string; weekdays: number[] }>
+  >(new Map());
+  const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [addTarget, setAddTarget] = useState<string | null>(null); // `${weekIndex}:${slotKey}`
   const [notes, setNotes] = useState<Map<string, string>>(new Map()); // weekStart -> note
   const [copyingWeek, setCopyingWeek] = useState<string | null>(null);
@@ -137,6 +153,14 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
 
   // Load per-week notes for the active schedule.
   const scheduleId = activeSchedule?.id;
+
+  // Drop optimistic edits when switching schedules (the fresh fetch is authoritative).
+  useEffect(() => {
+    setEdits(new Map());
+    saveTimers.current.forEach((timer) => clearTimeout(timer));
+    saveTimers.current.clear();
+  }, [scheduleId]);
+
   useEffect(() => {
     if (!scheduleId) {
       setNotes(new Map());
@@ -303,14 +327,41 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
 
   const rosterById = useMemo(() => new Map(roster.map((p) => [p.id, p.fullName] as const)), [roster]);
 
+  // Cells with optimistic edits applied on top of server-derived data, so toggles/add/remove
+  // show instantly without waiting for (or re-fetching) the server.
+  const effectiveCells = useMemo(() => {
+    const grid = new Map<string, Map<string, CellPerson>>();
+    for (const [cellKey, people] of cells) {
+      const m = new Map<string, CellPerson>();
+      for (const [eid, p] of people) {
+        m.set(eid, { employeeId: p.employeeId, name: p.name, weekdays: new Set(p.weekdays) });
+      }
+      grid.set(cellKey, m);
+    }
+    for (const { cellKey, employeeId, name, weekdays } of edits.values()) {
+      let m = grid.get(cellKey);
+      if (!m) {
+        m = new Map();
+        grid.set(cellKey, m);
+      }
+      if (weekdays.length === 0) {
+        m.delete(employeeId);
+      } else {
+        m.set(employeeId, { employeeId, name, weekdays: new Set(weekdays) });
+      }
+    }
+    return grid;
+  }, [cells, edits]);
+
   // Per-employee scheduled hours per ISO week (Monday start) — soft 48h guardrail, never blocking.
   const weeklyHours = useMemo(() => weeklyHoursByEmployee(shifts), [shifts]);
 
-  const saveCell = useCallback(
+  // Background save for a single cell edit. No spinner, no global disable, no refetch —
+  // the optimistic overlay keeps the UI correct; only errors trigger a reconciling refresh.
+  const doSave = useCallback(
     async (week: WeekRow, slot: Slot, employeeId: string, weekdays: number[]) => {
       if (!activeSchedule) return;
-      const cellKey = `${week.index}:${slot.key}:${employeeId}`;
-      setSavingCell(cellKey);
+      const cellKey = `${week.index}:${slot.key}`;
       try {
         const res = await fetch(`/api/v1/scheduling/schedules/${activeSchedule.id}/grid`, {
           method: "POST",
@@ -326,16 +377,43 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         if (!res.ok) {
           throw new Error(payload?.error?.message ?? t("grid.toastError"));
         }
-        const warnings: string[] = payload?.data?.warnings ?? [];
-        for (const w of warnings) addToast("info", w);
-        shiftsQuery.refresh();
+        for (const w of (payload?.data?.warnings ?? []) as string[]) addToast("info", w);
       } catch (err) {
         addToast("error", err instanceof Error ? err.message : t("grid.toastError"));
-      } finally {
-        setSavingCell(null);
+        // Drop the failed edit so the cell falls back to server state, then reconcile.
+        setEdits((cur) => {
+          const next = new Map(cur);
+          next.delete(editKey(cellKey, employeeId));
+          return next;
+        });
+        shiftsQuery.refresh();
       }
     },
-    [activeSchedule, addToast, shiftsQuery, t]
+    [activeSchedule, addToast, t, shiftsQuery]
+  );
+
+  // Apply an edit instantly to the UI and debounce the save (coalesces rapid day-toggles).
+  const applyEdit = useCallback(
+    (week: WeekRow, slot: Slot, employeeId: string, name: string, weekdays: number[]) => {
+      const cellKey = `${week.index}:${slot.key}`;
+      const k = editKey(cellKey, employeeId);
+      setEdits((cur) => {
+        const next = new Map(cur);
+        next.set(k, { cellKey, employeeId, name, weekdays });
+        return next;
+      });
+      const timers = saveTimers.current;
+      const existing = timers.get(k);
+      if (existing) clearTimeout(existing);
+      timers.set(
+        k,
+        setTimeout(() => {
+          timers.delete(k);
+          void doSave(week, slot, employeeId, weekdays);
+        }, 450)
+      );
+    },
+    [doSave]
   );
 
   const copyWeek = useCallback(
@@ -349,7 +427,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         let count = 0;
         const allWarnings = new Set<string>();
         for (const slot of slots) {
-          const sourcePeople = cells.get(`${source.index}:${slot.key}`);
+          const sourcePeople = effectiveCells.get(`${source.index}:${slot.key}`);
           if (!sourcePeople) continue;
           for (const person of sourcePeople.values()) {
             // Map the source person's worked weekdays onto the target week's in-range days.
@@ -372,6 +450,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
             }
           }
         }
+        setEdits(new Map());
         shiftsQuery.refresh();
         if (count > 0) {
           addToast("success", t("grid.copyWeekDone", { count }));
@@ -385,7 +464,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         setCopyingWeek(null);
       }
     },
-    [activeSchedule, weeks, slots, cells, shiftsQuery, addToast, t]
+    [activeSchedule, weeks, slots, effectiveCells, shiftsQuery, addToast, t]
   );
 
   const handleAddSlot = useCallback(() => {
@@ -504,7 +583,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                       <button
                         type="button"
                         className="schedule-grid-copy"
-                        disabled={copyingWeek !== null || savingCell !== null}
+                        disabled={copyingWeek !== null}
                         onClick={() => void copyWeek(week)}
                       >
                         {copyingWeek === week.weekStart ? t("grid.copying") : t("grid.copyWeek")}
@@ -513,7 +592,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                   </th>
                   {slots.map((slot) => {
                     const cellKey = `${week.index}:${slot.key}`;
-                    const people = cells.get(cellKey);
+                    const people = effectiveCells.get(cellKey);
                     const assignedIds = new Set(people ? [...people.keys()] : []);
                     const available = roster.filter((p) => !assignedIds.has(p.id));
                     const isAdding = addTarget === cellKey;
@@ -556,12 +635,11 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                                         key={wd}
                                         className={`schedule-grid-day${on ? " is-on" : ""}`}
                                         title={t("grid.toggleDay")}
-                                        disabled={savingCell !== null}
                                         onClick={() => {
                                           const next = new Set(person.weekdays);
                                           if (on) next.delete(wd);
                                           else next.add(wd);
-                                          void saveCell(week, slot, person.employeeId, [...next].sort((a, b) => a - b));
+                                          applyEdit(week, slot, person.employeeId, person.name, [...next].sort((a, b) => a - b));
                                         }}
                                       >
                                         {DAY_LETTERS[wd]}
@@ -574,8 +652,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                                   className="schedule-grid-remove"
                                   aria-label={t("grid.removePerson")}
                                   title={t("grid.removePerson")}
-                                  disabled={savingCell !== null}
-                                  onClick={() => void saveCell(week, slot, person.employeeId, [])}
+                                  onClick={() => applyEdit(week, slot, person.employeeId, person.name, [])}
                                 >
                                   ×
                                 </button>
@@ -591,7 +668,14 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                               value=""
                               onValueChange={(value) => {
                                 setAddTarget(null);
-                                void saveCell(week, slot, value, week.rangeWeekdays);
+                                const picked = roster.find((r) => r.id === value);
+                                applyEdit(
+                                  week,
+                                  slot,
+                                  value,
+                                  picked?.fullName ?? "",
+                                  defaultWeekdaysForTrack(week, activeSchedule?.scheduleTrack)
+                                );
                               }}
                             >
                               <SelectTrigger>
@@ -617,7 +701,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                           <button
                             type="button"
                             className="schedule-grid-add"
-                            disabled={savingCell !== null || available.length === 0}
+                            disabled={available.length === 0}
                             onClick={() => setAddTarget(cellKey)}
                           >
                             + {t("grid.addPerson")}

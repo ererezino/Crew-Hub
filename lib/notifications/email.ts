@@ -2140,6 +2140,61 @@ export async function sendSchedulePublishedEmail({
   }
 }
 
+/** Start-of-period reminder: lists a crew member's upcoming shifts for the week/weekend. */
+export async function sendScheduleReminderEmail({
+  orgId,
+  userId,
+  periodLabel,
+  shiftLines
+}: {
+  orgId: string;
+  userId: string;
+  periodLabel: string;
+  shiftLines: string[];
+}): Promise<void> {
+  try {
+    if (!isEmailEnabled("scheduleReminder")) return;
+    if (shiftLines.length === 0) return;
+
+    const recipient = await fetchRecipientProfile({ orgId, userId });
+    if (!recipient) return;
+
+    const canSend = await checkEmailPreference(orgId, userId, "announcements");
+    if (!canSend) return;
+
+    const locale = recipient.locale;
+    const t = createEmailTranslator(locale);
+    const name = firstName(recipient.fullName, locale);
+    const appUrl = resolveAppUrl();
+
+    const listHtml = `<ul style="margin:0 0 16px;padding-left:20px">${shiftLines
+      .map((line) => `<li style="margin:0 0 6px">${line}</li>`)
+      .join("")}</ul>`;
+
+    const html = renderEmailTemplate({
+      preheaderText: t("schedule.reminder.preheader", { period: periodLabel }),
+      greeting: t("greeting", { name }),
+      bodyHtml: [pLast(t("schedule.reminder.body", { period: periodLabel })), listHtml].join("\n"),
+      ctaButton: {
+        label: t("schedule.reminder.cta"),
+        url: `${appUrl}/scheduling`,
+        style: "cta"
+      },
+      ...emailLocaleOptions(t, locale)
+    });
+
+    await sendResendEmail({
+      to: [recipient.email],
+      subject: t("schedule.reminder.subject", { period: periodLabel }),
+      html
+    });
+  } catch (error) {
+    console.error("Unexpected schedule reminder email failure.", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+}
+
 /* ---------------------------------------------------------------------------
  * 30. Swap Requested (ACTIVE)
  * -------------------------------------------------------------------------*/
