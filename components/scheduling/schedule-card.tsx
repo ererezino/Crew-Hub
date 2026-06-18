@@ -12,6 +12,7 @@ type ScheduleCardProps = {
   onRegenerate: (id: string) => void;
   onDelete: (id: string) => void;
   onViewShifts: (id: string) => void;
+  onDuplicate?: (schedule: ScheduleRecord) => void;
   isPublishing?: boolean;
 };
 
@@ -22,6 +23,7 @@ export function ScheduleCard({
   onRegenerate,
   onDelete,
   onViewShifts,
+  onDuplicate,
   isPublishing
 }: ScheduleCardProps) {
   const t = useTranslations("scheduling");
@@ -73,6 +75,17 @@ export function ScheduleCard({
             disabled={isPublishing}
           >
             {tc("retry")}
+          </button>
+        ) : null}
+
+        {onDuplicate ? (
+          <button
+            type="button"
+            className="button button-ghost"
+            onClick={() => onDuplicate(schedule)}
+            title={t("card.useAsTemplate")}
+          >
+            {t("card.useAsTemplate")}
           </button>
         ) : null}
 
