@@ -473,7 +473,8 @@
       "shiftCount": "{count, plural, one {# quart} other {# quarts}}",
       "viewShifts": "Voir les quarts",
       "deleteSchedule": "Supprimer l'horaire",
-      "deleteDisabled": "Les horaires verrouillés ne peuvent pas être supprimés."
+      "deleteDisabled": "Les horaires verrouillés ne peuvent pas être supprimés.",
+      "useAsTemplate": "Utiliser comme modèle"
     },
     "cardGrid": {
       "emptyTitle": "Aucun horaire pour le moment",
@@ -489,6 +490,20 @@
       "confirmPublishBody": "La publication notifiera tous les membres assignés. Cette action est irréversible.",
       "confirmDeleteTitle": "Supprimer l'horaire ?",
       "confirmDeleteBody": "Cela supprimera définitivement cet horaire et tous les quarts associés.",
+      "untitledSchedule": "Horaire",
+      "duplicate": {
+        "title": "Utiliser comme modèle",
+        "description": "Créez un nouvel horaire brouillon à partir de celui-ci. Le schéma des quarts (qui travaille chaque créneau, semaine par semaine) est copié sur vos nouvelles dates — modifiez-le dans Composer avant de publier.",
+        "nameLabel": "Nom du nouvel horaire",
+        "startLabel": "Date de début",
+        "endLabel": "Date de fin",
+        "note": "Le schéma hebdomadaire se répète pour remplir les nouvelles dates. Si la plage est plus longue, les premières semaines se répètent.",
+        "create": "Créer à partir du modèle",
+        "creating": "Création…",
+        "success": "Créé à partir du modèle avec {count, plural, one {# quart} other {# quarts}}. Retrouvez-le dans Composer.",
+        "failed": "Impossible de créer le nouvel horaire.",
+        "invalidDates": "Choisissez une date de début et de fin valide."
+      },
       "toastPublished": "Horaire publié avec succès.",
       "toastDeleted": "Horaire supprimé.",
       "toastCreated": "Horaire créé avec des quarts auto-générés.",

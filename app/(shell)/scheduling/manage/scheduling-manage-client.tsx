@@ -13,6 +13,18 @@ import { useSchedulingSchedules } from "../../../../hooks/use-scheduling";
 import { usePeople } from "../../../../hooks/use-people";
 import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
+import type { ScheduleRecord } from "../../../../types/scheduling";
+
+function addIsoDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function isoDaysBetween(startIso: string, endIso: string): number {
+  const start = new Date(`${startIso}T00:00:00.000Z`).getTime();
+  const end = new Date(`${endIso}T00:00:00.000Z`).getTime();
+  return Math.round((end - start) / 86_400_000);
+}
 
 
 type ToastMessage = {
@@ -49,6 +61,11 @@ export function SchedulingManageClient({
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [confirmPublish, setConfirmPublish] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [duplicateSource, setDuplicateSource] = useState<ScheduleRecord | null>(null);
+  const [dupName, setDupName] = useState("");
+  const [dupStart, setDupStart] = useState("");
+  const [dupEnd, setDupEnd] = useState("");
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Convert people data to roster employees – Customer Success members first
@@ -216,6 +233,49 @@ export function SchedulingManageClient({
     router.replace(`/scheduling?tab=team-calendar&scheduleId=${encodeURIComponent(scheduleId)}`);
   }, [router]);
 
+  const openDuplicate = useCallback((schedule: ScheduleRecord) => {
+    // Prefill the new schedule to start the day after the source ends, with the same span.
+    const span = Math.max(0, isoDaysBetween(schedule.startDate, schedule.endDate));
+    const start = addIsoDays(schedule.endDate, 1);
+    setDuplicateSource(schedule);
+    setDupName(`${schedule.name ?? t("manage.untitledSchedule")} (copy)`);
+    setDupStart(start);
+    setDupEnd(addIsoDays(start, span));
+  }, [t]);
+
+  const closeDuplicate = useCallback(() => {
+    setDuplicateSource(null);
+    setIsDuplicating(false);
+  }, []);
+
+  const submitDuplicate = useCallback(async () => {
+    if (!duplicateSource) return;
+    if (!dupStart || !dupEnd || dupEnd < dupStart) {
+      addToast("error", t("manage.duplicate.invalidDates"));
+      return;
+    }
+    setIsDuplicating(true);
+    try {
+      const res = await fetch(`/api/v1/scheduling/schedules/${duplicateSource.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: dupName.trim() || undefined, startDate: dupStart, endDate: dupEnd })
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.error?.message ?? t("manage.duplicate.failed"));
+      }
+      const count = payload?.data?.schedule?.shiftCount ?? 0;
+      addToast("success", t("manage.duplicate.success", { count }));
+      refreshSchedules();
+      closeDuplicate();
+      router.replace("/scheduling?tab=build");
+    } catch (err) {
+      addToast("error", err instanceof Error ? err.message : t("manage.duplicate.failed"));
+      setIsDuplicating(false);
+    }
+  }, [duplicateSource, dupName, dupStart, dupEnd, addToast, refreshSchedules, closeDuplicate, router, t]);
+
   const handleWizardSubmit = useCallback(async (result: ScheduleWizardResult) => {
     // The wizard already created the schedule (and generated shifts when
     // auto-generation was on) — refresh the list and report the outcome.
@@ -326,6 +386,7 @@ export function SchedulingManageClient({
           onRegenerate={handleRegenerate}
           onDelete={(id) => setConfirmDelete(id)}
           onViewShifts={handleViewShifts}
+          onDuplicate={openDuplicate}
           onCreateNew={() => setWizardOpen(true)}
           publishingId={publishingId}
         />
@@ -370,6 +431,74 @@ export function SchedulingManageClient({
         }}
         onCancel={() => setConfirmDelete(null)}
       />
+
+      {/* Duplicate / use-as-template dialog */}
+      {duplicateSource ? (
+        <div className="modal-overlay" onClick={() => !isDuplicating && closeDuplicate()}>
+          <section
+            className="modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("manage.duplicate.title")}
+            onClick={(event) => event.stopPropagation()}
+            style={{ display: "grid", gap: "var(--space-3)", width: "min(480px, 92vw)" }}
+          >
+            <h2 className="modal-title">{t("manage.duplicate.title")}</h2>
+            <p className="settings-card-description">{t("manage.duplicate.description")}</p>
+
+            <label className="form-field">
+              <span className="form-label">{t("manage.duplicate.nameLabel")}</span>
+              <input
+                className="form-input"
+                value={dupName}
+                onChange={(event) => setDupName(event.target.value)}
+                maxLength={200}
+                disabled={isDuplicating}
+              />
+            </label>
+
+            <div className="timeoff-form-grid">
+              <label className="form-field">
+                <span className="form-label">{t("manage.duplicate.startLabel")}</span>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={dupStart}
+                  onChange={(event) => setDupStart(event.target.value)}
+                  disabled={isDuplicating}
+                />
+              </label>
+              <label className="form-field">
+                <span className="form-label">{t("manage.duplicate.endLabel")}</span>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={dupEnd}
+                  min={dupStart}
+                  onChange={(event) => setDupEnd(event.target.value)}
+                  disabled={isDuplicating}
+                />
+              </label>
+            </div>
+
+            <p className="settings-card-description">{t("manage.duplicate.note")}</p>
+
+            <div className="modal-actions">
+              <button type="button" className="button button-subtle" onClick={closeDuplicate} disabled={isDuplicating}>
+                {tc("cancel")}
+              </button>
+              <button
+                type="button"
+                className="button button-accent"
+                onClick={() => void submitDuplicate()}
+                disabled={isDuplicating || !dupStart || !dupEnd || dupEnd < dupStart}
+              >
+                {isDuplicating ? t("manage.duplicate.creating") : t("manage.duplicate.create")}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {/* Toast notifications */}
       {toasts.length > 0 ? (

@@ -11,6 +11,7 @@ type ScheduleCardGridProps = {
   onRegenerate: (id: string) => void;
   onDelete: (id: string) => void;
   onViewShifts: (id: string) => void;
+  onDuplicate?: (schedule: ScheduleRecord) => void;
   onCreateNew: () => void;
   publishingId: string | null;
 };
@@ -21,6 +22,7 @@ export function ScheduleCardGrid({
   onRegenerate,
   onDelete,
   onViewShifts,
+  onDuplicate,
   onCreateNew,
   publishingId
 }: ScheduleCardGridProps) {
@@ -59,6 +61,7 @@ export function ScheduleCardGrid({
           onRegenerate={onRegenerate}
           onDelete={onDelete}
           onViewShifts={onViewShifts}
+          onDuplicate={onDuplicate}
           isPublishing={publishingId === schedule.id}
         />
       ))}

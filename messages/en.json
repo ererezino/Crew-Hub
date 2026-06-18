@@ -473,7 +473,8 @@
       "shiftCount": "{count, plural, one {# shift} other {# shifts}}",
       "viewShifts": "View Shifts",
       "deleteSchedule": "Delete schedule",
-      "deleteDisabled": "Locked schedules cannot be deleted."
+      "deleteDisabled": "Locked schedules cannot be deleted.",
+      "useAsTemplate": "Use as template"
     },
     "cardGrid": {
       "emptyTitle": "No schedules yet",
@@ -489,6 +490,20 @@
       "confirmPublishBody": "Publishing will notify all assigned team members. This action cannot be undone.",
       "confirmDeleteTitle": "Delete schedule?",
       "confirmDeleteBody": "This will permanently delete this schedule and all linked shifts.",
+      "untitledSchedule": "Schedule",
+      "duplicate": {
+        "title": "Use as template",
+        "description": "Create a new draft schedule from this one. The shift pattern (who works each slot, week by week) is copied onto your new dates — edit it in Build before publishing.",
+        "nameLabel": "New schedule name",
+        "startLabel": "Start date",
+        "endLabel": "End date",
+        "note": "The weekly pattern repeats to fill the new dates. If the new range is longer, earlier weeks cycle.",
+        "create": "Create from template",
+        "creating": "Creating…",
+        "success": "Created from template with {count, plural, one {# shift} other {# shifts}}. Find it in Build.",
+        "failed": "Unable to create the new schedule.",
+        "invalidDates": "Pick a valid start and end date."
+      },
       "toastPublished": "Schedule published successfully.",
       "toastDeleted": "Schedule deleted.",
       "toastCreated": "Schedule created with auto-generated shifts.",
