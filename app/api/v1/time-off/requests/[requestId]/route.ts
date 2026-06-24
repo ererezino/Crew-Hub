@@ -571,6 +571,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
       }
 
+      // P1-5: stage the change as a CONDITIONAL transition. The update only
+      // applies while the request is still approved AND has no pending change,
+      // so two concurrent stage requests cannot both pass the earlier read and
+      // overwrite each other — the loser gets a 409.
       const { data: updatedRow, error: updateErr } = await svcClient
         .from("leave_requests")
         .update({
@@ -584,11 +588,17 @@ export async function PATCH(request: Request, context: RouteContext) {
         })
         .eq("id", existingRequest.id)
         .eq("org_id", session.profile.org_id)
+        .eq("status", "approved")
+        .is("pending_change_type", null)
         .select(SELECT_COLUMNS)
-        .single();
+        .maybeSingle();
 
-      if (updateErr || !updatedRow) {
+      if (updateErr) {
         return err(500, "REQUEST_UPDATE_FAILED", "Unable to record the change request.");
+      }
+
+      if (!updatedRow) {
+        return err(409, "CHANGE_CONFLICT", "A change was already submitted for this leave. Please refresh.");
       }
 
       // Notify whoever decides: the original approver, else the employee's manager.
@@ -641,6 +651,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const { data: changeRpcResult, error: changeRpcError } = await svcClient.rpc("decide_leave_change", {
       p_request_id: existingRequest.id,
+      p_org_id: session.profile.org_id,
       p_decision: decision,
       p_actor_id: session.profile.id
     });
@@ -660,6 +671,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       return err(422, "INVALID_STATUS", String(changeRpcData.error));
     }
 
+    // Note: the audit row for the change decision is written transactionally
+    // inside decide_leave_change (using the actor id), so the route only sends
+    // the user-facing notification here.
     if (decision === "reject") {
       await createNotification({
         orgId: session.profile.org_id,
@@ -668,14 +682,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         title: `${leaveLabel} change declined`,
         body: `Your request to change your ${leaveLabel} (${dateLabel}) was declined by ${session.profile.full_name}.`,
         link: "/time-off"
-      }).catch(() => undefined);
-
-      await logAudit({
-        action: "rejected",
-        tableName: "leave_requests",
-        recordId: existingRequest.id,
-        oldValue: { pending_change_type: existingRequest.pending_change_type },
-        newValue: { pending_change_type: null, change_decision: "rejected" }
       }).catch(() => undefined);
 
       return finalize(changeRpcData);
@@ -696,23 +702,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       title: changeType === "cancel" ? `${leaveLabel} cancelled` : `${leaveLabel} dates updated`,
       body: resultLabel,
       link: "/time-off"
-    }).catch(() => undefined);
-
-    await logAudit({
-      action: changeType === "cancel" ? "cancelled" : "updated",
-      tableName: "leave_requests",
-      recordId: existingRequest.id,
-      oldValue: {
-        status: existingRequest.status,
-        start_date: existingRequest.start_date,
-        end_date: existingRequest.end_date
-      },
-      newValue: {
-        change_decision: "approved",
-        change_type: changeType,
-        start_date: existingRequest.pending_start_date ?? existingRequest.start_date,
-        end_date: existingRequest.pending_end_date ?? existingRequest.end_date
-      }
     }).catch(() => undefined);
 
     return finalize(changeRpcData);

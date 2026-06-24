@@ -63,16 +63,34 @@ using (
   org_id = public.get_user_org_id()
   and deleted_at is null
   and (
-    (status = 'published' and public.can_view_published_schedule(department, id))
+    -- Ordinary employees: ONLY published schedules they're entitled to see, by
+    -- normalized department OR roster OR unscoped OR an existing shift
+    -- assignment. P1-1: the shift-assignment branch is gated under 'published'
+    -- so a draft is never selectable by an assigned ordinary employee — drafts
+    -- remain scheduler-only.
+    (
+      status = 'published'
+      and (
+        public.can_view_published_schedule(department, id)
+        or public.has_shift_assignment_in_schedule(id, org_id)
+      )
+    )
+    -- Managers/admins retain their broader scope, including drafts.
     or public.has_role('MANAGER')
     or public.has_role('HR_ADMIN')
     or public.has_role('FINANCE_ADMIN')
     or public.has_role('SUPER_ADMIN')
-    or public.has_shift_assignment_in_schedule(id, org_id)
   )
 );
 
 -- ── shifts: same rule, now via the shared normalized helper ──
+-- Shift visibility must match SCHEDULE visibility exactly, so a teammate who can
+-- see a published schedule also sees ALL shifts in it (not just their own). The
+-- schedule policy admits an assigned (but not rostered, not same-department)
+-- employee via has_shift_assignment_in_schedule; this policy now includes the
+-- SAME branch under 'published'. has_shift_assignment_in_schedule is
+-- SECURITY DEFINER (owned by a BYPASSRLS role), so the inner shifts lookup does
+-- not re-enter this policy — no recursion.
 drop policy if exists shifts_select_published on public.shifts;
 create policy shifts_select_published
 on public.shifts
@@ -88,7 +106,10 @@ using (
       and schedule_row.org_id = public.get_user_org_id()
       and schedule_row.status = 'published'
       and schedule_row.deleted_at is null
-      and public.can_view_published_schedule(schedule_row.department, schedule_row.id)
+      and (
+        public.can_view_published_schedule(schedule_row.department, schedule_row.id)
+        or public.has_shift_assignment_in_schedule(schedule_row.id, schedule_row.org_id)
+      )
   )
 );
 

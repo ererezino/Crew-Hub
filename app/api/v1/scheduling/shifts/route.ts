@@ -339,7 +339,6 @@ export async function GET(request: Request) {
   const query = parsedQuery.data;
   const canViewTeam = canViewTeamSchedules(session.profile.roles);
   const isScopedTeamLead = isDepartmentOnlyTeamLead(session.profile.roles);
-  const isManager = isSchedulingManager(session.profile.roles);
   const scope =
     query.scope === "team" && canViewTeam
       ? "team"

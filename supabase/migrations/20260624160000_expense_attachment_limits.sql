@@ -44,11 +44,28 @@ begin
       from public.expense_attachments
       where expense_id = NEW.expense_id and deleted_at is null and id <> NEW.id;
 
-      if v_active_count = 0
-         and v_status in ('manager_approved', 'additional_approved', 'approved', 'reimbursed', 'partially_paid') then
-        raise exception 'cannot remove the last evidence attachment from an approved expense %', NEW.expense_id
+      -- P1-4: an expense must keep at least one piece of evidence in EVERY state
+      -- except cancelled — not only once approved. With the FOR UPDATE lock above
+      -- this is race-free, so two concurrent "delete the last file" requests
+      -- against a pending expense can no longer both commit to zero.
+      if v_active_count = 0 and coalesce(v_status, '') <> 'cancelled' then
+        raise exception 'cannot remove the last evidence attachment from expense %', NEW.expense_id
           using errcode = 'check_violation';
       end if;
+
+      -- P1-4: if the row being removed is the expense's primary receipt, repoint
+      -- the legacy receipt_file_path to the next remaining attachment in the SAME
+      -- transaction as the soft-delete, so the primary pointer is never left
+      -- dangling by a separate, non-atomic update.
+      update public.expenses e
+      set receipt_file_path = coalesce((
+            select a.file_path
+            from public.expense_attachments a
+            where a.expense_id = NEW.expense_id and a.deleted_at is null and a.id <> NEW.id
+            order by a.sort_order, a.created_at
+            limit 1
+          ), e.receipt_file_path)
+      where e.id = NEW.expense_id and e.receipt_file_path = OLD.file_path;
     end if;
   end if;
 
@@ -65,5 +82,11 @@ drop trigger if exists trg_expense_attachment_limits_upd on public.expense_attac
 create trigger trg_expense_attachment_limits_upd
   before update on public.expense_attachments
   for each row execute function public.enforce_expense_attachment_limits();
+
+-- Hygiene: the trigger fires as the table owner, so no caller needs direct
+-- EXECUTE. Prevent it from being invoked directly via PostgREST.
+revoke all on function public.enforce_expense_attachment_limits() from public;
+revoke all on function public.enforce_expense_attachment_limits() from anon;
+revoke all on function public.enforce_expense_attachment_limits() from authenticated;
 
 commit;

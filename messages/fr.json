@@ -391,6 +391,7 @@
       "copying": "Copie…",
       "copyWeekDone": "{count, plural, one {# affectation copiée} other {# affectations copiées}} depuis la semaine précédente.",
       "copyWeekEmpty": "Rien à copier de la semaine précédente.",
+      "copyWeekPartial": "{failed, plural, one {# cellule n'a pas pu être copiée — elle a peut-être changé. Actualisez et réessayez.} other {# cellules n'ont pas pu être copiées — elles ont peut-être changé. Actualisez et réessayez.}}",
       "addSlot": "Ajouter un type de quart",
       "slotNamePlaceholder": "Nom du quart (ex. : Quart du matin)",
       "slotAddConfirm": "Ajouter la colonne",

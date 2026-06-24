@@ -152,15 +152,20 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
   // silently discarded.
   const [edits, setEdits] = useState<Map<string, CellEdit>>(new Map());
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  // Pending (debounced, not-yet-fired) saves, so we can FLUSH them before
-  // navigating to another schedule or unmounting (SCHED-04) instead of dropping
-  // recent edits when their 450ms timer is cleared.
-  const pendingSaves = useRef<Map<string, () => void>>(new Map());
+  // Pending (debounced, not-yet-fired) saves, so we can FLUSH and AWAIT them
+  // before navigating to another schedule or unmounting (SCHED-04/P1-3) instead
+  // of dropping recent edits. Each thunk returns the save's promise.
+  const pendingSaves = useRef<Map<string, () => Promise<void>>>(new Map());
   const editSeq = useRef(0);
   const isMounted = useRef(true);
   // Tracks the active schedule id for late save results to compare against, so a
-  // response that returns after the user navigated away is ignored (SCHED-04).
+  // response that returns after the user navigated away is ignored for the
+  // overlay (but still recorded as a durable failure — see failedBySchedule).
   const scheduleIdRef = useRef<string | undefined>(undefined);
+  // P1-3: failed saves persisted PER SCHEDULE so a failure that lands after the
+  // user navigated away is not silently lost — it is surfaced when they return.
+  const failedBySchedule = useRef<Map<string, Map<string, CellEdit>>>(new Map());
+  const [failedVersion, setFailedVersion] = useState(0);
   const [addTarget, setAddTarget] = useState<string | null>(null); // `${weekIndex}:${slotKey}`
   const [notes, setNotes] = useState<Map<string, string>>(new Map()); // weekStart -> note
   const [copyingWeek, setCopyingWeek] = useState<string | null>(null);
@@ -197,14 +202,19 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
   // and flush/clear any pending saves on unmount (SCHED-04).
   useEffect(() => {
     isMounted.current = true;
+    // Copy the refs into locals for the cleanup closure (the ref objects are
+    // stable for the component's lifetime, so this is safe and satisfies the
+    // exhaustive-deps ref-in-cleanup rule).
+    const timers = saveTimers.current;
+    const pending = pendingSaves.current;
     return () => {
       isMounted.current = false;
-      saveTimers.current.forEach((timer) => clearTimeout(timer));
-      saveTimers.current.clear();
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
       // Fire any debounced-but-unsent saves so a last-moment edit isn't lost.
-      const pending = [...pendingSaves.current.values()];
-      pendingSaves.current.clear();
-      for (const run of pending) run();
+      const runs = [...pending.values()];
+      pending.clear();
+      for (const run of runs) void run();
     };
   }, []);
 
@@ -409,12 +419,48 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
     return grid;
   }, [cells, edits]);
 
-  // SCHED-04: edits whose background save failed — surfaced with an explicit
-  // retry rather than being silently dropped.
-  const failedEdits = useMemo(
-    () => [...edits.values()].filter((edit) => edit.status === "failed"),
-    [edits]
+  // P1-3: the server's CURRENT shift ids for one cell (employee × slot × week),
+  // sent as the optimistic-concurrency baseline so the grid RPC's stale-cell
+  // guard actually fires when a competing edit changed the cell first.
+  const serverShiftIdsForCell = useCallback(
+    (week: WeekRow, slot: Slot, employeeId: string): string[] => {
+      const ids: string[] = [];
+      for (const shift of shifts) {
+        if (shift.employeeId !== employeeId || shift.status === "cancelled") continue;
+        if (toHHMM(shift.startTime) !== slot.startTime || toHHMM(shift.endTime) !== slot.endTime) continue;
+        if (!week.rangeDates.includes(shift.shiftDate)) continue;
+        ids.push(shift.id);
+      }
+      return ids;
+    },
+    [shifts]
   );
+
+  const recordFailure = useCallback((scheduleId: string, edit: CellEdit) => {
+    let m = failedBySchedule.current.get(scheduleId);
+    if (!m) {
+      m = new Map();
+      failedBySchedule.current.set(scheduleId, m);
+    }
+    m.set(editKey(edit.cellKey, edit.employeeId), { ...edit, status: "failed" });
+    setFailedVersion((v) => v + 1);
+  }, []);
+
+  const clearFailure = useCallback((scheduleId: string, k: string) => {
+    const m = failedBySchedule.current.get(scheduleId);
+    if (m && m.delete(k)) {
+      setFailedVersion((v) => v + 1);
+    }
+  }, []);
+
+  // SCHED-04/P1-3: failed edits for the ACTIVE schedule, surfaced with retry.
+  // Read from the durable per-schedule store so failures that arrived after a
+  // navigation are still shown when the user returns to that schedule.
+  const failedEdits = useMemo(() => {
+    void failedVersion;
+    if (!activeSchedule) return [] as CellEdit[];
+    return [...(failedBySchedule.current.get(activeSchedule.id)?.values() ?? [])];
+  }, [activeSchedule, failedVersion]);
 
   // Per-employee scheduled hours per ISO week (Monday start) — soft 48h guardrail, never blocking.
   const weeklyHours = useMemo(() => weeklyHoursByEmployee(shifts), [shifts]);
@@ -430,16 +476,20 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       week: WeekRow,
       slot: Slot,
       employeeId: string,
+      name: string,
       weekdays: number[],
       seq: number,
-      scheduleIdAtDispatch: string
+      scheduleIdAtDispatch: string,
+      expectedShiftIds: string[]
     ) => {
       const cellKey = `${week.index}:${slot.key}`;
       const k = editKey(cellKey, employeeId);
 
-      // Only apply a result if this is still the latest edit for the cell, the
-      // component is mounted, and we're still on the schedule it was sent for.
-      const stillCurrent = (cur: Map<string, CellEdit>): boolean => {
+      // Apply the OVERLAY result only if this is still the latest edit for the
+      // cell on the schedule it was sent for. A late result for a schedule the
+      // user has left no longer touches the overlay — but a FAILURE is still
+      // recorded durably (below) so the edit is never silently lost.
+      const overlayStillCurrent = (cur: Map<string, CellEdit>): boolean => {
         if (!isMounted.current) return false;
         if (scheduleIdAtDispatch !== scheduleIdRef.current) return false;
         const current = cur.get(k);
@@ -454,39 +504,48 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
             employeeId,
             slot: { name: slot.name, startTime: slot.startTime, endTime: slot.endTime },
             weekStart: week.weekStart,
-            weekdays
+            weekdays,
+            // P1-3: optimistic-concurrency baseline → server returns 409 if the
+            // cell changed under us.
+            expectedShiftIds
           })
         });
         const payload = await res.json().catch(() => null);
         if (!res.ok) {
           throw new Error(payload?.error?.message ?? t("grid.toastError"));
         }
-        if (!isMounted.current) return;
-        for (const w of (payload?.data?.warnings ?? []) as string[]) addToast("info", w);
-        // Mark acknowledged; the overlay is cleared only after the reconciling
-        // refetch lands (see the [shifts] effect below) so it never flickers to
-        // stale data, and only if still the latest edit.
-        setEdits((cur) => {
-          if (!stillCurrent(cur)) return cur;
-          const next = new Map(cur);
-          next.set(k, { ...cur.get(k)!, status: "saved" });
-          return next;
-        });
-        shiftsQuery.refresh();
+        // Success clears any prior recorded failure for this cell.
+        clearFailure(scheduleIdAtDispatch, k);
+        if (isMounted.current) {
+          for (const w of (payload?.data?.warnings ?? []) as string[]) addToast("info", w);
+          // Mark acknowledged; the overlay is cleared only after the reconciling
+          // refetch lands (the [shifts] effect) so it never flickers to stale data.
+          setEdits((cur) => {
+            if (!overlayStillCurrent(cur)) return cur;
+            const next = new Map(cur);
+            next.set(k, { ...cur.get(k)!, status: "saved" });
+            return next;
+          });
+        }
+        if (scheduleIdAtDispatch === scheduleIdRef.current) {
+          shiftsQuery.refresh();
+        }
       } catch (err) {
-        if (!isMounted.current) return;
-        addToast("error", err instanceof Error ? err.message : t("grid.toastError"));
-        // Keep the optimistic value visible with an explicit FAILED state +
-        // retry — never silently discard. Only if still the latest edit.
-        setEdits((cur) => {
-          if (!stillCurrent(cur)) return cur;
-          const next = new Map(cur);
-          next.set(k, { ...cur.get(k)!, status: "failed" });
-          return next;
-        });
+        // P1-3: record the failure DURABLY for this schedule regardless of
+        // whether the user is still here, so it is never silently dropped.
+        recordFailure(scheduleIdAtDispatch, { cellKey, employeeId, name, weekdays, seq, status: "failed" });
+        if (isMounted.current && scheduleIdAtDispatch === scheduleIdRef.current) {
+          addToast("error", err instanceof Error ? err.message : t("grid.toastError"));
+          setEdits((cur) => {
+            if (!overlayStillCurrent(cur)) return cur;
+            const next = new Map(cur);
+            next.set(k, { ...cur.get(k)!, status: "failed" });
+            return next;
+          });
+        }
       }
     },
-    [addToast, t, shiftsQuery]
+    [addToast, t, shiftsQuery, clearFailure, recordFailure]
   );
 
   // Apply an edit instantly to the UI and debounce the save (coalesces rapid day-toggles).
@@ -497,6 +556,11 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       const k = editKey(cellKey, employeeId);
       const seq = (editSeq.current += 1);
       const scheduleIdAtDispatch = activeSchedule.id;
+      // Snapshot the server's current shift ids for this cell as the optimistic
+      // baseline at edit time (P1-3).
+      const expectedShiftIds = serverShiftIdsForCell(week, slot, employeeId);
+      // A fresh edit supersedes any recorded failure for the same cell.
+      clearFailure(scheduleIdAtDispatch, k);
       setEdits((cur) => {
         const next = new Map(cur);
         next.set(k, { cellKey, employeeId, name, weekdays, seq, status: "saving" });
@@ -508,16 +572,16 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       const run = () => {
         timers.delete(k);
         pendingSaves.current.delete(k);
-        void doSave(week, slot, employeeId, weekdays, seq, scheduleIdAtDispatch);
+        return doSave(week, slot, employeeId, name, weekdays, seq, scheduleIdAtDispatch, expectedShiftIds);
       };
-      // Register the pending save so navigation/unmount can flush it.
+      // Register the pending save so navigation/unmount can flush AND await it.
       pendingSaves.current.set(k, run);
-      timers.set(k, setTimeout(run, 450));
+      timers.set(k, setTimeout(() => void run(), 450));
     },
-    [activeSchedule, doSave]
+    [activeSchedule, doSave, serverShiftIdsForCell, clearFailure]
   );
 
-  // Retry a previously failed cell edit (SCHED-04).
+  // Retry a previously failed cell edit (SCHED-04/P1-3).
   const retryEdit = useCallback(
     (edit: CellEdit) => {
       const [weekIndexStr, slotKey] = edit.cellKey.split(":");
@@ -530,9 +594,9 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
     [weeks, slots, applyEdit]
   );
 
-  // Flush all debounced-but-unsent saves immediately (used before switching
-  // schedules so recent edits are persisted, not dropped).
-  const flushPendingSaves = useCallback(() => {
+  // Flush all debounced-but-unsent saves immediately and AWAIT them (used before
+  // switching schedules so recent edits are persisted, not dropped — P1-3).
+  const flushPendingSaves = useCallback(async () => {
     const timers = saveTimers.current;
     const runs = [...pendingSaves.current.values()];
     pendingSaves.current.clear();
@@ -540,7 +604,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       clearTimeout(timer);
       timers.delete(k);
     }
-    for (const run of runs) run();
+    await Promise.all(runs.map((run) => run()));
   }, []);
 
   // Once a reconciling refetch lands (shifts changed), drop overlay edits that
@@ -569,7 +633,9 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       setCopyingWeek(targetWeek.weekStart);
       try {
         let count = 0;
+        let failed = 0;
         const allWarnings = new Set<string>();
+        const failureMessages = new Set<string>();
         for (const slot of slots) {
           const sourcePeople = effectiveCells.get(`${source.index}:${slot.key}`);
           if (!sourcePeople) continue;
@@ -584,13 +650,21 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
                 employeeId: person.employeeId,
                 slot: { name: slot.name, startTime: slot.startTime, endTime: slot.endTime },
                 weekStart: targetWeek.weekStart,
-                weekdays
+                weekdays,
+                // R3-2: send the target cell's current server shift ids so the
+                // RPC's stale-cell guard fires if the destination changed under us.
+                expectedShiftIds: serverShiftIdsForCell(targetWeek, slot, person.employeeId)
               })
             });
             const payload = await res.json().catch(() => null);
             if (res.ok) {
               count += 1;
               for (const w of payload?.data?.warnings ?? []) allWarnings.add(w);
+            } else {
+              // R3-2: a failed copy-cell (incl. a 409 stale-cell conflict) is
+              // surfaced, not silently ignored.
+              failed += 1;
+              failureMessages.add(payload?.error?.message ?? t("grid.toastError"));
             }
           }
         }
@@ -599,8 +673,12 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         if (count > 0) {
           addToast("success", t("grid.copyWeekDone", { count }));
           for (const w of allWarnings) addToast("info", w);
-        } else {
+        } else if (failed === 0) {
           addToast("info", t("grid.copyWeekEmpty"));
+        }
+        if (failed > 0) {
+          addToast("error", t("grid.copyWeekPartial", { failed }));
+          for (const m of failureMessages) addToast("error", m);
         }
       } catch (err) {
         addToast("error", err instanceof Error ? err.message : t("grid.toastError"));
@@ -608,7 +686,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         setCopyingWeek(null);
       }
     },
-    [activeSchedule, weeks, slots, effectiveCells, shiftsQuery, addToast, t]
+    [activeSchedule, weeks, slots, effectiveCells, serverShiftIdsForCell, shiftsQuery, addToast, t]
   );
 
   const handleAddSlot = useCallback(() => {
@@ -655,10 +733,10 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         <Select
           value={activeSchedule?.id ?? ""}
           onValueChange={(value) => {
-            // SCHED-04: persist recent edits to the current schedule before
-            // navigating away, instead of dropping their debounce timers.
-            flushPendingSaves();
-            setSelectedScheduleId(value);
+            // SCHED-04/P1-3: flush AND await recent edits to the current schedule
+            // before navigating away, so an in-flight save can still record a
+            // durable failure for this schedule rather than being dropped.
+            void flushPendingSaves().finally(() => setSelectedScheduleId(value));
           }}
         >
           <SelectTrigger>

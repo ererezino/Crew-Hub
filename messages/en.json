@@ -391,6 +391,7 @@
       "copying": "Copying…",
       "copyWeekDone": "Copied {count, plural, one {# assignment} other {# assignments}} from last week.",
       "copyWeekEmpty": "Nothing to copy from last week.",
+      "copyWeekPartial": "{failed, plural, one {# cell could not be copied — it may have changed. Refresh and retry.} other {# cells could not be copied — they may have changed. Refresh and retry.}}",
       "addSlot": "Add shift type",
       "slotNamePlaceholder": "Shift name (e.g. Morning Shift)",
       "slotAddConfirm": "Add column",

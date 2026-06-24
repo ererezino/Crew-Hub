@@ -49,18 +49,23 @@ declare
 begin
   -- Lock and collect this crew member's CURRENT shifts for THIS slot across the
   -- in-range week window. UTC comparison mirrors the app's extractIsoTime.
-  select coalesce(array_agg(s.id order by s.id), '{}'::uuid[])
+  -- NOTE: row locking (FOR UPDATE) is not permitted on an aggregate query, so we
+  -- lock the concrete shift rows in a subquery and aggregate the locked ids.
+  select coalesce(array_agg(locked.id order by locked.id), '{}'::uuid[])
   into v_existing
-  from public.shifts s
-  where s.org_id = p_org_id
-    and s.schedule_id = p_schedule_id
-    and s.employee_id = p_employee_id
-    and s.shift_date = any(p_week_dates)
-    and s.deleted_at is null
-    and s.status <> 'cancelled'
-    and to_char(s.start_time at time zone 'UTC', 'HH24:MI') = p_slot_start
-    and to_char(s.end_time at time zone 'UTC', 'HH24:MI') = p_slot_end
-  for update;
+  from (
+    select s.id
+    from public.shifts s
+    where s.org_id = p_org_id
+      and s.schedule_id = p_schedule_id
+      and s.employee_id = p_employee_id
+      and s.shift_date = any(p_week_dates)
+      and s.deleted_at is null
+      and s.status <> 'cancelled'
+      and to_char(s.start_time at time zone 'UTC', 'HH24:MI') = p_slot_start
+      and to_char(s.end_time at time zone 'UTC', 'HH24:MI') = p_slot_end
+    for update
+  ) locked;
 
   -- Optimistic guard: if the caller told us what it expected to replace and the
   -- live set differs, the cell changed under them — signal a stale conflict.
@@ -113,5 +118,14 @@ begin
   return jsonb_build_object('created', v_created, 'removed', v_removed);
 end;
 $$;
+
+-- P0-1: this SECURITY DEFINER mutation must never be callable directly by a
+-- browser session. PostgREST exposes public-schema functions as RPC and grants
+-- EXECUTE to anon/authenticated by default, which would bypass the route's
+-- authorization. Lock it down to the server's service-role client only.
+revoke all on function public.replace_schedule_grid_cell(uuid, uuid, uuid, text, text, text, date[], date[], uuid[]) from public;
+revoke all on function public.replace_schedule_grid_cell(uuid, uuid, uuid, text, text, text, date[], date[], uuid[]) from anon;
+revoke all on function public.replace_schedule_grid_cell(uuid, uuid, uuid, text, text, text, date[], date[], uuid[]) from authenticated;
+grant execute on function public.replace_schedule_grid_cell(uuid, uuid, uuid, text, text, text, date[], date[], uuid[]) to service_role;
 
 commit;

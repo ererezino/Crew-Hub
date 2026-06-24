@@ -78,10 +78,21 @@ begin
     end if;
   end if;
 
-  -- 1) Schedule.
-  insert into public.schedules (org_id, name, department, start_date, end_date, schedule_track, status, duplicate_op_key)
-  values (p_org_id, p_name, p_department, p_start_date, p_end_date, p_schedule_track, 'draft', p_op_key)
-  returning id into v_new_id;
+  -- 1) Schedule. Guard the op-key race: two concurrent calls with the same key
+  -- can both pass the check above, but only one insert wins the partial unique
+  -- index — the loser catches the violation and returns the winner's schedule
+  -- (idempotent) instead of creating a partial duplicate.
+  begin
+    insert into public.schedules (org_id, name, department, start_date, end_date, schedule_track, status, duplicate_op_key)
+    values (p_org_id, p_name, p_department, p_start_date, p_end_date, p_schedule_track, 'draft', p_op_key)
+    returning id into v_new_id;
+  exception when unique_violation then
+    select * into v_existing
+    from public.schedules
+    where org_id = p_org_id and duplicate_op_key = p_op_key and deleted_at is null
+    limit 1;
+    return jsonb_build_object('schedule', to_jsonb(v_existing), 'idempotent', true);
+  end;
 
   -- 2) Roster.
   insert into public.schedule_roster (schedule_id, employee_id, weekend_hours)
@@ -112,5 +123,11 @@ begin
   return jsonb_build_object('schedule', v_created_schedule, 'idempotent', false);
 end;
 $$;
+
+-- P0-1: server-only. Never callable by a browser session via PostgREST RPC.
+revoke all on function public.duplicate_schedule(uuid, text, text, date, date, text, jsonb, jsonb, text) from public;
+revoke all on function public.duplicate_schedule(uuid, text, text, date, date, text, jsonb, jsonb, text) from anon;
+revoke all on function public.duplicate_schedule(uuid, text, text, date, date, text, jsonb, jsonb, text) from authenticated;
+grant execute on function public.duplicate_schedule(uuid, text, text, date, date, text, jsonb, jsonb, text) to service_role;
 
 commit;

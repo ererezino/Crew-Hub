@@ -233,10 +233,20 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const newName = parsed.data.name?.trim() || `${source.data.name ?? "Schedule"} (copy)`;
 
   // Copy the source roster so the new schedule's crew list matches.
-  const { data: rosterRows } = await supabase
+  // P1-2: a roster-read error must FAIL the duplication — silently duplicating
+  // with an empty roster would drop the crew list.
+  const { data: rosterRows, error: rosterError } = await supabase
     .from("schedule_roster")
     .select("employee_id, weekend_hours")
     .eq("schedule_id", sourceId);
+
+  if (rosterError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "SOURCE_ROSTER_FETCH_FAILED", message: "Unable to read the source schedule's roster." },
+      meta: buildMeta()
+    });
+  }
 
   const rosterPayload = (rosterRows ?? [])
     .filter((r) => typeof r.employee_id === "string")

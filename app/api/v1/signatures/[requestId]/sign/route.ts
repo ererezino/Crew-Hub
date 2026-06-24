@@ -6,7 +6,6 @@ import { logAudit } from "../../../../../../lib/audit";
 import { sendOnboardingCompleteEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import { completeOnboarding } from "../../../../../../lib/onboarding/auto-transition";
-import { findUnlockableTasks } from "../../../../../../lib/onboarding/task-dependencies";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
@@ -299,7 +298,14 @@ export async function POST(
         .in("id", dependsOn)
         .is("deleted_at", null);
 
-      const prereqsComplete = (prereqRows ?? []).every((row) => row.status === "completed");
+      // P1-6: EXACT-MATCH — every declared prerequisite must exist AND be
+      // completed. `.every()` over the fetched rows would return true for an
+      // empty/short set (deleted prerequisite records), letting a blocked task
+      // be signed early; require the completed set to cover every declared id.
+      const completedIds = new Set(
+        (prereqRows ?? []).filter((row) => row.status === "completed").map((row) => row.id as string)
+      );
+      const prereqsComplete = dependsOn.every((id) => completedIds.has(id));
       if (!prereqsComplete) {
         return jsonResponse<null>(422, {
           data: null,
@@ -513,49 +519,38 @@ export async function POST(
 
     if (linkedTasks && linkedTasks.length > 0) {
       for (const linkedTask of linkedTasks) {
-        await serviceRoleClient
-          .from("onboarding_tasks")
-          .update({
-            status: "completed",
-            completed_by: session.profile.id,
-            completed_at: signedAt
-          })
-          .eq("id", linkedTask.id)
-          .eq("org_id", session.profile.org_id);
+        // P1-6: complete the task AND unlock its dependents in ONE transaction
+        // via the shared RPC (exact-match dependency enforcement included), so a
+        // signature completion can't leave dependents un-unlocked or partially
+        // applied. The earlier guard already rejected signing a blocked task; the
+        // RPC re-enforces (defense in depth) and skips an already-blocked task.
+        const { data: completeResult } = await serviceRoleClient.rpc(
+          "complete_onboarding_task_with_unlock",
+          {
+            p_task_id: linkedTask.id,
+            p_org_id: session.profile.org_id,
+            p_completed_by: session.profile.id,
+            p_enforce_dependencies: true
+          }
+        );
+        if (completeResult && typeof completeResult === "object" && "error" in completeResult) {
+          // Prerequisites not met (shouldn't happen after the guard) — leave the
+          // task as-is rather than force-completing it.
+          continue;
+        }
 
         // Recalculate onboarding instance progress using per-track checks
-        // (same logic as the normal task completion path)
+        // (same logic as the normal task completion path). The unlock pass
+        // already ran inside the RPC above.
         if (linkedTask.instance_id) {
           const { data: allInstanceTasks } = await serviceRoleClient
             .from("onboarding_tasks")
-            .select("id, status, track, depends_on_task_ids, assigned_to, title")
+            .select("id, status, track")
             .eq("instance_id", linkedTask.instance_id)
             .eq("org_id", session.profile.org_id)
             .is("deleted_at", null);
 
           if (allInstanceTasks && allInstanceTasks.length > 0) {
-            // ONBOARD-01: run the SAME dependency unlock pass as the manual
-            // completion route (shared findUnlockableTasks) off this single
-            // fetch, so completing a task by signature immediately flips any
-            // newly-eligible dependents 'blocked' → 'pending'.
-            const unlockable = findUnlockableTasks(
-              allInstanceTasks.map((t) => ({
-                id: t.id as string,
-                status: t.status as string,
-                depends_on_task_ids: (t.depends_on_task_ids as string[] | null) ?? null,
-                assigned_to: (t.assigned_to as string | null) ?? null,
-                title: (t.title as string | null) ?? ""
-              }))
-            );
-            for (const unlockTask of unlockable) {
-              await serviceRoleClient
-                .from("onboarding_tasks")
-                .update({ status: "pending" })
-                .eq("id", unlockTask.id)
-                .eq("org_id", session.profile.org_id)
-                .eq("status", "blocked");
-            }
-
             const employeeTasks = allInstanceTasks.filter((t) => t.track === "employee");
             const opsTasks = allInstanceTasks.filter((t) => t.track === "operations");
             const employeeDone = employeeTasks.length === 0 || employeeTasks.every((t) => t.status === "completed");
