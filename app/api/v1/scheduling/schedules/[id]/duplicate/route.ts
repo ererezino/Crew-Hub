@@ -6,7 +6,13 @@ import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../../../lib/department";
 import { isDepartmentOnlyTeamLead } from "../../../../../../../lib/roles";
-import { extractIsoTime, isIsoDate, isSchedulingManager } from "../../../../../../../lib/scheduling";
+import {
+  extractIsoTime,
+  isIsoDate,
+  isScheduleWithinMaxLength,
+  isSchedulingManager,
+  MAX_SCHEDULE_LENGTH_DAYS
+} from "../../../../../../../lib/scheduling";
 import { buildWeeks, gridWeekdayIndex } from "../../../../../../../lib/scheduling/week-grid";
 import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../../types/auth";
@@ -23,7 +29,10 @@ const bodySchema = z
   .object({
     name: z.string().trim().max(200).optional(),
     startDate: z.string().refine(isIsoDate, "startDate must be YYYY-MM-DD."),
-    endDate: z.string().refine(isIsoDate, "endDate must be YYYY-MM-DD.")
+    endDate: z.string().refine(isIsoDate, "endDate must be YYYY-MM-DD."),
+    // SCHED-06: optional stable key so a retried duplication is idempotent
+    // (a second call with the same key returns the schedule already created).
+    operationKey: z.string().trim().min(1).max(100).optional()
   })
   .refine((v) => v.endDate >= v.startDate, {
     message: "endDate must be on or after startDate.",
@@ -115,6 +124,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
   }
 
+  // SCHED-05/06: the duplicate's target range must respect the product max length.
+  if (!isScheduleWithinMaxLength(parsed.data.startDate, parsed.data.endDate)) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "SCHEDULE_TOO_LONG",
+        message: `A schedule cannot be longer than ${MAX_SCHEDULE_LENGTH_DAYS} days.`
+      },
+      meta: buildMeta()
+    });
+  }
+
   const orgId = session.profile.org_id;
   const supabase = createSupabaseServiceRoleClient();
 
@@ -154,10 +175,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
   }
 
-  // Load the source's shifts (the pattern to clone).
+  // Load the source's shifts (the pattern to clone). SCHED-06: include
+  // template_id and color so duplication preserves them.
   const { data: rawShifts, error: shiftsError } = await supabase
     .from("shifts")
-    .select("employee_id, shift_date, start_time, end_time, break_minutes, notes")
+    .select("employee_id, template_id, shift_date, start_time, end_time, break_minutes, notes, color")
     .eq("org_id", orgId)
     .eq("schedule_id", sourceId)
     .is("deleted_at", null)
@@ -179,10 +201,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   type PatternEntry = {
     weekday: number;
     employeeId: string | null;
+    templateId: string | null;
     startHHMM: string;
     endHHMM: string;
     breakMinutes: number;
     notes: string | null;
+    color: string | null;
   };
   const patternByWeek = new Map<number, PatternEntry[]>();
 
@@ -196,59 +220,34 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     list.push({
       weekday: gridWeekdayIndex(row.shift_date),
       employeeId: typeof row.employee_id === "string" ? row.employee_id : null,
+      templateId: typeof row.template_id === "string" ? row.template_id : null,
       startHHMM: extractIsoTime(row.start_time),
       endHHMM: extractIsoTime(row.end_time),
       breakMinutes: typeof row.break_minutes === "number" ? row.break_minutes : Number(row.break_minutes) || 0,
-      notes: typeof row.notes === "string" ? row.notes : null
+      notes: typeof row.notes === "string" ? row.notes : null,
+      color: typeof row.color === "string" ? row.color : null
     });
     patternByWeek.set(weekIndex, list);
   }
 
-  // Create the new draft schedule.
   const newName = parsed.data.name?.trim() || `${source.data.name ?? "Schedule"} (copy)`;
-  const { data: createdSchedule, error: createError } = await supabase
-    .from("schedules")
-    .insert({
-      org_id: orgId,
-      name: newName,
-      department: source.data.department,
-      start_date: parsed.data.startDate,
-      end_date: parsed.data.endDate,
-      schedule_track: source.data.schedule_track,
-      status: "draft"
-    })
-    .select("id, org_id, name, department, start_date, end_date, schedule_track, status, published_at, published_by, created_at, updated_at")
-    .single();
 
-  if (createError || !createdSchedule) {
-    return jsonResponse<null>(500, {
-      data: null,
-      error: { code: "SCHEDULE_CREATE_FAILED", message: "Unable to create the new schedule." },
-      meta: buildMeta()
-    });
-  }
-
-  const newScheduleId = createdSchedule.id as string;
-
-  // Copy the roster (so the new schedule's crew list matches the source).
+  // Copy the source roster so the new schedule's crew list matches.
   const { data: rosterRows } = await supabase
     .from("schedule_roster")
     .select("employee_id, weekend_hours")
     .eq("schedule_id", sourceId);
 
-  if ((rosterRows ?? []).length > 0) {
-    await supabase.from("schedule_roster").insert(
-      (rosterRows ?? []).map((r) => ({
-        schedule_id: newScheduleId,
-        employee_id: r.employee_id,
-        weekend_hours: r.weekend_hours
-      }))
-    );
-  }
+  const rosterPayload = (rosterRows ?? [])
+    .filter((r) => typeof r.employee_id === "string")
+    .map((r) => ({
+      employee_id: r.employee_id as string,
+      weekend_hours: typeof r.weekend_hours === "string" ? r.weekend_hours : null
+    }));
 
   // Remap the pattern onto the new weeks (source week i → target week i, cycling).
   const targetWeeks = buildWeeks(parsed.data.startDate, parsed.data.endDate);
-  const newShiftRows: Array<Record<string, unknown>> = [];
+  const shiftPayload: Array<Record<string, unknown>> = [];
 
   if (sourceWeeks.length > 0) {
     for (const targetWeek of targetWeeks) {
@@ -257,41 +256,80 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         const shiftDate = addDaysIso(targetWeek.weekStart, entry.weekday);
         if (shiftDate < parsed.data.startDate || shiftDate > parsed.data.endDate) continue;
         const times = toShiftDateTimes(shiftDate, entry.startHHMM, entry.endHHMM);
-        newShiftRows.push({
-          org_id: orgId,
-          schedule_id: newScheduleId,
+        shiftPayload.push({
           employee_id: entry.employeeId,
+          template_id: entry.templateId,
           shift_date: shiftDate,
           start_time: times.startTime,
           end_time: times.endTime,
           break_minutes: entry.breakMinutes,
-          status: "scheduled",
-          notes: entry.notes
+          notes: entry.notes,
+          color: entry.color
         });
       }
     }
   }
 
-  let copiedShifts = 0;
-  if (newShiftRows.length > 0) {
-    const { error: insertError } = await supabase.from("shifts").insert(newShiftRows);
-    if (insertError) {
-      // The schedule was created; surface the partial failure clearly.
-      return jsonResponse<null>(500, {
-        data: null,
-        error: { code: "SHIFT_COPY_FAILED", message: "The new schedule was created but its shifts could not be copied." },
-        meta: buildMeta()
-      });
-    }
-    copiedShifts = newShiftRows.length;
+  // SCHED-06: create schedule + roster + shifts in ONE transaction. Any failure
+  // rolls everything back (no orphan/partial draft). Cross-org employee ids are
+  // rejected inside the RPC. An optional operation key makes retries idempotent.
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("duplicate_schedule", {
+    p_org_id: orgId,
+    p_name: newName,
+    p_department: source.data.department,
+    p_start_date: parsed.data.startDate,
+    p_end_date: parsed.data.endDate,
+    p_schedule_track: source.data.schedule_track ?? "weekday",
+    p_roster: rosterPayload,
+    p_shifts: shiftPayload,
+    p_op_key: parsed.data.operationKey ?? null
+  });
+
+  if (rpcError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "SCHEDULE_DUPLICATE_FAILED", message: "Unable to duplicate the schedule." },
+      meta: buildMeta()
+    });
   }
+
+  const rpcData = (rpcResult ?? {}) as Record<string, unknown>;
+
+  if (rpcData.error === "CROSS_ORG_EMPLOYEE") {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "CROSS_ORG_EMPLOYEE",
+        message: "The source schedule references crew members outside this organization."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  const createdSchedule = rpcData.schedule as Record<string, unknown> | undefined;
+  if (!createdSchedule?.id) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "SCHEDULE_DUPLICATE_FAILED", message: "Unable to duplicate the schedule." },
+      meta: buildMeta()
+    });
+  }
+
+  const newScheduleId = createdSchedule.id as string;
+  const copiedShifts = shiftPayload.length;
 
   void logAudit({
     action: "created",
     tableName: "schedules",
     recordId: newScheduleId,
     oldValue: { duplicated_from: sourceId },
-    newValue: { name: newName, start_date: parsed.data.startDate, end_date: parsed.data.endDate, copied_shifts: copiedShifts }
+    newValue: {
+      name: newName,
+      start_date: parsed.data.startDate,
+      end_date: parsed.data.endDate,
+      copied_shifts: copiedShifts,
+      idempotent: rpcData.idempotent === true
+    }
   });
 
   return jsonResponse<SchedulingScheduleMutationResponseData>(201, {
@@ -299,8 +337,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       schedule: {
         id: newScheduleId,
         orgId,
-        name: createdSchedule.name as string | null,
-        department: createdSchedule.department as string | null,
+        name: (createdSchedule.name as string | null) ?? null,
+        department: (createdSchedule.department as string | null) ?? null,
         startDate: createdSchedule.start_date as string,
         endDate: createdSchedule.end_date as string,
         scheduleTrack: (createdSchedule.schedule_track as "weekday" | "weekend") ?? "weekday",

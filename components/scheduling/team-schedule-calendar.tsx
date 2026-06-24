@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Move, Plus } from "lucide-react";
 
 import { EmptyState } from "../shared/empty-state";
 import { formatMonth } from "../../lib/datetime";
+import { isOpenShift, resolveShiftDisplayName } from "../../lib/scheduling/shift-display";
 import type { ShiftRecord } from "../../types/scheduling";
 
 type CalendarDay = {
@@ -381,10 +382,19 @@ export function TeamScheduleCalendar({
                   const isSelectable = Boolean(onShiftSelect);
                   const shiftTimeLabel = `${formatTime(shift.startTime)} - ${formatTime(shift.endTime)}`;
                   const shiftNameLabel = shiftLabel(shift);
+                  // SCHED-01: open status comes ONLY from the assignment, never
+                  // from whether the display name loaded. An assigned shift with
+                  // an unresolved name shows the defensive crew label, not "Open".
+                  const displayName = resolveShiftDisplayName(
+                    shift,
+                    t("calendar.openShift"),
+                    t("calendar.crewMemberFallback")
+                  );
+                  const openShift = isOpenShift(shift);
                   return (
                     <article
                       key={shift.id}
-                      className={`teamcal-shift ${statusClass(shift.status)} ${shiftBandClass(shift)} ${isDraggable ? "teamcal-shift-draggable" : ""} ${isSelectable ? "teamcal-shift-selectable" : ""}`}
+                      className={`teamcal-shift ${statusClass(shift.status)} ${shiftBandClass(shift)} ${isDraggable ? "teamcal-shift-draggable" : ""} ${isSelectable ? "teamcal-shift-selectable" : ""} ${openShift ? "teamcal-shift-open" : ""}`}
                       draggable={isDraggable}
                       onDragStart={() => {
                         if (!isDraggable) return;
@@ -407,9 +417,9 @@ export function TeamScheduleCalendar({
                       role={isSelectable ? "button" : undefined}
                       tabIndex={isSelectable ? 0 : undefined}
                       style={isSelectable ? { cursor: "pointer" } : undefined}
-                      title={`${shift.employeeName ?? t("calendar.openShift")} · ${formatTime(shift.startTime)}-${formatTime(shift.endTime)}`}
+                      title={`${displayName} · ${formatTime(shift.startTime)}-${formatTime(shift.endTime)}`}
                     >
-                      <span className="teamcal-shift-name">{shift.employeeName ?? t("calendar.openShift")}</span>
+                      <span className="teamcal-shift-name">{displayName}</span>
                       <span className="teamcal-shift-time">
                         {shiftTimeLabel}
                       </span>

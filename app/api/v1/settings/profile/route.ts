@@ -307,7 +307,11 @@ export async function PATCH(request: Request) {
   }
 
   if (changedFields.length > 0) {
-    void logAudit({
+    // AUDIT-01: await the audit write so a serverless invocation cannot end
+    // before the insert lands. logAudit catches/logs its own errors and never
+    // throws, so a failed audit write does not fail the (already-committed)
+    // mutation — it is recorded to the error log for recovery.
+    await logAudit({
       action: "updated",
       tableName: "profiles",
       recordId: session.profile.id,

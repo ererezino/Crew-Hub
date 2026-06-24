@@ -189,15 +189,20 @@ function setupMocks(opts: {
     if (table === "onboarding_tasks") {
       onboardingTaskCallCount++;
       if (onboardingTaskCallCount === 1) {
-        // First call: find linked tasks by signature_request_id
-        return chainable({ data: opts.linkedTasks, error: null });
+        // ONBOARD-01 blocked-guard: look up linked tasks that are 'blocked'.
+        // None are blocked in these fixtures, so the guard passes.
+        return chainable({ data: [], error: null });
       }
       if (onboardingTaskCallCount === 2) {
-        // Second call: update task status (returns from .update().eq().eq())
-        return chainable({ data: null, error: null });
+        // Find linked tasks by signature_request_id.
+        return chainable({ data: opts.linkedTasks, error: null });
       }
       if (onboardingTaskCallCount === 3) {
-        // Third call: recount all instance tasks for progress check
+        // Update task status (returns from .update().eq().eq()).
+        return chainable({ data: null, error: null });
+      }
+      if (onboardingTaskCallCount === 4) {
+        // Recount all instance tasks for the unlock pass + progress check.
         return chainable({ data: opts.allInstanceTasks, error: null });
       }
       return chainable({ data: [], error: null });

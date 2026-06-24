@@ -15,6 +15,8 @@ import {
   isSchedulingManager,
   parseInteger
 } from "../../../../../lib/scheduling";
+import { resolveSchedulingIdentities } from "../../../../../lib/scheduling/identity-resolver";
+import { reportSchedulingInvariant } from "../../../../../lib/scheduling/shift-display";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ApiResponse } from "../../../../../types/auth";
 import {
@@ -84,13 +86,6 @@ const templateRowSchema = z.object({
   name: z.string()
 });
 
-const profileRowSchema = z.object({
-  id: z.string().uuid(),
-  full_name: z.string(),
-  department: z.string().nullable(),
-  country_code: z.string().nullable()
-});
-
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
 }
@@ -143,7 +138,7 @@ async function mapShiftRows({
     )
   ];
 
-  const [scheduleResult, templateResult, profileResult] = await Promise.all([
+  const [scheduleResult, templateResult, identityById] = await Promise.all([
     supabase
       .from("schedules")
       .select("id, name")
@@ -158,25 +153,21 @@ async function mapShiftRows({
           .is("deleted_at", null)
           .in("id", templateIds)
       : Promise.resolve({ data: [], error: null }),
-    employeeIds.length > 0
-      ? supabase
-          .from("profiles")
-          .select("id, full_name, department, country_code")
-          .eq("org_id", orgId)
-          .is("deleted_at", null)
-          .in("id", employeeIds)
-      : Promise.resolve({ data: [], error: null })
+    // SCHED-01: resolve assignee identities through the narrow, org-scoped,
+    // minimum-field service-role resolver — NOT profile RLS, which would only
+    // ever return the signed-in employee's own row and render everyone else
+    // "Unknown". IDs come exclusively from the already-authorized shift rows.
+    resolveSchedulingIdentities(employeeIds, orgId)
   ]);
 
-  if (scheduleResult.error || templateResult.error || profileResult.error) {
+  if (scheduleResult.error || templateResult.error) {
     throw new Error("Unable to resolve shift metadata.");
   }
 
   const parsedScheduleRows = z.array(scheduleRowSchema).safeParse(scheduleResult.data ?? []);
   const parsedTemplateRows = z.array(templateRowSchema).safeParse(templateResult.data ?? []);
-  const parsedProfileRows = z.array(profileRowSchema).safeParse(profileResult.data ?? []);
 
-  if (!parsedScheduleRows.success || !parsedTemplateRows.success || !parsedProfileRows.success) {
+  if (!parsedScheduleRows.success || !parsedTemplateRows.success) {
     throw new Error("Shift metadata is not in the expected shape.");
   }
 
@@ -186,10 +177,19 @@ async function mapShiftRows({
   const templateNameById = new Map(
     parsedTemplateRows.data.map((templateRow) => [templateRow.id, templateRow.name] as const)
   );
-  const profileById = new Map(parsedProfileRows.data.map((profileRow) => [profileRow.id, profileRow] as const));
 
   return rows.map((row) => {
-    const employeeProfile = row.employee_id ? profileById.get(row.employee_id) ?? null : null;
+    const identity = row.employee_id ? identityById.get(row.employee_id) ?? null : null;
+
+    // SCHED-01: an assigned shift whose identity did not resolve stays assigned
+    // (employeeName null → defensive label downstream). Flag it; never relabel
+    // it as open. Open status below depends ONLY on employee_id.
+    if (row.employee_id && !identity) {
+      reportSchedulingInvariant("Assigned shift identity did not resolve.", {
+        shiftId: row.id,
+        employeeId: row.employee_id
+      });
+    }
 
     return {
       id: row.id,
@@ -199,9 +199,9 @@ async function mapShiftRows({
       templateId: row.template_id,
       templateName: row.template_id ? templateNameById.get(row.template_id) ?? null : null,
       employeeId: row.employee_id,
-      employeeName: employeeProfile?.full_name ?? null,
-      employeeDepartment: employeeProfile?.department ?? null,
-      employeeCountryCode: employeeProfile?.country_code ?? null,
+      employeeName: identity?.fullName ?? null,
+      employeeDepartment: identity?.department ?? null,
+      employeeCountryCode: identity?.countryCode ?? null,
       shiftDate: row.shift_date,
       startTime: row.start_time,
       endTime: row.end_time,
@@ -388,7 +388,13 @@ export async function GET(request: Request) {
     shiftsQuery = shiftsQuery.lte("shift_date", query.endDate);
   }
 
-  if (scope === "team" && (isScopedTeamLead || !isManager)) {
+  // SCHED-02: a SCOPED team lead is deliberately narrowed to schedules in their
+  // own department. An ORDINARY employee is NOT narrowed here — their visibility
+  // (same normalized department OR rostered OR unscoped, published only) is
+  // defined once in RLS (shifts_select_published). Re-imposing a strict
+  // "my department only" app filter previously dropped the rostered
+  // cross-department and unscoped cases the policy intends them to see.
+  if (scope === "team" && isScopedTeamLead) {
     if (!session.profile.department) {
       return jsonResponse<SchedulingShiftsResponseData>(200, {
         data: { shifts: [] },

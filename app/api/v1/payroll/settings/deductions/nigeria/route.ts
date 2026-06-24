@@ -217,7 +217,8 @@ export async function PUT(request: Request) {
     );
 
     if (changedFields.length > 0) {
-      void logAudit({
+      // AUDIT-01: await for durability (see settings/profile for the policy).
+      await logAudit({
         action: "updated",
         tableName: "deduction_rules",
         recordId: null,

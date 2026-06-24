@@ -1,6 +1,10 @@
 import type { ShiftRecord } from "../../types/scheduling";
+import { reportSchedulingInvariant } from "./shift-display";
 
 /** Shared pure helpers for the weekly grid / roster views (weeks × shift-slots × people). */
+
+/** Defensive label for an assigned crew member whose name did not resolve. */
+export const DEFAULT_CREW_FALLBACK_LABEL = "Crew member";
 
 export type GridSlot = { key: string; name: string; startTime: string; endTime: string };
 
@@ -55,12 +59,21 @@ export function slotKeyOf(startHHMM: string, endHHMM: string): string {
   return `${startHHMM}-${endHHMM}`;
 }
 
-/** Group a schedule's date range into Mon–Sun weeks that intersect the range (max 8). */
+/**
+ * Group a schedule's date range into the Mon–Sun weeks that intersect it.
+ *
+ * SCHED-05: there is NO hidden week cap here. The product's maximum schedule
+ * length is enforced once, at schedule creation/duplication input validation
+ * (see assertScheduleWithinMaxLength). The bound below is only a runaway guard
+ * far above any valid schedule (a 3-month schedule is ≤ 14 weeks).
+ */
+export const MAX_GRID_WEEKS_RUNAWAY_GUARD = 60;
+
 export function buildWeeks(startDate: string, endDate: string, locale = "en"): GridWeek[] {
   const out: GridWeek[] = [];
   let cursorMonday = mondayOf(startDate);
   let index = 0;
-  while (cursorMonday <= endDate && index < 8) {
+  while (cursorMonday <= endDate && index < MAX_GRID_WEEKS_RUNAWAY_GUARD) {
     const rangeDates: string[] = [];
     const rangeWeekdays: number[] = [];
     for (let i = 0; i < 7; i += 1) {
@@ -105,10 +118,19 @@ export function buildSlots(shifts: ShiftRecord[]): GridSlot[] {
   return [...map.values()].sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 
-/** Build `${weekIndex}:${slotKey}` → Map<employeeId, person with worked weekdays>. */
+/**
+ * Build `${weekIndex}:${slotKey}` → Map<employeeId, person with worked weekdays>.
+ *
+ * Only assigned, non-cancelled shifts produce roster people — open shifts
+ * (no assignee) are intentionally excluded here and surfaced separately.
+ * An assigned shift whose name failed to resolve keeps its place in the
+ * roster under a defensive fallback label (SCHED-01) rather than vanishing
+ * or being mislabelled; the gap is flagged as a monitored invariant.
+ */
 export function buildCells(
   shifts: ShiftRecord[],
-  weeks: GridWeek[]
+  weeks: GridWeek[],
+  crewFallbackLabel: string = DEFAULT_CREW_FALLBACK_LABEL
 ): Map<string, Map<string, GridCellPerson>> {
   const grid = new Map<string, Map<string, GridCellPerson>>();
   if (weeks.length === 0) return grid;
@@ -131,9 +153,16 @@ export function buildCells(
     if (existing) {
       existing.weekdays.add(wd);
     } else {
+      const resolvedName = shift.employeeName?.trim();
+      if (!resolvedName) {
+        reportSchedulingInvariant("Roster cell assigned shift is missing a resolved name.", {
+          shiftId: shift.id,
+          employeeId: shift.employeeId
+        });
+      }
       people.set(shift.employeeId, {
         employeeId: shift.employeeId,
-        name: shift.employeeName ?? "Unknown",
+        name: resolvedName || crewFallbackLabel,
         weekdays: new Set([wd])
       });
     }

@@ -8,7 +8,7 @@ import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { StatusBadge } from "../../../../components/shared/status-badge";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import { useSchedulingShifts, useSchedulingSwaps } from "../../../../hooks/use-scheduling";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { formatSwapStatus } from "../../../../lib/format-labels";
@@ -66,7 +66,7 @@ export function SchedulingSwapsClient({
   const shiftsQuery = useSchedulingShifts({
     scope: "mine"
   });
-  const reportsQuery = usePeople({
+  const reportsQuery = useAllPeople({
     scope: "reports",
     enabled: canManageSwaps
   });

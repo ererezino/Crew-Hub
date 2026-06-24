@@ -5,8 +5,10 @@ import { useTranslations } from "next-intl";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { useSchedulingSchedules, useSchedulingShifts } from "../../../../hooks/use-scheduling";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import { areDepartmentsEqual } from "../../../../lib/department";
+import { MAX_GRID_WEEKS_RUNAWAY_GUARD } from "../../../../lib/scheduling/week-grid";
+import { reportSchedulingInvariant } from "../../../../lib/scheduling/shift-display";
 import {
   WEEKLY_HOURS_SOFT_LIMIT,
   isOverWeeklyLimit,
@@ -23,6 +25,19 @@ type CellPerson = {
   employeeId: string;
   name: string;
   weekdays: Set<number>; // 0=Mon..6=Sun
+};
+
+/** An optimistic cell edit awaiting / having attempted a background save (SCHED-04). */
+type CellEdit = {
+  cellKey: string;
+  employeeId: string;
+  name: string;
+  weekdays: number[];
+  /** Monotonic version; only the latest seq for a cell may apply its result. */
+  seq: number;
+  /** "saving" until acknowledged; "saved" once the server confirmed (cleared on
+   *  the next reconciling refetch); "failed" surfaces an explicit retry. */
+  status: "saving" | "saved" | "failed";
 };
 
 type WeekRow = {
@@ -116,7 +131,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
   );
   const shifts = useMemo(() => shiftsQuery.data?.shifts ?? [], [shiftsQuery.data]);
 
-  const peopleQuery = usePeople({ scope: "all" });
+  const peopleQuery = useAllPeople({ scope: "all" });
   const roster = useMemo(() => {
     const people = peopleQuery.people ?? [];
     const active = people.filter((p) => p.status === "active" || p.status === "onboarding");
@@ -130,11 +145,22 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   // Optimistic cell edits: applied to the UI instantly, saved in the background (debounced).
-  // Keyed by `${cellKey}__${employeeId}` → desired weekday set ([] means removed).
-  const [edits, setEdits] = useState<
-    Map<string, { cellKey: string; employeeId: string; name: string; weekdays: number[] }>
-  >(new Map());
+  // Keyed by `${cellKey}__${employeeId}`. SCHED-04: each edit carries a
+  // monotonically increasing `seq` so an out-of-order success/failure can only
+  // be applied if it still matches the LATEST edit for that cell, and a `status`
+  // so a failed save shows an explicit retry affordance instead of being
+  // silently discarded.
+  const [edits, setEdits] = useState<Map<string, CellEdit>>(new Map());
   const saveTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  // Pending (debounced, not-yet-fired) saves, so we can FLUSH them before
+  // navigating to another schedule or unmounting (SCHED-04) instead of dropping
+  // recent edits when their 450ms timer is cleared.
+  const pendingSaves = useRef<Map<string, () => void>>(new Map());
+  const editSeq = useRef(0);
+  const isMounted = useRef(true);
+  // Tracks the active schedule id for late save results to compare against, so a
+  // response that returns after the user navigated away is ignored (SCHED-04).
+  const scheduleIdRef = useRef<string | undefined>(undefined);
   const [addTarget, setAddTarget] = useState<string | null>(null); // `${weekIndex}:${slotKey}`
   const [notes, setNotes] = useState<Map<string, string>>(new Map()); // weekStart -> note
   const [copyingWeek, setCopyingWeek] = useState<string | null>(null);
@@ -154,12 +180,33 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
   // Load per-week notes for the active schedule.
   const scheduleId = activeSchedule?.id;
 
-  // Drop optimistic edits when switching schedules (the fresh fetch is authoritative).
+  // SCHED-04: when the active schedule changes, the prior schedule's pending
+  // saves were already flushed by the navigation handler (flushPendingSaves).
+  // Here we only clear any leftover timers and reset the overlay for the new
+  // schedule, whose fresh fetch is authoritative. Recent edits are not dropped
+  // silently — they were sent before the switch.
   useEffect(() => {
+    scheduleIdRef.current = scheduleId;
     setEdits(new Map());
     saveTimers.current.forEach((timer) => clearTimeout(timer));
     saveTimers.current.clear();
+    pendingSaves.current.clear();
   }, [scheduleId]);
+
+  // Track mount state so a late save result never calls setState after unmount,
+  // and flush/clear any pending saves on unmount (SCHED-04).
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      saveTimers.current.forEach((timer) => clearTimeout(timer));
+      saveTimers.current.clear();
+      // Fire any debounced-but-unsent saves so a last-moment edit isn't lost.
+      const pending = [...pendingSaves.current.values()];
+      pendingSaves.current.clear();
+      for (const run of pending) run();
+    };
+  }, []);
 
   useEffect(() => {
     if (!scheduleId) {
@@ -234,7 +281,7 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
     let cursorMonday = mondayOf(activeSchedule.startDate);
     let index = 0;
     // Guard: at most 8 weeks (covers a month-plus schedule).
-    while (cursorMonday <= activeSchedule.endDate && index < 8) {
+    while (cursorMonday <= activeSchedule.endDate && index < MAX_GRID_WEEKS_RUNAWAY_GUARD) {
       const rangeDates: string[] = [];
       const rangeWeekdays: number[] = [];
       for (let i = 0; i < 7; i += 1) {
@@ -315,15 +362,24 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       if (existing) {
         existing.weekdays.add(wd);
       } else {
+        const resolvedName = shift.employeeName?.trim();
+        if (!resolvedName) {
+          // SCHED-01: assigned shift with an unresolved name keeps its slot under
+          // the defensive crew label, never "Unknown" / treated as open.
+          reportSchedulingInvariant("Grid cell assigned shift is missing a resolved name.", {
+            shiftId: shift.id,
+            employeeId: shift.employeeId
+          });
+        }
         people.set(shift.employeeId, {
           employeeId: shift.employeeId,
-          name: shift.employeeName ?? "Unknown",
+          name: resolvedName || t("calendar.crewMemberFallback"),
           weekdays: new Set([wd])
         });
       }
     }
     return grid;
-  }, [shifts, weeks]);
+  }, [shifts, weeks, t]);
 
   const rosterById = useMemo(() => new Map(roster.map((p) => [p.id, p.fullName] as const)), [roster]);
 
@@ -353,17 +409,45 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
     return grid;
   }, [cells, edits]);
 
+  // SCHED-04: edits whose background save failed — surfaced with an explicit
+  // retry rather than being silently dropped.
+  const failedEdits = useMemo(
+    () => [...edits.values()].filter((edit) => edit.status === "failed"),
+    [edits]
+  );
+
   // Per-employee scheduled hours per ISO week (Monday start) — soft 48h guardrail, never blocking.
   const weeklyHours = useMemo(() => weeklyHoursByEmployee(shifts), [shifts]);
 
-  // Background save for a single cell edit. No spinner, no global disable, no refetch —
-  // the optimistic overlay keeps the UI correct; only errors trigger a reconciling refresh.
+  // Background save for a single cell edit. SCHED-04: the save is tagged with the
+  // cell's edit `seq` and the schedule id it was dispatched for; its result is
+  // applied ONLY if it still matches the latest edit for that cell on the same
+  // schedule — so an out-of-order or stale response can never clobber a newer
+  // optimistic value, and a failure surfaces an explicit retry instead of a
+  // silent discard.
   const doSave = useCallback(
-    async (week: WeekRow, slot: Slot, employeeId: string, weekdays: number[]) => {
-      if (!activeSchedule) return;
+    async (
+      week: WeekRow,
+      slot: Slot,
+      employeeId: string,
+      weekdays: number[],
+      seq: number,
+      scheduleIdAtDispatch: string
+    ) => {
       const cellKey = `${week.index}:${slot.key}`;
+      const k = editKey(cellKey, employeeId);
+
+      // Only apply a result if this is still the latest edit for the cell, the
+      // component is mounted, and we're still on the schedule it was sent for.
+      const stillCurrent = (cur: Map<string, CellEdit>): boolean => {
+        if (!isMounted.current) return false;
+        if (scheduleIdAtDispatch !== scheduleIdRef.current) return false;
+        const current = cur.get(k);
+        return Boolean(current && current.seq === seq);
+      };
+
       try {
-        const res = await fetch(`/api/v1/scheduling/schedules/${activeSchedule.id}/grid`, {
+        const res = await fetch(`/api/v1/scheduling/schedules/${scheduleIdAtDispatch}/grid`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -377,44 +461,104 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         if (!res.ok) {
           throw new Error(payload?.error?.message ?? t("grid.toastError"));
         }
+        if (!isMounted.current) return;
         for (const w of (payload?.data?.warnings ?? []) as string[]) addToast("info", w);
-      } catch (err) {
-        addToast("error", err instanceof Error ? err.message : t("grid.toastError"));
-        // Drop the failed edit so the cell falls back to server state, then reconcile.
+        // Mark acknowledged; the overlay is cleared only after the reconciling
+        // refetch lands (see the [shifts] effect below) so it never flickers to
+        // stale data, and only if still the latest edit.
         setEdits((cur) => {
+          if (!stillCurrent(cur)) return cur;
           const next = new Map(cur);
-          next.delete(editKey(cellKey, employeeId));
+          next.set(k, { ...cur.get(k)!, status: "saved" });
           return next;
         });
         shiftsQuery.refresh();
+      } catch (err) {
+        if (!isMounted.current) return;
+        addToast("error", err instanceof Error ? err.message : t("grid.toastError"));
+        // Keep the optimistic value visible with an explicit FAILED state +
+        // retry — never silently discard. Only if still the latest edit.
+        setEdits((cur) => {
+          if (!stillCurrent(cur)) return cur;
+          const next = new Map(cur);
+          next.set(k, { ...cur.get(k)!, status: "failed" });
+          return next;
+        });
       }
     },
-    [activeSchedule, addToast, t, shiftsQuery]
+    [addToast, t, shiftsQuery]
   );
 
   // Apply an edit instantly to the UI and debounce the save (coalesces rapid day-toggles).
   const applyEdit = useCallback(
     (week: WeekRow, slot: Slot, employeeId: string, name: string, weekdays: number[]) => {
+      if (!activeSchedule) return;
       const cellKey = `${week.index}:${slot.key}`;
       const k = editKey(cellKey, employeeId);
+      const seq = (editSeq.current += 1);
+      const scheduleIdAtDispatch = activeSchedule.id;
       setEdits((cur) => {
         const next = new Map(cur);
-        next.set(k, { cellKey, employeeId, name, weekdays });
+        next.set(k, { cellKey, employeeId, name, weekdays, seq, status: "saving" });
         return next;
       });
       const timers = saveTimers.current;
       const existing = timers.get(k);
       if (existing) clearTimeout(existing);
-      timers.set(
-        k,
-        setTimeout(() => {
-          timers.delete(k);
-          void doSave(week, slot, employeeId, weekdays);
-        }, 450)
-      );
+      const run = () => {
+        timers.delete(k);
+        pendingSaves.current.delete(k);
+        void doSave(week, slot, employeeId, weekdays, seq, scheduleIdAtDispatch);
+      };
+      // Register the pending save so navigation/unmount can flush it.
+      pendingSaves.current.set(k, run);
+      timers.set(k, setTimeout(run, 450));
     },
-    [doSave]
+    [activeSchedule, doSave]
   );
+
+  // Retry a previously failed cell edit (SCHED-04).
+  const retryEdit = useCallback(
+    (edit: CellEdit) => {
+      const [weekIndexStr, slotKey] = edit.cellKey.split(":");
+      const week = weeks.find((w) => w.index === Number(weekIndexStr));
+      const slot = slots.find((s) => s.key === slotKey);
+      if (week && slot) {
+        applyEdit(week, slot, edit.employeeId, edit.name, edit.weekdays);
+      }
+    },
+    [weeks, slots, applyEdit]
+  );
+
+  // Flush all debounced-but-unsent saves immediately (used before switching
+  // schedules so recent edits are persisted, not dropped).
+  const flushPendingSaves = useCallback(() => {
+    const timers = saveTimers.current;
+    const runs = [...pendingSaves.current.values()];
+    pendingSaves.current.clear();
+    for (const [k, timer] of timers) {
+      clearTimeout(timer);
+      timers.delete(k);
+    }
+    for (const run of runs) run();
+  }, []);
+
+  // Once a reconciling refetch lands (shifts changed), drop overlay edits that
+  // the server has already acknowledged ("saved") — the overlay is cleared only
+  // AFTER reconciliation, never before (SCHED-04).
+  useEffect(() => {
+    setEdits((cur) => {
+      let changed = false;
+      const next = new Map(cur);
+      for (const [k, edit] of cur) {
+        if (edit.status === "saved") {
+          next.delete(k);
+          changed = true;
+        }
+      }
+      return changed ? next : cur;
+    });
+  }, [shifts]);
 
   const copyWeek = useCallback(
     async (targetWeek: WeekRow) => {
@@ -510,7 +654,12 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
         <span className="form-label">{t("grid.scheduleLabel")}</span>
         <Select
           value={activeSchedule?.id ?? ""}
-          onValueChange={(value) => setSelectedScheduleId(value)}
+          onValueChange={(value) => {
+            // SCHED-04: persist recent edits to the current schedule before
+            // navigating away, instead of dropping their debounce timers.
+            flushPendingSaves();
+            setSelectedScheduleId(value);
+          }}
         >
           <SelectTrigger>
             <SelectValue />
@@ -526,6 +675,28 @@ export function SchedulingGridClient({ canManage }: { canManage: boolean }) {
       </div>
 
       <p className="settings-card-description">{t("grid.helpText")}</p>
+
+      {failedEdits.length > 0 ? (
+        <div className="schedule-grid-save-failed" role="alert">
+          <span className="schedule-grid-save-failed-text">
+            {t("grid.saveFailedBanner", { count: failedEdits.length })}
+          </span>
+          <ul className="schedule-grid-save-failed-list">
+            {failedEdits.map((edit) => (
+              <li key={`${edit.cellKey}__${edit.employeeId}`}>
+                <span>{edit.name}</span>
+                <button
+                  type="button"
+                  className="button button-subtle button-xs"
+                  onClick={() => retryEdit(edit)}
+                >
+                  {t("grid.retrySave")}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="schedule-grid-slot-add">
         {addingSlot ? (

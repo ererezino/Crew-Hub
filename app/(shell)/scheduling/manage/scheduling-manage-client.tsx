@@ -10,7 +10,7 @@ import { ScheduleWizard, type ScheduleWizardResult } from "../../../../component
 import { TeamSetupPanel } from "../../../../components/scheduling/team-setup-panel";
 import type { RosterEmployee } from "../../../../components/scheduling/roster-selector";
 import { useSchedulingSchedules } from "../../../../hooks/use-scheduling";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import type { ScheduleRecord } from "../../../../types/scheduling";
@@ -50,7 +50,7 @@ export function SchedulingManageClient({
     people,
     isLoading: isPeopleLoading,
     setPeople
-  } = usePeople();
+  } = useAllPeople();
   const isSuperAdmin = hasRole(userRoles, "SUPER_ADMIN");
   const isHrAdmin = hasRole(userRoles, "HR_ADMIN");
 

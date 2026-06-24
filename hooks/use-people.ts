@@ -23,15 +23,23 @@ import type {
 type PeopleScope = "all" | "reports" | "me";
 
 /**
- * Historical full-list limit (also the server-side maximum). `usePeople`
- * passes it explicitly so callers that consume the entire list (org chart,
- * manager/approver pickers, scheduling grids, signer dropdowns) keep
- * working now that the server default is a small page.
+ * Historical full-list limit (also the server-side maximum page size). It is
+ * the largest `limit` the API accepts in a single request — NOT a cap on how
+ * many people a consumer can load. Callers that need the entire org use
+ * {@link useAllPeople}, which pages through every record.
  */
 export const PEOPLE_FULL_LIST_LIMIT = 250;
 
 /** Default page size for the paginated directory view. */
 export const PEOPLE_PAGE_SIZE = 50;
+
+/**
+ * Hard ceiling on pages accumulated by {@link accumulatePeoplePages}. Acts as
+ * a circuit-breaker so a misbehaving server that always returns `hasMore`
+ * cannot spin forever. At {@link PEOPLE_PAGE_SIZE} this allows 50k people —
+ * far above any real org — so it never truncates legitimate data.
+ */
+const PEOPLE_ACCUMULATE_MAX_PAGES = 1000;
 
 type UsePeopleOptions = {
   scope?: PeopleScope;
@@ -112,6 +120,123 @@ export function usePeople(options: UsePeopleOptions = {}): UsePeopleResult {
           people: nextPeople,
           total: currentData?.total ?? nextPeople.length,
           hasMore: currentData?.hasMore ?? false
+        };
+      });
+    },
+    [queryClient, queryKey]
+  );
+
+  return {
+    people: query.data?.people ?? [],
+    isLoading: enabled && query.isPending && !query.data,
+    errorMessage: query.error instanceof Error ? query.error.message : null,
+    refresh,
+    setPeople
+  };
+}
+
+/* ── Accumulating (whole-org) variant for pickers/grids/dropdowns ── */
+
+/**
+ * Page-fetching function used by {@link accumulatePeoplePages}. Given an
+ * `offset`, returns one page of data (people + total + hasMore).
+ */
+type PeoplePageFetcher = (offset: number) => Promise<PeopleListResponseData>;
+
+/**
+ * Accumulate EVERY page of people by walking offsets until the server reports
+ * no more records. This is the core of {@link useAllPeople}: it removes the
+ * historical 250 ceiling for consumers that genuinely need the whole org
+ * (org chart, manager/approver pickers, scheduling grids, signer dropdowns).
+ *
+ * Pure and React-free so the pagination-advance logic is unit-testable: pass
+ * any `fetchPage` and a `pageSize`, get back the fully-accumulated list plus
+ * the final `total`.
+ */
+export async function accumulatePeoplePages(
+  fetchPage: PeoplePageFetcher,
+  pageSize: number
+): Promise<PeopleListResponseData> {
+  const people: PersonRecord[] = [];
+  let total = 0;
+  let offset = 0;
+
+  for (let page = 0; page < PEOPLE_ACCUMULATE_MAX_PAGES; page += 1) {
+    const data = await fetchPage(offset);
+    people.push(...data.people);
+    total = data.total;
+
+    // Stop when the server says there's nothing left, or when a page comes
+    // back short/empty (defensive: avoids an infinite loop if `hasMore` is
+    // ever wrong while the page itself is not full).
+    if (!data.hasMore || data.people.length === 0 || data.people.length < pageSize) {
+      break;
+    }
+
+    offset += pageSize;
+  }
+
+  return { people, total: total || people.length, hasMore: false };
+}
+
+type UseAllPeopleOptions = {
+  scope?: PeopleScope;
+  enabled?: boolean;
+  /** First page fetched server-side; seeds the cache for a fast first paint. */
+  initialData?: PeopleListResponseData;
+  /** Page size used while walking the list. Defaults to the directory size. */
+  pageSize?: number;
+};
+
+/**
+ * Fetch the COMPLETE people list for a scope, paging through every record so
+ * no one is silently omitted past the API's per-request maximum. Use this for
+ * any consumer that needs everyone (pickers, dropdowns, org chart, scheduling
+ * roster). For the browsable directory prefer {@link usePeopleInfinite}, which
+ * loads pages on demand instead of all at once.
+ */
+export function useAllPeople(options: UseAllPeopleOptions = {}): UsePeopleResult {
+  const scope = options.scope ?? "all";
+  const enabled = options.enabled ?? true;
+  const pageSize = options.pageSize ?? PEOPLE_PAGE_SIZE;
+  const queryKey = useMemo(
+    () => ["people", "all", scope, pageSize] as const,
+    [scope, pageSize]
+  );
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey,
+    queryFn: ({ signal }) =>
+      accumulatePeoplePages(
+        (offset) => fetchPeople(buildPeopleUrl(scope, pageSize, offset), signal),
+        pageSize
+      ),
+    initialData: options.initialData,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false
+  });
+
+  const refresh = useCallback(() => {
+    void query.refetch();
+  }, [query]);
+
+  const setPeople: Dispatch<SetStateAction<PersonRecord[]>> = useCallback(
+    (value) => {
+      queryClient.setQueryData<PeopleListResponseData>(queryKey, (currentData) => {
+        const currentPeople = currentData?.people ?? [];
+        const nextPeople =
+          typeof value === "function"
+            ? (value as (previousValue: PersonRecord[]) => PersonRecord[])(currentPeople)
+            : value;
+
+        return {
+          people: nextPeople,
+          total: currentData?.total ?? nextPeople.length,
+          hasMore: false
         };
       });
     },

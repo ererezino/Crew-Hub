@@ -8,7 +8,7 @@ import { EmptyState } from "../../../../components/shared/empty-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { useLearningCourses } from "../../../../hooks/use-learning";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { toSentenceCase } from "../../../../lib/format-labels";
@@ -56,7 +56,7 @@ export function LearningAdminClient() {
   const locale = useLocale() as AppLocale;
 
   const coursesQuery = useLearningCourses({ includeDraft: true });
-  const peopleQuery = usePeople({ scope: "all" });
+  const peopleQuery = useAllPeople({ scope: "all" });
 
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [assignmentForm, setAssignmentForm] = useState<AssignmentFormState>(defaultAssignmentForm);

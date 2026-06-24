@@ -12,7 +12,7 @@ import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useAtRiskOnboardings, useOnboardingInstances, useOnboardingTemplates } from "../../../hooks/use-onboarding";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
-import { usePeople } from "../../../hooks/use-people";
+import { useAllPeople } from "../../../hooks/use-people";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
@@ -429,7 +429,7 @@ export function OnboardingClient({
   });
   const templatesQuery = useOnboardingTemplates();
   const atRiskQuery = useAtRiskOnboardings();
-  const peopleQuery = usePeople({
+  const peopleQuery = useAllPeople({
     scope: canManageOnboarding ? "all" : instanceScope
   });
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);

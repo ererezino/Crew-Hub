@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { usePeople } from "../../hooks/use-people";
+import { useAllPeople } from "../../hooks/use-people";
 import { SlidePanel } from "../shared/slide-panel";
 import { StatusBadge } from "../shared/status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
@@ -57,8 +57,8 @@ export function ApprovalQueuesSection() {
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // People list for the destination dropdown (full-list default)
-  const { people } = usePeople();
+  // People list for the destination dropdown (full org, paged through)
+  const { people } = useAllPeople();
 
   // ── Data fetching ─────────────────────────────────────────────────────
 

@@ -73,7 +73,7 @@ export async function GET() {
       .is("deleted_at", null),
     supabase
       .from("leave_requests")
-      .select("id, employee_id")
+      .select("id, employee_id, approver_id")
       .eq("org_id", orgId)
       .eq("status", "pending")
       .is("deleted_at", null)
@@ -91,7 +91,14 @@ export async function GET() {
   const additionalExpenses = additionalExpensesResult.data ?? [];
   const pendingLeave = pendingLeaveResult.data ?? [];
 
-  /* Manager-stage items route to the submitter's manager — resolve those. */
+  /* APPROVAL-01: ownership = the request's stored current approver when present
+   * (leave_requests.approver_id), otherwise the product's operational lead
+   * resolver (team_lead_id ?? manager_id). Manager-stage expenses have no stored
+   * approver until approved, so they fall back to the operational lead. Items
+   * with no resolvable owner are surfaced in an explicit UNASSIGNED bucket, never
+   * silently dropped. */
+  const UNASSIGNED = "__unassigned__";
+
   const employeeIds = [
     ...new Set(
       [...pendingExpenses, ...pendingLeave]
@@ -100,18 +107,31 @@ export async function GET() {
     )
   ];
 
-  const managerByEmployeeId = new Map<string, string>();
+  const operationalLeadByEmployeeId = new Map<string, string>();
 
   if (employeeIds.length > 0) {
-    const { data: employeeRows } = await supabase
+    const { data: employeeRows, error: employeeError } = await supabase
       .from("profiles")
-      .select("id, manager_id")
+      .select("id, manager_id, team_lead_id")
       .eq("org_id", orgId)
       .in("id", employeeIds);
 
+    // APPROVAL-01: a failed metadata query is an ERROR, not "no managers".
+    if (employeeError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "QUEUE_FETCH_FAILED", message: "Unable to resolve approver hierarchy." },
+        meta: buildMeta()
+      });
+    }
+
     for (const row of employeeRows ?? []) {
-      if (typeof row?.id === "string" && typeof row?.manager_id === "string") {
-        managerByEmployeeId.set(row.id, row.manager_id);
+      const lead =
+        (typeof row?.team_lead_id === "string" && row.team_lead_id) ||
+        (typeof row?.manager_id === "string" && row.manager_id) ||
+        null;
+      if (typeof row?.id === "string" && lead) {
+        operationalLeadByEmployeeId.set(row.id, lead);
       }
     }
   }
@@ -125,7 +145,7 @@ export async function GET() {
         approverId,
         approverName: "",
         approverStatus: null,
-        isOrphaned: false,
+        isOrphaned: approverId === UNASSIGNED,
         pendingExpensesManagerStage: 0,
         pendingExpensesAdditionalStage: 0,
         pendingExpenseIdsAdditionalStage: [],
@@ -137,42 +157,66 @@ export async function GET() {
   }
 
   for (const row of pendingExpenses) {
-    const managerId = row.employee_id ? managerByEmployeeId.get(row.employee_id as string) : undefined;
-    if (managerId) {
-      entryFor(managerId).pendingExpensesManagerStage += 1;
-    }
+    const ownerId =
+      (row.employee_id ? operationalLeadByEmployeeId.get(row.employee_id as string) : undefined) ?? UNASSIGNED;
+    entryFor(ownerId).pendingExpensesManagerStage += 1;
   }
 
   for (const row of additionalExpenses) {
-    const approverId = row.additional_approver_id as string;
+    const approverId = (row.additional_approver_id as string | null) ?? UNASSIGNED;
     const entry = entryFor(approverId);
     entry.pendingExpensesAdditionalStage += 1;
     entry.pendingExpenseIdsAdditionalStage.push(row.id as string);
   }
 
   for (const row of pendingLeave) {
-    const managerId = row.employee_id ? managerByEmployeeId.get(row.employee_id as string) : undefined;
-    if (managerId) {
-      entryFor(managerId).pendingLeaveRequests += 1;
-    }
+    // Prefer the request's stored current approver; else the operational lead.
+    const ownerId =
+      (row.approver_id as string | null) ??
+      (row.employee_id ? operationalLeadByEmployeeId.get(row.employee_id as string) : undefined) ??
+      UNASSIGNED;
+    entryFor(ownerId).pendingLeaveRequests += 1;
   }
 
-  /* Resolve approver names and statuses; flag orphans. */
-  const approverIds = [...entries.keys()];
+  /* Resolve approver names and statuses; flag orphans. The synthetic UNASSIGNED
+   * bucket is labelled directly and never sent to the profile lookup. */
+  const approverIds = [...entries.keys()].filter((id) => id !== UNASSIGNED);
 
   if (approverIds.length > 0) {
-    const { data: approverRows } = await supabase
+    const { data: approverRows, error: approverError } = await supabase
       .from("profiles")
       .select("id, full_name, status, deleted_at")
       .eq("org_id", orgId)
       .in("id", approverIds);
 
+    // APPROVAL-01: a failed approver-metadata query is an ERROR, not "all orphaned".
+    if (approverError) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "QUEUE_FETCH_FAILED", message: "Unable to resolve approver details." },
+        meta: buildMeta()
+      });
+    }
+
     const parsed = z.array(profileRowSchema).safeParse(approverRows ?? []);
-    const profileById = new Map(
-      (parsed.success ? parsed.data : []).map((row) => [row.id, row] as const)
-    );
+
+    if (!parsed.success) {
+      return jsonResponse<null>(500, {
+        data: null,
+        error: { code: "QUEUE_FETCH_FAILED", message: "Approver details are not in the expected shape." },
+        meta: buildMeta()
+      });
+    }
+
+    const profileById = new Map(parsed.data.map((row) => [row.id, row] as const));
 
     for (const entry of entries.values()) {
+      if (entry.approverId === UNASSIGNED) {
+        entry.approverName = "Unassigned";
+        entry.approverStatus = null;
+        entry.isOrphaned = true;
+        continue;
+      }
       const profile = profileById.get(entry.approverId);
       entry.approverName = profile?.full_name ?? "Unknown";
       entry.approverStatus = profile?.status ?? null;
@@ -181,6 +225,13 @@ export async function GET() {
         Boolean(profile.deleted_at) ||
         profile.status === "inactive" ||
         profile.status === "offboarding";
+    }
+  } else {
+    // Only the UNASSIGNED bucket exists (or nothing). Label it.
+    const unassigned = entries.get(UNASSIGNED);
+    if (unassigned) {
+      unassigned.approverName = "Unassigned";
+      unassigned.isOrphaned = true;
     }
   }
 

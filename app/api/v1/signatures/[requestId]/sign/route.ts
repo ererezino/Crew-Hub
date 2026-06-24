@@ -6,6 +6,7 @@ import { logAudit } from "../../../../../../lib/audit";
 import { sendOnboardingCompleteEmail } from "../../../../../../lib/notifications/email";
 import { createNotification } from "../../../../../../lib/notifications/service";
 import { completeOnboarding } from "../../../../../../lib/onboarding/auto-transition";
+import { findUnlockableTasks } from "../../../../../../lib/onboarding/task-dependencies";
 import { hasRole } from "../../../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../types/auth";
@@ -271,6 +272,47 @@ export async function POST(
     });
   }
 
+  // ONBOARD-01: reject signing while the linked onboarding task is dependency-
+  // blocked with prerequisites still incomplete. Signing completes the task, so
+  // allowing it here would bypass the dependency model (early completion).
+  {
+    const { data: linkedBlocked } = await serviceRoleClient
+      .from("onboarding_tasks")
+      .select("id, instance_id, status, depends_on_task_ids")
+      .eq("signature_request_id", parsedRequestRow.data.id)
+      .eq("org_id", session.profile.org_id)
+      .eq("status", "blocked")
+      .is("deleted_at", null);
+
+    for (const blockedTask of linkedBlocked ?? []) {
+      const dependsOn: string[] = Array.isArray(blockedTask.depends_on_task_ids)
+        ? (blockedTask.depends_on_task_ids as string[])
+        : [];
+      if (dependsOn.length === 0 || !blockedTask.instance_id) {
+        continue;
+      }
+      const { data: prereqRows } = await serviceRoleClient
+        .from("onboarding_tasks")
+        .select("id, status")
+        .eq("instance_id", blockedTask.instance_id)
+        .eq("org_id", session.profile.org_id)
+        .in("id", dependsOn)
+        .is("deleted_at", null);
+
+      const prereqsComplete = (prereqRows ?? []).every((row) => row.status === "completed");
+      if (!prereqsComplete) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "TASK_BLOCKED",
+            message: "Complete the prerequisite onboarding tasks before signing this document."
+          },
+          meta: buildMeta()
+        });
+      }
+    }
+  }
+
   const resolvedSignatureMode =
     parsedBody.data.signatureMode ?? (parsedBody.data.signatureImageData ? "drawn" : "typed");
   let signatureImagePath: string | null = null;
@@ -486,12 +528,34 @@ export async function POST(
         if (linkedTask.instance_id) {
           const { data: allInstanceTasks } = await serviceRoleClient
             .from("onboarding_tasks")
-            .select("id, status, track")
+            .select("id, status, track, depends_on_task_ids, assigned_to, title")
             .eq("instance_id", linkedTask.instance_id)
             .eq("org_id", session.profile.org_id)
             .is("deleted_at", null);
 
           if (allInstanceTasks && allInstanceTasks.length > 0) {
+            // ONBOARD-01: run the SAME dependency unlock pass as the manual
+            // completion route (shared findUnlockableTasks) off this single
+            // fetch, so completing a task by signature immediately flips any
+            // newly-eligible dependents 'blocked' → 'pending'.
+            const unlockable = findUnlockableTasks(
+              allInstanceTasks.map((t) => ({
+                id: t.id as string,
+                status: t.status as string,
+                depends_on_task_ids: (t.depends_on_task_ids as string[] | null) ?? null,
+                assigned_to: (t.assigned_to as string | null) ?? null,
+                title: (t.title as string | null) ?? ""
+              }))
+            );
+            for (const unlockTask of unlockable) {
+              await serviceRoleClient
+                .from("onboarding_tasks")
+                .update({ status: "pending" })
+                .eq("id", unlockTask.id)
+                .eq("org_id", session.profile.org_id)
+                .eq("status", "blocked");
+            }
+
             const employeeTasks = allInstanceTasks.filter((t) => t.track === "employee");
             const opsTasks = allInstanceTasks.filter((t) => t.track === "operations");
             const employeeDone = employeeTasks.length === 0 || employeeTasks.every((t) => t.status === "completed");

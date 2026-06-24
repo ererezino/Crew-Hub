@@ -7,7 +7,7 @@ import { EmptyState } from "../../../../components/shared/empty-state";
 import { OrgChartSidePanel } from "../../../../components/org-chart/org-chart-side-panel";
 import { OrgChartToolbar } from "../../../../components/org-chart/org-chart-toolbar";
 import { OrgChartTree, type OrgChartTreeHandle } from "../../../../components/org-chart/org-chart-tree";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import type { OrgChartPerson } from "../../../../lib/org-chart/types";
 import type { PersonRecord } from "../../../../types/people";
 
@@ -28,7 +28,7 @@ function toOrgChartPerson(p: PersonRecord): OrgChartPerson {
 
 export function OrgChartClient() {
   const t = useTranslations("orgChart");
-  const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({ scope: "all" });
+  const { people, isLoading, errorMessage, refresh, setPeople } = useAllPeople({ scope: "all" });
 
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [showOperationalLeads, setShowOperationalLeads] = useState(false);

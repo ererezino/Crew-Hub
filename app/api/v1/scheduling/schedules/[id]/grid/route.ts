@@ -6,7 +6,7 @@ import { getAuthenticatedSession } from "../../../../../../../lib/auth/session";
 import { logAudit } from "../../../../../../../lib/audit";
 import { areDepartmentsEqual } from "../../../../../../../lib/department";
 import { isDepartmentOnlyTeamLead } from "../../../../../../../lib/roles";
-import { extractIsoTime, isSchedulingManager } from "../../../../../../../lib/scheduling";
+import { areTimeRangesOverlapping, extractIsoTime, isSchedulingManager } from "../../../../../../../lib/scheduling";
 import { createSupabaseServiceRoleClient } from "../../../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../../../types/auth";
 import { SCHEDULE_STATUSES } from "../../../../../../../types/scheduling";
@@ -31,8 +31,24 @@ const gridCellSchema = z.object({
   // Any date inside the target week; we derive the Mon–Sun window and clamp to the schedule.
   weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   // 0 = Monday … 6 = Sunday. Empty clears the crew member from this cell for the week.
-  weekdays: z.array(z.number().int().min(0).max(6)).max(7)
+  // SCHED-03: deduplicate weekdays so a repeated index can't produce duplicate
+  // shifts for the same day.
+  weekdays: z
+    .array(z.number().int().min(0).max(6))
+    .max(7)
+    .transform((days) => [...new Set(days)]),
+  // SCHED-03/04: optional optimistic-concurrency guard. The IDs the client
+  // believes currently fill this cell; a mismatch means a concurrent edit won.
+  expectedShiftIds: z.array(z.string().uuid()).max(7).optional()
 });
+
+/** Employee eligibility for a service-role grid write (SCHED-03). */
+const eligibleEmployeeSchema = z.object({
+  id: z.string().uuid(),
+  org_id: z.string().uuid(),
+  status: z.string().nullable()
+});
+const SCHEDULING_ELIGIBLE_STATUSES = new Set(["active", "onboarding"]);
 
 const scheduleRowSchema = z.object({
   id: z.string().uuid(),
@@ -265,6 +281,66 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }
   }
 
+  // SCHED-03: prove the target employee is an eligible member of THIS schedule's
+  // org before any service-role write — never trust the client-supplied UUID.
+  const { data: employeeRaw, error: employeeError } = await supabase
+    .from("profiles")
+    .select("id, org_id, status")
+    .eq("id", employeeId)
+    .eq("org_id", orgId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  const employee = employeeRaw ? eligibleEmployeeSchema.safeParse(employeeRaw) : null;
+
+  if (employeeError) {
+    return jsonResponse<null>(500, {
+      data: null,
+      error: { code: "EMPLOYEE_LOOKUP_FAILED", message: "Unable to verify the crew member." },
+      meta: buildMeta()
+    });
+  }
+
+  if (!employee?.success) {
+    return jsonResponse<null>(404, {
+      data: null,
+      error: { code: "EMPLOYEE_NOT_FOUND", message: "Crew member is not part of this organization." },
+      meta: buildMeta()
+    });
+  }
+
+  if (!SCHEDULING_ELIGIBLE_STATUSES.has(employee.data.status ?? "")) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "EMPLOYEE_NOT_ELIGIBLE",
+        message: "Only active or onboarding crew members can be scheduled."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // Team leads may only schedule crew members from their own department.
+  if (isDepartmentOnlyTeamLead(session.profile.roles)) {
+    const { data: employeeDeptRow } = await supabase
+      .from("profiles")
+      .select("department")
+      .eq("id", employeeId)
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!areDepartmentsEqual(employeeDeptRow?.department ?? null, session.profile.department)) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "Team leads can only schedule crew members from their own department."
+        },
+        meta: buildMeta()
+      });
+    }
+  }
+
   // Resolve the target dates: selected weekdays within this week, clamped to the schedule range.
   const allWeekDates = weekDates(weekStart);
   const inRange = (iso: string) =>
@@ -285,88 +361,52 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     });
   }
 
-  const now = new Date().toISOString();
+  // SCHED-03: clear-old + insert-new + swap cleanup happen in ONE atomic RPC, so
+  // an insert failure can never lose the old cell, and concurrent saves to the
+  // same cell are serialized (FOR UPDATE). An optional expected-id guard returns
+  // a stale-cell conflict when a competing edit changed the cell first.
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("replace_schedule_grid_cell", {
+    p_org_id: orgId,
+    p_schedule_id: scheduleId,
+    p_employee_id: employeeId,
+    p_slot_start: slot.startTime,
+    p_slot_end: slot.endTime,
+    p_slot_name: slot.name,
+    p_week_dates: weekRangeDates,
+    p_target_dates: targetDates,
+    p_expected_shift_ids: parsed.data.expectedShiftIds ?? null
+  });
 
-  // 1) Clear this crew member's existing shifts for THIS slot across the in-range week,
-  //    so the cell ends up reflecting exactly the selected weekdays.
-  const { data: existingRows, error: existingError } = await supabase
-    .from("shifts")
-    .select("id, shift_date, start_time, end_time")
-    .eq("org_id", orgId)
-    .eq("schedule_id", scheduleId)
-    .eq("employee_id", employeeId)
-    .in("shift_date", weekRangeDates)
-    .is("deleted_at", null)
-    .neq("status", "cancelled");
-
-  if (existingError) {
+  if (rpcError) {
     return jsonResponse<null>(500, {
       data: null,
-      error: { code: "GRID_FETCH_FAILED", message: "Unable to load existing shifts for this cell." },
+      error: { code: "GRID_SAVE_FAILED", message: "Unable to save this cell." },
       meta: buildMeta()
     });
   }
 
-  const slotRowIds = (existingRows ?? [])
-    .filter(
-      (row) =>
-        typeof row.start_time === "string" &&
-        typeof row.end_time === "string" &&
-        timesMatchSlot(row.start_time, row.end_time, slot.startTime, slot.endTime)
-    )
-    .map((row) => row.id as string);
+  const rpcData = (rpcResult ?? {}) as Record<string, unknown>;
 
-  if (slotRowIds.length > 0) {
-    await supabase
-      .from("shift_swaps")
-      .update({ deleted_at: now })
-      .eq("org_id", orgId)
-      .in("shift_id", slotRowIds)
-      .is("deleted_at", null);
-
-    const { error: clearError } = await supabase
-      .from("shifts")
-      .update({ deleted_at: now, status: "cancelled" })
-      .eq("org_id", orgId)
-      .in("id", slotRowIds);
-
-    if (clearError) {
-      return jsonResponse<null>(500, {
+  if (typeof rpcData.error === "string") {
+    if (rpcData.error === "STALE_CELL") {
+      return jsonResponse<null>(409, {
         data: null,
-        error: { code: "GRID_CLEAR_FAILED", message: "Unable to update this cell." },
+        error: {
+          code: "GRID_CELL_CONFLICT",
+          message: "This cell changed since you loaded it. Refresh and try again."
+        },
         meta: buildMeta()
       });
     }
-  }
-
-  // 2) Insert the selected weekdays.
-  let createdCount = 0;
-  if (targetDates.length > 0) {
-    const rows = targetDates.map((shiftDate) => {
-      const times = toShiftDateTimes(shiftDate, slot.startTime, slot.endTime);
-      return {
-        org_id: orgId,
-        schedule_id: scheduleId,
-        employee_id: employeeId,
-        shift_date: shiftDate,
-        start_time: times.startTime,
-        end_time: times.endTime,
-        break_minutes: 0,
-        status: "scheduled" as const,
-        notes: slot.name
-      };
+    return jsonResponse<null>(422, {
+      data: null,
+      error: { code: "GRID_SAVE_REJECTED", message: rpcData.error },
+      meta: buildMeta()
     });
-
-    const { error: insertError } = await supabase.from("shifts").insert(rows);
-    if (insertError) {
-      return jsonResponse<null>(500, {
-        data: null,
-        error: { code: "GRID_INSERT_FAILED", message: "Unable to save this cell." },
-        meta: buildMeta()
-      });
-    }
-    createdCount = rows.length;
   }
+
+  const createdCount = typeof rpcData.created === "number" ? rpcData.created : 0;
+  const removedCount = typeof rpcData.removed === "number" ? rpcData.removed : 0;
 
   // 3) Advisory, non-blocking warnings.
   const warnings: string[] = [];
@@ -401,7 +441,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       );
     }
 
-    // (b) A different slot on the same day at an overlapping time.
+    // (b) Another shift on the same day whose actual time interval OVERLAPS the
+    //     new shift. SCHED-03: a different, non-overlapping slot is NOT a double
+    //     booking; use real interval overlap (handles overnight, where the end
+    //     rolls past midnight). Same-slot rows (what we just wrote) are skipped.
     const { data: otherRows } = await supabase
       .from("shifts")
       .select("shift_date, start_time, end_time")
@@ -411,12 +454,23 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       .is("deleted_at", null)
       .neq("status", "cancelled");
 
-    const hasDoubleBooking = (otherRows ?? []).some(
-      (row) =>
-        typeof row.start_time === "string" &&
-        typeof row.end_time === "string" &&
-        !timesMatchSlot(row.start_time, row.end_time, slot.startTime, slot.endTime)
-    );
+    const hasDoubleBooking = (otherRows ?? []).some((row) => {
+      if (typeof row.start_time !== "string" || typeof row.end_time !== "string") {
+        return false;
+      }
+      if (timesMatchSlot(row.start_time, row.end_time, slot.startTime, slot.endTime)) {
+        return false; // same slot — not a conflict
+      }
+      const shiftDate = typeof row.shift_date === "string" ? row.shift_date : null;
+      if (!shiftDate) return false;
+      const newTimes = toShiftDateTimes(shiftDate, slot.startTime, slot.endTime);
+      return areTimeRangesOverlapping({
+        startA: newTimes.startTime,
+        endA: newTimes.endTime,
+        startB: row.start_time,
+        endB: row.end_time
+      });
+    });
     if (hasDoubleBooking) {
       warnings.push("This crew member is already on another shift on one of these days.");
     }
@@ -427,11 +481,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     tableName: "shifts",
     recordId: scheduleId,
     oldValue: { slot: slot.name, employee_id: employeeId },
-    newValue: { weekdays, created: createdCount, removed: slotRowIds.length }
+    newValue: { weekdays, created: createdCount, removed: removedCount }
   });
 
   return jsonResponse<{ created: number; removed: number; warnings: string[] }>(200, {
-    data: { created: createdCount, removed: slotRowIds.length, warnings },
+    data: { created: createdCount, removed: removedCount, warnings },
     error: null,
     meta: buildMeta()
   });

@@ -468,8 +468,6 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const leaveLabel = formatLeaveTypeLabel(existingRequest.leave_type);
     const dateLabel = formatDateRangeHuman(existingRequest.start_date, existingRequest.end_date);
-    const isUnlimitedType = UNLIMITED_LEAVE_TYPES.has(existingRequest.leave_type);
-    const existingTotalDays = parseNumeric(existingRequest.total_days);
 
     const finalize = async (updatedRow: unknown) => {
       const parsed = leaveRequestRowSchema.safeParse(updatedRow);
@@ -632,29 +630,37 @@ export async function PATCH(request: Request, context: RouteContext) {
       return err(422, "INVALID_STATUS", "There is no pending change to act on for this leave request.");
     }
 
-    const clearPendingChange = {
-      pending_change_type: null,
-      pending_start_date: null,
-      pending_end_date: null,
-      pending_total_days: null,
-      change_reason: null,
-      change_requested_by: null,
-      change_requested_at: null
-    } as const;
+    // LEAVE-01: apply the change decision atomically. decide_leave_change locks
+    // the request row, re-verifies the expected state (status approved AND a
+    // pending change still present), applies the status/date change, clears the
+    // pending change, and adjusts the balance — all in one transaction. A
+    // competing decision that already consumed the pending change returns
+    // STALE_CHANGE → 409 instead of double-applying the balance delta.
+    const decision = parsedBody.data.action === "approve_change" ? "approve" : "reject";
+    const changeType = existingRequest.pending_change_type;
 
-    if (parsedBody.data.action === "reject_change") {
-      const { data: updatedRow, error: updateErr } = await svcClient
-        .from("leave_requests")
-        .update(clearPendingChange)
-        .eq("id", existingRequest.id)
-        .eq("org_id", session.profile.org_id)
-        .select(SELECT_COLUMNS)
-        .single();
+    const { data: changeRpcResult, error: changeRpcError } = await svcClient.rpc("decide_leave_change", {
+      p_request_id: existingRequest.id,
+      p_decision: decision,
+      p_actor_id: session.profile.id
+    });
 
-      if (updateErr || !updatedRow) {
-        return err(500, "REQUEST_UPDATE_FAILED", "Unable to reject the change request.");
+    if (changeRpcError) {
+      return err(500, "REQUEST_UPDATE_FAILED", humanizeError(changeRpcError.message));
+    }
+
+    const changeRpcData = changeRpcResult as Record<string, unknown> | null;
+    if (changeRpcData && typeof changeRpcData === "object" && typeof changeRpcData.error === "string") {
+      if (changeRpcData.error === "STALE_CHANGE") {
+        return err(409, "CHANGE_CONFLICT", "This change was already decided. Please refresh.");
       }
+      if (changeRpcData.error === "NOT_FOUND") {
+        return err(404, "NOT_FOUND", "Leave request not found.");
+      }
+      return err(422, "INVALID_STATUS", String(changeRpcData.error));
+    }
 
+    if (decision === "reject") {
       await createNotification({
         orgId: session.profile.org_id,
         userId: employeeProfile.id,
@@ -672,102 +678,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         newValue: { pending_change_type: null, change_decision: "rejected" }
       }).catch(() => undefined);
 
-      return finalize(updatedRow);
-    }
-
-    // approve_change — apply the staged change and adjust balances.
-    const changeType = existingRequest.pending_change_type;
-    let updatePayload: Record<string, unknown> = { ...clearPendingChange };
-
-    if (changeType === "cancel") {
-      updatePayload = { ...updatePayload, status: "cancelled" };
-    } else {
-      // edit
-      const newStart = existingRequest.pending_start_date;
-      const newEnd = existingRequest.pending_end_date;
-      const newTotal =
-        existingRequest.pending_total_days === null || existingRequest.pending_total_days === undefined
-          ? existingTotalDays
-          : parseNumeric(existingRequest.pending_total_days);
-
-      if (!newStart || !newEnd) {
-        return err(422, "INVALID_STATUS", "The staged change is missing its new dates.");
-      }
-
-      updatePayload = {
-        ...updatePayload,
-        start_date: newStart,
-        end_date: newEnd,
-        total_days: newTotal
-      };
-    }
-
-    const { data: updatedRow, error: updateErr } = await svcClient
-      .from("leave_requests")
-      .update(updatePayload)
-      .eq("id", existingRequest.id)
-      .eq("org_id", session.profile.org_id)
-      .select(SELECT_COLUMNS)
-      .single();
-
-    if (updateErr || !updatedRow) {
-      return err(500, "REQUEST_UPDATE_FAILED", "Unable to apply the change request.");
-    }
-
-    // Adjust used-day balances for limited leave types (best-effort; the change is already applied).
-    if (!isUnlimitedType) {
-      try {
-        if (changeType === "cancel") {
-          if (existingTotalDays > 0) {
-            await applyBalanceDeltas({
-              orgId: session.profile.org_id,
-              employeeId: existingRequest.employee_id,
-              leaveType: existingRequest.leave_type,
-              year: Number.parseInt(existingRequest.start_date.slice(0, 4), 10),
-              usedDaysDelta: existingTotalDays * -1,
-              pendingDaysDelta: 0
-            });
-          }
-        } else {
-          const newStart = existingRequest.pending_start_date as string;
-          const newTotal =
-            existingRequest.pending_total_days === null || existingRequest.pending_total_days === undefined
-              ? existingTotalDays
-              : parseNumeric(existingRequest.pending_total_days);
-          const oldYear = Number.parseInt(existingRequest.start_date.slice(0, 4), 10);
-          const newYear = Number.parseInt(newStart.slice(0, 4), 10);
-
-          if (oldYear === newYear) {
-            await applyBalanceDeltas({
-              orgId: session.profile.org_id,
-              employeeId: existingRequest.employee_id,
-              leaveType: existingRequest.leave_type,
-              year: oldYear,
-              usedDaysDelta: newTotal - existingTotalDays,
-              pendingDaysDelta: 0
-            });
-          } else {
-            await applyBalanceDeltas({
-              orgId: session.profile.org_id,
-              employeeId: existingRequest.employee_id,
-              leaveType: existingRequest.leave_type,
-              year: oldYear,
-              usedDaysDelta: existingTotalDays * -1,
-              pendingDaysDelta: 0
-            });
-            await applyBalanceDeltas({
-              orgId: session.profile.org_id,
-              employeeId: existingRequest.employee_id,
-              leaveType: existingRequest.leave_type,
-              year: newYear,
-              usedDaysDelta: newTotal,
-              pendingDaysDelta: 0
-            });
-          }
-        }
-      } catch {
-        // Balance reconciliation is best-effort; the leave change itself has been applied.
-      }
+      return finalize(changeRpcData);
     }
 
     const resultLabel =
@@ -804,7 +715,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }).catch(() => undefined);
 
-    return finalize(updatedRow);
+    return finalize(changeRpcData);
   }
 
   let nextStatus = existingRequest.status;
@@ -1052,7 +963,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
   }
 
-  // Cancel path: standard multi-step (no balance atomicity needed for cancels)
+  // Cancel path. LEAVE-01: make it a CONDITIONAL transition — the update only
+  // applies if the row is still in the status we read (expected-state guard), so
+  // a competing decision that already moved it can't be silently overwritten.
   const { data: updatedRequestRow, error: updateError } = await svcClient
     .from("leave_requests")
     .update({
@@ -1062,15 +975,27 @@ export async function PATCH(request: Request, context: RouteContext) {
     })
     .eq("id", existingRequest.id)
     .eq("org_id", session.profile.org_id)
+    .eq("status", existingRequest.status)
     .select(SELECT_COLUMNS)
-    .single();
+    .maybeSingle();
 
-  if (updateError || !updatedRequestRow) {
+  if (updateError) {
     return jsonResponse<null>(500, {
       data: null,
       error: {
         code: "REQUEST_UPDATE_FAILED",
         message: "Unable to update leave request."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!updatedRequestRow) {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "REQUEST_CONFLICT",
+        message: "This leave request was already updated. Please refresh."
       },
       meta: buildMeta()
     });

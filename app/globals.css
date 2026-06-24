@@ -21591,6 +21591,49 @@ html.dark .crew-games-platform-game:hover {
   font-size: 14px;
 }
 
+.offline-queue-banner-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.offline-queue-banner-attention {
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--status-error-bg);
+  border-color: var(--status-error-text);
+  color: var(--status-error-text);
+}
+
+.offline-queue-attention-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.offline-queue-attention-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--status-error-text);
+}
+
+.offline-queue-attention-error {
+  opacity: 0.85;
+}
+
+.offline-queue-attention-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 /* ── Approval queues (delegations page) ─────────────── */
 
 .approval-queues-section {

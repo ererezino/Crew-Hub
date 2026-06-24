@@ -14,6 +14,8 @@ import { TimeOffClient } from "./time-off-client";
 type TimeOffTabsClientProps = {
   requestedTab: string;
   userRoles: UserRole[];
+  currentUserId: string;
+  currentOrgId: string;
   initialSummaryData?: TimeOffSummaryResponseData;
 };
 
@@ -27,7 +29,7 @@ function resolveInitialTab(requestedTab: string, tabs: PageTab[]): string {
   return "my-requests";
 }
 
-export function TimeOffTabsClient({ requestedTab, userRoles, initialSummaryData }: TimeOffTabsClientProps) {
+export function TimeOffTabsClient({ requestedTab, userRoles, currentUserId, currentOrgId, initialSummaryData }: TimeOffTabsClientProps) {
   const tNav = useTranslations('nav');
   const t = useTranslations('timeOffPage');
   const pathname = usePathname();
@@ -87,7 +89,14 @@ export function TimeOffTabsClient({ requestedTab, userRoles, initialSummaryData 
       />
 
       <section key={activeTab} className="tab-content-layout">
-        {activeTab === "my-requests" ? <TimeOffClient embedded initialSummaryData={initialSummaryData} /> : null}
+        {activeTab === "my-requests" ? (
+          <TimeOffClient
+            embedded
+            currentUserId={currentUserId}
+            currentOrgId={currentOrgId}
+            initialSummaryData={initialSummaryData}
+          />
+        ) : null}
         {activeTab === "calendar" ? <TimeOffCalendarClient embedded userRoles={userRoles} /> : null}
       </section>
     </>

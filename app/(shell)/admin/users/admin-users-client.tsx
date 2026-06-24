@@ -10,7 +10,7 @@ import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
 import { ErrorState } from "../../../../components/shared/error-state";
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import {
   getNavigationDefinitions,
   isNavItemVisibleForUser
@@ -117,7 +117,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isResettingAuthenticator, setIsResettingAuthenticator] = useState(false);
 
-  const { people, isLoading, errorMessage, refresh, setPeople } = usePeople({
+  const { people, isLoading, errorMessage, refresh, setPeople } = useAllPeople({
     scope: "all"
   });
 

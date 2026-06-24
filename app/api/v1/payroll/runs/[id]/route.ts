@@ -640,6 +640,12 @@ export async function GET(
       items.map((item) => ({
         grossAmount: item.grossAmount,
         netAmount: item.netAmount,
+        // Sum the actual deduction line items rather than deriving from
+        // gross - net (which would mislabel adjustments as deductions).
+        deductionsAmount: item.deductions.reduce(
+          (sum, deduction) => sum + Math.trunc(deduction.amount),
+          0
+        ),
         payCurrency: item.payCurrency
       }))
     );

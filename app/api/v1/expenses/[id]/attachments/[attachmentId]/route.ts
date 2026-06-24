@@ -19,9 +19,13 @@ import {
 
 const SIGNED_URL_TTL_SECONDS = 300;
 
+/** States in which the OWNER may still remove their own evidence (EXPENSE-01). */
+const OWNER_EDITABLE_EXPENSE_STATES = new Set(["draft", "pending"]);
+
 const expenseAccessRowSchema = z.object({
   id: z.string().uuid(),
   employee_id: z.string().uuid(),
+  status: z.string(),
   receipt_file_path: z.string()
 });
 
@@ -77,7 +81,7 @@ export async function DELETE(
 
   const { data: rawExpense } = await supabase
     .from("expenses")
-    .select("id, employee_id, receipt_file_path")
+    .select("id, employee_id, status, receipt_file_path")
     .eq("id", expenseId)
     .eq("org_id", session.profile.org_id)
     .is("deleted_at", null)
@@ -94,11 +98,27 @@ export async function DELETE(
   }
 
   const isOwner = parsedExpense.data.employee_id === session.profile.id;
+  const isAdmin = isExpenseAdmin(session.profile.roles);
 
-  if (!isOwner && !isExpenseAdmin(session.profile.roles)) {
+  if (!isOwner && !isAdmin) {
     return jsonResponse<null>(403, {
       data: null,
       error: { code: "FORBIDDEN", message: "You cannot modify documents on this expense." },
+      meta: buildMeta()
+    });
+  }
+
+  // EXPENSE-01: once the expense has entered approval, its evidence is what the
+  // approvers acted on — the owner can no longer remove it; only an audited
+  // admin flow may. (The DB also blocks removing the LAST evidence of an
+  // approved expense, race-free.)
+  if (isOwner && !isAdmin && !OWNER_EDITABLE_EXPENSE_STATES.has(parsedExpense.data.status)) {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "EVIDENCE_LOCKED",
+        message: "This expense is in approval and its documents can no longer be changed. Ask an admin if a correction is needed."
+      },
       meta: buildMeta()
     });
   }
@@ -135,17 +155,39 @@ export async function DELETE(
     });
   }
 
-  const { error: deleteError } = await supabase
+  // EXPENSE-01: conditional soft-delete — only act on a still-active row, and
+  // confirm it actually transitioned, so two concurrent deletes of the SAME
+  // attachment can't both "succeed". The DB trigger additionally rejects
+  // removing the last evidence of an approved expense, so the final-file race
+  // is closed at the database, not just by the read-then-write check above.
+  const { data: deletedRows, error: deleteError } = await supabase
     .from("expense_attachments")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", attachmentId)
     .eq("org_id", session.profile.org_id)
-    .eq("expense_id", expenseId);
+    .eq("expense_id", expenseId)
+    .is("deleted_at", null)
+    .select("id");
 
   if (deleteError) {
-    return jsonResponse<null>(500, {
+    const isLastEvidence = deleteError.code === "23514" || /last evidence/i.test(deleteError.message ?? "");
+    return jsonResponse<null>(isLastEvidence ? 409 : 500, {
       data: null,
-      error: { code: "ATTACHMENT_DELETE_FAILED", message: "Unable to remove the document." },
+      error: {
+        code: isLastEvidence ? "INVALID_STATE" : "ATTACHMENT_DELETE_FAILED",
+        message: isLastEvidence
+          ? "An expense must keep at least one document."
+          : "Unable to remove the document."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  if (!deletedRows || deletedRows.length === 0) {
+    // Already removed by a concurrent request — nothing more to do.
+    return jsonResponse<null>(409, {
+      data: null,
+      error: { code: "INVALID_STATE", message: "This document was already removed." },
       meta: buildMeta()
     });
   }
