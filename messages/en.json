@@ -4428,7 +4428,26 @@
       "enableDescription": "Re-enable this crew member's account so they can log in and access Crew Hub again.",
       "disableDescription": "Disable this crew member's account. They will no longer be able to log in until the account is re-enabled.",
       "initiateOffboarding": "Initiate offboarding",
-      "offboardingDescription": "Begin the offboarding process for this crew member. This will change their status, create offboarding tasks, and notify relevant parties."
+      "offboardingDescription": "Begin the offboarding process for this crew member. This will change their status, create offboarding tasks, and notify relevant parties.",
+      "removeFromCrewHub": "Remove from Crew Hub",
+      "removeDescription": "Quickly remove someone who left without full offboarding. Archives their record (hidden everywhere but kept and recoverable), revokes access, blocks sign-in and re-invite, and auto-completes offboarding."
+    },
+    "removeModal": {
+      "title": "Remove {name} from Crew Hub",
+      "warning": "This archives {name}'s record (hidden from all lists, but kept in the database), signs them out everywhere, blocks them from signing in or being re-invited, and marks any offboarding complete. You can restore them later if needed.",
+      "reasonLabel": "Reason (optional)",
+      "selectReason": "Select a reason",
+      "reasonTermination": "Termination",
+      "reasonResignation": "Resignation",
+      "reasonRedundancy": "Redundancy",
+      "reasonContractEnd": "Contract end",
+      "reasonAbandoned": "Abandoned / no-show",
+      "reasonHistorical": "Historical cleanup",
+      "reasonOther": "Other",
+      "confirmLabel": "To confirm, type {name} below",
+      "processing": "Removing...",
+      "removeButton": "Remove from Crew Hub",
+      "error": "Unable to remove this person. Please try again."
     },
     "offboardModal": {
       "title": "Initiate offboarding for {name}",
