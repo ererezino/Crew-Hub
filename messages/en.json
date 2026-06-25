@@ -5700,7 +5700,14 @@
       "resetting": "Resetting...",
       "invite": "Invite",
       "reInvite": "Re-invite",
-      "sending": "Sending..."
+      "sending": "Sending...",
+      "remove": "Remove",
+      "removing": "Removing..."
+    },
+    "removeConfirm": {
+      "title": "Remove {name} from Crew Hub?",
+      "message": "This archives {name} (hidden everywhere but kept and recoverable), revokes their access, and blocks them from signing in or being re-invited. Their offboarding is auto-completed.",
+      "confirm": "Remove"
     },
     "createPanel": {
       "title": "Add Person",
@@ -5858,6 +5865,8 @@
       "unableToSendInvite": "Unable to send invite.",
       "authenticatorReset": "Authenticator reset. Setup link generated for {name}.",
       "unableToResetAuth": "Unable to reset authenticator.",
+      "personRemoved": "{name} was removed from Crew Hub.",
+      "unableToRemove": "Unable to remove this person.",
       "personCreated": "Person created.",
       "unableToCreatePerson": "Unable to create person.",
       "importedSuccess": "{count, plural, one {# person} other {# people}} imported successfully.",

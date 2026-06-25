@@ -5676,6 +5676,8 @@
       "invite": "Inviter",
       "reInvite": "Réinviter",
       "sending": "Envoi en cours...",
+      "remove": "Retirer",
+      "removing": "Retrait...",
       "access": "Accès",
       "accessNotInvited": "Non invité",
       "accessInvited": "Invité",
@@ -5701,6 +5703,11 @@
       "role": "Rôle",
       "status": "Statut",
       "view": "Voir"
+    },
+    "removeConfirm": {
+      "title": "Retirer {name} de Crew Hub ?",
+      "message": "Ceci archive {name} (masqué partout mais conservé et restaurable), révoque son accès et l'empêche de se connecter ou d'être réinvité. Son départ est finalisé automatiquement.",
+      "confirm": "Retirer"
     },
     "createPanel": {
       "title": "Ajouter une personne",
@@ -5858,6 +5865,8 @@
       "unableToSendInvite": "Impossible d'envoyer l'invitation.",
       "authenticatorReset": "Authentificateur réinitialisé. Lien de configuration généré pour {name}.",
       "unableToResetAuth": "Impossible de réinitialiser l'authentificateur.",
+      "personRemoved": "{name} a été retiré de Crew Hub.",
+      "unableToRemove": "Impossible de retirer cette personne.",
       "personCreated": "Personne créée.",
       "importedSuccess": "{count, plural, one {# personne importée} other {# personnes importées}} avec succès.",
       "importedFailed": "{count, plural, one {# personne a échoué} other {# personnes ont échoué}} à l'import.",

@@ -596,6 +596,10 @@ export function PeopleClient({
   const [confirmResetPerson, setConfirmResetPerson] = useState<PersonRecord | null>(null);
   const [resetSetupLink, setResetSetupLink] = useState<string | null>(null);
 
+  // Quick-remove state
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [confirmRemovePerson, setConfirmRemovePerson] = useState<PersonRecord | null>(null);
+
   // Bulk upload state
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [bulkStep, setBulkStep] = useState<BulkStep>("template");
@@ -1205,6 +1209,37 @@ export function PeopleClient({
     }
   }, [t, td]);
 
+  const handleRemovePerson = useCallback(async (person: PersonRecord) => {
+    setRemovingId(person.id);
+    try {
+      const response = await fetch(`/api/v1/people/${person.id}/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // The danger confirmation IS the deliberate step here; pass the name to
+        // satisfy the endpoint's name-match guard.
+        body: JSON.stringify({ confirmName: person.fullName })
+      });
+      const payload = await parseJsonResponse<{
+        data?: { profileId: string } | null;
+        error?: { message?: string } | null;
+      }>(response);
+
+      if (!response.ok || !payload?.data) {
+        addToast("error", humanizeError(payload?.error?.message ?? t('toast.unableToRemove')));
+        return;
+      }
+
+      // Optimistically drop the now-archived person from the list.
+      setPeople((previous) => previous.filter((entry) => entry.id !== person.id));
+      addToast("success", td('toast.personRemoved', { name: person.fullName }));
+    } catch (error) {
+      addToast("error", error instanceof Error ? error.message : t('toast.unableToRemove'));
+    } finally {
+      setRemovingId(null);
+      setConfirmRemovePerson(null);
+    }
+  }, [t, td, setPeople]);
+
   const closeCreatePanel = () => {
     if (isCreating) {
       return;
@@ -1586,6 +1621,16 @@ export function PeopleClient({
                             onClick={() => setConfirmInvitePerson(person)}
                           >
                             {invitingId === person.id ? t('table.sending') : t('table.invite')}
+                          </button>
+                        ) : null}
+                        {canEditPeople && person.id !== currentUserId ? (
+                          <button
+                            type="button"
+                            className="table-row-action table-row-action-danger"
+                            disabled={removingId === person.id}
+                            onClick={() => setConfirmRemovePerson(person)}
+                          >
+                            {removingId === person.id ? t('table.removing') : t('table.remove')}
                           </button>
                         ) : null}
                       </div>
@@ -2816,6 +2861,47 @@ export function PeopleClient({
                 disabled={resettingId !== null}
               >
                 {resettingId ? t('resetDialog.resetting') : resetSetupLink ? t('resetDialog.generateNewLink') : t('resetDialog.resetAuthenticator')}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {/* ── Remove from Crew Hub Confirmation Dialog ── */}
+      {confirmRemovePerson !== null ? (
+        <div
+          className="modal-overlay"
+          onClick={() => { if (removingId === null) setConfirmRemovePerson(null); }}
+        >
+          <section
+            className="confirm-dialog modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={td('removeConfirm.title', { name: confirmRemovePerson.fullName })}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="modal-title">{td('removeConfirm.title', { name: confirmRemovePerson.fullName })}</h2>
+            <p className="settings-card-description">
+              {td('removeConfirm.message', { name: confirmRemovePerson.fullName })}
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-subtle"
+                onClick={() => setConfirmRemovePerson(null)}
+                disabled={removingId !== null}
+              >
+                {tCommon('cancel')}
+              </button>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={() => {
+                  if (confirmRemovePerson) void handleRemovePerson(confirmRemovePerson);
+                }}
+                disabled={removingId !== null}
+              >
+                {removingId ? t('table.removing') : t('removeConfirm.confirm')}
               </button>
             </div>
           </section>
