@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useAnnouncements } from "../../hooks/use-announcements";
 import { useNotifications } from "../../hooks/use-notifications";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../lib/datetime";
+import { shouldBrowserAlert } from "../../lib/notifications/browser-alerts";
 import type { NotificationAction } from "../../types/notifications";
 import { NotificationActionButton } from "./notification-action-button";
 
@@ -156,10 +157,25 @@ export function NotificationCenter() {
   }, [notifications, refreshAnnouncements]);
 
   useEffect(() => {
+    // CRITICAL: wait until BOTH data sources have actually loaded before
+    // bootstrapping. The bug was that this ran on first render while the data
+    // was still loading (notifications.data === undefined, announcements still
+    // loading), so it bootstrapped an EMPTY "already alerted" set, then fired a
+    // browser notification for the entire unread backlog on the next render —
+    // flooding the user with weeks-old holiday/leave/birthday alerts on every
+    // login.
+    const notificationsLoaded = notifications.data !== undefined;
+    const announcementsLoaded = !announcementsLoading;
+    if (!notificationsLoaded || !announcementsLoaded) {
+      return;
+    }
+
     const currentNotifications = notifications.data?.notifications ?? [];
     const currentAnnouncements = announcements;
 
     if (!bootstrappedBrowserAlerts.current) {
+      // Whatever is already in the feed at load time is the BACKLOG — record it
+      // as "seen" so it is never surfaced as a system notification.
       for (const notification of currentNotifications) {
         browserAlertedNotificationIds.current.add(notification.id);
       }
@@ -179,8 +195,18 @@ export function NotificationCenter() {
       return;
     }
 
+    const now = Date.now();
+
     for (const notification of currentNotifications) {
-      if (notification.isRead || browserAlertedNotificationIds.current.has(notification.id)) {
+      const alreadyAlerted = browserAlertedNotificationIds.current.has(notification.id);
+      // Mark as processed regardless, so a stale item is never reconsidered.
+      browserAlertedNotificationIds.current.add(notification.id);
+      if (
+        !shouldBrowserAlert(
+          { isRead: notification.isRead, createdAt: notification.createdAt },
+          { alreadyAlerted, now }
+        )
+      ) {
         continue;
       }
 
@@ -193,12 +219,17 @@ export function NotificationCenter() {
         window.location.href = notification.link ?? "/announcements";
         browserNotification.close();
       };
-
-      browserAlertedNotificationIds.current.add(notification.id);
     }
 
     for (const announcement of currentAnnouncements) {
-      if (announcement.isRead || browserAlertedAnnouncementIds.current.has(announcement.id)) {
+      const alreadyAlerted = browserAlertedAnnouncementIds.current.has(announcement.id);
+      browserAlertedAnnouncementIds.current.add(announcement.id);
+      if (
+        !shouldBrowserAlert(
+          { isRead: announcement.isRead, createdAt: announcement.createdAt },
+          { alreadyAlerted, now }
+        )
+      ) {
         continue;
       }
 
@@ -211,10 +242,8 @@ export function NotificationCenter() {
         window.location.href = "/announcements";
         browserNotification.close();
       };
-
-      browserAlertedAnnouncementIds.current.add(announcement.id);
     }
-  }, [announcements, browserPushEnabled, notifications.data?.notifications]);
+  }, [announcements, announcementsLoading, browserPushEnabled, notifications.data]);
 
   /* Build unified feed — only unread, filtered by optimistic dismissals */
   const feedItems: FeedItem[] = useMemo(() => {
