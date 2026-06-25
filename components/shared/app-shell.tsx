@@ -1084,7 +1084,12 @@ function AppShellContent({ currentUserRoles, currentUserProfile, profileLocale, 
       <aside
         className={[
           "sidebar",
-          isSidebarCollapsed ? "sidebar-collapsed" : "",
+          // The collapsed icon-rail is a DESKTOP concept. When the mobile drawer
+          // is open it must render as a full-width sidebar with visible labels —
+          // applying `sidebar-collapsed` here (e.g. because the user collapsed
+          // the sidebar on desktop, persisted in localStorage) triggers the
+          // desktop "hide labels" rule and makes every nav label invisible.
+          isSidebarCollapsed && !isMobileSidebarOpen ? "sidebar-collapsed" : "",
           isMobileSidebarOpen ? "sidebar-mobile-open" : ""
         ]
           .filter(Boolean)
