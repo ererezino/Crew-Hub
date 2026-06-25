@@ -158,6 +158,13 @@ export async function POST(request: Request) {
       });
 
     if (enrollError || !enrollData) {
+      // Surface the real Supabase reason in server logs — the user-facing message
+      // stays generic, but a swallowed error here previously made re-invite MFA
+      // failures impossible to diagnose.
+      console.error("[MFA_ENROLL_FAILED]", {
+        userId: session.userId,
+        message: enrollError?.message ?? "no enroll data returned"
+      });
       return jsonResponse<null>(500, {
         data: null,
         error: { code: "MFA_ENROLL_FAILED", message: "Unable to start MFA enrollment." },

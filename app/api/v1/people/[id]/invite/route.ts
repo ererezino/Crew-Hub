@@ -347,6 +347,49 @@ export async function POST(
      */
 
     if (isResend) {
+      /*
+       * Re-invite gives the person fresh access: the link below sends them to
+       * /mfa-setup to enroll an authenticator. If they STILL have a previously
+       * verified TOTP factor, Supabase rejects enrolling a new one at AAL1, and
+       * the setup screen shows the generic "Unable to start MFA enrollment".
+       * Clear any existing authenticator factors first (the same reset the
+       * password-reset flow performs). Best-effort: a failure must not block the
+       * invite, but it is logged for diagnosis.
+       */
+      try {
+        const { data: existingFactors, error: listFactorsError } =
+          await serviceRoleClient.auth.admin.mfa.listFactors({ userId: personId });
+        if (listFactorsError) {
+          logger.error("Re-invite: unable to list MFA factors before reset.", {
+            personId,
+            message: listFactorsError.message
+          });
+        } else {
+          const totpFactors = (existingFactors?.factors ?? []).filter(
+            (factor) => factor.factor_type === "totp"
+          );
+          for (const factor of totpFactors) {
+            const { error: deleteError } = await serviceRoleClient.auth.admin.mfa.deleteFactor({
+              id: factor.id,
+              userId: personId
+            });
+            if (deleteError) {
+              logger.error("Re-invite: unable to delete an existing MFA factor.", {
+                personId,
+                factorId: factor.id,
+                message: deleteError.message
+              });
+            }
+          }
+        }
+      } catch (mfaResetError) {
+        // Best-effort: never let MFA cleanup block the re-invite itself.
+        logger.error("Re-invite: MFA factor reset threw.", {
+          personId,
+          message: mfaResetError instanceof Error ? mfaResetError.message : String(mfaResetError)
+        });
+      }
+
       /* Existing auth user — generate a recovery (password reset) link */
       const { data: linkData, error: linkError } = await generateLinkWithRedirectFallback({
         type: "recovery",
