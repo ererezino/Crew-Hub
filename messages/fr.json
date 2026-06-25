@@ -4428,7 +4428,26 @@
       "enableDescription": "Réactivez le compte de ce membre de l'équipe afin qu'il puisse se connecter et accéder à Crew Hub à nouveau.",
       "disableDescription": "Désactivez le compte de ce membre de l'équipe. Il ne pourra plus se connecter tant que le compte ne sera pas réactivé.",
       "initiateOffboarding": "Initier le départ",
-      "offboardingDescription": "Lancez le processus de départ pour ce membre de l'équipe. Cela modifiera son statut, créera des tâches de départ et notifiera les parties concernées."
+      "offboardingDescription": "Lancez le processus de départ pour ce membre de l'équipe. Cela modifiera son statut, créera des tâches de départ et notifiera les parties concernées.",
+      "removeFromCrewHub": "Retirer de Crew Hub",
+      "removeDescription": "Retirez rapidement une personne partie sans départ complet. Archive son dossier (masqué partout mais conservé et restaurable), révoque l'accès, bloque la connexion et la réinvitation, et finalise le départ."
+    },
+    "removeModal": {
+      "title": "Retirer {name} de Crew Hub",
+      "warning": "Ceci archive le dossier de {name} (masqué de toutes les listes, mais conservé dans la base de données), le déconnecte partout, l'empêche de se connecter ou d'être réinvité, et finalise tout départ. Vous pourrez le restaurer plus tard si nécessaire.",
+      "reasonLabel": "Motif (facultatif)",
+      "selectReason": "Sélectionnez un motif",
+      "reasonTermination": "Licenciement",
+      "reasonResignation": "Démission",
+      "reasonRedundancy": "Suppression de poste",
+      "reasonContractEnd": "Fin de contrat",
+      "reasonAbandoned": "Abandon / absence",
+      "reasonHistorical": "Nettoyage historique",
+      "reasonOther": "Autre",
+      "confirmLabel": "Pour confirmer, tapez {name} ci-dessous",
+      "processing": "Retrait en cours...",
+      "removeButton": "Retirer de Crew Hub",
+      "error": "Impossible de retirer cette personne. Veuillez réessayer."
     },
     "offboardModal": {
       "title": "Initier le départ de {name}",

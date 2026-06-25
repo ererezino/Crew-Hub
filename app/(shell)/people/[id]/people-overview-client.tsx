@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "../../../../components/shared/confirm-dialog";
@@ -144,6 +145,7 @@ export function PeopleOverviewClient({
 }: PeopleOverviewClientProps) {
   const t = useTranslations('peopleOverview');
   const tCommon = useTranslations('common');
+  const router = useRouter();
   const locale = useLocale() as AppLocale;
   const _td = t as (key: string, params?: Record<string, unknown>) => string;
 
@@ -201,6 +203,13 @@ export function PeopleOverviewClient({
   const [offboardConfirmName, setOffboardConfirmName] = useState("");
   const [isSubmittingOffboard, setIsSubmittingOffboard] = useState(false);
   const [offboardError, setOffboardError] = useState<string | null>(null);
+
+  // Quick-remove ("Remove from Crew Hub") state
+  const [isRemoveOpen, setIsRemoveOpen] = useState(false);
+  const [removeConfirmName, setRemoveConfirmName] = useState("");
+  const [removeReason, setRemoveReason] = useState("");
+  const [isSubmittingRemove, setIsSubmittingRemove] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   // Cancel offboarding state
   const [isCancelOffboardOpen, setIsCancelOffboardOpen] = useState(false);
@@ -717,6 +726,46 @@ export function PeopleOverviewClient({
     },
     [person, offboardLastDay, offboardReason, offboardConfirmName, refresh, t]
   );
+
+  // Quick-remove handler — archives + revokes access + bans, then leaves the page
+  // (the person is now hidden, so this detail view would 404 on reload).
+  const handleRemove = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (!person) return;
+
+      setIsSubmittingRemove(true);
+      setRemoveError(null);
+
+      try {
+        const response = await fetch(`/api/v1/people/${person.id}/remove`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            confirmName: removeConfirmName,
+            ...(removeReason ? { reason: removeReason } : {})
+          })
+        });
+
+        const payload = (await response.json()) as ApiResponse<{ profileId: string }>;
+
+        if (!response.ok || !payload.data) {
+          setRemoveError(payload.error?.message ?? t("removeModal.error"));
+          return;
+        }
+
+        setIsRemoveOpen(false);
+        router.push("/people");
+      } catch (error) {
+        setRemoveError(error instanceof Error ? error.message : t("removeModal.error"));
+      } finally {
+        setIsSubmittingRemove(false);
+      }
+    },
+    [person, removeConfirmName, removeReason, router, t]
+  );
+
+  const removeNameMatches = person ? removeConfirmName === person.fullName : false;
 
   const offboardNameMatches = person
     ? offboardConfirmName === person.fullName
@@ -1439,6 +1488,97 @@ export function PeopleOverviewClient({
               </button>
             </div>
           ) : null}
+
+          {/* Quick remove — available for anyone still in records, regardless of status */}
+          {canInitiateOffboarding ? (
+            <div className="danger-zone-content">
+              <div className="danger-zone-description">
+                <p className="danger-zone-label">{t('dangerZone.removeFromCrewHub')}</p>
+                <p className="settings-card-description">{t('dangerZone.removeDescription')}</p>
+              </div>
+              <button
+                type="button"
+                className="button button-danger"
+                onClick={() => {
+                  setRemoveConfirmName("");
+                  setRemoveReason("");
+                  setRemoveError(null);
+                  setIsRemoveOpen(true);
+                }}
+              >
+                {t('dangerZone.removeFromCrewHub')}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Remove from Crew Hub Modal */}
+      {isRemoveOpen && person ? (
+        <div className="modal-overlay" onClick={() => !isSubmittingRemove && setIsRemoveOpen(false)}>
+          <div
+            className="modal-content"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("removeModal.title", { name: person.fullName })}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 className="modal-title">{t("removeModal.title", { name: person.fullName })}</h2>
+            <form onSubmit={handleRemove} className="modal-form">
+              <p className="settings-card-description">
+                {t("removeModal.warning", { name: person.fullName })}
+              </p>
+
+              <label className="form-field">
+                <span className="form-label">{t("removeModal.reasonLabel")}</span>
+                <Select value={removeReason} onValueChange={setRemoveReason}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("removeModal.selectReason")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="termination">{t("removeModal.reasonTermination")}</SelectItem>
+                    <SelectItem value="resignation">{t("removeModal.reasonResignation")}</SelectItem>
+                    <SelectItem value="redundancy">{t("removeModal.reasonRedundancy")}</SelectItem>
+                    <SelectItem value="contract_end">{t("removeModal.reasonContractEnd")}</SelectItem>
+                    <SelectItem value="abandoned">{t("removeModal.reasonAbandoned")}</SelectItem>
+                    <SelectItem value="historical_cleanup">{t("removeModal.reasonHistorical")}</SelectItem>
+                    <SelectItem value="other">{t("removeModal.reasonOther")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+
+              <label className="form-field">
+                <span className="form-label">{t("removeModal.confirmLabel", { name: person.fullName })}</span>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={removeConfirmName}
+                  onChange={(event) => setRemoveConfirmName(event.target.value)}
+                  autoComplete="off"
+                />
+              </label>
+
+              {removeError ? <p className="form-error-banner">{removeError}</p> : null}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="button button-subtle"
+                  onClick={() => setIsRemoveOpen(false)}
+                  disabled={isSubmittingRemove}
+                >
+                  {tCommon("cancel")}
+                </button>
+                <button
+                  type="submit"
+                  className="button button-danger"
+                  disabled={!removeNameMatches || isSubmittingRemove}
+                >
+                  {isSubmittingRemove ? t("removeModal.processing") : t("removeModal.removeButton")}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       ) : null}
 
