@@ -6,15 +6,40 @@
  * When an expense or leave-request submission fails because the network is
  * down (fetch TypeError / navigator.onLine false), the submission is stored
  * in IndexedDB (Blob-capable, survives reloads) and replayed automatically
- * when connectivity returns. Every queued submission carries a
- * client-generated clientRequestId; the API uses it to make replays
- * idempotent, so a retry can never create a duplicate.
+ * when connectivity returns.
+ *
+ * Exactly-once (OFFLINE-01): every logical submission carries a single
+ * client-generated clientRequestId (its `id`). The id is created BEFORE the
+ * first network attempt and reused on every replay, so even if the server
+ * commits a request whose response is then lost, the retry carries the same
+ * id and the API returns the already-created row instead of duplicating.
+ *
+ * Account binding (OFFLINE-02): every queued item records the authenticated
+ * identity (ownerUserId / ownerOrgId) that created it. On a shared browser an
+ * item is only ever displayed or replayed for the same identity; items that
+ * belong to a different signed-in user are quarantined (hidden + never
+ * transmitted) rather than leaked or silently deleted.
  *
  * UX truthfulness: queued items are VISIBLE (pending-sync banner via
- * useOfflineQueue) — nothing is silently retried behind the user's back.
+ * useOfflineQueue). Nothing is silently retried behind the user's back, and
+ * nothing is silently dropped: a definitive server rejection (4xx) becomes a
+ * visible `failed` state and an item older than MAX_QUEUE_AGE_MS becomes a
+ * visible `stale` state — both require an explicit user action (Retry/Remove).
  */
 
 export type QueuedSubmissionKind = "expense" | "leave_request";
+
+/**
+ * Lifecycle of a queued submission:
+ *  - pending:     waiting to transmit (default); auto-replayed when online.
+ *  - failed:      the server saw it and rejected it (4xx); carries the error.
+ *                 Never auto-retried — needs the user to Retry or Remove.
+ *  - stale:       older than MAX_QUEUE_AGE_MS; needs human review, not silent
+ *                 replay. Never auto-retried — needs Retry or Remove.
+ *  - quarantined: created by a different signed-in identity; hidden from the
+ *                 current user and never transmitted. Not deleted.
+ */
+export type QueuedSubmissionStatus = "pending" | "failed" | "stale" | "quarantined";
 
 export type QueuedFile = {
   field: string;
@@ -35,6 +60,20 @@ export type QueuedSubmission = {
   createdAt: number;
   attempts: number;
   lastError: string | null;
+  /** Immutable identity that created this submission (OFFLINE-02). */
+  ownerUserId: string;
+  ownerOrgId: string;
+  /** Visible lifecycle state (OFFLINE-02 — no silent drops). */
+  status: QueuedSubmissionStatus;
+  /** HTTP status of the last definitive server rejection, when failed. */
+  failedStatus: number | null;
+};
+
+/** Identity of the currently authenticated user, threaded in at enqueue and
+ * replay time so the queue can bind and gate items per account. */
+export type QueueIdentity = {
+  userId: string;
+  orgId: string;
 };
 
 type QueueListener = (items: QueuedSubmission[]) => void;
@@ -42,9 +81,86 @@ type QueueListener = (items: QueuedSubmission[]) => void;
 const DB_NAME = "crew-hub-offline-queue";
 const DB_VERSION = 1;
 const STORE = "submissions";
-/** Items older than this are dropped on load — stale submissions (e.g. an
- * expense queued two days ago) need human review, not silent replay. */
+/** Items older than this become a visible `stale` state — stale submissions
+ * (e.g. an expense queued two days ago) need human review, not silent
+ * replay. They are NOT deleted. */
 export const MAX_QUEUE_AGE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Generates the single clientRequestId for a logical submission. Called
+ * BEFORE the first network attempt so the very first request and every replay
+ * carry the same id — the basis of exactly-once delivery (OFFLINE-01).
+ */
+export function createSubmissionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // Non-secure fallback for environments without crypto.randomUUID.
+  const hex = (n: number) => Math.floor(n).toString(16).padStart(2, "0");
+  const bytes = Array.from({ length: 16 }, () => hex(Math.random() * 256));
+  bytes[6] = ((Number.parseInt(bytes[6], 16) & 0x0f) | 0x40).toString(16).padStart(2, "0");
+  bytes[8] = ((Number.parseInt(bytes[8], 16) & 0x3f) | 0x80).toString(16).padStart(2, "0");
+  return `${bytes.slice(0, 4).join("")}-${bytes.slice(4, 6).join("")}-${bytes
+    .slice(6, 8)
+    .join("")}-${bytes.slice(8, 10).join("")}-${bytes.slice(10, 16).join("")}`;
+}
+
+/* ── Pure decision logic (unit-tested without IndexedDB) ─────────────── */
+
+/**
+ * True when a queued item belongs to the given authenticated identity. Both
+ * the user and the org must match — an item is only ever shown or replayed
+ * under the exact account that created it (OFFLINE-02).
+ */
+export function ownsSubmission(
+  item: Pick<QueuedSubmission, "ownerUserId" | "ownerOrgId">,
+  identity: QueueIdentity | null
+): boolean {
+  if (!identity) return false;
+  return item.ownerUserId === identity.userId && item.ownerOrgId === identity.orgId;
+}
+
+export type ReplayDisposition =
+  | "transmit" // ok to send to the server
+  | "quarantine" // belongs to a different identity — hide, never send
+  | "stale" // too old — needs user review, do not send
+  | "skip"; // already failed/stale/quarantined — leave for user action
+
+/**
+ * Decides what should happen to an item BEFORE a network attempt, given the
+ * current identity and clock. Pure — no IO. This is the gate that prevents
+ * account-mismatched or stale items from ever being transmitted.
+ */
+export function decideReplayDisposition(
+  item: Pick<QueuedSubmission, "ownerUserId" | "ownerOrgId" | "createdAt" | "status">,
+  identity: QueueIdentity | null,
+  now: number,
+  maxAgeMs: number = MAX_QUEUE_AGE_MS
+): ReplayDisposition {
+  if (!ownsSubmission(item, identity)) return "quarantine";
+  if (item.status === "failed" || item.status === "stale" || item.status === "quarantined") {
+    return "skip";
+  }
+  if (now - item.createdAt > maxAgeMs) return "stale";
+  return "transmit";
+}
+
+/**
+ * Maps an HTTP response to the item's next visible status after a transmit
+ * attempt. Pure. 2xx (incl. idempotent replays) and 4xx are both definitive
+ * — the queue drops the row on success and surfaces a visible `failed` state
+ * on rejection (never a silent delete). 5xx leaves the item pending to retry.
+ */
+export function dispositionFromResponse(status: number):
+  | { outcome: "done" }
+  | { outcome: "failed"; failedStatus: number }
+  | { outcome: "retry" } {
+  if (status >= 200 && status < 300) return { outcome: "done" };
+  if (status >= 400 && status < 500) return { outcome: "failed", failedStatus: status };
+  return { outcome: "retry" };
+}
+
+/* ── IndexedDB plumbing ──────────────────────────────────────────────── */
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -79,19 +195,64 @@ async function withStore<T>(
 const listeners = new Set<QueueListener>();
 let replaying = false;
 let initialized = false;
+/** Current authenticated identity, kept in module scope so subscribers,
+ * auto-replay (online/interval) and the banner all gate against the same
+ * account. Set by setQueueIdentity() when the client mounts. */
+let currentIdentity: QueueIdentity | null = null;
 
-async function readAll(): Promise<QueuedSubmission[]> {
+async function readAllRaw(): Promise<QueuedSubmission[]> {
   const items = await withStore<QueuedSubmission[]>("readonly", (store) =>
     store.getAll() as IDBRequest<QueuedSubmission[]>
   );
   return items.sort((a, b) => a.createdAt - b.createdAt);
 }
 
+/**
+ * Reads the queue and reconciles each item against the current identity and
+ * clock: mismatched items become `quarantined` and over-age `pending` items
+ * become `stale`. Reconciliation is persisted so the visible state is stable
+ * and account-switch cleanup is durable (not just a render-time filter).
+ */
+async function readAll(): Promise<QueuedSubmission[]> {
+  const items = await readAllRaw();
+  const now = Date.now();
+  const reconciled: QueuedSubmission[] = [];
+
+  for (const item of items) {
+    let next = item;
+
+    if (!ownsSubmission(item, currentIdentity)) {
+      if (item.status !== "quarantined") {
+        next = { ...item, status: "quarantined" };
+        await withStore("readwrite", (store) => store.put(next)).catch(() => undefined);
+      }
+    } else if (item.status === "quarantined") {
+      // Owner signed back in — restore to pending (or keep prior terminal state
+      // if it was failed/stale, which quarantine never overwrites here).
+      next = { ...item, status: "pending" };
+      await withStore("readwrite", (store) => store.put(next)).catch(() => undefined);
+    } else if (item.status === "pending" && now - item.createdAt > MAX_QUEUE_AGE_MS) {
+      next = { ...item, status: "stale" };
+      await withStore("readwrite", (store) => store.put(next)).catch(() => undefined);
+    }
+
+    reconciled.push(next);
+  }
+
+  return reconciled;
+}
+
+/** Items the current user is allowed to see: theirs, never quarantined. */
+function visibleFor(items: QueuedSubmission[], identity: QueueIdentity | null): QueuedSubmission[] {
+  return items.filter((item) => ownsSubmission(item, identity) && item.status !== "quarantined");
+}
+
 async function notify(): Promise<void> {
   if (listeners.size === 0) return;
   const items = await readAll().catch(() => []);
+  const visible = visibleFor(items, currentIdentity);
   for (const listener of listeners) {
-    listener(items);
+    listener(visible);
   }
 }
 
@@ -121,6 +282,21 @@ export function splitFormData(formData: FormData): {
   return { fields, files };
 }
 
+/**
+ * Registers the currently authenticated identity. Called by the offline-queue
+ * hook when a client mounts. On an account switch this triggers a reconcile so
+ * the previous user's items are quarantined (hidden, not deleted) and the new
+ * user only ever sees and replays their own.
+ */
+export function setQueueIdentity(identity: QueueIdentity | null): void {
+  const changed =
+    currentIdentity?.userId !== identity?.userId || currentIdentity?.orgId !== identity?.orgId;
+  currentIdentity = identity;
+  if (changed) {
+    void notify();
+  }
+}
+
 export async function enqueueSubmission(input: {
   id: string;
   kind: QueuedSubmissionKind;
@@ -128,13 +304,23 @@ export async function enqueueSubmission(input: {
   encoding: "json" | "form";
   fields: Record<string, string>;
   files?: QueuedFile[];
+  /** Authenticated identity that owns this submission (OFFLINE-02). */
+  owner: QueueIdentity;
 }): Promise<void> {
   const item: QueuedSubmission = {
-    ...input,
+    id: input.id,
+    kind: input.kind,
+    url: input.url,
+    encoding: input.encoding,
+    fields: input.fields,
     files: input.files ?? [],
     createdAt: Date.now(),
     attempts: 0,
-    lastError: null
+    lastError: null,
+    ownerUserId: input.owner.userId,
+    ownerOrgId: input.owner.orgId,
+    status: "pending",
+    failedStatus: null
   };
   await withStore("readwrite", (store) => store.put(item));
   await notify();
@@ -145,8 +331,27 @@ export async function removeSubmission(id: string): Promise<void> {
   await notify();
 }
 
+/**
+ * Moves a visible failed/stale item back to `pending` so the user can retry
+ * it explicitly. Only the owning identity may do this.
+ */
+export async function retrySubmission(id: string): Promise<void> {
+  const item = await withStore<QueuedSubmission | undefined>("readonly", (store) =>
+    store.get(id) as IDBRequest<QueuedSubmission | undefined>
+  );
+  if (!item || !ownsSubmission(item, currentIdentity)) {
+    return;
+  }
+  const next: QueuedSubmission = { ...item, status: "pending", lastError: null, failedStatus: null };
+  await withStore("readwrite", (store) => store.put(next));
+  await notify();
+  void replayQueue();
+}
+
+/** Lists the current identity's visible items (excludes quarantined). */
 export async function listSubmissions(): Promise<QueuedSubmission[]> {
-  return readAll();
+  const items = await readAll();
+  return visibleFor(items, currentIdentity);
 }
 
 function buildRequest(item: QueuedSubmission): { body: BodyInit; headers?: HeadersInit } {
@@ -169,10 +374,15 @@ function buildRequest(item: QueuedSubmission): { body: BodyInit; headers?: Heade
 }
 
 /**
- * Replays all queued submissions in order. Success or a definitive server
- * rejection (4xx — the server saw it and said no) removes the item; network
- * failures keep it queued for the next attempt. Returns the number of items
- * that left the queue.
+ * Replays queued submissions in order, gated by identity and age. Each item's
+ * disposition is decided by the pure decideReplayDisposition():
+ *  - quarantine → marked quarantined (different account), never transmitted.
+ *  - stale      → marked stale (over-age), surfaced for user action.
+ *  - skip       → already failed/stale/quarantined; left for user action.
+ *  - transmit   → sent; a 2xx (incl. idempotent replay) removes it, a 4xx
+ *                 becomes a visible `failed` state, a 5xx/network error keeps
+ *                 it pending for the next attempt.
+ * Nothing is ever silently deleted. Returns the count that left the queue.
  */
 export async function replayQueue(): Promise<number> {
   if (replaying) return 0;
@@ -181,31 +391,64 @@ export async function replayQueue(): Promise<number> {
   let settled = 0;
 
   try {
-    const items = await readAll();
+    const items = await readAllRaw();
     for (const item of items) {
-      if (Date.now() - item.createdAt > MAX_QUEUE_AGE_MS) {
-        await removeSubmission(item.id);
+      const disposition = decideReplayDisposition(item, currentIdentity, Date.now());
+
+      if (disposition === "skip") {
+        continue;
+      }
+
+      if (disposition === "quarantine") {
+        if (item.status !== "quarantined") {
+          await withStore("readwrite", (store) => store.put({ ...item, status: "quarantined" }));
+        }
+        continue;
+      }
+
+      if (disposition === "stale") {
+        await withStore("readwrite", (store) => store.put({ ...item, status: "stale" }));
         continue;
       }
 
       try {
         const { body, headers } = buildRequest(item);
         const response = await fetch(item.url, { method: "POST", body, headers });
+        const outcome = dispositionFromResponse(response.status);
 
-        if (response.ok || (response.status >= 400 && response.status < 500)) {
-          /* Delivered (2xx, incl. idempotent 200 replays) or definitively
-           * rejected (4xx) — either way the queue's job is done. */
+        if (outcome.outcome === "done") {
           await removeSubmission(item.id);
           settled += 1;
+        } else if (outcome.outcome === "failed") {
+          /* The server saw it and said no (4xx). Surface a VISIBLE failed
+           * state with the error — never a silent delete. */
+          await withStore("readwrite", (store) =>
+            store.put({
+              ...item,
+              status: "failed",
+              attempts: item.attempts + 1,
+              failedStatus: outcome.failedStatus,
+              lastError: `HTTP ${outcome.failedStatus}`
+            })
+          );
         } else {
-          item.attempts += 1;
-          item.lastError = `HTTP ${response.status}`;
-          await withStore("readwrite", (store) => store.put(item));
+          // 5xx — transient; keep pending and retry later.
+          await withStore("readwrite", (store) =>
+            store.put({
+              ...item,
+              attempts: item.attempts + 1,
+              lastError: `HTTP ${response.status}`
+            })
+          );
         }
       } catch (error) {
-        item.attempts += 1;
-        item.lastError = error instanceof Error ? error.message : String(error);
-        await withStore("readwrite", (store) => store.put(item));
+        await withStore("readwrite", (store) =>
+          store.put({
+            ...item,
+            attempts: item.attempts + 1,
+            lastError: error instanceof Error ? error.message : String(error)
+          })
+        );
         if (isNetworkFailure(error)) {
           break; // still offline — stop burning the queue
         }
@@ -221,7 +464,9 @@ export async function replayQueue(): Promise<number> {
 
 export function subscribeToQueue(listener: QueueListener): () => void {
   listeners.add(listener);
-  void readAll().then((items) => listener(items)).catch(() => listener([]));
+  void readAll()
+    .then((items) => listener(visibleFor(items, currentIdentity)))
+    .catch(() => listener([]));
 
   if (!initialized && typeof window !== "undefined") {
     initialized = true;

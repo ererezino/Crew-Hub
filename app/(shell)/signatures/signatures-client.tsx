@@ -19,7 +19,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDocuments } from "../../../hooks/use-documents";
-import { usePeople } from "../../../hooks/use-people";
+import { useAllPeople } from "../../../hooks/use-people";
 import { useSignatures } from "../../../hooks/use-signatures";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import { toSentenceCase } from "../../../lib/format-labels";
@@ -177,7 +177,7 @@ export function SignaturesClient({
   const [isSubmittingSignature, setIsSubmittingSignature] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
-  const signerPeople = usePeople({
+  const signerPeople = useAllPeople({
     scope: "all",
     enabled: canManageSignatures
   });

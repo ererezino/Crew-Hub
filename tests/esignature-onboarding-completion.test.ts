@@ -50,6 +50,8 @@ vi.mock("../lib/supabase/server", () => ({
 vi.mock("../lib/supabase/service-role", () => ({
   createSupabaseServiceRoleClient: vi.fn(() => ({
     from: (...args: unknown[]) => serviceRoleFromMock(...args),
+    // P1-6: signature task completion + unlock now happens through an atomic RPC.
+    rpc: vi.fn(async () => ({ data: { completed: true, unlocked: [] }, error: null })),
     storage: {
       from: () => serviceRoleStorageMock()
     }
@@ -189,15 +191,17 @@ function setupMocks(opts: {
     if (table === "onboarding_tasks") {
       onboardingTaskCallCount++;
       if (onboardingTaskCallCount === 1) {
-        // First call: find linked tasks by signature_request_id
-        return chainable({ data: opts.linkedTasks, error: null });
+        // ONBOARD-01 blocked-guard: look up linked tasks that are 'blocked'.
+        // None are blocked in these fixtures, so the guard passes.
+        return chainable({ data: [], error: null });
       }
       if (onboardingTaskCallCount === 2) {
-        // Second call: update task status (returns from .update().eq().eq())
-        return chainable({ data: null, error: null });
+        // Find linked tasks by signature_request_id.
+        return chainable({ data: opts.linkedTasks, error: null });
       }
       if (onboardingTaskCallCount === 3) {
-        // Third call: recount all instance tasks for progress check
+        // Completion + unlock now happen via rpc(); the next onboarding_tasks
+        // read is the per-track progress recount.
         return chainable({ data: opts.allInstanceTasks, error: null });
       }
       return chainable({ data: [], error: null });

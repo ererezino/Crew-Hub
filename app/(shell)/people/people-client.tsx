@@ -11,7 +11,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
-import { usePeople, usePeopleInfinite } from "../../../hooks/use-people";
+import { useAllPeople, usePeopleInfinite } from "../../../hooks/use-people";
 import { usePresence, type PresenceState } from "../../../hooks/use-presence";
 import { countryFlagFromCode, countryNameFromCode, getCountryDefaults } from "../../../lib/countries";
 import { formatDate as formatDateLib, formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
@@ -560,9 +560,9 @@ export function PeopleClient({
   const [isEditSaving, setIsEditSaving] = useState(false);
 
   // Manager/team-lead pickers need the FULL people list, not just the loaded
-  // pages. Fetched lazily (only while a create/edit panel is open) with an
-  // explicit high limit so the paginated directory stays lightweight.
-  const { people: fullPeopleList } = usePeople({
+  // pages. Fetched lazily (only while a create/edit panel is open) by paging
+  // through every record so the directory itself stays lightweight.
+  const { people: fullPeopleList } = useAllPeople({
     scope: initialScope,
     enabled: isCreateOpen || isEditOpen
   });

@@ -3,6 +3,31 @@ import type { UserRole } from "./navigation";
 const isoDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
+/**
+ * SCHED-05: the product's maximum schedule length, enforced ONCE at input
+ * validation (schedule creation + duplication). The wizard permits up to three
+ * months; 100 days comfortably covers a 3-month span (≈14 weeks). With the
+ * hidden 8-week grid/roster cap removed, this is the single source of truth for
+ * "how long may a schedule be".
+ */
+export const MAX_SCHEDULE_LENGTH_DAYS = 100;
+
+/** Inclusive day count between two ISO dates (endDate − startDate + 1). */
+export function scheduleLengthInDays(startDate: string, endDate: string): number {
+  const start = new Date(`${startDate}T00:00:00.000Z`).getTime();
+  const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+    return 0;
+  }
+  return Math.round((end - start) / 86_400_000) + 1;
+}
+
+/** True when a schedule's [startDate, endDate] is within the product maximum. */
+export function isScheduleWithinMaxLength(startDate: string, endDate: string): boolean {
+  const days = scheduleLengthInDays(startDate, endDate);
+  return days > 0 && days <= MAX_SCHEDULE_LENGTH_DAYS;
+}
+
 export function isIsoDate(value: string): boolean {
   return isoDatePattern.test(value);
 }

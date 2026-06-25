@@ -319,13 +319,13 @@ export async function createOnboardingInstance({
 
     // Auto-trigger signature requests for e_signature tasks with a document_id.
     //
-    // DECISION (task dependencies): signature requests still fire at creation
-    // even when the e-signature task starts 'blocked'. Deferring them to
-    // unlock time would require the signatures flow to participate in the
-    // dependency model (the sign route completes linked onboarding tasks
-    // directly), which is out of scope here. Practical consequence: a blocked
-    // e-signature task's document can be signed early, which completes the
-    // task via the signatures route regardless of its blocked status.
+    // The signature request is still created at instance creation even when the
+    // e-signature task starts 'blocked', but ONBOARD-01 closes the early-signing
+    // gap at the point of signing: the signatures sign route now REJECTS signing
+    // while the linked task's prerequisites are incomplete, and runs the same
+    // dependency unlock pass as manual completion once the task is signed. So a
+    // blocked e-signature task can no longer be completed ahead of its
+    // prerequisites, and signing it unlocks its dependents atomically.
     if (insertedTasks) {
       for (const insertedTask of insertedTasks) {
         if (

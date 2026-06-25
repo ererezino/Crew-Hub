@@ -173,7 +173,11 @@ export type ExpenseBulkApproveResponseData = {
   stage: ExpenseApprovalStage;
   expenses: ExpenseRecord[];
   approvedCount: number;
+  /** Items not eligible for this stage (wrong status / out of scope). */
   skippedIds: string[];
+  /** APPROVAL-02: items whose update errored — surfaced precisely instead of a
+   *  blanket failure that hides the items that DID commit. */
+  failedIds: string[];
 };
 
 export type ExpenseReportBucket = {

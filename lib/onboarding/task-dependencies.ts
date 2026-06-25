@@ -9,12 +9,13 @@
  * These functions only COMPUTE transitions; callers perform the updates,
  * notifications, and audit entries (see the task completion route).
  *
- * KNOWN GAP: e-signature tasks linked to a signature request are completed by
- * the signatures sign route, which does not yet run an unlock pass. The
- * unlock computation here is deliberately self-healing — it unlocks ANY
- * blocked task whose prerequisites are all complete, not just direct
- * dependents of the task that just completed — so the next completion through
- * the onboarding route repairs any unlock missed by the signatures path.
+ * Both completion paths now share this computation (ONBOARD-01): the manual
+ * task-completion route AND the signatures sign route call findUnlockableTasks
+ * after a completion, so a task completed by signature unlocks its dependents
+ * immediately. The signatures route additionally rejects signing while a
+ * linked task's prerequisites are incomplete. The unlock computation stays
+ * deliberately self-healing — it unlocks ANY blocked task whose prerequisites
+ * are all complete — so a missed pass is still repaired by the next completion.
  */
 
 export type DependencyTaskRow = {

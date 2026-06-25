@@ -9,7 +9,7 @@ import { ErrorState } from "../../../../components/shared/error-state";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import { formatDate as formatDateLib, formatRelativeTime } from "../../../../lib/datetime";
 import type { WorkToolRequestStatus, WorkToolIssueType, WorkToolRecord, WorkToolRequestRecord, WorkToolsAdminResponseData, WorkToolStatus, WorkToolType } from "../../../../types/work-tools";
 import { WORK_TOOL_REQUEST_STATUSES, WORK_TOOL_STATUSES, WORK_TOOL_TYPES } from "../../../../types/work-tools";
@@ -181,7 +181,7 @@ export function WorkToolsClient() {
   const [requestError, setRequestError] = useState<string | null>(null);
   const [isSavingRequest, setIsSavingRequest] = useState(false);
 
-  const { people } = usePeople({ scope: "all" });
+  const { people } = useAllPeople({ scope: "all" });
 
   const employeeOptions = useMemo(
     () =>

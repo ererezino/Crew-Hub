@@ -52,7 +52,11 @@ export function SchedulingRosterClient({ currentUserId = "" }: { currentUserId?:
     [activeSchedule, locale]
   );
   const slots = useMemo(() => buildSlots(shifts), [shifts]);
-  const cells = useMemo(() => buildCells(shifts, weeks), [shifts, weeks]);
+  const crewFallback = t("calendar.crewMemberFallback");
+  const cells = useMemo(
+    () => buildCells(shifts, weeks, crewFallback),
+    [shifts, weeks, crewFallback]
+  );
 
   if (schedulesQuery.isLoading) {
     return (

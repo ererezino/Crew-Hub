@@ -6,6 +6,7 @@ import { CalendarClock } from "lucide-react";
 
 import { EmptyState } from "../shared/empty-state";
 import { formatDate } from "../../lib/datetime";
+import { resolveShiftDisplayName } from "../../lib/scheduling/shift-display";
 import type { ShiftRecord } from "../../types/scheduling";
 
 // ---------------------------------------------------------------------------
@@ -260,19 +261,27 @@ export function ScheduleCalendar({
 
               return (
                 <div key={slotKey} className="schedule-calendar-slot-cell">
-                  {unique.map((shift) => (
-                    <div key={shift.id} className="schedule-calendar-person">
-                      <span
-                        className="schedule-calendar-avatar"
-                        style={{ backgroundColor: avatarColor(shift.employeeName ?? "?") }}
-                      >
-                        {getInitial(shift.employeeName ?? "?")}
-                      </span>
-                      <span className="schedule-calendar-person-name">
-                        {shift.employeeName ?? t("calendar.unassigned")}
-                      </span>
-                    </div>
-                  ))}
+                  {unique.map((shift) => {
+                    // These are all assigned shifts (open shifts are filtered
+                    // out above). A missing name falls back to the defensive
+                    // crew label + monitored invariant, never to "Unassigned".
+                    const displayName = resolveShiftDisplayName(
+                      shift,
+                      t("calendar.crewMemberFallback"),
+                      t("calendar.crewMemberFallback")
+                    );
+                    return (
+                      <div key={shift.id} className="schedule-calendar-person">
+                        <span
+                          className="schedule-calendar-avatar"
+                          style={{ backgroundColor: avatarColor(displayName) }}
+                        >
+                          {getInitial(displayName)}
+                        </span>
+                        <span className="schedule-calendar-person-name">{displayName}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}

@@ -11,7 +11,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { useDocuments } from "../../../hooks/use-documents";
-import { usePeople } from "../../../hooks/use-people";
+import { useAllPeople } from "../../../hooks/use-people";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime } from "../../../lib/datetime";
 import {
@@ -204,7 +204,7 @@ export function DocumentsClient({ currentUserId, canManageDocuments }: Documents
   const [isDeleting, setIsDeleting] = useState(false);
 
   type SignerOption = { id: string; fullName: string; department: string | null; title: string | null };
-  const signerPeople = usePeople({
+  const signerPeople = useAllPeople({
     scope: "all",
     enabled: Boolean(sigReqTarget && canManageDocuments)
   });

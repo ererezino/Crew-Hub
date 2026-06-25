@@ -9,8 +9,11 @@ import { isDepartmentOnlyTeamLead } from "../../../../../lib/roles";
 import {
   canViewTeamSchedules,
   isIsoDate,
-  isSchedulingManager
+  isSchedulingManager,
+  isScheduleWithinMaxLength,
+  MAX_SCHEDULE_LENGTH_DAYS
 } from "../../../../../lib/scheduling";
+import { resolveSchedulingIdentities } from "../../../../../lib/scheduling/identity-resolver";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ApiResponse } from "../../../../../types/auth";
@@ -81,11 +84,6 @@ const scheduleRowSchema = z.object({
   updated_at: z.string()
 });
 
-const profileRowSchema = z.object({
-  id: z.string().uuid(),
-  full_name: z.string()
-});
-
 function buildMeta() {
   return { timestamp: new Date().toISOString() };
 }
@@ -131,25 +129,21 @@ async function mapSchedules({
     )
   ];
 
-  const [{ data: rawShifts, error: shiftsError }, { data: rawProfiles, error: profilesError }] =
-    await Promise.all([
-      supabase
-        .from("shifts")
-        .select("schedule_id")
-        .eq("org_id", orgId)
-        .is("deleted_at", null)
-        .in("schedule_id", scheduleIds),
-      publisherIds.length > 0
-        ? supabase
-            .from("profiles")
-            .select("id, full_name")
-            .eq("org_id", orgId)
-            .is("deleted_at", null)
-            .in("id", publisherIds)
-        : Promise.resolve({ data: [], error: null })
-    ]);
+  const [{ data: rawShifts, error: shiftsError }, publisherIdentities] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select("schedule_id")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("schedule_id", scheduleIds),
+    // SCHED-01: publisher names are scheduling-safe identity too. Resolve them
+    // through the same narrow resolver so an ordinary employee viewing their
+    // own published schedules sees the publisher's name (profile RLS would not
+    // return another person's row).
+    resolveSchedulingIdentities(publisherIds, orgId)
+  ]);
 
-  if (shiftsError || profilesError) {
+  if (shiftsError) {
     throw new Error("Unable to resolve schedule metadata.");
   }
 
@@ -165,14 +159,8 @@ async function mapSchedules({
     shiftCountsByScheduleId.set(scheduleId, (shiftCountsByScheduleId.get(scheduleId) ?? 0) + 1);
   }
 
-  const parsedProfiles = z.array(profileRowSchema).safeParse(rawProfiles ?? []);
-
-  if (!parsedProfiles.success) {
-    throw new Error("Unable to parse schedule publisher metadata.");
-  }
-
   const publisherNameById = new Map(
-    parsedProfiles.data.map((profileRow) => [profileRow.id, profileRow.full_name] as const)
+    [...publisherIdentities.values()].map((identity) => [identity.id, identity.fullName] as const)
   );
 
   return rows.map((row) => ({
@@ -326,15 +314,14 @@ export async function GET(request: Request) {
   } else if (scope === "team" && isScopedTeamLead) {
     schedulesQuery = schedulesQuery.ilike("department", session.profile.department as string);
   } else if (scope === "team" && !isManager) {
-    if (!session.profile.department) {
-      return jsonResponse<SchedulingSchedulesResponseData>(200, {
-        data: { schedules: [] },
-        error: null,
-        meta: buildMeta()
-      });
-    }
-
-    schedulesQuery = schedulesQuery.ilike("department", session.profile.department);
+    // SCHED-02: an ordinary employee's published-schedule visibility is defined
+    // once, in RLS (same normalized department OR rostered OR unscoped). Do NOT
+    // re-impose a stricter "my department only" app filter here — it dropped the
+    // rostered cross-department and unscoped cases the policy intends them to
+    // see, and used case-sensitive matching that diverged from the policy.
+    // Restrict to published (drafts stay scheduler-only) and let RLS do the rest;
+    // an employee with no department still sees rostered/unscoped schedules.
+    schedulesQuery = schedulesQuery.eq("status", "published");
   }
 
   const { data: rawRows, error } = await schedulesQuery;
@@ -478,6 +465,18 @@ export async function POST(request: Request) {
       error: {
         code: "VALIDATION_ERROR",
         message: "endDate must be on or after startDate."
+      },
+      meta: buildMeta()
+    });
+  }
+
+  // SCHED-05: enforce the product's maximum schedule length once, here at input.
+  if (!isScheduleWithinMaxLength(startDate, endDate)) {
+    return jsonResponse<null>(422, {
+      data: null,
+      error: {
+        code: "SCHEDULE_TOO_LONG",
+        message: `A schedule cannot be longer than ${MAX_SCHEDULE_LENGTH_DAYS} days.`
       },
       meta: buildMeta()
     });

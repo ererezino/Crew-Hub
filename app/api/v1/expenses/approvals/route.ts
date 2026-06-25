@@ -610,7 +610,8 @@ export async function POST(request: Request) {
         stage,
         expenses: [],
         approvedCount: 0,
-        skippedIds
+        skippedIds,
+        failedIds: []
       },
       error: null,
       meta: buildMeta()
@@ -622,7 +623,18 @@ export async function POST(request: Request) {
   // For manager stage, resolve delegation context per expense and group by context
   // to minimize DB round-trips while maintaining per-item audit accuracy.
   let updatedRowsRaw: unknown[] | null = null;
-  let updatedRowsError: { code?: string; message: string } | null = null;
+  // APPROVAL-02: collect per-group failures so a later group error no longer
+  // discards the groups that already committed. A permission error fails closed;
+  // a transient error on one group surfaces those ids as failedIds while the
+  // successful groups are still audited and reported.
+  const failedIds: string[] = [];
+  let permissionDenied = false;
+  function recordGroupError(error: { code?: string; message: string }, ids: string[]) {
+    if (error.code === "42501" || error.code === "PGRST301") {
+      permissionDenied = true;
+    }
+    failedIds.push(...ids);
+  }
 
   if (stage === "additional") {
     // Group by delegation context (direct vs covering for the assigned
@@ -678,8 +690,8 @@ export async function POST(request: Request) {
         .select(expenseSelectColumns);
 
       if (groupError) {
-        updatedRowsError = groupError;
-        break;
+        recordGroupError(groupError, group.ids);
+        continue;
       }
 
       if (groupRows) {
@@ -687,9 +699,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!updatedRowsError) {
-      updatedRowsRaw = allUpdatedAdditionalRows;
-    }
+    updatedRowsRaw = allUpdatedAdditionalRows;
   } else if (stage === "manager") {
     type DelegationGroup = {
       ids: string[];
@@ -745,8 +755,8 @@ export async function POST(request: Request) {
         .select(expenseSelectColumns);
 
       if (groupError) {
-        updatedRowsError = groupError;
-        break;
+        recordGroupError(groupError, group.ids);
+        continue;
       }
 
       if (groupRows) {
@@ -754,9 +764,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!updatedRowsError) {
-      updatedRowsRaw = allUpdatedRows;
-    }
+    updatedRowsRaw = allUpdatedRows;
   } else {
     const financeResult = await svcClient
       .from("expenses")
@@ -783,20 +791,27 @@ export async function POST(request: Request) {
       )
       .select(expenseSelectColumns);
 
-    updatedRowsRaw = financeResult.data;
-    updatedRowsError = financeResult.error;
+    if (financeResult.error) {
+      recordGroupError(financeResult.error, allowedIds);
+      updatedRowsRaw = [];
+    } else {
+      updatedRowsRaw = financeResult.data;
+    }
   }
 
-  if (updatedRowsError) {
-    const isPermissionError = updatedRowsError.code === "42501" || updatedRowsError.code === "PGRST301";
-
-    return jsonResponse<null>(isPermissionError ? 403 : 500, {
+  // APPROVAL-02: only fail the whole request when NOTHING committed. A
+  // permission denial with no successes is a 403; any other total failure is a
+  // 500. When some groups committed, we proceed and report failedIds precisely
+  // rather than returning an ambiguous blanket failure that hides the commits.
+  const anySucceeded = (updatedRowsRaw ?? []).length > 0;
+  if (!anySucceeded && failedIds.length > 0) {
+    return jsonResponse<null>(permissionDenied ? 403 : 500, {
       data: null,
       error: {
-        code: isPermissionError ? "FORBIDDEN" : "EXPENSE_BULK_APPROVE_FAILED",
-        message: isPermissionError
-          ? "You are not allowed to bulk process one or more selected expenses."
-          : "Unable to process selected expenses."
+        code: permissionDenied ? "FORBIDDEN" : "EXPENSE_BULK_APPROVE_FAILED",
+        message: permissionDenied
+          ? "You are not allowed to bulk process the selected expenses."
+          : "Unable to process the selected expenses."
       },
       meta: buildMeta()
     });
@@ -952,11 +967,22 @@ export async function POST(request: Request) {
     }
   }
 
+  // APPROVAL-02: account for EVERY input id precisely. An id is approved (in
+  // `expenses`), failed (group errored), or skipped — where skipped now also
+  // includes "stale" rows that were allowed but whose conditional status guard
+  // matched nothing (a concurrent transition already moved them).
+  const approvedIdSet = new Set(expenses.map((expense) => expense.id));
+  const failedIdSet = new Set(failedIds);
+  const preciseSkippedIds = payload.expenseIds.filter(
+    (id) => !approvedIdSet.has(id) && !failedIdSet.has(id)
+  );
+
   const responseData: ExpenseBulkApproveResponseData = {
     stage,
     expenses,
     approvedCount: expenses.length,
-    skippedIds
+    skippedIds: preciseSkippedIds,
+    failedIds
   };
 
   return jsonResponse<ExpenseBulkApproveResponseData>(200, {

@@ -28,6 +28,7 @@ import { useExpenses } from "../../../hooks/use-expenses";
 import { useUnsavedGuard } from "../../../hooks/use-unsaved-guard";
 import { OfflineQueueBanner } from "../../../components/shared/offline-queue-banner";
 import {
+  createSubmissionId,
   enqueueSubmission,
   isNetworkFailure,
   splitFormData
@@ -865,11 +866,13 @@ function ReceiptLightbox({
 
 export function ExpensesClient({
   currentUserId,
+  currentOrgId,
   canViewReports,
   showEmployeeColumn,
   initialExpensesData
 }: {
   currentUserId: string;
+  currentOrgId: string;
   canViewReports: boolean;
   showEmployeeColumn: boolean;
   initialExpensesData?: ExpensesListResponseData;
@@ -1343,6 +1346,11 @@ export function ExpensesClient({
     setUploadProgress(0);
 
     let formData: FormData | null = null;
+    // OFFLINE-01: one idempotency key is minted BEFORE the first network attempt
+    // and travels with the initial request, the queued record, and every replay.
+    // If the server commits but the response is lost, the replay carries the SAME
+    // id, so the server treats it as an idempotent repeat — never a duplicate.
+    const clientRequestId = createSubmissionId();
 
     try {
       formData = buildExpenseSubmissionFormData(
@@ -1352,6 +1360,7 @@ export function ExpensesClient({
         },
         receiptFiles
       );
+      formData.append("clientRequestId", clientRequestId);
       const result = await uploadExpenseWithProgress(formData, setUploadProgress);
 
       if (result.status < 200 || result.status > 299 || !result.payload?.data?.expense) {
@@ -1371,13 +1380,19 @@ export function ExpensesClient({
       if (formData && isNetworkFailure(error)) {
         try {
           const { fields, files } = splitFormData(formData);
+          // The queue re-injects clientRequestId on every replay (buildRequest),
+          // so drop the copy we appended for the initial request to avoid a
+          // duplicate field.
+          delete fields.clientRequestId;
           await enqueueSubmission({
-            id: crypto.randomUUID(),
+            // Reuse the pre-generated key so the queued replay is idempotent.
+            id: clientRequestId,
             kind: "expense",
             url: "/api/v1/expenses",
             encoding: "form",
             fields,
-            files
+            files,
+            owner: { userId: currentUserId, orgId: currentOrgId }
           });
           closePanel();
           showToast("info", tCommon("offlineQueue.queuedToast"));
@@ -1694,7 +1709,7 @@ export function ExpensesClient({
 
   return (
     <>
-      <OfflineQueueBanner kind="expense" />
+      <OfflineQueueBanner kind="expense" identity={{ userId: currentUserId, orgId: currentOrgId }} />
       <PageHeader
         title={t('pageTitle')}
         description={t('pageDescription')}

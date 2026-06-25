@@ -119,7 +119,13 @@
       "pending": "{count, plural, one {# submission waiting to sync} other {# submissions waiting to sync}}",
       "description": "Saved on this device — it will be submitted automatically when you're back online.",
       "retryNow": "Retry now",
-      "queuedToast": "You appear to be offline. Your submission was saved on this device and will be sent automatically when you are back online."
+      "queuedToast": "You appear to be offline. Your submission was saved on this device and will be sent automatically when you are back online.",
+      "needsAttention": "{count, plural, one {# submission needs your attention} other {# submissions need your attention}}",
+      "failedDescription": "The server rejected this submission. Review it, then retry or remove it.",
+      "staleDescription": "This submission has been waiting over 48 hours. Retry it or remove it.",
+      "errorLabel": "Error: {message}",
+      "retry": "Retry",
+      "remove": "Remove"
     }
   },
   "nav": {
@@ -385,13 +391,17 @@
       "copying": "Copying…",
       "copyWeekDone": "Copied {count, plural, one {# assignment} other {# assignments}} from last week.",
       "copyWeekEmpty": "Nothing to copy from last week.",
+      "copyWeekPartial": "{failed, plural, one {# cell could not be copied — it may have changed. Refresh and retry.} other {# cells could not be copied — they may have changed. Refresh and retry.}}",
       "addSlot": "Add shift type",
       "slotNamePlaceholder": "Shift name (e.g. Morning Shift)",
       "slotAddConfirm": "Add column",
       "slotInvalid": "Enter a name and a valid start/end time.",
       "slotExists": "That shift type already exists.",
       "onLeaveTag": "on leave",
-      "onLeaveTooltip": "This crew member has approved time off during this week."
+      "onLeaveTooltip": "This crew member has approved time off during this week.",
+      "crewMemberFallback": "Crew member",
+      "saveFailedBanner": "{count, plural, one {# edit didn't save} other {# edits didn't save}}. Retry below.",
+      "retrySave": "Retry"
     },
     "track": {
       "weekday": "Weekday",
@@ -542,6 +552,7 @@
       "noPublishedTitle": "No published shifts in this schedule",
       "noPublishedDescription": "Publish shifts from Manage before reviewing the team calendar.",
       "openShift": "Open shift",
+      "crewMemberFallback": "Crew member",
       "publishedSchedule": "Published schedule",
       "allPublishedOption": "All published schedules",
       "allPublishedSummary": "All published schedules",

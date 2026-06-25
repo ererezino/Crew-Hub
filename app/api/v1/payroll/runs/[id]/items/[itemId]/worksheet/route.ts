@@ -68,7 +68,11 @@ const itemRowSchema = z.object({
 const runTotalsItemRowSchema = z.object({
   gross_amount: z.union([z.number(), z.string()]),
   net_amount: z.union([z.number(), z.string()]),
-  pay_currency: z.string().length(3)
+  pay_currency: z.string().length(3),
+  deductions: z
+    .array(z.object({ amount: z.union([z.number(), z.string()]).optional().default(0) }))
+    .nullish()
+    .transform((rows) => rows ?? [])
 });
 
 function parseAmount(value: string | number): number {
@@ -474,7 +478,7 @@ export async function PATCH(
 
   const { data: rawRunTotalItems, error: runTotalItemsError } = await serviceClient
     .from("payroll_items")
-    .select("gross_amount, net_amount, pay_currency")
+    .select("gross_amount, net_amount, pay_currency, deductions")
     .eq("payroll_run_id", runId)
     .eq("org_id", profile.org_id)
     .is("deleted_at", null);
@@ -496,6 +500,12 @@ export async function PATCH(
     parsedRunTotalItems.data.map((item) => ({
       grossAmount: parseAmount(item.gross_amount),
       netAmount: parseAmount(item.net_amount),
+      // Sum the actual deduction line items rather than deriving from
+      // gross - net (which would mislabel adjustments as deductions).
+      deductionsAmount: item.deductions.reduce(
+        (sum, deduction) => sum + parseAmount(deduction.amount),
+        0
+      ),
       payCurrency: item.pay_currency
     }))
   );

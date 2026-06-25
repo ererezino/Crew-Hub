@@ -9,7 +9,7 @@ import { ShiftEditModal } from "../../../../components/scheduling/shift-edit-mod
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { TeamScheduleCalendar } from "../../../../components/scheduling/team-schedule-calendar";
 import { useSchedulingSchedules, useSchedulingShifts } from "../../../../hooks/use-scheduling";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import { areDepartmentsEqual } from "../../../../lib/department";
 import { formatDateShort, formatMonth } from "../../../../lib/datetime";
 import type { ShiftRecord } from "../../../../types/scheduling";
@@ -79,7 +79,7 @@ export function SchedulingCalendarClient({
   const [isDeletingShift, setIsDeletingShift] = useState(false);
   const [isCreatingShift, setIsCreatingShift] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const peopleQuery = usePeople({ scope: "all", enabled: canManageShifts });
+  const peopleQuery = useAllPeople({ scope: "all", enabled: canManageShifts });
 
   const allPublishedRange = useMemo(() => {
     if (publishedSchedules.length === 0) {

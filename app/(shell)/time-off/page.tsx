@@ -48,6 +48,8 @@ export default async function TimeOffPage({ searchParams }: TimeOffPageProps) {
     <TimeOffTabsClient
       requestedTab={resolveRequestedTab(resolvedSearchParams)}
       userRoles={session.profile.roles}
+      currentUserId={session.profile.id}
+      currentOrgId={session.profile.org_id}
       initialSummaryData={initialSummaryData}
     />
   );

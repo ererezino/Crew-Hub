@@ -119,7 +119,13 @@
       "pending": "{count, plural, one {# envoi en attente de synchronisation} other {# envois en attente de synchronisation}}",
       "description": "Enregistré sur cet appareil — il sera soumis automatiquement dès que vous serez de nouveau en ligne.",
       "retryNow": "Réessayer maintenant",
-      "queuedToast": "Vous semblez être hors ligne. Votre envoi a été enregistré sur cet appareil et sera envoyé automatiquement dès que vous serez de nouveau en ligne."
+      "queuedToast": "Vous semblez être hors ligne. Votre envoi a été enregistré sur cet appareil et sera envoyé automatiquement dès que vous serez de nouveau en ligne.",
+      "needsAttention": "{count, plural, one {# envoi nécessite votre attention} other {# envois nécessitent votre attention}}",
+      "failedDescription": "Le serveur a rejeté cet envoi. Vérifiez-le, puis réessayez ou supprimez-le.",
+      "staleDescription": "Cet envoi est en attente depuis plus de 48 heures. Réessayez-le ou supprimez-le.",
+      "errorLabel": "Erreur : {message}",
+      "retry": "Réessayer",
+      "remove": "Supprimer"
     }
   },
   "nav": {
@@ -385,13 +391,17 @@
       "copying": "Copie…",
       "copyWeekDone": "{count, plural, one {# affectation copiée} other {# affectations copiées}} depuis la semaine précédente.",
       "copyWeekEmpty": "Rien à copier de la semaine précédente.",
+      "copyWeekPartial": "{failed, plural, one {# cellule n'a pas pu être copiée — elle a peut-être changé. Actualisez et réessayez.} other {# cellules n'ont pas pu être copiées — elles ont peut-être changé. Actualisez et réessayez.}}",
       "addSlot": "Ajouter un type de quart",
       "slotNamePlaceholder": "Nom du quart (ex. : Quart du matin)",
       "slotAddConfirm": "Ajouter la colonne",
       "slotInvalid": "Saisissez un nom et une heure de début/fin valide.",
       "slotExists": "Ce type de quart existe déjà.",
       "onLeaveTag": "en congé",
-      "onLeaveTooltip": "Ce membre a un congé approuvé pendant cette semaine."
+      "onLeaveTooltip": "Ce membre a un congé approuvé pendant cette semaine.",
+      "crewMemberFallback": "Membre d'équipe",
+      "saveFailedBanner": "{count, plural, one {# modification non enregistrée} other {# modifications non enregistrées}}. Réessayez ci-dessous.",
+      "retrySave": "Réessayer"
     },
     "track": {
       "weekday": "Semaine",
@@ -542,6 +552,7 @@
       "noPublishedTitle": "Aucun quart publié dans cet horaire",
       "noPublishedDescription": "Publiez des quarts depuis Gérer avant de consulter le calendrier d'équipe.",
       "openShift": "Quart ouvert",
+      "crewMemberFallback": "Membre d'équipe",
       "publishedSchedule": "Horaire publié",
       "allPublishedOption": "Tous les horaires publiés",
       "allPublishedSummary": "Tous les horaires publiés",

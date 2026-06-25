@@ -22,6 +22,11 @@ import {
 
 const SIGNED_URL_TTL_SECONDS = 300;
 
+/** States in which the OWNER may still add/remove their own evidence (EXPENSE-01).
+ *  After this, evidence is what approvers acted on — only an audited admin flow
+ *  may change it. */
+const OWNER_EDITABLE_EXPENSE_STATES = new Set(["draft", "pending"]);
+
 const expenseAccessRowSchema = z.object({
   id: z.string().uuid(),
   employee_id: z.string().uuid(),
@@ -152,8 +157,9 @@ export async function POST(
   }
 
   const isOwner = parsedExpense.data.employee_id === session.profile.id;
+  const isAdmin = isExpenseAdmin(session.profile.roles);
 
-  if (!isOwner && !isExpenseAdmin(session.profile.roles)) {
+  if (!isOwner && !isAdmin) {
     return jsonResponse<null>(403, {
       data: null,
       error: { code: "FORBIDDEN", message: "You cannot add documents to this expense." },
@@ -165,6 +171,21 @@ export async function POST(
     return jsonResponse<null>(409, {
       data: null,
       error: { code: "INVALID_STATE", message: "Documents cannot be added to a cancelled expense." },
+      meta: buildMeta()
+    });
+  }
+
+  // EXPENSE-01: owner evidence is mutable only while the expense is still
+  // editable (draft/pending). Once it has entered approval, the owner can no
+  // longer add/alter the evidence that approvers acted on — only an expense
+  // admin may, as an explicit, audited correction.
+  if (isOwner && !isAdmin && !OWNER_EDITABLE_EXPENSE_STATES.has(parsedExpense.data.status)) {
+    return jsonResponse<null>(409, {
+      data: null,
+      error: {
+        code: "EVIDENCE_LOCKED",
+        message: "This expense is in approval and its documents can no longer be changed. Ask an admin if a correction is needed."
+      },
       meta: buildMeta()
     });
   }

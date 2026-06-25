@@ -81,6 +81,14 @@ export function calculatePayrollRunCurrencyTotals(
   rows: ReadonlyArray<{
     grossAmount: number;
     netAmount: number;
+    /**
+     * Sum of the row's actual deduction line items in integer minor units.
+     * This is the real total of withheld amounts for the row — NOT
+     * `grossAmount - netAmount`, which silently folds in adjustments
+     * (net = gross - deductions + adjustments) and is therefore wrong
+     * whenever an adjustment is present.
+     */
+    deductionsAmount: number;
     payCurrency: string;
   }>
 ): {
@@ -98,7 +106,7 @@ export function calculatePayrollRunCurrencyTotals(
     totalDeductions = addCurrencyTotal(
       totalDeductions,
       row.payCurrency,
-      row.grossAmount - row.netAmount
+      row.deductionsAmount
     );
   }
 

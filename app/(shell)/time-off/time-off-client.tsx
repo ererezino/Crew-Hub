@@ -16,7 +16,7 @@ import { TeamAvailabilityPanel } from "../../../components/time-off/team-availab
 import { useConfirmAction } from "../../../hooks/use-confirm-action";
 import { useAfkLogs, useTimeOffSummary } from "../../../hooks/use-time-off";
 import { OfflineQueueBanner } from "../../../components/shared/offline-queue-banner";
-import { enqueueSubmission, isNetworkFailure } from "../../../lib/offline/submission-queue";
+import { createSubmissionId, enqueueSubmission, isNetworkFailure } from "../../../lib/offline/submission-queue";
 import {
   formatDays,
   formatDateRangeHuman,
@@ -186,9 +186,13 @@ function TimeOffSkeleton() {
 
 export function TimeOffClient({
   embedded = false,
+  currentUserId,
+  currentOrgId,
   initialSummaryData
 }: {
   embedded?: boolean;
+  currentUserId: string;
+  currentOrgId: string;
   initialSummaryData?: TimeOffSummaryResponseData;
 }) {
   const t = useTranslations('timeOff');
@@ -644,6 +648,10 @@ export function TimeOffClient({
     setIsSubmitting(true);
 
     let medicalEvidencePath: string | undefined;
+    // OFFLINE-01: one idempotency key for the whole lifecycle of this submission
+    // (initial request, queued record, every replay). Declared before the try so
+    // the network-failure catch can reuse it when enqueueing.
+    const clientRequestId = createSubmissionId();
 
     try {
       if (isSickLeaveOverTwoDays && medicalEvidenceFile) {
@@ -680,6 +688,7 @@ export function TimeOffClient({
           startDate: formValues.startDate,
           endDate: formValues.endDate,
           reason: formValues.reason.trim(),
+          clientRequestId,
           ...(medicalEvidencePath ? { medicalEvidencePath } : {})
         })
       });
@@ -706,7 +715,8 @@ export function TimeOffClient({
       if (isNetworkFailure(error) && canQueue) {
         try {
           await enqueueSubmission({
-            id: crypto.randomUUID(),
+            // Reuse the pre-generated key so the queued replay is idempotent.
+            id: clientRequestId,
             kind: "leave_request",
             url: "/api/v1/time-off/requests",
             encoding: "json",
@@ -716,7 +726,8 @@ export function TimeOffClient({
               endDate: formValues.endDate,
               reason: formValues.reason.trim(),
               ...(medicalEvidencePath ? { medicalEvidencePath } : {})
-            }
+            },
+            owner: { userId: currentUserId, orgId: currentOrgId }
           });
           closeRequestPanel();
           showToast("info", tCommon("offlineQueue.queuedToast"));
@@ -910,7 +921,7 @@ export function TimeOffClient({
 
   return (
     <>
-      <OfflineQueueBanner kind="leave_request" />
+      <OfflineQueueBanner kind="leave_request" identity={{ userId: currentUserId, orgId: currentOrgId }} />
       {!embedded ? (
         <PageHeader
           title={t('title')}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 
@@ -10,7 +10,7 @@ import { ScheduleWizard, type ScheduleWizardResult } from "../../../../component
 import { TeamSetupPanel } from "../../../../components/scheduling/team-setup-panel";
 import type { RosterEmployee } from "../../../../components/scheduling/roster-selector";
 import { useSchedulingSchedules } from "../../../../hooks/use-scheduling";
-import { usePeople } from "../../../../hooks/use-people";
+import { useAllPeople } from "../../../../hooks/use-people";
 import type { UserRole } from "../../../../lib/navigation";
 import { hasRole } from "../../../../lib/roles";
 import type { ScheduleRecord } from "../../../../types/scheduling";
@@ -50,7 +50,7 @@ export function SchedulingManageClient({
     people,
     isLoading: isPeopleLoading,
     setPeople
-  } = usePeople();
+  } = useAllPeople();
   const isSuperAdmin = hasRole(userRoles, "SUPER_ADMIN");
   const isHrAdmin = hasRole(userRoles, "HR_ADMIN");
 
@@ -66,6 +66,11 @@ export function SchedulingManageClient({
   const [dupStart, setDupStart] = useState("");
   const [dupEnd, setDupEnd] = useState("");
   const [isDuplicating, setIsDuplicating] = useState(false);
+  // P1-2: one stable operation key per duplicate attempt, generated before the
+  // first request and REUSED on retry so a retried duplication is idempotent
+  // (the RPC returns the already-created schedule instead of a second draft).
+  // Cleared on success/close so the next duplication gets a fresh key.
+  const dupOpKeyRef = useRef<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Convert people data to roster employees – Customer Success members first
@@ -246,6 +251,7 @@ export function SchedulingManageClient({
   const closeDuplicate = useCallback(() => {
     setDuplicateSource(null);
     setIsDuplicating(false);
+    dupOpKeyRef.current = null;
   }, []);
 
   const submitDuplicate = useCallback(async () => {
@@ -255,11 +261,28 @@ export function SchedulingManageClient({
       return;
     }
     setIsDuplicating(true);
+    // Mint the operation key once; a retry after a failure reuses the same key.
+    // R3-3: the non-crypto fallback must be UNIQUE per dialog attempt (not a
+    // deterministic source+range string), otherwise a later intentional
+    // re-duplication of the same source/range would collide on the op key and
+    // return the previous copy instead of creating a new one. It is still stored
+    // in dupOpKeyRef so a retry of THIS attempt reuses it.
+    if (!dupOpKeyRef.current) {
+      dupOpKeyRef.current =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `dup-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e12).toString(36)}`;
+    }
     try {
       const res = await fetch(`/api/v1/scheduling/schedules/${duplicateSource.id}/duplicate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: dupName.trim() || undefined, startDate: dupStart, endDate: dupEnd })
+        body: JSON.stringify({
+          name: dupName.trim() || undefined,
+          startDate: dupStart,
+          endDate: dupEnd,
+          operationKey: dupOpKeyRef.current
+        })
       });
       const payload = await res.json().catch(() => null);
       if (!res.ok) {

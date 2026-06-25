@@ -271,6 +271,54 @@ export async function POST(
     });
   }
 
+  // ONBOARD-01: reject signing while the linked onboarding task is dependency-
+  // blocked with prerequisites still incomplete. Signing completes the task, so
+  // allowing it here would bypass the dependency model (early completion).
+  {
+    const { data: linkedBlocked } = await serviceRoleClient
+      .from("onboarding_tasks")
+      .select("id, instance_id, status, depends_on_task_ids")
+      .eq("signature_request_id", parsedRequestRow.data.id)
+      .eq("org_id", session.profile.org_id)
+      .eq("status", "blocked")
+      .is("deleted_at", null);
+
+    for (const blockedTask of linkedBlocked ?? []) {
+      const dependsOn: string[] = Array.isArray(blockedTask.depends_on_task_ids)
+        ? (blockedTask.depends_on_task_ids as string[])
+        : [];
+      if (dependsOn.length === 0 || !blockedTask.instance_id) {
+        continue;
+      }
+      const { data: prereqRows } = await serviceRoleClient
+        .from("onboarding_tasks")
+        .select("id, status")
+        .eq("instance_id", blockedTask.instance_id)
+        .eq("org_id", session.profile.org_id)
+        .in("id", dependsOn)
+        .is("deleted_at", null);
+
+      // P1-6: EXACT-MATCH — every declared prerequisite must exist AND be
+      // completed. `.every()` over the fetched rows would return true for an
+      // empty/short set (deleted prerequisite records), letting a blocked task
+      // be signed early; require the completed set to cover every declared id.
+      const completedIds = new Set(
+        (prereqRows ?? []).filter((row) => row.status === "completed").map((row) => row.id as string)
+      );
+      const prereqsComplete = dependsOn.every((id) => completedIds.has(id));
+      if (!prereqsComplete) {
+        return jsonResponse<null>(422, {
+          data: null,
+          error: {
+            code: "TASK_BLOCKED",
+            message: "Complete the prerequisite onboarding tasks before signing this document."
+          },
+          meta: buildMeta()
+        });
+      }
+    }
+  }
+
   const resolvedSignatureMode =
     parsedBody.data.signatureMode ?? (parsedBody.data.signatureImageData ? "drawn" : "typed");
   let signatureImagePath: string | null = null;
@@ -471,18 +519,29 @@ export async function POST(
 
     if (linkedTasks && linkedTasks.length > 0) {
       for (const linkedTask of linkedTasks) {
-        await serviceRoleClient
-          .from("onboarding_tasks")
-          .update({
-            status: "completed",
-            completed_by: session.profile.id,
-            completed_at: signedAt
-          })
-          .eq("id", linkedTask.id)
-          .eq("org_id", session.profile.org_id);
+        // P1-6: complete the task AND unlock its dependents in ONE transaction
+        // via the shared RPC (exact-match dependency enforcement included), so a
+        // signature completion can't leave dependents un-unlocked or partially
+        // applied. The earlier guard already rejected signing a blocked task; the
+        // RPC re-enforces (defense in depth) and skips an already-blocked task.
+        const { data: completeResult } = await serviceRoleClient.rpc(
+          "complete_onboarding_task_with_unlock",
+          {
+            p_task_id: linkedTask.id,
+            p_org_id: session.profile.org_id,
+            p_completed_by: session.profile.id,
+            p_enforce_dependencies: true
+          }
+        );
+        if (completeResult && typeof completeResult === "object" && "error" in completeResult) {
+          // Prerequisites not met (shouldn't happen after the guard) — leave the
+          // task as-is rather than force-completing it.
+          continue;
+        }
 
         // Recalculate onboarding instance progress using per-track checks
-        // (same logic as the normal task completion path)
+        // (same logic as the normal task completion path). The unlock pass
+        // already ran inside the RPC above.
         if (linkedTask.instance_id) {
           const { data: allInstanceTasks } = await serviceRoleClient
             .from("onboarding_tasks")

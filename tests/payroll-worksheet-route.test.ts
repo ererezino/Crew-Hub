@@ -256,8 +256,12 @@ describe("PATCH /items/[itemId]/worksheet", () => {
     });
     enqueue("payroll_items", {
       data: [
-        { gross_amount: 56000, net_amount: 56000, pay_currency: "USD" },
-        { gross_amount: 100000, net_amount: 90000, pay_currency: "NGN" }
+        // USD item: net == gross, no deductions.
+        { gross_amount: 56000, net_amount: 56000, pay_currency: "USD", deductions: [] },
+        // NGN item: net is 10000 below gross because of an ACTUAL 10000 deduction
+        // row. PAYROLL-01: total_deductions sums real deduction rows, so the
+        // fixture must carry the row it implies (not rely on gross - net).
+        { gross_amount: 100000, net_amount: 90000, pay_currency: "NGN", deductions: [{ amount: 10000 }] }
       ],
       error: null
     });

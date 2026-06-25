@@ -6,7 +6,20 @@ import i18next from "eslint-plugin-i18next";
 export default defineConfig([
   ...nextVitals,
   ...nextTypescript,
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "scripts/**"]),
+  // TOOLING-01: keep the canonical root `eslint .` deterministic over the real
+  // repository. `.claude/` (agent worktrees) and `artifacts/` are generated /
+  // untracked scratch dirs — linting them produced ~58 spurious errors unrelated
+  // to source. They are ignored here, NOT any source-controlled application code.
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "scripts/**",
+    ".claude/**",
+    "artifacts/**",
+    "coverage/**"
+  ]),
 
   // Allow underscore-prefixed variables to signal intentionally unused bindings
   {
