@@ -9,6 +9,8 @@ const getUserByIdMock = vi.fn();
 const updateUserByIdMock = vi.fn();
 const generateLinkMock = vi.fn();
 const inviteUserByEmailMock = vi.fn();
+const listFactorsMock = vi.fn();
+const deleteFactorMock = vi.fn();
 
 const loggerErrorMock = vi.fn();
 
@@ -69,7 +71,11 @@ vi.mock("../lib/supabase/service-role", () => ({
         getUserById: getUserByIdMock,
         updateUserById: updateUserByIdMock,
         generateLink: generateLinkMock,
-        inviteUserByEmail: inviteUserByEmailMock
+        inviteUserByEmail: inviteUserByEmailMock,
+        mfa: {
+          listFactors: listFactorsMock,
+          deleteFactor: deleteFactorMock
+        }
       }
     }
   }))
@@ -129,6 +135,8 @@ describe("People invite route behavior", () => {
     sendWelcomeEmailMock.mockResolvedValue(undefined);
     logAuditMock.mockResolvedValue(undefined);
     deriveSystemPasswordMock.mockReturnValue("derived-password");
+    listFactorsMock.mockResolvedValue({ data: { factors: [] }, error: null });
+    deleteFactorMock.mockResolvedValue({ data: {}, error: null });
   });
 
   it("returns 200 with inviteSent true when audit logging fails after successful invite", async () => {
@@ -218,6 +226,46 @@ describe("People invite route behavior", () => {
     expect(result.body.data?.isResend).toBe(true);
     expect(result.body.data?.inviteLink).toBeTruthy();
     expect(result.body.error?.code).toBe("EMAIL_DELIVERY_FAILED");
+  });
+
+  it("re-invite clears an existing verified authenticator so MFA enrollment can restart", async () => {
+    // Existing auth user (resend path) who still has a verified TOTP factor —
+    // the cause of the "Unable to start MFA enrollment" error on /mfa-setup.
+    getUserByIdMock.mockResolvedValueOnce({
+      data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+      error: null
+    });
+    listFactorsMock.mockResolvedValueOnce({
+      data: { factors: [{ id: "factor-aaa", factor_type: "totp", status: "verified" }] },
+      error: null
+    });
+
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(200);
+    expect(result.body.data?.isResend).toBe(true);
+    // The stale factor was looked up and removed before the recovery link was issued.
+    expect(listFactorsMock).toHaveBeenCalledWith({
+      userId: "11111111-1111-4111-8111-111111111111"
+    });
+    expect(deleteFactorMock).toHaveBeenCalledWith({
+      id: "factor-aaa",
+      userId: "11111111-1111-4111-8111-111111111111"
+    });
+  });
+
+  it("re-invite does not block when MFA listing fails (best-effort)", async () => {
+    getUserByIdMock.mockResolvedValueOnce({
+      data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+      error: null
+    });
+    listFactorsMock.mockRejectedValueOnce(new Error("admin mfa unavailable"));
+
+    const result = await callInviteRoute();
+
+    expect(result.status).toBe(200);
+    expect(result.body.data?.isResend).toBe(true);
+    expect(deleteFactorMock).not.toHaveBeenCalled();
   });
 
   it("returns 200 with inviteSent true and no error when everything succeeds", async () => {
