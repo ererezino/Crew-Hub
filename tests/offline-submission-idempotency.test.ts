@@ -93,12 +93,32 @@ const employeeProfileRow = {
   status: "active"
 };
 
+/* The route rejects start dates in the past (and ranges spanning calendar
+ * years), so hardcoded dates rot as time passes. Use a Monday ≥30 days out,
+ * advanced a week when Mon–Wed would straddle New Year. */
+function futureLeaveWindow(): { start: string; end: string } {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  start.setUTCDate(start.getUTCDate() + 30);
+  while (start.getUTCDay() !== 1) start.setUTCDate(start.getUTCDate() + 1);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 2);
+  while (iso(start).slice(0, 4) !== iso(end).slice(0, 4)) {
+    start.setUTCDate(start.getUTCDate() + 7);
+    end.setUTCDate(end.getUTCDate() + 7);
+  }
+  return { start: iso(start), end: iso(end) };
+}
+
+const LEAVE_WINDOW = futureLeaveWindow();
+
 const existingLeaveRequestRow = {
   id: EXISTING_REQUEST_ID,
   employee_id: USR,
   leave_type: "annual_leave",
-  start_date: "2026-07-06",
-  end_date: "2026-07-08",
+  start_date: LEAVE_WINDOW.start,
+  end_date: LEAVE_WINDOW.end,
   total_days: 3,
   status: "pending",
   reason: "Family trip",
@@ -137,8 +157,8 @@ describe("offline submission idempotency — leave requests", () => {
     const res = await POST(
       postRequest({
         leaveType: "annual_leave",
-        startDate: "2026-07-06",
-        endDate: "2026-07-08",
+        startDate: LEAVE_WINDOW.start,
+        endDate: LEAVE_WINDOW.end,
         reason: "Family trip",
         clientRequestId: CLIENT_REQUEST_ID
       })
@@ -159,8 +179,8 @@ describe("offline submission idempotency — leave requests", () => {
     const res = await POST(
       postRequest({
         leaveType: "annual_leave",
-        startDate: "2026-07-06",
-        endDate: "2026-07-08",
+        startDate: LEAVE_WINDOW.start,
+        endDate: LEAVE_WINDOW.end,
         reason: "Family trip",
         clientRequestId: "not-a-uuid"
       })
