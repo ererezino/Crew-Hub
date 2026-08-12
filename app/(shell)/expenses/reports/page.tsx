@@ -8,7 +8,11 @@ import { hasRole } from "../../../../lib/roles";
 import { ExpenseReportsClient } from "./reports-client";
 
 function canViewExpenseReports(roles: readonly UserRole[]): boolean {
+  /* Mirrors the API gate (canViewExpenseReports in _helpers): every
+   * manager-stage approver — TEAM_LEAD included — gets reports scoped to
+   * their own operational reports. */
   return (
+    hasRole(roles, "TEAM_LEAD") ||
     hasRole(roles, "MANAGER") ||
     hasRole(roles, "HR_ADMIN") ||
     hasRole(roles, "FINANCE_ADMIN") ||

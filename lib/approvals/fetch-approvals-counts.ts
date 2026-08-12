@@ -115,7 +115,12 @@ async function countExpensesByStatus({
   return typeof count === "number" ? count : 0;
 }
 
-async function countAdditionalExpenses({
+/**
+ * Pending additional-stage approvals naming `userId` as the approver.
+ * Exported: the approvals route uses this to admit approvers who hold no
+ * manager/finance role but are explicitly named on routed expenses.
+ */
+export async function countAdditionalExpenses({
   supabase,
   orgId,
   userId
@@ -205,13 +210,11 @@ export async function fetchApprovalsCountsData(
           employeeIds: superAdmin ? null : expenseReportIds
         })
       : Promise.resolve(0),
-    (includeManagerExpenses || includeFinanceExpenses)
-      ? countAdditionalExpenses({
-          supabase: svcClient,
-          orgId: profile.org_id,
-          userId: profile.id
-        })
-      : Promise.resolve(0),
+    countAdditionalExpenses({
+      supabase: svcClient,
+      orgId: profile.org_id,
+      userId: profile.id
+    }),
     includeFinanceExpenses
       ? countExpensesByStatus({
           supabase: svcClient,

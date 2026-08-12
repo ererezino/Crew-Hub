@@ -28,6 +28,7 @@ export default async function ExpensesPage() {
 
   const canViewReports =
     canApprove ||
+    hasRole(session.profile.roles, "TEAM_LEAD") ||
     hasRole(session.profile.roles, "HR_ADMIN");
 
   const isAdmin =

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { logAudit } from "../../../../../../lib/audit";
+import { isEffectiveApproverFor } from "../../../../../../lib/delegation";
 import { getAuthenticatedSession } from "../../../../../../lib/auth/session";
 import {
   ALLOWED_RECEIPT_EXTENSIONS,
@@ -26,7 +27,7 @@ import type {
   ExpenseCommentsResponseData
 } from "../../../../../../types/expenses";
 import { expenseCommentTypeSchema } from "../../_comment-state";
-import { buildMeta, jsonResponse } from "../../_helpers";
+import { buildMeta, canManagerApproveExpenses, canRequestExpenseInfo, jsonResponse } from "../../_helpers";
 
 const expenseRowSchema = z.object({
   id: z.string().uuid(),
@@ -39,7 +40,8 @@ const expenseRowSchema = z.object({
 const profileRowSchema = z.object({
   id: z.string().uuid(),
   full_name: z.string(),
-  manager_id: z.string().uuid().nullable()
+  manager_id: z.string().uuid().nullable(),
+  team_lead_id: z.string().uuid().nullable().optional().default(null)
 });
 
 const expenseCommentAttachmentRowSchema = z.object({
@@ -66,7 +68,6 @@ const expenseCommentPayloadSchema = z.object({
   message: z.string().trim().max(2000, "Message is too long.").optional().default("")
 });
 
-const COMMENTABLE_EXPENSE_STATUSES = new Set(["pending", "manager_approved", "approved"]);
 const FINANCE_THREAD_STATUSES = new Set(["manager_approved", "approved"]);
 
 function canAdminViewExpense(roles: readonly UserRole[]): boolean {
@@ -76,34 +77,6 @@ function canAdminViewExpense(roles: readonly UserRole[]): boolean {
     hasRole(roles, "FINANCE_APPROVER") ||
     hasRole(roles, "SUPER_ADMIN")
   );
-}
-
-function canRequestExpenseInfo({
-  roles,
-  isOwner,
-  isSuperAdmin,
-  isManagerOwner,
-  status
-}: {
-  roles: readonly UserRole[];
-  isOwner: boolean;
-  isSuperAdmin: boolean;
-  isManagerOwner: boolean;
-  status: string;
-}): boolean {
-  if (isOwner || !COMMENTABLE_EXPENSE_STATUSES.has(status)) {
-    return false;
-  }
-
-  if (status === "pending") {
-    return isSuperAdmin || isManagerOwner;
-  }
-
-  if (FINANCE_THREAD_STATUSES.has(status)) {
-    return isSuperAdmin || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER");
-  }
-
-  return false;
 }
 
 function mapExpenseCommentAttachment(
@@ -240,12 +213,56 @@ async function validateCommentAttachments(files: readonly File[]) {
   return null;
 }
 
+type SupabaseClientForCommentReads =
+  | Awaited<ReturnType<typeof createSupabaseServerClient>>
+  | ReturnType<typeof createSupabaseServiceRoleClient>;
+
+/**
+ * Manager-stage authority over an expense is OPERATIONAL: the employee's
+ * team lead (team_lead_id, falling back to manager_id when unset) or an
+ * active delegate covering that lead — exactly the scope the approvals
+ * queue admits. A raw manager_id comparison silently locks out team leads
+ * and delegates who can approve the very same expense.
+ */
+async function resolveIsOperationalApprover({
+  supabase,
+  profile,
+  employeeProfile,
+  isOwner
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  profile: { id: string; org_id: string; roles: readonly UserRole[] };
+  employeeProfile: z.infer<typeof profileRowSchema>;
+  isOwner: boolean;
+}): Promise<boolean> {
+  if (isOwner || !canManagerApproveExpenses(profile.roles)) {
+    return false;
+  }
+
+  // Fast path mirroring listOperationalReportIds: team lead link, or line
+  // manager when no team lead is set. No delegation query needed.
+  if (employeeProfile.team_lead_id === profile.id) {
+    return true;
+  }
+  if (employeeProfile.team_lead_id === null && employeeProfile.manager_id === profile.id) {
+    return true;
+  }
+
+  return isEffectiveApproverFor({
+    supabase,
+    orgId: profile.org_id,
+    userId: profile.id,
+    employeeId: employeeProfile.id,
+    scope: "expense"
+  });
+}
+
 async function loadExpenseContext({
   supabase,
   orgId,
   expenseId
 }: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  supabase: SupabaseClientForCommentReads;
   orgId: string;
   expenseId: string;
 }) {
@@ -269,7 +286,7 @@ async function loadExpenseContext({
 
   const { data: rawEmployeeProfile, error: employeeProfileError } = await supabase
     .from("profiles")
-    .select("id, full_name, manager_id")
+    .select("id, full_name, manager_id, team_lead_id")
     .eq("id", parsedExpense.data.employee_id)
     .eq("org_id", orgId)
     .is("deleted_at", null)
@@ -409,7 +426,7 @@ async function loadProfilesById({
   orgId,
   profileIds
 }: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  supabase: SupabaseClientForCommentReads;
   orgId: string;
   profileIds: string[];
 }) {
@@ -497,8 +514,9 @@ export async function GET(
   }
 
   const supabase = await createSupabaseServerClient();
+  const svcClient = createSupabaseServiceRoleClient();
   const expenseContext = await loadExpenseContext({
-    supabase,
+    supabase: svcClient,
     orgId: session.profile.org_id,
     expenseId
   });
@@ -518,8 +536,16 @@ export async function GET(
   const isOwner = expense.employee_id === session.profile.id;
   const isSuperAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
   const isAdminViewer = canAdminViewExpense(session.profile.roles);
-  const isManagerOwner = employeeProfile.manager_id === session.profile.id && !isOwner;
-  const canView = isOwner || isSuperAdmin || isAdminViewer || isManagerOwner;
+  const isManagerOwner = await resolveIsOperationalApprover({
+    supabase,
+    profile: session.profile,
+    employeeProfile,
+    isOwner
+  });
+  /* Line managers keep thread READ visibility even when a separate team lead
+   * holds the operational approval authority (mirrors the RLS read scope). */
+  const isDirectManager = employeeProfile.manager_id === session.profile.id && !isOwner;
+  const canView = isOwner || isSuperAdmin || isAdminViewer || isManagerOwner || isDirectManager;
 
   if (!canView) {
     return jsonResponse<null>(403, {
@@ -567,7 +593,7 @@ export async function GET(
   }
 
   const profileResult = await loadProfilesById({
-    supabase,
+    supabase: svcClient,
     orgId: session.profile.org_id,
     profileIds: [...new Set(commentsResult.comments.map((comment) => comment.author_id))]
   });
@@ -678,8 +704,9 @@ export async function POST(
   }
 
   const supabase = await createSupabaseServerClient();
+  const svcClient = createSupabaseServiceRoleClient();
   const expenseContext = await loadExpenseContext({
-    supabase,
+    supabase: svcClient,
     orgId: session.profile.org_id,
     expenseId
   });
@@ -698,7 +725,12 @@ export async function POST(
   const { expense, employeeProfile } = expenseContext;
   const isOwner = expense.employee_id === session.profile.id;
   const isSuperAdmin = hasRole(session.profile.roles, "SUPER_ADMIN");
-  const isManagerOwner = employeeProfile.manager_id === session.profile.id && !isOwner;
+  const isManagerOwner = await resolveIsOperationalApprover({
+    supabase,
+    profile: session.profile,
+    employeeProfile,
+    isOwner
+  });
   const canRequestInfo = canRequestExpenseInfo({
     roles: session.profile.roles,
     isOwner,
@@ -900,7 +932,9 @@ export async function POST(
     }
   });
 
-  const directManagerId = employeeProfile.manager_id;
+  /* The FYI goes to whoever operationally leads the employee — the team lead
+   * when one is set, the line manager otherwise. */
+  const operationalLeadId = employeeProfile.team_lead_id ?? employeeProfile.manager_id;
   const isFinanceStageRequester =
     parsedRequest.payload.action === "request_info" &&
     FINANCE_THREAD_STATUSES.has(expense.status) &&
@@ -922,13 +956,13 @@ export async function POST(
 
     if (
       isFinanceStageRequester &&
-      directManagerId &&
-      directManagerId !== session.profile.id &&
-      directManagerId !== expense.employee_id
+      operationalLeadId &&
+      operationalLeadId !== session.profile.id &&
+      operationalLeadId !== expense.employee_id
     ) {
       await createNotification({
         orgId: session.profile.org_id,
-        userId: directManagerId,
+        userId: operationalLeadId,
         type: "expense_status",
         title: "Finance requested more info on an approved expense",
         body: `${session.profile.full_name} requested more details from ${employeeProfile.full_name}.`,
@@ -972,13 +1006,13 @@ export async function POST(
     }
 
     if (
-      directManagerId &&
-      directManagerId !== session.profile.id &&
-      directManagerId !== requestOwnerId
+      operationalLeadId &&
+      operationalLeadId !== session.profile.id &&
+      operationalLeadId !== requestOwnerId
     ) {
       await createNotification({
         orgId: session.profile.org_id,
-        userId: directManagerId,
+        userId: operationalLeadId,
         type: "expense_status",
         title: "Expense clarification updated",
         body: `${session.profile.full_name} responded to a finance clarification request.`,

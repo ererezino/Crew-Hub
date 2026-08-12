@@ -766,28 +766,57 @@ export async function PATCH(
   }
 
   if (normalizedAction === "approve" && updatedExpense.status === "manager_approved") {
-    const financeAdminUserIds = await listFinanceAdminIds({
-      supabase: svcClient,
-      orgId: session.profile.org_id
-    });
+    if (updatedExpense.requiresAdditionalApproval) {
+      /* Routed to the additional stage: the named approver is the one with
+       * work to do — notify THEM, not finance (the expense is not ready for
+       * payment yet; finance is notified by the additional_approve path). */
+      await createNotification({
+        orgId: session.profile.org_id,
+        userId: updatedExpense.employeeId,
+        type: "expense_status",
+        title: "Expense manager-approved",
+        body: `Your expense was approved by your manager and is pending additional approval.`,
+        link: "/expenses"
+      });
 
-    await createNotification({
-      orgId: session.profile.org_id,
-      userId: updatedExpense.employeeId,
-      type: "expense_status",
-      title: "Expense manager-approved",
-      body: `Your expense was approved by your manager and is pending finance payment confirmation.`,
-      link: "/expenses"
-    });
+      if (
+        updatedExpense.additionalApproverId &&
+        updatedExpense.additionalApproverId !== updatedExpense.employeeId &&
+        updatedExpense.additionalApproverId !== session.profile.id
+      ) {
+        await createNotification({
+          orgId: session.profile.org_id,
+          userId: updatedExpense.additionalApproverId,
+          type: "expense_status",
+          title: "Expense needs your additional approval",
+          body: `${updatedExpense.employeeName}'s expense was manager-approved and is waiting on your additional approval.`,
+          link: "/approvals?tab=expenses"
+        });
+      }
+    } else {
+      const financeAdminUserIds = await listFinanceAdminIds({
+        supabase: svcClient,
+        orgId: session.profile.org_id
+      });
 
-    await createBulkNotifications({
-      orgId: session.profile.org_id,
-      userIds: financeAdminUserIds.filter((userId) => userId !== updatedExpense.employeeId),
-      type: "expense_status",
-      title: "Expense ready for payment confirmation",
-      body: `${updatedExpense.employeeName}'s expense was approved by a manager and is ready for finance payment confirmation.`,
-      link: "/expenses/approvals"
-    });
+      await createNotification({
+        orgId: session.profile.org_id,
+        userId: updatedExpense.employeeId,
+        type: "expense_status",
+        title: "Expense manager-approved",
+        body: `Your expense was approved by your manager and is pending finance payment confirmation.`,
+        link: "/expenses"
+      });
+
+      await createBulkNotifications({
+        orgId: session.profile.org_id,
+        userIds: financeAdminUserIds.filter((userId) => userId !== updatedExpense.employeeId),
+        type: "expense_status",
+        title: "Expense ready for payment confirmation",
+        body: `${updatedExpense.employeeName}'s expense was approved by a manager and is ready for finance payment confirmation.`,
+        link: "/expenses/approvals"
+      });
+    }
 
     // Fire-and-forget email notification for expense approval
     sendExpenseApprovedEmail({
