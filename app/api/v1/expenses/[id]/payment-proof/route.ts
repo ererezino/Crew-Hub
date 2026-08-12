@@ -121,8 +121,9 @@ export async function GET(
 /**
  * POST /api/v1/expenses/[id]/payment-proof
  *
- * Upload a payment proof receipt file. Only finance admins and super admins
- * can upload payment proof for expenses in manager_approved or reimbursed status.
+ * Upload a payment proof receipt file. Only finance roles (Finance Admin,
+ * Finance Approver) and super admins can upload payment proof for expenses
+ * in manager_approved or reimbursed status.
  */
 export async function POST(
   request: Request,
@@ -150,7 +151,7 @@ export async function POST(
       data: null,
       error: {
         code: "FORBIDDEN",
-        message: "Only Finance Admin or Super Admin can upload payment proof."
+        message: "Only Finance Admin, Finance Approver, or Super Admin can upload payment proof."
       },
       meta: buildMeta()
     });
