@@ -172,8 +172,37 @@ create table public.audit_log (
 create table public.expenses (
   id uuid primary key default gen_random_uuid(),
   org_id uuid not null,
+  employee_id uuid,
   status text not null,
-  receipt_file_path text
+  receipt_file_path text,
+  deleted_at timestamptz
+);
+
+create table public.expense_comments (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  expense_id uuid not null,
+  author_id uuid not null,
+  message text default '',
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
+create table public.expense_comment_attachments (
+  id uuid primary key default gen_random_uuid(),
+  org_id uuid not null,
+  comment_id uuid not null,
+  file_path text not null,
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
+);
+
+-- Supabase storage catalog, only what bucket policies reference.
+create schema if not exists storage;
+create table storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text not null,
+  name text not null
 );
 
 create table public.expense_attachments (
