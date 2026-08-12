@@ -416,6 +416,34 @@ export async function getEffectiveApproverScope({
   return { directReportIds, delegatedReportIds, coveringFor };
 }
 
+/**
+ * True when `userId` is `employeeId`'s effective approver for `scope`: their
+ * operational lead (team_lead_id, falling back to manager_id) or an active
+ * delegate covering that lead. This is THE authorization question for
+ * manager-stage actions on someone's request — routes must ask it instead of
+ * comparing `manager_id` directly, which silently excludes team-lead links
+ * and delegates the product otherwise admits.
+ */
+export async function isEffectiveApproverFor({
+  supabase,
+  orgId,
+  userId,
+  employeeId,
+  scope
+}: {
+  supabase: SupabaseClient;
+  orgId: string;
+  userId: string;
+  employeeId: string;
+  scope: DelegateScope;
+}): Promise<boolean> {
+  const approverScope = await getEffectiveApproverScope({ supabase, orgId, userId, scope });
+  return (
+    approverScope.directReportIds.includes(employeeId) ||
+    approverScope.delegatedReportIds.includes(employeeId)
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Delegation context resolution (for audit trail)
 // ---------------------------------------------------------------------------

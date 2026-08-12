@@ -147,6 +147,43 @@ export function canReimburseExpenses(roles: readonly UserRole[]): boolean {
   return canFinanceApproveExpenses(roles);
 }
 
+const COMMENTABLE_EXPENSE_STATUSES = new Set(["pending", "manager_approved", "approved"]);
+const FINANCE_THREAD_STATUSES = new Set(["manager_approved", "approved"]);
+
+/**
+ * Who may open an info-request thread on an expense at its current status.
+ * `isManagerOwner` must be the OPERATIONAL answer (team lead / manager
+ * fallback / active delegate — see resolveIsOperationalApprover in the
+ * comments route), not a raw manager_id comparison.
+ */
+export function canRequestExpenseInfo({
+  roles,
+  isOwner,
+  isSuperAdmin,
+  isManagerOwner,
+  status
+}: {
+  roles: readonly UserRole[];
+  isOwner: boolean;
+  isSuperAdmin: boolean;
+  isManagerOwner: boolean;
+  status: string;
+}): boolean {
+  if (isOwner || !COMMENTABLE_EXPENSE_STATUSES.has(status)) {
+    return false;
+  }
+
+  if (status === "pending") {
+    return isSuperAdmin || isManagerOwner;
+  }
+
+  if (FINANCE_THREAD_STATUSES.has(status)) {
+    return isSuperAdmin || hasRole(roles, "FINANCE_ADMIN") || hasRole(roles, "FINANCE_APPROVER");
+  }
+
+  return false;
+}
+
 export function isExpenseAdmin(roles: readonly UserRole[]): boolean {
   return (
     hasRole(roles, "HR_ADMIN") ||

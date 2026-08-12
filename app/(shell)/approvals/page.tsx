@@ -23,8 +23,27 @@ function resolveRequestedTab(searchParams: Record<string, string | string[] | un
 }
 
 export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps) {
-  const { allowed, profile } = await checkPageAccess("/approvals");
+  const pageAccess = await checkPageAccess("/approvals");
+  const profile = pageAccess.profile;
+  let allowed = pageAccess.allowed;
   const tNav = await getTranslations('nav');
+
+  /* Server-fetch approval counts up front: they seed the tab badges AND
+   * decide access for employees who hold no approvals-granting role but are
+   * named as the additional approver on routed expenses — the only people
+   * who can move those expenses. */
+  let initialCountsData;
+  if (profile) {
+    try {
+      initialCountsData = await fetchApprovalsCountsData(profile);
+    } catch {
+      // Graceful degradation: client will fetch on mount
+    }
+  }
+
+  if (!allowed && (initialCountsData?.additionalExpenses ?? 0) > 0) {
+    allowed = true;
+  }
 
   if (!profile) {
     const t = await getTranslations('common');
@@ -70,20 +89,11 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
     hasRole(roles, "MANAGER") ||
     hasRole(roles, "FINANCE_ADMIN") ||
     hasRole(roles, "FINANCE_APPROVER") ||
-    hasRole(roles, "SUPER_ADMIN");
+    hasRole(roles, "SUPER_ADMIN") ||
+    (initialCountsData?.additionalExpenses ?? 0) > 0;
 
   const resolvedSearchParams = await searchParams;
   const requestedTab = resolveRequestedTab(resolvedSearchParams);
-
-  // Server-fetch approval counts so tab badges render in the initial HTML.
-  // If the fetch fails, render without initialData — the client will retry via API.
-  let initialCountsData;
-
-  try {
-    initialCountsData = await fetchApprovalsCountsData(profile);
-  } catch {
-    // Graceful degradation: client will fetch on mount
-  }
 
   return (
     <ApprovalsClient

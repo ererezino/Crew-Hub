@@ -212,7 +212,11 @@ export function ApprovalsClient({
         {activeTab === "expenses" ? (
           <ExpenseApprovalsClient
             canManagerApprove={canManagerApproveExpenses}
-            canAdditionalApprove={canManagerApproveExpenses || canFinanceApproveExpenses}
+            canAdditionalApprove={
+              canManagerApproveExpenses ||
+              canFinanceApproveExpenses ||
+              additionalExpensesCount > 0
+            }
             canFinanceApprove={canFinanceApproveExpenses}
             managerCount={managerExpensesCount}
             additionalCount={additionalExpensesCount}

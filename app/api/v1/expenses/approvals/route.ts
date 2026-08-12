@@ -12,6 +12,7 @@ import { logger } from "../../../../../lib/logger";
 import { sendExpenseDisbursedEmail } from "../../../../../lib/notifications/email";
 import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
 import { addCurrencyAmount, currentMonthKey, isIsoMonth, monthDateRange, parseIntegerAmount } from "../../../../../lib/expenses";
+import { countAdditionalExpenses } from "../../../../../lib/approvals/fetch-approvals-counts";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
@@ -69,13 +70,24 @@ function stageLabel(stage: ExpenseApprovalStage): string {
 function resolveStage({
   requestedStage,
   canManagerApprove,
-  canFinanceApprove
+  canFinanceApprove,
+  isNamedAdditionalApprover = false
 }: {
   requestedStage: ExpenseApprovalStage | undefined;
   canManagerApprove: boolean;
   canFinanceApprove: boolean;
+  /** Named on ≥1 routed expense — may open the additional queue with no other role. */
+  isNamedAdditionalApprover?: boolean;
 }): ExpenseApprovalStage | null {
-  const stage = requestedStage ?? (canManagerApprove ? "manager" : canFinanceApprove ? "finance" : null);
+  const stage =
+    requestedStage ??
+    (canManagerApprove
+      ? "manager"
+      : canFinanceApprove
+        ? "finance"
+        : isNamedAdditionalApprover
+          ? "additional"
+          : null);
 
   if (!stage) {
     return null;
@@ -169,16 +181,31 @@ export async function GET(request: Request) {
   const profile = session.profile;
   const canManagerApprove = canManagerApproveExpenses(profile.roles);
   const canFinanceApprove = canFinanceApproveExpenses(profile.roles);
+  const svcClient = createSupabaseServiceRoleClient();
 
+  /* Routing rules can name ANY employee as an additional approver
+   * (approver_type = specific_person). Someone with no manager/finance role
+   * can still be the only person able to move those expenses — they must be
+   * able to open their queue. */
+  let isNamedAdditionalApprover = false;
   if (!canManagerApprove && !canFinanceApprove) {
-    return jsonResponse<null>(403, {
-      data: null,
-      error: {
-        code: "FORBIDDEN",
-        message: "You are not allowed to view expense approvals."
-      },
-      meta: buildMeta()
+    const namedCount = await countAdditionalExpenses({
+      supabase: svcClient,
+      orgId: profile.org_id,
+      userId: profile.id
     });
+    isNamedAdditionalApprover = namedCount > 0;
+
+    if (!isNamedAdditionalApprover) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "You are not allowed to view expense approvals."
+        },
+        meta: buildMeta()
+      });
+    }
   }
 
   const requestUrl = new URL(request.url);
@@ -201,7 +228,8 @@ export async function GET(request: Request) {
   const stage = resolveStage({
     requestedStage: query.stage,
     canManagerApprove,
-    canFinanceApprove
+    canFinanceApprove,
+    isNamedAdditionalApprover
   });
 
   if (!stage) {
@@ -216,7 +244,6 @@ export async function GET(request: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const svcClient = createSupabaseServiceRoleClient();
   const isSuperAdmin = hasRole(profile.roles, "SUPER_ADMIN");
 
   let allowedEmployeeIds: string[] = [];
@@ -434,14 +461,24 @@ export async function POST(request: Request) {
   const canFinanceApprove = canFinanceApproveExpenses(profile.roles);
 
   if (!canManagerApprove && !canFinanceApprove) {
-    return jsonResponse<null>(403, {
-      data: null,
-      error: {
-        code: "FORBIDDEN",
-        message: "You are not allowed to bulk approve expenses."
-      },
-      meta: buildMeta()
+    /* Named additional approvers may bulk-process their own queue; the
+     * per-expense filter below still restricts rows to ones naming them. */
+    const namedCount = await countAdditionalExpenses({
+      supabase: createSupabaseServiceRoleClient(),
+      orgId: profile.org_id,
+      userId: profile.id
     });
+
+    if (namedCount === 0) {
+      return jsonResponse<null>(403, {
+        data: null,
+        error: {
+          code: "FORBIDDEN",
+          message: "You are not allowed to bulk approve expenses."
+        },
+        meta: buildMeta()
+      });
+    }
   }
 
   let body: unknown;

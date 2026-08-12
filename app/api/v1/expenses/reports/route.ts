@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getAuthenticatedSession } from "../../../../../lib/auth/session";
+import { getEffectiveApproverScope } from "../../../../../lib/delegation";
 import {
   getExpenseStatusLabel,
   currentMonthKey,
@@ -9,7 +10,7 @@ import {
   monthDateRange,
   partitionByPrimaryCurrency
 } from "../../../../../lib/expenses";
-import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type { ExpenseReportsResponseData, ExpenseStatus } from "../../../../../types/expenses";
 import {
   buildMeta,
@@ -47,33 +48,6 @@ function csvEscape(value: string | number): string {
 function formatDateForCsv(isoDate: string): string {
   const date = new Date(`${isoDate}T00:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? isoDate : date.toISOString().slice(0, 10);
-}
-
-async function listManagerScopeIds({
-  supabase,
-  orgId,
-  managerId
-}: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
-  orgId: string;
-  managerId: string;
-}): Promise<string[]> {
-  const { data: reports, error } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("org_id", orgId)
-    .eq("manager_id", managerId)
-    .is("deleted_at", null);
-
-  if (error || !reports) {
-    return [managerId];
-  }
-
-  const ids = reports
-    .map((row) => row.id)
-    .filter((value): value is string => typeof value === "string");
-
-  return [managerId, ...ids];
 }
 
 export async function GET(request: Request) {
@@ -132,20 +106,32 @@ export async function GET(request: Request) {
     });
   }
 
-  const supabase = await createSupabaseServerClient();
+  /* Reads run service-role: the roster is scoped explicitly below, and the
+   * gate above already decided WHO may call. User-scoped reads silently
+   * dropped delegated principals' reports (no delegation clause in RLS) and
+   * returned self-only data for TEAM_LEAD callers. */
+  const svcClient = createSupabaseServiceRoleClient();
   const adminScope = isExpenseAdmin(session.profile.roles);
 
   let scopedEmployeeIds: string[] = [];
 
   if (!adminScope) {
-    scopedEmployeeIds = await listManagerScopeIds({
-      supabase,
+    /* Same resolver the approvals queue uses: operational reports
+     * (team_lead_id, manager_id fallback) plus active delegations. */
+    const approverScope = await getEffectiveApproverScope({
+      supabase: svcClient,
       orgId: session.profile.org_id,
-      managerId: session.profile.id
+      userId: session.profile.id,
+      scope: "expense"
     });
+    scopedEmployeeIds = [
+      session.profile.id,
+      ...approverScope.directReportIds,
+      ...approverScope.delegatedReportIds
+    ];
   }
 
-  let expensesQuery = supabase
+  let expensesQuery = svcClient
     .from("expenses")
     .select(expenseSelectColumns)
     .eq("org_id", session.profile.org_id)
@@ -265,7 +251,7 @@ export async function GET(request: Request) {
   }
 
   const profileIds = collectProfileIds(parsedExpenses.data);
-  const { data: rawProfiles, error: profilesError } = await supabase
+  const { data: rawProfiles, error: profilesError } = await svcClient
     .from("profiles")
     .select("id, full_name, department, country_code, manager_id")
     .eq("org_id", session.profile.org_id)
