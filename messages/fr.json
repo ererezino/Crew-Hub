@@ -1548,6 +1548,7 @@
     "allStatuses": "Tous les statuts",
     "allCategories": "Toutes les catégories",
     "showingMonth": "Affichage des données de dépenses pour {month}.",
+    "excludedCurrenciesNote": "Les montants sont affichés en {currency}. {count, plural, one {# dépense dans une autre devise ({currencies}) n’est pas incluse} other {# dépenses dans d’autres devises ({currencies}) ne sont pas incluses}} dans ces chiffres — utilisez l’export CSV pour la liste complète.",
     "unavailable": "Les rapports de dépenses sont indisponibles",
     "totalSubmitted": "Total soumis",
     "expenses": "dépenses",
