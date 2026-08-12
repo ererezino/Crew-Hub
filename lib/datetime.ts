@@ -29,6 +29,23 @@ export function todayIsoDate(): string {
   return toIsoDate(new Date());
 }
 
+/**
+ * Today's date (YYYY-MM-DD) on the USER'S local calendar, not UTC.
+ *
+ * Client-only: use for user-facing "today" defaults (e.g. pre-filling a date
+ * input). For a UTC+1..+3 user between local midnight and UTC midnight,
+ * todayIsoDate() still returns yesterday's date — this returns the day the
+ * user actually sees on their wall clock. Server code must keep using
+ * todayIsoDate(): the server's local zone is meaningless to the end user.
+ */
+export function todayIsoDateLocal(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function nowIsoTimestamp(): string {
   return new Date().toISOString();
 }

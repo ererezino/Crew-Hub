@@ -301,6 +301,21 @@ export function currentMonthKey(now: Date = new Date()): string {
   return `${year}-${month}`;
 }
 
+/**
+ * Current month key (YYYY-MM) on the USER'S local calendar, not UTC.
+ *
+ * Client-only: use for user-facing month defaults (month pickers). On the 1st
+ * of a month before UTC midnight, currentMonthKey() still returns the previous
+ * month for UTC+ users — this returns the month on their wall clock. Server
+ * code (API month fallbacks, the /expenses initial server fetch, CSV export,
+ * cron aggregations) must keep using currentMonthKey().
+ */
+export function currentMonthKeyLocal(now: Date = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
 export function formatMonthLabel(month: string, locale?: string): string {
   const range = monthDateRange(month);
 

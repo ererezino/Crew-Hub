@@ -41,11 +41,11 @@ import {
   formatDateTimeTooltip,
   formatRelativeTime,
   formatSingleDateHuman,
-  todayIsoDate
+  todayIsoDateLocal
 } from "../../../lib/datetime";
 import {
   ALLOWED_RECEIPT_EXTENSIONS,
-  currentMonthKey,
+  currentMonthKeyLocal,
   EXPENSE_CATEGORY_GUIDANCE,
   formatMonthLabel,
   getExpenseCategoryLabel,
@@ -154,7 +154,7 @@ const INITIAL_FORM_VALUES: ExpenseFormValues = {
   customCategory: "",
   description: "",
   amount: "",
-  expenseDate: todayIsoDate(),
+  expenseDate: todayIsoDateLocal(),
   currency: "USD",
   vendorName: "",
   vendorPaymentMethod: "bank_transfer",
@@ -891,7 +891,13 @@ export function ExpensesClient({
   const locale = useLocale() as AppLocale;
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 
-  const [month, setMonth] = useState(currentMonthKey());
+  /* Default to the user's LOCAL month, not UTC: on the 1st before UTC
+   * midnight, UTC+ users would otherwise land on the previous month. The
+   * server page still fetches initialData for the UTC month; during the brief
+   * window where local month ≠ UTC month, resolveInitialExpensesData (in
+   * hooks/use-expenses.ts) sees the month mismatch, skips the seed, and the
+   * client simply fetches the local month — correct, just unseeded. */
+  const [month, setMonth] = useState(currentMonthKeyLocal());
   const expensesQuery = useExpenses({ month, initialData: initialExpensesData });
   const queryClient = useQueryClient();
 
@@ -1046,7 +1052,7 @@ export function ExpensesClient({
     setIsPanelOpen(true);
     setFormValues({
       ...INITIAL_FORM_VALUES,
-      expenseDate: todayIsoDate()
+      expenseDate: todayIsoDateLocal()
     });
     setSelectedVendorId("");
     setFormTouched(INITIAL_TOUCHED);
@@ -1778,7 +1784,7 @@ export function ExpensesClient({
               className="form-input numeric"
               type="month"
               value={month}
-              onChange={(event) => setMonth(event.currentTarget.value || currentMonthKey())}
+              onChange={(event) => setMonth(event.currentTarget.value || currentMonthKeyLocal())}
             />
           </label>
           <p className="settings-card-description">
@@ -1943,9 +1949,12 @@ export function ExpensesClient({
                       <Fragment key={expense.id}>
                         <tr className="data-table-row">
                           <td>
+                            {/* expenseDate is date-only: a datetime tooltip would
+                                fabricate a local-tz time (or the previous day), so
+                                pin the title to the UTC date formatter. */}
                             <time
                               dateTime={expense.expenseDate}
-                              title={formatDateTimeTooltip(expense.expenseDate, locale)}
+                              title={formatSingleDateHuman(expense.expenseDate, locale)}
                             >
                               {formatSingleDateHuman(expense.expenseDate, locale)}
                             </time>
