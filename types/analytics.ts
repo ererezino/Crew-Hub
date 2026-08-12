@@ -180,8 +180,11 @@ export type AnalyticsExpensesSection = {
     avgProcessingDays: number;
     approvedAmount: number;
     expenseCount: number;
+    /** Currency every amount in this section is denominated in (dominant by row count). */
     currency: string;
   };
+  /** Rows in other currencies, excluded from the aggregation — surfaced, never silent. */
+  excludedCurrencies: Array<{ currency: string; count: number }>;
   byCategory: AnalyticsExpensesCategoryRow[];
   trend: AnalyticsExpensesTrendRow[];
   topSpenders: AnalyticsExpensesTopSpenderRow[];

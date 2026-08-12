@@ -718,6 +718,20 @@ function AnalyticsContent({ userRoles }: { userRoles: readonly UserRole[] }) {
               exportingLabel={t('exporting')}
               exportCsvLabel={t('exportCsv')}
             />
+            {data.expenses.excludedCurrencies.length > 0 ? (
+              <p className="expenses-report-currency-note" role="note">
+                {t('excludedCurrenciesNote', {
+                  currency: data.expenses.metrics.currency,
+                  count: data.expenses.excludedCurrencies.reduce(
+                    (sum, entry) => sum + entry.count,
+                    0
+                  ),
+                  currencies: data.expenses.excludedCurrencies
+                    .map((entry) => entry.currency)
+                    .join(", ")
+                })}
+              </p>
+            ) : null}
             <section className="analytics-metric-grid">
               <article className="metric-card">
                 <p className="metric-label">{t('totalSubmitted')}</p>

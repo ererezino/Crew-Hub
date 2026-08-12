@@ -98,6 +98,12 @@ describe("partitionByPrimaryCurrency", () => {
     expect(result.excludedCurrencies).toEqual([]);
   });
 
+  it("breaks count ties deterministically (lexicographic code), never by row order", () => {
+    expect(partitionByPrimaryCurrency([{ currency: "USD" }, { currency: "KES" }]).primaryCurrency).toBe("KES");
+    expect(partitionByPrimaryCurrency([{ currency: "KES" }, { currency: "USD" }]).primaryCurrency).toBe("KES");
+    expect(partitionByPrimaryCurrency([{ currency: "NGN" }, { currency: "GHS" }]).primaryCurrency).toBe("GHS");
+  });
+
   it("treats an empty currency code as USD", () => {
     const result = partitionByPrimaryCurrency([
       { currency: "" },

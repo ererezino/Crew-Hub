@@ -2746,6 +2746,7 @@
     "expensesDescription": "Expense submissions, reimbursements, and processing efficiency.",
     "totalSubmitted": "Total submitted",
     "totalSubmittedHint": "All expenses in range",
+    "excludedCurrenciesNote": "Expense figures are shown in {currency}. {count, plural, one {# expense in another currency ({currencies}) is} other {# expenses in other currencies ({currencies}) are}} not included.",
     "totalReimbursed": "Total reimbursed",
     "totalReimbursedHint": "Reimbursed in range",
     "pendingReimbursement": "Pending reimbursement",
