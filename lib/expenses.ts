@@ -294,7 +294,9 @@ export function partitionByPrimaryCurrency<T extends { currency: string }>(
   let primaryCurrency = "USD";
   let maxCount = 0;
   for (const [code, count] of counts) {
-    if (count > maxCount) {
+    /* Deterministic on ties (lexicographic code): row order from the DB is
+     * unspecified, and the dominant currency must not flip between loads. */
+    if (count > maxCount || (count === maxCount && maxCount > 0 && code < primaryCurrency)) {
       maxCount = count;
       primaryCurrency = code;
     }

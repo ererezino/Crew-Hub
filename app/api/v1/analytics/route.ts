@@ -6,6 +6,11 @@ import { normalizeUserRoles, type UserRole } from "../../../../lib/navigation";
 import { checkApiAccess } from "../../../../lib/auth/check-api-access";
 import { hasRole } from "../../../../lib/roles";
 import { createSupabaseServiceRoleClient } from "../../../../lib/supabase/service-role";
+import {
+  buildExpensesAnalytics,
+  type AnalyticsExpenseProfile,
+  type AnalyticsExpenseSourceRow
+} from "../../../../lib/analytics/expenses-section";
 import type { ApiResponse } from "../../../../types/auth";
 import type {
   AnalyticsCsvSection,
@@ -260,53 +265,6 @@ function normalizePayroll(value: unknown): Omit<AnalyticsPayrollSection, "compen
       };
     }),
     compensationBands: { belowMidpoint: 0, atMidpoint: 0, aboveMidpoint: 0 }
-  };
-}
-
-function normalizeExpenses(value: unknown): AnalyticsExpensesSection {
-  const source = asRecord(value);
-  const metrics = asRecord(source.metrics);
-
-  return {
-    metrics: {
-      totalAmount: Math.trunc(toNumber(metrics.totalAmount)),
-      reimbursedAmount: 0,
-      pendingAmount: Math.trunc(toNumber(metrics.pendingAmount)),
-      avgProcessingDays: 0,
-      approvedAmount: Math.trunc(toNumber(metrics.approvedAmount)),
-      expenseCount: Math.trunc(toNumber(metrics.expenseCount)),
-      currency: "USD"
-    },
-    byCategory: asArray(source.byCategory).map((rowValue) => {
-      const row = asRecord(rowValue);
-
-      return {
-        key: toStringValue(row.key, "other"),
-        totalAmount: Math.trunc(toNumber(row.totalAmount)),
-        expenseCount: Math.trunc(toNumber(row.expenseCount))
-      };
-    }),
-    trend: asArray(source.trend).map((rowValue) => {
-      const row = asRecord(rowValue);
-
-      return {
-        month: toStringValue(row.month, "--"),
-        totalAmount: Math.trunc(toNumber(row.totalAmount)),
-        expenseCount: Math.trunc(toNumber(row.expenseCount))
-      };
-    }),
-    topSpenders: asArray(source.topSpenders).map((rowValue) => {
-      const row = asRecord(rowValue);
-
-      return {
-        employeeId: toStringValue(row.employeeId, ""),
-        fullName: toStringValue(row.fullName, "Unknown user"),
-        department: toStringValue(row.department, "No department"),
-        countryCode: toStringValue(row.countryCode, "--"),
-        totalAmount: Math.trunc(toNumber(row.totalAmount)),
-        expenseCount: Math.trunc(toNumber(row.expenseCount))
-      };
-    })
   };
 }
 
@@ -814,25 +772,62 @@ async function queryPayrollEnhanced(ctx: EnhancedQueryCtx) {
 async function queryExpensesEnhanced(ctx: EnhancedQueryCtx) {
   const { supabase, orgId, startDate, endDate } = ctx;
 
-  // Reimbursed amount
-  let reimbursedQuery = supabase
+  /* One fetch feeds the whole expenses section. Like the analytics_expenses
+   * RPC this replaces, it is scoped by org + date range only (the RPC never
+   * saw country/department filters); unlike the RPC, aggregation happens in
+   * buildExpensesAnalytics so mixed currencies are partitioned instead of
+   * summed into one meaningless figure. */
+  const { data: expenseRows } = await supabase
     .from("expenses")
-    .select("amount, currency")
+    .select("amount, currency, status, category, expense_date, employee_id")
     .eq("org_id", orgId)
-    .eq("status", "reimbursed")
+    .is("deleted_at", null)
     .gte("expense_date", startDate)
     .lte("expense_date", endDate);
 
-  if (ctx.countryFilter) {
-    reimbursedQuery = reimbursedQuery.eq("country_code", ctx.countryFilter);
+  const sourceRows: AnalyticsExpenseSourceRow[] = (expenseRows ?? []).map((row) => ({
+    amount: Math.trunc(toNumber((row as Record<string, unknown>).amount)),
+    currency: toStringValue((row as Record<string, unknown>).currency, "USD"),
+    status: toStringValue((row as Record<string, unknown>).status, "unknown"),
+    category: toStringValue((row as Record<string, unknown>).category, "other"),
+    expense_date: toStringValue((row as Record<string, unknown>).expense_date, ""),
+    employee_id: toStringValue((row as Record<string, unknown>).employee_id, "")
+  }));
+
+  const employeeIds = [...new Set(sourceRows.map((row) => row.employee_id).filter(Boolean))];
+  const profileById = new Map<string, AnalyticsExpenseProfile>();
+
+  if (employeeIds.length > 0) {
+    const { data: profileRows } = await supabase
+      .from("profiles")
+      .select("id, full_name, department, country_code")
+      .eq("org_id", orgId)
+      .is("deleted_at", null)
+      .in("id", employeeIds);
+
+    for (const row of profileRows ?? []) {
+      const record = row as Record<string, unknown>;
+      const id = toStringValue(record.id, "");
+      if (id) {
+        profileById.set(id, {
+          id,
+          full_name: toStringValue(record.full_name, "Unknown user"),
+          department: typeof record.department === "string" ? record.department : null,
+          country_code: typeof record.country_code === "string" ? record.country_code : null
+        });
+      }
+    }
   }
 
-  const { data: reimbursedData } = await reimbursedQuery;
-  const reimbursedAmount = reimbursedData
-    ? reimbursedData.reduce((sum, row) => sum + Math.trunc(toNumber(row.amount)), 0)
-    : 0;
+  const aggregation = buildExpensesAnalytics({
+    rows: sourceRows,
+    profileById,
+    startDate,
+    endDate
+  });
 
-  // Average processing time (submitted → reimbursed, in days)
+  // Average processing time (submitted → reimbursed, in days) — a time
+  // metric, deliberately measured over ALL currencies.
   const { data: processingData } = await supabase
     .from("expenses")
     .select("created_at, reimbursed_at")
@@ -854,24 +849,7 @@ async function queryExpensesEnhanced(ctx: EnhancedQueryCtx) {
     avgProcessingDays = Math.round((totalDays / processingData.length) * 10) / 10;
   }
 
-  // Derive primary currency from expenses
-  const expenseCurrencyCounts = new Map<string, number>();
-  if (reimbursedData) {
-    for (const row of reimbursedData) {
-      const cur = (row as unknown as { currency: string | null }).currency;
-      if (cur) expenseCurrencyCounts.set(cur, (expenseCurrencyCounts.get(cur) ?? 0) + 1);
-    }
-  }
-  let expenseCurrency = "USD";
-  let maxExpenseCurrencyCount = 0;
-  for (const [code, count] of expenseCurrencyCounts) {
-    if (count > maxExpenseCurrencyCount) {
-      maxExpenseCurrencyCount = count;
-      expenseCurrency = code;
-    }
-  }
-
-  return { reimbursedAmount, avgProcessingDays, currency: expenseCurrency };
+  return { aggregation, avgProcessingDays };
 }
 
 async function queryPipeline(ctx: EnhancedQueryCtx): Promise<AnalyticsPipelineSection> {
@@ -1098,7 +1076,6 @@ export async function GET(request: Request) {
     peopleResult,
     timeOffResult,
     payrollResult,
-    expensesResult,
     enhancedPeople,
     enhancedLeave,
     enhancedPayroll,
@@ -1109,7 +1086,6 @@ export async function GET(request: Request) {
     supabase.rpc("analytics_people", rpcPayload),
     supabase.rpc("analytics_time_off", rpcPayload),
     supabase.rpc("analytics_payroll", rpcPayload),
-    supabase.rpc("analytics_expenses", rpcPayload),
     queryDeparturesAndTenure(ctx),
     queryLeaveEnhanced(ctx),
     queryPayrollEnhanced(ctx),
@@ -1121,8 +1097,7 @@ export async function GET(request: Request) {
   const rpcError =
     peopleResult.error ??
     timeOffResult.error ??
-    payrollResult.error ??
-    expensesResult.error;
+    payrollResult.error;
 
   if (rpcError) {
     return jsonResponse<null>(500, {
@@ -1186,15 +1161,22 @@ export async function GET(request: Request) {
     compensationBands: enhancedPayroll.compensationBands
   };
 
-  // Build expenses section
+  // Build expenses section — dominant-currency aggregation with explicit
+  // exclusions (see buildExpensesAnalytics).
   const expenses: AnalyticsExpensesSection = {
-    ...normalizeExpenses(expensesResult.data),
     metrics: {
-      ...normalizeExpenses(expensesResult.data).metrics,
-      reimbursedAmount: enhancedExpenses.reimbursedAmount,
+      totalAmount: enhancedExpenses.aggregation.metrics.totalAmount,
+      reimbursedAmount: enhancedExpenses.aggregation.metrics.reimbursedAmount,
+      pendingAmount: enhancedExpenses.aggregation.metrics.pendingAmount,
+      approvedAmount: enhancedExpenses.aggregation.metrics.approvedAmount,
+      expenseCount: enhancedExpenses.aggregation.metrics.expenseCount,
       avgProcessingDays: enhancedExpenses.avgProcessingDays,
-      currency: enhancedExpenses.currency
-    }
+      currency: enhancedExpenses.aggregation.primaryCurrency
+    },
+    excludedCurrencies: enhancedExpenses.aggregation.excludedCurrencies,
+    byCategory: enhancedExpenses.aggregation.byCategory,
+    trend: enhancedExpenses.aggregation.trend,
+    topSpenders: enhancedExpenses.aggregation.topSpenders
   };
 
   const responseData: AnalyticsResponseData = {

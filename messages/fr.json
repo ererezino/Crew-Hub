@@ -2868,6 +2868,7 @@
     "expensesDescription": "Soumissions de dépenses, remboursements et efficacité du traitement.",
     "totalSubmitted": "Total soumis",
     "totalSubmittedHint": "Toutes les dépenses de la période",
+    "excludedCurrenciesNote": "Les chiffres des dépenses sont affichés en {currency}. {count, plural, one {# dépense dans une autre devise ({currencies}) n’est pas incluse} other {# dépenses dans d’autres devises ({currencies}) ne sont pas incluses}}.",
     "totalReimbursed": "Total remboursé",
     "totalReimbursedHint": "Remboursé dans la période",
     "pendingReimbursement": "Remboursement en attente",
