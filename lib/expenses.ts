@@ -1,6 +1,7 @@
 import {
   EXPENSE_CATEGORIES,
   EXPENSE_STATUSES,
+  type CurrencyAmounts,
   type ExpenseCategory,
   type ExpenseRecord,
   type ExpenseStatus,
@@ -197,25 +198,39 @@ export function parseIntegerAmount(value: number | string): number {
   return Math.trunc(parsed);
 }
 
+/**
+ * Add `amount` (minor units) to the bucket for `currency`. Amounts in
+ * different currencies are NEVER summed together — a NGN 150,000 + USD 40
+ * month must not render as one meaningless number under a single symbol.
+ */
+export function addCurrencyAmount(
+  amounts: CurrencyAmounts,
+  currency: string,
+  amount: number
+): void {
+  const code = currency || "USD";
+  amounts[code] = (amounts[code] ?? 0) + amount;
+}
+
 export function summarizeExpenses(expenses: readonly ExpenseRecord[]): ExpensesSummary {
   return expenses.reduce<ExpensesSummary>(
     (summary, expense) => {
       summary.totalCount += 1;
-      summary.totalAmount += expense.amount;
+      addCurrencyAmount(summary.totalAmountByCurrency, expense.currency, expense.amount);
 
       if (expense.status === "pending") {
         summary.pendingCount += 1;
-        summary.pendingAmount += expense.amount;
+        addCurrencyAmount(summary.pendingAmountByCurrency, expense.currency, expense.amount);
       }
 
       if (expense.status === "manager_approved") {
         summary.managerApprovedCount += 1;
-        summary.pendingAmount += expense.amount;
+        addCurrencyAmount(summary.pendingAmountByCurrency, expense.currency, expense.amount);
       }
 
       if (expense.status === "additional_approved") {
         summary.managerApprovedCount += 1;
-        summary.pendingAmount += expense.amount;
+        addCurrencyAmount(summary.pendingAmountByCurrency, expense.currency, expense.amount);
       }
 
       if (expense.status === "approved") {
@@ -224,7 +239,7 @@ export function summarizeExpenses(expenses: readonly ExpenseRecord[]): ExpensesS
 
       if (expense.status === "reimbursed") {
         summary.reimbursedCount += 1;
-        summary.reimbursedAmount += expense.amount;
+        addCurrencyAmount(summary.reimbursedAmountByCurrency, expense.currency, expense.amount);
       }
 
       if (expense.status === "rejected") {
@@ -243,18 +258,55 @@ export function summarizeExpenses(expenses: readonly ExpenseRecord[]): ExpensesS
     },
     {
       totalCount: 0,
-      totalAmount: 0,
+      totalAmountByCurrency: {},
       pendingCount: 0,
-      pendingAmount: 0,
+      pendingAmountByCurrency: {},
       approvedCount: 0,
       managerApprovedCount: 0,
       reimbursedCount: 0,
-      reimbursedAmount: 0,
+      reimbursedAmountByCurrency: {},
       rejectedCount: 0,
       financeRejectedCount: 0,
       cancelledCount: 0
     }
   );
+}
+
+/**
+ * Split rows into the dominant currency's population and an explicit summary
+ * of what that leaves out. Report-style aggregations (percentages, ranked
+ * buckets) need ONE denominator; the honest way to get it is to aggregate a
+ * single currency and say out loud how many rows were excluded.
+ */
+export function partitionByPrimaryCurrency<T extends { currency: string }>(
+  rows: readonly T[]
+): {
+  primaryCurrency: string;
+  primaryRows: T[];
+  excludedCurrencies: Array<{ currency: string; count: number }>;
+} {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const code = row.currency || "USD";
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+
+  let primaryCurrency = "USD";
+  let maxCount = 0;
+  for (const [code, count] of counts) {
+    if (count > maxCount) {
+      maxCount = count;
+      primaryCurrency = code;
+    }
+  }
+
+  const primaryRows = rows.filter((row) => (row.currency || "USD") === primaryCurrency);
+  const excludedCurrencies = [...counts.entries()]
+    .filter(([code]) => code !== primaryCurrency)
+    .map(([currency, count]) => ({ currency, count }))
+    .sort((left, right) => right.count - left.count);
+
+  return { primaryCurrency, primaryRows, excludedCurrencies };
 }
 
 export function receiptFileNameFromPath(filePath: string): string {

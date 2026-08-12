@@ -19,6 +19,7 @@ import { FileAttachmentPicker } from "../../../../components/shared/file-attachm
 import { PageHeader } from "../../../../components/shared/page-header";
 import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
+import { CurrencyAmountList } from "../../../../components/ui/currency-amount-list";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useExpenseApprovals } from "../../../../hooks/use-expenses";
 import { invalidateApprovalSurfaces } from "../../../../lib/approval-invalidation";
@@ -335,11 +336,6 @@ export function ExpenseApprovalsClient({
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [confirmApproveTarget, setConfirmApproveTarget] = useState<ExpenseRecord | null>(null);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
-
-  const queueCurrency = useMemo(() => {
-    const rows = approvalsQuery.data?.expenses ?? [];
-    return rows.length > 0 ? rows[0].currency : "USD";
-  }, [approvalsQuery.data?.expenses]);
 
   const expenses = useMemo(() => {
     const rows = approvalsQuery.data?.expenses ?? [];
@@ -1220,7 +1216,7 @@ export function ExpenseApprovalsClient({
             <article className="metric-card">
               <p className="metric-label">{t('metrics.queueAmount')}</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={approvalsQuery.data.pendingAmount} currency={queueCurrency} />
+                <CurrencyAmountList amounts={approvalsQuery.data.pendingAmountByCurrency} locale={locale} />
               </p>
               <p className="metric-hint">{t('metrics.queueAmountHint')}</p>
             </article>

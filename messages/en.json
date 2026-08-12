@@ -1426,6 +1426,7 @@
     "allStatuses": "All statuses",
     "allCategories": "All categories",
     "showingMonth": "Showing {month} expense data.",
+    "excludedCurrenciesNote": "Amounts are shown in {currency}. {count, plural, one {# expense in another currency ({currencies}) is} other {# expenses in other currencies ({currencies}) are}} not included in these figures — use the CSV export for the complete list.",
     "unavailable": "Expense reports are unavailable",
     "totalSubmitted": "Total Submitted",
     "expenses": "expenses",

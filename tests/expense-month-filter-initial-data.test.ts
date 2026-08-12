@@ -5,13 +5,13 @@ import type { ExpensesListResponseData, ExpensesSummary } from "../types/expense
 
 const emptySummary: ExpensesSummary = {
   totalCount: 0,
-  totalAmount: 0,
+  totalAmountByCurrency: {},
   pendingCount: 0,
-  pendingAmount: 0,
+  pendingAmountByCurrency: {},
   approvedCount: 0,
   managerApprovedCount: 0,
   reimbursedCount: 0,
-  reimbursedAmount: 0,
+  reimbursedAmountByCurrency: {},
   rejectedCount: 0,
   financeRejectedCount: 0,
   cancelledCount: 0

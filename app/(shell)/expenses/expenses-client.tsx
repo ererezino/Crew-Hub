@@ -22,6 +22,7 @@ import { PageHeader } from "../../../components/shared/page-header";
 import { SlidePanel } from "../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../components/shared/status-badge";
 import { FileAttachmentPicker } from "../../../components/shared/file-attachment-picker";
+import { CurrencyAmountList } from "../../../components/ui/currency-amount-list";
 import { CurrencyDisplay } from "../../../components/ui/currency-display";
 import { MoneyInput } from "../../../components/ui/money-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select";
@@ -968,11 +969,6 @@ export function ExpensesClient({
     }
   ] as const;
 
-  const summaryCurrency = useMemo(() => {
-    const rows = expensesQuery.data?.expenses ?? [];
-    return rows.length > 0 ? rows[0].currency : "USD";
-  }, [expensesQuery.data?.expenses]);
-
   const importedExpensePreviews = useMemo(
     () => importedExpenseRows.map((row) => normalizeImportedExpenseRow(row, td)),
     [importedExpenseRows, td]
@@ -1812,14 +1808,14 @@ export function ExpensesClient({
             <article className="metric-card">
               <p className="metric-label">{t('metrics.submittedAmount')}</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={expensesQuery.data.summary.totalAmount} currency={summaryCurrency} />
+                <CurrencyAmountList amounts={expensesQuery.data.summary.totalAmountByCurrency} locale={locale} />
               </p>
               <p className="metric-hint">{t('metrics.submissionCount', { count: expensesQuery.data.summary.totalCount })}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">{t('metrics.pendingReimbursement')}</p>
               <p className="metric-value">
-                <CurrencyDisplay amount={expensesQuery.data.summary.pendingAmount} currency={summaryCurrency} />
+                <CurrencyAmountList amounts={expensesQuery.data.summary.pendingAmountByCurrency} locale={locale} />
               </p>
               <p className="metric-hint">
                 {t('metrics.pendingCount', { count: expensesQuery.data.summary.pendingCount + expensesQuery.data.summary.managerApprovedCount })}
@@ -1836,7 +1832,7 @@ export function ExpensesClient({
               <p className="metric-label">{t('metrics.reimbursed')}</p>
               <p className="metric-value numeric">{expensesQuery.data.summary.reimbursedCount}</p>
               <p className="metric-hint">
-                <CurrencyDisplay amount={expensesQuery.data.summary.reimbursedAmount} currency={summaryCurrency} />
+                <CurrencyAmountList amounts={expensesQuery.data.summary.reimbursedAmountByCurrency} locale={locale} />
               </p>
             </article>
           </section>

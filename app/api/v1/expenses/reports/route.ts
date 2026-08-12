@@ -6,7 +6,8 @@ import {
   currentMonthKey,
   getExpenseCategoryLabel,
   isIsoMonth,
-  monthDateRange
+  monthDateRange,
+  partitionByPrimaryCurrency
 } from "../../../../../lib/expenses";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import type { ExpenseReportsResponseData, ExpenseStatus } from "../../../../../types/expenses";
@@ -200,6 +201,7 @@ export async function GET(request: Request) {
     const emptyResponse: ExpenseReportsResponseData = {
       month,
       primaryCurrency: "USD",
+      excludedCurrencies: [],
       totals: {
         expenseCount: 0,
         totalAmount: 0,
@@ -349,13 +351,45 @@ export async function GET(request: Request) {
   let submissionToManagerApprovalCount = 0;
   let managerApprovalToDisbursementHoursTotal = 0;
   let managerApprovalToDisbursementCount = 0;
-  const currencyCounts = new Map<string, number>();
 
+  /* Every amount, bucket, and percentage in this report shares ONE
+   * denominator: the dominant currency's expenses. Rows in other currencies
+   * are excluded from the aggregation and reported explicitly — summing
+   * NGN and USD minor units into one figure is not a number anyone can use.
+   * The CSV export below is unaffected (raw rows carry their own currency). */
+  const { primaryCurrency, primaryRows, excludedCurrencies } =
+    partitionByPrimaryCurrency(filteredExpenses);
+
+  /* Approval-turnaround timings are currency-independent — measure them over
+   * ALL rows in scope, not just the dominant currency's. */
   for (const expense of filteredExpenses) {
+    const submittedAt = Date.parse(expense.created_at);
+    const managerApprovedAt = Date.parse(
+      expense.manager_approved_at ?? expense.approved_at ?? ""
+    );
+    const reimbursedAt = Date.parse(expense.reimbursed_at ?? "");
+
+    if (Number.isFinite(submittedAt) && Number.isFinite(managerApprovedAt)) {
+      const elapsed = managerApprovedAt - submittedAt;
+      if (elapsed >= 0) {
+        submissionToManagerApprovalHoursTotal += elapsed / (1000 * 60 * 60);
+        submissionToManagerApprovalCount += 1;
+      }
+    }
+
+    if (Number.isFinite(managerApprovedAt) && Number.isFinite(reimbursedAt)) {
+      const elapsed = reimbursedAt - managerApprovedAt;
+      if (elapsed >= 0) {
+        managerApprovalToDisbursementHoursTotal += elapsed / (1000 * 60 * 60);
+        managerApprovalToDisbursementCount += 1;
+      }
+    }
+  }
+
+  for (const expense of primaryRows) {
     const amount = typeof expense.amount === "number" ? expense.amount : Number.parseInt(expense.amount, 10);
     const safeAmount = Number.isFinite(amount) ? Math.trunc(amount) : 0;
     totalAmount += safeAmount;
-    currencyCounts.set(expense.currency, (currencyCounts.get(expense.currency) ?? 0) + 1);
 
     if (
       expense.status === "pending" ||
@@ -420,26 +454,7 @@ export async function GET(request: Request) {
     statusTotals.set(expense.status, statusEntry);
 
     const submittedAt = Date.parse(expense.created_at);
-    const managerApprovedAt = Date.parse(
-      expense.manager_approved_at ?? expense.approved_at ?? ""
-    );
     const reimbursedAt = Date.parse(expense.reimbursed_at ?? "");
-
-    if (Number.isFinite(submittedAt) && Number.isFinite(managerApprovedAt)) {
-      const elapsed = managerApprovedAt - submittedAt;
-      if (elapsed >= 0) {
-        submissionToManagerApprovalHoursTotal += elapsed / (1000 * 60 * 60);
-        submissionToManagerApprovalCount += 1;
-      }
-    }
-
-    if (Number.isFinite(managerApprovedAt) && Number.isFinite(reimbursedAt)) {
-      const elapsed = reimbursedAt - managerApprovedAt;
-      if (elapsed >= 0) {
-        managerApprovalToDisbursementHoursTotal += elapsed / (1000 * 60 * 60);
-        managerApprovalToDisbursementCount += 1;
-      }
-    }
 
     // ── Enhanced employee breakdown ──
     const empEnh = enhEmployeeMap.get(expense.employee_id) ?? {
@@ -663,21 +678,12 @@ export async function GET(request: Request) {
     }))
     .sort((left, right) => right.totalAmount - left.totalAmount);
 
-  // Derive primary currency from most common currency in filtered expenses
-  let primaryCurrency = "USD";
-  let maxCurrencyCount = 0;
-  for (const [code, count] of currencyCounts) {
-    if (count > maxCurrencyCount) {
-      maxCurrencyCount = count;
-      primaryCurrency = code;
-    }
-  }
-
   const responseData: ExpenseReportsResponseData = {
     month,
     primaryCurrency,
+    excludedCurrencies,
     totals: {
-      expenseCount: filteredExpenses.length,
+      expenseCount: primaryRows.length,
       totalAmount,
       managerApprovedAmount,
       financeApprovedAmount,

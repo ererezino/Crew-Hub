@@ -11,11 +11,12 @@ import {
 import { logger } from "../../../../../lib/logger";
 import { sendExpenseDisbursedEmail } from "../../../../../lib/notifications/email";
 import { createBulkNotifications, createNotification } from "../../../../../lib/notifications/service";
-import { currentMonthKey, isIsoMonth, monthDateRange, parseIntegerAmount } from "../../../../../lib/expenses";
+import { addCurrencyAmount, currentMonthKey, isIsoMonth, monthDateRange, parseIntegerAmount } from "../../../../../lib/expenses";
 import { hasRole } from "../../../../../lib/roles";
 import { createSupabaseServerClient } from "../../../../../lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "../../../../../lib/supabase/service-role";
 import type {
+  CurrencyAmounts,
   ExpenseApprovalStage,
   ExpenseApprovalsResponseData,
   ExpenseBulkApprovePayload,
@@ -234,7 +235,7 @@ export async function GET(request: Request) {
           stage,
           expenses: [],
           pendingCount: 0,
-          pendingAmount: 0
+          pendingAmountByCurrency: {}
         },
         error: null,
         meta: buildMeta()
@@ -322,7 +323,7 @@ export async function GET(request: Request) {
         stage,
         expenses: [],
         pendingCount: 0,
-        pendingAmount: 0
+        pendingAmountByCurrency: {}
       },
       error: null,
       meta: buildMeta()
@@ -395,13 +396,16 @@ export async function GET(request: Request) {
         : null
     };
   });
-  const pendingAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const pendingAmountByCurrency: CurrencyAmounts = {};
+  for (const expense of expenses) {
+    addCurrencyAmount(pendingAmountByCurrency, expense.currency, expense.amount);
+  }
 
   const responseData: ExpenseApprovalsResponseData = {
     stage,
     expenses,
     pendingCount: expenses.length,
-    pendingAmount
+    pendingAmountByCurrency
   };
 
   return jsonResponse<ExpenseApprovalsResponseData>(200, {

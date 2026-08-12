@@ -395,6 +395,21 @@ export function ExpenseReportsClient() {
 
       {!reportsQuery.isLoading && !reportsQuery.errorMessage && reportsQuery.data ? (
         <>
+          {reportsQuery.data.excludedCurrencies.length > 0 ? (
+            <p className="expenses-report-currency-note" role="note">
+              {t("excludedCurrenciesNote", {
+                currency: reportsQuery.data.primaryCurrency,
+                count: reportsQuery.data.excludedCurrencies.reduce(
+                  (sum, entry) => sum + entry.count,
+                  0
+                ),
+                currencies: reportsQuery.data.excludedCurrencies
+                  .map((entry) => entry.currency)
+                  .join(", ")
+              })}
+            </p>
+          ) : null}
+
           {/* ── Summary cards ── */}
           <section className="expenses-metric-grid" aria-label={t("summaryAriaLabel")}>
             <article className="metric-card">

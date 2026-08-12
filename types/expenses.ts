@@ -138,15 +138,22 @@ export type ExpenseRecord = {
   updatedAt: string;
 };
 
+/**
+ * Amounts in minor units keyed by ISO currency code. Amounts in different
+ * currencies are never summed into one number — they are rendered as one
+ * line per currency.
+ */
+export type CurrencyAmounts = Record<string, number>;
+
 export type ExpensesSummary = {
   totalCount: number;
-  totalAmount: number;
+  totalAmountByCurrency: CurrencyAmounts;
   pendingCount: number;
-  pendingAmount: number;
+  pendingAmountByCurrency: CurrencyAmounts;
   approvedCount: number;
   managerApprovedCount: number;
   reimbursedCount: number;
-  reimbursedAmount: number;
+  reimbursedAmountByCurrency: CurrencyAmounts;
   rejectedCount: number;
   financeRejectedCount: number;
   cancelledCount: number;
@@ -166,7 +173,7 @@ export type ExpenseApprovalsResponseData = {
   stage: ExpenseApprovalStage;
   expenses: ExpenseRecord[];
   pendingCount: number;
-  pendingAmount: number;
+  pendingAmountByCurrency: CurrencyAmounts;
 };
 
 export type ExpenseBulkApproveResponseData = {
@@ -224,7 +231,10 @@ export type EnhancedDepartmentBucket = {
 
 export type ExpenseReportsResponseData = {
   month: string;
+  /** Currency every amount in this report is denominated in (dominant by row count). */
   primaryCurrency: string;
+  /** Rows in other currencies, excluded from the aggregation — shown to the user, never silent. */
+  excludedCurrencies: Array<{ currency: string; count: number }>;
   totals: {
     expenseCount: number;
     totalAmount: number;
