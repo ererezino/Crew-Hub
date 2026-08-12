@@ -2094,6 +2094,19 @@ button.att-img-link {
   white-space: nowrap;
 }
 
+.lightbox-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lightbox-download:hover {
+  color: #fff;
+}
+
 .lightbox-counter {
   color: rgba(255, 255, 255, 0.45);
 }

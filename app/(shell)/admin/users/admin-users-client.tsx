@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { AccessChecklist, type AccessChecklistItem } from "../../../../components/admin/access-checklist";
 import { InviteForm } from "../../../../components/admin/invite-form";
@@ -120,6 +121,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
   const { people, isLoading, errorMessage, refresh, setPeople } = useAllPeople({
     scope: "all"
   });
+  const queryClient = useQueryClient();
 
   const managerOptions = useMemo(
     () =>
@@ -242,6 +244,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
     setPeople((currentPeople) =>
       currentPeople.map((row) => (row.id === person.id ? updatedPerson : row))
     );
+    void queryClient.invalidateQueries({ queryKey: ["people"] });
     setEditMessage(t('deactivatedMessage', { name: updatedPerson.fullName }));
   };
 
@@ -328,6 +331,7 @@ export function AdminUsersClient({ currentUserId }: AdminUsersClientProps) {
       setPeople((currentPeople) =>
         currentPeople.map((row) => (row.id === updatedPerson.id ? updatedPerson : row))
       );
+      void queryClient.invalidateQueries({ queryKey: ["people"] });
 
       setEditMessage(t('userUpdated'));
       await loadAccessConfig();

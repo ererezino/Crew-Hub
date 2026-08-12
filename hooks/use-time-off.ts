@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { fetchWithRetry } from "./use-fetch-with-retry";
+import { getCurrentMonthKey } from "../lib/time-off";
 import type {
   AfkLogsResponse,
   AfkLogsResponseData,
@@ -137,10 +138,20 @@ export function useTimeOffSummary(
     [month, year]
   );
 
+  /* The server snapshot is for ONE month. Seed the cache only when this query
+   * targets that month — otherwise (e.g. an SSR render straddling a month
+   * rollover, or a future month switcher) the wrong month's balances/holidays
+   * would be stamped fresh onto this key and the real fetch would never fire.
+   * Same bug class as the expenses month filter (resolveInitialExpensesData). */
+  const resolvedInitialData =
+    initialData && initialData.month === (month ?? getCurrentMonthKey())
+      ? initialData
+      : undefined;
+
   const queryResult = useQuery({
     queryKey: ["time-off-summary", year ?? "current", month ?? "current"],
     queryFn: ({ signal }) => fetchSummary(endpoint, signal),
-    initialData,
+    initialData: resolvedInitialData,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 1,

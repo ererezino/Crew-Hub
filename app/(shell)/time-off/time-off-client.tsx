@@ -1,8 +1,9 @@
 "use client";
 
-import { type ChangeEvent, type FormEvent, useMemo, useState } from "react";
+import { type ChangeEvent, type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 type AppLocale = "en" | "fr";
@@ -16,7 +17,10 @@ import { TeamAvailabilityPanel } from "../../../components/time-off/team-availab
 import { useConfirmAction } from "../../../hooks/use-confirm-action";
 import { useAfkLogs, useTimeOffSummary } from "../../../hooks/use-time-off";
 import { OfflineQueueBanner } from "../../../components/shared/offline-queue-banner";
-import { createSubmissionId, enqueueSubmission, isNetworkFailure } from "../../../lib/offline/submission-queue";
+import { createSubmissionId, enqueueSubmission, isNetworkFailure,
+  SUBMISSION_SYNCED_EVENT,
+  type SubmissionSyncedDetail
+} from "../../../lib/offline/submission-queue";
 import {
   formatDays,
   formatDateRangeHuman,
@@ -236,6 +240,27 @@ export function TimeOffClient({
     },
     initialSummaryData
   );
+  const queryClient = useQueryClient();
+
+  /* Requests also paint the team calendar (pending + approved), so refresh
+   * both summary and calendar caches, not just the visible summary key. */
+  const refreshTimeOffData = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["time-off-summary"] });
+    void queryClient.invalidateQueries({ queryKey: ["time-off-calendar"] });
+  }, [queryClient]);
+
+  /* A queued offline leave request that replays successfully exists on the
+   * server but not in any still-fresh cache — refresh so it shows up. */
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<SubmissionSyncedDetail>).detail;
+      if (detail?.kind === "leave_request") {
+        refreshTimeOffData();
+      }
+    };
+    window.addEventListener(SUBMISSION_SYNCED_EVENT, handler);
+    return () => window.removeEventListener(SUBMISSION_SYNCED_EVENT, handler);
+  }, [refreshTimeOffData]);
 
   const currentBirthdayYear = new Date().getUTCFullYear();
   const birthdayProfile = summaryQuery.data?.profile ?? null;
@@ -424,7 +449,7 @@ export function TimeOffClient({
         return;
       }
 
-      summaryQuery.refresh();
+      refreshTimeOffData();
       closeRequestPanel();
       showToast("success", td("toast.birthdaySelected"));
     } catch (error) {
@@ -490,7 +515,7 @@ export function TimeOffClient({
 
       closeAfkPanel();
       afkQuery.refresh();
-      summaryQuery.refresh();
+      refreshTimeOffData();
       showToast("success", afkDurationMinutes > 120
         ? td("toast.afkReclassified")
         : td("toast.afkLogged"));
@@ -623,7 +648,7 @@ export function TimeOffClient({
         }
 
         closeRequestPanel();
-        summaryQuery.refresh();
+        refreshTimeOffData();
         showToast("success", td("toast.birthdaySelected"));
       } catch (error) {
         const message =
@@ -703,7 +728,7 @@ export function TimeOffClient({
       }
 
       closeRequestPanel();
-      summaryQuery.refresh();
+      refreshTimeOffData();
       showToast("success", td("toast.leaveRequestSubmitted"));
     } catch (error) {
       /* Network failure — save on-device for idempotent auto-replay. Only
@@ -777,7 +802,7 @@ export function TimeOffClient({
         return;
       }
 
-      summaryQuery.refresh();
+      refreshTimeOffData();
       showToast("info", td("toast.leaveRequestCancelled"));
     } catch (error) {
       showToast(
@@ -817,7 +842,7 @@ export function TimeOffClient({
         return;
       }
 
-      summaryQuery.refresh();
+      refreshTimeOffData();
       showToast("info", td("changeRequest.toastSubmitted"));
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : td("changeRequest.toastError"));
@@ -877,7 +902,7 @@ export function TimeOffClient({
         return;
       }
 
-      summaryQuery.refresh();
+      refreshTimeOffData();
       showToast("info", td("changeRequest.toastSubmitted"));
       closeChangePanel();
     } catch (error) {

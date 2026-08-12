@@ -14,6 +14,7 @@ import {
 } from "react";
 import { z } from "zod";
 import { useLocale, useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { EmptyState } from "../../../components/shared/empty-state";
 import { ContextualHelp } from "../../../components/shared/contextual-help";
@@ -31,7 +32,9 @@ import {
   createSubmissionId,
   enqueueSubmission,
   isNetworkFailure,
-  splitFormData
+  splitFormData,
+  SUBMISSION_SYNCED_EVENT,
+  type SubmissionSyncedDetail
 } from "../../../lib/offline/submission-queue";
 import { countryFlagFromCode, countryNameFromCode } from "../../../lib/countries";
 import {
@@ -59,7 +62,7 @@ import {
 } from "../../../lib/expenses/csv-import";
 import { useVendorBeneficiaries } from "../../../hooks/use-vendor-beneficiaries";
 import { useMePaymentDetails } from "../../../hooks/use-payment-details";
-import { ChevronLeft, ChevronRight, Receipt, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Receipt, X } from "lucide-react";
 import type {
   ExpenseAttachmentsListResponse,
   ExpenseCommentAttachmentSignedUrlResponse,
@@ -141,7 +144,7 @@ const expenseFormSchema = z.object({
     .string()
     .trim()
     .regex(/^\d+(\.\d{1,2})?$/, "validation.amountInvalid"),
-  expenseDate: z.iso.date(),
+  expenseDate: z.iso.date("validation.dateInvalid"),
   currency: z.string().trim().length(3, "validation.currencyLength")
 });
 
@@ -759,9 +762,11 @@ type ReceiptLightboxData = {
 
 function ReceiptLightbox({
   data,
+  downloadLabel,
   onClose
 }: {
   data: ReceiptLightboxData;
+  downloadLabel: string;
   onClose: () => void;
 }) {
   const [activeIndex, setActiveIndex] = useState(data.index);
@@ -858,6 +863,10 @@ function ReceiptLightbox({
         <div className="lightbox-filename">
           {current.fileName}
           {total > 1 ? <span className="lightbox-counter"> · {activeIndex + 1} / {total}</span> : null}
+          {" · "}
+          <a href={current.url} target="_blank" rel="noopener noreferrer" className="lightbox-download">
+            <Download size={13} aria-hidden="true" /> {downloadLabel}
+          </a>
         </div>
       </div>
     </div>
@@ -884,6 +893,28 @@ export function ExpensesClient({
 
   const [month, setMonth] = useState(currentMonthKey());
   const expensesQuery = useExpenses({ month, initialData: initialExpensesData });
+  const queryClient = useQueryClient();
+
+  /* Mutations may touch months other than the one on screen (backdated
+   * expenses) and always affect the reports rollups, so invalidate the whole
+   * prefix instead of refetching just the visible month's key. */
+  const refreshExpenseData = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ["expenses"] });
+    void queryClient.invalidateQueries({ queryKey: ["expense-reports"] });
+  }, [queryClient]);
+
+  /* A queued offline submission that replays successfully exists on the
+   * server but not in any still-fresh cache — refresh so it shows up. */
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<SubmissionSyncedDetail>).detail;
+      if (detail?.kind === "expense") {
+        refreshExpenseData();
+      }
+    };
+    window.addEventListener(SUBMISSION_SYNCED_EVENT, handler);
+    return () => window.removeEventListener(SUBMISSION_SYNCED_EVENT, handler);
+  }, [refreshExpenseData]);
   const vendorBeneficiaries = useVendorBeneficiaries();
   const mePaymentDetails = useMePaymentDetails();
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -1131,7 +1162,12 @@ export function ExpensesClient({
       receipt: true
     };
 
-    const merged = [...receiptFiles, ...incoming].slice(0, MAX_EXPENSE_ATTACHMENTS);
+    const combined = [...receiptFiles, ...incoming];
+    const merged = combined.slice(0, MAX_EXPENSE_ATTACHMENTS);
+    if (combined.length > MAX_EXPENSE_ATTACHMENTS) {
+      /* Never silently drop evidence the user believes they attached. */
+      showToast("error", td("validation.tooManyAttachments", { max: MAX_EXPENSE_ATTACHMENTS }));
+    }
     setReceiptFiles(merged);
     setFormTouched(nextTouched);
     setFormErrors(getFormErrors(formValues, nextTouched, merged, td));
@@ -1293,7 +1329,7 @@ export function ExpensesClient({
                 row: importedExpensePreviews[index]?.rowNumber ?? index + 2
               })
             );
-            expensesQuery.refresh();
+            refreshExpenseData();
             return;
           }
 
@@ -1302,7 +1338,7 @@ export function ExpensesClient({
         }
 
         closePanel();
-        expensesQuery.refresh();
+        refreshExpenseData();
         if (shouldRefreshVendors) {
           vendorBeneficiaries.refresh();
         }
@@ -1315,7 +1351,7 @@ export function ExpensesClient({
             row: importedExpensePreviews[createdCount]?.rowNumber ?? createdCount + 2
           })
         );
-        expensesQuery.refresh();
+        refreshExpenseData();
       } finally {
         setIsSubmitting(false);
       }
@@ -1369,7 +1405,7 @@ export function ExpensesClient({
       }
 
       closePanel();
-      expensesQuery.refresh();
+      refreshExpenseData();
       if (formValues.saveVendor) {
         vendorBeneficiaries.refresh();
       }
@@ -1635,7 +1671,7 @@ export function ExpensesClient({
         [expense.id]: false
       }));
 
-      expensesQuery.refresh();
+      refreshExpenseData();
       showToast("success", td("toast.responseSent"));
     } catch (error) {
       setCommentErrorByExpenseId((current) => ({
@@ -1698,7 +1734,7 @@ export function ExpensesClient({
         return;
       }
 
-      expensesQuery.refresh();
+      refreshExpenseData();
       showToast("success", td("toast.expenseCancelled"));
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : td("toast.unableToUpdate"));
@@ -1742,11 +1778,11 @@ export function ExpensesClient({
               className="form-input numeric"
               type="month"
               value={month}
-              onChange={(event) => setMonth(event.currentTarget.value)}
+              onChange={(event) => setMonth(event.currentTarget.value || currentMonthKey())}
             />
           </label>
           <p className="settings-card-description">
-            {t('toolbar.showingMonth', { month: formatMonthLabel(month) })}
+            {t('toolbar.showingMonth', { month: formatMonthLabel(month, locale) })}
           </p>
         </div>
         <div className="expenses-toolbar-actions">
@@ -1762,17 +1798,12 @@ export function ExpensesClient({
       {expensesQuery.isLoading ? <ExpensesSkeleton /> : null}
 
       {!expensesQuery.isLoading && expensesQuery.errorMessage ? (
-        <>
-          <EmptyState
-            title={t('emptyState.errorTitle')}
-            description={expensesQuery.errorMessage}
-            ctaLabel={tCommon('retry')}
-            ctaHref="/expenses"
-          />
-          <button type="button" className="button button-accent" onClick={() => expensesQuery.refresh()}>
-            {tCommon('retry')}
-          </button>
-        </>
+        <EmptyState
+          title={t('emptyState.errorTitle')}
+          description={expensesQuery.errorMessage}
+          ctaLabel={tCommon('retry')}
+          onCtaClick={() => expensesQuery.refresh()}
+        />
       ) : null}
 
       {!expensesQuery.isLoading && !expensesQuery.errorMessage && expensesQuery.data ? (
@@ -1813,10 +1844,10 @@ export function ExpensesClient({
           {expenses.length === 0 ? (
             <EmptyState
               icon={<Receipt size={32} />}
-              title={t('emptyState.title')}
-              description={t('emptyState.description')}
+              title={month ? td('emptyState.monthTitle', { month: formatMonthLabel(month, locale) }) : t('emptyState.title')}
+              description={month ? t('emptyState.monthDescription') : t('emptyState.description')}
               ctaLabel={t('actions.submitExpense')}
-              ctaHref="/expenses"
+              onCtaClick={openPanel}
             />
           ) : (
             <section className="data-table-container" aria-label={t('table.ariaLabel')}>
@@ -1889,19 +1920,23 @@ export function ExpensesClient({
                       : null;
 
                     const financeDescription = expense.reimbursedAt
-                      ? td("timeline.markedPaidBy", {
-                          name: expense.reimbursedByName ?? td("timeline.financeFallback"),
-                          ref: expense.reimbursementReference
-                            ? td("timeline.refSuffix", { ref: expense.reimbursementReference })
+                      ? [
+                          td("timeline.markedPaidBy", {
+                            name: expense.reimbursedByName ?? td("timeline.financeFallback")
+                          }),
+                          expense.reimbursementReference
+                            ? ` ${td("timeline.paymentRef", { reference: expense.reimbursementReference })}`
                             : ""
-                        })
+                        ].join("")
                       : expense.financeRejectedAt
-                        ? td("timeline.financeRejectedBy", {
-                            name: expense.financeRejectedByName ?? td("timeline.financeFallback"),
-                            reason: expense.financeRejectionReason
-                              ? td("timeline.reasonSuffix", { reason: expense.financeRejectionReason })
+                        ? [
+                            td("timeline.financeRejectedBy", {
+                              name: expense.financeRejectedByName ?? td("timeline.financeFallback")
+                            }),
+                            expense.financeRejectionReason
+                              ? ` ${td("timeline.financeRejectionReason", { reason: expense.financeRejectionReason })}`
                               : ""
-                          })
+                          ].join("")
                         : td("timeline.awaitingFinance");
 
                     return (
@@ -3076,7 +3111,7 @@ export function ExpensesClient({
               ref={cameraInputRef}
               type="file"
               className="expenses-hidden-input"
-              accept="image/*"
+              accept="image/jpeg,image/png"
               capture="environment"
               onChange={handleReceiptInputChange}
             />
@@ -3116,6 +3151,7 @@ export function ExpensesClient({
         <ReceiptLightbox
           key={receiptLightbox.items[0]?.url ?? receiptLightbox.label}
           data={receiptLightbox}
+          downloadLabel={tCommon('download')}
           onClose={() => setReceiptLightbox(null)}
         />
       ) : null}

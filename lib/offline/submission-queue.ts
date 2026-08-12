@@ -30,6 +30,17 @@
 export type QueuedSubmissionKind = "expense" | "leave_request";
 
 /**
+ * Fired on `window` after a queued submission successfully replays to the
+ * server (detail: `{ kind }`). Pages listen for this to invalidate their
+ * query caches — otherwise a synced expense/leave request disappears from the
+ * offline banner but doesn't appear in the (still-fresh) list, which reads as
+ * the app having lost the submission.
+ */
+export const SUBMISSION_SYNCED_EVENT = "crew-hub:submission-synced";
+
+export type SubmissionSyncedDetail = { kind: QueuedSubmissionKind };
+
+/**
  * Lifecycle of a queued submission:
  *  - pending:     waiting to transmit (default); auto-replayed when online.
  *  - failed:      the server saw it and rejected it (4xx); carries the error.
@@ -419,6 +430,13 @@ export async function replayQueue(): Promise<number> {
         if (outcome.outcome === "done") {
           await removeSubmission(item.id);
           settled += 1;
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent<SubmissionSyncedDetail>(SUBMISSION_SYNCED_EVENT, {
+                detail: { kind: item.kind }
+              })
+            );
+          }
         } else if (outcome.outcome === "failed") {
           /* The server saw it and said no (4xx). Surface a VISIBLE failed
            * state with the error — never a silent delete. */

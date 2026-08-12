@@ -369,6 +369,9 @@ export async function fetchTimeOffSummaryData(
     policies,
     balances,
     requests,
-    holidays
+    holidays,
+    /* Which month the holidays/requests slice was computed for — consumers
+     * use this to avoid seeding another month's query with this snapshot. */
+    month
   };
 }
