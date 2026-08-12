@@ -301,7 +301,7 @@ export function currentMonthKey(now: Date = new Date()): string {
   return `${year}-${month}`;
 }
 
-export function formatMonthLabel(month: string): string {
+export function formatMonthLabel(month: string, locale?: string): string {
   const range = monthDateRange(month);
 
   if (!range) {
@@ -314,7 +314,9 @@ export function formatMonthLabel(month: string): string {
     return month;
   }
 
-  return date.toLocaleString(undefined, {
+  /* Fall back to the runtime locale only when the app locale isn't passed —
+   * otherwise a French UI on an English OS would label months in English. */
+  return date.toLocaleString(locale, {
     month: "long",
     year: "numeric",
     timeZone: "UTC"

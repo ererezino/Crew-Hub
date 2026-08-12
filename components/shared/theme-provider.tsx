@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode
 } from "react";
 
@@ -42,9 +43,46 @@ function getInitialTheme(): Theme {
   return "light";
 }
 
+/* The stored/preferred theme lives in localStorage + matchMedia, which the
+ * server cannot read — resolving it during render made the server HTML
+ * (light) disagree with a dark-mode client's first render, a hydration
+ * failure on every page for those users. useSyncExternalStore serves the
+ * server snapshot ("light", isReady=false) during SSR and hydration so both
+ * trees agree, then re-renders with the stored theme. The snapshot is cached
+ * because getSnapshot must return a stable value; toggles layer on top via
+ * local state and persist through the effect below. */
+const emptySubscribe = () => () => {};
+
+let cachedClientTheme: Theme | null = null;
+
+function getClientInitialTheme(): Theme {
+  if (cachedClientTheme === null) {
+    cachedClientTheme = getInitialTheme();
+  }
+  return cachedClientTheme;
+}
+
+function getServerInitialTheme(): Theme {
+  return "light";
+}
+
+function getClientIsReady(): boolean {
+  return true;
+}
+
+function getServerIsReady(): boolean {
+  return false;
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => getInitialTheme());
-  const isReady = true;
+  const initialTheme = useSyncExternalStore(
+    emptySubscribe,
+    getClientInitialTheme,
+    getServerInitialTheme
+  );
+  const isReady = useSyncExternalStore(emptySubscribe, getClientIsReady, getServerIsReady);
+  const [override, setOverride] = useState<Theme | null>(null);
+  const theme = override ?? initialTheme;
 
   useEffect(() => {
     if (!isReady) {
@@ -67,9 +105,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       theme,
       isReady,
       toggleTheme: () => {
-        setTheme((currentTheme) =>
-          currentTheme === "light" ? "dark" : "light"
-        );
+        setOverride(theme === "light" ? "dark" : "light");
       }
     }),
     [isReady, theme]

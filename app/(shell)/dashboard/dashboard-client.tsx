@@ -1,6 +1,8 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+
+import { invalidateApprovalSurfaces } from "../../../lib/approval-invalidation";
 import Link from "next/link";
 import { useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -786,6 +788,13 @@ function PendingDecisionsWidget({ data }: { data: DashboardResponseData }) {
       const item = items?.find((i) => i.id === id);
       if (!item) return;
 
+      /* Only leave and expense decisions PATCH these endpoints; any future
+       * item type (e.g. signature) must get its own branch, not fall through
+       * to the expenses API. */
+      if (item.type !== "leave" && item.type !== "expense") {
+        throw new Error(t('widget.failedApprove'));
+      }
+
       const endpoint =
         item.type === "leave"
           ? `/api/v1/time-off/requests/${id}`
@@ -805,7 +814,8 @@ function PendingDecisionsWidget({ data }: { data: DashboardResponseData }) {
         );
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      /* The decision also changes the approvals queue, badges, and lists. */
+      await invalidateApprovalSurfaces(queryClient);
     },
     [items, queryClient, t]
   );
@@ -814,6 +824,10 @@ function PendingDecisionsWidget({ data }: { data: DashboardResponseData }) {
     async (id: string, reason?: string) => {
       const item = items?.find((i) => i.id === id);
       if (!item) return;
+
+      if (item.type !== "leave" && item.type !== "expense") {
+        throw new Error(t('widget.failedDecline'));
+      }
 
       const endpoint =
         item.type === "leave"
@@ -837,7 +851,8 @@ function PendingDecisionsWidget({ data }: { data: DashboardResponseData }) {
         );
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      /* The decision also changes the approvals queue, badges, and lists. */
+      await invalidateApprovalSurfaces(queryClient);
     },
     [items, queryClient, t]
   );

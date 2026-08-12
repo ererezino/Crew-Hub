@@ -41,6 +41,27 @@ type ExpenseReportsQuery = {
   category?: string;
 };
 
+/**
+ * Server-rendered initialData is a snapshot of ONE specific slice (a single
+ * month, no status filter). Seed the React Query cache with it only when the
+ * live query targets that exact slice. Seeding it unconditionally would stamp
+ * every month the user navigates to with the wrong month's rows and mark them
+ * fresh for `staleTime`, so the real fetch never fires — past months would
+ * show the current month's data (or nothing at all).
+ */
+export function resolveInitialExpensesData(
+  query: ExpensesQuery
+): ExpensesListResponseData | undefined {
+  if (!query.initialData || query.status) {
+    return undefined;
+  }
+
+  const requestedMonth = query.month || null;
+  const seededMonth = query.initialData.month ?? null;
+
+  return seededMonth === requestedMonth ? query.initialData : undefined;
+}
+
 function buildExpensesUrl(query: ExpensesQuery): string {
   const searchParams = new URLSearchParams();
 
@@ -154,7 +175,7 @@ export function useExpenses(query: ExpensesQuery = {}): UseFetchState<ExpensesLi
   const queryResult = useQuery({
     queryKey: ["expenses", query.status ?? "all", query.month ?? "all"],
     queryFn: ({ signal }) => fetchExpenses(endpoint, signal),
-    initialData: query.initialData,
+    initialData: resolveInitialExpensesData(query),
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 1,

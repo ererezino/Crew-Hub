@@ -124,6 +124,8 @@ export type TimeOffSummaryResponseData = {
   balances: LeaveBalance[];
   requests: LeaveRequestRecord[];
   holidays: HolidayCalendarDay[];
+  /** The month (YYYY-MM) this snapshot was computed for. */
+  month: string;
 };
 
 export type TimeOffSummaryResponse = ApiResponse<TimeOffSummaryResponseData>;

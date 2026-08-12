@@ -7,7 +7,8 @@ import {
   Suspense,
   useCallback,
   useRef,
-  useState
+  useState,
+  useSyncExternalStore
 } from "react";
 import { z } from "zod";
 
@@ -33,6 +34,27 @@ function getGreeting(): string {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+/* Time-of-day text must NOT be in the server HTML: this page is prerendered
+ * at build time, so a rendered greeting freezes at the build hour and
+ * mismatches the client for most of the day — a hydration error on every
+ * login page load. useSyncExternalStore serves a stable word during SSR and
+ * hydration, then swaps in the real greeting. The value is cached because
+ * getSnapshot must be stable across renders. */
+const emptySubscribe = () => () => {};
+
+let cachedGreeting: string | null = null;
+
+function getClientGreeting(): string {
+  if (cachedGreeting === null) {
+    cachedGreeting = getGreeting();
+  }
+  return cachedGreeting;
+}
+
+function getServerGreeting(): string {
+  return "Welcome";
 }
 
 const INVITE_ERROR_MESSAGES: Record<string, string> = {
@@ -68,6 +90,8 @@ function LoginForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [hasPasskey, setHasPasskey] = useState(false);
   const [passkeySigningIn, setPasskeySigningIn] = useState(false);
+
+  const greeting = useSyncExternalStore(emptySubscribe, getClientGreeting, getServerGreeting);
 
   const acceptedEmailRef = useRef<string>("");
   const checkingRef = useRef(false);
@@ -262,7 +286,7 @@ function LoginForm() {
       <section className="standalone-card auth-card" aria-label="Crew Hub login form">
         <header className="auth-card-header">
           <h1 className="auth-brand">Crew Hub</h1>
-          <p className="auth-greeting">{getGreeting()}, crewmember</p>
+          <p className="auth-greeting">{greeting}, crewmember</p>
         </header>
 
         {inviteBanner ? (

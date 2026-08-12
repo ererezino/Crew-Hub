@@ -3,6 +3,7 @@
 import {
   type ChangeEvent,
   type FormEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -20,10 +21,10 @@ import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useExpenseApprovals } from "../../../../hooks/use-expenses";
+import { invalidateApprovalSurfaces } from "../../../../lib/approval-invalidation";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDateTimeTooltip, formatRelativeTime, formatSingleDateHuman } from "../../../../lib/datetime";
 import {
-  currentMonthKey,
   formatMonthLabel,
   getExpenseCategoryLabel,
   getExpenseStatusLabel,
@@ -38,13 +39,14 @@ import type {
   ExpenseBulkApproveResponse,
   ExpenseCommentRecord,
   ExpenseCommentsResponse,
+  ExpenseAttachmentsListResponse,
   ExpenseReceiptSignedUrlResponse,
   ExpenseRecord,
   UpdateExpenseResponse
 } from "../../../../types/expenses";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../../components/ui/select";
 import { humanizeError } from "@/lib/errors";
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
 
 type AppLocale = "en" | "fr";
 type SortDirection = "asc" | "desc";
@@ -108,35 +110,58 @@ function ApprovalSkeleton() {
 
 /* ─── Receipt lightbox ─── */
 
-type ReceiptLightboxData = {
+type ReceiptLightboxItem = {
   url: string;
   fileName: string;
+};
+
+type ReceiptLightboxData = {
+  items: ReceiptLightboxItem[];
+  index: number;
   label: string;
 };
 
 function ReceiptLightbox({
   data,
+  downloadLabel,
   onClose
 }: {
   data: ReceiptLightboxData;
+  downloadLabel: string;
   onClose: () => void;
 }) {
-  const isPdf = data.fileName.toLowerCase().endsWith(".pdf");
+  const [activeIndex, setActiveIndex] = useState(data.index);
+  const total = data.items.length;
+  const current = data.items[Math.min(activeIndex, total - 1)] ?? data.items[0];
+  const isPdf = (current?.fileName ?? "").toLowerCase().endsWith(".pdf");
   const [imageLoaded, setImageLoaded] = useState(isPdf);
+
+  const goTo = useCallback((next: number) => {
+    if (total === 0) return;
+    const wrapped = (next + total) % total;
+    setActiveIndex(wrapped);
+    setImageLoaded(false);
+  }, [total]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") goTo(activeIndex + 1);
+      if (e.key === "ArrowLeft") goTo(activeIndex - 1);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, goTo, activeIndex]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, []);
+
+  if (!current) {
+    return null;
+  }
 
   return (
     <div className="lightbox-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={data.label}>
@@ -145,11 +170,33 @@ function ReceiptLightbox({
           <X size={20} />
         </button>
 
+        {total > 1 ? (
+          <>
+            <button
+              type="button"
+              className="lightbox-nav lightbox-nav-prev"
+              onClick={() => goTo(activeIndex - 1)}
+              aria-label="Previous document"
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <button
+              type="button"
+              className="lightbox-nav lightbox-nav-next"
+              onClick={() => goTo(activeIndex + 1)}
+              aria-label="Next document"
+            >
+              <ChevronRight size={22} />
+            </button>
+          </>
+        ) : null}
+
         <div className={isPdf ? "lightbox-stage lightbox-stage-doc" : "lightbox-stage"}>
           {isPdf ? (
             <iframe
-              src={`${data.url}#toolbar=1&navpanes=0`}
-              title={data.fileName}
+              key={current.url}
+              src={`${current.url}#toolbar=1&navpanes=0`}
+              title={current.fileName}
               className="lightbox-pdf"
             />
           ) : (
@@ -161,9 +208,9 @@ function ReceiptLightbox({
               ) : null}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                key={data.url}
-                src={data.url}
-                alt={data.fileName}
+                key={current.url}
+                src={current.url}
+                alt={current.fileName}
                 className="lightbox-img lightbox-img-expense"
                 loading="eager"
                 onLoad={() => setImageLoaded(true)}
@@ -174,7 +221,14 @@ function ReceiptLightbox({
           )}
         </div>
 
-        <div className="lightbox-filename">{data.label}</div>
+        <div className="lightbox-filename">
+          {current.fileName}
+          {total > 1 ? <span className="lightbox-counter"> · {activeIndex + 1} / {total}</span> : null}
+          {" · "}
+          <a href={current.url} target="_blank" rel="noopener noreferrer" className="lightbox-download">
+            <Download size={13} aria-hidden="true" /> {downloadLabel}
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -235,8 +289,17 @@ export function ExpenseApprovalsClient({
 
     return stages;
   }, [canAdditionalApprove, canFinanceApprove, canManagerApprove]);
-  const [month, setMonth] = useState(currentMonthKey());
-  const [stage, setStage] = useState<ExpenseApprovalStage>(availableStages[0] ?? "manager");
+  /* The queue must show everything awaiting action by default — the tab
+   * badges count ALL months, so a month-scoped default made them disagree
+   * (badge "3", empty list) whenever submissions carried older expense
+   * dates. Empty month = no date filter; the picker narrows on demand. */
+  const [month, setMonth] = useState("");
+  /* Land on the queue matching the user's primary role: manager stage for
+   * managers, payment stage for finance — never the rarely-used additional
+   * queue just because it sorts first. */
+  const [stage, setStage] = useState<ExpenseApprovalStage>(
+    canManagerApprove ? "manager" : canFinanceApprove ? "finance" : availableStages[0] ?? "manager"
+  );
   const [employeeFilter, setEmployeeFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<ExpenseCategory | "all">("all");
   const [fromDateFilter, setFromDateFilter] = useState("");
@@ -411,8 +474,7 @@ export function ExpenseApprovalsClient({
       }
 
       setSelectedIds((current) => current.filter((id) => id !== expense.id));
-      approvalsQuery.refresh();
-      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      void invalidateApprovalSurfaces(queryClient);
       showToast("success", t('toast.approveSuccess'));
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : t('toast.approveError'));
@@ -485,8 +547,8 @@ export function ExpenseApprovalsClient({
       }
 
       setReceiptLightbox({
-        url: payload.data.url,
-        fileName: payload.data.fileName || fileName,
+        items: [{ url: payload.data.url, fileName: payload.data.fileName || fileName }],
+        index: 0,
         label: payload.data.fileName || fileName
       });
     } catch (error) {
@@ -596,8 +658,7 @@ export function ExpenseApprovalsClient({
       setRequestInfoMessage("");
       setRequestInfoFiles([]);
       setRequestInfoErrors({});
-      approvalsQuery.refresh();
-      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      void invalidateApprovalSurfaces(queryClient);
       showToast("info", t('toast.requestInfoSuccess'));
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : t('toast.requestInfoError'));
@@ -741,8 +802,7 @@ export function ExpenseApprovalsClient({
 
       closeDisbursePanel();
       setSelectedIds((current) => current.filter((id) => id !== disburseTarget.id));
-      approvalsQuery.refresh();
-      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      void invalidateApprovalSurfaces(queryClient);
       showToast("success", t('toast.markPaidSuccess'));
     } catch (error) {
       showToast("error", error instanceof Error ? error.message : t('toast.markPaidError'));
@@ -784,8 +844,7 @@ export function ExpenseApprovalsClient({
       }
 
       setSelectedIds([]);
-      approvalsQuery.refresh();
-      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      void invalidateApprovalSurfaces(queryClient);
       showToast(
         "success",
         t('toast.bulkApproveSuccess', { count: payload.data.approvedCount })
@@ -905,8 +964,7 @@ export function ExpenseApprovalsClient({
 
       closeRejectPanel();
       setSelectedIds((current) => current.filter((id) => id !== rejectTarget.id));
-      approvalsQuery.refresh();
-      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      void invalidateApprovalSurfaces(queryClient);
       showToast(
         rejectMode === "manager" ? "info" : "error",
         rejectMode === "manager" ? t('toast.rejectSuccess') : t('toast.financeRejectSuccess')
@@ -926,20 +984,33 @@ export function ExpenseApprovalsClient({
     }));
 
     try {
-      const response = await fetch(`/api/v1/expenses/${expense.id}/receipt`, {
+      /* Approvers must see EVERY document on the expense, not just the first
+       * receipt — reviewing an invoice that sits in attachment #2 is the
+       * whole job. Legacy single-receipt endpoint stays as the fallback. */
+      const response = await fetch(`/api/v1/expenses/${expense.id}/attachments`, {
         method: "GET"
       });
+      const payload = (await response.json()) as ExpenseAttachmentsListResponse;
+      const items = (payload.data?.attachments ?? [])
+        .filter((attachment) => attachment.url)
+        .map((attachment) => ({ url: attachment.url, fileName: attachment.fileName }));
 
-      const payload = (await response.json()) as ExpenseReceiptSignedUrlResponse;
+      if (response.ok && items.length > 0) {
+        setReceiptLightbox({ items, index: 0, label: expense.receiptFileName });
+        return;
+      }
 
-      if (!response.ok || !payload.data?.url) {
-        showToast("error", payload.error?.message ?? t('toast.openReceiptError'));
+      const legacyResponse = await fetch(`/api/v1/expenses/${expense.id}/receipt`, { method: "GET" });
+      const legacyPayload = (await legacyResponse.json()) as ExpenseReceiptSignedUrlResponse;
+
+      if (!legacyResponse.ok || !legacyPayload.data?.url) {
+        showToast("error", legacyPayload.error?.message ?? t('toast.openReceiptError'));
         return;
       }
 
       setReceiptLightbox({
-        url: payload.data.url,
-        fileName: expense.receiptFileName,
+        items: [{ url: legacyPayload.data.url, fileName: expense.receiptFileName }],
+        index: 0,
         label: expense.receiptFileName
       });
     } catch (error) {
@@ -1001,16 +1072,18 @@ export function ExpenseApprovalsClient({
 
       {availableStages.length > 1 ? (
         <section className="page-tabs" aria-label={t('tabs.ariaLabel')}>
-          <button
-            type="button"
-            className={stage === "manager" ? "page-tab page-tab-active" : "page-tab"}
-            onClick={() => setStage("manager")}
-          >
-            {t('tabs.pendingMyApproval')}
-            {typeof managerCount === "number" && managerCount > 0 ? (
-              <span className="page-tab-badge numeric">{managerCount}</span>
-            ) : null}
-          </button>
+          {availableStages.includes("manager") ? (
+            <button
+              type="button"
+              className={stage === "manager" ? "page-tab page-tab-active" : "page-tab"}
+              onClick={() => setStage("manager")}
+            >
+              {t('tabs.pendingMyApproval')}
+              {typeof managerCount === "number" && managerCount > 0 ? (
+                <span className="page-tab-badge numeric">{managerCount}</span>
+              ) : null}
+            </button>
+          ) : null}
           {availableStages.includes("additional") ? (
             <button
               type="button"
@@ -1018,21 +1091,23 @@ export function ExpenseApprovalsClient({
               onClick={() => setStage("additional")}
             >
               {t('tabs.pendingAdditionalApproval')}
-              {typeof additionalCount === "number" ? (
+              {typeof additionalCount === "number" && additionalCount > 0 ? (
                 <span className="page-tab-badge numeric">{additionalCount}</span>
               ) : null}
             </button>
           ) : null}
-          <button
-            type="button"
-            className={stage === "finance" ? "page-tab page-tab-active" : "page-tab"}
-            onClick={() => setStage("finance")}
-          >
-            {t('tabs.pendingPayment')}
-            {typeof financeCount === "number" && financeCount > 0 ? (
-              <span className="page-tab-badge numeric">{financeCount}</span>
-            ) : null}
-          </button>
+          {availableStages.includes("finance") ? (
+            <button
+              type="button"
+              className={stage === "finance" ? "page-tab page-tab-active" : "page-tab"}
+              onClick={() => setStage("finance")}
+            >
+              {t('tabs.pendingPayment')}
+              {typeof financeCount === "number" && financeCount > 0 ? (
+                <span className="page-tab-badge numeric">{financeCount}</span>
+              ) : null}
+            </button>
+          ) : null}
         </section>
       ) : null}
 
@@ -1048,13 +1123,23 @@ export function ExpenseApprovalsClient({
             />
           </label>
           <p className="settings-card-description">
-            {stageTitle}: {formatMonthLabel(month)}.
+            {stageTitle}: {month ? formatMonthLabel(month, locale) : t('toolbar.allMonths')}.
           </p>
         </div>
         <div className="expenses-toolbar-actions">
           <p className="settings-card-description">
             {t('toolbar.filterHint')}
           </p>
+          {embedded && canBulkProcess ? (
+            <button
+              type="button"
+              className="button button-accent"
+              onClick={openBulkApproveConfirm}
+              disabled={selectedIds.length === 0 || isBulkApproving}
+            >
+              {isBulkApproving ? tCommon('working') : t('actions.bulkApprove', { count: selectedIds.length })}
+            </button>
+          ) : null}
           <button type="button" className="button" onClick={clearFilters} disabled={!hasActiveFilters}>
             {t('toolbar.clearFilters')}
           </button>
@@ -1116,17 +1201,12 @@ export function ExpenseApprovalsClient({
       {approvalsQuery.isLoading ? <ApprovalSkeleton /> : null}
 
       {!approvalsQuery.isLoading && approvalsQuery.errorMessage ? (
-        <>
-          <EmptyState
-            title={t('emptyState.errorTitle')}
-            description={approvalsQuery.errorMessage}
-            ctaLabel={tCommon('retry')}
-            ctaHref={embedded ? "/approvals?tab=expenses" : "/expenses/approvals"}
-          />
-          <button type="button" className="button button-accent" onClick={() => approvalsQuery.refresh()}>
-            {tCommon('retry')}
-          </button>
-        </>
+        <EmptyState
+          title={t('emptyState.errorTitle')}
+          description={approvalsQuery.errorMessage}
+          ctaLabel={tCommon('retry')}
+          onCtaClick={() => approvalsQuery.refresh()}
+        />
       ) : null}
 
       {!approvalsQuery.isLoading && !approvalsQuery.errorMessage && approvalsQuery.data ? (
@@ -1153,7 +1233,9 @@ export function ExpenseApprovalsClient({
                   ? t('emptyState.noMatchTitle')
                   : stage === "manager"
                     ? t('emptyState.noPendingManagerTitle')
-                    : t('emptyState.noPendingPaymentTitle')
+                    : stage === "additional"
+                      ? t('emptyState.noPendingAdditionalTitle')
+                      : t('emptyState.noPendingPaymentTitle')
               }
               description={
                 hasActiveFilters
@@ -1670,8 +1752,9 @@ export function ExpenseApprovalsClient({
 
       {receiptLightbox ? (
         <ReceiptLightbox
-          key={receiptLightbox.url}
+          key={receiptLightbox.items[0]?.url ?? receiptLightbox.label}
           data={receiptLightbox}
+          downloadLabel={tCommon('download')}
           onClose={() => setReceiptLightbox(null)}
         />
       ) : null}

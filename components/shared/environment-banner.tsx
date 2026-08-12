@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 const PRODUCTION_PROJECT_REF = "xmeruhyybvyosqxfleiu";
 
@@ -30,14 +30,32 @@ export function resolveEnvironmentBannerLabel({
   return hostname === "localhost" || hostname === "127.0.0.1" ? "LOCAL" : "STAGING";
 }
 
+/* The hostname is client-only knowledge. useSyncExternalStore renders the
+ * server snapshot (null → no banner) during SSR AND hydration so both trees
+ * agree, then re-renders with the real hostname — computing it during render
+ * was a hydration failure on every page load outside production. */
+const emptySubscribe = () => () => {};
+
+function getHostnameSnapshot(): string {
+  return window.location.hostname;
+}
+
+function getHostnameServerSnapshot(): string | null {
+  return null;
+}
+
 export function EnvironmentBanner() {
-  const [label] = useState<string | null>(() =>
-    resolveEnvironmentBannerLabel({
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV,
-      hostname: typeof window === "undefined" ? null : window.location.hostname
-    })
+  const hostname = useSyncExternalStore(
+    emptySubscribe,
+    getHostnameSnapshot,
+    getHostnameServerSnapshot
   );
+
+  const label = resolveEnvironmentBannerLabel({
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV,
+    hostname
+  });
 
   useEffect(() => {
     if (!label) return;

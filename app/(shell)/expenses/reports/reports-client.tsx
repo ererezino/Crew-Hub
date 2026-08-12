@@ -274,7 +274,9 @@ export function ExpenseReportsClient() {
 
   const handleCsvExport = () => {
     const params = new URLSearchParams();
-    params.set("month", month);
+    if (month) {
+      params.set("month", month);
+    }
     params.set("format", "csv");
     if (country !== "all") params.set("country", country);
     if (department !== "all") params.set("department", department);
@@ -303,7 +305,7 @@ export function ExpenseReportsClient() {
             className="form-input numeric"
             type="month"
             value={month}
-            onChange={(event) => setMonth(event.currentTarget.value)}
+            onChange={(event) => setMonth(event.currentTarget.value || currentMonthKey())}
           />
         </label>
 
@@ -349,7 +351,11 @@ export function ExpenseReportsClient() {
               <SelectItem value="all">{t("allStatuses")}</SelectItem>
               {EXPENSE_STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {getExpenseStatusLabel(s)}
+                  {s === "manager_approved"
+                    ? t("statusManagerApproved")
+                    : s === "additional_approved"
+                      ? t("statusAdditionalApproved")
+                      : getExpenseStatusLabel(s)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -373,23 +379,18 @@ export function ExpenseReportsClient() {
           </Select>
         </div>
 
-        <p className="settings-card-description">{t("showingMonth", { month: formatMonthLabel(month) })}</p>
+        <p className="settings-card-description">{t("showingMonth", { month: formatMonthLabel(month, locale) })}</p>
       </section>
 
       {reportsQuery.isLoading ? <ReportsSkeleton /> : null}
 
       {!reportsQuery.isLoading && reportsQuery.errorMessage ? (
-        <>
-          <EmptyState
-            title={t("unavailable")}
-            description={reportsQuery.errorMessage}
-            ctaLabel={tCommon("retry")}
-            ctaHref="/expenses/reports"
-          />
-          <button type="button" className="button button-accent" onClick={() => reportsQuery.refresh()}>
-            {tCommon("retry")}
-          </button>
-        </>
+        <EmptyState
+          title={t("unavailable")}
+          description={reportsQuery.errorMessage}
+          ctaLabel={tCommon("retry")}
+          onCtaClick={() => reportsQuery.refresh()}
+        />
       ) : null}
 
       {!reportsQuery.isLoading && !reportsQuery.errorMessage && reportsQuery.data ? (

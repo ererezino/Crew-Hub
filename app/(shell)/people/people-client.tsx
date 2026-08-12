@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { EmptyState } from "../../../components/shared/empty-state";
@@ -530,6 +531,7 @@ export function PeopleClient({
     scope: initialScope,
     initialData: initialPeopleData
   });
+  const queryClient = useQueryClient();
 
   const { presenceMap } = usePresence(isAdmin === true);
 
@@ -865,6 +867,8 @@ export function PeopleClient({
       setPeople((current) =>
         current.map((p) => (p.id === updated.id ? updated : p))
       );
+      /* Other pages (org chart, pickers, admin) hold their own people caches. */
+      void queryClient.invalidateQueries({ queryKey: ["people"] });
 
       closeEditPanel();
       addToast("success", td('toast.personUpdated', { name: updated.fullName }));
@@ -873,7 +877,7 @@ export function PeopleClient({
     } finally {
       setIsEditSaving(false);
     }
-  }, [editPerson, editValues, closeEditPanel, setPeople, t, td]);
+  }, [editPerson, editValues, closeEditPanel, setPeople, queryClient, t, td]);
 
   /* ── Pre-start action handlers ── */
 
@@ -919,6 +923,8 @@ export function PeopleClient({
       setPeople((current) =>
         current.map((p) => (p.id === payload.data!.person.id ? payload.data!.person : p))
       );
+      /* Other pages (org chart, pickers, admin) hold their own people caches. */
+      void queryClient.invalidateQueries({ queryKey: ["people"] });
 
       setRescindTarget(null);
       closeEditPanel();
@@ -928,7 +934,7 @@ export function PeopleClient({
     } finally {
       setIsRescinding(false);
     }
-  }, [rescindTarget, closeEditPanel, setPeople, t, td]);
+  }, [rescindTarget, closeEditPanel, setPeople, queryClient, t, td]);
 
   /* ── Contract handlers ── */
 
@@ -1231,6 +1237,8 @@ export function PeopleClient({
 
       // Optimistically drop the now-archived person from the list.
       setPeople((previous) => previous.filter((entry) => entry.id !== person.id));
+      /* Other pages (org chart, pickers, admin) hold their own people caches. */
+      void queryClient.invalidateQueries({ queryKey: ["people"] });
       addToast("success", td('toast.personRemoved', { name: person.fullName }));
     } catch (error) {
       addToast("error", error instanceof Error ? error.message : t('toast.unableToRemove'));
@@ -1238,7 +1246,7 @@ export function PeopleClient({
       setRemovingId(null);
       setConfirmRemovePerson(null);
     }
-  }, [t, td, setPeople]);
+  }, [t, td, setPeople, queryClient]);
 
   const closeCreatePanel = () => {
     if (isCreating) {
@@ -1348,6 +1356,7 @@ export function PeopleClient({
       closeCreatePanel();
       addToast("success", t('toast.personCreated'));
       refresh();
+      void queryClient.invalidateQueries({ queryKey: ["people"] });
     } catch (error) {
       setCreateErrors((currentErrors) => ({
         ...currentErrors,

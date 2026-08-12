@@ -13,6 +13,7 @@ import { SlidePanel } from "../../../../components/shared/slide-panel";
 import { StatusBadge } from "../../../../components/shared/status-badge";
 import { TeamAvailabilityPanel } from "../../../../components/time-off/team-availability-panel";
 import { useTimeOffApprovals } from "../../../../hooks/use-time-off";
+import { invalidateApprovalSurfaces } from "../../../../lib/approval-invalidation";
 import { countryFlagFromCode, countryNameFromCode } from "../../../../lib/countries";
 import { formatDays, formatDateRangeHuman, formatDateTimeTooltip, formatRelativeTime } from "../../../../lib/datetime";
 import { formatLeaveStatus } from "../../../../lib/format-labels";
@@ -147,8 +148,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
         return;
       }
 
-      approvalsQuery.refresh();
-      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      void invalidateApprovalSurfaces(queryClient);
       if (contextTarget?.id === requestRecord.id) {
         setContextTarget(null);
       }
@@ -182,8 +182,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
         return;
       }
 
-      approvalsQuery.refresh();
-      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      void invalidateApprovalSurfaces(queryClient);
       if (contextTarget?.id === requestRecord.id) {
         setContextTarget(null);
       }
@@ -295,8 +294,7 @@ export function TimeOffApprovalsClient({ embedded = false }: { embedded?: boolea
         return;
       }
 
-      approvalsQuery.refresh();
-      void queryClient.invalidateQueries({ queryKey: ["approvals-tab-counts"] });
+      void invalidateApprovalSurfaces(queryClient);
       closeRejectPanel();
       showToast("info", t('toastRejected'));
     } catch (error) {
