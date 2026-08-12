@@ -1345,9 +1345,12 @@ export function ExpenseApprovalsClient({
                         </span>
                       </td>
                       <td>
+                        {/* expenseDate is date-only: a datetime tooltip would
+                            fabricate a local-tz time (or the previous day), so
+                            pin the title to the UTC date formatter. */}
                         <time
                           dateTime={expense.expenseDate}
-                          title={formatDateTimeTooltip(expense.expenseDate, locale)}
+                          title={formatSingleDateHuman(expense.expenseDate, locale)}
                         >
                           {formatSingleDateHuman(expense.expenseDate, locale)}
                         </time>

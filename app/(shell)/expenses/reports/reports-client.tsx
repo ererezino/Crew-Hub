@@ -11,7 +11,7 @@ import type { AppLocale } from "../../../../i18n/locales";
 import { CurrencyDisplay } from "../../../../components/ui/currency-display";
 import { useExpenseReports } from "../../../../hooks/use-expenses";
 import {
-  currentMonthKey,
+  currentMonthKeyLocal,
   formatMonthLabel,
   getExpenseCategoryLabel,
   getExpenseStatusLabel
@@ -251,7 +251,9 @@ export function ExpenseReportsClient() {
   // Dynamic key lookup for sub-component table headers
   const td = t as (key: string, params?: Record<string, unknown>) => string;
 
-  const [month, setMonth] = useState(currentMonthKey());
+  /* User's LOCAL month, not UTC — see the note in expenses-client.tsx. There
+   * is no server-side initialData seed on this page, so no gating concern. */
+  const [month, setMonth] = useState(currentMonthKeyLocal());
   const [country, setCountry] = useState("all");
   const [department, setDepartment] = useState("all");
   const [status, setStatus] = useState("all");
@@ -305,7 +307,7 @@ export function ExpenseReportsClient() {
             className="form-input numeric"
             type="month"
             value={month}
-            onChange={(event) => setMonth(event.currentTarget.value || currentMonthKey())}
+            onChange={(event) => setMonth(event.currentTarget.value || currentMonthKeyLocal())}
           />
         </label>
 
